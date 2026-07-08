@@ -55,3 +55,17 @@ class ReadingListDetailsResponse(ReadingListResponse):
     total_count: int = 0
     progress_percentage: float = 0.0
     items: List[ListItemProgressResponse] = []
+
+import enum
+class TVImportType(str, enum.Enum):
+    SERIES = "series"
+    SEASON = "season"
+    EPISODE = "episode"
+
+class TVImportRequest(BaseModel):
+    series_id: int
+    import_type: TVImportType
+    season_number: Optional[int] = None
+    episode_number: Optional[int] = None
+    starting_order_index: int = 0
+

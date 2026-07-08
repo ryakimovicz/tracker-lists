@@ -7,9 +7,10 @@ from app.core.database import get_db
 from app.api.deps import get_current_user, get_current_user_optional
 from app.models.user import User
 from app.models.list import ReadingList, VisibilityEnum
-from app.models.list_item import ListItem
+from app.models.list_item import ListItem, ItemTypeEnum
 from app.models.saved_list import SavedList
 from app.models.item_progress import ItemProgress
+from app.services.tmdb import TMDBService
 from app.schemas.list import (
     ReadingListCreate,
     ReadingListUpdate,
@@ -17,7 +18,9 @@ from app.schemas.list import (
     ReadingListDetailsResponse,
     ListItemCreate,
     ListItemResponse,
-    ListItemProgressResponse
+    ListItemProgressResponse,
+    TVImportRequest,
+    TVImportType
 )
 
 router = APIRouter()
@@ -348,3 +351,114 @@ def lookup_item_lists(
         ReadingList.visibility == VisibilityEnum.PUBLIC
     ).all()
     return lists
+
+# 12. Bulk TV Import (Series, Season, Episode)
+@router.post("/{list_id}/items/tv-import", response_model=List[ListItemResponse], status_code=status.HTTP_201_CREATED)
+def import_tv_items(
+    list_id: int,
+    import_req: TVImportRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    reading_list = db.query(ReadingList).filter(ReadingList.id == list_id).first()
+    if not reading_list:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="List not found")
+        
+    if reading_list.creator_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the creator can edit this list"
+        )
+        
+    created_items = []
+    order_idx = import_req.starting_order_index
+    
+    if import_req.import_type == TVImportType.SERIES:
+        series = TMDBService.get_series_detail(import_req.series_id)
+        if not series:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Series not found in TMDB")
+            
+        poster = series.get("poster_path")
+        image_url = f"https://image.tmdb.org/t/p/w185{poster}" if poster else None
+        
+        item = ListItem(
+            list_id=list_id,
+            order_index=order_idx,
+            item_type=ItemTypeEnum.SERIES,
+            external_id=str(import_req.series_id),
+            title=series.get("name") or "Untitled Series",
+            image_url=image_url,
+            custom_notes=f"Serie Completa: {series.get('name')}",
+            section="Series"
+        )
+        db.add(item)
+        created_items.append(item)
+        
+    elif import_req.import_type == TVImportType.SEASON:
+        if import_req.season_number is None:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="season_number is required for season imports")
+            
+        series = TMDBService.get_series_detail(import_req.series_id)
+        series_name = series.get("name") if series else "Series"
+        
+        episodes = TMDBService.get_season_episodes(import_req.series_id, import_req.season_number)
+        if not episodes:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No episodes found for this season in TMDB")
+            
+        for ep in episodes:
+            ep_num = ep.get("episode_number")
+            ep_name = ep.get("name") or "Untitled Episode"
+            title = f"{series_name} - S{import_req.season_number:02d}E{ep_num:02d} - {ep_name}"
+            
+            still = ep.get("still_path")
+            image_url = f"https://image.tmdb.org/t/p/w185{still}" if still else None
+            
+            item = ListItem(
+                list_id=list_id,
+                order_index=order_idx,
+                item_type=ItemTypeEnum.SERIES,
+                external_id=f"tmdb-ep-{ep.get('id')}",
+                title=title,
+                image_url=image_url,
+                custom_notes=ep.get("overview"),
+                section=f"Season {import_req.season_number}"
+            )
+            db.add(item)
+            created_items.append(item)
+            order_idx += 1
+            
+    elif import_req.import_type == TVImportType.EPISODE:
+        if import_req.season_number is None or import_req.episode_number is None:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="season_number and episode_number are required for episode imports")
+            
+        series = TMDBService.get_series_detail(import_req.series_id)
+        series_name = series.get("name") if series else "Series"
+        
+        ep = TMDBService.get_episode_detail(import_req.series_id, import_req.season_number, import_req.episode_number)
+        if not ep:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Episode not found in TMDB")
+            
+        ep_name = ep.get("name") or "Untitled Episode"
+        title = f"{series_name} - S{import_req.season_number:02d}E{import_req.episode_number:02d} - {ep_name}"
+        
+        still = ep.get("still_path")
+        image_url = f"https://image.tmdb.org/t/p/w185{still}" if still else None
+        
+        item = ListItem(
+            list_id=list_id,
+            order_index=order_idx,
+            item_type=ItemTypeEnum.SERIES,
+            external_id=f"tmdb-ep-{ep.get('id')}",
+            title=title,
+            image_url=image_url,
+            custom_notes=ep.get("overview"),
+            section=f"Season {import_req.season_number}"
+        )
+        db.add(item)
+        created_items.append(item)
+        
+    db.commit()
+    for item in created_items:
+        db.refresh(item)
+    return created_items
+
