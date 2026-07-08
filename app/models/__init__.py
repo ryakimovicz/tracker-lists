@@ -5,6 +5,8 @@ from app.models.list import ReadingList, VisibilityEnum
 from app.models.list_item import ListItem, ItemTypeEnum
 from app.models.saved_list import SavedList
 from app.models.item_progress import ItemProgress
+from app.models.library import UserLibraryItem, UserLibraryStatusEnum
+from app.models.social import ListVote, ListReport, Comment, CommentVote, CommentReport, Follow
 
 __all__ = [
     "Base",
@@ -15,4 +17,12 @@ __all__ = [
     "ItemTypeEnum",
     "SavedList",
     "ItemProgress",
+    "UserLibraryItem",
+    "UserLibraryStatusEnum",
+    "ListVote",
+    "ListReport",
+    "Comment",
+    "CommentVote",
+    "CommentReport",
+    "Follow"
 ]

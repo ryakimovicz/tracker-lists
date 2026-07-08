@@ -23,3 +23,5 @@ class ReadingList(Base):
     creator = relationship("User", back_populates="lists")
     items = relationship("ListItem", back_populates="reading_list", cascade="all, delete-orphan", order_by="ListItem.order_index")
     saved_by_users = relationship("SavedList", back_populates="reading_list", cascade="all, delete-orphan")
+    comments = relationship("Comment", back_populates="reading_list", cascade="all, delete-orphan")
+    votes = relationship("ListVote", backref="reading_list", cascade="all, delete-orphan")
