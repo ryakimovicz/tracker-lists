@@ -110,6 +110,17 @@ def run_tests():
         print(f" - Progress: {progress_percentage_updated:.2f}%")
         assert completed_items_updated == 2, "Completed items count should remain 2"
         assert progress_percentage_updated == 50.0, "Progress should drop to 50% after new item is added"
+        print("\n=== Test 6: Database local searches (Users & Lists) ===")
+        search_list_results = db.query(ReadingList).filter(
+            ReadingList.visibility == VisibilityEnum.PUBLIC,
+            (ReadingList.title.like("%Batman%") | ReadingList.description.like("%Batman%"))
+        ).all()
+        print(f"List search for 'Batman' found: {len(search_list_results)} lists")
+        assert len(search_list_results) == 1, "Should find 1 list with 'Batman'"
+        
+        search_user_results = db.query(User).filter(User.username.like("%ro%")).all()
+        print(f"User search for 'ro' found: {len(search_user_results)} users ({[u.username for u in search_user_results]})")
+        assert len(search_user_results) == 2, "Should find 2 users containing 'ro' ('coro' and 'roman')"
         
         print("\nSUCCESS: All DB logic tests passed!")
         

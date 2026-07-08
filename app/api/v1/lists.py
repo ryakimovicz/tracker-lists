@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -461,4 +461,18 @@ def import_tv_items(
     for item in created_items:
         db.refresh(item)
     return created_items
+
+# 13. Search Lists in Database
+@router.get("/db/search", response_model=List[ReadingListResponse])
+def search_lists_in_db(
+    q: str = Query(..., min_length=1, description="List title or description search query"),
+    db: Session = Depends(get_db)
+):
+    search_pattern = f"%{q.lower()}%"
+    lists = db.query(ReadingList).filter(
+        ReadingList.visibility == VisibilityEnum.PUBLIC,
+        (ReadingList.title.like(search_pattern) | ReadingList.description.like(search_pattern))
+    ).all()
+    return lists
+
 
