@@ -31,5 +31,9 @@ class Settings(BaseSettings):
     BACKEND_CORS_ORIGINS: Annotated[
         List[str], BeforeValidator(assemble_cors_origins)
     ] = []
+    
+    # External APIs
+    COMIC_VINE_API_KEY: str = ""
+
 
 settings = Settings()
