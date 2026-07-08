@@ -122,6 +122,31 @@ def run_tests():
         print(f"User search for 'ro' found: {len(search_user_results)} users ({[u.username for u in search_user_results]})")
         assert len(search_user_results) == 2, "Should find 2 users containing 'ro' ('coro' and 'roman')"
         
+        print("\n=== Test 7: Item editing and reordering ===")
+        item1.title = "Batman Year One - Ultimate Edition"
+        item1.order_index = 10
+        item1.custom_notes = "Updated notes"
+        db.commit()
+        
+        db.refresh(item1)
+        print(f"Updated item details:")
+        print(f" - Title: {item1.title}")
+        print(f" - Order Index: {item1.order_index}")
+        print(f" - Notes: {item1.custom_notes}")
+        assert item1.title == "Batman Year One - Ultimate Edition"
+        assert item1.order_index == 10
+        assert item1.custom_notes == "Updated notes"
+        
+        print("\n=== Test 8: Dashboard details retrieval ===")
+        user2_created = db.query(ReadingList).filter(ReadingList.creator_id == user2.id).all()
+        user2_saved = db.query(ReadingList).join(SavedList, SavedList.list_id == ReadingList.id).filter(SavedList.user_id == user2.id).all()
+        print(f"User '{user2.username}' dashboard:")
+        print(f" - Created lists: {len(user2_created)}")
+        print(f" - Saved lists: {len(user2_saved)} (Title: '{user2_saved[0].title}')")
+        assert len(user2_created) == 0
+        assert len(user2_saved) == 1
+        assert user2_saved[0].title == "Batman Reading Order"
+        
         print("\nSUCCESS: All DB logic tests passed!")
         
     finally:

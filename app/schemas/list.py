@@ -16,6 +16,12 @@ class ListItemBase(BaseModel):
 class ListItemCreate(ListItemBase):
     pass
 
+class ListItemUpdate(BaseModel):
+    title: Optional[str] = None
+    custom_notes: Optional[str] = None
+    section: Optional[str] = None
+    order_index: Optional[int] = None
+
 class ListItemResponse(ListItemBase):
     id: int
     list_id: int

@@ -17,6 +17,7 @@ from app.schemas.list import (
     ReadingListResponse,
     ReadingListDetailsResponse,
     ListItemCreate,
+    ListItemUpdate,
     ListItemResponse,
     ListItemProgressResponse,
     TVImportRequest,
@@ -466,13 +467,47 @@ def import_tv_items(
 @router.get("/db/search", response_model=List[ReadingListResponse])
 def search_lists_in_db(
     q: str = Query(..., min_length=1, description="List title or description search query"),
+    skip: int = 0,
+    limit: int = 20,
     db: Session = Depends(get_db)
 ):
     search_pattern = f"%{q.lower()}%"
     lists = db.query(ReadingList).filter(
         ReadingList.visibility == VisibilityEnum.PUBLIC,
         (ReadingList.title.like(search_pattern) | ReadingList.description.like(search_pattern))
-    ).all()
+    ).offset(skip).limit(limit).all()
     return lists
+
+# 14. Update item inside list (customization / reordering)
+@router.put("/{list_id}/items/{item_id}", response_model=ListItemResponse)
+def update_list_item(
+    list_id: int,
+    item_id: int,
+    item_in: ListItemUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    reading_list = db.query(ReadingList).filter(ReadingList.id == list_id).first()
+    if not reading_list:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="List not found")
+        
+    if reading_list.creator_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the creator can modify items in this list"
+        )
+        
+    item = db.query(ListItem).filter(ListItem.id == item_id, ListItem.list_id == list_id).first()
+    if not item:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found in this list")
+        
+    update_data = item_in.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(item, field, value)
+        
+    db.commit()
+    db.refresh(item)
+    return item
+
 
 

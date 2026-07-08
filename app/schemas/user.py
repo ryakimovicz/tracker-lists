@@ -21,3 +21,17 @@ class Token(BaseModel):
 
 class TokenData(BaseModel):
     user_id: int | None = None
+
+from typing import List
+from app.schemas.list import ReadingListResponse
+
+class UserDashboardResponse(BaseModel):
+    id: int
+    username: str
+    email: EmailStr
+    created_at: datetime
+    created_lists: List[ReadingListResponse] = []
+    saved_lists: List[ReadingListResponse] = []
+
+    class Config:
+        from_attributes = True
