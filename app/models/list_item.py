@@ -9,6 +9,7 @@ class ItemTypeEnum(str, enum.Enum):
     BOOK = "book"
     MOVIE = "movie"
     SERIES = "series"
+    GAME = "game"
     CUSTOM = "custom"
 
 class ListItem(Base):

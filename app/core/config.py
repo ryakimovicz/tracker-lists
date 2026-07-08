@@ -35,6 +35,7 @@ class Settings(BaseSettings):
     # External APIs
     COMIC_VINE_API_KEY: str = ""
     TMDB_API_KEY: str = ""
+    RAWG_API_KEY: str = ""
 
 
 settings = Settings()
