@@ -43,14 +43,16 @@ def run_tests():
         db.commit()
         
         # Add 3 items to the list
-        item1 = ListItem(list_id=new_list.id, order_index=1, item_type=ItemTypeEnum.COMIC, external_id="cv-101", title="Batman Year One")
-        item2 = ListItem(list_id=new_list.id, order_index=2, item_type=ItemTypeEnum.COMIC, external_id="cv-102", title="Batman The Long Halloween")
-        item3 = ListItem(list_id=new_list.id, order_index=3, item_type=ItemTypeEnum.COMIC, external_id="cv-103", title="Batman Dark Victory")
+        item1 = ListItem(list_id=new_list.id, order_index=1, item_type=ItemTypeEnum.COMIC, external_id="cv-101", title="Batman Year One", section="Parte 1: El Origen")
+        item2 = ListItem(list_id=new_list.id, order_index=2, item_type=ItemTypeEnum.COMIC, external_id="cv-102", title="Batman The Long Halloween", section="Parte 2: Crossovers")
+        item3 = ListItem(list_id=new_list.id, order_index=3, item_type=ItemTypeEnum.COMIC, external_id="cv-103", title="Batman Dark Victory", section="Parte 2: Crossovers")
         db.add_all([item1, item2, item3])
         db.commit()
         print(f"List '{new_list.title}' created with {len(new_list.items)} items.")
         for item in new_list.items:
-            print(f" - [{item.order_index}] {item.title} (Type: {item.item_type})")
+            print(f" - [{item.order_index}] {item.title} (Section: {item.section}, Type: {item.item_type})")
+            if item.id == item1.id:
+                assert item.section == "Parte 1: El Origen", "Section not saved correctly"
             
         print("\n=== Test 3: User 2 saves/follows User 1's list ===")
         saved_list = SavedList(user_id=user2.id, list_id=new_list.id)

@@ -11,6 +11,7 @@ class ListItemBase(BaseModel):
     title: str = Field(..., min_length=1, max_length=250)
     image_url: Optional[str] = None
     custom_notes: Optional[str] = None
+    section: Optional[str] = None
 
 class ListItemCreate(ListItemBase):
     pass

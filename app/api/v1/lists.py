@@ -115,6 +115,7 @@ def get_list_details(
                 title=item.title,
                 image_url=item.image_url,
                 custom_notes=item.custom_notes,
+                section=item.section,
                 is_completed=is_completed
             )
         )
@@ -210,7 +211,8 @@ def add_item_to_list(
         external_id=item_in.external_id,
         title=item_in.title,
         image_url=item_in.image_url,
-        custom_notes=item_in.custom_notes
+        custom_notes=item_in.custom_notes,
+        section=item_in.section
     )
     db.add(new_item)
     db.commit()

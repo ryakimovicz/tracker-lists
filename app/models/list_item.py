@@ -22,6 +22,7 @@ class ListItem(Base):
     title = Column(String(250), nullable=False)        # Item title
     image_url = Column(String(500), nullable=True)     # Portada/Image URL
     custom_notes = Column(Text, nullable=True)         # Personal commentary/notes
+    section = Column(String(100), nullable=True)      # Nullable section/part name (e.g., 'Parte 1: El Origen')
 
     # Relationships
     reading_list = relationship("ReadingList", back_populates="items")
