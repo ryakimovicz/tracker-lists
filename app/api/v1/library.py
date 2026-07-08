@@ -13,12 +13,48 @@ from app.services.tmdb import TMDBService
 
 router = APIRouter()
 
+def validate_media_status(item_type: str, status_val: UserLibraryStatusEnum):
+    t_lower = item_type.lower()
+    if status_val == UserLibraryStatusEnum.DROPPED:
+        return
+        
+    if t_lower == "game":
+        allowed = {UserLibraryStatusEnum.PLAN_TO_PLAY, UserLibraryStatusEnum.PLAYING, UserLibraryStatusEnum.COMPLETED}
+        if status_val not in allowed:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid status for game. Must be 'plan_to_play', 'playing', 'completed', or 'dropped'."
+            )
+    elif t_lower == "movie":
+        allowed = {UserLibraryStatusEnum.PLAN_TO_WATCH, UserLibraryStatusEnum.COMPLETED}
+        if status_val not in allowed:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid status for movie. Must be 'plan_to_watch', 'completed', or 'dropped'."
+            )
+    elif t_lower == "series":
+        allowed = {UserLibraryStatusEnum.PLAN_TO_WATCH, UserLibraryStatusEnum.WATCHING, UserLibraryStatusEnum.COMPLETED}
+        if status_val not in allowed:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid status for series. Must be 'plan_to_watch', 'watching', 'completed', or 'dropped'."
+            )
+    elif t_lower in ("comic", "manga", "book"):
+        allowed = {UserLibraryStatusEnum.PLAN_TO_READ, UserLibraryStatusEnum.READING, UserLibraryStatusEnum.READ}
+        if status_val not in allowed:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid status for book/manga/comic. Must be 'plan_to_read', 'reading', 'read', or 'dropped'."
+            )
+
 @router.post("/", response_model=LibraryItemResponse, status_code=status.HTTP_201_CREATED)
 def add_to_library(
     item_in: LibraryItemCreate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    validate_media_status(item_in.item_type, item_in.status)
+
     # Check if already exists in library
     existing = db.query(UserLibraryItem).filter(
         UserLibraryItem.user_id == current_user.id,
@@ -120,6 +156,7 @@ def update_library_item(
             detail="Library item not found"
         )
         
+    validate_media_status(lib_item.item_type, item_in.status)
     lib_item.status = item_in.status
     db.commit()
     db.refresh(lib_item)

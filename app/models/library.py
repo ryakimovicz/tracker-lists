@@ -11,6 +11,8 @@ class UserLibraryStatusEnum(str, enum.Enum):
     PLAN_TO_READ = "plan_to_read"
     READING = "reading"
     READ = "read"
+    PLAN_TO_PLAY = "plan_to_play"
+    PLAYING = "playing"
 
 class UserLibraryItem(Base):
     __tablename__ = "user_library_items"
