@@ -21,7 +21,8 @@ from app.schemas.list import (
     ListItemResponse,
     ListItemProgressResponse,
     TVImportRequest,
-    TVImportType
+    TVImportType,
+    SectionBulkActionRequest
 )
 
 router = APIRouter()
@@ -102,12 +103,18 @@ def get_list_details(
             ItemProgress.user_id == current_user.id,
             ItemProgress.list_item_id.in_(item_ids)
         ).all()
-        progress_map = {p.list_item_id: p.is_completed for p in progress_records}
+        progress_map = {p.list_item_id: (p.is_completed, p.is_skipped) for p in progress_records}
+
+    completed_count = 0
+    skipped_count = 0
+    items_response = []
 
     for item in items:
-        is_completed = progress_map.get(item.id, False)
+        is_completed, is_skipped = progress_map.get(item.id, (False, False))
         if is_completed:
             completed_count += 1
+        if is_skipped:
+            skipped_count += 1
             
         items_response.append(
             ListItemProgressResponse(
@@ -120,13 +127,16 @@ def get_list_details(
                 image_url=item.image_url,
                 custom_notes=item.custom_notes,
                 section=item.section,
-                is_completed=is_completed
+                is_completed=is_completed,
+                is_skipped=is_skipped
             )
         )
 
     progress_percentage = 0.0
+    skipped_percentage = 0.0
     if total_count > 0:
         progress_percentage = (completed_count / total_count) * 100.0
+        skipped_percentage = (skipped_count / total_count) * 100.0
 
     return ReadingListDetailsResponse(
         id=reading_list.id,
@@ -138,8 +148,10 @@ def get_list_details(
         creator_username=creator_username,
         is_saved_by_me=is_saved_by_me,
         completed_count=completed_count,
+        skipped_count=skipped_count,
         total_count=total_count,
         progress_percentage=round(progress_percentage, 2),
+        skipped_percentage=round(skipped_percentage, 2),
         items=items_response
     )
 
@@ -324,12 +336,15 @@ def toggle_item_progress(
     
     if progress:
         progress.is_completed = not progress.is_completed
+        if progress.is_completed:
+            progress.is_skipped = False
         progress.completed_at = datetime.now(timezone.utc) if progress.is_completed else None
     else:
         progress = ItemProgress(
             user_id=current_user.id,
             list_item_id=item_id,
             is_completed=True,
+            is_skipped=False,
             completed_at=datetime.now(timezone.utc)
         )
         db.add(progress)
@@ -508,6 +523,136 @@ def update_list_item(
     db.commit()
     db.refresh(item)
     return item
+
+# 15. Toggle Skip: Mark/unmark an item as skipped
+@router.post("/items/{item_id}/toggle-skip")
+def toggle_item_skip(
+    item_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    item = db.query(ListItem).filter(ListItem.id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="List item not found")
+        
+    reading_list = db.query(ReadingList).filter(ReadingList.id == item.list_id).first()
+    if reading_list.visibility == VisibilityEnum.PRIVATE and reading_list.creator_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Item belongs to a private list you don't access"
+        )
+        
+    progress = db.query(ItemProgress).filter(
+        ItemProgress.user_id == current_user.id,
+        ItemProgress.list_item_id == item_id
+    ).first()
+    
+    if progress:
+        progress.is_skipped = not progress.is_skipped
+        if progress.is_skipped:
+            progress.is_completed = False
+        progress.completed_at = datetime.now(timezone.utc) if progress.is_skipped else None
+    else:
+        progress = ItemProgress(
+            user_id=current_user.id,
+            list_item_id=item_id,
+            is_completed=False,
+            is_skipped=True,
+            completed_at=datetime.now(timezone.utc)
+        )
+        db.add(progress)
+        
+    db.commit()
+    return {
+        "item_id": item_id,
+        "is_skipped": progress.is_skipped,
+        "is_completed": progress.is_completed
+    }
+
+# 16. Bulk Section Action (Skip, Unskip, Complete, Reset)
+@router.post("/{list_id}/sections/bulk-action")
+def bulk_section_action(
+    list_id: int,
+    action_req: SectionBulkActionRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    reading_list = db.query(ReadingList).filter(ReadingList.id == list_id).first()
+    if not reading_list:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="List not found")
+        
+    if reading_list.visibility == VisibilityEnum.PRIVATE and reading_list.creator_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This is a private list you don't access"
+        )
+        
+    # Get all items in this list belonging to the specified section
+    items = db.query(ListItem).filter(
+        ListItem.list_id == list_id,
+        ListItem.section == action_req.section_name
+    ).all()
+    
+    if not items:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No items found in section '{action_req.section_name}' for this list"
+        )
+        
+    item_ids = [i.id for i in items]
+    
+    # Retrieve existing progress records
+    existing_records = db.query(ItemProgress).filter(
+        ItemProgress.user_id == current_user.id,
+        ItemProgress.list_item_id.in_(item_ids)
+    ).all()
+    
+    records_map = {r.list_item_id: r for r in existing_records}
+    
+    action = action_req.action.lower()
+    
+    for item_id in item_ids:
+        rec = records_map.get(item_id)
+        if action == "skip":
+            if rec:
+                rec.is_skipped = True
+                rec.is_completed = False
+                rec.completed_at = datetime.now(timezone.utc)
+            else:
+                new_rec = ItemProgress(
+                    user_id=current_user.id,
+                    list_item_id=item_id,
+                    is_completed=False,
+                    is_skipped=True,
+                    completed_at=datetime.now(timezone.utc)
+                )
+                db.add(new_rec)
+        elif action == "unskip":
+            if rec:
+                rec.is_skipped = False
+                rec.completed_at = None
+        elif action == "complete":
+            if rec:
+                rec.is_completed = True
+                rec.is_skipped = False
+                rec.completed_at = datetime.now(timezone.utc)
+            else:
+                new_rec = ItemProgress(
+                    user_id=current_user.id,
+                    list_item_id=item_id,
+                    is_completed=True,
+                    is_skipped=False,
+                    completed_at=datetime.now(timezone.utc)
+                )
+                db.add(new_rec)
+        elif action == "uncomplete":
+            if rec:
+                rec.is_completed = False
+                rec.completed_at = None
+                
+    db.commit()
+    return {"message": f"Section '{action_req.section_name}' items updated successfully with action '{action}'"}
+
 
 
 

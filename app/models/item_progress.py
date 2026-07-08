@@ -11,6 +11,7 @@ class ItemProgress(Base):
     list_item_id = Column(Integer, ForeignKey("list_items.id", ondelete="CASCADE"), nullable=False)
     is_completed = Column(Boolean, default=False, nullable=False)
     completed_at = Column(DateTime(timezone=True), nullable=True)
+    is_skipped = Column(Boolean, default=False, nullable=False)
 
     # Relationships
     user = relationship("User", back_populates="progress_records")

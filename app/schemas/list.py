@@ -31,6 +31,7 @@ class ListItemResponse(ListItemBase):
 
 class ListItemProgressResponse(ListItemResponse):
     is_completed: bool = False
+    is_skipped: bool = False
 
 # Reading List schemas
 class ReadingListBase(BaseModel):
@@ -58,8 +59,10 @@ class ReadingListDetailsResponse(ReadingListResponse):
     creator_username: str
     is_saved_by_me: bool = False
     completed_count: int = 0
+    skipped_count: int = 0
     total_count: int = 0
     progress_percentage: float = 0.0
+    skipped_percentage: float = 0.0
     items: List[ListItemProgressResponse] = []
 
 import enum
@@ -74,4 +77,8 @@ class TVImportRequest(BaseModel):
     season_number: Optional[int] = None
     episode_number: Optional[int] = None
     starting_order_index: int = 0
+
+class SectionBulkActionRequest(BaseModel):
+    section_name: str
+    action: str # "skip", "unskip", "complete", "uncomplete"
 

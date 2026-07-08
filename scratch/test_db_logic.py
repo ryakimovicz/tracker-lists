@@ -147,6 +147,35 @@ def run_tests():
         assert len(user2_saved) == 1
         assert user2_saved[0].title == "Batman Reading Order"
         
+        print("\n=== Test 9: Skipping Items and Section Metrics ===")
+        progress3 = db.query(ItemProgress).filter(
+            ItemProgress.user_id == user2.id,
+            ItemProgress.list_item_id == item3.id
+        ).first()
+        if progress3:
+            progress3.is_skipped = True
+            progress3.is_completed = False
+        else:
+            progress3 = ItemProgress(user_id=user2.id, list_item_id=item3.id, is_skipped=True, is_completed=False)
+            db.add(progress3)
+        db.commit()
+        
+        items_list = db.query(ListItem).filter(ListItem.list_id == new_list.id).all()
+        tot_count = len(items_list)
+        progress_recs = db.query(ItemProgress).filter(
+            ItemProgress.user_id == user2.id,
+            ItemProgress.list_item_id.in_([i.id for i in items_list])
+        ).all()
+        
+        comp_count = sum(1 for p in progress_recs if p.is_completed)
+        skip_count = sum(1 for p in progress_recs if p.is_skipped)
+        
+        print(f"List progress metrics with skips:")
+        print(f" - Completed: {comp_count} of {tot_count}")
+        print(f" - Skipped: {skip_count} of {tot_count}")
+        assert comp_count == 2, "Completed count mismatch"
+        assert skip_count == 1, "Skipped count mismatch"
+        
         print("\nSUCCESS: All DB logic tests passed!")
         
     finally:

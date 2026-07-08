@@ -70,20 +70,20 @@ def get_user_up_next(
     guides_up_next = []
     personal_up_next = []
     
-    # Pre-fetch completed item ids for the user
-    completed_item_ids = {
+    # Pre-fetch completed or skipped item ids for the user
+    completed_or_skipped_item_ids = {
         p.list_item_id for p in 
         db.query(ItemProgress).filter(
             ItemProgress.user_id == current_user.id,
-            ItemProgress.is_completed == True
+            (ItemProgress.is_completed == True) | (ItemProgress.is_skipped == True)
         ).all()
     }
     
     for rlist in all_user_lists:
-        # Find the first item in the list that is NOT completed
+        # Find the first item in the list that is NOT completed or skipped
         first_uncompleted = None
         for item in rlist.items:
-            if item.id not in completed_item_ids:
+            if item.id not in completed_or_skipped_item_ids:
                 first_uncompleted = item
                 break
                 
