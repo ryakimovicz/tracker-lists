@@ -23,6 +23,10 @@ class ListReport(Base):
     reason = Column(String(500), nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
+    # Relationships
+    user = relationship("User")
+    reading_list = relationship("ReadingList")
+
 class Comment(Base):
     __tablename__ = "comments"
 
@@ -56,6 +60,10 @@ class CommentReport(Base):
     comment_id = Column(Integer, ForeignKey("comments.id", ondelete="CASCADE"), nullable=False)
     reason = Column(String(500), nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    # Relationships
+    user = relationship("User")
+    comment = relationship("Comment")
 
 class Follow(Base):
     __tablename__ = "follows"

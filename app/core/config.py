@@ -36,6 +36,13 @@ class Settings(BaseSettings):
     COMIC_VINE_API_KEY: str = ""
     TMDB_API_KEY: str = ""
     RAWG_API_KEY: str = ""
-
+    
+    # SMTP Email Settings
+    SMTP_TLS: bool = True
+    SMTP_PORT: int = 587
+    SMTP_HOST: str = ""
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    EMAILS_FROM_EMAIL: str = "noreply@trackerlists.com"
 
 settings = Settings()

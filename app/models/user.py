@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import Column, Integer, String, DateTime
+from sqlalchemy import Column, Integer, String, DateTime, Boolean
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 
@@ -14,6 +14,7 @@ class User(Base):
     reset_token = Column(String(250), nullable=True)
     reset_token_expires = Column(DateTime(timezone=True), nullable=True)
     refresh_token = Column(String(250), nullable=True)
+    is_admin = Column(Boolean, default=False, nullable=False)
 
     # Relationships
     lists = relationship("ReadingList", back_populates="creator", cascade="all, delete-orphan")

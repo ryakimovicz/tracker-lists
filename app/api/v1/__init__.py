@@ -7,6 +7,7 @@ from app.api.v1.library import router as library_router
 from app.api.v1.social import router as social_router
 from app.api.v1.reviews import router as reviews_router
 from app.api.v1.additions import router as additions_router
+from app.api.v1.admin import router as admin_router
 
 api_router = APIRouter()
 
@@ -18,4 +19,5 @@ api_router.include_router(library_router, prefix="/library", tags=["library"])
 api_router.include_router(social_router, prefix="/social", tags=["social"])
 api_router.include_router(reviews_router, prefix="/reviews", tags=["reviews"])
 api_router.include_router(additions_router, prefix="/additions", tags=["additions"])
+api_router.include_router(admin_router, prefix="/admin", tags=["admin"])
 

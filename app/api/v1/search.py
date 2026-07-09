@@ -1,16 +1,19 @@
 from typing import List
-from fastapi import APIRouter, Query, HTTPException, status
+from fastapi import APIRouter, Query, HTTPException, status, Request
 from app.services.base import SearchResultItem
 from app.services.mangadex import MangaDexService
 from app.services.comicvine import ComicVineService
 from app.services.tmdb import TMDBService
 from app.services.googlebooks import GoogleBooksService
 from app.services.rawg import RAWGService
+from app.core.limiter import limiter
 
 router = APIRouter()
 
 @router.get("/", response_model=List[SearchResultItem])
+@limiter.limit("20/minute")
 def search_media(
+    request: Request,
     q: str = Query(..., min_length=1, description="The search query term"),
     type: str = Query(..., description="The media type: 'comic', 'manga', 'book', 'game', 'movie' or 'series'")
 ):

@@ -1,9 +1,11 @@
 import secrets
 from datetime import datetime, timezone, timedelta
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Response, Cookie
+from fastapi import APIRouter, Depends, HTTPException, status, Response, Cookie, BackgroundTasks
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
+import smtplib
+from email.mime.text import MIMEText
 
 from app.core.config import settings
 from app.core.database import get_db
@@ -13,6 +15,38 @@ from app.schemas.user import UserCreate, UserResponse, Token
 from app.schemas.auth import ForgotPasswordRequest, ResetPasswordRequest, GoogleLoginRequest
 
 router = APIRouter()
+
+def send_reset_email(to_email: str, username: str, token: str):
+    # Print local fallback simulation for developer logs
+    reset_link = f"http://localhost:5173/reset-password?token={token}"
+    print("\n" + "="*50)
+    print("SIMULATED RESET PASSWORD EMAIL SEND")
+    print(f"To: {to_email}")
+    print(f"Token: {token}")
+    print(f"Reset URL: {reset_link}")
+    print("="*50 + "\n")
+
+    if not settings.SMTP_HOST or not settings.SMTP_USER or not settings.SMTP_PASSWORD:
+        print(f"[SMTP Warning] SMTP credentials not set. Skipping real email dispatch to {to_email}")
+        return
+        
+    try:
+        msg_content = f"Hello {username},\n\nYou requested a password reset. Click the link below to reset your password:\n{reset_link}\n\nThis link is valid for 1 hour."
+        
+        msg = MIMEText(msg_content)
+        msg['Subject'] = "Reset your Password - Tracker Lists"
+        msg['From'] = settings.EMAILS_FROM_EMAIL
+        msg['To'] = to_email
+        
+        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
+            if settings.SMTP_TLS:
+                server.starttls()
+            server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+            server.sendmail(settings.EMAILS_FROM_EMAIL, [to_email], msg.as_string())
+            
+        print(f"[SMTP Success] Password reset email sent to {to_email}")
+    except Exception as e:
+        print(f"[SMTP Error] Failed to send password reset email: {str(e)}")
 
 # Helper to set cookie
 def set_refresh_cookie(response: Response, refresh_token: str):
@@ -216,6 +250,7 @@ def google_auth(
 @router.post("/forgot-password")
 def forgot_password(
     payload: ForgotPasswordRequest,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
 ):
     user = db.query(User).filter(User.email == payload.email).first()
@@ -228,13 +263,8 @@ def forgot_password(
     user.reset_token_expires = datetime.now(timezone.utc) + timedelta(hours=1)
     db.commit()
     
-    # Local simulated log print for developer testing
-    print("\n" + "="*50)
-    print("SIMULATED RESET PASSWORD EMAIL SEND")
-    print(f"To: {user.email}")
-    print(f"Token: {token}")
-    print(f"Reset URL: http://localhost:5173/reset-password?token={token}")
-    print("="*50 + "\n")
+    # Asynchronously dispatch reset email via BackgroundTasks
+    background_tasks.add_task(send_reset_email, user.email, user.username, token)
     
     return {"message": "If the email is registered, a password reset link has been generated."}
 
