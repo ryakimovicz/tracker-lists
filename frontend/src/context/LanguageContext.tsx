@@ -88,6 +88,17 @@ const translations: Translations = {
   mediaComic: { en: 'Comics', es: 'Cómics' },
   mediaManga: { en: 'Manga', es: 'Mangas' },
 
+  // Search Page
+  searchTitle: { en: 'Explore Media Database', es: 'Explorar Base de Datos' },
+  searchPlaceholder: { en: 'Search games, movies, series, books, anime, manga...', es: 'Buscar juegos, películas, series, libros, anime, manga...' },
+  searchButton: { en: 'Search', es: 'Buscar' },
+  searchNoResults: { en: 'No results found.', es: 'No se encontraron resultados.' },
+  searchAddShelf: { en: 'Add to Shelf', es: 'Añadir a Estantería' },
+  searchSelectStatus: { en: 'Select Status', es: 'Seleccionar Estado' },
+  searchItemAdded: { en: 'Item added to your shelf!', es: '¡Elemento añadido a tu estantería!' },
+  errRateLimit: { en: 'Too many search requests. Please wait a minute.', es: 'Demasiadas búsquedas. Por favor espera un minuto.' },
+  errSearchFailed: { en: 'Search failed. Please try again.', es: 'Error al realizar la búsqueda. Inténtalo de nuevo.' },
+
   // Themes
   themeSystem: { en: 'System', es: 'Sistema' },
   themeLight: { en: 'Light', es: 'Claro' },
