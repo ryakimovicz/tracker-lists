@@ -28,6 +28,7 @@ interface UserProfile {
   email: string;
   photo_url: string;
   is_admin: boolean;
+  created_at: string;
   created_lists: any[];
   saved_lists: any[];
 }
@@ -45,6 +46,14 @@ export const Profile: React.FC = () => {
 
   // Favorites state (local highlight mock for UX polish)
   const [favorites, setFavorites] = useState<LibraryItem[]>([]);
+
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString(language === 'es' ? 'es-ES' : 'en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
 
   useEffect(() => {
     fetchProfileAndLibrary();
@@ -165,7 +174,7 @@ export const Profile: React.FC = () => {
               )}
             </div>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', margin: '0 0 0.8rem 0', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <Calendar size={16} /> {language === 'es' ? 'Miembro desde' : 'Joined'} {new Date().toLocaleDateString()}
+              <Calendar size={16} /> {language === 'es' ? 'Miembro desde' : 'Joined'} {formatDate(new Date(profile.created_at))}
             </p>
             <div style={{ display: 'flex', gap: '1.5rem', fontSize: '0.9rem' }}>
               <span><strong>0</strong> {language === 'es' ? 'Seguidores' : 'Followers'}</span>
@@ -417,7 +426,9 @@ export const Profile: React.FC = () => {
             <CheckCircle size={16} color="#10b981" />
             <div>
               <span>{language === 'es' ? 'Creaste tu cuenta de TrackerLists.' : 'Created your TrackerLists account.'}</span>
-              <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginLeft: '1rem' }}>{new Date().toLocaleDateString()}</span>
+              <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginLeft: '1rem' }}>
+                {profile ? formatDate(new Date(profile.created_at)) : formatDate(new Date())}
+              </span>
             </div>
           </div>
         </div>
