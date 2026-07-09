@@ -16,7 +16,7 @@ export const Landing: React.FC = () => {
           {t('heroSubtitle')}
         </p>
         <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', marginTop: '1rem' }}>
-          <Link to="/" className="btn-primary" style={{ textDecoration: 'none' }}>
+          <Link to="/login" className="btn-primary" style={{ textDecoration: 'none' }}>
             {t('btnStartCollection')} <Flame size={18} />
           </Link>
           <Link to="/recommended" className="btn-secondary" style={{ textDecoration: 'none' }}>
