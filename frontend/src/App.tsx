@@ -10,10 +10,12 @@ import { Search } from './pages/Search';
 import { AdminPanel } from './pages/AdminPanel';
 
 import { LanguageProvider } from './context/LanguageContext';
+import { ThemeProvider } from './context/ThemeContext';
 
 function App() {
   return (
-    <LanguageProvider>
+    <ThemeProvider>
+      <LanguageProvider>
       <AuthProvider>
         <Router>
           <div className="app-container">
@@ -56,7 +58,8 @@ function App() {
         </div>
       </Router>
       </AuthProvider>
-    </LanguageProvider>
+      </LanguageProvider>
+    </ThemeProvider>
   );
 }
 

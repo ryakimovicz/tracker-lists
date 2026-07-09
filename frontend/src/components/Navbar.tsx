@@ -1,11 +1,14 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../context/LanguageContext';
-import { LogOut, Search, List, Shield, Bookmark, Globe } from 'lucide-react';
+import { useTheme } from '../context/ThemeContext';
+import type { Theme } from '../context/ThemeContext';
+import { LogOut, Search, List, Shield, Bookmark, Globe, Sun, Moon, Monitor } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
   const { user, isAuthenticated, logout } = useAuth();
   const { language, setLanguage, t } = useTranslation();
+  const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
 
   const handleLogout = async () => {
@@ -15,6 +18,18 @@ export const Navbar: React.FC = () => {
 
   const toggleLanguage = () => {
     setLanguage(language === 'en' ? 'es' : 'en');
+  };
+
+  const cycleTheme = () => {
+    const sequence: Theme[] = ['system', 'light', 'dark'];
+    const nextIndex = (sequence.indexOf(theme) + 1) % sequence.length;
+    setTheme(sequence[nextIndex]);
+  };
+
+  const getThemeIcon = () => {
+    if (theme === 'light') return <Sun size={16} />;
+    if (theme === 'dark') return <Moon size={16} />;
+    return <Monitor size={16} />;
   };
 
   return (
@@ -78,6 +93,24 @@ export const Navbar: React.FC = () => {
         >
           <Globe size={16} />
           <span>{language.toUpperCase()}</span>
+        </button>
+
+        {/* Theme Toggle Button */}
+        <button
+          onClick={cycleTheme}
+          className="btn-secondary"
+          style={{
+            padding: '0.4rem 0.8rem',
+            fontSize: '0.85rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.4rem',
+            background: 'transparent'
+          }}
+          title={`Theme: ${theme}`}
+        >
+          {getThemeIcon()}
+          <span style={{ textTransform: 'capitalize' }}>{theme}</span>
         </button>
 
         {isAuthenticated && user ? (
