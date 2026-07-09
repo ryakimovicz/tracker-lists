@@ -65,6 +65,18 @@ const translations: Translations = {
   authPasswordPlaceholder: { en: 'enter your password', es: 'ingresa tu contraseña' },
   authUsernamePlaceholder: { en: 'choose a username', es: 'elige un nombre de usuario' },
 
+  // Auth Errors & Alerts
+  errUsernameTaken: { en: 'Username already registered', es: 'El nombre de usuario ya está registrado' },
+  errEmailTaken: { en: 'Email already registered', es: 'El correo electrónico ya está registrado' },
+  errRegistrationFailed: { en: 'Registration failed. Username or email might be already taken.', es: 'Error al registrarse. El nombre de usuario o correo podrían estar ya en uso.' },
+  errLoginFailed: { en: 'Invalid username/email or password.', es: 'Usuario/correo o contraseña incorrectos.' },
+  errPasswordLength: { en: 'Password must be at least 6 characters long.', es: 'La contraseña debe tener al menos 6 caracteres.' },
+  errUsernameLength: { en: 'Username must be at least 3 characters long.', es: 'El nombre de usuario debe tener al menos 3 caracteres.' },
+  errPasswordsNotMatch: { en: 'Passwords do not match.', es: 'Las contraseñas no coinciden.' },
+  errResetTokenMissing: { en: 'Reset token is missing or invalid.', es: 'El token de recuperación falta o no es válido.' },
+  errForgotPasswordFailed: { en: 'Failed to request password reset.', es: 'No se pudo solicitar el restablecimiento de contraseña.' },
+  errResetPasswordFailed: { en: 'Failed to reset password. Token may have expired.', es: 'No se pudo restablecer la contraseña. El token podría haber expirado.' },
+
   // Themes
   themeSystem: { en: 'System', es: 'Sistema' },
   themeLight: { en: 'Light', es: 'Claro' },

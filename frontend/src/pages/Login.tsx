@@ -42,9 +42,9 @@ export const Login: React.FC = () => {
 
       const { access_token } = response.data;
       await login(access_token);
-      navigate('/dashboard');
+      navigate('/profile');
     } catch (err: any) {
-      setErrorMsg(err.response?.data?.detail || 'Invalid username/email or password.');
+      setErrorMsg(t('errLoginFailed'));
     } finally {
       setIsSubmitting(false);
     }
@@ -60,9 +60,9 @@ export const Login: React.FC = () => {
       });
       const { access_token } = response.data;
       await login(access_token);
-      navigate('/dashboard');
+      navigate('/profile');
     } catch (err: any) {
-      setErrorMsg('Mock Google Login failed.');
+      setErrorMsg(t('errLoginFailed'));
     } finally {
       setIsSubmitting(false);
     }

@@ -28,11 +28,11 @@ export const Register: React.FC = () => {
     if (!username || !email || !password) return;
 
     if (username.length < 3) {
-      setErrorMsg('Username must be at least 3 characters long.');
+      setErrorMsg(t('errUsernameLength'));
       return;
     }
     if (password.length < 6) {
-      setErrorMsg('Password must be at least 6 characters long.');
+      setErrorMsg(t('errPasswordLength'));
       return;
     }
 
@@ -47,7 +47,14 @@ export const Register: React.FC = () => {
       });
       setIsSuccess(true);
     } catch (err: any) {
-      setErrorMsg(err.response?.data?.detail || 'Registration failed. Username or email might be already taken.');
+      const backendDetail = err.response?.data?.detail;
+      if (backendDetail === 'Username already registered') {
+        setErrorMsg(t('errUsernameTaken'));
+      } else if (backendDetail === 'Email already registered') {
+        setErrorMsg(t('errEmailTaken'));
+      } else {
+        setErrorMsg(t('errRegistrationFailed'));
+      }
     } finally {
       setIsSubmitting(false);
     }
