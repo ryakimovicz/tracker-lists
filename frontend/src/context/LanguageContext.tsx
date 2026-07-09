@@ -19,20 +19,20 @@ const translations: Translations = {
   navRegister: { en: 'Register', es: 'Registrarse' },
 
   // Landing Page
-  heroTitle: { en: 'Chronological Guides for Manga, Series & Games', es: 'Cronologías de Lectura, Visualización y Juegos' },
-  heroSubtitle: { en: 'Create custom chronological order lists, track episodes, adopt community modifications, and keep your personal shelf synced.', es: 'Crea tus propias guías de orden cronológico, realiza seguimientos de episodios, adopta modificaciones de la comunidad y mantén tu biblioteca personal sincronizada.' },
-  btnGoShelf: { en: 'Go to My Shelf', es: 'Ir a mi Estantería' },
-  btnGetStarted: { en: 'Get Started', es: 'Empezar Gratis' },
+  heroTitle: { en: 'Everything you love, in one place.', es: 'Todo lo que amas, en un solo lugar.' },
+  heroSubtitle: { en: 'Movies, comics, books, series, and video games. Create the ultimate guides, track your progress, and discover your next obsession together with the community.', es: 'Películas, cómics, libros, series y videojuegos. Crea las guías definitivas, haz un seguimiento de tu progreso y descubre tu próxima obsesión junto a la comunidad.' },
+  btnStartCollection: { en: 'Start My Collection', es: 'Empezar mi colección' },
+  btnExploreGuides: { en: 'Explore Guides', es: 'Explorar Guías' },
   
   // Features
-  featSearchTitle: { en: 'Unified Media Search', es: 'Buscador de Medios Unificado' },
-  featSearchDesc: { en: 'Find and manage books, manga, comics, series, movies, and video games in a single search dashboard.', es: 'Busca y gestiona libros, mangas, cómics, series de televisión, películas y videojuegos en una consola de búsqueda unificada.' },
+  featSearchTitle: { en: '🌌 Endless Universes', es: '🌌 Universos Sin Fronteras' },
+  featSearchDesc: { en: 'Want to build the chronological order of Star Wars mixing movies, comics, and video games? Here you can. Our global search connects with the largest databases in the world so you don\'t miss anything.', es: '¿Quieres armar el orden cronológico de Star Wars mezclando las películas, los cómics y los videojuegos? Aquí puedes. Nuestro buscador global se conecta con las bases de datos más grandes del mundo para que no te falte nada.' },
   
-  featModsTitle: { en: 'Community Mods', es: 'Mods de la Comunidad' },
-  featModsDesc: { en: 'Missing a special issue, light novel, or filler episode? Inject custom entries, share them, and adopt guides made by the community.', es: '¿Falta un especial, novela ligera o episodio de relleno? Añade entradas personalizadas, compártelas y adopta guías creadas por la comunidad.' },
+  featModsTitle: { en: '🛠️ Make It Yours (Community Mods)', es: '🛠️ Hazlo Tuyo (Mods de la Comunidad)' },
+  featModsDesc: { en: 'Missing an indie comic or a special episode? Add custom items to any public guide. The community will be able to vote and integrate your contributions into their own lists.', es: '¿Falta un cómic independiente o un episodio especial? Añade ítems personalizados a cualquier guía pública. La comunidad podrá votar e incorporar tus aportes a sus propias listas.' },
   
-  featShelfTitle: { en: 'Flexible Library Shelf', es: 'Estantería Flexible' },
-  featShelfDesc: { en: 'Manage consumption statuses (Reading, Playing, Skipped, Completed) with rigorous category validations and global sync.', es: 'Administra tus estados de consumo (Leyendo, Jugando, Omitido, Completado) con validaciones categóricas y sincronización de progreso global.' },
+  featShelfTitle: { en: '✅ Your Progress, Your Rules', es: '✅ Tu Progreso, Tu Reglas' },
+  featShelfDesc: { en: 'Forget about getting lost between seasons and volumes. Save community guides, check off what you have consumed, and our Up Next algorithm will tell you exactly what to follow.', es: 'Olvídate de perderte entre temporadas y volúmenes. Guarda las listas de la comunidad, marca lo que ya consumiste y nuestro algoritmo Up Next te dirá exactamente por dónde seguir.' },
 
   // Priority Levels
   priorityOptional: { en: 'Optional', es: 'Opcional' },

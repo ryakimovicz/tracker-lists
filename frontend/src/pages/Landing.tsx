@@ -18,20 +18,12 @@ export const Landing: React.FC = () => {
           {t('heroSubtitle')}
         </p>
         <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', marginTop: '1rem' }}>
-          {isAuthenticated ? (
-            <Link to="/dashboard" className="btn-primary" style={{ textDecoration: 'none' }}>
-              {t('btnGoShelf')} <Flame size={18} />
-            </Link>
-          ) : (
-            <>
-              <Link to="/register" className="btn-primary" style={{ textDecoration: 'none' }}>
-                {t('btnGetStarted')} <Flame size={18} />
-              </Link>
-              <Link to="/login" className="btn-secondary" style={{ textDecoration: 'none' }}>
-                {t('navLogin')}
-              </Link>
-            </>
-          )}
+          <Link to={isAuthenticated ? "/dashboard" : "/register"} className="btn-primary" style={{ textDecoration: 'none' }}>
+            {t('btnStartCollection')} <Flame size={18} />
+          </Link>
+          <Link to="/search" className="btn-secondary" style={{ textDecoration: 'none' }}>
+            {t('btnExploreGuides')}
+          </Link>
         </div>
       </section>
 
@@ -42,33 +34,36 @@ export const Landing: React.FC = () => {
         gap: '2.5rem',
         marginTop: '2rem'
       }}>
+        {/* Feature 1: Universos Sin Fronteras */}
         <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', textAlign: 'left' }}>
           <div style={{ display: 'inline-flex', padding: '0.75rem', borderRadius: '12px', background: 'rgba(124,58,237,0.1)', color: 'var(--accent-primary)', width: 'fit-content' }}>
             <Compass size={24} />
           </div>
           <h3>{t('featSearchTitle')}</h3>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem' }}>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', lineHeight: '1.4' }}>
             {t('featSearchDesc')}
           </p>
         </div>
 
-        <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', textAlign: 'left' }}>
-          <div style={{ display: 'inline-flex', padding: '0.75rem', borderRadius: '12px', background: 'rgba(124,58,237,0.1)', color: 'var(--accent-primary)', width: 'fit-content' }}>
-            <Layers size={24} />
-          </div>
-          <h3>{t('featModsTitle')}</h3>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem' }}>
-            {t('featModsDesc')}
-          </p>
-        </div>
-
+        {/* Feature 2: Tu Progreso, Tus Reglas */}
         <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', textAlign: 'left' }}>
           <div style={{ display: 'inline-flex', padding: '0.75rem', borderRadius: '12px', background: 'rgba(124,58,237,0.1)', color: 'var(--accent-primary)', width: 'fit-content' }}>
             <Star size={24} />
           </div>
           <h3>{t('featShelfTitle')}</h3>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem' }}>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', lineHeight: '1.4' }}>
             {t('featShelfDesc')}
+          </p>
+        </div>
+
+        {/* Feature 3: Hazlo Tuyo (Mods de la Comunidad) */}
+        <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', textAlign: 'left' }}>
+          <div style={{ display: 'inline-flex', padding: '0.75rem', borderRadius: '12px', background: 'rgba(124,58,237,0.1)', color: 'var(--accent-primary)', width: 'fit-content' }}>
+            <Layers size={24} />
+          </div>
+          <h3>{t('featModsTitle')}</h3>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', lineHeight: '1.4' }}>
+            {t('featModsDesc')}
           </p>
         </div>
       </section>
