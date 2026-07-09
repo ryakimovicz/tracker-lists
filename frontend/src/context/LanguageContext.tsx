@@ -64,6 +64,8 @@ const translations: Translations = {
   authEmailPlaceholder: { en: 'enter your email', es: 'ingresa tu correo' },
   authPasswordPlaceholder: { en: 'enter your password', es: 'ingresa tu contraseña' },
   authUsernamePlaceholder: { en: 'choose a username', es: 'elige un nombre de usuario' },
+  authRegistering: { en: 'Registering...', es: 'Registrando...' },
+  authLoggingIn: { en: 'Logging in...', es: 'Iniciando sesión...' },
 
   // Auth Errors & Alerts
   errUsernameTaken: { en: 'Username already registered', es: 'El nombre de usuario ya está registrado' },

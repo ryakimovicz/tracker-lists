@@ -133,7 +133,7 @@ export const Register: React.FC = () => {
           </div>
 
           <button type="submit" disabled={isSubmitting} className="btn-primary" style={{ width: '100%', marginTop: '0.5rem' }}>
-            {isSubmitting ? 'Registering...' : t('authRegisterButton')}
+            {isSubmitting ? t('authRegistering') : t('authRegisterButton')}
           </button>
 
           <p style={{ textAlign: 'center', fontSize: '0.9rem', marginTop: '1rem', color: 'var(--text-secondary)' }}>

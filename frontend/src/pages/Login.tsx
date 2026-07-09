@@ -118,7 +118,7 @@ export const Login: React.FC = () => {
         </div>
 
         <button type="submit" disabled={isSubmitting} className="btn-primary" style={{ width: '100%', marginTop: '0.5rem' }}>
-          <LogIn size={18} /> {isSubmitting ? 'Logging in...' : t('authLoginButton')}
+          <LogIn size={18} /> {isSubmitting ? t('authLoggingIn') : t('authLoginButton')}
         </button>
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', margin: '0.5rem 0', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
