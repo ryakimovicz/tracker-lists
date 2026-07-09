@@ -32,7 +32,7 @@ const translations: Translations = {
   featModsDesc: { en: 'Missing an indie comic or a special episode? Add custom items to any public guide. The community will be able to vote and integrate your contributions into their own lists.', es: '¿Falta un cómic independiente o un episodio especial? Añade ítems personalizados a cualquier guía pública. La comunidad podrá votar e incorporar tus aportes a sus propias listas.' },
   
   featShelfTitle: { en: 'Your Progress, Your Rules', es: 'Tu Progreso, Tus Reglas' },
-  featShelfDesc: { en: 'Forget about getting lost between seasons and volumes. Save community guides, check off what you have consumed, and our Up Next algorithm will tell you exactly what to follow.', es: 'Olvídate de perderte entre temporadas y volúmenes. Guarda las listas de la comunidad, marca lo que ya consumiste y nuestro algoritmo Up Next te dirá exactamente por dónde seguir.' },
+  featShelfDesc: { en: 'Forget about getting lost between seasons and volumes. Save community guides, check off what you have consumed, and discover exactly what to follow next.', es: 'Olvídate de perderte entre temporadas y volúmenes. Guarda las listas de la comunidad, marca lo que ya consumiste y descubre exactamente por dónde seguir.' },
 
   // Priority Levels
   priorityOptional: { en: 'Optional', es: 'Opcional' },
