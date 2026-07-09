@@ -10,6 +10,7 @@ from app.models.list import ReadingList, VisibilityEnum
 from app.models.list_item import ListItem, ItemTypeEnum
 from app.models.saved_list import SavedList
 from app.models.item_progress import ItemProgress
+from app.models.addition import ListAddition, UserAdoptedAddition
 from app.services.tmdb import TMDBService
 from app.schemas.list import (
     ReadingListCreate,
@@ -92,11 +93,8 @@ def get_list_details(
     # Fetch list items and their progress
     items = reading_list.items
     total_count = len(items)
-    completed_count = 0
-    items_response = []
-
-    # Map item progress
     progress_map = {}
+    
     if current_user and total_count > 0:
         item_ids = [item.id for item in items]
         progress_records = db.query(ItemProgress).filter(
@@ -105,18 +103,44 @@ def get_list_details(
         ).all()
         progress_map = {p.list_item_id: (p.is_completed, p.is_skipped) for p in progress_records}
 
-    completed_count = 0
-    skipped_count = 0
-    items_response = []
+    # Fetch active additions for the current user
+    addition_items = []
+    addition_progress_map = {}
+    if current_user:
+        # Additions created by user
+        user_additions = db.query(ListAddition).filter(
+            ListAddition.list_id == list_id,
+            ListAddition.user_id == current_user.id
+        ).all()
+        # Additions adopted by user
+        adopted_additions = db.query(ListAddition).join(
+            UserAdoptedAddition, UserAdoptedAddition.addition_id == ListAddition.id
+        ).filter(
+            ListAddition.list_id == list_id,
+            UserAdoptedAddition.user_id == current_user.id
+        ).all()
+        
+        all_active_additions = list(set(user_additions + adopted_additions))
+        
+        for add in all_active_additions:
+            addition_items.extend(add.items)
+            
+        if len(addition_items) > 0:
+            add_item_ids = [ai.id for ai in addition_items]
+            add_progress_records = db.query(ItemProgress).filter(
+                ItemProgress.user_id == current_user.id,
+                ItemProgress.addition_item_id.in_(add_item_ids)
+            ).all()
+            addition_progress_map = {p.addition_item_id: (p.is_completed, p.is_skipped) for p in add_progress_records}
 
+    # Sort addition items by order_index so they inject sequentially
+    addition_items.sort(key=lambda x: x.order_index)
+
+    # Map base items
+    merged_items = []
     for item in items:
         is_completed, is_skipped = progress_map.get(item.id, (False, False))
-        if is_completed:
-            completed_count += 1
-        if is_skipped:
-            skipped_count += 1
-            
-        items_response.append(
+        merged_items.append(
             ListItemProgressResponse(
                 id=item.id,
                 list_id=item.list_id,
@@ -128,15 +152,55 @@ def get_list_details(
                 custom_notes=item.custom_notes,
                 section=item.section,
                 is_completed=is_completed,
-                is_skipped=is_skipped
+                is_skipped=is_skipped,
+                is_addition=False
             )
         )
 
+    # Inject addition items after anchor items
+    for ai in addition_items:
+        is_completed, is_skipped = addition_progress_map.get(ai.id, (False, False))
+        ai_resp = ListItemProgressResponse(
+            id=ai.id,
+            list_id=list_id,
+            order_index=ai.order_index,
+            item_type=ai.item_type,
+            external_id=ai.external_id,
+            title=ai.title,
+            image_url=ai.image_url,
+            custom_notes=ai.custom_notes,
+            section=ai.section,
+            is_completed=is_completed,
+            is_skipped=is_skipped,
+            is_addition=True,
+            addition_id=ai.addition_id,
+            addition_item_id=ai.id
+        )
+        
+        inserted = False
+        if ai.after_item_id:
+            for index, base_item in enumerate(merged_items):
+                if not base_item.is_addition and base_item.id == ai.after_item_id:
+                    # Find last addition item inserted after this base item to insert after it
+                    insert_idx = index + 1
+                    while insert_idx < len(merged_items) and merged_items[insert_idx].is_addition:
+                        insert_idx += 1
+                    merged_items.insert(insert_idx, ai_resp)
+                    inserted = True
+                    break
+        if not inserted:
+            merged_items.append(ai_resp)
+
+    # Recalculate metrics dynamically based on merged items list
+    merged_total = len(merged_items)
+    completed_count = sum(1 for x in merged_items if x.is_completed)
+    skipped_count = sum(1 for x in merged_items if x.is_skipped)
+
     progress_percentage = 0.0
     skipped_percentage = 0.0
-    if total_count > 0:
-        progress_percentage = (completed_count / total_count) * 100.0
-        skipped_percentage = (skipped_count / total_count) * 100.0
+    if merged_total > 0:
+        progress_percentage = (completed_count / merged_total) * 100.0
+        skipped_percentage = (skipped_count / merged_total) * 100.0
 
     return ReadingListDetailsResponse(
         id=reading_list.id,
@@ -149,10 +213,10 @@ def get_list_details(
         is_saved_by_me=is_saved_by_me,
         completed_count=completed_count,
         skipped_count=skipped_count,
-        total_count=total_count,
+        total_count=merged_total,
         progress_percentage=round(progress_percentage, 2),
         skipped_percentage=round(skipped_percentage, 2),
-        items=items_response
+        items=merged_items
     )
 
 # 4. Update reading list

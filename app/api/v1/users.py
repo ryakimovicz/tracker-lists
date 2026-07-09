@@ -10,6 +10,7 @@ from app.models.list_item import ListItem
 from app.models.saved_list import SavedList
 from app.models.item_progress import ItemProgress
 from app.models.library import UserLibraryItem
+from app.models.addition import ListAddition, UserAdoptedAddition
 from app.schemas.user import UserResponse, UserDashboardResponse
 from app.schemas.social import UpNextResponse, UpNextItemResponse
 
@@ -67,6 +68,21 @@ def get_user_up_next(
         ).all()
     }
     
+    # Fetch active additions for the current user for all lists
+    user_additions = db.query(ListAddition).filter(
+        ListAddition.user_id == current_user.id
+    ).all()
+    adopted_additions = db.query(ListAddition).join(
+        UserAdoptedAddition, UserAdoptedAddition.addition_id == ListAddition.id
+    ).filter(
+        UserAdoptedAddition.user_id == current_user.id
+    ).all()
+    all_active_additions = list(set(user_additions + adopted_additions))
+    
+    additions_by_list = {}
+    for add in all_active_additions:
+        additions_by_list.setdefault(add.list_id, []).append(add)
+    
     guides_up_next = []
     personal_up_next = []
     
@@ -75,28 +91,69 @@ def get_user_up_next(
         p.list_item_id for p in 
         db.query(ItemProgress).filter(
             ItemProgress.user_id == current_user.id,
+            ItemProgress.list_item_id.isnot(None),
+            (ItemProgress.is_completed == True) | (ItemProgress.is_skipped == True)
+        ).all()
+    }
+    completed_or_skipped_addition_ids = {
+        p.addition_item_id for p in 
+        db.query(ItemProgress).filter(
+            ItemProgress.user_id == current_user.id,
+            ItemProgress.addition_item_id.isnot(None),
             (ItemProgress.is_completed == True) | (ItemProgress.is_skipped == True)
         ).all()
     }
     
     for rlist in all_user_lists:
-        # Find the first item in the list that is NOT completed or skipped
-        first_uncompleted = None
+        addition_items = []
+        for add in additions_by_list.get(rlist.id, []):
+            addition_items.extend(add.items)
+        addition_items.sort(key=lambda x: x.order_index)
+        
+        merged_items = []
         for item in rlist.items:
-            if item.id not in completed_or_skipped_item_ids:
-                first_uncompleted = item
-                break
+            merged_items.append((item.id, item, False, None, None))
+            
+        for ai in addition_items:
+            inserted = False
+            if ai.after_item_id:
+                for index, (base_id, base_item, is_addition, _, _) in enumerate(merged_items):
+                    if not is_addition and base_id == ai.after_item_id:
+                        insert_idx = index + 1
+                        while insert_idx < len(merged_items) and merged_items[insert_idx][2]:
+                            insert_idx += 1
+                        merged_items.insert(insert_idx, (ai.id, ai, True, ai.addition_id, ai.id))
+                        inserted = True
+                        break
+            if not inserted:
+                merged_items.append((ai.id, ai, True, ai.addition_id, ai.id))
                 
+        # Find the first item in the merged list that is NOT completed or skipped
+        first_uncompleted = None
+        for item_id, item, is_addition, add_id, add_item_id in merged_items:
+            if is_addition:
+                if item_id not in completed_or_skipped_addition_ids:
+                    first_uncompleted = (item, is_addition, add_id, add_item_id)
+                    break
+            else:
+                if item_id not in completed_or_skipped_item_ids:
+                    first_uncompleted = (item, is_addition, None, None)
+                    break
+                    
         if first_uncompleted:
+            item, is_addition, add_id, add_item_id = first_uncompleted
             up_next_item = UpNextItemResponse(
-                item_id=first_uncompleted.id,
+                item_id=item.id,
                 list_id=rlist.id,
                 list_title=rlist.title,
-                order_index=first_uncompleted.order_index,
-                item_type=first_uncompleted.item_type,
-                title=first_uncompleted.title,
-                image_url=first_uncompleted.image_url,
-                section=first_uncompleted.section
+                order_index=item.order_index,
+                item_type=item.item_type,
+                title=item.title,
+                image_url=item.image_url,
+                section=item.section,
+                is_addition=is_addition,
+                addition_id=add_id,
+                addition_item_id=add_item_id
             )
             
             if rlist.id in personal_tracker_ids:

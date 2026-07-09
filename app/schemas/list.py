@@ -32,6 +32,9 @@ class ListItemResponse(ListItemBase):
 class ListItemProgressResponse(ListItemResponse):
     is_completed: bool = False
     is_skipped: bool = False
+    is_addition: bool = False
+    addition_id: Optional[int] = None
+    addition_item_id: Optional[int] = None
 
 # Reading List schemas
 class ReadingListBase(BaseModel):

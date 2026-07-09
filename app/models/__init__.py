@@ -8,6 +8,7 @@ from app.models.item_progress import ItemProgress
 from app.models.library import UserLibraryItem, UserLibraryStatusEnum
 from app.models.social import ListVote, ListReport, Comment, CommentVote, CommentReport, Follow
 from app.models.review import MediaReview, MediaReviewVote, MediaReviewReport
+from app.models.addition import ListAddition, ListAdditionItem, UserAdoptedAddition, AdditionVote, AdditionComment
 
 __all__ = [
     "Base",
@@ -28,5 +29,10 @@ __all__ = [
     "Follow",
     "MediaReview",
     "MediaReviewVote",
-    "MediaReviewReport"
+    "MediaReviewReport",
+    "ListAddition",
+    "ListAdditionItem",
+    "UserAdoptedAddition",
+    "AdditionVote",
+    "AdditionComment"
 ]

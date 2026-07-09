@@ -43,6 +43,9 @@ class UpNextItemResponse(BaseModel):
     title: str
     image_url: Optional[str] = None
     section: Optional[str] = None
+    is_addition: bool = False
+    addition_id: Optional[int] = None
+    addition_item_id: Optional[int] = None
 
     class Config:
         from_attributes = True
