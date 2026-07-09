@@ -9,6 +9,8 @@ import { Dashboard } from './pages/Dashboard';
 import { Search } from './pages/Search';
 import { AdminPanel } from './pages/AdminPanel';
 import { Recommended } from './pages/Recommended';
+import { ForgotPassword } from './pages/ForgotPassword';
+import { ResetPassword } from './pages/ResetPassword';
 
 import { LanguageProvider } from './context/LanguageContext';
 import { ThemeProvider } from './context/ThemeContext';
@@ -27,6 +29,8 @@ function App() {
               <Route path="/recommended" element={<Recommended />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
               
               {/* Authenticated Routes */}
               <Route

@@ -41,6 +41,24 @@ const translations: Translations = {
   priorityMandatory: { en: 'Mandatory', es: 'Obligatorio' },
   priorityEssential: { en: 'Essential', es: 'Esencial' },
 
+  // Authentication & Forms
+  authEmail: { en: 'Email Address', es: 'Correo Electrónico' },
+  authPassword: { en: 'Password', es: 'Contraseña' },
+  authConfirmPassword: { en: 'Confirm Password', es: 'Confirmar Contraseña' },
+  authUsername: { en: 'Username', es: 'Nombre de usuario' },
+  authForgotPassword: { en: 'Forgot Password?', es: '¿Olvidaste tu contraseña?' },
+  authResetPasswordTitle: { en: 'Reset Password', es: 'Restablecer Contraseña' },
+  authSendResetLink: { en: 'Send Reset Link', es: 'Enviar Enlace de Recuperación' },
+  authLoginButton: { en: 'Sign In', es: 'Iniciar Sesión' },
+  authRegisterButton: { en: 'Create Account', es: 'Crear Cuenta' },
+  authOr: { en: 'Or', es: 'O' },
+  authGoogleLogin: { en: 'Sign In with Google', es: 'Iniciar Sesión con Google' },
+  authNoAccount: { en: "Don't have an account?", es: '¿No tienes una cuenta?' },
+  authHaveAccount: { en: 'Already have an account?', es: '¿Ya tienes una cuenta?' },
+  authEmailPlaceholder: { en: 'enter your email', es: 'ingresa tu correo' },
+  authPasswordPlaceholder: { en: 'enter your password', es: 'ingresa tu contraseña' },
+  authUsernamePlaceholder: { en: 'choose a username', es: 'elige un nombre de usuario' },
+
   // Themes
   themeSystem: { en: 'System', es: 'Sistema' },
   themeLight: { en: 'Light', es: 'Claro' },
