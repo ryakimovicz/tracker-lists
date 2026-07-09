@@ -5,13 +5,15 @@ import { RouteGuard } from './components/RouteGuard';
 import { Landing } from './pages/Landing';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
-import { Dashboard } from './pages/Dashboard';
 import { Search } from './pages/Search';
 import { AdminPanel } from './pages/AdminPanel';
 import { Recommended } from './pages/Recommended';
 import { ForgotPassword } from './pages/ForgotPassword';
 import { ResetPassword } from './pages/ResetPassword';
 import { Home } from './pages/Home';
+import { Profile } from './pages/Profile';
+import { Social } from './pages/Social';
+import { CreateGuide } from './pages/CreateGuide';
 
 import { LanguageProvider } from './context/LanguageContext';
 import { ThemeProvider } from './context/ThemeContext';
@@ -35,10 +37,26 @@ function AppRoutes() {
             
             {/* Authenticated Routes */}
             <Route
-              path="/dashboard"
+              path="/profile"
               element={
                 <RouteGuard>
-                  <Dashboard />
+                  <Profile />
+                </RouteGuard>
+              }
+            />
+            <Route
+              path="/social"
+              element={
+                <RouteGuard>
+                  <Social />
+                </RouteGuard>
+              }
+            />
+            <Route
+              path="/create"
+              element={
+                <RouteGuard>
+                  <CreateGuide />
                 </RouteGuard>
               }
             />

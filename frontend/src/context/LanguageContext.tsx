@@ -17,6 +17,11 @@ const translations: Translations = {
   navLogout: { en: 'Log Out', es: 'Salir' },
   navLogin: { en: 'Log In', es: 'Iniciar Sesión' },
   navRegister: { en: 'Register', es: 'Registrarse' },
+  navHome: { en: 'Home', es: 'Inicio' },
+  navSocial: { en: 'Social', es: 'Social' },
+  navCreate: { en: 'Create', es: 'Crear' },
+  navExplore: { en: 'Explore', es: 'Explorar' },
+  navProfile: { en: 'Profile', es: 'Perfil' },
 
   // Landing Page
   heroTitleLine1: { en: 'Guides for everything you love', es: 'Guías de todo lo que amas' },

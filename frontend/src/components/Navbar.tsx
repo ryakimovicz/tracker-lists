@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
 import type { Theme } from '../context/ThemeContext';
-import { LogOut, Search, List, Shield, Bookmark, Globe, Sun, Moon, Monitor } from 'lucide-react';
+import { LogOut, List, Shield, Globe, Sun, Moon, Monitor, Home, Users, PlusCircle, Compass, User } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
   const { user, isAuthenticated, logout } = useAuth();
@@ -62,11 +62,20 @@ export const Navbar: React.FC = () => {
 
         {isAuthenticated && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
-            <Link to="/search" style={{ color: 'var(--text-secondary)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <Search size={18} /> {t('navSearch')}
+            <Link to="/" style={{ color: 'var(--text-secondary)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <Home size={18} /> {t('navHome')}
             </Link>
-            <Link to="/dashboard" style={{ color: 'var(--text-secondary)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <Bookmark size={18} /> {t('navShelf')}
+            <Link to="/social" style={{ color: 'var(--text-secondary)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <Users size={18} /> {t('navSocial')}
+            </Link>
+            <Link to="/create" style={{ color: 'var(--text-secondary)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <PlusCircle size={18} /> {t('navCreate')}
+            </Link>
+            <Link to="/search" style={{ color: 'var(--text-secondary)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <Compass size={18} /> {t('navExplore')}
+            </Link>
+            <Link to="/profile" style={{ color: 'var(--text-secondary)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <User size={18} /> {t('navProfile')}
             </Link>
             {user?.is_admin && (
               <Link to="/admin" style={{ color: '#ef4444', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 500 }}>
