@@ -46,6 +46,8 @@ def get_user_dashboard(
         username=current_user.username,
         email=current_user.email,
         created_at=current_user.created_at,
+        photo_url=current_user.photo_url,
+        is_admin=current_user.is_admin,
         created_lists=created_lists,
         saved_lists=saved_lists
     )
