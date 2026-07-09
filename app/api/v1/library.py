@@ -130,13 +130,15 @@ def add_to_library(
 @router.get("/", response_model=List[LibraryItemResponse])
 def get_library(
     status: Optional[UserLibraryStatusEnum] = Query(None, description="Filter library by status"),
+    skip: int = 0,
+    limit: int = 50,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     query = db.query(UserLibraryItem).filter(UserLibraryItem.user_id == current_user.id)
     if status:
         query = query.filter(UserLibraryItem.status == status)
-    return query.all()
+    return query.offset(skip).limit(limit).all()
 
 @router.put("/{library_item_id}", response_model=LibraryItemResponse)
 def update_library_item(
