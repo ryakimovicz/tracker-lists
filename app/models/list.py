@@ -1,6 +1,6 @@
 import enum
 from datetime import datetime, timezone
-from sqlalchemy import Column, Integer, String, Text, ForeignKey, Enum, DateTime
+from sqlalchemy import Column, Integer, String, Text, ForeignKey, Enum, DateTime, JSON
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 
@@ -18,6 +18,10 @@ class ReadingList(Base):
     description = Column(Text, nullable=True)
     visibility = Column(Enum(VisibilityEnum), default=VisibilityEnum.PUBLIC, nullable=False)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+    
+    # Custom importance levels naming and defaults mapping
+    importance_labels = Column(JSON, nullable=True, default=lambda: {"1": "Optional", "2": "Recommended", "3": "Highly Recommended", "4": "Mandatory", "5": "Essential"})
+    section_importances = Column(JSON, nullable=True, default=dict)
 
     # Relationships
     creator = relationship("User", back_populates="lists")

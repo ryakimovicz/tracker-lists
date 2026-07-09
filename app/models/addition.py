@@ -35,6 +35,7 @@ class ListAdditionItem(Base):
     image_url = Column(String(500), nullable=True)
     custom_notes = Column(Text, nullable=True)
     section = Column(String(100), nullable=True)
+    importance_rank = Column(Integer, nullable=True)
 
     # Relationships
     addition = relationship("ListAddition", back_populates="items")

@@ -24,6 +24,7 @@ class ListItem(Base):
     image_url = Column(String(500), nullable=True)     # Portada/Image URL
     custom_notes = Column(Text, nullable=True)         # Personal commentary/notes
     section = Column(String(100), nullable=True)      # Nullable section/part name (e.g., 'Parte 1: El Origen')
+    importance_rank = Column(Integer, nullable=True)  # Priority level override (1 to 5)
 
     # Relationships
     reading_list = relationship("ReadingList", back_populates="items")

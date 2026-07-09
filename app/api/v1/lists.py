@@ -51,7 +51,9 @@ def create_list(
         creator_id=current_user.id,
         title=list_in.title,
         description=list_in.description,
-        visibility=list_in.visibility
+        visibility=list_in.visibility,
+        importance_labels=list_in.importance_labels,
+        section_importances=list_in.section_importances
     )
     db.add(new_list)
     db.commit()
@@ -138,11 +140,17 @@ def get_list_details(
 
     # Map base items
     merged_items = []
+    sec_importances = reading_list.section_importances or {}
     for item in items:
         if item.external_id:
             is_completed, is_skipped = external_progress_map.get((item.item_type.lower(), item.external_id), (False, False))
         else:
             is_completed, is_skipped = custom_progress_map.get(item.id, (False, False))
+            
+        inherited = item.importance_rank
+        if inherited is None and item.section:
+            inherited = sec_importances.get(item.section)
+            
         merged_items.append(
             ListItemProgressResponse(
                 id=item.id,
@@ -156,7 +164,9 @@ def get_list_details(
                 section=item.section,
                 is_completed=is_completed,
                 is_skipped=is_skipped,
-                is_addition=False
+                is_addition=False,
+                importance_rank=item.importance_rank,
+                inherited_importance_rank=inherited
             )
         )
 
@@ -166,6 +176,11 @@ def get_list_details(
             is_completed, is_skipped = external_progress_map.get((ai.item_type.lower(), ai.external_id), (False, False))
         else:
             is_completed, is_skipped = addition_progress_map.get(ai.id, (False, False))
+            
+        inherited = ai.importance_rank
+        if inherited is None and ai.section:
+            inherited = sec_importances.get(ai.section)
+            
         ai_resp = ListItemProgressResponse(
             id=ai.id,
             list_id=list_id,
@@ -180,7 +195,9 @@ def get_list_details(
             is_skipped=is_skipped,
             is_addition=True,
             addition_id=ai.addition_id,
-            addition_item_id=ai.id
+            addition_item_id=ai.id,
+            importance_rank=ai.importance_rank,
+            inherited_importance_rank=inherited
         )
         
         inserted = False
@@ -298,7 +315,8 @@ def add_item_to_list(
         title=item_in.title,
         image_url=item_in.image_url,
         custom_notes=item_in.custom_notes,
-        section=item_in.section
+        section=item_in.section,
+        importance_rank=item_in.importance_rank
     )
     db.add(new_item)
     db.commit()

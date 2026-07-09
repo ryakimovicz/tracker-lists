@@ -12,6 +12,7 @@ class ListAdditionItemCreate(BaseModel):
     custom_notes: Optional[str] = None
     section: Optional[str] = None
     order_index: int = 0
+    importance_rank: Optional[int] = Field(None, ge=1, le=5)
 
 class ListAdditionItemResponse(BaseModel):
     id: int
@@ -24,6 +25,7 @@ class ListAdditionItemResponse(BaseModel):
     custom_notes: Optional[str]
     section: Optional[str]
     order_index: int
+    importance_rank: Optional[int]
 
     class Config:
         from_attributes = True

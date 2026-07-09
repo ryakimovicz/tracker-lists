@@ -12,6 +12,7 @@ class ListItemBase(BaseModel):
     image_url: Optional[str] = None
     custom_notes: Optional[str] = None
     section: Optional[str] = None
+    importance_rank: Optional[int] = Field(None, ge=1, le=5)
 
 class ListItemCreate(ListItemBase):
     pass
@@ -21,6 +22,7 @@ class ListItemUpdate(BaseModel):
     custom_notes: Optional[str] = None
     section: Optional[str] = None
     order_index: Optional[int] = None
+    importance_rank: Optional[int] = Field(None, ge=1, le=5)
 
 class ListItemResponse(ListItemBase):
     id: int
@@ -35,12 +37,15 @@ class ListItemProgressResponse(ListItemResponse):
     is_addition: bool = False
     addition_id: Optional[int] = None
     addition_item_id: Optional[int] = None
+    inherited_importance_rank: Optional[int] = None
 
 # Reading List schemas
 class ReadingListBase(BaseModel):
     title: str = Field(..., min_length=1, max_length=150)
     description: Optional[str] = None
     visibility: VisibilityEnum = VisibilityEnum.PUBLIC
+    importance_labels: Optional[dict] = None
+    section_importances: Optional[dict] = None
 
 class ReadingListCreate(ReadingListBase):
     pass
@@ -49,6 +54,8 @@ class ReadingListUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
     visibility: Optional[VisibilityEnum] = None
+    importance_labels: Optional[dict] = None
+    section_importances: Optional[dict] = None
 
 class ReadingListResponse(ReadingListBase):
     id: int

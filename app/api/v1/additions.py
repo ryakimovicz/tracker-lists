@@ -99,7 +99,8 @@ def add_item_to_addition(
         title=item_in.title,
         image_url=item_in.image_url,
         custom_notes=item_in.custom_notes,
-        section=item_in.section
+        section=item_in.section,
+        importance_rank=item_in.importance_rank
     )
     db.add(addition_item)
     db.commit()
