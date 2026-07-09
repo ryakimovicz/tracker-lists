@@ -1,0 +1,194 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+
+:root {
+  /* Premium Dark Theme Color Tokens */
+  --bg-primary: #09090c;
+  --bg-secondary: #121218;
+  --bg-tertiary: #191a24;
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  
+  --accent-primary: #7c3aed; /* Neon Purple */
+  --accent-secondary: #06b6d4; /* Neon Cyan */
+  --accent-gradient: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
+  
+  --border-color: #272733;
+  --border-glow: rgba(124, 58, 237, 0.15);
+  --card-shadow: rgba(0, 0, 0, 0.5) 0px 10px 30px -10px;
+  
+  /* Priority Color Levels (1 to 5) */
+  --priority-1: #64748b; /* Optional/Gray */
+  --priority-2: #3b82f6; /* Recommended/Blue */
+  --priority-3: #10b981; /* Highly Recommended/Green */
+  --priority-4: #f59e0b; /* Mandatory/Amber */
+  --priority-5: #ef4444; /* Essential/Red */
+
+  --font-sans: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+[data-theme="light"] {
+  /* Optional Light Mode Support */
+  --bg-primary: #f8fafc;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #f1f5f9;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+  --border-color: #e2e8f0;
+  --border-glow: rgba(124, 58, 237, 0.05);
+  --card-shadow: rgba(148, 163, 184, 0.1) 0px 10px 30px -10px;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  min-height: 100vh;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Premium Layout Wrappers */
+.app-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.main-content {
+  flex: 1;
+  width: 100%;
+  max-width: 1300px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+}
+
+/* Typography & Headers */
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  line-height: 1.25;
+}
+
+.gradient-text {
+  background: var(--accent-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Card glassmorphism styling */
+.glass-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  padding: 1.5rem;
+  box-shadow: var(--card-shadow);
+  position: relative;
+  overflow: hidden;
+}
+
+.glass-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--accent-gradient);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.glass-card:hover::before {
+  opacity: 1;
+}
+
+.glass-card:hover {
+  border-color: rgba(124, 58, 237, 0.3);
+}
+
+/* Interactive elements */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: var(--accent-gradient);
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 0.75rem 1.5rem;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.35);
+  transition: transform 0.2s, opacity 0.2s;
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  opacity: 0.95;
+}
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 0.75rem 1.5rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.2s, transform 0.2s;
+}
+
+.btn-secondary:hover {
+  border-color: var(--accent-primary);
+  transform: translateY(-2px);
+}
+
+/* Inputs & Forms */
+.input-field {
+  width: 100%;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  outline: none;
+  font-family: inherit;
+}
+
+.input-field:focus {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px var(--border-glow);
+}
+
+/* Badges for Priority Levels */
+.priority-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  padding: 0.25rem 0.6rem;
+  border-radius: 9999px;
+  color: #ffffff;
+}
+
+.priority-badge-1 { background-color: var(--priority-1); }
+.priority-badge-2 { background-color: var(--priority-2); }
+.priority-badge-3 { background-color: var(--priority-3); }
+.priority-badge-4 { background-color: var(--priority-4); }
+.priority-badge-5 { background-color: var(--priority-5); }
