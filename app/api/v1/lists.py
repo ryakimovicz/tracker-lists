@@ -93,19 +93,27 @@ def get_list_details(
     # Fetch list items and their progress
     items = reading_list.items
     total_count = len(items)
-    progress_map = {}
+    external_progress_map = {}
+    custom_progress_map = {}
+    addition_progress_map = {}
     
-    if current_user and total_count > 0:
-        item_ids = [item.id for item in items]
-        progress_records = db.query(ItemProgress).filter(
-            ItemProgress.user_id == current_user.id,
-            ItemProgress.list_item_id.in_(item_ids)
-        ).all()
-        progress_map = {p.list_item_id: (p.is_completed, p.is_skipped) for p in progress_records}
+    if current_user:
+        progress_records = db.query(ItemProgress).filter(ItemProgress.user_id == current_user.id).all()
+        external_progress_map = {
+            (p.item_type.lower() if p.item_type else "", p.external_id): (p.is_completed, p.is_skipped)
+            for p in progress_records if p.external_id
+        }
+        custom_progress_map = {
+            p.list_item_id: (p.is_completed, p.is_skipped)
+            for p in progress_records if p.list_item_id and not p.external_id
+        }
+        addition_progress_map = {
+            p.addition_item_id: (p.is_completed, p.is_skipped)
+            for p in progress_records if p.addition_item_id and not p.external_id
+        }
 
     # Fetch active additions for the current user
     addition_items = []
-    addition_progress_map = {}
     if current_user:
         # Additions created by user
         user_additions = db.query(ListAddition).filter(
@@ -124,14 +132,6 @@ def get_list_details(
         
         for add in all_active_additions:
             addition_items.extend(add.items)
-            
-        if len(addition_items) > 0:
-            add_item_ids = [ai.id for ai in addition_items]
-            add_progress_records = db.query(ItemProgress).filter(
-                ItemProgress.user_id == current_user.id,
-                ItemProgress.addition_item_id.in_(add_item_ids)
-            ).all()
-            addition_progress_map = {p.addition_item_id: (p.is_completed, p.is_skipped) for p in add_progress_records}
 
     # Sort addition items by order_index so they inject sequentially
     addition_items.sort(key=lambda x: x.order_index)
@@ -139,7 +139,10 @@ def get_list_details(
     # Map base items
     merged_items = []
     for item in items:
-        is_completed, is_skipped = progress_map.get(item.id, (False, False))
+        if item.external_id:
+            is_completed, is_skipped = external_progress_map.get((item.item_type.lower(), item.external_id), (False, False))
+        else:
+            is_completed, is_skipped = custom_progress_map.get(item.id, (False, False))
         merged_items.append(
             ListItemProgressResponse(
                 id=item.id,
@@ -159,7 +162,10 @@ def get_list_details(
 
     # Inject addition items after anchor items
     for ai in addition_items:
-        is_completed, is_skipped = addition_progress_map.get(ai.id, (False, False))
+        if ai.external_id:
+            is_completed, is_skipped = external_progress_map.get((ai.item_type.lower(), ai.external_id), (False, False))
+        else:
+            is_completed, is_skipped = addition_progress_map.get(ai.id, (False, False))
         ai_resp = ListItemProgressResponse(
             id=ai.id,
             list_id=list_id,
@@ -393,10 +399,17 @@ def toggle_item_progress(
             detail="Item belongs to a private list you don't access"
         )
         
-    progress = db.query(ItemProgress).filter(
-        ItemProgress.user_id == current_user.id,
-        ItemProgress.list_item_id == item_id
-    ).first()
+    if item.external_id:
+        progress = db.query(ItemProgress).filter(
+            ItemProgress.user_id == current_user.id,
+            ItemProgress.item_type == item.item_type,
+            ItemProgress.external_id == item.external_id
+        ).first()
+    else:
+        progress = db.query(ItemProgress).filter(
+            ItemProgress.user_id == current_user.id,
+            ItemProgress.list_item_id == item_id
+        ).first()
     
     if progress:
         progress.is_completed = not progress.is_completed
@@ -404,13 +417,24 @@ def toggle_item_progress(
             progress.is_skipped = False
         progress.completed_at = datetime.now(timezone.utc) if progress.is_completed else None
     else:
-        progress = ItemProgress(
-            user_id=current_user.id,
-            list_item_id=item_id,
-            is_completed=True,
-            is_skipped=False,
-            completed_at=datetime.now(timezone.utc)
-        )
+        if item.external_id:
+            progress = ItemProgress(
+                user_id=current_user.id,
+                item_type=item.item_type,
+                external_id=item.external_id,
+                list_item_id=item_id, # Link for reference
+                is_completed=True,
+                is_skipped=False,
+                completed_at=datetime.now(timezone.utc)
+            )
+        else:
+            progress = ItemProgress(
+                user_id=current_user.id,
+                list_item_id=item_id,
+                is_completed=True,
+                is_skipped=False,
+                completed_at=datetime.now(timezone.utc)
+            )
         db.add(progress)
         
     db.commit()
@@ -606,10 +630,17 @@ def toggle_item_skip(
             detail="Item belongs to a private list you don't access"
         )
         
-    progress = db.query(ItemProgress).filter(
-        ItemProgress.user_id == current_user.id,
-        ItemProgress.list_item_id == item_id
-    ).first()
+    if item.external_id:
+        progress = db.query(ItemProgress).filter(
+            ItemProgress.user_id == current_user.id,
+            ItemProgress.item_type == item.item_type,
+            ItemProgress.external_id == item.external_id
+        ).first()
+    else:
+        progress = db.query(ItemProgress).filter(
+            ItemProgress.user_id == current_user.id,
+            ItemProgress.list_item_id == item_id
+        ).first()
     
     if progress:
         progress.is_skipped = not progress.is_skipped
@@ -617,13 +648,24 @@ def toggle_item_skip(
             progress.is_completed = False
         progress.completed_at = datetime.now(timezone.utc) if progress.is_skipped else None
     else:
-        progress = ItemProgress(
-            user_id=current_user.id,
-            list_item_id=item_id,
-            is_completed=False,
-            is_skipped=True,
-            completed_at=datetime.now(timezone.utc)
-        )
+        if item.external_id:
+            progress = ItemProgress(
+                user_id=current_user.id,
+                item_type=item.item_type,
+                external_id=item.external_id,
+                list_item_id=item_id,
+                is_completed=False,
+                is_skipped=True,
+                completed_at=datetime.now(timezone.utc)
+            )
+        else:
+            progress = ItemProgress(
+                user_id=current_user.id,
+                list_item_id=item_id,
+                is_completed=False,
+                is_skipped=True,
+                completed_at=datetime.now(timezone.utc)
+            )
         db.add(progress)
         
     db.commit()
@@ -665,31 +707,46 @@ def bulk_section_action(
         
     item_ids = [i.id for i in items]
     
-    # Retrieve existing progress records
-    existing_records = db.query(ItemProgress).filter(
-        ItemProgress.user_id == current_user.id,
-        ItemProgress.list_item_id.in_(item_ids)
-    ).all()
+    # Load all user progress records first to avoid N+1 queries
+    all_user_progress = db.query(ItemProgress).filter(ItemProgress.user_id == current_user.id).all()
     
-    records_map = {r.list_item_id: r for r in existing_records}
+    # Maps
+    external_progress = {(p.item_type.lower() if p.item_type else "", p.external_id): p for p in all_user_progress if p.external_id}
+    custom_progress = {p.list_item_id: p for p in all_user_progress if p.list_item_id and not p.external_id}
     
     action = action_req.action.lower()
     
-    for item_id in item_ids:
-        rec = records_map.get(item_id)
+    for item in items:
+        # Find record
+        if item.external_id:
+            rec = external_progress.get((item.item_type.lower(), item.external_id))
+        else:
+            rec = custom_progress.get(item.id)
+            
         if action == "skip":
             if rec:
                 rec.is_skipped = True
                 rec.is_completed = False
                 rec.completed_at = datetime.now(timezone.utc)
             else:
-                new_rec = ItemProgress(
-                    user_id=current_user.id,
-                    list_item_id=item_id,
-                    is_completed=False,
-                    is_skipped=True,
-                    completed_at=datetime.now(timezone.utc)
-                )
+                if item.external_id:
+                    new_rec = ItemProgress(
+                        user_id=current_user.id,
+                        item_type=item.item_type,
+                        external_id=item.external_id,
+                        list_item_id=item.id,
+                        is_completed=False,
+                        is_skipped=True,
+                        completed_at=datetime.now(timezone.utc)
+                    )
+                else:
+                    new_rec = ItemProgress(
+                        user_id=current_user.id,
+                        list_item_id=item.id,
+                        is_completed=False,
+                        is_skipped=True,
+                        completed_at=datetime.now(timezone.utc)
+                    )
                 db.add(new_rec)
         elif action == "unskip":
             if rec:
@@ -701,13 +758,24 @@ def bulk_section_action(
                 rec.is_skipped = False
                 rec.completed_at = datetime.now(timezone.utc)
             else:
-                new_rec = ItemProgress(
-                    user_id=current_user.id,
-                    list_item_id=item_id,
-                    is_completed=True,
-                    is_skipped=False,
-                    completed_at=datetime.now(timezone.utc)
-                )
+                if item.external_id:
+                    new_rec = ItemProgress(
+                        user_id=current_user.id,
+                        item_type=item.item_type,
+                        external_id=item.external_id,
+                        list_item_id=item.id,
+                        is_completed=True,
+                        is_skipped=False,
+                        completed_at=datetime.now(timezone.utc)
+                    )
+                else:
+                    new_rec = ItemProgress(
+                        user_id=current_user.id,
+                        list_item_id=item.id,
+                        is_completed=True,
+                        is_skipped=False,
+                        completed_at=datetime.now(timezone.utc)
+                    )
                 db.add(new_rec)
         elif action == "uncomplete":
             if rec:
