@@ -8,6 +8,7 @@ import { Register } from './pages/Register';
 import { Dashboard } from './pages/Dashboard';
 import { Search } from './pages/Search';
 import { AdminPanel } from './pages/AdminPanel';
+import { Recommended } from './pages/Recommended';
 
 import { LanguageProvider } from './context/LanguageContext';
 import { ThemeProvider } from './context/ThemeContext';
@@ -23,6 +24,7 @@ function App() {
           <main className="main-content">
             <Routes>
               <Route path="/" element={<Landing />} />
+              <Route path="/recommended" element={<Recommended />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               

@@ -1,10 +1,8 @@
 import { Link } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../context/LanguageContext';
 import { Flame, Star, Compass, Layers } from 'lucide-react';
 
 export const Landing: React.FC = () => {
-  const { isAuthenticated } = useAuth();
   const { t } = useTranslation();
 
   return (
@@ -18,10 +16,10 @@ export const Landing: React.FC = () => {
           {t('heroSubtitle')}
         </p>
         <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', marginTop: '1rem' }}>
-          <Link to={isAuthenticated ? "/dashboard" : "/register"} className="btn-primary" style={{ textDecoration: 'none' }}>
+          <Link to="/" className="btn-primary" style={{ textDecoration: 'none' }}>
             {t('btnStartCollection')} <Flame size={18} />
           </Link>
-          <Link to="/search" className="btn-secondary" style={{ textDecoration: 'none' }}>
+          <Link to="/recommended" className="btn-secondary" style={{ textDecoration: 'none' }}>
             {t('btnExploreGuides')}
           </Link>
         </div>
