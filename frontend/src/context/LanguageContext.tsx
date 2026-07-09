@@ -20,16 +20,16 @@ const translations: Translations = {
 
   // Landing Page
   heroTitle: { en: 'Chronological Guides for Manga, Series & Games', es: 'Cronologías de Lectura, Visualización y Juegos' },
-  heroSubtitle: { en: 'Create custom chronological order lists, track episodes, adopt community additions, and keep your personal shelf synced.', es: 'Crea tus propias guías de orden cronológico, realiza seguimientos de episodios, adopta adiciones de la comunidad y mantén tu biblioteca personal sincronizada.' },
+  heroSubtitle: { en: 'Create custom chronological order lists, track episodes, adopt community modifications, and keep your personal shelf synced.', es: 'Crea tus propias guías de orden cronológico, realiza seguimientos de episodios, adopta modificaciones de la comunidad y mantén tu biblioteca personal sincronizada.' },
   btnGoShelf: { en: 'Go to My Shelf', es: 'Ir a mi Estantería' },
   btnGetStarted: { en: 'Get Started', es: 'Empezar Gratis' },
   
   // Features
-  featSearchTitle: { en: 'Unified Media Search', es: 'Multimedios Unificado' },
-  featSearchDesc: { en: 'Find and manage books, manga, comics, series, movies, and video games connecting 4 APIs in a single console.', es: 'Busca y gestiona libros, mangas, cómics, series de televisión, películas y videojuegos conectando 4 APIs en un único portal.' },
+  featSearchTitle: { en: 'Unified Media Search', es: 'Buscador de Medios Unificado' },
+  featSearchDesc: { en: 'Find and manage books, manga, comics, series, movies, and video games in a single search dashboard.', es: 'Busca y gestiona libros, mangas, cómics, series de televisión, películas y videojuegos en una consola de búsqueda unificada.' },
   
-  featModsTitle: { en: 'Community Mods (Additions)', es: 'Mods de Comunidad (Additions)' },
-  featModsDesc: { en: 'Missing a special issue, light novel, or filler episode? Inject additions, share them, and adopt community ones.', es: '¿Falta un especial, novela ligera o episodio de relleno? Inyecta adiciones, compártelas y adopta las de la comunidad.' },
+  featModsTitle: { en: 'Community Mods', es: 'Mods de la Comunidad' },
+  featModsDesc: { en: 'Missing a special issue, light novel, or filler episode? Inject custom entries, share them, and adopt guides made by the community.', es: '¿Falta un especial, novela ligera o episodio de relleno? Añade entradas personalizadas, compártelas y adopta guías creadas por la comunidad.' },
   
   featShelfTitle: { en: 'Flexible Library Shelf', es: 'Estantería Flexible' },
   featShelfDesc: { en: 'Manage consumption statuses (Reading, Playing, Skipped, Completed) with rigorous category validations and global sync.', es: 'Administra tus estados de consumo (Leyendo, Jugando, Omitido, Completado) con validaciones categóricas y sincronización de progreso global.' },
