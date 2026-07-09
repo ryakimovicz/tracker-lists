@@ -10,11 +10,11 @@ export const Landing: React.FC = () => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '4rem', padding: '2rem 0' }}>
       {/* Hero Section */}
-      <section style={{ textAlign: 'center', maxWidth: '800px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-        <h1 className="gradient-text" style={{ fontSize: '3.5rem', fontWeight: 800, lineHeight: 1.15 }}>
+      <section style={{ textAlign: 'center', maxWidth: '1000px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        <h1 className="gradient-text" style={{ fontSize: '3.5rem', fontWeight: 800, lineHeight: 1.15, whiteSpace: 'normal' }}>
           {t('heroTitle')}
         </h1>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '1.25rem', lineHeight: 1.5 }}>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '1.25rem', lineHeight: 1.5, maxWidth: '800px', margin: '0 auto' }}>
           {t('heroSubtitle')}
         </p>
         <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', marginTop: '1rem' }}>
@@ -35,34 +35,40 @@ export const Landing: React.FC = () => {
         marginTop: '2rem'
       }}>
         {/* Feature 1: Universos Sin Fronteras */}
-        <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', textAlign: 'left' }}>
-          <div style={{ display: 'inline-flex', padding: '0.75rem', borderRadius: '12px', background: 'rgba(124,58,237,0.1)', color: 'var(--accent-primary)', width: 'fit-content' }}>
-            <Compass size={24} />
+        <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', textAlign: 'left' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <div style={{ display: 'inline-flex', padding: '0.6rem', borderRadius: '10px', background: 'rgba(124,58,237,0.1)', color: 'var(--accent-primary)' }}>
+              <Compass size={20} />
+            </div>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 600 }}>{t('featSearchTitle')}</h3>
           </div>
-          <h3>{t('featSearchTitle')}</h3>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', lineHeight: '1.4' }}>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', lineHeight: '1.5' }}>
             {t('featSearchDesc')}
           </p>
         </div>
 
         {/* Feature 2: Tu Progreso, Tus Reglas */}
-        <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', textAlign: 'left' }}>
-          <div style={{ display: 'inline-flex', padding: '0.75rem', borderRadius: '12px', background: 'rgba(124,58,237,0.1)', color: 'var(--accent-primary)', width: 'fit-content' }}>
-            <Star size={24} />
+        <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', textAlign: 'left' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <div style={{ display: 'inline-flex', padding: '0.6rem', borderRadius: '10px', background: 'rgba(124,58,237,0.1)', color: 'var(--accent-primary)' }}>
+              <Star size={20} />
+            </div>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 600 }}>{t('featShelfTitle')}</h3>
           </div>
-          <h3>{t('featShelfTitle')}</h3>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', lineHeight: '1.4' }}>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', lineHeight: '1.5' }}>
             {t('featShelfDesc')}
           </p>
         </div>
 
         {/* Feature 3: Hazlo Tuyo (Mods de la Comunidad) */}
-        <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', textAlign: 'left' }}>
-          <div style={{ display: 'inline-flex', padding: '0.75rem', borderRadius: '12px', background: 'rgba(124,58,237,0.1)', color: 'var(--accent-primary)', width: 'fit-content' }}>
-            <Layers size={24} />
+        <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', textAlign: 'left' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <div style={{ display: 'inline-flex', padding: '0.6rem', borderRadius: '10px', background: 'rgba(124,58,237,0.1)', color: 'var(--accent-primary)' }}>
+              <Layers size={20} />
+            </div>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 600 }}>{t('featModsTitle')}</h3>
           </div>
-          <h3>{t('featModsTitle')}</h3>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', lineHeight: '1.4' }}>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', lineHeight: '1.5' }}>
             {t('featModsDesc')}
           </p>
         </div>

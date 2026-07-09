@@ -19,19 +19,19 @@ const translations: Translations = {
   navRegister: { en: 'Register', es: 'Registrarse' },
 
   // Landing Page
-  heroTitle: { en: 'Everything you love, in one place.', es: 'Todo lo que amas, en un solo lugar.' },
+  heroTitle: { en: 'Everything you love, in one place', es: 'Todo lo que amas, en un solo lugar' },
   heroSubtitle: { en: 'Movies, comics, books, series, and video games. Create the ultimate guides, track your progress, and discover your next obsession together with the community.', es: 'Películas, cómics, libros, series y videojuegos. Crea las guías definitivas, haz un seguimiento de tu progreso y descubre tu próxima obsesión junto a la comunidad.' },
   btnStartCollection: { en: 'Start My Collection', es: 'Empezar mi colección' },
   btnExploreGuides: { en: 'Explore Guides', es: 'Explorar Guías' },
   
   // Features
-  featSearchTitle: { en: '🌌 Endless Universes', es: '🌌 Universos Sin Fronteras' },
+  featSearchTitle: { en: 'Endless Universes', es: 'Universos Sin Fronteras' },
   featSearchDesc: { en: 'Want to build the chronological order of Star Wars mixing movies, comics, and video games? Here you can. Our global search connects with the largest databases in the world so you don\'t miss anything.', es: '¿Quieres armar el orden cronológico de Star Wars mezclando las películas, los cómics y los videojuegos? Aquí puedes. Nuestro buscador global se conecta con las bases de datos más grandes del mundo para que no te falte nada.' },
   
-  featModsTitle: { en: '🛠️ Make It Yours (Community Mods)', es: '🛠️ Hazlo Tuyo (Mods de la Comunidad)' },
+  featModsTitle: { en: 'Make It Yours (Community Mods)', es: 'Hazlo Tuyo (Mods de la Comunidad)' },
   featModsDesc: { en: 'Missing an indie comic or a special episode? Add custom items to any public guide. The community will be able to vote and integrate your contributions into their own lists.', es: '¿Falta un cómic independiente o un episodio especial? Añade ítems personalizados a cualquier guía pública. La comunidad podrá votar e incorporar tus aportes a sus propias listas.' },
   
-  featShelfTitle: { en: '✅ Your Progress, Your Rules', es: '✅ Tu Progreso, Tu Reglas' },
+  featShelfTitle: { en: 'Your Progress, Your Rules', es: 'Tu Progreso, Tus Reglas' },
   featShelfDesc: { en: 'Forget about getting lost between seasons and volumes. Save community guides, check off what you have consumed, and our Up Next algorithm will tell you exactly what to follow.', es: 'Olvídate de perderte entre temporadas y volúmenes. Guarda las listas de la comunidad, marca lo que ya consumiste y nuestro algoritmo Up Next te dirá exactamente por dónde seguir.' },
 
   // Priority Levels
