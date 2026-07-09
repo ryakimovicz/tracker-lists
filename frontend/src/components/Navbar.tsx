@@ -107,10 +107,10 @@ export const Navbar: React.FC = () => {
             gap: '0.4rem',
             background: 'transparent'
           }}
-          title={`Theme: ${theme}`}
+          title={t('theme' + theme.charAt(0).toUpperCase() + theme.slice(1))}
         >
           {getThemeIcon()}
-          <span style={{ textTransform: 'capitalize' }}>{theme}</span>
+          <span>{t('theme' + theme.charAt(0).toUpperCase() + theme.slice(1))}</span>
         </button>
 
         {isAuthenticated && user ? (

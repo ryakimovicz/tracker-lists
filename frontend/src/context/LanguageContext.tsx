@@ -40,6 +40,11 @@ const translations: Translations = {
   priorityHighlyRec: { en: 'Highly Recommended', es: 'Altamente Recomendado' },
   priorityMandatory: { en: 'Mandatory', es: 'Obligatorio' },
   priorityEssential: { en: 'Essential', es: 'Esencial' },
+
+  // Themes
+  themeSystem: { en: 'System', es: 'Sistema' },
+  themeLight: { en: 'Light', es: 'Claro' },
+  themeDark: { en: 'Dark', es: 'Oscuro' },
 };
 
 interface LanguageContextType {
