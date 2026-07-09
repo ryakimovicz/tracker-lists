@@ -10,7 +10,9 @@ export const Landing: React.FC = () => {
       {/* Hero Section */}
       <section style={{ textAlign: 'center', maxWidth: '1000px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
         <h1 className="gradient-text" style={{ fontSize: '3.5rem', fontWeight: 800, lineHeight: 1.15, whiteSpace: 'normal' }}>
-          {t('heroTitle')}
+          {t('heroTitleLine1')}
+          <br />
+          {t('heroTitleLine2')}
         </h1>
         <p style={{ color: 'var(--text-secondary)', fontSize: '1.25rem', lineHeight: 1.5, maxWidth: '800px', margin: '0 auto' }}>
           {t('heroSubtitle')}
