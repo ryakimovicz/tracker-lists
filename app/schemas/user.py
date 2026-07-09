@@ -12,6 +12,7 @@ class UserResponse(UserBase):
     id: int
     created_at: datetime
     photo_url: str
+    is_admin: bool = False
 
     class Config:
         from_attributes = True
@@ -32,6 +33,7 @@ class UserDashboardResponse(BaseModel):
     email: EmailStr
     created_at: datetime
     photo_url: str
+    is_admin: bool = False
     created_lists: List[ReadingListResponse] = []
     saved_lists: List[ReadingListResponse] = []
 
