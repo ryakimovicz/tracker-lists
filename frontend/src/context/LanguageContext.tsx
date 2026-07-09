@@ -79,6 +79,15 @@ const translations: Translations = {
   errForgotPasswordFailed: { en: 'Failed to request password reset.', es: 'No se pudo solicitar el restablecimiento de contraseña.' },
   errResetPasswordFailed: { en: 'Failed to reset password. Token may have expired.', es: 'No se pudo restablecer la contraseña. El token podría haber expirado.' },
 
+  // Media Categories
+  mediaAll: { en: 'All', es: 'Todos' },
+  mediaGame: { en: 'Games', es: 'Videojuegos' },
+  mediaMovie: { en: 'Movies', es: 'Películas' },
+  mediaSeries: { en: 'Series', es: 'Series' },
+  mediaBook: { en: 'Books', es: 'Libros' },
+  mediaComic: { en: 'Comics', es: 'Cómics' },
+  mediaManga: { en: 'Manga', es: 'Mangas' },
+
   // Themes
   themeSystem: { en: 'System', es: 'Sistema' },
   themeLight: { en: 'Light', es: 'Claro' },

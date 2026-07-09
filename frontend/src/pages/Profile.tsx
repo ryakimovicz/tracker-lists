@@ -33,7 +33,7 @@ interface UserProfile {
 }
 
 export const Profile: React.FC = () => {
-  const { language } = useTranslation();
+  const { t, language } = useTranslation();
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [libraryItems, setLibraryItems] = useState<LibraryItem[]>([]);
@@ -266,7 +266,7 @@ export const Profile: React.FC = () => {
                   textTransform: 'capitalize'
                 }}
               >
-                {type === 'all' ? (language === 'es' ? 'Todos' : 'All') : type}
+                {t('media' + type.charAt(0).toUpperCase() + type.slice(1))}
               </button>
             ))}
           </div>
@@ -292,8 +292,8 @@ export const Profile: React.FC = () => {
                     <h4 style={{ margin: '0 0 0.25rem 0', fontSize: '1rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.title}>
                       {item.title}
                     </h4>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--accent-primary)', textTransform: 'capitalize' }}>
-                      {item.item_type}
+                    <span style={{ fontSize: '0.75rem', color: 'var(--accent-primary)' }}>
+                      {t('media' + item.item_type.charAt(0).toUpperCase() + item.item_type.slice(1))}
                     </span>
                   </div>
 
@@ -397,8 +397,8 @@ export const Profile: React.FC = () => {
                     style={{ width: '100%', height: '260px', objectFit: 'cover', borderRadius: '8px' }}
                   />
                   <h4>{item.title}</h4>
-                  <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', textTransform: 'capitalize' }}>
-                    {item.item_type}
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                    {t('media' + item.item_type.charAt(0).toUpperCase() + item.item_type.slice(1))}
                   </span>
                 </div>
               ))}
