@@ -77,7 +77,7 @@ export const Navbar: React.FC = () => {
           }}
         >
           <Globe size={16} />
-          <span>{language === 'en' ? 'ES' : 'EN'}</span>
+          <span>{language.toUpperCase()}</span>
         </button>
 
         {isAuthenticated && user ? (
