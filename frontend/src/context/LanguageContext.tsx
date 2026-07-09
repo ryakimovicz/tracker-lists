@@ -19,8 +19,8 @@ const translations: Translations = {
   navRegister: { en: 'Register', es: 'Registrarse' },
 
   // Landing Page
-  heroTitle: { en: 'Everything you love, in one place', es: 'Todo lo que amas, en un solo lugar' },
-  heroSubtitle: { en: 'Movies, comics, books, series, and video games. Create the ultimate guides, track your progress, and discover your next obsession together with the community.', es: 'Películas, cómics, libros, series y videojuegos. Crea las guías definitivas, haz un seguimiento de tu progreso y descubre tu próxima obsesión junto a la comunidad.' },
+  heroTitle: { en: 'Guides for everything you love, in a single place', es: 'Guías de todo lo que amas, en un único sitio' },
+  heroSubtitle: { en: 'Movies, series, anime, books, comics, manga, and video games. Create complete guides, track your progress, and discover your next obsession together with the community.', es: 'Películas, series, animes, libros, comics, mangas y videojuegos. Crea las guías completas, haz un seguimiento de tu progreso y descubre tu próxima obsesión junto a la comunidad.' },
   btnStartCollection: { en: 'Start My Collection', es: 'Empezar mi colección' },
   btnExploreGuides: { en: 'Explore Guides', es: 'Explorar Guías' },
   
