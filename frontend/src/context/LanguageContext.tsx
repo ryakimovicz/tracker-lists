@@ -87,6 +87,29 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   }, []);
 
+  // Update HTML metadata dynamically based on language choice
+  useEffect(() => {
+    // Translate page title
+    document.title = language === 'en' 
+      ? 'TrackerLists - Chronological Guides & Backlog Tracker' 
+      : 'TrackerLists - Cronologías y Seguimiento de Colecciones';
+      
+    // Translate SEO meta description
+    let metaDesc = document.querySelector('meta[name="description"]');
+    if (!metaDesc) {
+      metaDesc = document.createElement('meta');
+      metaDesc.setAttribute('name', 'description');
+      document.head.appendChild(metaDesc);
+    }
+    metaDesc.setAttribute('content', language === 'en'
+      ? 'Create chronological reading orders, track episode lists, adopt community mods, and catalog your books, series, games, and movies in a unified library.'
+      : 'Crea guías de orden cronológico, haz seguimiento de episodios, adopta mods de la comunidad y cataloga tus libros, series, videojuegos y películas.'
+    );
+
+    // Update lang attribute on html tag
+    document.documentElement.lang = language;
+  }, [language]);
+
   const setLanguage = (lang: Language) => {
     setLanguageState(lang);
     localStorage.setItem('language', lang);
