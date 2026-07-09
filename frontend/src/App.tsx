@@ -9,11 +9,14 @@ import { Dashboard } from './pages/Dashboard';
 import { Search } from './pages/Search';
 import { AdminPanel } from './pages/AdminPanel';
 
+import { LanguageProvider } from './context/LanguageContext';
+
 function App() {
   return (
-    <AuthProvider>
-      <Router>
-        <div className="app-container">
+    <LanguageProvider>
+      <AuthProvider>
+        <Router>
+          <div className="app-container">
           <Navbar />
           <main className="main-content">
             <Routes>
@@ -52,7 +55,8 @@ function App() {
           </main>
         </div>
       </Router>
-    </AuthProvider>
+      </AuthProvider>
+    </LanguageProvider>
   );
 }
 

@@ -1,14 +1,20 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { LogOut, Search, List, Shield, Bookmark } from 'lucide-react';
+import { useTranslation } from '../context/LanguageContext';
+import { LogOut, Search, List, Shield, Bookmark, Globe } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
   const { user, isAuthenticated, logout } = useAuth();
+  const { language, setLanguage, t } = useTranslation();
   const navigate = useNavigate();
 
   const handleLogout = async () => {
     await logout();
     navigate('/login');
+  };
+
+  const toggleLanguage = () => {
+    setLanguage(language === 'en' ? 'es' : 'en');
   };
 
   return (
@@ -42,14 +48,14 @@ export const Navbar: React.FC = () => {
         {isAuthenticated && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
             <Link to="/search" style={{ color: 'var(--text-secondary)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <Search size={18} /> Buscar
+              <Search size={18} /> {t('navSearch')}
             </Link>
             <Link to="/dashboard" style={{ color: 'var(--text-secondary)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <Bookmark size={18} /> Estantería
+              <Bookmark size={18} /> {t('navShelf')}
             </Link>
             {user?.is_admin && (
               <Link to="/admin" style={{ color: '#ef4444', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 500 }}>
-                <Shield size={18} /> Admin Panel
+                <Shield size={18} /> {t('navAdmin')}
               </Link>
             )}
           </div>
@@ -57,6 +63,23 @@ export const Navbar: React.FC = () => {
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+        {/* Language Toggle Button */}
+        <button
+          onClick={toggleLanguage}
+          className="btn-secondary"
+          style={{
+            padding: '0.4rem 0.8rem',
+            fontSize: '0.85rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.4rem',
+            background: 'transparent'
+          }}
+        >
+          <Globe size={16} />
+          <span>{language === 'en' ? 'ES' : 'EN'}</span>
+        </button>
+
         {isAuthenticated && user ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -72,16 +95,16 @@ export const Navbar: React.FC = () => {
               className="btn-secondary"
               style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}
             >
-              <LogOut size={16} /> Salir
+              <LogOut size={16} /> {t('navLogout')}
             </button>
           </div>
         ) : (
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
             <Link to="/login" className="btn-secondary" style={{ padding: '0.4rem 1rem', textDecoration: 'none', fontSize: '0.9rem' }}>
-              Iniciar Sesión
+              {t('navLogin')}
             </Link>
             <Link to="/register" className="btn-primary" style={{ padding: '0.4rem 1rem', textDecoration: 'none', fontSize: '0.9rem' }}>
-              Registrarse
+              {t('navRegister')}
             </Link>
           </div>
         )}
