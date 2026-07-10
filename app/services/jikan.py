@@ -6,12 +6,12 @@ from app.services.base import SearchResultItem
 
 class JikanService:
     @staticmethod
-    def search_manga(query: str) -> List[SearchResultItem]:
+    def search_anime(query: str) -> List[SearchResultItem]:
         if not query:
             return []
         
         encoded_query = urllib.parse.quote(query)
-        url = f"https://api.jikan.moe/v4/manga?q={encoded_query}&limit=15"
+        url = f"https://api.jikan.moe/v4/anime?q={encoded_query}&limit=10"
         
         req = urllib.request.Request(
             url,
@@ -26,22 +26,34 @@ class JikanService:
                     data = json.loads(response.read().decode())
                     results = []
                     for item in data.get("data", []):
+                        title = item.get("title") or "Untitled Anime"
+                        
+                        # Get cover image
                         images = item.get("images", {})
-                        jpg_images = images.get("jpg", {})
-                        image_url = jpg_images.get("large_image_url") or jpg_images.get("image_url")
+                        jpg_imgs = images.get("jpg", {})
+                        image_url = jpg_imgs.get("large_image_url") or jpg_imgs.get("image_url")
+                        
+                        # Extract release date
+                        aired = item.get("aired", {})
+                        from_date = aired.get("from")
+                        release_date = None
+                        if from_date and isinstance(from_date, str):
+                            release_date = from_date[:10]
+                            
+                        desc = item.get("synopsis") or ""
                         
                         results.append(
                             SearchResultItem(
-                                external_id=str(item.get("mal_id")),
-                                title=item.get("title"),
+                                external_id=f"jikan-{item.get('mal_id')}",
+                                title=title,
                                 image_url=image_url,
-                                description=item.get("synopsis"),
-                                item_type="manga"
+                                description=desc,
+                                item_type="anime",
+                                release_date=release_date
                             )
                         )
                     return results
         except Exception as e:
-            # Fail silently or log error for diagnostics
-            print(f"Jikan API Error: {e}")
+            print(f"Jikan API Search Error: {e}")
             return []
         return []

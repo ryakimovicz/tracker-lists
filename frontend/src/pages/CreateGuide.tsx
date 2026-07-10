@@ -874,12 +874,11 @@ export const CreateGuide: React.FC = () => {
                 {searchResults.length > 0 && (
                   <div style={{
                     display: 'flex',
+                    flexWrap: 'wrap',
                     gap: '0.4rem',
-                    overflowX: 'auto',
-                    paddingBottom: '0.5rem',
                     borderBottom: '1px solid var(--border-color)',
                     marginBottom: '0.5rem',
-                    WebkitOverflowScrolling: 'touch'
+                    paddingBottom: '0.5rem'
                   }}>
                     {[
                       { value: 'all', label: language === 'es' ? 'Todo' : 'All' },
@@ -963,7 +962,7 @@ export const CreateGuide: React.FC = () => {
                           />
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <h5 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{media.title}</h5>
-                            <span style={{ fontSize: '0.72rem', color: 'var(--accent-primary)', textTransform: 'capitalize', fontWeight: 600 }}>{media.item_type}</span>
+                            <span style={{ fontSize: '0.72rem', color: 'var(--accent-primary)', textTransform: 'capitalize', fontWeight: 600 }}>{t('media' + media.item_type.charAt(0).toUpperCase() + media.item_type.slice(1))}</span>
                             
                             <div style={{ display: 'flex', gap: '1rem', marginTop: '0.25rem' }}>
                               <button
