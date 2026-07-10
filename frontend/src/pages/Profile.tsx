@@ -285,6 +285,12 @@ export const Profile: React.FC = () => {
     return matchesMedia && matchesSearch;
   });
 
+  const isFavorite = selectedItem && libraryItems.some(li =>
+    li.item_type === selectedItem.item_type &&
+    li.external_id === selectedItem.external_id &&
+    li.is_favorite
+  );
+
   if (loading) {
     return <div style={{ textAlign: 'center', padding: '3rem' }}>Cargando información...</div>;
   }
@@ -898,7 +904,7 @@ export const Profile: React.FC = () => {
                 {/* Favorite toggler */}
                 <div>
                   <button
-                    onClick={() => handleToggleFavorite(selectedItem.id, selectedItem.is_favorite)}
+                    onClick={() => handleToggleFavorite(selectedItem.id, isFavorite)}
                     className="btn-secondary"
                     style={{
                       display: 'inline-flex',
@@ -906,13 +912,13 @@ export const Profile: React.FC = () => {
                       gap: '0.5rem',
                       fontSize: '0.85rem',
                       padding: '0.4rem 0.8rem',
-                      borderColor: selectedItem.is_favorite ? 'var(--accent-primary)' : 'var(--border-color)',
-                      background: selectedItem.is_favorite ? 'rgba(124, 58, 237, 0.1)' : 'transparent',
-                      color: selectedItem.is_favorite ? 'var(--accent-primary)' : 'var(--text-primary)'
+                      borderColor: isFavorite ? 'var(--accent-primary)' : 'var(--border-color)',
+                      background: isFavorite ? 'rgba(124, 58, 237, 0.1)' : 'transparent',
+                      color: isFavorite ? 'var(--accent-primary)' : 'var(--text-primary)'
                     }}
                   >
-                    <Heart size={16} fill={selectedItem.is_favorite ? 'var(--accent-primary)' : 'none'} />
-                    {selectedItem.is_favorite
+                    <Heart size={16} fill={isFavorite ? 'var(--accent-primary)' : 'none'} />
+                    {isFavorite
                       ? (language === 'es' ? 'Destacado (Quitar)' : 'Featured (Remove)')
                       : (language === 'es' ? 'Destacar (Favorito)' : 'Feature (Favorite)')
                     }
