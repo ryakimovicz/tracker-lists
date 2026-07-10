@@ -6,7 +6,7 @@ from app.services.comicvine import ComicVineService
 from app.services.tmdb import TMDBService
 from app.services.googlebooks import GoogleBooksService
 from app.services.rawg import RAWGService
-from app.services.jikan import JikanService
+from app.services.anilist import AniListService
 from app.core.limiter import limiter
 
 router = APIRouter()
@@ -33,15 +33,15 @@ def search_media(
         import concurrent.futures
         with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
             future_tmdb = executor.submit(TMDBService.search_media, q, "series")
-            future_jikan = executor.submit(JikanService.search_anime, q)
+            future_anilist = executor.submit(AniListService.search_anime, q)
             tmdb_res = future_tmdb.result()
-            jikan_res = future_jikan.result()
+            anilist_res = future_anilist.result()
         
-        if jikan_res is None:
+        if anilist_res is None:
             combined = tmdb_res
         else:
             filtered_tmdb = [item for item in tmdb_res if item.item_type != "anime"]
-            combined = filtered_tmdb + jikan_res
+            combined = filtered_tmdb + anilist_res
         
         # Sort combined by relevance
         query_clean = q.lower().strip()
@@ -77,7 +77,7 @@ def search_all_media(
     with concurrent.futures.ThreadPoolExecutor(max_workers=7) as executor:
         future_movies = executor.submit(TMDBService.search_media, q, "movie")
         future_series = executor.submit(TMDBService.search_media, q, "series")
-        future_animes = executor.submit(JikanService.search_anime, q)
+        future_animes = executor.submit(AniListService.search_anime, q)
         future_books = executor.submit(GoogleBooksService.search_books, q)
         future_games = executor.submit(RAWGService.search_games, q)
         future_mangas = executor.submit(MangaDexService.search_manga, q)
