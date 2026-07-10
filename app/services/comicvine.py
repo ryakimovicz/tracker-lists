@@ -24,7 +24,7 @@ class ComicVineService:
             ]
         
         encoded_query = urllib.parse.quote(query)
-        url = f"https://comicvine.gamespot.com/api/search/?api_key={api_key}&format=json&resources=volume&query={encoded_query}"
+        url = f"https://comicvine.gamespot.com/api/search/?api_key={api_key}&format=json&resources=volume,issue&query={encoded_query}"
         
         req = urllib.request.Request(
             url,
@@ -42,12 +42,24 @@ class ComicVineService:
                         image_data = item.get("image", {})
                         image_url = image_data.get("super_url") or image_data.get("medium_url") or image_data.get("thumb_url")
                         
+                        resource_type = item.get("resource_type")
+                        if resource_type == "issue":
+                            vol_name = item.get("volume", {}).get("name") or "Unknown Volume"
+                            issue_num = item.get("issue_number") or ""
+                            issue_name = item.get("name")
+                            title_parts = f"{vol_name} #{issue_num}"
+                            if issue_name:
+                                title_parts += f" ({issue_name})"
+                            title = title_parts
+                        else:
+                            title = item.get("name") or "Untitled Volume"
+
                         results.append(
                             SearchResultItem(
                                 external_id=str(item.get("id")),
-                                title=item.get("name") or "Untitled Volume",
+                                title=title,
                                 image_url=image_url,
-                                description=item.get("description"),
+                                description=item.get("description") or "",
                                 item_type="comic"
                             )
                         )
