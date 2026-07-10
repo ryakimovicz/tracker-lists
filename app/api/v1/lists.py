@@ -1048,7 +1048,8 @@ def toggle_tmdb_episode(
         
     return {
         "item_id": item.id,
-        "is_completed": progress.is_completed
+        "is_completed": progress.is_completed,
+        "completed_at": progress.completed_at.isoformat() if (progress.completed_at and progress.is_completed) else None
     }
 
 @router.post("/{list_id}/bulk-toggle-season", status_code=status.HTTP_200_OK)

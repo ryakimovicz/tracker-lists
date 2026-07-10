@@ -245,7 +245,6 @@ export const Profile: React.FC = () => {
         const listRes = await apiClient.get(`/lists/${item.tracking_list_id}`);
         const itemsList = listRes.data.items || [];
         setEpisodes(itemsList);
-        setSeasonEpisodes({});
         
         let filteredSeasons = [];
         const cacheKey = `series_${item.external_id}`;
@@ -261,7 +260,21 @@ export const Profile: React.FC = () => {
 
         const nextSeason = findNextSeasonToSee(itemsList);
         setActiveSeason(nextSeason);
-        handleLoadSeasonEpisodes(item.external_id, nextSeason);
+
+        const cacheKeyS = `${item.external_id}_s${nextSeason}`;
+        const cachedS = getCachedTMDB(cacheKeyS);
+        if (cachedS) {
+          setSeasonEpisodes({ [nextSeason]: cachedS });
+        } else {
+          setIsLoadingSeasonEpisodes(true);
+          apiClient.get(`/search/series/${item.external_id}/season/${nextSeason}`)
+            .then(res => {
+              setCachedTMDB(cacheKeyS, res.data);
+              setSeasonEpisodes({ [nextSeason]: res.data || [] });
+            })
+            .catch(e => console.error(e))
+            .finally(() => setIsLoadingSeasonEpisodes(false));
+        }
       } catch (err) {
         console.error("Failed to fetch episodes", err);
       }
@@ -365,17 +378,22 @@ export const Profile: React.FC = () => {
 
   const handleToggleEpisode = async (listId: number, ep: any) => {
     try {
-      await apiClient.post(`/lists/${listId}/toggle-tmdb-episode`, {
+      const res = await apiClient.post(`/lists/${listId}/toggle-tmdb-episode`, {
         tmdb_episode_id: ep.id,
-        title: `${selectedItem.title} - S${ep.season_number < 10 ? '0' + ep.season_number : ep.season_number}E${ep.episode_number < 10 ? '0' + ep.episode_number : ep.episode_number} - ${ep.name || 'Untitled Episode'}`,
-        image_url: ep.still_path ? `https://image.tmdb.org/t/p/w185${ep.still_path}` : null,
-        overview: ep.overview,
+        title: ep.title || `${selectedItem.title} - S${ep.season_number < 10 ? '0' + ep.season_number : ep.season_number}E${ep.episode_number < 10 ? '0' + ep.episode_number : ep.episode_number} - ${ep.name || 'Untitled Episode'}`,
+        image_url: ep.image_url || (ep.still_path ? `https://image.tmdb.org/t/p/w185${ep.still_path}` : null),
+        overview: ep.custom_notes || ep.overview,
         season_number: ep.season_number,
         episode_number: ep.episode_number
       });
       
       const listRes = await apiClient.get(`/lists/${listId}`);
-      setEpisodes(listRes.data.items || []);
+      const updatedList = listRes.data.items || [];
+      setEpisodes(updatedList);
+
+      if (selectedItem && (selectedItem.external_id === `tmdb-ep-${ep.id}` || selectedItem.id === ep.id)) {
+        setSelectedItem((prev: any) => prev ? { ...prev, completed_at: res.data.completed_at } : null);
+      }
       
       const libraryRes = await apiClient.get('/library/');
       setLibraryItems(libraryRes.data);
@@ -718,8 +736,7 @@ export const Profile: React.FC = () => {
                             </span>
                             {/* Last completed episode for series */}
                             {item.item_type === 'series' && item.last_seen_episode && (
-                              <span style={{ fontSize: '0.72rem', color: 'var(--accent-primary)', fontWeight: 500, display: 'block', marginTop: '-0.3rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.last_seen_episode}>
-                                {language === 'es' ? 'Último visto: ' : 'Last watched: '}
+                              <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 500, display: 'block', marginTop: '-0.3rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.last_seen_episode}>
                                 {item.last_seen_episode.includes(' - ') ? item.last_seen_episode.split(' - ').slice(1).join(' - ') : item.last_seen_episode}
                               </span>
                             )}
@@ -1225,6 +1242,36 @@ export const Profile: React.FC = () => {
                       </select>
                     </div>
                   )}
+
+                  {/* Episode seen checkbox and date completed */}
+                  {isEpisode && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.5rem' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.88rem', fontWeight: 600 }}>
+                        <input
+                          type="checkbox"
+                          checked={!!selectedItem.completed_at}
+                          onChange={async () => {
+                            await handleToggleEpisode(selectedItem.list_id, {
+                              id: selectedItem.rawEpisodeId,
+                              title: selectedItem.title,
+                              image_url: selectedItem.image_url,
+                              custom_notes: selectedItem.custom_notes,
+                              season_number: selectedItem.season_number,
+                              episode_number: selectedItem.episode_number
+                            });
+                          }}
+                          style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                        />
+                        {language === 'es' ? 'Marcar como visto' : 'Mark as seen'}
+                      </label>
+                      {selectedItem.completed_at && (
+                        <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                          {language === 'es' ? 'Visto el: ' : 'Watched on: '}
+                          {formatDate(new Date(selectedItem.completed_at))}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1377,7 +1424,10 @@ export const Profile: React.FC = () => {
                                           title: `${selectedItem.title} - S${ep.season_number < 10 ? '0' + ep.season_number : ep.season_number}E${ep.episode_number < 10 ? '0' + ep.episode_number : ep.episode_number} - ${ep.name || 'Untitled'}`,
                                           image_url: ep.still_path ? `https://image.tmdb.org/t/p/w185${ep.still_path}` : selectedItem.image_url,
                                           custom_notes: ep.overview,
-                                          completed_at: dbEp?.completed_at
+                                          completed_at: dbEp?.completed_at,
+                                          season_number: ep.season_number,
+                                          episode_number: ep.episode_number,
+                                          rawEpisodeId: ep.id
                                         })}
                                         className="btn-secondary"
                                         style={{ padding: '0.2rem 0.4rem', fontSize: '0.74rem' }}
