@@ -46,13 +46,23 @@ class TMDBService:
                         poster_path = item.get("poster_path")
                         image_url = f"https://image.tmdb.org/t/p/w185{poster_path}" if poster_path else None
                         
+                        item_type_val = type
+                        if type == "series":
+                            is_anime = (
+                                item.get("original_language") == "ja" or
+                                "JP" in item.get("origin_country", []) or
+                                16 in item.get("genre_ids", [])
+                            )
+                            if is_anime:
+                                item_type_val = "anime"
+
                         results.append(
                             SearchResultItem(
                                 external_id=str(item.get("id")),
                                 title=title,
                                 image_url=image_url,
                                 description=item.get("overview"),
-                                item_type=type,
+                                item_type=item_type_val,
                                 release_date=item.get("release_date") or item.get("first_air_date")
                             )
                         )

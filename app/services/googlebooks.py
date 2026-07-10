@@ -12,7 +12,12 @@ class GoogleBooksService:
             return []
         try:
             from app.core.config import settings
-            encoded_query = urllib.parse.quote(query)
+            query_clean = query.strip().replace("-", "").replace(" ", "")
+            if query_clean.isdigit() and len(query_clean) in (10, 13):
+                search_term = f"isbn:{query_clean}"
+            else:
+                search_term = query
+            encoded_query = urllib.parse.quote(search_term)
             url = f"https://www.googleapis.com/books/v1/volumes?q={encoded_query}&maxResults=15"
             if settings.GOOGLE_BOOKS_API_KEY:
                 url += f"&key={settings.GOOGLE_BOOKS_API_KEY}"
@@ -67,8 +72,12 @@ class GoogleBooksService:
         if not query:
             return []
         try:
-            encoded_query = urllib.parse.quote(query)
-            url = f"https://openlibrary.org/search.json?q={encoded_query}&limit=15"
+            query_clean = query.strip().replace("-", "").replace(" ", "")
+            if query_clean.isdigit() and len(query_clean) in (10, 13):
+                url = f"https://openlibrary.org/search.json?isbn={query_clean}&limit=15"
+            else:
+                encoded_query = urllib.parse.quote(query)
+                url = f"https://openlibrary.org/search.json?q={encoded_query}&limit=15"
             req = urllib.request.Request(
                 url,
                 headers={"User-Agent": "TrackerLists/1.0 (contact@trackerlists.com)"}

@@ -121,6 +121,8 @@ def add_to_library(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    if item_in.item_type == "anime":
+        item_in.item_type = "series"
     validate_media_status(item_in.item_type, item_in.status)
 
     # Check if already exists in library

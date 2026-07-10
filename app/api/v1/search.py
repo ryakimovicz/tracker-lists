@@ -34,6 +34,37 @@ def search_media(
             detail="Invalid search type. Must be 'comic', 'manga', 'book', 'game', 'movie' or 'series'."
         )
 
+@router.get("/all", response_model=List[SearchResultItem])
+@limiter.limit("20/minute")
+def search_all_media(
+    request: Request,
+    q: str = Query(..., min_length=1, description="The search query term")
+):
+    import concurrent.futures
+    with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
+        future_movies = executor.submit(TMDBService.search_media, q, "movie")
+        future_series = executor.submit(TMDBService.search_media, q, "series")
+        future_books = executor.submit(GoogleBooksService.search_books, q)
+        future_games = executor.submit(RAWGService.search_games, q)
+        future_mangas = executor.submit(MangaDexService.search_manga, q)
+        future_comics = executor.submit(ComicVineService.search_comics, q)
+        
+        movies = future_movies.result()
+        series = future_series.result()
+        books = future_books.result()
+        games = future_games.result()
+        mangas = future_mangas.result()
+        comics = future_comics.result()
+        
+    combined = []
+    combined.extend(movies)
+    combined.extend(series)
+    combined.extend(books)
+    combined.extend(games)
+    combined.extend(mangas)
+    combined.extend(comics)
+    return combined
+
 @router.get("/series/{series_id}/season/{season_number}")
 def get_series_season_episodes(
     series_id: int,
