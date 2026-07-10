@@ -29,9 +29,11 @@ export const CreateGuide: React.FC = () => {
   const [visibility, setVisibility] = useState<'public' | 'private'>('public');
 
   // Custom priority labels state
-  const [label1, setLabel1] = useState(language === 'es' ? 'Relleno / Opcional' : 'Filler / Optional');
-  const [label3, setLabel3] = useState(language === 'es' ? 'Recomendado' : 'Recommended');
-  const [label5, setLabel5] = useState(language === 'es' ? 'Canon / Esencial' : 'Canon / Essential');
+  const [label1, setLabel1] = useState(language === 'es' ? 'Muy Bajo / Relleno' : 'Very Low / Filler');
+  const [label2, setLabel2] = useState(language === 'es' ? 'Bajo' : 'Low');
+  const [label3, setLabel3] = useState(language === 'es' ? 'Medio / Recomendado' : 'Medium / Recommended');
+  const [label4, setLabel4] = useState(language === 'es' ? 'Alto' : 'High');
+  const [label5, setLabel5] = useState(language === 'es' ? 'Muy Alto / Esencial' : 'Very High / Essential');
 
   // Step 2: Editor actions state
   const [activeSection, setActiveSection] = useState('');
@@ -62,7 +64,9 @@ export const CreateGuide: React.FC = () => {
       // Build importance labels renaming map
       const importanceLabels = {
         "1": label1,
+        "2": label2,
         "3": label3,
+        "4": label4,
         "5": label5
       };
 
@@ -171,15 +175,15 @@ export const CreateGuide: React.FC = () => {
       {/* STEP 1: GUIDE DETAILS CREATOR */}
       {!guide ? (
         <form onSubmit={handleCreateGuideSubmit} className="glass-card" style={{ padding: '2.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-          <h2>{language === 'es' ? 'Crear Nueva Guía Cronológica' : 'Create New Chronological Guide'}</h2>
+          <h2>{language === 'es' ? 'Crear Nueva Lista/Guía' : 'Create New List/Guide'}</h2>
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-            <label style={{ fontSize: '0.9rem', fontWeight: 500 }}>{language === 'es' ? 'Título de la Guía' : 'Guide Title'}</label>
+            <label style={{ fontSize: '0.9rem', fontWeight: 500 }}>{language === 'es' ? 'Título de la Lista/Guía' : 'List/Guide Title'}</label>
             <input
               type="text"
               required
               className="input-field"
-              placeholder={language === 'es' ? 'Ej. Batman: Orden de Lectura Completo' : 'e.g. Marvel Cinematic Universe timeline'}
+              placeholder={language === 'es' ? 'Ej. Mis películas favoritas, Batman: Orden de lectura completo...' : 'e.g. My favorite movies, Batman reading order...'}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
             />
@@ -190,7 +194,7 @@ export const CreateGuide: React.FC = () => {
             <textarea
               className="input-field"
               rows={3}
-              placeholder={language === 'es' ? 'De qué se trata esta cronología...' : 'What this guide is about...'}
+              placeholder={language === 'es' ? 'De qué se trata esta lista o guía...' : 'What this list or guide is about...'}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
             />
@@ -212,19 +216,27 @@ export const CreateGuide: React.FC = () => {
           <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <h4>{language === 'es' ? 'Renombrar Escala de Importancia (Opcional)' : 'Customize Importance Labels (Optional)'}</h4>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: 0 }}>
-              Asigna nombres específicos a las prioridades de tu guía.
+              Asigna nombres específicos a las 5 prioridades de tu lista/guía.
             </p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '1rem' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                <label style={{ fontSize: '0.8rem' }}>{language === 'es' ? 'Prioridad Baja (1)' : 'Low Priority (1)'}</label>
+                <label style={{ fontSize: '0.8rem' }}>{language === 'es' ? 'Nivel 1 (Muy Bajo)' : 'Level 1 (Very Low)'}</label>
                 <input type="text" className="input-field" value={label1} onChange={(e) => setLabel1(e.target.value)} />
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
-                <label style={{ fontSize: '0.8rem' }}>{language === 'es' ? 'Prioridad Media (3)' : 'Medium Priority (3)'}</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                <label style={{ fontSize: '0.8rem' }}>{language === 'es' ? 'Nivel 2 (Bajo)' : 'Level 2 (Low)'}</label>
+                <input type="text" className="input-field" value={label2} onChange={(e) => setLabel2(e.target.value)} />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                <label style={{ fontSize: '0.8rem' }}>{language === 'es' ? 'Nivel 3 (Medio)' : 'Level 3 (Medium)'}</label>
                 <input type="text" className="input-field" value={label3} onChange={(e) => setLabel3(e.target.value)} />
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
-                <label style={{ fontSize: '0.8rem' }}>{language === 'es' ? 'Prioridad Alta (5)' : 'High Priority (5)'}</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                <label style={{ fontSize: '0.8rem' }}>{language === 'es' ? 'Nivel 4 (Alto)' : 'Level 4 (High)'}</label>
+                <input type="text" className="input-field" value={label4} onChange={(e) => setLabel4(e.target.value)} />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                <label style={{ fontSize: '0.8rem' }}>{language === 'es' ? 'Nivel 5 (Muy Alto)' : 'Level 5 (Very High)'}</label>
                 <input type="text" className="input-field" value={label5} onChange={(e) => setLabel5(e.target.value)} />
               </div>
             </div>
@@ -315,9 +327,9 @@ export const CreateGuide: React.FC = () => {
                     >
                       <option value="">{language === 'es' ? 'Heredada (Sección)' : 'Inherited'}</option>
                       <option value="1">1 - {label1}</option>
-                      <option value="2">2</option>
+                      <option value="2">2 - {label2}</option>
                       <option value="3">3 - {label3}</option>
-                      <option value="4">4</option>
+                      <option value="4">4 - {label4}</option>
                       <option value="5">5 - {label5}</option>
                     </select>
                   </div>
