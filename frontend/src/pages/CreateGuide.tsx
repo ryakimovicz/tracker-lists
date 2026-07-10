@@ -28,6 +28,8 @@ export const CreateGuide: React.FC = () => {
   const [description, setDescription] = useState('');
   const [visibility, setVisibility] = useState<'public' | 'private'>('public');
 
+  const [showCustomLabels, setShowCustomLabels] = useState(false);
+
   // Custom priority labels state
   const [label1, setLabel1] = useState(language === 'es' ? 'Muy Bajo / Relleno' : 'Very Low / Filler');
   const [label2, setLabel2] = useState(language === 'es' ? 'Bajo' : 'Low');
@@ -212,34 +214,50 @@ export const CreateGuide: React.FC = () => {
             </select>
           </div>
 
-          {/* Scale customization */}
-          <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <h4>{language === 'es' ? 'Renombrar Escala de Importancia (Opcional)' : 'Customize Importance Labels (Optional)'}</h4>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: 0 }}>
-              Asigna nombres específicos a las 5 prioridades de tu lista/guía.
-            </p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '1rem' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                <label style={{ fontSize: '0.8rem' }}>{language === 'es' ? 'Nivel 1 (Muy Bajo)' : 'Level 1 (Very Low)'}</label>
-                <input type="text" className="input-field" value={label1} onChange={(e) => setLabel1(e.target.value)} />
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                <label style={{ fontSize: '0.8rem' }}>{language === 'es' ? 'Nivel 2 (Bajo)' : 'Level 2 (Low)'}</label>
-                <input type="text" className="input-field" value={label2} onChange={(e) => setLabel2(e.target.value)} />
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                <label style={{ fontSize: '0.8rem' }}>{language === 'es' ? 'Nivel 3 (Medio)' : 'Level 3 (Medium)'}</label>
-                <input type="text" className="input-field" value={label3} onChange={(e) => setLabel3(e.target.value)} />
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                <label style={{ fontSize: '0.8rem' }}>{language === 'es' ? 'Nivel 4 (Alto)' : 'Level 4 (High)'}</label>
-                <input type="text" className="input-field" value={label4} onChange={(e) => setLabel4(e.target.value)} />
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                <label style={{ fontSize: '0.8rem' }}>{language === 'es' ? 'Nivel 5 (Muy Alto)' : 'Level 5 (Very High)'}</label>
-                <input type="text" className="input-field" value={label5} onChange={(e) => setLabel5(e.target.value)} />
-              </div>
+          {/* Scale customization checkbox */}
+          <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <input
+                type="checkbox"
+                id="customScaleCheck"
+                checked={showCustomLabels}
+                onChange={(e) => setShowCustomLabels(e.target.checked)}
+                style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+              />
+              <label htmlFor="customScaleCheck" style={{ fontSize: '0.9rem', cursor: 'pointer', fontWeight: 500 }}>
+                {language === 'es' ? 'Personalizar escala de importancia' : 'Customize importance scale'}
+              </label>
             </div>
+
+            {showCustomLabels && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '0.5rem' }}>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: 0 }}>
+                  {language === 'es' ? 'Asigna nombres específicos a las 5 prioridades de tu lista/guía.' : 'Assign specific names to the 5 priorities of your list/guide.'}
+                </p>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '1rem' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                    <label style={{ fontSize: '0.8rem' }}>{language === 'es' ? 'Nivel 1 (Muy Bajo)' : 'Level 1 (Very Low)'}</label>
+                    <input type="text" className="input-field" value={label1} onChange={(e) => setLabel1(e.target.value)} />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                    <label style={{ fontSize: '0.8rem' }}>{language === 'es' ? 'Nivel 2 (Bajo)' : 'Level 2 (Low)'}</label>
+                    <input type="text" className="input-field" value={label2} onChange={(e) => setLabel2(e.target.value)} />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                    <label style={{ fontSize: '0.8rem' }}>{language === 'es' ? 'Nivel 3 (Medio)' : 'Level 3 (Medium)'}</label>
+                    <input type="text" className="input-field" value={label3} onChange={(e) => setLabel3(e.target.value)} />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                    <label style={{ fontSize: '0.8rem' }}>{language === 'es' ? 'Nivel 4 (Alto)' : 'Level 4 (High)'}</label>
+                    <input type="text" className="input-field" value={label4} onChange={(e) => setLabel4(e.target.value)} />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                    <label style={{ fontSize: '0.8rem' }}>{language === 'es' ? 'Nivel 5 (Muy Alto)' : 'Level 5 (Very High)'}</label>
+                    <input type="text" className="input-field" value={label5} onChange={(e) => setLabel5(e.target.value)} />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           <button type="submit" disabled={isSubmitting} className="btn-primary" style={{ marginTop: '1rem' }}>
