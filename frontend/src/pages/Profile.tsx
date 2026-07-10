@@ -162,7 +162,38 @@ export const Profile: React.FC = () => {
       setErrorMsg(language === 'es' ? 'Error al actualizar el progreso.' : 'Failed to toggle item progress.');
     }
   };
+  const handleBulkToggle = async (itemIds: number[], completed: boolean) => {
+    if (!viewingGuide || itemIds.length === 0) return;
+    try {
+      await apiClient.post(`/lists/${viewingGuide.id}/items/bulk-toggle`, {
+        item_ids: itemIds,
+        completed
+      });
 
+      setViewingGuide((prev: any) => {
+        if (!prev) return null;
+        const updatedItems = (prev.items || []).map((item: any) => {
+          if (itemIds.includes(item.id)) {
+            return { ...item, is_completed: completed };
+          }
+          return item;
+        });
+
+        const completedCount = updatedItems.filter((i: any) => i.is_completed).length;
+        const totalCount = updatedItems.length;
+        const progressPercentage = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
+
+        return {
+          ...prev,
+          items: updatedItems,
+          completed_count: completedCount,
+          progress_percentage: Math.round(progressPercentage * 100) / 100
+        };
+      });
+    } catch (err: any) {
+      setErrorMsg(language === 'es' ? 'Error al actualizar el progreso.' : 'Failed to update bulk progress.');
+    }
+  };
   const handleDeleteGuide = async (listId: number) => {
     if (!window.confirm(language === 'es' ? '¿Estás seguro de que deseas eliminar esta guía?' : 'Are you sure you want to delete this guide?')) return;
     setErrorMsg('');
@@ -646,13 +677,58 @@ export const Profile: React.FC = () => {
                   );
                 }
 
+                // Helper to get all items under a section
+                const getSectionItemIds = (sectionEl: any) => {
+                  const ids: number[] = [];
+                  const idx = docFlowList.findIndex((x: any) => x.id === sectionEl.id);
+                  if (idx === -1) return ids;
+                  for (let i = idx + 1; i < docFlowList.length; i++) {
+                    const el = docFlowList[i];
+                    if (el.type === 'section') break;
+                    if (el.type === 'block') {
+                      (el.items || []).forEach((item: any) => ids.push(item.id));
+                      (el.subblocks || []).forEach((sub: any) => {
+                        (sub.items || []).forEach((item: any) => ids.push(item.id));
+                      });
+                    }
+                  }
+                  return ids;
+                };
+
+                // Helper to get all items under a block
+                const getBlockItemIds = (blockEl: any) => {
+                  const ids: number[] = [];
+                  (blockEl.items || []).forEach((item: any) => ids.push(item.id));
+                  (blockEl.subblocks || []).forEach((sub: any) => {
+                    (sub.items || []).forEach((item: any) => ids.push(item.id));
+                  });
+                  return ids;
+                };
+
+                // Helper to get all items under a subblock
+                const getSubblockItemIds = (subblockEl: any) => {
+                  return (subblockEl.items || []).map((item: any) => item.id);
+                };
+
                 // Render structured flow
                 return docFlowList.map((el: any) => {
                   if (el.type === 'section') {
+                    const sectionIds = getSectionItemIds(el);
+                    const isSectionCompleted = sectionIds.length > 0 && sectionIds.every((id: number) => itemsList.find((i: any) => i.id === id)?.is_completed);
                     return (
-                      <div key={el.id} style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem', marginTop: '0.5rem' }}>
-                        <h3 style={{ color: 'var(--accent-primary)', fontSize: '1.2rem', margin: '0 0 0.25rem 0', fontWeight: 800 }}>{el.title.toUpperCase()}</h3>
-                        {el.description && <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', fontStyle: 'italic', margin: 0 }}>{el.description}</p>}
+                      <div key={el.id} style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem', marginTop: '0.5rem', display: 'flex', gap: '0.75rem', alignItems: 'start' }}>
+                        {sectionIds.length > 0 && (
+                          <input
+                            type="checkbox"
+                            checked={isSectionCompleted}
+                            onChange={() => handleBulkToggle(sectionIds, !isSectionCompleted)}
+                            style={{ width: '20px', height: '20px', cursor: 'pointer', marginTop: '0.2rem' }}
+                          />
+                        )}
+                        <div style={{ flex: 1 }}>
+                          <h3 style={{ color: 'var(--accent-primary)', fontSize: '1.2rem', margin: '0 0 0.25rem 0', fontWeight: 800 }}>{el.title.toUpperCase()}</h3>
+                          {el.description && <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', fontStyle: 'italic', margin: 0 }}>{el.description}</p>}
+                        </div>
                       </div>
                     );
                   }
@@ -661,6 +737,8 @@ export const Profile: React.FC = () => {
                     // Find actual list items mapped in this block
                     const blockItemsIds = (el.items || []).map((i: any) => i.id);
                     const blockItems = itemsList.filter((item: any) => blockItemsIds.includes(item.id));
+                    const allBlockIds = getBlockItemIds(el);
+                    const isBlockCompleted = allBlockIds.length > 0 && allBlockIds.every((id: number) => itemsList.find((i: any) => i.id === id)?.is_completed);
                     
                     const priorityLabel = el.importance_rank && viewingGuide.importance_labels
                       ? viewingGuide.importance_labels[el.importance_rank.toString()]
@@ -668,11 +746,23 @@ export const Profile: React.FC = () => {
 
                     return (
                       <div key={el.id} style={{ paddingLeft: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', flexWrap: 'wrap' }}>
-                          <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700 }}>{el.title}</h4>
-                          {priorityLabel && <span style={{ fontSize: '0.75rem', color: 'var(--accent-primary)', fontWeight: 600 }}>({priorityLabel})</span>}
+                        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'start' }}>
+                          {allBlockIds.length > 0 && (
+                            <input
+                              type="checkbox"
+                              checked={isBlockCompleted}
+                              onChange={() => handleBulkToggle(allBlockIds, !isBlockCompleted)}
+                              style={{ width: '18px', height: '18px', cursor: 'pointer', marginTop: '0.15rem' }}
+                            />
+                          )}
+                          <div style={{ flex: 1 }}>
+                            <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', flexWrap: 'wrap' }}>
+                              <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700 }}>{el.title}</h4>
+                              {priorityLabel && <span style={{ fontSize: '0.75rem', color: 'var(--accent-primary)', fontWeight: 600 }}>({priorityLabel})</span>}
+                            </div>
+                            {el.description && <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', margin: '0.25rem 0 0 0' }}>{el.description}</p>}
+                          </div>
                         </div>
-                        {el.description && <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', margin: 0 }}>{el.description}</p>}
 
                         {/* Block Items */}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', paddingLeft: '0.5rem' }}>
@@ -728,6 +818,8 @@ export const Profile: React.FC = () => {
                         {(el.subblocks || []).map((sub: any) => {
                           const subItemsIds = (sub.items || []).map((i: any) => i.id);
                           const subItems = itemsList.filter((item: any) => subItemsIds.includes(item.id));
+                          const allSubblockIds = getSubblockItemIds(sub);
+                          const isSubblockCompleted = allSubblockIds.length > 0 && allSubblockIds.every((id: number) => itemsList.find((i: any) => i.id === id)?.is_completed);
                           
                           const subPriorityLabel = sub.importance_rank && viewingGuide.importance_labels
                             ? viewingGuide.importance_labels[sub.importance_rank.toString()]
@@ -735,11 +827,23 @@ export const Profile: React.FC = () => {
 
                           return (
                             <div key={sub.id} style={{ marginLeft: '1.5rem', paddingLeft: '0.75rem', borderLeft: '2px dashed var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                              <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', flexWrap: 'wrap' }}>
-                                <h5 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700 }}>{sub.title}</h5>
-                                {subPriorityLabel && <span style={{ fontSize: '0.72rem', color: 'var(--accent-primary)', fontWeight: 600 }}>({subPriorityLabel})</span>}
+                              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'start' }}>
+                                {allSubblockIds.length > 0 && (
+                                  <input
+                                    type="checkbox"
+                                    checked={isSubblockCompleted}
+                                    onChange={() => handleBulkToggle(allSubblockIds, !isSubblockCompleted)}
+                                    style={{ width: '16px', height: '16px', cursor: 'pointer', marginTop: '0.1rem' }}
+                                  />
+                                )}
+                                <div style={{ flex: 1 }}>
+                                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                    <h5 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700 }}>{sub.title}</h5>
+                                    {subPriorityLabel && <span style={{ fontSize: '0.72rem', color: 'var(--accent-primary)', fontWeight: 600 }}>({subPriorityLabel})</span>}
+                                  </div>
+                                  {sub.description && <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0.2rem 0 0 0' }}>{sub.description}</p>}
+                                </div>
                               </div>
-                              {sub.description && <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: 0 }}>{sub.description}</p>}
 
                               {/* Subblock items */}
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>

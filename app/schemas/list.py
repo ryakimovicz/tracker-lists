@@ -94,3 +94,7 @@ class SectionBulkActionRequest(BaseModel):
     section_name: str
     action: str # "skip", "unskip", "complete", "uncomplete"
 
+class BulkToggleRequest(BaseModel):
+    item_ids: List[int]
+    completed: bool
+

@@ -23,7 +23,8 @@ from app.schemas.list import (
     ListItemProgressResponse,
     TVImportRequest,
     TVImportType,
-    SectionBulkActionRequest
+    SectionBulkActionRequest,
+    BulkToggleRequest
 )
 
 router = APIRouter()
@@ -464,6 +465,60 @@ def toggle_item_progress(
         "item_id": item_id,
         "is_completed": progress.is_completed
     }
+
+# Bulk toggle progress for items in a list
+@router.post("/{list_id}/items/bulk-toggle", status_code=status.HTTP_200_OK)
+def bulk_toggle_items_progress(
+    list_id: int,
+    req_body: BulkToggleRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    for item_id in req_body.item_ids:
+        item = db.query(ListItem).filter(ListItem.id == item_id, ListItem.list_id == list_id).first()
+        if not item:
+            continue
+        
+        if item.external_id:
+            progress = db.query(ItemProgress).filter(
+                ItemProgress.user_id == current_user.id,
+                ItemProgress.item_type == item.item_type,
+                ItemProgress.external_id == item.external_id
+            ).first()
+        else:
+            progress = db.query(ItemProgress).filter(
+                ItemProgress.user_id == current_user.id,
+                ItemProgress.list_item_id == item_id
+            ).first()
+            
+        if progress:
+            progress.is_completed = req_body.completed
+            if req_body.completed:
+                progress.is_skipped = False
+            progress.completed_at = datetime.now(timezone.utc) if req_body.completed else None
+        else:
+            if item.external_id:
+                progress = ItemProgress(
+                    user_id=current_user.id,
+                    item_type=item.item_type,
+                    external_id=item.external_id,
+                    list_item_id=item_id,
+                    is_completed=req_body.completed,
+                    is_skipped=False,
+                    completed_at=datetime.now(timezone.utc) if req_body.completed else None
+                )
+            else:
+                progress = ItemProgress(
+                    user_id=current_user.id,
+                    list_item_id=item_id,
+                    is_completed=req_body.completed,
+                    is_skipped=False,
+                    completed_at=datetime.now(timezone.utc) if req_body.completed else None
+                )
+            db.add(progress)
+            
+    db.commit()
+    return {"status": "success"}
 
 # 11. Reverse Lookup: See which lists contain this item
 @router.get("/items/lookup", response_model=List[ReadingListResponse])
