@@ -27,7 +27,8 @@ from app.schemas.list import (
     TVImportType,
     SectionBulkActionRequest,
     BulkToggleRequest,
-    ToggleTMDBEpisodeRequest
+    ToggleTMDBEpisodeRequest,
+    BulkToggleSeasonRequest
 )
 
 router = APIRouter()
@@ -1049,6 +1050,114 @@ def toggle_tmdb_episode(
         "item_id": item.id,
         "is_completed": progress.is_completed
     }
+
+@router.post("/{list_id}/bulk-toggle-season", status_code=status.HTTP_200_OK)
+def bulk_toggle_season(
+    list_id: int,
+    req: BulkToggleSeasonRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    reading_list = db.query(ReadingList).filter(ReadingList.id == list_id).first()
+    if not reading_list:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="List not found")
+    if reading_list.creator_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+        
+    lib_item = db.query(UserLibraryItem).filter(
+        UserLibraryItem.user_id == current_user.id,
+        UserLibraryItem.tracking_list_id == list_id
+    ).first()
+    
+    series_title = lib_item.title if lib_item else "Series"
+    
+    for ep in req.episodes:
+        ext_id = f"tmdb-ep-{ep.get('id')}"
+        item = db.query(ListItem).filter(
+            ListItem.list_id == list_id,
+            ListItem.external_id == ext_id
+        ).first()
+        
+        if not item:
+            item_count = db.query(ListItem).filter(ListItem.list_id == list_id).count()
+            item = ListItem(
+                list_id=list_id,
+                order_index=item_count + 1,
+                item_type=ItemTypeEnum.SERIES,
+                external_id=ext_id,
+                title=f"{series_title} - S{req.season_number:02d}E{ep.get('episode_number', 1):02d} - {ep.get('name', 'Untitled')}",
+                image_url=f"https://image.tmdb.org/t/p/w185{ep.get('still_path')}" if ep.get('still_path') else None,
+                custom_notes=ep.get('overview'),
+                section=f"Season {req.season_number}"
+            )
+            db.add(item)
+            db.commit()
+            db.refresh(item)
+            
+        progress = db.query(ItemProgress).filter(
+            ItemProgress.user_id == current_user.id,
+            ItemProgress.external_id == ext_id
+        ).first()
+        
+        if progress:
+            progress.is_completed = req.completed
+            progress.completed_at = datetime.now(timezone.utc) if req.completed else None
+        else:
+            progress = ItemProgress(
+                user_id=current_user.id,
+                item_type=ItemTypeEnum.SERIES,
+                external_id=ext_id,
+                list_item_id=item.id,
+                is_completed=req.completed,
+                is_skipped=False,
+                completed_at=datetime.now(timezone.utc) if req.completed else None
+            )
+            db.add(progress)
+            
+    db.commit()
+    
+    if lib_item:
+        completed_episodes = db.query(ItemProgress).join(ListItem).filter(
+            ItemProgress.user_id == current_user.id,
+            ListItem.list_id == list_id,
+            ItemProgress.is_completed == True
+        ).all()
+        
+        completed_count = len(completed_episodes)
+        
+        if completed_count > 0:
+            total_episodes = 99999
+            try:
+                series_id = int(lib_item.external_id)
+                series_detail = TMDBService.get_series_detail(series_id)
+                total_episodes = series_detail.get("number_of_episodes") or 99999
+            except Exception:
+                pass
+                
+            if completed_count >= total_episodes:
+                lib_item.status = UserLibraryStatusEnum.COMPLETED
+                lib_item.completed_at = datetime.now(timezone.utc)
+            else:
+                lib_item.status = UserLibraryStatusEnum.WATCHING
+                lib_item.completed_at = None
+                
+            last_completed = db.query(ListItem).join(ItemProgress).filter(
+                ListItem.list_id == list_id,
+                ItemProgress.user_id == current_user.id,
+                ItemProgress.is_completed == True
+            ).order_by(ListItem.id.desc()).first()
+            
+            if last_completed:
+                lib_item.last_seen_episode = last_completed.title
+        else:
+            lib_item.status = UserLibraryStatusEnum.PLAN_TO_WATCH
+            lib_item.completed_at = None
+            lib_item.last_seen_episode = None
+            
+        lib_item.updated_at = datetime.now(timezone.utc)
+        db.commit()
+        
+    return {"message": "Season progress toggled successfully"}
 
 
 

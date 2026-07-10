@@ -48,6 +48,72 @@ def validate_media_status(item_type: str, status_val: UserLibraryStatusEnum):
                 detail="Invalid status for book/manga/comic. Must be 'plan_to_read', 'reading', 'read', or 'dropped'."
             )
 
+def bulk_complete_series_episodes(db: Session, user_id: int, tracking_list_id: int, external_id: str, title: str):
+    try:
+        from app.models.list_item import ListItem, ItemTypeEnum
+        from app.models.item_progress import ItemProgress
+        from datetime import datetime, timezone
+        
+        series_id = int(external_id)
+        series_detail = TMDBService.get_series_detail(series_id)
+        seasons = series_detail.get("seasons", [])
+        
+        last_completed_title = None
+        for s in seasons:
+            s_num = s.get("season_number")
+            if s_num == 0:
+                continue
+            
+            episodes = TMDBService.get_season_episodes(series_id, s_num)
+            for ep in episodes:
+                ext_id = f"tmdb-ep-{ep.get('id')}"
+                li = db.query(ListItem).filter(
+                    ListItem.list_id == tracking_list_id,
+                    ListItem.external_id == ext_id
+                ).first()
+                
+                if not li:
+                    item_count = db.query(ListItem).filter(ListItem.list_id == tracking_list_id).count()
+                    li = ListItem(
+                        list_id=tracking_list_id,
+                        order_index=item_count + 1,
+                        item_type=ItemTypeEnum.SERIES,
+                        external_id=ext_id,
+                        title=f"{title} - S{s_num:02d}E{ep.get('episode_number', 1):02d} - {ep.get('name', 'Untitled')}",
+                        image_url=f"https://image.tmdb.org/t/p/w185{ep.get('still_path')}" if ep.get('still_path') else None,
+                        custom_notes=ep.get('overview'),
+                        section=f"Season {s_num}"
+                    )
+                    db.add(li)
+                    db.commit()
+                    db.refresh(li)
+                    
+                progress = db.query(ItemProgress).filter(
+                    ItemProgress.user_id == user_id,
+                    ItemProgress.external_id == ext_id
+                ).first()
+                
+                if progress:
+                    progress.is_completed = True
+                    progress.completed_at = datetime.now(timezone.utc)
+                else:
+                    progress = ItemProgress(
+                        user_id=user_id,
+                        item_type=ItemTypeEnum.SERIES,
+                        external_id=ext_id,
+                        list_item_id=li.id,
+                        is_completed=True,
+                        is_skipped=False,
+                        completed_at=datetime.now(timezone.utc)
+                    )
+                    db.add(progress)
+                last_completed_title = li.title
+        db.commit()
+        return last_completed_title
+    except Exception as e:
+        print(f"Failed to bulk complete series episodes: {e}")
+        return None
+
 @router.post("/", response_model=LibraryItemResponse, status_code=status.HTTP_201_CREATED)
 def add_to_library(
     item_in: LibraryItemCreate,
@@ -116,8 +182,11 @@ def add_to_library(
             
     from datetime import datetime, timezone
     completed_at_val = None
+    last_title = None
     if item_in.status in (UserLibraryStatusEnum.COMPLETED, UserLibraryStatusEnum.READ):
         completed_at_val = datetime.now(timezone.utc)
+        if item_in.item_type == "series" and tracking_list_id:
+            last_title = bulk_complete_series_episodes(db, current_user.id, tracking_list_id, item_in.external_id, item_in.title)
 
     new_lib_item = UserLibraryItem(
         user_id=current_user.id,
@@ -128,6 +197,7 @@ def add_to_library(
         status=item_in.status,
         is_favorite=item_in.is_favorite if item_in.is_favorite is not None else False,
         completed_at=completed_at_val,
+        last_seen_episode=last_title,
         tracking_list_id=tracking_list_id
     )
     db.add(new_lib_item)
@@ -189,6 +259,10 @@ def update_library_item(
         from datetime import datetime, timezone
         if item_in.status in (UserLibraryStatusEnum.COMPLETED, UserLibraryStatusEnum.READ):
             lib_item.completed_at = datetime.now(timezone.utc)
+            if lib_item.item_type == "series" and lib_item.tracking_list_id:
+                last_title = bulk_complete_series_episodes(db, current_user.id, lib_item.tracking_list_id, lib_item.external_id, lib_item.title)
+                if last_title:
+                    lib_item.last_seen_episode = last_title
         else:
             lib_item.completed_at = None
             

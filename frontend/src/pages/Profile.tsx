@@ -32,6 +32,27 @@ interface LibraryItem {
   tracking_list_id?: number;
 }
 
+const getCachedTMDB = (key: string) => {
+  try {
+    const item = localStorage.getItem(`tmdb_cache_${key}`);
+    if (item) {
+      const parsed = JSON.parse(item);
+      if (Date.now() - parsed.timestamp < 6 * 60 * 60 * 1000) {
+        return parsed.data;
+      }
+    }
+  } catch(e){}
+  return null;
+};
+const setCachedTMDB = (key: string, data: any) => {
+  try {
+    localStorage.setItem(`tmdb_cache_${key}`, JSON.stringify({
+      data,
+      timestamp: Date.now()
+    }));
+  } catch(e){}
+};
+
 interface UserProfile {
   id: number;
   username: string;
@@ -187,9 +208,20 @@ export const Profile: React.FC = () => {
 
   const handleLoadSeasonEpisodes = async (seriesId: string, seasonNumber: number) => {
     if (seasonEpisodes[seasonNumber]) return;
+    const cacheKey = `${seriesId}_s${seasonNumber}`;
+    const cached = getCachedTMDB(cacheKey);
+    if (cached) {
+      setSeasonEpisodes(prev => ({
+        ...prev,
+        [seasonNumber]: cached
+      }));
+      return;
+    }
+
     setIsLoadingSeasonEpisodes(true);
     try {
       const res = await apiClient.get(`/search/series/${seriesId}/season/${seasonNumber}`);
+      setCachedTMDB(cacheKey, res.data);
       setSeasonEpisodes(prev => ({
         ...prev,
         [seasonNumber]: res.data || []
@@ -215,8 +247,16 @@ export const Profile: React.FC = () => {
         setEpisodes(itemsList);
         setSeasonEpisodes({});
         
-        const seriesRes = await apiClient.get(`/search/series/${item.external_id}`);
-        const filteredSeasons = (seriesRes.data.seasons || []).filter((s: any) => s.season_number > 0);
+        let filteredSeasons = [];
+        const cacheKey = `series_${item.external_id}`;
+        const cached = getCachedTMDB(cacheKey);
+        if (cached) {
+          filteredSeasons = cached;
+        } else {
+          const seriesRes = await apiClient.get(`/search/series/${item.external_id}`);
+          filteredSeasons = (seriesRes.data.seasons || []).filter((s: any) => s.season_number > 0);
+          setCachedTMDB(cacheKey, filteredSeasons);
+        }
         setSeasons(filteredSeasons);
 
         const nextSeason = findNextSeasonToSee(itemsList);
@@ -245,20 +285,33 @@ export const Profile: React.FC = () => {
       console.error(e);
     }
 
-    apiClient.get('/search/', { params: { q: item.title, type: item.item_type } })
-      .then(searchRes => {
-        const match = searchRes.data.find((x: any) => x.external_id === item.external_id);
-        if (match && match.description) {
-          setSelectedItem((prev: any) => {
-            if (!prev) return null;
-            return {
-              ...prev,
-              custom_notes: JSON.stringify({ description: match.description })
-            };
-          });
-        }
-      })
-      .catch(e => console.error(e));
+    const descCacheKey = `desc_${item.item_type}_${item.external_id}`;
+    const cachedDesc = getCachedTMDB(descCacheKey);
+    if (cachedDesc) {
+      setSelectedItem((prev: any) => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          custom_notes: JSON.stringify({ description: cachedDesc })
+        };
+      });
+    } else {
+      apiClient.get('/search/', { params: { q: item.title, type: item.item_type } })
+        .then(searchRes => {
+          const match = searchRes.data.find((x: any) => x.external_id === item.external_id);
+          if (match && match.description) {
+            setCachedTMDB(descCacheKey, match.description);
+            setSelectedItem((prev: any) => {
+              if (!prev) return null;
+              return {
+                ...prev,
+                custom_notes: JSON.stringify({ description: match.description })
+              };
+            });
+          }
+        })
+        .catch(e => console.error(e));
+    }
   };
 
   const handleSaveRating = async (ratingVal: number) => {
@@ -663,26 +716,21 @@ export const Profile: React.FC = () => {
                             <span style={{ fontSize: '0.75rem', color: 'var(--accent-primary)' }}>
                               {t('media' + item.item_type.charAt(0).toUpperCase() + item.item_type.slice(1))}
                             </span>
+                            {/* Last completed episode for series */}
+                            {item.item_type === 'series' && item.last_seen_episode && (
+                              <span style={{ fontSize: '0.72rem', color: 'var(--accent-primary)', fontWeight: 500, display: 'block', marginTop: '-0.3rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.last_seen_episode}>
+                                {language === 'es' ? 'Último visto: ' : 'Last watched: '}
+                                {item.last_seen_episode.includes(' - ') ? item.last_seen_episode.split(' - ').slice(1).join(' - ') : item.last_seen_episode}
+                              </span>
+                            )}
+
+                            {/* Completion date if completed */}
+                            {item.completed_at && (
+                              <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontStyle: 'italic', display: 'block', marginTop: '-0.3rem' }}>
+                                {formatDate(new Date(item.completed_at))}
+                              </span>
+                            )}
                           </div>
-
-                          {/* Last completed episode for series */}
-                          {item.item_type === 'series' && item.last_seen_episode && (
-                            <span style={{ fontSize: '0.72rem', color: 'var(--accent-primary)', fontWeight: 500, display: 'block', marginTop: '-0.3rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.last_seen_episode}>
-                              {language === 'es' ? 'Último visto: ' : 'Last watched: '}
-                              {item.last_seen_episode}
-                            </span>
-                          )}
-
-                          {/* Completion date if completed */}
-                          {item.completed_at && (
-                            <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontStyle: 'italic', display: 'block', marginTop: '-0.3rem' }}>
-                              {item.item_type === 'movie'
-                                ? (language === 'es' ? 'Visto: ' : 'Watched: ')
-                                : (language === 'es' ? 'Terminado: ' : 'Completed: ')
-                              }
-                              {formatDate(new Date(item.completed_at))}
-                            </span>
-                          )}
 
                           {/* Status selection */}
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
@@ -1140,6 +1188,43 @@ export const Profile: React.FC = () => {
                       </button>
                     </div>
                   )}
+
+                  {/* Status selection inside modal */}
+                  {!isEpisode && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.5rem' }}>
+                      <h5 style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                        {language === 'es' ? 'Estado:' : 'Status:'}
+                      </h5>
+                      <select
+                        className="input-field"
+                        value={selectedItem.status || ''}
+                        onChange={async (e) => {
+                          const newStatus = e.target.value;
+                          await handleStatusChange(selectedItem.id, newStatus);
+                          setSelectedItem((prev: any) => prev ? { ...prev, status: newStatus } : null);
+                          if (selectedItem.item_type === 'series' && newStatus === 'completed' && selectedItem.tracking_list_id) {
+                            const listRes = await apiClient.get(`/lists/${selectedItem.tracking_list_id}`);
+                            setEpisodes(listRes.data.items || []);
+                          }
+                        }}
+                        style={{
+                          padding: '0.4rem 0.8rem',
+                          fontSize: '0.85rem',
+                          background: 'var(--bg-secondary)',
+                          border: '1px solid var(--border-color)',
+                          color: 'var(--text-primary)',
+                          borderRadius: '6px',
+                          maxWidth: '200px'
+                        }}
+                      >
+                        {getAllowedStatuses(selectedItem.item_type).map(status => (
+                          <option key={status.value} value={status.value}>
+                            {status.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1179,6 +1264,63 @@ export const Profile: React.FC = () => {
                             }}
                           >
                             <span>
+                              <input
+                                type="checkbox"
+                                checked={(() => {
+                                  const listSeps = episodes.filter(x => x.section === `Season ${s.season_number}`);
+                                  const cacheKey = `${selectedItem.external_id}_s${s.season_number}`;
+                                  const tmdbEps = getCachedTMDB(cacheKey) || [];
+                                  if (tmdbEps.length === 0) {
+                                    return listSeps.length > 0 && listSeps.every(x => x.is_completed);
+                                  }
+                                  return tmdbEps.every((te: any) => episodes.some(x => x.external_id === `tmdb-ep-${te.id}` && x.is_completed));
+                                })()}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                }}
+                                onChange={async (e) => {
+                                  e.stopPropagation();
+                                  const checkedVal = e.target.checked;
+                                  const cacheKey = `${selectedItem.external_id}_s${s.season_number}`;
+                                  let tmdbEps = getCachedTMDB(cacheKey);
+                                  if (!tmdbEps) {
+                                    setIsLoadingSeasonEpisodes(true);
+                                    try {
+                                      const res = await apiClient.get(`/search/series/${selectedItem.external_id}/season/${s.season_number}`);
+                                      tmdbEps = res.data || [];
+                                      setCachedTMDB(cacheKey, tmdbEps);
+                                      setSeasonEpisodes(prev => ({ ...prev, [s.season_number]: tmdbEps }));
+                                    } catch (err) {
+                                      console.error("Failed to load season episodes for bulk toggle", err);
+                                      return;
+                                    } finally {
+                                      setIsLoadingSeasonEpisodes(false);
+                                    }
+                                  }
+                                  
+                                  if (tmdbEps && tmdbEps.length > 0) {
+                                    try {
+                                      await apiClient.post(`/lists/${selectedItem.tracking_list_id}/bulk-toggle-season`, {
+                                        season_number: s.season_number,
+                                        episodes: tmdbEps,
+                                        completed: checkedVal
+                                      });
+                                      
+                                      const listRes = await apiClient.get(`/lists/${selectedItem.tracking_list_id}`);
+                                      setEpisodes(listRes.data.items || []);
+                                      
+                                      const libraryRes = await apiClient.get('/library/');
+                                      setLibraryItems(libraryRes.data);
+                                      
+                                      const actRes = await apiClient.get('/users/me/activity');
+                                      setActivities(actRes.data);
+                                    } catch (err) {
+                                      console.error("Bulk toggle failed", err);
+                                    }
+                                  }
+                                }}
+                                style={{ width: '16px', height: '16px', cursor: 'pointer', marginRight: '0.6rem', verticalAlign: 'middle' }}
+                              />
                               {language === 'es' ? `Temporada ${s.season_number}` : `Season ${s.season_number}`}
                               <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginLeft: '0.5rem', fontWeight: 400 }}>
                                 ({s.episode_count} {language === 'es' ? 'capítulos' : 'episodes'})

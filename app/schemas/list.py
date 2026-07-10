@@ -106,3 +106,8 @@ class ToggleTMDBEpisodeRequest(BaseModel):
     season_number: int
     episode_number: int
 
+class BulkToggleSeasonRequest(BaseModel):
+    season_number: int
+    episodes: List[dict]
+    completed: bool
+
