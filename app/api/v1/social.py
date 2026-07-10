@@ -10,6 +10,7 @@ from app.models.list import ReadingList, VisibilityEnum
 from app.models.list_item import ListItem
 from app.models.item_progress import ItemProgress
 from app.models.social import ListVote, ListReport, Comment, CommentVote, CommentReport, Follow
+from app.models.activity import UserActivityLog
 from app.schemas.social import (
     CommentCreate,
     CommentResponse,
@@ -87,6 +88,16 @@ def add_comment(
         content=comment_in.content
     )
     db.add(new_comment)
+    
+    # Record activity log
+    activity = UserActivityLog(
+        user_id=current_user.id,
+        activity_type="guide_commented",
+        item_title=reading_list.title,
+        item_type="guide",
+        details=comment_in.content[:100]
+    )
+    db.add(activity)
     db.commit()
     db.refresh(new_comment)
     

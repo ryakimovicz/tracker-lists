@@ -49,6 +49,34 @@ def create_or_update_review(
         )
         db.add(review)
 
+    # Find the title if it exists in the library, otherwise use a placeholder
+    lib_item = db.query(UserLibraryItem).filter(
+        UserLibraryItem.user_id == current_user.id,
+        UserLibraryItem.item_type == item_type_lower,
+        UserLibraryItem.external_id == external_id
+    ).first()
+    resolved_title = lib_item.title if lib_item else f"{item_type_lower.capitalize()} ({external_id})"
+
+    if review_in.rating is not None and review_in.rating > 0:
+        activity_rating = UserActivityLog(
+            user_id=current_user.id,
+            activity_type="item_rated",
+            item_title=resolved_title,
+            item_type=item_type_lower,
+            details=str(review_in.rating)
+        )
+        db.add(activity_rating)
+
+    if review_in.content and review_in.content.strip():
+        activity_comment = UserActivityLog(
+            user_id=current_user.id,
+            activity_type="item_commented",
+            item_title=resolved_title,
+            item_type=item_type_lower,
+            details=review_in.content[:100]
+        )
+        db.add(activity_comment)
+
     db.commit()
     db.refresh(review)
 

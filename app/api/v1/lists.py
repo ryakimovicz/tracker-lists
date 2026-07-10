@@ -72,6 +72,22 @@ def create_list(
     db.add(new_list)
     db.commit()
     db.refresh(new_list)
+
+    # Automatically follow/save the newly created guide for the creator
+    saved = SavedList(user_id=current_user.id, list_id=new_list.id)
+    db.add(saved)
+
+    # Record activity log
+    activity = UserActivityLog(
+        user_id=current_user.id,
+        activity_type="guide_created",
+        item_title=new_list.title,
+        item_type="guide",
+        details="created"
+    )
+    db.add(activity)
+    db.commit()
+
     return new_list
 
 # 3. Get list details (with progress calculated if logged in)
@@ -285,12 +301,29 @@ def update_list(
             detail="Only the creator can modify this list"
         )
         
+    old_visibility = reading_list.visibility
     update_data = list_in.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(reading_list, field, value)
         
     db.commit()
     db.refresh(reading_list)
+
+    # Log activity
+    act_type = "guide_updated"
+    if old_visibility == VisibilityEnum.DRAFT and reading_list.visibility in (VisibilityEnum.PUBLIC, VisibilityEnum.PRIVATE):
+        act_type = "guide_published"
+
+    activity = UserActivityLog(
+        user_id=current_user.id,
+        activity_type=act_type,
+        item_title=reading_list.title,
+        item_type="guide",
+        details="published" if act_type == "guide_published" else "updated"
+    )
+    db.add(activity)
+    db.commit()
+
     return reading_list
 
 # 5. Delete reading list
@@ -310,6 +343,15 @@ def delete_list(
             detail="Only the creator can delete this list"
         )
         
+    # Record activity log before deletion
+    activity = UserActivityLog(
+        user_id=current_user.id,
+        activity_type="guide_deleted",
+        item_title=reading_list.title,
+        item_type="guide",
+        details="deleted"
+    )
+    db.add(activity)
     db.delete(reading_list)
     db.commit()
     return None
@@ -400,6 +442,16 @@ def save_list_to_library(
         
     saved = SavedList(user_id=current_user.id, list_id=list_id)
     db.add(saved)
+
+    # Record activity log
+    activity = UserActivityLog(
+        user_id=current_user.id,
+        activity_type="guide_followed",
+        item_title=reading_list.title,
+        item_type="guide",
+        details="followed"
+    )
+    db.add(activity)
     db.commit()
     return {"message": "List saved to library successfully"}
 
@@ -410,6 +462,9 @@ def unsave_list_from_library(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    reading_list = db.query(ReadingList).filter(ReadingList.id == list_id).first()
+    list_title = reading_list.title if reading_list else f"Guide {list_id}"
+
     saved_record = db.query(SavedList).filter(
         SavedList.user_id == current_user.id,
         SavedList.list_id == list_id
@@ -418,6 +473,16 @@ def unsave_list_from_library(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Saved list not found")
         
     db.delete(saved_record)
+
+    # Record activity log
+    activity = UserActivityLog(
+        user_id=current_user.id,
+        activity_type="guide_unfollowed",
+        item_title=list_title,
+        item_type="guide",
+        details="unfollowed"
+    )
+    db.add(activity)
     db.commit()
     return {"message": "List removed from library successfully"}
 

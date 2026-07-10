@@ -364,7 +364,6 @@ export const CreateGuide: React.FC = () => {
         params: { q: searchQuery }
       });
       setSearchResults(response.data);
-      setActiveSearchTab('all');
     } catch (err: any) {
       setErrorMsg(language === 'es' ? 'Error al buscar en la API.' : 'Search failed.');
     } finally {

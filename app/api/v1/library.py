@@ -346,6 +346,16 @@ def delete_from_library(
             detail="Library item not found"
         )
         
+    # Record activity log
+    activity = UserActivityLog(
+        user_id=current_user.id,
+        activity_type="shelf_remove",
+        item_title=lib_item.title,
+        item_type=lib_item.item_type,
+        details="removed"
+    )
+    db.add(activity)
+
     # If there is an associated private tracking list, delete it too
     if lib_item.tracking_list_id:
         private_list = db.query(ReadingList).filter(ReadingList.id == lib_item.tracking_list_id).first()
