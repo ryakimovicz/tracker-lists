@@ -16,6 +16,7 @@ class LibraryItemUpdate(BaseModel):
     status: Optional[UserLibraryStatusEnum] = None
     is_favorite: Optional[bool] = None
     completed_at: Optional[datetime] = None
+    last_seen_episode: Optional[str] = None
 
 class LibraryItemResponse(BaseModel):
     id: int
@@ -28,6 +29,7 @@ class LibraryItemResponse(BaseModel):
     is_favorite: bool = False
     completed_at: Optional[datetime] = None
     updated_at: datetime
+    last_seen_episode: Optional[str] = None
     tracking_list_id: Optional[int] = None
 
     class Config:

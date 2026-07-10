@@ -28,6 +28,7 @@ interface LibraryItem {
   created_at: string;
   completed_at?: string;
   updated_at?: string;
+  last_seen_episode?: string;
   tracking_list_id?: number;
 }
 
@@ -71,6 +72,10 @@ export const Profile: React.FC = () => {
   const [isSavingReview, setIsSavingReview] = useState(false);
   const [descExpanded, setDescExpanded] = useState(false);
   const [episodes, setEpisodes] = useState<any[]>([]);
+  const [seasons, setSeasons] = useState<any[]>([]);
+  const [activeSeason, setActiveSeason] = useState<number | null>(null);
+  const [seasonEpisodes, setSeasonEpisodes] = useState<{ [seasonNumber: number]: any[] }>({});
+  const [isLoadingSeasonEpisodes, setIsLoadingSeasonEpisodes] = useState(false);
 
   // Favorites state (local highlight mock for UX polish)
   const [favorites, setFavorites] = useState<LibraryItem[]>([]);
@@ -150,6 +155,52 @@ export const Profile: React.FC = () => {
     }
   };
 
+  const findNextSeasonToSee = (items: any[]) => {
+    const completed = items.filter(ep => ep.is_completed);
+    if (completed.length === 0) return 1;
+    
+    const sorted = [...completed].sort((a, b) => {
+      const sA = parseInt(a.section?.match(/Season (\d+)/)?.[1] || '0');
+      const sB = parseInt(b.section?.match(/Season (\d+)/)?.[1] || '0');
+      if (sA !== sB) return sA - sB;
+      // Extract episode number if possible
+      const epA = parseInt(a.title?.match(/E(\d+)/)?.[1] || '0');
+      const epB = parseInt(b.title?.match(/E(\d+)/)?.[1] || '0');
+      if (epA !== epB) return epA - epB;
+      return a.order_index - b.order_index;
+    });
+    
+    const lastCompleted = sorted[sorted.length - 1];
+    const lastSeasonNum = parseInt(lastCompleted.section?.match(/Season (\d+)/)?.[1] || '1');
+    
+    const hasUncompletedInLastSeason = items.some(ep => {
+      const sNum = parseInt(ep.section?.match(/Season (\d+)/)?.[1] || '0');
+      return sNum === lastSeasonNum && !ep.is_completed;
+    });
+    
+    if (hasUncompletedInLastSeason) {
+      return lastSeasonNum;
+    } else {
+      return lastSeasonNum + 1;
+    }
+  };
+
+  const handleLoadSeasonEpisodes = async (seriesId: string, seasonNumber: number) => {
+    if (seasonEpisodes[seasonNumber]) return;
+    setIsLoadingSeasonEpisodes(true);
+    try {
+      const res = await apiClient.get(`/search/series/${seriesId}/season/${seasonNumber}`);
+      setSeasonEpisodes(prev => ({
+        ...prev,
+        [seasonNumber]: res.data || []
+      }));
+    } catch (err) {
+      console.error("Failed to load season episodes", err);
+    } finally {
+      setIsLoadingSeasonEpisodes(false);
+    }
+  };
+
   const handleOpenItemDetails = async (item: any) => {
     setSelectedItem(item);
     setUserRating(0);
@@ -160,12 +211,23 @@ export const Profile: React.FC = () => {
     if (item.item_type === 'series' && item.tracking_list_id) {
       try {
         const listRes = await apiClient.get(`/lists/${item.tracking_list_id}`);
-        setEpisodes(listRes.data.items || []);
+        const itemsList = listRes.data.items || [];
+        setEpisodes(itemsList);
+        setSeasonEpisodes({});
+        
+        const seriesRes = await apiClient.get(`/search/series/${item.external_id}`);
+        const filteredSeasons = (seriesRes.data.seasons || []).filter((s: any) => s.season_number > 0);
+        setSeasons(filteredSeasons);
+
+        const nextSeason = findNextSeasonToSee(itemsList);
+        setActiveSeason(nextSeason);
+        handleLoadSeasonEpisodes(item.external_id, nextSeason);
       } catch (err) {
         console.error("Failed to fetch episodes", err);
       }
     } else {
       setEpisodes([]);
+      setSeasons([]);
     }
 
     try {
@@ -199,6 +261,36 @@ export const Profile: React.FC = () => {
       .catch(e => console.error(e));
   };
 
+  const handleSaveRating = async (ratingVal: number) => {
+    if (!selectedItem) return;
+    setUserRating(ratingVal);
+    try {
+      await apiClient.post(`/reviews/${selectedItem.item_type}/${selectedItem.external_id}`, {
+        rating: ratingVal,
+        content: userComment || null
+      });
+      const revRes = await apiClient.get(`/reviews/${selectedItem.item_type}/${selectedItem.external_id}`);
+      setItemReviews(revRes.data);
+    } catch (err) {
+      console.error("Failed to save rating", err);
+    }
+  };
+
+  const handleDeleteRating = async () => {
+    if (!selectedItem) return;
+    setUserRating(0);
+    try {
+      await apiClient.post(`/reviews/${selectedItem.item_type}/${selectedItem.external_id}`, {
+        rating: null,
+        content: userComment || null
+      });
+      const revRes = await apiClient.get(`/reviews/${selectedItem.item_type}/${selectedItem.external_id}`);
+      setItemReviews(revRes.data);
+    } catch (err) {
+      console.error("Failed to delete rating", err);
+    }
+  };
+
   const handleSaveReview = async () => {
     if (!selectedItem) return;
     setIsSavingReview(true);
@@ -209,19 +301,34 @@ export const Profile: React.FC = () => {
       });
       const revRes = await apiClient.get(`/reviews/${selectedItem.item_type}/${selectedItem.external_id}`);
       setItemReviews(revRes.data);
-      alert(language === 'es' ? 'Valoración guardada con éxito.' : 'Review saved successfully.');
+      alert(language === 'es' ? 'Comentario guardado con éxito.' : 'Comment saved successfully.');
     } catch(err) {
       console.error(err);
-      alert(language === 'es' ? 'Error al guardar la valoración.' : 'Failed to save review.');
+      alert(language === 'es' ? 'Error al guardar el comentario.' : 'Failed to save comment.');
     } finally {
       setIsSavingReview(false);
     }
   };
 
-  const handleToggleEpisode = async (episodeId: number) => {
+  const handleToggleEpisode = async (listId: number, ep: any) => {
     try {
-      await apiClient.post(`/lists/items/${episodeId}/toggle`);
-      setEpisodes(prev => prev.map(ep => ep.id === episodeId ? { ...ep, is_completed: !ep.is_completed } : ep));
+      await apiClient.post(`/lists/${listId}/toggle-tmdb-episode`, {
+        tmdb_episode_id: ep.id,
+        title: `${selectedItem.title} - S${ep.season_number < 10 ? '0' + ep.season_number : ep.season_number}E${ep.episode_number < 10 ? '0' + ep.episode_number : ep.episode_number} - ${ep.name || 'Untitled Episode'}`,
+        image_url: ep.still_path ? `https://image.tmdb.org/t/p/w185${ep.still_path}` : null,
+        overview: ep.overview,
+        season_number: ep.season_number,
+        episode_number: ep.episode_number
+      });
+      
+      const listRes = await apiClient.get(`/lists/${listId}`);
+      setEpisodes(listRes.data.items || []);
+      
+      const libraryRes = await apiClient.get('/library/');
+      setLibraryItems(libraryRes.data);
+      
+      const actRes = await apiClient.get('/users/me/activity');
+      setActivities(actRes.data);
     } catch (err) {
       console.error("Failed to toggle episode", err);
     }
@@ -308,7 +415,8 @@ export const Profile: React.FC = () => {
     .filter(item => {
       const matchesMedia = mediaFilter === 'all' || item.item_type === mediaFilter;
       const matchesSearch = item.title.toLowerCase().includes(shelfSearchQuery.toLowerCase());
-      return matchesMedia && matchesSearch;
+      const isEp = item.external_id?.startsWith('tmdb-ep-');
+      return matchesMedia && matchesSearch && !isEp;
     })
     .sort((a, b) => {
       const dateA = new Date(a.completed_at || a.updated_at || 0).getTime();
@@ -556,6 +664,14 @@ export const Profile: React.FC = () => {
                               {t('media' + item.item_type.charAt(0).toUpperCase() + item.item_type.slice(1))}
                             </span>
                           </div>
+
+                          {/* Last completed episode for series */}
+                          {item.item_type === 'series' && item.last_seen_episode && (
+                            <span style={{ fontSize: '0.72rem', color: 'var(--accent-primary)', fontWeight: 500, display: 'block', marginTop: '-0.3rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.last_seen_episode}>
+                              {language === 'es' ? 'Último visto: ' : 'Last watched: '}
+                              {item.last_seen_episode}
+                            </span>
+                          )}
 
                           {/* Completion date if completed */}
                           {item.completed_at && (
@@ -818,6 +934,8 @@ export const Profile: React.FC = () => {
       {/* Standalone Item Details Modal (at the top) */}
       {selectedItem && (() => {
         const isEpisode = !!(selectedItem.external_id?.startsWith('tmdb-ep-') || selectedItem.list_id);
+        const ratings = itemReviews.filter(r => r.rating !== null && r.rating !== 0).map(r => r.rating);
+        const avgRating = ratings.length > 0 ? (ratings.reduce((a: number, b: number) => a + b, 0) / ratings.length).toFixed(1) : null;
         return (
           <div
             style={{
@@ -866,9 +984,25 @@ export const Profile: React.FC = () => {
                   )}
                   <div>
                     <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700 }}>{selectedItem.title}</h2>
-                    <span style={{ fontSize: '0.78rem', color: 'var(--accent-primary)', textTransform: 'uppercase', fontWeight: 700 }}>
-                      {t('media' + selectedItem.item_type.charAt(0).toUpperCase() + selectedItem.item_type.slice(1))}
-                    </span>
+                    <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '0.78rem', color: 'var(--accent-primary)', textTransform: 'uppercase', fontWeight: 700 }}>
+                        {t('media' + selectedItem.item_type.charAt(0).toUpperCase() + selectedItem.item_type.slice(1))}
+                      </span>
+                      {avgRating && (
+                        <span style={{ fontSize: '0.78rem', color: '#f59e0b', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.1rem' }}>
+                          ★ {avgRating} / 5 ({ratings.length} {language === 'es' ? 'val.' : 'ratings'})
+                        </span>
+                      )}
+                      {selectedItem.completed_at && (
+                        <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                          • {selectedItem.item_type === 'movie' || selectedItem.item_type === 'series'
+                            ? (language === 'es' ? 'Visto el: ' : 'Watched on: ')
+                            : (language === 'es' ? 'Terminado el: ' : 'Completed on: ')
+                          }
+                          {formatDate(new Date(selectedItem.completed_at))}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
                 <button
@@ -947,11 +1081,11 @@ export const Profile: React.FC = () => {
                   {/* Star rating selector */}
                   <div>
                     <h5 style={{ margin: '0 0 0.4rem 0', color: 'var(--text-secondary)' }}>{language === 'es' ? 'Tu Calificación:' : 'Your Rating:'}</h5>
-                    <div style={{ display: 'flex', gap: '0.25rem' }}>
+                    <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
                       {[1, 2, 3, 4, 5].map((star) => (
                         <button
                           key={star}
-                          onClick={() => setUserRating(star)}
+                          onClick={() => handleSaveRating(star)}
                           style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 0 }}
                         >
                           <Star
@@ -961,6 +1095,23 @@ export const Profile: React.FC = () => {
                           />
                         </button>
                       ))}
+                      {userRating > 0 && (
+                        <button
+                          onClick={handleDeleteRating}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            color: '#ef4444',
+                            fontSize: '0.78rem',
+                            cursor: 'pointer',
+                            marginLeft: '0.75rem',
+                            padding: 0,
+                            textDecoration: 'underline'
+                          }}
+                        >
+                          {language === 'es' ? 'Eliminar puntuación' : 'Clear rating'}
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -992,55 +1143,114 @@ export const Profile: React.FC = () => {
                 </div>
               </div>
 
-              {/* TV Series Episode Tracking */}
-              {selectedItem.item_type === 'series' && episodes.length > 0 && !isEpisode && (
+              {/* TV Series Season Accordion Tracking */}
+              {selectedItem.item_type === 'series' && seasons.length > 0 && !isEpisode && (
                 <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                   <h4 style={{ margin: 0, fontSize: '1.1rem' }}>
-                    {language === 'es' ? 'Seguimiento de Capítulos' : 'Episode Tracking'}
+                    {language === 'es' ? 'Seguimiento de Temporadas' : 'Season Tracking'}
                   </h4>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '220px', overflowY: 'auto', paddingRight: '0.5rem' }}>
-                    {episodes.map((ep) => (
-                      <div
-                        key={ep.id}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          padding: '0.5rem 0.75rem',
-                          background: 'var(--bg-secondary)',
-                          border: '1px solid var(--border-color)',
-                          borderRadius: '6px',
-                          gap: '1rem'
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                          <input
-                            type="checkbox"
-                            checked={!!ep.is_completed}
-                            onChange={() => handleToggleEpisode(ep.id)}
-                            style={{ width: '18px', height: '18px', cursor: 'pointer' }}
-                          />
-                          <span style={{ fontSize: '0.88rem', fontWeight: 500, color: 'var(--text-primary)' }}>
-                            {ep.title}
-                          </span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    {seasons.map((s) => {
+                      const isSeasonActive = activeSeason === s.season_number;
+                      return (
+                        <div key={s.id || s.season_number} style={{ border: '1px solid var(--border-color)', borderRadius: '6px', overflow: 'hidden' }}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (isSeasonActive) {
+                                setActiveSeason(null);
+                              } else {
+                                setActiveSeason(s.season_number);
+                                handleLoadSeasonEpisodes(selectedItem.external_id, s.season_number);
+                              }
+                            }}
+                            style={{
+                              width: '100%',
+                              padding: '0.75rem 1rem',
+                              background: 'var(--bg-secondary)',
+                              border: 'none',
+                              color: 'var(--text-primary)',
+                              fontWeight: 600,
+                              textAlign: 'left',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center'
+                            }}
+                          >
+                            <span>
+                              {language === 'es' ? `Temporada ${s.season_number}` : `Season ${s.season_number}`}
+                              <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginLeft: '0.5rem', fontWeight: 400 }}>
+                                ({s.episode_count} {language === 'es' ? 'capítulos' : 'episodes'})
+                              </span>
+                            </span>
+                            <span>{isSeasonActive ? '▼' : '►'}</span>
+                          </button>
+
+                          {isSeasonActive && (
+                            <div style={{ padding: '0.5rem', background: 'var(--bg-primary)', display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '220px', overflowY: 'auto' }}>
+                              {isLoadingSeasonEpisodes ? (
+                                <div style={{ padding: '1rem', textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                                  {language === 'es' ? 'Cargando capítulos...' : 'Loading episodes...'}
+                                </div>
+                              ) : (seasonEpisodes[s.season_number] || []).length === 0 ? (
+                                <div style={{ padding: '1rem', textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                                  {language === 'es' ? 'No se encontraron capítulos.' : 'No episodes found.'}
+                                </div>
+                              ) : (
+                                (seasonEpisodes[s.season_number] || []).map((ep: any) => {
+                                  const dbEp = episodes.find(x => x.external_id === `tmdb-ep-${ep.id}`);
+                                  const isCompleted = !!dbEp?.is_completed;
+                                  return (
+                                    <div
+                                      key={ep.id}
+                                      style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        padding: '0.4rem 0.6rem',
+                                        background: 'var(--bg-secondary)',
+                                        border: '1px solid var(--border-color)',
+                                        borderRadius: '4px',
+                                        gap: '1rem'
+                                      }}
+                                    >
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                                        <input
+                                          type="checkbox"
+                                          checked={isCompleted}
+                                          onChange={() => handleToggleEpisode(selectedItem.tracking_list_id, ep)}
+                                          style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                                        />
+                                        <span style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-primary)' }}>
+                                          {ep.episode_number}. {ep.name || 'Untitled'}
+                                        </span>
+                                      </div>
+                                      <button
+                                        onClick={() => handleOpenItemDetails({
+                                          id: dbEp ? dbEp.id : ep.id,
+                                          list_id: selectedItem.tracking_list_id,
+                                          item_type: 'series',
+                                          external_id: `tmdb-ep-${ep.id}`,
+                                          title: `${selectedItem.title} - S${ep.season_number < 10 ? '0' + ep.season_number : ep.season_number}E${ep.episode_number < 10 ? '0' + ep.episode_number : ep.episode_number} - ${ep.name || 'Untitled'}`,
+                                          image_url: ep.still_path ? `https://image.tmdb.org/t/p/w185${ep.still_path}` : selectedItem.image_url,
+                                          custom_notes: ep.overview,
+                                          completed_at: dbEp?.completed_at
+                                        })}
+                                        className="btn-secondary"
+                                        style={{ padding: '0.2rem 0.4rem', fontSize: '0.74rem' }}
+                                      >
+                                        {language === 'es' ? 'Ver Info' : 'View Info'}
+                                      </button>
+                                    </div>
+                                  );
+                                })
+                              )}
+                            </div>
+                          )}
                         </div>
-                        <button
-                          onClick={() => handleOpenItemDetails({
-                            id: ep.id,
-                            list_id: ep.list_id,
-                            item_type: 'series',
-                            external_id: ep.external_id,
-                            title: ep.title,
-                            image_url: ep.image_url || selectedItem.image_url,
-                            custom_notes: ep.custom_notes
-                          })}
-                          className="btn-secondary"
-                          style={{ padding: '0.25rem 0.5rem', fontSize: '0.78rem' }}
-                        >
-                          {language === 'es' ? 'Ver Info' : 'View Info'}
-                        </button>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}

@@ -26,7 +26,8 @@ from app.schemas.list import (
     TVImportRequest,
     TVImportType,
     SectionBulkActionRequest,
-    BulkToggleRequest
+    BulkToggleRequest,
+    ToggleTMDBEpisodeRequest
 )
 
 router = APIRouter()
@@ -919,6 +920,135 @@ def bulk_section_action(
                 
     db.commit()
     return {"message": f"Section '{action_req.section_name}' items updated successfully with action '{action}'"}
+
+@router.post("/{list_id}/toggle-tmdb-episode", status_code=status.HTTP_200_OK)
+def toggle_tmdb_episode(
+    list_id: int,
+    ep_req: ToggleTMDBEpisodeRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    # Verify the private list exists and belongs to this user
+    reading_list = db.query(ReadingList).filter(ReadingList.id == list_id).first()
+    if not reading_list:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="List not found")
+    if reading_list.creator_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You do not have access to this list")
+        
+    ext_id = f"tmdb-ep-{ep_req.tmdb_episode_id}"
+    
+    # Check if ListItem already exists
+    item = db.query(ListItem).filter(
+        ListItem.list_id == list_id,
+        ListItem.external_id == ext_id
+    ).first()
+    
+    if not item:
+        # Create dynamically
+        # Let's count current items to calculate order_index
+        item_count = db.query(ListItem).filter(ListItem.list_id == list_id).count()
+        item = ListItem(
+            list_id=list_id,
+            order_index=item_count + 1,
+            item_type=ItemTypeEnum.SERIES,
+            external_id=ext_id,
+            title=ep_req.title,
+            image_url=ep_req.image_url,
+            custom_notes=ep_req.overview,
+            section=f"Season {ep_req.season_number}"
+        )
+        db.add(item)
+        db.commit()
+        db.refresh(item)
+        
+    # Toggle progress
+    progress = db.query(ItemProgress).filter(
+        ItemProgress.user_id == current_user.id,
+        ItemProgress.external_id == ext_id
+    ).first()
+    
+    if progress:
+        progress.is_completed = not progress.is_completed
+        progress.completed_at = datetime.now(timezone.utc) if progress.is_completed else None
+    else:
+        progress = ItemProgress(
+            user_id=current_user.id,
+            item_type=ItemTypeEnum.SERIES,
+            external_id=ext_id,
+            list_item_id=item.id,
+            is_completed=True,
+            is_skipped=False,
+            completed_at=datetime.now(timezone.utc)
+        )
+        db.add(progress)
+        
+    if progress.is_completed:
+        # Record activity log
+        activity = UserActivityLog(
+            user_id=current_user.id,
+            activity_type="item_completed",
+            item_title=item.title,
+            item_type="series",
+            details="completed"
+        )
+        db.add(activity)
+        
+    db.commit()
+    
+    # Run TV Series general UserLibraryItem automatic transitions
+    lib_item = db.query(UserLibraryItem).filter(
+        UserLibraryItem.user_id == current_user.id,
+        UserLibraryItem.tracking_list_id == list_id
+    ).first()
+    
+    if lib_item:
+        # 1. Count completed episodes in this tracking list
+        completed_episodes = db.query(ItemProgress).join(ListItem).filter(
+            ItemProgress.user_id == current_user.id,
+            ListItem.list_id == list_id,
+            ItemProgress.is_completed == True
+        ).all()
+        
+        completed_count = len(completed_episodes)
+        
+        if completed_count > 0:
+            # Check if all episodes across all seasons are completed
+            total_episodes = 99999
+            try:
+                series_id = int(lib_item.external_id)
+                series_detail = TMDBService.get_series_detail(series_id)
+                total_episodes = series_detail.get("number_of_episodes") or 99999
+            except Exception:
+                pass
+                
+            if completed_count >= total_episodes:
+                lib_item.status = UserLibraryStatusEnum.COMPLETED
+                lib_item.completed_at = datetime.now(timezone.utc)
+            else:
+                lib_item.status = UserLibraryStatusEnum.WATCHING
+                lib_item.completed_at = None
+                
+            # Find last completed episode
+            last_completed = db.query(ListItem).join(ItemProgress).filter(
+                ListItem.list_id == list_id,
+                ItemProgress.user_id == current_user.id,
+                ItemProgress.is_completed == True
+            ).order_by(ListItem.id.desc()).first() # newest entry first
+            
+            if last_completed:
+                lib_item.last_seen_episode = last_completed.title
+        else:
+            lib_item.status = UserLibraryStatusEnum.PLAN_TO_WATCH
+            lib_item.completed_at = None
+            lib_item.last_seen_episode = None
+            
+        lib_item.updated_at = datetime.now(timezone.utc)
+        db.commit()
+        
+    return {
+        "item_id": item.id,
+        "is_completed": progress.is_completed
+    }
 
 
 
