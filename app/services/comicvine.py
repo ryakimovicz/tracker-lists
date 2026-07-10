@@ -23,7 +23,12 @@ class ComicVineService:
                 )
             ]
         
-        encoded_query = urllib.parse.quote(query)
+        # Clean the query: replace '#' with a space and remove duplicate spaces
+        # This resolves Comic Vine's search index failing to match special characters like '#'
+        cleaned_query = query.replace('#', ' ')
+        cleaned_query = " ".join(cleaned_query.split())
+        
+        encoded_query = urllib.parse.quote(cleaned_query)
         url = f"https://comicvine.gamespot.com/api/search/?api_key={api_key}&format=json&resources=volume,issue&query={encoded_query}"
         
         req = urllib.request.Request(
