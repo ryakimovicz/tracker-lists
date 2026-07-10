@@ -97,6 +97,7 @@ export const Profile: React.FC = () => {
   const [activeSeason, setActiveSeason] = useState<number | null>(null);
   const [seasonEpisodes, setSeasonEpisodes] = useState<{ [seasonNumber: number]: any[] }>({});
   const [isLoadingSeasonEpisodes, setIsLoadingSeasonEpisodes] = useState(false);
+  const [isLoadingMetadata, setIsLoadingMetadata] = useState(false);
 
   // Favorites state (local highlight mock for UX polish)
   const [favorites, setFavorites] = useState<LibraryItem[]>([]);
@@ -107,6 +108,29 @@ export const Profile: React.FC = () => {
       month: 'long',
       day: 'numeric'
     });
+  };
+
+  const formatReleaseDate = (dateStr: string) => {
+    if (!dateStr) return '';
+    if (/^\d{4}$/.test(dateStr)) return dateStr;
+    try {
+      const cleanStr = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
+      const parts = cleanStr.split('-');
+      if (parts.length === 3) {
+        const year = parseInt(parts[0]);
+        const month = parseInt(parts[1]) - 1;
+        const day = parseInt(parts[2]);
+        const date = new Date(year, month, day);
+        if (!isNaN(date.getTime())) {
+          return formatDate(date);
+        }
+      }
+      const date = new Date(cleanStr + 'T00:00:00');
+      if (isNaN(date.getTime())) return dateStr;
+      return formatDate(date);
+    } catch (e) {
+      return dateStr;
+    }
   };
 
   useEffect(() => {
@@ -301,6 +325,7 @@ export const Profile: React.FC = () => {
     const descCacheKey = `desc_${item.item_type}_${item.external_id}`;
     const cachedDesc = getCachedTMDB(descCacheKey);
     if (cachedDesc) {
+      setIsLoadingMetadata(false);
       setSelectedItem((prev: any) => {
         if (!prev) return null;
         return {
@@ -309,6 +334,7 @@ export const Profile: React.FC = () => {
         };
       });
     } else {
+      setIsLoadingMetadata(true);
       apiClient.get('/search/', { params: { q: item.title, type: item.item_type } })
         .then(searchRes => {
           const match = searchRes.data.find((x: any) => x.external_id === item.external_id);
@@ -324,7 +350,10 @@ export const Profile: React.FC = () => {
             });
           }
         })
-        .catch(e => console.error(e));
+        .catch(e => console.error(e))
+        .finally(() => {
+          setIsLoadingMetadata(false);
+        });
     }
   };
 
@@ -1106,6 +1135,27 @@ export const Profile: React.FC = () => {
                       txt.innerHTML = clean;
                       return txt.value;
                     };
+
+                    if (isLoadingMetadata) {
+                      return (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '0.25rem 0' }}>
+                          <div>
+                            <h5 style={{ margin: '0 0 0.4rem 0', color: 'var(--text-secondary)' }}>{language === 'es' ? 'Descripción:' : 'Description:'}</h5>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                              <div className="skeleton" style={{ height: '0.85rem', width: '100%' }}></div>
+                              <div className="skeleton" style={{ height: '0.85rem', width: '92%' }}></div>
+                              <div className="skeleton" style={{ height: '0.85rem', width: '95%' }}></div>
+                              <div className="skeleton" style={{ height: '0.85rem', width: '45%' }}></div>
+                            </div>
+                          </div>
+                          <div>
+                            <h5 style={{ margin: '0 0 0.4rem 0', color: 'var(--text-secondary)' }}>{language === 'es' ? 'Fecha de lanzamiento:' : 'Release Date:'}</h5>
+                            <div className="skeleton" style={{ height: '0.9rem', width: '130px' }}></div>
+                          </div>
+                        </div>
+                      );
+                    }
+
                     const notes = parseNotes(selectedItem.custom_notes || '');
                     if (!notes.description) return null;
                     const cleanText = stripHtml(notes.description);
@@ -1148,7 +1198,7 @@ export const Profile: React.FC = () => {
                               {language === 'es' ? 'Fecha de lanzamiento:' : 'Release Date:'}
                             </h5>
                             <span style={{ fontSize: '0.88rem', color: 'var(--text-primary)' }}>
-                              {selectedItem.release_date || notes.release_date}
+                              {formatReleaseDate(selectedItem.release_date || notes.release_date)}
                             </span>
                           </div>
                         )}

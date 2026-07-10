@@ -192,3 +192,18 @@ h1, h2, h3, h4, h5, h6 {
 .priority-badge-3 { background-color: var(--priority-3); }
 .priority-badge-4 { background-color: var(--priority-4); }
 .priority-badge-5 { background-color: var(--priority-5); }
+
+/* Skeleton pulse animation */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: .45;
+  }
+}
+.skeleton {
+  animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  background-color: var(--border-color);
+  border-radius: 6px;
+}
