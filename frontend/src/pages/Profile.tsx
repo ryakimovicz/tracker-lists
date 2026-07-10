@@ -298,20 +298,27 @@ export const Profile: React.FC = () => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           {/* Media Filter Selectors */}
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-            {(['all', 'game', 'movie', 'series', 'book', 'comic', 'manga'] as const).map(type => (
-              <button
-                key={type}
-                onClick={() => setMediaFilter(type)}
-                className={mediaFilter === type ? 'btn-primary' : 'btn-secondary'}
-                style={{
-                  padding: '0.35rem 0.85rem',
-                  fontSize: '0.85rem',
-                  textTransform: 'capitalize'
-                }}
-              >
-                {t('media' + type.charAt(0).toUpperCase() + type.slice(1))}
-              </button>
-            ))}
+            {(() => {
+              const baseTypes = ['all', 'movie', 'series', 'book', 'comic', 'manga', 'game'] as const;
+              const allowedTypes = baseTypes.filter(type => {
+                if (type === 'all') return true;
+                return libraryItems.some(item => item.item_type === type);
+              });
+              return allowedTypes.map(type => (
+                <button
+                  key={type}
+                  onClick={() => setMediaFilter(type)}
+                  className={mediaFilter === type ? 'btn-primary' : 'btn-secondary'}
+                  style={{
+                    padding: '0.35rem 0.85rem',
+                    fontSize: '0.85rem',
+                    textTransform: 'capitalize'
+                  }}
+                >
+                  {t('media' + type.charAt(0).toUpperCase() + type.slice(1))}
+                </button>
+              ));
+            })()}
           </div>
 
           {filteredItems.length === 0 ? (

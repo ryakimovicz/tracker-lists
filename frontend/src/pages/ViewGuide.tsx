@@ -5,26 +5,39 @@ import { apiClient } from '../api/client';
 import {
   ChevronDown,
   ChevronRight,
-  ArrowLeft
+  ArrowLeft,
+  Star,
+  Heart,
+  X
 } from 'lucide-react';
 
 export const ViewGuide: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { language } = useTranslation();
+  const { t, language } = useTranslation();
 
   const [guide, setGuide] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
-  const [expandedItems, setExpandedItems] = useState<Record<number, boolean>>({});
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
   const [collapsedNodes, setCollapsedNodes] = useState<Record<string, boolean>>({});
 
-  // Fetch guide details on mount
+  // Standalone details modal states
+  const [selectedItem, setSelectedItem] = useState<any | null>(null);
+  const [currentUser, setCurrentUser] = useState<any | null>(null);
+  const [libraryItems, setLibraryItems] = useState<any[]>([]);
+  const [itemReviews, setItemReviews] = useState<any[]>([]);
+  const [userRating, setUserRating] = useState<number>(0);
+  const [userComment, setUserComment] = useState<string>('');
+  const [isSavingReview, setIsSavingReview] = useState(false);
+
+  // Fetch guide details and profile information on mount
   useEffect(() => {
     if (!id) return;
     setLoading(true);
     setErrorMsg('');
+    
+    // Fetch guide
     apiClient.get(`/lists/${id}`)
       .then(response => {
         setGuide(response.data);
@@ -46,6 +59,16 @@ export const ViewGuide: React.FC = () => {
       .finally(() => {
         setLoading(false);
       });
+
+    // Fetch user profile
+    apiClient.get('/users/me')
+      .then(res => setCurrentUser(res.data))
+      .catch(e => console.error(e));
+
+    // Fetch shelf library items
+    apiClient.get('/library/')
+      .then(res => setLibraryItems(res.data))
+      .catch(e => console.error(e));
   }, [id, language]);
 
   const toggleNodeCollapse = (nodeId: string) => {
@@ -62,6 +85,7 @@ export const ViewGuide: React.FC = () => {
     try {
       await apiClient.post(`/lists/items/${itemId}/toggle`);
       
+      // Update completion status in local viewing state
       setGuide((prev: any) => {
         if (!prev) return null;
         let toggledState = false;
@@ -84,6 +108,12 @@ export const ViewGuide: React.FC = () => {
           progress_percentage: Math.round(progressPercentage * 100) / 100
         };
       });
+
+      // Refresh local library shelf since checking an item adds it to the shelf
+      apiClient.get('/library/')
+        .then(res => setLibraryItems(res.data))
+        .catch(e => console.error(e));
+
     } catch (err: any) {
       setErrorMsg(language === 'es' ? 'Error al actualizar el progreso.' : 'Failed to toggle item progress.');
     }
@@ -117,8 +147,89 @@ export const ViewGuide: React.FC = () => {
           progress_percentage: Math.round(progressPercentage * 100) / 100
         };
       });
+
+      // Refresh local library shelf
+      apiClient.get('/library/')
+        .then(res => setLibraryItems(res.data))
+        .catch(e => console.error(e));
+
     } catch (err: any) {
       setErrorMsg(language === 'es' ? 'Error al actualizar el progreso.' : 'Failed to update bulk progress.');
+    }
+  };
+
+  // Open overlay detail dialog
+  const handleOpenItemDetails = async (item: any) => {
+    setSelectedItem(item);
+    setUserRating(0);
+    setUserComment('');
+    setItemReviews([]);
+
+    try {
+      const res = await apiClient.get(`/reviews/${item.item_type}/${item.external_id}`);
+      setItemReviews(res.data);
+      
+      // Look if current user already has a review
+      if (currentUser) {
+        const myReview = res.data.find((r: any) => r.user_id === currentUser.id);
+        if (myReview) {
+          setUserRating(myReview.rating || 0);
+          setUserComment(myReview.content || '');
+        }
+      }
+    } catch(e) {
+      console.error(e);
+    }
+  };
+
+  const handleToggleFavorite = async () => {
+    if (!selectedItem) return;
+    try {
+      const existing = libraryItems.find(li => li.item_type === selectedItem.item_type && li.external_id === selectedItem.external_id);
+      const isFav = existing && ['completed', 'read'].includes(existing.status);
+
+      let targetStatus: string;
+      if (['book', 'comic', 'manga'].includes(selectedItem.item_type)) {
+        targetStatus = isFav ? 'reading' : 'read';
+      } else {
+        targetStatus = isFav ? 'watching' : 'completed';
+      }
+
+      if (existing) {
+        const res = await apiClient.put(`/library/${existing.id}`, { status: targetStatus });
+        setLibraryItems(prev => prev.map(li => li.id === existing.id ? res.data : li));
+      } else {
+        const res = await apiClient.post('/library/', {
+          item_type: selectedItem.item_type,
+          external_id: selectedItem.external_id,
+          title: selectedItem.title,
+          image_url: selectedItem.image_url,
+          status: targetStatus
+        });
+        setLibraryItems(prev => [...prev, res.data]);
+      }
+    } catch(err) {
+      console.error("Failed to toggle favorite", err);
+    }
+  };
+
+  const handleSaveReview = async () => {
+    if (!selectedItem) return;
+    setIsSavingReview(true);
+    try {
+      await apiClient.post(`/reviews/${selectedItem.item_type}/${selectedItem.external_id}`, {
+        rating: userRating || null,
+        content: userComment || null
+      });
+      // Refresh reviews list
+      const revRes = await apiClient.get(`/reviews/${selectedItem.item_type}/${selectedItem.external_id}`);
+      setItemReviews(revRes.data);
+      alert(language === 'es' ? 'Valoración guardada con éxito.' : 'Review saved successfully.');
+    } catch(err) {
+      console.error(err);
+      alert(language === 'es' ? 'Error al guardar la valoración.' : 'Failed to save review.');
+    } finally {
+      setIsSavingReview(false);
     }
   };
 
@@ -196,8 +307,14 @@ export const ViewGuide: React.FC = () => {
     return (subblockEl.items || []).map((item: any) => item.id);
   };
 
+  const isFavorite = selectedItem && libraryItems.some(li =>
+    li.item_type === selectedItem.item_type &&
+    li.external_id === selectedItem.external_id &&
+    ['completed', 'read'].includes(li.status)
+  );
+
   return (
-    <div className="container" style={{ padding: '2rem 1rem', maxWidth: '800px' }}>
+    <div className="container" style={{ padding: '2rem 1rem', maxWidth: '800px', margin: '0 auto' }}>
       {/* Header buttons */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
         <button onClick={() => navigate(-1)} className="btn-secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -239,8 +356,6 @@ export const ViewGuide: React.FC = () => {
               return (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                   {itemsList.map((item: any) => {
-                    const notes = parseNotes(item.custom_notes || '');
-                    const showInfo = expandedItems[item.id];
                     return (
                       <div key={item.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.75rem', background: 'var(--bg-secondary)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
                         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
@@ -261,19 +376,14 @@ export const ViewGuide: React.FC = () => {
                           <div style={{ flex: 1 }}>
                             <h5 style={{ margin: 0, fontSize: '0.95rem' }}>{item.title}</h5>
                           </div>
-                          {notes.description && (
-                            <button
-                              onClick={() => setExpandedItems(prev => ({ ...prev, [item.id]: !prev[item.id] }))}
-                              className="btn-secondary"
-                              style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem' }}
-                            >
-                              {showInfo ? (language === 'es' ? 'Ocultar info' : 'Hide info') : (language === 'es' ? 'Ver info' : 'View info')}
-                            </button>
-                          )}
+                          <button
+                            onClick={() => handleOpenItemDetails(item)}
+                            className="btn-secondary"
+                            style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem' }}
+                          >
+                            {language === 'es' ? 'Ver info' : 'View info'}
+                          </button>
                         </div>
-                        {showInfo && notes.description && (
-                          <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)', paddingLeft: '3rem' }}>{stripHtml(notes.description)}</p>
-                        )}
                       </div>
                     );
                   })}
@@ -359,8 +469,6 @@ export const ViewGuide: React.FC = () => {
                         {/* Block Items */}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', paddingLeft: '1.5rem' }}>
                           {blockItems.map((item: any) => {
-                            const notes = parseNotes(item.custom_notes || '');
-                            const showInfo = expandedItems[item.id];
                             return (
                               <div key={item.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.6rem', background: 'var(--bg-secondary)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
                                 <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
@@ -381,26 +489,14 @@ export const ViewGuide: React.FC = () => {
                                   <div style={{ flex: 1 }}>
                                     <h5 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 600 }}>{item.title}</h5>
                                   </div>
-                                  {notes.description && (
-                                    <button
-                                      onClick={() => setExpandedItems(prev => ({ ...prev, [item.id]: !prev[item.id] }))}
-                                      className="btn-secondary"
-                                      style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem' }}
-                                    >
-                                      {showInfo ? (language === 'es' ? 'Ocultar info' : 'Hide info') : (language === 'es' ? 'Ver info' : 'View info')}
-                                    </button>
-                                  )}
+                                  <button
+                                    onClick={() => handleOpenItemDetails(item)}
+                                    className="btn-secondary"
+                                    style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem' }}
+                                  >
+                                    {language === 'es' ? 'Ver info' : 'View info'}
+                                  </button>
                                 </div>
-                                {showInfo && notes.description && (
-                                  <div style={{ paddingLeft: '2.8rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                                    <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{stripHtml(notes.description)}</p>
-                                    {notes.sub_items && notes.sub_items.length > 0 && (
-                                      <ul style={{ margin: '0.2rem 0 0 0', paddingLeft: '1rem', fontSize: '0.78rem', fontFamily: 'monospace', listStyleType: 'circle' }}>
-                                        {notes.sub_items.map((sub: string, sidx: number) => <li key={sidx}>{sub}</li>)}
-                                      </ul>
-                                    )}
-                                  </div>
-                                )}
                               </div>
                             );
                           })}
@@ -448,8 +544,6 @@ export const ViewGuide: React.FC = () => {
                                 /* Subblock items */
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', paddingLeft: '1.25rem' }}>
                                   {subItems.map((item: any) => {
-                                    const notes = parseNotes(item.custom_notes || '');
-                                    const showInfo = expandedItems[item.id];
                                     return (
                                       <div key={item.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.4rem 0.8rem', background: 'var(--bg-secondary)', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
                                         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
@@ -470,26 +564,14 @@ export const ViewGuide: React.FC = () => {
                                           <div style={{ flex: 1 }}>
                                             <h6 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 600 }}>{item.title}</h6>
                                           </div>
-                                          {notes.description && (
-                                            <button
-                                              onClick={() => setExpandedItems(prev => ({ ...prev, [item.id]: !prev[item.id] }))}
-                                              className="btn-secondary"
-                                              style={{ padding: '0.15rem 0.45rem', fontSize: '0.72rem' }}
-                                            >
-                                              {showInfo ? (language === 'es' ? 'Ocultar info' : 'Hide info') : (language === 'es' ? 'Ver info' : 'View info')}
-                                            </button>
-                                          )}
+                                          <button
+                                            onClick={() => handleOpenItemDetails(item)}
+                                            className="btn-secondary"
+                                            style={{ padding: '0.15rem 0.45rem', fontSize: '0.72rem' }}
+                                          >
+                                            {language === 'es' ? 'Ver info' : 'View info'}
+                                          </button>
                                         </div>
-                                        {showInfo && notes.description && (
-                                          <div style={{ paddingLeft: '2.5rem', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                                            <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{stripHtml(notes.description)}</p>
-                                            {notes.sub_items && notes.sub_items.length > 0 && (
-                                              <ul style={{ margin: '0.15rem 0 0 0', paddingLeft: '1rem', fontSize: '0.75rem', fontFamily: 'monospace', listStyleType: 'circle' }}>
-                                                {notes.sub_items.map((sub: string, sidx: number) => <li key={sidx}>{sub}</li>)}
-                                              </ul>
-                                            )}
-                                          </div>
-                                        )}
                                       </div>
                                     );
                                   })}
@@ -508,6 +590,184 @@ export const ViewGuide: React.FC = () => {
           })()}
         </div>
       </div>
+
+      {/* Standalone Item Details Modal (at the top) */}
+      {selectedItem && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(0, 0, 0, 0.75)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 2000
+          }}
+        >
+          <div
+            className="glass-card"
+            style={{
+              width: '650px',
+              maxHeight: '90vh',
+              padding: '2rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '1.5rem',
+              overflowY: 'auto',
+              textAlign: 'left'
+            }}
+          >
+            {/* Modal Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem' }}>
+              <div>
+                <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700 }}>{selectedItem.title}</h2>
+                <span style={{ fontSize: '0.78rem', color: 'var(--accent-primary)', textTransform: 'uppercase', fontWeight: 700 }}>
+                  {t('media' + selectedItem.item_type.charAt(0).toUpperCase() + selectedItem.item_type.slice(1))}
+                </span>
+              </div>
+              <button
+                onClick={() => setSelectedItem(null)}
+                style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '0.2rem' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Modal Body Info */}
+            <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
+              {selectedItem.image_url && (
+                <img
+                  src={selectedItem.image_url}
+                  alt={selectedItem.title}
+                  onClick={() => setZoomedImage(selectedItem.image_url)}
+                  style={{ width: '130px', height: '190px', objectFit: 'cover', borderRadius: '8px', cursor: 'zoom-in', boxShadow: '0 5px 15px rgba(0,0,0,0.3)' }}
+                />
+              )}
+              
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem', minWidth: '250px' }}>
+                {/* Description info */}
+                {(() => {
+                  const notes = parseNotes(selectedItem.custom_notes || '');
+                  if (!notes.description) return null;
+                  return (
+                    <div>
+                      <h5 style={{ margin: '0 0 0.25rem 0', color: 'var(--text-secondary)' }}>{language === 'es' ? 'Descripción:' : 'Description:'}</h5>
+                      <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-primary)', lineHeight: '1.4' }}>
+                        {stripHtml(notes.description)}
+                      </p>
+                    </div>
+                  );
+                })()}
+
+                {/* Star rating selector */}
+                <div>
+                  <h5 style={{ margin: '0 0 0.4rem 0', color: 'var(--text-secondary)' }}>{language === 'es' ? 'Tu Calificación:' : 'Your Rating:'}</h5>
+                  <div style={{ display: 'flex', gap: '0.25rem' }}>
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        onClick={() => setUserRating(star)}
+                        style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 0 }}
+                      >
+                        <Star
+                          size={24}
+                          fill={star <= userRating ? '#f59e0b' : 'none'}
+                          color={star <= userRating ? '#f59e0b' : 'var(--text-muted)'}
+                        />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Favorite toggler */}
+                <div>
+                  <button
+                    onClick={handleToggleFavorite}
+                    className="btn-secondary"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      fontSize: '0.85rem',
+                      padding: '0.4rem 0.8rem',
+                      borderColor: isFavorite ? 'var(--accent-primary)' : 'var(--border-color)',
+                      background: isFavorite ? 'rgba(124, 58, 237, 0.1)' : 'transparent',
+                      color: isFavorite ? 'var(--accent-primary)' : 'var(--text-primary)'
+                    }}
+                  >
+                    <Heart size={16} fill={isFavorite ? 'var(--accent-primary)' : 'none'} />
+                    {isFavorite
+                      ? (language === 'es' ? 'Destacado (Quitar)' : 'Featured (Remove)')
+                      : (language === 'es' ? 'Destacar (Favorito)' : 'Feature (Favorite)')
+                    }
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Comment write area */}
+            <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <h4 style={{ margin: 0, fontSize: '1.1rem' }}>{language === 'es' ? 'Escribe tu reseña o comentario' : 'Write your review or comment'}</h4>
+              <textarea
+                className="input-field"
+                value={userComment}
+                onChange={(e) => setUserComment(e.target.value)}
+                placeholder={language === 'es' ? '¿Qué te pareció este elemento? Escribe aquí...' : 'What did you think of this item? Write here...'}
+                style={{ width: '100%', minHeight: '80px', padding: '0.75rem', background: 'var(--bg-secondary)', resize: 'vertical' }}
+              />
+              <button
+                onClick={handleSaveReview}
+                className="btn-primary"
+                disabled={isSavingReview}
+                style={{ alignSelf: 'flex-end', padding: '0.4rem 1rem', fontSize: '0.85rem' }}
+              >
+                {isSavingReview
+                  ? (language === 'es' ? 'Guardando...' : 'Saving...')
+                  : (language === 'es' ? 'Guardar Valoración' : 'Save Review')
+                }
+              </button>
+            </div>
+
+            {/* Community Reviews List */}
+            <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', textAlign: 'left' }}>
+              <h4 style={{ margin: 0, fontSize: '1.1rem' }}>{language === 'es' ? 'Comentarios de la Comunidad' : 'Community Comments'}</h4>
+              {itemReviews.length === 0 ? (
+                <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                  {language === 'es' ? 'Nadie ha comentado sobre esto aún.' : 'No comments on this item yet.'}
+                </p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '180px', overflowY: 'auto' }}>
+                  {itemReviews.map((rev: any) => (
+                    <div key={rev.id} style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.85rem', fontWeight: 600, textTransform: 'capitalize' }}>{rev.username}</span>
+                        {rev.rating && (
+                          <div style={{ display: 'flex', gap: '0.1rem' }}>
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <Star
+                                key={star}
+                                size={12}
+                                fill={star <= rev.rating ? '#f59e0b' : 'none'}
+                                color={star <= rev.rating ? '#f59e0b' : 'var(--text-muted)'}
+                              />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      {rev.content && (
+                        <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: '1.3' }}>
+                          {rev.content}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Image Zoom Modal */}
       {zoomedImage && (

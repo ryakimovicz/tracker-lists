@@ -12,6 +12,7 @@ from app.models.saved_list import SavedList
 from app.models.item_progress import ItemProgress
 from app.models.addition import ListAddition, UserAdoptedAddition
 from app.services.tmdb import TMDBService
+from app.models.library import UserLibraryItem, UserLibraryStatusEnum
 from app.schemas.list import (
     ReadingListCreate,
     ReadingListUpdate,
@@ -402,6 +403,33 @@ def unsave_list_from_library(
     return {"message": "List removed from library successfully"}
 
 # 10. Toggle item progress completion status
+def auto_add_to_library(db: Session, user_id: int, item: ListItem):
+    if not item.external_id:
+        return
+    existing = db.query(UserLibraryItem).filter(
+        UserLibraryItem.user_id == user_id,
+        UserLibraryItem.item_type == item.item_type,
+        UserLibraryItem.external_id == item.external_id
+    ).first()
+    if not existing:
+        status_val = UserLibraryStatusEnum.COMPLETED
+        if item.item_type in ("book", "comic", "manga"):
+            status_val = UserLibraryStatusEnum.READ
+        elif item.item_type == "game":
+            status_val = UserLibraryStatusEnum.COMPLETED
+        elif item.item_type == "series":
+            status_val = UserLibraryStatusEnum.COMPLETED
+            
+        lib_item = UserLibraryItem(
+            user_id=user_id,
+            item_type=item.item_type,
+            external_id=item.external_id,
+            title=item.title,
+            image_url=item.image_url,
+            status=status_val
+        )
+        db.add(lib_item)
+
 @router.post("/items/{item_id}/toggle", status_code=status.HTTP_200_OK)
 def toggle_item_progress(
     item_id: int,
@@ -409,7 +437,6 @@ def toggle_item_progress(
     db: Session = Depends(get_db)
 ):
     # Verify the item exists
-    item = db.query(ListItem).first() # Query by id
     item = db.query(ListItem).filter(ListItem.id == item_id).first()
     if not item:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="List item not found")
@@ -459,6 +486,9 @@ def toggle_item_progress(
                 completed_at=datetime.now(timezone.utc)
             )
         db.add(progress)
+        
+    if progress.is_completed:
+        auto_add_to_library(db, current_user.id, item)
         
     db.commit()
     return {
@@ -516,6 +546,9 @@ def bulk_toggle_items_progress(
                     completed_at=datetime.now(timezone.utc) if req_body.completed else None
                 )
             db.add(progress)
+            
+        if req_body.completed:
+            auto_add_to_library(db, current_user.id, item)
             
     db.commit()
     return {"status": "success"}
