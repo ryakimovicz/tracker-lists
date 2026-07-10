@@ -91,7 +91,7 @@ export const Profile: React.FC = () => {
   const [itemReviews, setItemReviews] = useState<any[]>([]);
   const [userRating, setUserRating] = useState<number>(0);
   const [userComment, setUserComment] = useState<string>('');
-  const [pagesReadVal, setPagesReadVal] = useState<number>(0);
+  const [pagesReadVal, setPagesReadVal] = useState<number | ''>(0);
   const [isSavingReview, setIsSavingReview] = useState(false);
   const [descExpanded, setDescExpanded] = useState(false);
   const [episodes, setEpisodes] = useState<any[]>([]);
@@ -435,6 +435,22 @@ export const Profile: React.FC = () => {
       setActivities(actRes.data);
     } catch (err) {
       console.error("Failed to toggle episode", err);
+    }
+  };
+
+  const handleSavePagesRead = async (val: number) => {
+    if (!selectedItem) return;
+    try {
+      const res = await apiClient.put(`/library/${selectedItem.id}`, {
+        pages_read: val
+      });
+      setSelectedItem((prev: any) => prev ? { ...prev, pages_read: res.data.pages_read, status: res.data.status } : null);
+      const libraryRes = await apiClient.get('/library/');
+      setLibraryItems(libraryRes.data);
+      const actRes = await apiClient.get('/users/me/activity');
+      setActivities(actRes.data);
+    } catch (err) {
+      console.error("Failed to update pages read", err);
     }
   };
 
@@ -1328,7 +1344,26 @@ export const Profile: React.FC = () => {
                           className="input-field"
                           value={pagesReadVal}
                           min={0}
-                          onChange={(e) => setPagesReadVal(parseInt(e.target.value) || 0)}
+                          onFocus={() => {
+                            if (pagesReadVal === 0) setPagesReadVal('');
+                          }}
+                          onBlur={() => {
+                            const finalVal = pagesReadVal === '' ? 0 : pagesReadVal;
+                            setPagesReadVal(finalVal);
+                            handleSavePagesRead(finalVal);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              const finalVal = pagesReadVal === '' ? 0 : pagesReadVal;
+                              setPagesReadVal(finalVal);
+                              handleSavePagesRead(finalVal);
+                              (e.target as HTMLInputElement).blur();
+                            }
+                          }}
+                          onChange={(e) => {
+                            const val = e.target.value === '' ? '' : parseInt(e.target.value) || 0;
+                            setPagesReadVal(val);
+                          }}
                           style={{
                             padding: '0.4rem 0.8rem',
                             fontSize: '0.85rem',
@@ -1339,27 +1374,6 @@ export const Profile: React.FC = () => {
                             maxWidth: '120px'
                           }}
                         />
-                        <button
-                          onClick={async () => {
-                            try {
-                              const res = await apiClient.put(`/library/${selectedItem.id}`, {
-                                pages_read: pagesReadVal
-                              });
-                              setSelectedItem((prev: any) => prev ? { ...prev, pages_read: res.data.pages_read, status: res.data.status } : null);
-                              const libraryRes = await apiClient.get('/library/');
-                              setLibraryItems(libraryRes.data);
-                              const actRes = await apiClient.get('/users/me/activity');
-                              setActivities(actRes.data);
-                              alert(language === 'es' ? 'Páginas actualizadas con éxito.' : 'Pages updated successfully.');
-                            } catch (err) {
-                              console.error("Failed to update pages read", err);
-                            }
-                          }}
-                          className="btn-secondary"
-                          style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}
-                        >
-                          {language === 'es' ? 'Guardar' : 'Save'}
-                        </button>
                       </div>
                     </div>
                   )}

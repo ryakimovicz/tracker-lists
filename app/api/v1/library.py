@@ -1,4 +1,5 @@
 from typing import List, Optional
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 
@@ -185,7 +186,6 @@ def add_to_library(
     if pages_val > 0 and status_val not in (UserLibraryStatusEnum.READ, UserLibraryStatusEnum.COMPLETED):
         status_val = UserLibraryStatusEnum.READING
 
-    from datetime import datetime, timezone
     completed_at_val = None
     last_title = None
     if status_val in (UserLibraryStatusEnum.COMPLETED, UserLibraryStatusEnum.READ):
@@ -262,7 +262,6 @@ def update_library_item(
         lib_item.status = item_in.status
         
         # Set completed_at date
-        from datetime import datetime, timezone
         if item_in.status in (UserLibraryStatusEnum.COMPLETED, UserLibraryStatusEnum.READ):
             lib_item.completed_at = datetime.now(timezone.utc)
             if lib_item.item_type == "series" and lib_item.tracking_list_id:
