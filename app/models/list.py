@@ -22,6 +22,7 @@ class ReadingList(Base):
     # Custom importance levels naming and defaults mapping
     importance_labels = Column(JSON, nullable=True, default=lambda: {"1": "Optional", "2": "Recommended", "3": "Highly Recommended", "4": "Mandatory", "5": "Essential"})
     section_importances = Column(JSON, nullable=True, default=dict)
+    section_descriptions = Column(JSON, nullable=True, default=dict)
 
     # Relationships
     creator = relationship("User", back_populates="lists")

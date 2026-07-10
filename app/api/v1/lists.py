@@ -53,7 +53,8 @@ def create_list(
         description=list_in.description,
         visibility=list_in.visibility,
         importance_labels=list_in.importance_labels,
-        section_importances=list_in.section_importances
+        section_importances=list_in.section_importances,
+        section_descriptions=list_in.section_descriptions
     )
     db.add(new_list)
     db.commit()

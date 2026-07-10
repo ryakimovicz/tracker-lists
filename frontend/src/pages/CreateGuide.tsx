@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from '../context/LanguageContext';
 import { apiClient } from '../api/client';
 import {
@@ -7,7 +7,8 @@ import {
   PlusCircle,
   Import,
   AlertCircle,
-  CheckCircle
+  CheckCircle,
+  FolderPlus
 } from 'lucide-react';
 
 interface CreatedGuide {
@@ -16,6 +17,8 @@ interface CreatedGuide {
   description: string;
   visibility: string;
   importance_labels: Record<string, string>;
+  section_importances: Record<string, number>;
+  section_descriptions: Record<string, string>;
   items: any[];
 }
 
@@ -31,19 +34,30 @@ export const CreateGuide: React.FC = () => {
   const [showCustomLabels, setShowCustomLabels] = useState(false);
 
   // Custom priority labels state
-  const [label1, setLabel1] = useState(language === 'es' ? 'Muy Bajo / Relleno' : 'Very Low / Filler');
-  const [label2, setLabel2] = useState(language === 'es' ? 'Bajo' : 'Low');
-  const [label3, setLabel3] = useState(language === 'es' ? 'Medio / Recomendado' : 'Medium / Recommended');
-  const [label4, setLabel4] = useState(language === 'es' ? 'Alto' : 'High');
-  const [label5, setLabel5] = useState(language === 'es' ? 'Muy Alto / Esencial' : 'Very High / Essential');
+  const [label1, setLabel1] = useState(language === 'es' ? 'Lectura Opcional' : 'Optional Reading');
+  const [label2, setLabel2] = useState(language === 'es' ? 'Lectura Recomendada' : 'Recommended Reading');
+  const [label3, setLabel3] = useState(language === 'es' ? 'Lectura Altamente Recomendada' : 'Highly Recommended');
+  const [label4, setLabel4] = useState(language === 'es' ? 'Lectura Importante' : 'Important Reading');
+  const [label5, setLabel5] = useState(language === 'es' ? 'Lectura Obligatoria' : 'Mandatory Reading');
 
   // Step 2: Editor actions state
-  const [activeSection, setActiveSection] = useState('');
+  const [sections, setSections] = useState<Record<string, string>>({});
+  
+  // Section Manager inputs
+  const [newSectionTitle, setNewSectionTitle] = useState('');
+  const [newSectionDescription, setNewSectionDescription] = useState('');
+
+  // Item Form inputs
+  const [selectedSection, setSelectedSection] = useState('');
   const [newItemTitle, setNewItemTitle] = useState('');
-  const [newItemType, setNewItemType] = useState('game');
+  const [newItemType, setNewItemType] = useState('comic');
   const [newItemExternalId, setNewItemExternalId] = useState('');
   const [newItemImageUrl, setNewItemImageUrl] = useState('');
-  const [newItemNotes, setNewItemNotes] = useState('');
+  
+  // Rich item content
+  const [newItemDescription, setNewItemDescription] = useState('');
+  const [newItemSubItems, setNewItemSubItems] = useState(''); // Textarea, one per line
+  
   const [newItemPriority, setNewItemPriority] = useState<number | null>(null);
   const [newItemOrder, setNewItemOrder] = useState<number>(0);
 
@@ -56,6 +70,13 @@ export const CreateGuide: React.FC = () => {
   const [successMsg, setSuccessMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Populate sections when guide state changes
+  useEffect(() => {
+    if (guide) {
+      setSections(guide.section_descriptions || {});
+    }
+  }, [guide]);
+
   const handleCreateGuideSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
@@ -63,7 +84,6 @@ export const CreateGuide: React.FC = () => {
     setIsSubmitting(true);
     setErrorMsg('');
     try {
-      // Build importance labels renaming map
       const importanceLabels = {
         "1": label1,
         "2": label2,
@@ -76,10 +96,11 @@ export const CreateGuide: React.FC = () => {
         title,
         description,
         visibility,
-        importance_labels: importanceLabels
+        importance_labels: importanceLabels,
+        section_descriptions: {}
       });
       setGuide(response.data);
-      setSuccessMsg(language === 'es' ? '¡Guía creada con éxito!' : 'Guide created successfully!');
+      setSuccessMsg(language === 'es' ? '¡Lista/Guía creada con éxito!' : 'List/Guide created successfully!');
       setTimeout(() => setSuccessMsg(''), 4000);
     } catch (err: any) {
       setErrorMsg(err.response?.data?.detail || 'Failed to create guide.');
@@ -88,25 +109,66 @@ export const CreateGuide: React.FC = () => {
     }
   };
 
-  const handleAddItemSubmit = async (e: React.FormEvent) => {
+  const handleAddSectionSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!guide || !newItemTitle.trim() || !newItemExternalId.trim()) return;
+    if (!guide || !newSectionTitle.trim()) return;
 
     setErrorMsg('');
     setSuccessMsg('');
     try {
+      const updatedDescriptions = {
+        ...sections,
+        [newSectionTitle.trim()]: newSectionDescription.trim()
+      };
+
+      const response = await apiClient.put(`/lists/${guide.id}`, {
+        section_descriptions: updatedDescriptions
+      });
+
+      setGuide(response.data);
+      setSections(updatedDescriptions);
+      setSelectedSection(newSectionTitle.trim()); // Auto-select the newly created section
+      setNewSectionTitle('');
+      setNewSectionDescription('');
+      setSuccessMsg(language === 'es' ? '¡Sección/Etapa añadida!' : 'Section/Stage added!');
+      setTimeout(() => setSuccessMsg(''), 3000);
+    } catch (err: any) {
+      setErrorMsg(err.response?.data?.detail || 'Failed to add section.');
+    }
+  };
+
+  const handleAddItemSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!guide || !newItemTitle.trim()) return;
+
+    setErrorMsg('');
+    setSuccessMsg('');
+    try {
+      // Pack description and sub items list as JSON in custom_notes field
+      const subItemsList = newItemSubItems
+        .split('\n')
+        .map(s => s.trim())
+        .filter(Boolean);
+
+      const notesPayload = JSON.stringify({
+        description: newItemDescription.trim(),
+        sub_items: subItemsList
+      });
+
+      // If no external_id is provided, auto-generate a fallback mock ID to satisfy the backend
+      const finalExternalId = newItemExternalId.trim() || `manual-${Date.now()}`;
+
       const response = await apiClient.post(`/lists/${guide.id}/items`, {
         item_type: newItemType,
-        external_id: newItemExternalId,
-        title: newItemTitle,
-        image_url: newItemImageUrl,
-        custom_notes: newItemNotes,
-        section: activeSection || null,
+        external_id: finalExternalId,
+        title: newItemTitle.trim(),
+        image_url: newItemImageUrl.trim() || null,
+        custom_notes: notesPayload,
+        section: selectedSection || null,
         importance_rank: newItemPriority,
         order_index: newItemOrder
       });
 
-      // Update guide list view local state
       setGuide(prev => {
         if (!prev) return null;
         return {
@@ -119,7 +181,8 @@ export const CreateGuide: React.FC = () => {
       setNewItemTitle('');
       setNewItemExternalId('');
       setNewItemImageUrl('');
-      setNewItemNotes('');
+      setNewItemDescription('');
+      setNewItemSubItems('');
       setNewItemPriority(null);
       setNewItemOrder(prev => prev + 1);
       setTimeout(() => setSuccessMsg(''), 3000);
@@ -143,22 +206,59 @@ export const CreateGuide: React.FC = () => {
         starting_order_index: newItemOrder
       });
 
-      // Refetch the entire guide details to populate newly imported episodes
       const response = await apiClient.get(`/lists/${guide.id}`);
       setGuide(response.data);
 
-      setSuccessMsg(language === 'es' ? '¡Episodios importados correctamente!' : 'Episodes imported successfully!');
+      setSuccessMsg(language === 'es' ? '¡Episodios importados!' : 'Episodes imported!');
       setTmdbSeriesId('');
       setTimeout(() => setSuccessMsg(''), 4000);
     } catch (err: any) {
-      setErrorMsg(err.response?.data?.detail || 'Failed to import episodes. Verify TMDB ID.');
+      setErrorMsg(err.response?.data?.detail || 'Failed to import episodes.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  // Helper to parse JSON notes
+  const parseNotes = (notes: string) => {
+    try {
+      if (notes.startsWith('{')) {
+        return JSON.parse(notes);
+      }
+    } catch (e) {
+      // fallback
+    }
+    return { description: notes, sub_items: [] };
+  };
+
+  // Group items by section
+  const getGroupedItems = () => {
+    if (!guide) return {};
+    const grouped: Record<string, any[]> = {};
+    
+    // Seed groups with all created sections first to keep order
+    Object.keys(sections).forEach(secName => {
+      grouped[secName] = [];
+    });
+    
+    // Add fallback for unsectioned
+    grouped[''] = [];
+
+    (guide.items || []).forEach(item => {
+      const sec = item.section || '';
+      if (!grouped[sec]) {
+        grouped[sec] = [];
+      }
+      grouped[sec].push(item);
+    });
+
+    return grouped;
+  };
+
+  const groupedItems = getGroupedItems();
+
   return (
-    <div style={{ maxWidth: '900px', margin: '0 auto', padding: '2rem 0', display: 'flex', flexDirection: 'column', gap: '2rem', textAlign: 'left' }}>
+    <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '2rem 0', display: 'flex', flexDirection: 'column', gap: '2rem', textAlign: 'left' }}>
       
       {errorMsg && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', padding: '0.75rem', borderRadius: 8, fontSize: '0.9rem' }}>
@@ -174,7 +274,7 @@ export const CreateGuide: React.FC = () => {
         </div>
       )}
 
-      {/* STEP 1: GUIDE DETAILS CREATOR */}
+      {/* STEP 1: CREATE GUIDE DETAILS FORM */}
       {!guide ? (
         <form onSubmit={handleCreateGuideSubmit} className="glass-card" style={{ padding: '2.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           <h2>{language === 'es' ? 'Crear Nueva Lista/Guía' : 'Create New List/Guide'}</h2>
@@ -261,200 +361,301 @@ export const CreateGuide: React.FC = () => {
           </div>
 
           <button type="submit" disabled={isSubmitting} className="btn-primary" style={{ marginTop: '1rem' }}>
-            {language === 'es' ? 'Crear Guía' : 'Create Guide'} <ArrowRight size={18} />
+            {language === 'es' ? 'Crear Lista/Guía' : 'Create List/Guide'} <ArrowRight size={18} />
           </button>
         </form>
       ) : (
         /* STEP 2: GUIDE BUILDER EDITOR VIEW */
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '2rem', alignItems: 'start' }}>
           
-          <div className="glass-card" style={{ padding: '2rem' }}>
-            <span style={{ fontSize: '0.75rem', background: 'rgba(124,58,237,0.1)', color: 'var(--accent-primary)', padding: '0.2rem 0.5rem', borderRadius: '4px', textTransform: 'capitalize' }}>
-              {guide.visibility}
-            </span>
-            <h2 style={{ marginTop: '0.5rem' }}>{guide.title}</h2>
-            <p style={{ color: 'var(--text-secondary)', margin: '0.5rem 0 0 0' }}>{guide.description}</p>
-          </div>
+          {/* Left Column: Form builders */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+            
+            {/* Guide Info Card */}
+            <div className="glass-card" style={{ padding: '2rem' }}>
+              <span style={{ fontSize: '0.75rem', background: 'rgba(124,58,237,0.1)', color: 'var(--accent-primary)', padding: '0.2rem 0.5rem', borderRadius: '4px', textTransform: 'capitalize' }}>
+                {guide.visibility}
+              </span>
+              <h2 style={{ marginTop: '0.5rem', fontSize: '1.75rem' }}>{guide.title}</h2>
+              <p style={{ color: 'var(--text-secondary)', margin: '0.5rem 0 0 0' }}>{guide.description}</p>
+            </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: '2rem', alignItems: 'start' }}>
-            {/* Left side: Add elements & TMDB Importer */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+            {/* Form A: Add Section/Stage */}
+            <form onSubmit={handleAddSectionSubmit} className="glass-card" style={{ padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
+                <FolderPlus size={20} color="var(--accent-primary)" /> {language === 'es' ? 'Crear Nueva Sección/Etapa' : 'Create Section/Stage'}
+              </h3>
               
-              {/* Form 1: Add individual item */}
-              <form onSubmit={handleAddItemSubmit} className="glass-card" style={{ padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
-                  <PlusCircle size={20} color="var(--accent-primary)" /> {language === 'es' ? 'Añadir Ítem' : 'Add Item'}
-                </h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                <label style={{ fontSize: '0.85rem', fontWeight: 500 }}>{language === 'es' ? 'Nombre de la Sección' : 'Section Name'}</label>
+                <input
+                  type="text"
+                  required
+                  className="input-field"
+                  placeholder={language === 'es' ? 'Ej. PARTE 0: FUNDAMENTOS' : 'e.g. PART 0: ESSENTIALS'}
+                  value={newSectionTitle}
+                  onChange={(e) => setNewSectionTitle(e.target.value)}
+                />
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                <label style={{ fontSize: '0.85rem', fontWeight: 500 }}>{language === 'es' ? 'Descripción de la Sección' : 'Section Description'}</label>
+                <textarea
+                  className="input-field"
+                  rows={2}
+                  placeholder={language === 'es' ? 'Explica de qué trata esta etapa...' : 'Describe what this stage is about...'}
+                  value={newSectionDescription}
+                  onChange={(e) => setNewSectionDescription(e.target.value)}
+                />
+              </div>
+
+              <button type="submit" className="btn-secondary" style={{ width: '100%' }}>
+                <Plus size={16} /> {language === 'es' ? 'Crear Sección' : 'Create Section'}
+              </button>
+            </form>
+
+            {/* Form B: Add Item */}
+            <form onSubmit={handleAddItemSubmit} className="glass-card" style={{ padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
+                <PlusCircle size={20} color="var(--accent-primary)" /> {language === 'es' ? 'Añadir Elemento a la Lista' : 'Add Item to List'}
+              </h3>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                <label style={{ fontSize: '0.85rem' }}>{language === 'es' ? 'Título del Elemento' : 'Element Title'}</label>
+                <input
+                  type="text"
+                  required
+                  className="input-field"
+                  placeholder={language === 'es' ? 'Ej. La creación de la Liga Original' : 'e.g. The Brave and the Bold #28'}
+                  value={newItemTitle}
+                  onChange={(e) => setNewItemTitle(e.target.value)}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                  <label style={{ fontSize: '0.85rem' }}>{language === 'es' ? 'Sección / Etapa' : 'Section / Stage'}</label>
+                  <select
+                    className="input-field"
+                    value={selectedSection}
+                    onChange={(e) => setSelectedSection(e.target.value)}
+                  >
+                    <option value="">{language === 'es' ? '-- Sin Sección --' : '-- No Section --'}</option>
+                    {Object.keys(sections).map(secName => (
+                      <option key={secName} value={secName}>{secName}</option>
+                    ))}
+                  </select>
+                </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                  <label style={{ fontSize: '0.85rem' }}>{language === 'es' ? 'Título del Ítem' : 'Item Title'}</label>
+                  <label style={{ fontSize: '0.85rem' }}>{language === 'es' ? 'Prioridad' : 'Priority'}</label>
+                  <select
+                    className="input-field"
+                    value={newItemPriority || ''}
+                    onChange={(e) => setNewItemPriority(e.target.value ? parseInt(e.target.value) : null)}
+                  >
+                    <option value="">{language === 'es' ? 'Sin prioridad definida' : 'No Priority'}</option>
+                    <option value="1">1 - {label1}</option>
+                    <option value="2">2 - {label2}</option>
+                    <option value="3">3 - {label3}</option>
+                    <option value="4">4 - {label4}</option>
+                    <option value="5">5 - {label5}</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                  <label style={{ fontSize: '0.85rem' }}>{language === 'es' ? 'Formato' : 'Format'}</label>
+                  <select className="input-field" value={newItemType} onChange={(e) => setNewItemType(e.target.value)}>
+                    <option value="comic">{t('mediaComic')}</option>
+                    <option value="manga">{t('mediaManga')}</option>
+                    <option value="book">{t('mediaBook')}</option>
+                    <option value="game">{t('mediaGame')}</option>
+                    <option value="movie">{t('mediaMovie')}</option>
+                    <option value="series">{t('mediaSeries')}</option>
+                  </select>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                  <label style={{ fontSize: '0.85rem' }}>{language === 'es' ? 'ID Externo (Opcional)' : 'External ID (Optional)'}</label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    placeholder="e.g. 1726"
+                    value={newItemExternalId}
+                    onChange={(e) => setNewItemExternalId(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                <label style={{ fontSize: '0.85rem' }}>{language === 'es' ? 'Descripción del Elemento' : 'Element Description'}</label>
+                <textarea
+                  className="input-field"
+                  rows={2}
+                  placeholder={language === 'es' ? 'Explica de qué trata o por qué leerlo...' : 'Why to read/watch this item...'}
+                  value={newItemDescription}
+                  onChange={(e) => setNewItemDescription(e.target.value)}
+                />
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                <label style={{ fontSize: '0.85rem' }}>{language === 'es' ? 'Elementos / Capítulos incluidos (uno por línea)' : 'Included issues / chapters (one per line)'}</label>
+                <textarea
+                  className="input-field"
+                  rows={3}
+                  placeholder={language === 'es' ? 'Ej:\nThe Brave and the Bold #28\nJustice League of America #9' : 'e.g.:\nThe Brave and the Bold #28\nJustice League of America #9'}
+                  value={newItemSubItems}
+                  onChange={(e) => setNewItemSubItems(e.target.value)}
+                />
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                <label style={{ fontSize: '0.85rem' }}>{language === 'es' ? 'URL de Imagen (Opcional)' : 'Image URL (Optional)'}</label>
+                <input
+                  type="text"
+                  className="input-field"
+                  placeholder="https://..."
+                  value={newItemImageUrl}
+                  onChange={(e) => setNewItemImageUrl(e.target.value)}
+                />
+              </div>
+
+              <button type="submit" className="btn-primary" style={{ width: '100%' }}>
+                <Plus size={16} /> {language === 'es' ? 'Añadir Elemento' : 'Add Element'}
+              </button>
+            </form>
+
+            {/* Form C: TMDB Importer */}
+            <form onSubmit={handleImportTvEpisodes} className="glass-card" style={{ padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
+                <Import size={20} color="var(--accent-primary)" /> {language === 'es' ? 'Importador Automático (TMDB)' : 'TMDB TV Importer'}
+              </h3>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: 0 }}>
+                Importa temporadas completas como elementos de tu guía.
+              </p>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                  <label style={{ fontSize: '0.85rem' }}>Series TMDB ID</label>
                   <input
                     type="text"
                     required
                     className="input-field"
-                    placeholder="e.g. Iron Man 1"
-                    value={newItemTitle}
-                    onChange={(e) => setNewItemTitle(e.target.value)}
+                    placeholder="e.g. 1399"
+                    value={tmdbSeriesId}
+                    onChange={(e) => setTmdbSeriesId(e.target.value)}
                   />
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                    <label style={{ fontSize: '0.85rem' }}>{language === 'es' ? 'Formato' : 'Format'}</label>
-                    <select className="input-field" value={newItemType} onChange={(e) => setNewItemType(e.target.value)}>
-                      <option value="game">{t('mediaGame')}</option>
-                      <option value="movie">{t('mediaMovie')}</option>
-                      <option value="series">{t('mediaSeries')}</option>
-                      <option value="book">{t('mediaBook')}</option>
-                      <option value="comic">{t('mediaComic')}</option>
-                      <option value="manga">{t('mediaManga')}</option>
-                    </select>
-                  </div>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                    <label style={{ fontSize: '0.85rem' }}>{language === 'es' ? 'ID Externo (API)' : 'External ID (API)'}</label>
-                    <input
-                      type="text"
-                      required
-                      className="input-field"
-                      placeholder="e.g. 1726"
-                      value={newItemExternalId}
-                      onChange={(e) => setNewItemExternalId(e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                    <label style={{ fontSize: '0.85rem' }}>{language === 'es' ? 'Sección / Arco' : 'Section / Arc'}</label>
-                    <input
-                      type="text"
-                      className="input-field"
-                      placeholder={language === 'es' ? 'Ej. Fase 1' : 'e.g. Phase 1'}
-                      value={activeSection}
-                      onChange={(e) => setActiveSection(e.target.value)}
-                    />
-                  </div>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                    <label style={{ fontSize: '0.85rem' }}>{language === 'es' ? 'Prioridad' : 'Priority'}</label>
-                    <select
-                      className="input-field"
-                      value={newItemPriority || ''}
-                      onChange={(e) => setNewItemPriority(e.target.value ? parseInt(e.target.value) : null)}
-                    >
-                      <option value="">{language === 'es' ? 'Heredada (Sección)' : 'Inherited'}</option>
-                      <option value="1">1 - {label1}</option>
-                      <option value="2">2 - {label2}</option>
-                      <option value="3">3 - {label3}</option>
-                      <option value="4">4 - {label4}</option>
-                      <option value="5">5 - {label5}</option>
-                    </select>
-                  </div>
-                </div>
-
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                  <label style={{ fontSize: '0.85rem' }}>{language === 'es' ? 'URL de Imagen' : 'Image URL'}</label>
+                  <label style={{ fontSize: '0.85rem' }}>{language === 'es' ? 'Temporada' : 'Season'}</label>
                   <input
-                    type="text"
+                    type="number"
+                    required
                     className="input-field"
-                    placeholder="https://..."
-                    value={newItemImageUrl}
-                    onChange={(e) => setNewItemImageUrl(e.target.value)}
+                    value={tmdbSeasonNum}
+                    onChange={(e) => setTmdbSeasonNum(e.target.value)}
                   />
                 </div>
+              </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                  <label style={{ fontSize: '0.85rem' }}>{language === 'es' ? 'Notas / Recomendaciones' : 'Notes / Tips'}</label>
-                  <textarea
-                    className="input-field"
-                    rows={2}
-                    value={newItemNotes}
-                    onChange={(e) => setNewItemNotes(e.target.value)}
-                  />
-                </div>
+              <button type="submit" disabled={isSubmitting} className="btn-secondary" style={{ width: '100%' }}>
+                {isSubmitting ? '...' : language === 'es' ? 'Importar en Lote' : 'Bulk Import'}
+              </button>
+            </form>
 
-                <button type="submit" className="btn-primary" style={{ width: '100%' }}>
-                  <Plus size={16} /> {language === 'es' ? 'Añadir a la lista' : 'Add to list'}
-                </button>
-              </form>
+          </div>
 
-              {/* Form 2: TMDB Season Importer */}
-              <form onSubmit={handleImportTvEpisodes} className="glass-card" style={{ padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
-                  <Import size={20} color="var(--accent-primary)" /> {language === 'es' ? 'Importar Temporada (TMDB)' : 'Import Season (TMDB)'}
-                </h3>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: 0 }}>
-                  Introduce el ID de TMDB de la serie para auto-importar sus capítulos.
-                </p>
+          {/* Right Column: Live styled preview matching user specification */}
+          <div className="glass-card" style={{ padding: '2.5rem', display: 'flex', flexDirection: 'column', gap: '2rem', maxHeight: '1100px', overflowY: 'auto' }}>
+            <h2 style={{ borderBottom: '2px solid var(--accent-primary)', paddingBottom: '0.5rem', margin: 0 }}>
+              {language === 'es' ? 'Vista Previa del Contenido' : 'Content Live Preview'}
+            </h2>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                    <label style={{ fontSize: '0.85rem' }}>Series TMDB ID</label>
-                    <input
-                      type="text"
-                      required
-                      className="input-field"
-                      placeholder="e.g. 1399 (Game of Thrones)"
-                      value={tmdbSeriesId}
-                      onChange={(e) => setTmdbSeriesId(e.target.value)}
-                    />
-                  </div>
+            {Object.keys(groupedItems).map(secName => {
+              const secDesc = sections[secName] || '';
+              const items = groupedItems[secName] || [];
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                    <label style={{ fontSize: '0.85rem' }}>{language === 'es' ? 'Temporada' : 'Season'}</label>
-                    <input
-                      type="number"
-                      required
-                      className="input-field"
-                      value={tmdbSeasonNum}
-                      onChange={(e) => setTmdbSeasonNum(e.target.value)}
-                    />
-                  </div>
-                </div>
+              // Skip empty sections to keep display clean
+              if (items.length === 0 && !secDesc) return null;
 
-                <button type="submit" disabled={isSubmitting} className="btn-secondary" style={{ width: '100%' }}>
-                  {isSubmitting ? 'Importing...' : language === 'es' ? 'Importar Capítulos' : 'Import Episodes'}
-                </button>
-              </form>
-
-            </div>
-
-            {/* Right side: Items Preview list */}
-            <div className="glass-card" style={{ padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1.5rem', maxHeight: '720px', overflowY: 'auto' }}>
-              <h3 style={{ margin: 0 }}>{language === 'es' ? 'Vista Previa de la Guía' : 'Guide Preview'}</h3>
-              
-              {(!guide.items || guide.items.length === 0) ? (
-                <p style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: '2rem 0' }}>
-                  {language === 'es' ? 'Aún no hay elementos añadidos.' : 'No items added yet.'}
-                </p>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  {guide.items.map((item: any, index: number) => (
-                    <div key={item.id || index} style={{ display: 'flex', gap: '1rem', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem', textAlign: 'left' }}>
-                      <img
-                        src={item.image_url || 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=100'}
-                        alt={item.title}
-                        style={{ width: '50px', height: '70px', objectFit: 'cover', borderRadius: '4px' }}
-                      />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <h4 style={{ margin: '0 0 0.2rem 0', fontSize: '0.95rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {item.title}
-                        </h4>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--accent-primary)', textTransform: 'capitalize' }}>
-                          {item.item_type}
-                        </span>
-                        {item.section && (
-                          <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginLeft: '1rem' }}>
-                            ({item.section})
-                          </span>
-                        )}
-                      </div>
+              return (
+                <div key={secName} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '2rem' }}>
+                  
+                  {/* Section Header */}
+                  {secName && (
+                    <div style={{ textAlign: 'left', marginTop: '1rem' }}>
+                      <h3 style={{ margin: '0 0 0.5rem 0', color: 'var(--accent-primary)', fontSize: '1.35rem', fontWeight: 800, letterSpacing: '0.05em' }}>
+                        {secName.toUpperCase()}
+                      </h3>
+                      {secDesc && (
+                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.92rem', fontStyle: 'italic', lineHeight: 1.5, margin: 0, paddingLeft: '1rem', borderLeft: '3px solid var(--border-color)' }}>
+                          {secDesc}
+                        </p>
+                      )}
                     </div>
-                  ))}
+                  )}
+
+                  {/* Section Items */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
+                    {items.map((item: any) => {
+                      const notes = parseNotes(item.custom_notes || '');
+                      
+                      // Find priority label name
+                      const priorityLabel = item.importance_rank
+                        ? guide.importance_labels[item.importance_rank.toString()] || `Priority ${item.importance_rank}`
+                        : '';
+
+                      return (
+                        <div key={item.id} style={{ display: 'flex', gap: '1.25rem', alignItems: 'start', textAlign: 'left' }}>
+                          {item.image_url && (
+                            <img
+                              src={item.image_url}
+                              alt={item.title}
+                              style={{ width: '80px', height: '115px', objectFit: 'cover', borderRadius: '6px', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-sm)' }}
+                            />
+                          )}
+                          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', flexWrap: 'wrap' }}>
+                              <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700 }}>{item.title}</h4>
+                              {priorityLabel && (
+                                <span style={{ fontSize: '0.78rem', color: 'var(--accent-primary)', fontWeight: 600 }}>
+                                  ({priorityLabel})
+                                </span>
+                              )}
+                            </div>
+                            
+                            {notes.description && (
+                              <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: 0, lineHeight: 1.45 }}>
+                                {notes.description}
+                              </p>
+                            )}
+
+                            {/* Bulleted Sub-items */}
+                            {notes.sub_items && notes.sub_items.length > 0 && (
+                              <ul style={{ margin: '0.25rem 0 0 0', paddingLeft: '1.25rem', color: 'var(--text-primary)', fontSize: '0.85rem', fontFamily: 'monospace', listStyleType: 'circle', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                                {notes.sub_items.map((sub: string, sidx: number) => (
+                                  <li key={sidx}>{sub}</li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
                 </div>
-              )}
-            </div>
+              );
+            })}
+
+            {guide.items?.length === 0 && (
+              <p style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: '3rem 0' }}>
+                {language === 'es' ? 'Comienza a añadir secciones y elementos a tu lista.' : 'Start adding sections and items to your list.'}
+              </p>
+            )}
 
           </div>
 

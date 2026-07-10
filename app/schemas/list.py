@@ -46,6 +46,7 @@ class ReadingListBase(BaseModel):
     visibility: VisibilityEnum = VisibilityEnum.PUBLIC
     importance_labels: Optional[dict] = None
     section_importances: Optional[dict] = None
+    section_descriptions: Optional[dict] = None
 
 class ReadingListCreate(ReadingListBase):
     pass
@@ -56,6 +57,7 @@ class ReadingListUpdate(BaseModel):
     visibility: Optional[VisibilityEnum] = None
     importance_labels: Optional[dict] = None
     section_importances: Optional[dict] = None
+    section_descriptions: Optional[dict] = None
 
 class ReadingListResponse(ReadingListBase):
     id: int
