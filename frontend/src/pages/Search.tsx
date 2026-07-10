@@ -1002,28 +1002,43 @@ export const Search: React.FC = () => {
                           <span style={{ display: 'flex', alignItems: 'center' }}>
                             <input
                               type="checkbox"
-                              disabled={!currentShelfItem}
                               checked={isCompleted}
                               onClick={(e) => {
                                 e.stopPropagation();
                               }}
                               onChange={async (e) => {
                                 e.stopPropagation();
-                                if (!currentShelfItem) return;
                                 const checkedVal = e.target.checked;
                                 const cacheKey = `${selectedItem.external_id}_s${s.season_number}`;
                                 const tmdbEps = getCachedTMDB(cacheKey);
                                 
                                 try {
-                                  await apiClient.post(`/lists/${currentShelfItem.tracking_list_id}/bulk-toggle-season`, {
-                                    season_number: s.season_number,
-                                    episodes: tmdbEps || null,
-                                    completed: checkedVal
-                                  });
-                                  
-                                  const listRes = await apiClient.get(`/lists/${currentShelfItem.tracking_list_id}`);
-                                  setEpisodes(listRes.data.items || []);
-                                  await loadShelfItems();
+                                  let trackingListId = currentShelfItem?.tracking_list_id;
+                                  if (!trackingListId) {
+                                    await apiClient.post('/library/', {
+                                      item_type: 'series',
+                                      external_id: selectedItem.external_id,
+                                      title: selectedItem.title,
+                                      image_url: selectedItem.image_url,
+                                      status: 'watching'
+                                    });
+                                    const updatedShelf = await apiClient.get('/library/');
+                                    setShelfItems(updatedShelf.data);
+                                    const freshItem = updatedShelf.data.find((x: any) => x.external_id === selectedItem.external_id && x.item_type === 'series');
+                                    trackingListId = freshItem?.tracking_list_id;
+                                  }
+
+                                  if (trackingListId) {
+                                    await apiClient.post(`/lists/${trackingListId}/bulk-toggle-season`, {
+                                      season_number: s.season_number,
+                                      episodes: tmdbEps || null,
+                                      completed: checkedVal
+                                    });
+                                    
+                                    const listRes = await apiClient.get(`/lists/${trackingListId}`);
+                                    setEpisodes(listRes.data.items || []);
+                                    await loadShelfItems();
+                                  }
                                 } catch (err) {
                                   console.error("Bulk toggle failed", err);
                                 }
@@ -1057,14 +1072,32 @@ export const Search: React.FC = () => {
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, minWidth: 0 }}>
                                       <input
                                         type="checkbox"
-                                        disabled={!currentShelfItem}
                                         checked={isEpCompleted}
                                         onChange={async () => {
-                                          if (currentShelfItem && currentShelfItem.tracking_list_id) {
-                                            await handleToggleEpisode(currentShelfItem.tracking_list_id, ep);
+                                          try {
+                                            let trackingListId = currentShelfItem?.tracking_list_id;
+                                            if (!trackingListId) {
+                                              await apiClient.post('/library/', {
+                                                item_type: 'series',
+                                                external_id: selectedItem.external_id,
+                                                title: selectedItem.title,
+                                                image_url: selectedItem.image_url,
+                                                status: 'watching'
+                                              });
+                                              const updatedShelf = await apiClient.get('/library/');
+                                              setShelfItems(updatedShelf.data);
+                                              const freshItem = updatedShelf.data.find((x: any) => x.external_id === selectedItem.external_id && x.item_type === 'series');
+                                              trackingListId = freshItem?.tracking_list_id;
+                                            }
+
+                                            if (trackingListId) {
+                                              await handleToggleEpisode(trackingListId, ep);
+                                            }
+                                          } catch (err) {
+                                            console.error("Episode toggle failed", err);
                                           }
                                         }}
-                                        style={{ width: '15px', height: '15px', cursor: currentShelfItem ? 'pointer' : 'default' }}
+                                        style={{ width: '15px', height: '15px', cursor: 'pointer' }}
                                       />
                                       <span style={{ fontWeight: 500, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
                                         E{ep.episode_number}

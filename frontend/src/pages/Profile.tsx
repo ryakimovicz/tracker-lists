@@ -462,6 +462,10 @@ export const Profile: React.FC = () => {
       await apiClient.delete(`/library/${itemId}`);
       setLibraryItems(prev => prev.filter(item => item.id !== itemId));
       setSuccessMsg(language === 'es' ? 'Elemento eliminado de la estantería.' : 'Item removed from shelf.');
+      
+      const actRes = await apiClient.get('/users/me/activity');
+      setActivities(actRes.data);
+      
       setTimeout(() => setSuccessMsg(''), 3000);
     } catch (err: any) {
       setErrorMsg(err.response?.data?.detail || 'Failed to delete item.');
@@ -488,6 +492,9 @@ export const Profile: React.FC = () => {
           saved_lists: (prev.saved_lists || []).filter((l: any) => l.id !== listId)
         };
       });
+
+      const actRes = await apiClient.get('/users/me/activity');
+      setActivities(actRes.data);
 
       setSuccessMsg(language === 'es' ? 'Guía eliminada con éxito.' : 'Guide deleted successfully.');
       setTimeout(() => setSuccessMsg(''), 3000);
