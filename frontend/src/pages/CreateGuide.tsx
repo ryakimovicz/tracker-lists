@@ -37,6 +37,11 @@ interface DocElement {
   subblocks?: DocElement[]; // Nested subblocks (only inside blocks)
 }
 
+const stripHtml = (html: string) => {
+  if (!html) return '';
+  return html.replace(/<[^>]*>/g, '');
+};
+
 export const CreateGuide: React.FC = () => {
   const { t, language } = useTranslation();
 
@@ -755,7 +760,7 @@ export const CreateGuide: React.FC = () => {
                   <img src={media.image_url} alt={media.title} style={{ width: '40px', height: '55px', objectFit: 'cover', borderRadius: '4px' }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <h5 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{media.title}</h5>
-                    <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{media.description}</p>
+                    <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{stripHtml(media.description)}</p>
                   </div>
                 </div>
               ))}

@@ -11,6 +11,11 @@ interface SearchResultItem {
   item_type: 'game' | 'movie' | 'series' | 'comic' | 'manga' | 'book';
 }
 
+const stripHtml = (html: string) => {
+  if (!html) return '';
+  return html.replace(/<[^>]*>/g, '');
+};
+
 export const Search: React.FC = () => {
   const { t, language } = useTranslation();
 
@@ -182,7 +187,7 @@ export const Search: React.FC = () => {
                   {item.title}
                 </h4>
                 <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', margin: 0, height: '3.2rem', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' }}>
-                  {item.description}
+                  {stripHtml(item.description)}
                 </p>
               </div>
 
