@@ -1,5 +1,9 @@
 from typing import List
-from fastapi import APIRouter, Query, HTTPException, status, Request
+from fastapi import APIRouter, Query, HTTPException, status, Request, Depends
+from sqlalchemy.orm import Session
+from app.core.database import get_db
+from app.models.user import User
+from app.models.list import ReadingList, VisibilityEnum
 from app.services.base import SearchResultItem
 from app.services.mangadex import MangaDexService
 from app.services.comicvine import ComicVineService
@@ -77,7 +81,8 @@ def search_media(
 @limiter.limit("20/minute")
 def search_all_media(
     request: Request,
-    q: str = Query(..., min_length=1, description="The search query term")
+    q: str = Query(..., min_length=1, description="The search query term"),
+    db: Session = Depends(get_db)
 ):
     import concurrent.futures
     with concurrent.futures.ThreadPoolExecutor(max_workers=7) as executor:
@@ -109,6 +114,35 @@ def search_all_media(
     combined.extend(games)
     combined.extend(mangas)
     combined.extend(comics)
+
+    # Search users and guides in database
+    search_pattern = f"%{q.lower()}%"
+    db_users = db.query(User).filter(User.username.like(search_pattern)).limit(20).all()
+    db_guides = db.query(ReadingList).filter(
+        ReadingList.visibility == VisibilityEnum.PUBLIC,
+        (ReadingList.title.like(search_pattern) | ReadingList.description.like(search_pattern))
+    ).limit(20).all()
+    
+    for u in db_users:
+        combined.append(SearchResultItem(
+            external_id=str(u.id),
+            title=u.username,
+            image_url=u.photo_url or "",
+            description="Usuario de Pathd",
+            item_type="user",
+            popularity=0.0
+        ))
+        
+    for g in db_guides:
+        creator_name = g.creator.username if g.creator else "Usuario"
+        combined.append(SearchResultItem(
+            external_id=str(g.id),
+            title=g.title,
+            image_url="",
+            description=g.description or f"Guía creada por {creator_name}",
+            item_type="guide",
+            popularity=10.0
+        ))
 
     query_clean = q.lower().strip()
     query_words = set(query_clean.split())

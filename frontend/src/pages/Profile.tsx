@@ -965,7 +965,7 @@ export const Profile: React.FC = () => {
           <h3>{language === 'es' ? 'Mis Obras Destacadas' : 'My Featured Favorites'}</h3>
           {favorites.length === 0 ? (
             <div className="glass-card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-              {language === 'es' ? 'Marca obras en tu estantería como "Terminado" para destacarlas aquí.' : 'Mark items on your shelf as "Completed" to highlight them here.'}
+              {language === 'es' ? 'Marca obras en tu estantería como favoritas (con el ícono de corazón) para destacarlas aquí.' : 'Mark items on your shelf as favorites (with the heart icon) to highlight them here.'}
             </div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '2rem' }}>
@@ -1478,41 +1478,25 @@ export const Profile: React.FC = () => {
                                   e.stopPropagation();
                                   const checkedVal = e.target.checked;
                                   const cacheKey = `${selectedItem.external_id}_s${s.season_number}`;
-                                  let tmdbEps = getCachedTMDB(cacheKey);
-                                  if (!tmdbEps) {
-                                    setIsLoadingSeasonEpisodes(true);
-                                    try {
-                                      const res = await apiClient.get(`/search/series/${selectedItem.external_id}/season/${s.season_number}`);
-                                      tmdbEps = res.data || [];
-                                      setCachedTMDB(cacheKey, tmdbEps);
-                                      setSeasonEpisodes(prev => ({ ...prev, [s.season_number]: tmdbEps }));
-                                    } catch (err) {
-                                      console.error("Failed to load season episodes for bulk toggle", err);
-                                      return;
-                                    } finally {
-                                      setIsLoadingSeasonEpisodes(false);
-                                    }
-                                  }
+                                  const tmdbEps = getCachedTMDB(cacheKey);
                                   
-                                  if (tmdbEps && tmdbEps.length > 0) {
-                                    try {
-                                      await apiClient.post(`/lists/${selectedItem.tracking_list_id}/bulk-toggle-season`, {
-                                        season_number: s.season_number,
-                                        episodes: tmdbEps,
-                                        completed: checkedVal
-                                      });
-                                      
-                                      const listRes = await apiClient.get(`/lists/${selectedItem.tracking_list_id}`);
-                                      setEpisodes(listRes.data.items || []);
-                                      
-                                      const libraryRes = await apiClient.get('/library/');
-                                      setLibraryItems(libraryRes.data);
-                                      
-                                      const actRes = await apiClient.get('/users/me/activity');
-                                      setActivities(actRes.data);
-                                    } catch (err) {
-                                      console.error("Bulk toggle failed", err);
-                                    }
+                                  try {
+                                    await apiClient.post(`/lists/${selectedItem.tracking_list_id}/bulk-toggle-season`, {
+                                      season_number: s.season_number,
+                                      episodes: tmdbEps || null,
+                                      completed: checkedVal
+                                    });
+                                    
+                                    const listRes = await apiClient.get(`/lists/${selectedItem.tracking_list_id}`);
+                                    setEpisodes(listRes.data.items || []);
+                                    
+                                    const libraryRes = await apiClient.get('/library/');
+                                    setLibraryItems(libraryRes.data);
+                                    
+                                    const actRes = await apiClient.get('/users/me/activity');
+                                    setActivities(actRes.data);
+                                  } catch (err) {
+                                    console.error("Bulk toggle failed", err);
                                   }
                                 }}
                                 style={{ width: '16px', height: '16px', cursor: 'pointer', marginRight: '0.6rem', verticalAlign: 'middle' }}

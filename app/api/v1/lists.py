@@ -309,20 +309,21 @@ def update_list(
     db.commit()
     db.refresh(reading_list)
 
-    # Log activity
-    act_type = "guide_updated"
-    if old_visibility == VisibilityEnum.DRAFT and reading_list.visibility in (VisibilityEnum.PUBLIC, VisibilityEnum.PRIVATE):
-        act_type = "guide_published"
+    # Log activity only on explicit publish (when metadata/visibility are updated)
+    if "title" in update_data or "visibility" in update_data:
+        act_type = "guide_updated"
+        if old_visibility == VisibilityEnum.DRAFT and reading_list.visibility in (VisibilityEnum.PUBLIC, VisibilityEnum.PRIVATE):
+            act_type = "guide_published"
 
-    activity = UserActivityLog(
-        user_id=current_user.id,
-        activity_type=act_type,
-        item_title=reading_list.title,
-        item_type="guide",
-        details="published" if act_type == "guide_published" else "updated"
-    )
-    db.add(activity)
-    db.commit()
+        activity = UserActivityLog(
+            user_id=current_user.id,
+            activity_type=act_type,
+            item_title=reading_list.title,
+            item_type="guide",
+            details="published" if act_type == "guide_published" else "updated"
+        )
+        db.add(activity)
+        db.commit()
 
     return reading_list
 
@@ -1153,7 +1154,23 @@ def bulk_toggle_season(
     
     series_title = lib_item.title if lib_item else "Series"
     
-    for ep in req.episodes:
+    # Resolve episodes list (fetch from TMDB directly if not supplied)
+    episodes_list = req.episodes
+    if not episodes_list:
+        if lib_item and lib_item.external_id:
+            try:
+                series_id = int(lib_item.external_id)
+                episodes_list = TMDBService.get_season_episodes(series_id, req.season_number) or []
+            except Exception as e:
+                print(f"Failed to fetch episodes for bulk toggle in backend: {e}")
+                episodes_list = []
+        else:
+            episodes_list = []
+
+    # Get initial item count to increment index in memory
+    item_count = db.query(ListItem).filter(ListItem.list_id == list_id).count()
+
+    for ep in episodes_list:
         ext_id = f"tmdb-ep-{ep.get('id')}"
         item = db.query(ListItem).filter(
             ListItem.list_id == list_id,
@@ -1161,10 +1178,10 @@ def bulk_toggle_season(
         ).first()
         
         if not item:
-            item_count = db.query(ListItem).filter(ListItem.list_id == list_id).count()
+            item_count += 1
             item = ListItem(
                 list_id=list_id,
-                order_index=item_count + 1,
+                order_index=item_count,
                 item_type=ItemTypeEnum.SERIES,
                 external_id=ext_id,
                 title=f"{series_title} - S{req.season_number:02d}E{ep.get('episode_number', 1):02d} - {ep.get('name', 'Untitled')}",
@@ -1173,8 +1190,8 @@ def bulk_toggle_season(
                 section=f"Season {req.season_number}"
             )
             db.add(item)
-            db.commit()
-            db.refresh(item)
+            # Flush so item.id is populated for ItemProgress mapping without full transaction commit
+            db.flush()
             
         progress = db.query(ItemProgress).filter(
             ItemProgress.user_id == current_user.id,

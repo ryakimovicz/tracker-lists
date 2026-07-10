@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from '../context/LanguageContext';
 import { apiClient } from '../api/client';
-import { Search as SearchIcon, AlertCircle, CheckCircle, Plus, X, Heart, Star } from 'lucide-react';
+import { Search as SearchIcon, AlertCircle, CheckCircle, Plus, X, Heart, Star, Users, BookOpen } from 'lucide-react';
 
 interface SearchResultItem {
   external_id: string;
   title: string;
   image_url: string;
   description: string;
-  item_type: 'game' | 'movie' | 'series' | 'comic' | 'manga' | 'book' | 'anime';
+  item_type: 'game' | 'movie' | 'series' | 'comic' | 'manga' | 'book' | 'anime' | 'user' | 'guide';
   release_date?: string;
 }
 
@@ -22,10 +23,11 @@ const stripHtml = (html: string) => {
 
 export const Search: React.FC = () => {
   const { t, language } = useTranslation();
+  const navigate = useNavigate();
 
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResultItem[]>([]);
-  const [activeTab, setActiveTab] = useState<'all' | 'movie' | 'series' | 'anime' | 'book' | 'comic' | 'manga' | 'game'>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'movie' | 'series' | 'anime' | 'book' | 'comic' | 'manga' | 'game' | 'user' | 'guide'>('all');
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [isSearching, setIsSearching] = useState(false);
@@ -44,6 +46,40 @@ export const Search: React.FC = () => {
   const [pagesReadVal, setPagesReadVal] = useState<number | ''>(0);
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
 
+  // TV Tracking states inside details modal
+  const [seasons, setSeasons] = useState<any[]>([]);
+  const [episodes, setEpisodes] = useState<any[]>([]);
+  const [activeSeason, setActiveSeason] = useState<number | null>(null);
+  const [seasonEpisodes, setSeasonEpisodes] = useState<{ [seasonNumber: number]: any[] }>({});
+  const [isLoadingSeasonEpisodes, setIsLoadingSeasonEpisodes] = useState(false);
+
+  // User & Guide search tracking
+  const [currentUser, setCurrentUser] = useState<any | null>(null);
+  const [followingUsers, setFollowingUsers] = useState<any[]>([]);
+  const [savedGuides, setSavedGuides] = useState<any[]>([]);
+
+  const getCachedTMDB = (key: string) => {
+    try {
+      const item = localStorage.getItem(`tmdb_cache_${key}`);
+      if (item) {
+        const parsed = JSON.parse(item);
+        if (Date.now() - parsed.timestamp < 6 * 60 * 60 * 1000) {
+          return parsed.data;
+        }
+      }
+    } catch(e){}
+    return null;
+  };
+
+  const setCachedTMDB = (key: string, data: any) => {
+    try {
+      localStorage.setItem(`tmdb_cache_${key}`, JSON.stringify({
+        data,
+        timestamp: Date.now()
+      }));
+    } catch(e){}
+  };
+
   const loadShelfItems = async () => {
     try {
       const res = await apiClient.get('/library/');
@@ -53,8 +89,21 @@ export const Search: React.FC = () => {
     }
   };
 
+  const loadSocialMetadata = async () => {
+    try {
+      const profileRes = await apiClient.get('/users/me');
+      setCurrentUser(profileRes.data);
+      const followingRes = await apiClient.get(`/users/${profileRes.data.id}/following`);
+      setFollowingUsers(followingRes.data);
+      setSavedGuides(profileRes.data.saved_lists || []);
+    } catch(e) {
+      console.error("Failed to load user social data", e);
+    }
+  };
+
   useEffect(() => {
     loadShelfItems();
+    loadSocialMetadata();
   }, []);
 
   const handleSearch = async (e: React.FormEvent) => {
@@ -152,12 +201,92 @@ export const Search: React.FC = () => {
     }
   };
 
+  const findNextSeasonToSee = (itemsList: any[], seasonsList: any[]) => {
+    const completed = itemsList.filter(ep => ep.is_completed);
+    if (completed.length === 0) return 1;
+    
+    const sorted = [...completed].sort((a, b) => {
+      const sA = parseInt(a.section?.match(/Season (\d+)/)?.[1] || '0');
+      const sB = parseInt(b.section?.match(/Season (\d+)/)?.[1] || '0');
+      if (sA !== sB) return sA - sB;
+      const epA = parseInt(a.title?.match(/E(\d+)/)?.[1] || '0');
+      const epB = parseInt(b.title?.match(/E(\d+)/)?.[1] || '0');
+      if (epA !== epB) return epA - epB;
+      return a.order_index - b.order_index;
+    });
+    
+    const lastCompleted = sorted[sorted.length - 1];
+    const lastSeasonNum = parseInt(lastCompleted.section?.match(/Season (\d+)/)?.[1] || '1');
+    const lastEpisodeNum = parseInt(lastCompleted.title?.match(/E(\d+)/)?.[1] || '1');
+    
+    const seasonInfo = seasonsList.find(s => s.season_number === lastSeasonNum);
+    const maxEpisodes = seasonInfo ? seasonInfo.episode_count : 0;
+    
+    if (lastEpisodeNum < maxEpisodes) {
+      return lastSeasonNum;
+    } else {
+      const nextSeasonNum = lastSeasonNum + 1;
+      const hasNextSeason = seasonsList.some(s => s.season_number === nextSeasonNum);
+      return hasNextSeason ? nextSeasonNum : lastSeasonNum;
+    }
+  };
+
+  const handleLoadSeasonEpisodes = async (seriesId: string, seasonNumber: number) => {
+    if (seasonEpisodes[seasonNumber]) return;
+    const cacheKey = `${seriesId}_s${seasonNumber}`;
+    const cached = getCachedTMDB(cacheKey);
+    if (cached) {
+      setSeasonEpisodes(prev => ({
+        ...prev,
+        [seasonNumber]: cached
+      }));
+      return;
+    }
+
+    setIsLoadingSeasonEpisodes(true);
+    try {
+      const res = await apiClient.get(`/search/series/${seriesId}/season/${seasonNumber}`);
+      setCachedTMDB(cacheKey, res.data);
+      setSeasonEpisodes(prev => ({
+        ...prev,
+        [seasonNumber]: res.data || []
+      }));
+    } catch (err) {
+      console.error("Failed to load season episodes", err);
+    } finally {
+      setIsLoadingSeasonEpisodes(false);
+    }
+  };
+
+  const handleToggleEpisode = async (listId: number, ep: any) => {
+    try {
+      await apiClient.post(`/lists/${listId}/toggle-tmdb-episode`, {
+        tmdb_episode_id: ep.id,
+        title: ep.title || `${selectedItem?.title} - S${ep.season_number < 10 ? '0' + ep.season_number : ep.season_number}E${ep.episode_number < 10 ? '0' + ep.episode_number : ep.episode_number} - ${ep.name || 'Untitled Episode'}`,
+        image_url: ep.image_url || (ep.still_path ? `https://image.tmdb.org/t/p/w185${ep.still_path}` : null),
+        overview: ep.custom_notes || ep.overview,
+        season_number: ep.season_number,
+        episode_number: ep.episode_number
+      });
+      
+      const listRes = await apiClient.get(`/lists/${listId}`);
+      setEpisodes(listRes.data.items || []);
+      await loadShelfItems();
+    } catch (err) {
+      console.error("Failed to toggle episode", err);
+    }
+  };
+
   const handleOpenItemDetails = async (item: SearchResultItem) => {
     setSelectedItem(item);
     setUserRating(0);
     setUserComment('');
     setItemReviews([]);
     setPagesReadVal(0);
+    setSeasons([]);
+    setEpisodes([]);
+    setActiveSeason(null);
+    setSeasonEpisodes({});
 
     const normType = item.item_type === 'anime' ? 'series' : item.item_type;
     const matchedShelf = shelfItems.find(x => x.external_id === item.external_id && x.item_type === normType);
@@ -175,6 +304,94 @@ export const Search: React.FC = () => {
       }
     } catch (err) {
       console.error("Failed to load item reviews", err);
+    }
+
+    if (item.item_type === 'series') {
+      try {
+        let filteredSeasons = [];
+        const cacheKey = `series_${item.external_id}`;
+        const cached = getCachedTMDB(cacheKey);
+        if (cached) {
+          filteredSeasons = cached;
+        } else {
+          const seriesRes = await apiClient.get(`/search/series/${item.external_id}`);
+          filteredSeasons = (seriesRes.data.seasons || []).filter((s: any) => s.season_number > 0);
+          setCachedTMDB(cacheKey, filteredSeasons);
+        }
+        setSeasons(filteredSeasons);
+
+        if (matchedShelf && matchedShelf.tracking_list_id) {
+          const listRes = await apiClient.get(`/lists/${matchedShelf.tracking_list_id}`);
+          const itemsList = listRes.data.items || [];
+          setEpisodes(itemsList);
+
+          const nextSeason = findNextSeasonToSee(itemsList, filteredSeasons);
+          setActiveSeason(nextSeason);
+
+          const cacheKeyS = `${item.external_id}_s${nextSeason}`;
+          const cachedS = getCachedTMDB(cacheKeyS);
+          if (cachedS) {
+            setSeasonEpisodes({ [nextSeason]: cachedS });
+          } else {
+            setIsLoadingSeasonEpisodes(true);
+            apiClient.get(`/search/series/${item.external_id}/season/${nextSeason}`)
+              .then(res => {
+                setCachedTMDB(cacheKeyS, res.data);
+                setSeasonEpisodes({ [nextSeason]: res.data || [] });
+              })
+              .catch(e => console.error(e))
+              .finally(() => setIsLoadingSeasonEpisodes(false));
+          }
+        } else {
+          setActiveSeason(1);
+          const cacheKeyS = `${item.external_id}_s1`;
+          const cachedS = getCachedTMDB(cacheKeyS);
+          if (cachedS) {
+            setSeasonEpisodes({ 1: cachedS });
+          } else {
+            setIsLoadingSeasonEpisodes(true);
+            apiClient.get(`/search/series/${item.external_id}/season/1`)
+              .then(res => {
+                setCachedTMDB(cacheKeyS, res.data);
+                setSeasonEpisodes({ 1: res.data || [] });
+              })
+              .catch(e => console.error(e))
+              .finally(() => setIsLoadingSeasonEpisodes(false));
+          }
+        }
+      } catch (e) {
+        console.error("Failed to load TV series seasons", e);
+      }
+    }
+  };
+
+  const handleToggleFollowUser = async (userId: number) => {
+    try {
+      const res = await apiClient.post(`/social/users/${userId}/follow`);
+      await loadSocialMetadata();
+      setSuccessMsg(res.data.following
+        ? (language === 'es' ? 'Comenzaste a seguir a este usuario.' : 'Started following this user.')
+        : (language === 'es' ? 'Dejaste de seguir a este usuario.' : 'Unfollowed this user.')
+      );
+      setTimeout(() => setSuccessMsg(''), 3000);
+    } catch(err) {
+      console.error("Failed to follow user", err);
+    }
+  };
+
+  const handleToggleSaveGuide = async (guideId: number, isSaved: boolean) => {
+    try {
+      if (isSaved) {
+        await apiClient.delete(`/lists/${guideId}/save`);
+        setSuccessMsg(language === 'es' ? 'Guía quitada de tu biblioteca.' : 'Guide removed from library.');
+      } else {
+        await apiClient.post(`/lists/${guideId}/save`);
+        setSuccessMsg(language === 'es' ? 'Guía guardada en tu biblioteca.' : 'Guide saved to library.');
+      }
+      await loadSocialMetadata();
+      setTimeout(() => setSuccessMsg(''), 3000);
+    } catch(err) {
+      console.error("Failed to toggle guide save", err);
     }
   };
 
@@ -284,6 +501,8 @@ export const Search: React.FC = () => {
         if (activeTab === 'comic') return item.item_type === 'comic';
         if (activeTab === 'manga') return item.item_type === 'manga';
         if (activeTab === 'game') return item.item_type === 'game';
+        if (activeTab === 'user') return item.item_type === 'user';
+        if (activeTab === 'guide') return item.item_type === 'guide';
         return true;
       });
 
@@ -349,7 +568,9 @@ export const Search: React.FC = () => {
             { value: 'book', label: language === 'es' ? 'Libros' : 'Books' },
             { value: 'comic', label: language === 'es' ? 'Cómics' : 'Comics' },
             { value: 'manga', label: language === 'es' ? 'Mangas' : 'Manga' },
-            { value: 'game', label: language === 'es' ? 'Juegos' : 'Games' }
+            { value: 'game', label: language === 'es' ? 'Juegos' : 'Games' },
+            { value: 'user', label: language === 'es' ? 'Usuarios' : 'Users' },
+            { value: 'guide', label: language === 'es' ? 'Guías' : 'Guides' }
           ].map(tab => (
             <button
               key={tab.value}
@@ -379,6 +600,87 @@ export const Search: React.FC = () => {
       {filteredResults.length > 0 && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1.5rem' }}>
           {filteredResults.map((item) => {
+            if (item.item_type === 'user') {
+              const isFollowing = followingUsers.some(u => String(u.id) === item.external_id);
+              const isMe = currentUser && String(currentUser.id) === item.external_id;
+              return (
+                <div key={item.external_id} className="glass-card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', textAlign: 'center' }}>
+                  <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'var(--bg-secondary)', border: '2px solid var(--accent-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                    {item.image_url ? (
+                      <img src={item.image_url} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      <Users size={40} color="var(--accent-primary)" />
+                    )}
+                  </div>
+                  <div>
+                    <h4 style={{ margin: '0 0 0.25rem 0', fontSize: '1.1rem', fontWeight: 600 }}>{item.title}</h4>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 600 }}>
+                      {language === 'es' ? 'Usuario' : 'User'}
+                    </span>
+                  </div>
+                  {!isMe && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleToggleFollowUser(parseInt(item.external_id));
+                      }}
+                      className={isFollowing ? "btn-secondary" : "btn-primary"}
+                      style={{ width: '100%', fontSize: '0.85rem', padding: '0.4rem' }}
+                    >
+                      {isFollowing 
+                        ? (language === 'es' ? 'Siguiendo (Dejar)' : 'Following (Unfollow)') 
+                        : (language === 'es' ? 'Seguir' : 'Follow')
+                      }
+                    </button>
+                  )}
+                </div>
+              );
+            }
+
+            if (item.item_type === 'guide') {
+              const isSaved = savedGuides.some(g => String(g.id) === item.external_id);
+              return (
+                <div key={item.external_id} className="glass-card" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', textAlign: 'left' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <BookOpen size={18} color="var(--accent-primary)" />
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 600 }}>
+                      {language === 'es' ? 'Guía Pública' : 'Public Guide'}
+                    </span>
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <h4 style={{ margin: '0 0 0.4rem 0', fontSize: '1.05rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                      {item.title}
+                    </h4>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' }}>
+                      {item.description}
+                    </p>
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                    <button
+                      onClick={() => navigate(`/guide/${item.external_id}`)}
+                      className="btn-primary"
+                      style={{ flex: 1, fontSize: '0.82rem', padding: '0.4rem' }}
+                    >
+                      {language === 'es' ? 'Ver' : 'View'}
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleToggleSaveGuide(parseInt(item.external_id), isSaved);
+                      }}
+                      className="btn-secondary"
+                      style={{ flex: 1, fontSize: '0.82rem', padding: '0.4rem', color: isSaved ? '#ef4444' : 'var(--text-primary)', borderColor: isSaved ? 'rgba(239, 68, 68, 0.2)' : 'var(--border-color)' }}
+                    >
+                      {isSaved 
+                        ? (language === 'es' ? 'Dejar de seguir' : 'Unfollow') 
+                        : (language === 'es' ? 'Seguir' : 'Follow')
+                      }
+                    </button>
+                  </div>
+                </div>
+              );
+            }
+
             const onShelf = shelfItems.some(x => x.external_id === item.external_id && x.item_type === (item.item_type === 'anime' ? 'series' : item.item_type));
             return (
               <div key={item.external_id} className="glass-card" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', cursor: 'pointer' }} onClick={() => handleOpenItemDetails(item)}>
@@ -644,6 +946,145 @@ export const Search: React.FC = () => {
                 )}
               </div>
             </div>
+
+            {/* TV Series Season Accordion Tracking */}
+            {selectedItem.item_type === 'series' && seasons.length > 0 && (
+              <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', textAlign: 'left' }}>
+                <h4 style={{ margin: 0, fontSize: '1.1rem' }}>
+                  {language === 'es' ? 'Seguimiento de Temporadas' : 'Season Tracking'}
+                </h4>
+                {!currentShelfItem && (
+                  <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--accent-primary)', fontStyle: 'italic' }}>
+                    {language === 'es' 
+                      ? 'Para marcar capítulos como vistos, primero debes añadir esta serie a tu estantería.' 
+                      : 'To mark episodes as watched, you must first add this series to your shelf.'}
+                  </p>
+                )}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  {seasons.map((s) => {
+                    const isSeasonActive = activeSeason === s.season_number;
+                    const isCompleted = currentShelfItem ? (() => {
+                      const listSeps = episodes.filter(x => x.section === `Season ${s.season_number}`);
+                      const cacheKey = `${selectedItem.external_id}_s${s.season_number}`;
+                      const tmdbEps = getCachedTMDB(cacheKey) || [];
+                      if (tmdbEps.length === 0) {
+                        return listSeps.length > 0 && listSeps.every(x => x.is_completed);
+                      }
+                      return tmdbEps.every((te: any) => episodes.some(x => x.external_id === `tmdb-ep-${te.id}` && x.is_completed));
+                    })() : false;
+
+                    return (
+                      <div key={s.id || s.season_number} style={{ border: '1px solid var(--border-color)', borderRadius: '6px', overflow: 'hidden' }}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (isSeasonActive) {
+                              setActiveSeason(null);
+                            } else {
+                              setActiveSeason(s.season_number);
+                              handleLoadSeasonEpisodes(selectedItem.external_id, s.season_number);
+                            }
+                          }}
+                          style={{
+                            width: '100%',
+                            padding: '0.75rem 1rem',
+                            background: 'var(--bg-secondary)',
+                            border: 'none',
+                            color: 'var(--text-primary)',
+                            fontWeight: 600,
+                            textAlign: 'left',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center'
+                          }}
+                        >
+                          <span style={{ display: 'flex', alignItems: 'center' }}>
+                            <input
+                              type="checkbox"
+                              disabled={!currentShelfItem}
+                              checked={isCompleted}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                              }}
+                              onChange={async (e) => {
+                                e.stopPropagation();
+                                if (!currentShelfItem) return;
+                                const checkedVal = e.target.checked;
+                                const cacheKey = `${selectedItem.external_id}_s${s.season_number}`;
+                                const tmdbEps = getCachedTMDB(cacheKey);
+                                
+                                try {
+                                  await apiClient.post(`/lists/${currentShelfItem.tracking_list_id}/bulk-toggle-season`, {
+                                    season_number: s.season_number,
+                                    episodes: tmdbEps || null,
+                                    completed: checkedVal
+                                  });
+                                  
+                                  const listRes = await apiClient.get(`/lists/${currentShelfItem.tracking_list_id}`);
+                                  setEpisodes(listRes.data.items || []);
+                                  await loadShelfItems();
+                                } catch (err) {
+                                  console.error("Bulk toggle failed", err);
+                                }
+                              }}
+                              style={{ width: '16px', height: '16px', cursor: currentShelfItem ? 'pointer' : 'default', marginRight: '0.6rem', verticalAlign: 'middle' }}
+                            />
+                            {language === 'es' ? `Temporada ${s.season_number}` : `Season ${s.season_number}`}
+                            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginLeft: '0.5rem', fontWeight: 400 }}>
+                              ({s.episode_count} {language === 'es' ? 'capítulos' : 'episodes'})
+                            </span>
+                          </span>
+                          <span>{isSeasonActive ? '▼' : '►'}</span>
+                        </button>
+
+                        {isSeasonActive && (
+                          <div style={{ padding: '0.5rem', background: 'var(--bg-primary)', display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '220px', overflowY: 'auto' }}>
+                            {isLoadingSeasonEpisodes ? (
+                              <div style={{ padding: '1rem', textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                                {language === 'es' ? 'Cargando capítulos...' : 'Loading episodes...'}
+                              </div>
+                            ) : (seasonEpisodes[s.season_number] || []).length === 0 ? (
+                              <div style={{ padding: '1rem', textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                                {language === 'es' ? 'No se encontraron capítulos.' : 'No episodes found.'}
+                              </div>
+                            ) : (
+                              (seasonEpisodes[s.season_number] || []).map((ep: any) => {
+                                const dbEp = episodes.find(x => x.external_id === `tmdb-ep-${ep.id}`);
+                                const isEpCompleted = dbEp ? dbEp.is_completed : false;
+                                return (
+                                  <div key={ep.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.4rem', borderBottom: '1px solid var(--border-color)', fontSize: '0.85rem' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, minWidth: 0 }}>
+                                      <input
+                                        type="checkbox"
+                                        disabled={!currentShelfItem}
+                                        checked={isEpCompleted}
+                                        onChange={async () => {
+                                          if (currentShelfItem && currentShelfItem.tracking_list_id) {
+                                            await handleToggleEpisode(currentShelfItem.tracking_list_id, ep);
+                                          }
+                                        }}
+                                        style={{ width: '15px', height: '15px', cursor: currentShelfItem ? 'pointer' : 'default' }}
+                                      />
+                                      <span style={{ fontWeight: 500, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
+                                        E{ep.episode_number}
+                                      </span>
+                                      <span style={{ color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={ep.name}>
+                                        {ep.name}
+                                      </span>
+                                    </div>
+                                  </div>
+                                );
+                              })
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Ratings and Comments section (Only if on shelf) */}
             {currentShelfItem && (
