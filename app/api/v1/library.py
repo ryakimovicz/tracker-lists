@@ -185,6 +185,8 @@ def add_to_library(
     pages_val = item_in.pages_read if item_in.pages_read is not None else 0
     if pages_val > 0 and status_val not in (UserLibraryStatusEnum.READ, UserLibraryStatusEnum.COMPLETED):
         status_val = UserLibraryStatusEnum.READING
+    elif pages_val == 0 and status_val in (UserLibraryStatusEnum.READING, UserLibraryStatusEnum.READ):
+        status_val = UserLibraryStatusEnum.PLAN_TO_READ
 
     completed_at_val = None
     last_title = None
@@ -302,6 +304,16 @@ def update_library_item(
         lib_item.updated_at = datetime.now(timezone.utc)
         if item_in.pages_read > 0 and lib_item.status not in (UserLibraryStatusEnum.READ, UserLibraryStatusEnum.COMPLETED):
             lib_item.status = UserLibraryStatusEnum.READING
+            activity = UserActivityLog(
+                user_id=current_user.id,
+                activity_type="shelf_status",
+                item_title=lib_item.title,
+                item_type=lib_item.item_type,
+                details=lib_item.status.value
+            )
+            db.add(activity)
+        elif item_in.pages_read == 0 and lib_item.status in (UserLibraryStatusEnum.READING, UserLibraryStatusEnum.READ):
+            lib_item.status = UserLibraryStatusEnum.PLAN_TO_READ
             activity = UserActivityLog(
                 user_id=current_user.id,
                 activity_type="shelf_status",
