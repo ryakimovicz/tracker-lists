@@ -1,6 +1,7 @@
 import json
 import urllib.request
 import urllib.parse
+import re
 from typing import List
 from app.core.config import settings
 from app.services.base import SearchResultItem
@@ -24,76 +25,138 @@ class ComicVineService:
             ]
         
         # Clean the query: replace '#' with a space and remove duplicate spaces
-        # This resolves Comic Vine's search index failing to match special characters like '#'
         cleaned_query = query.replace('#', ' ')
         cleaned_query = " ".join(cleaned_query.split())
         
-        encoded_query = urllib.parse.quote(cleaned_query)
-        url = f"https://comicvine.gamespot.com/api/search/?api_key={api_key}&format=json&resources=volume,issue&query={encoded_query}"
-        
-        req = urllib.request.Request(
-            url,
-            headers={
-                "User-Agent": "TrackerLists/1.0 (contact@trackerlists.com)"
-            }
-        )
-        
+        issue_results = []
+        global_results = []
+
         try:
-            with urllib.request.urlopen(req, timeout=8) as response:
-                if response.status == 200:
-                    data = json.loads(response.read().decode())
-                    results = []
-                    for item in data.get("results", []):
-                        image_data = item.get("image", {})
-                        image_url = image_data.get("super_url") or image_data.get("medium_url") or image_data.get("thumb_url")
-                        
-                        resource_type = item.get("resource_type")
-                        if resource_type == "issue":
-                            vol_name = item.get("volume", {}).get("name") or "Unknown Volume"
-                            issue_num = item.get("issue_number") or ""
-                            issue_name = item.get("name")
-                            title_parts = f"{vol_name} #{issue_num}"
-                            if issue_name:
-                                title_parts += f" ({issue_name})"
-                            title = title_parts
-                        else:
-                            title = item.get("name") or "Untitled Volume"
+            # 1. Check if the query ends with an issue number (e.g. "Justice League of America 9")
+            issue_number_match = re.search(r'^(.*?)\s*#?\s*(\d+)$', cleaned_query)
+            if issue_number_match:
+                series_name = issue_number_match.group(1).strip()
+                issue_number = issue_number_match.group(2).strip()
+                
+                if series_name:
+                    encoded_series = urllib.parse.quote(series_name)
+                    # Query issues endpoint directly filtered by the exact issue number
+                    issues_url = f"https://comicvine.gamespot.com/api/issues/?api_key={api_key}&format=json&filter=issue_number:{issue_number}&query={encoded_series}"
+                    req_issues = urllib.request.Request(
+                        issues_url,
+                        headers={
+                            "User-Agent": "TrackerLists/1.0 (contact@trackerlists.com)"
+                        }
+                    )
+                    try:
+                        with urllib.request.urlopen(req_issues, timeout=6) as response:
+                            if response.status == 200:
+                                data = json.loads(response.read().decode())
+                                for item in data.get("results", []):
+                                    image_data = item.get("image", {})
+                                    image_url = image_data.get("super_url") or image_data.get("medium_url") or image_data.get("thumb_url")
+                                    vol_name = item.get("volume", {}).get("name") or "Unknown Volume"
+                                    issue_num = item.get("issue_number") or ""
+                                    issue_name = item.get("name")
+                                    title_parts = f"{vol_name} #{issue_num}"
+                                    if issue_name:
+                                        title_parts += f" ({issue_name})"
+                                    
+                                    issue_results.append(
+                                        SearchResultItem(
+                                            external_id=str(item.get("id")),
+                                            title=title_parts,
+                                            image_url=image_url,
+                                            description=item.get("description") or "",
+                                            item_type="comic"
+                                        )
+                                    )
+                    except Exception as e:
+                        print(f"Comic Vine Issues API Error: {e}")
 
-                        results.append(
-                            SearchResultItem(
-                                external_id=str(item.get("id")),
-                                title=title,
-                                image_url=image_url,
-                                description=item.get("description") or "",
-                                item_type="comic"
+            # 2. Perform standard global search
+            encoded_query = urllib.parse.quote(cleaned_query)
+            url = f"https://comicvine.gamespot.com/api/search/?api_key={api_key}&format=json&resources=volume,issue&query={encoded_query}"
+            
+            req = urllib.request.Request(
+                url,
+                headers={
+                    "User-Agent": "TrackerLists/1.0 (contact@trackerlists.com)"
+                }
+            )
+            
+            try:
+                with urllib.request.urlopen(req, timeout=8) as response:
+                    if response.status == 200:
+                        data = json.loads(response.read().decode())
+                        for item in data.get("results", []):
+                            image_data = item.get("image", {})
+                            image_url = image_data.get("super_url") or image_data.get("medium_url") or image_data.get("thumb_url")
+                            
+                            resource_type = item.get("resource_type")
+                            if resource_type == "issue":
+                                vol_name = item.get("volume", {}).get("name") or "Unknown Volume"
+                                issue_num = item.get("issue_number") or ""
+                                issue_name = item.get("name")
+                                title_parts = f"{vol_name} #{issue_num}"
+                                if issue_name:
+                                    title_parts += f" ({issue_name})"
+                                title = title_parts
+                            else:
+                                title = item.get("name") or "Untitled Volume"
+
+                            global_results.append(
+                                SearchResultItem(
+                                    external_id=str(item.get("id")),
+                                    title=title,
+                                    image_url=image_url,
+                                    description=item.get("description") or "",
+                                    item_type="comic"
+                                )
                             )
-                        )
-                    
-                    # Sort results using relevance scoring based on the query
-                    def get_relevance_score(title_str: str) -> float:
-                        t_lower = title_str.lower()
-                        q_lower = query.lower()
-                        
-                        # Perfect exact match
-                        if t_lower == q_lower:
-                            return 100.0
-                        
-                        # Prefix match (starts with the query name)
-                        if t_lower.startswith(q_lower):
-                            # Prioritize issue numbers sequence
-                            rem = t_lower[len(q_lower):].strip()
-                            if rem.startswith('#') or (rem and rem[0].isdigit()):
-                                return 80.0
-                            return 70.0
-                            
-                        # Substring match
-                        if q_lower in t_lower:
-                            return 40.0
-                            
-                        return 0.0
+            except Exception as e:
+                print(f"Comic Vine Global Search API Error: {e}")
 
-                    results.sort(key=lambda x: get_relevance_score(x.title), reverse=True)
-                    return results
+            # Merge results without duplicates (prioritize issues endpoint first)
+            seen_ids = set()
+            merged_results = []
+            
+            for item in issue_results:
+                if item.external_id not in seen_ids:
+                    seen_ids.add(item.external_id)
+                    merged_results.append(item)
+                    
+            for item in global_results:
+                if item.external_id not in seen_ids:
+                    seen_ids.add(item.external_id)
+                    merged_results.append(item)
+
+            # Sort merged results using relevance scoring based on the query
+            def get_relevance_score(title_str: str) -> float:
+                t_lower = title_str.lower()
+                q_lower = query.lower()
+                
+                # Perfect exact match
+                if t_lower == q_lower:
+                    return 100.0
+                
+                # Prefix match (starts with the query name)
+                if t_lower.startswith(q_lower):
+                    # Prioritize issue numbers sequence
+                    rem = t_lower[len(q_lower):].strip()
+                    if rem.startswith('#') or (rem and rem[0].isdigit()):
+                        return 80.0
+                    return 70.0
+                    
+                # Substring match
+                if q_lower in t_lower:
+                    return 40.0
+                    
+                return 0.0
+
+            merged_results.sort(key=lambda x: get_relevance_score(x.title), reverse=True)
+            return merged_results
+
         except Exception as e:
             print(f"Comic Vine API Error: {e}")
             return [
@@ -105,4 +168,3 @@ class ComicVineService:
                     item_type="comic"
                 )
             ]
-        return []

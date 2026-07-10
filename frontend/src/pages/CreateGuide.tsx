@@ -69,6 +69,8 @@ export const CreateGuide: React.FC = () => {
   const [searchType, setSearchType] = useState('comic');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [searchTab, setSearchTab] = useState<'search' | 'manual'>('search');
+  const [manualTitle, setManualTitle] = useState('');
 
   // Feedback states
   const [errorMsg, setErrorMsg] = useState('');
@@ -238,6 +240,8 @@ export const CreateGuide: React.FC = () => {
     setSearchTarget({ elementId, subblockId });
     setSearchQuery('');
     setSearchResults([]);
+    setSearchTab('search');
+    setManualTitle('');
   };
 
   const triggerSearch = async (e: React.FormEvent) => {
@@ -246,6 +250,7 @@ export const CreateGuide: React.FC = () => {
 
     setIsSearching(true);
     setErrorMsg('');
+    setManualTitle(searchQuery);
     try {
       const response = await apiClient.get('/search/', {
         params: { q: searchQuery, type: searchType }
@@ -706,67 +711,154 @@ export const CreateGuide: React.FC = () => {
           zIndex: 2000
         }}>
           <div className="glass-card" style={{ width: '500px', maxHeight: '80vh', padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-            <h3 style={{ margin: 0 }}>{language === 'es' ? 'Buscar Obra en APIs' : 'Search Media in APIs'}</h3>
+            <h3 style={{ margin: 0 }}>{language === 'es' ? 'Añadir Obra' : 'Add Media Item'}</h3>
             
-            <form onSubmit={triggerSearch} style={{ display: 'flex', gap: '0.5rem' }}>
-              <div style={{ flex: 1, position: 'relative' }}>
-                <input
-                  type="text"
-                  required
-                  className="input-field"
-                  placeholder={language === 'es' ? 'Ej. Batman, Star Wars...' : 'e.g. Batman, Star Wars...'}
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  style={{ paddingLeft: '2.25rem' }}
-                />
-                <SearchIcon size={14} color="var(--text-muted)" style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)' }} />
-              </div>
-              <select
-                className="input-field"
-                value={searchType}
-                onChange={(e) => setSearchType(e.target.value)}
-                style={{ width: '110px' }}
+            {/* Tabs */}
+            <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', marginBottom: '0.5rem' }}>
+              <button
+                type="button"
+                onClick={() => setSearchTab('search')}
+                style={{
+                  flex: 1,
+                  padding: '0.5rem',
+                  background: 'transparent',
+                  border: 'none',
+                  borderBottom: searchTab === 'search' ? '2px solid var(--accent-primary)' : '2px solid transparent',
+                  color: searchTab === 'search' ? 'var(--text-primary)' : 'var(--text-secondary)',
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
               >
-                <option value="comic">{t('mediaComic')}</option>
-                <option value="manga">{t('mediaManga')}</option>
-                <option value="book">{t('mediaBook')}</option>
-                <option value="game">{t('mediaGame')}</option>
-                <option value="movie">{t('mediaMovie')}</option>
-                <option value="series">{t('mediaSeries')}</option>
-              </select>
-              <button type="submit" disabled={isSearching} className="btn-primary" style={{ padding: '0 1rem' }}>
-                {isSearching ? '...' : t('searchButton')}
+                {language === 'es' ? 'Buscar en API' : 'API Search'}
               </button>
-            </form>
-
-            <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.75rem', paddingRight: '0.25rem' }}>
-              {searchResults.length === 0 && !isSearching && (
-                <p style={{ color: 'var(--text-secondary)', textAlign: 'center', margin: '2rem 0' }}>
-                  {language === 'es' ? 'Escribe y busca para ver resultados.' : 'Type and search to display results.'}
-                </p>
-              )}
-              {searchResults.map((media) => (
-                <div
-                  key={media.external_id}
-                  onClick={() => handleSelectMediaItem(media)}
-                  style={{
-                    display: 'flex', gap: '1rem', alignItems: 'center', padding: '0.5rem',
-                    background: 'var(--bg-secondary)', border: '1px solid var(--border-color)',
-                    borderRadius: '6px', cursor: 'pointer', transition: 'all 0.2s', textAlign: 'left'
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.borderColor = 'var(--accent-primary)'}
-                  onMouseLeave={(e) => e.currentTarget.style.borderColor = 'var(--border-color)'}
-                >
-                  <img src={media.image_url} alt={media.title} style={{ width: '40px', height: '55px', objectFit: 'cover', borderRadius: '4px' }} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <h5 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{media.title}</h5>
-                    <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{stripHtml(media.description)}</p>
-                  </div>
-                </div>
-              ))}
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchTab('manual');
+                  if (!manualTitle && searchQuery) {
+                    setManualTitle(searchQuery);
+                  }
+                }}
+                style={{
+                  flex: 1,
+                  padding: '0.5rem',
+                  background: 'transparent',
+                  border: 'none',
+                  borderBottom: searchTab === 'manual' ? '2px solid var(--accent-primary)' : '2px solid transparent',
+                  color: searchTab === 'manual' ? 'var(--text-primary)' : 'var(--text-secondary)',
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                {language === 'es' ? 'Añadir Manualmente' : 'Add Manually'}
+              </button>
             </div>
 
-            <button type="button" className="btn-secondary" onClick={() => setSearchTarget(null)} style={{ alignSelf: 'flex-end' }}>
+            {searchTab === 'search' ? (
+              <>
+                <form onSubmit={triggerSearch} style={{ display: 'flex', gap: '0.5rem' }}>
+                  <div style={{ flex: 1, position: 'relative' }}>
+                    <input
+                      type="text"
+                      required
+                      className="input-field"
+                      placeholder={language === 'es' ? 'Ej. Batman, Star Wars...' : 'e.g. Batman, Star Wars...'}
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      style={{ paddingLeft: '2.25rem' }}
+                    />
+                    <SearchIcon size={14} color="var(--text-muted)" style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)' }} />
+                  </div>
+                  <select
+                    className="input-field"
+                    value={searchType}
+                    onChange={(e) => setSearchType(e.target.value)}
+                    style={{ width: '110px' }}
+                  >
+                    <option value="comic">{t('mediaComic')}</option>
+                    <option value="manga">{t('mediaManga')}</option>
+                    <option value="book">{t('mediaBook')}</option>
+                    <option value="game">{t('mediaGame')}</option>
+                    <option value="movie">{t('mediaMovie')}</option>
+                    <option value="series">{t('mediaSeries')}</option>
+                  </select>
+                  <button type="submit" disabled={isSearching} className="btn-primary" style={{ padding: '0 1rem' }}>
+                    {isSearching ? '...' : t('searchButton')}
+                  </button>
+                </form>
+
+                <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.75rem', paddingRight: '0.25rem', minHeight: '200px' }}>
+                  {searchResults.length === 0 && !isSearching && (
+                    <p style={{ color: 'var(--text-secondary)', textAlign: 'center', margin: '2rem 0' }}>
+                      {language === 'es' ? 'Escribe y busca para ver resultados.' : 'Type and search to display results.'}
+                    </p>
+                  )}
+                  {searchResults.map((media) => (
+                    <div
+                      key={media.external_id}
+                      onClick={() => handleSelectMediaItem(media)}
+                      style={{
+                        display: 'flex', gap: '1rem', alignItems: 'center', padding: '0.5rem',
+                        background: 'var(--bg-secondary)', border: '1px solid var(--border-color)',
+                        borderRadius: '6px', cursor: 'pointer', transition: 'all 0.2s', textAlign: 'left'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.borderColor = 'var(--accent-primary)'}
+                      onMouseLeave={(e) => e.currentTarget.style.borderColor = 'var(--border-color)'}
+                    >
+                      <img src={media.image_url} alt={media.title} style={{ width: '40px', height: '55px', objectFit: 'cover', borderRadius: '4px' }} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <h5 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{media.title}</h5>
+                        <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{stripHtml(media.description)}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                if (!manualTitle.trim()) return;
+                handleSelectMediaItem({
+                  item_type: searchType,
+                  external_id: `manual-${Date.now()}`,
+                  title: manualTitle.trim(),
+                  image_url: '',
+                  description: ''
+                });
+              }} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', minHeight: '200px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', textAlign: 'left' }}>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 500 }}>{language === 'es' ? 'Título de la Obra' : 'Media Title'}</label>
+                  <input
+                    type="text"
+                    required
+                    className="input-field"
+                    placeholder={language === 'es' ? 'Ej. Justice League of America #9' : 'e.g. Justice League of America #9'}
+                    value={manualTitle}
+                    onChange={(e) => setManualTitle(e.target.value)}
+                  />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', textAlign: 'left' }}>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 500 }}>{language === 'es' ? 'Formato' : 'Format'}</label>
+                  <select
+                    className="input-field"
+                    value={searchType}
+                    onChange={(e) => setSearchType(e.target.value)}
+                  >
+                    <option value="comic">{t('mediaComic')}</option>
+                    <option value="manga">{t('mediaManga')}</option>
+                    <option value="book">{t('mediaBook')}</option>
+                    <option value="game">{t('mediaGame')}</option>
+                    <option value="movie">{t('mediaMovie')}</option>
+                    <option value="series">{t('mediaSeries')}</option>
+                  </select>
+                </div>
+                <button type="submit" className="btn-primary" style={{ marginTop: 'auto' }}>
+                  {language === 'es' ? 'Añadir al Canvas' : 'Add to Canvas'}
+                </button>
+              </form>
+            )}
+
+            <button type="button" className="btn-secondary" onClick={() => setSearchTarget(null)} style={{ alignSelf: 'flex-end', marginTop: '0.5rem' }}>
               {language === 'es' ? 'Cerrar' : 'Close'}
             </button>
           </div>

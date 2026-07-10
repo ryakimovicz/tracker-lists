@@ -39,4 +39,4 @@ def root():
         "docs_url": "/docs",
         "project": settings.PROJECT_NAME
     }
-# Trigger uvicorn hot-reload configuration update (v5)
+# Trigger uvicorn hot-reload configuration update (v6)
