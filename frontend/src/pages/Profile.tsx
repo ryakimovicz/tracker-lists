@@ -58,6 +58,7 @@ export const Profile: React.FC = () => {
   // Shelf expansion & pagination states
   const [isShelfExpanded, setIsShelfExpanded] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [shelfSearchQuery, setShelfSearchQuery] = useState('');
 
   // Overlay modal states for shelf items details
   const [selectedItem, setSelectedItem] = useState<any | null>(null);
@@ -167,7 +168,7 @@ export const Profile: React.FC = () => {
       console.error(e);
     }
 
-    apiClient.get('/search/', { params: { query: item.title, type: item.item_type } })
+    apiClient.get('/search/', { params: { q: item.title, type: item.item_type } })
       .then(searchRes => {
         const match = searchRes.data.find((x: any) => x.external_id === item.external_id);
         if (match && match.description) {
@@ -279,8 +280,9 @@ export const Profile: React.FC = () => {
 
 
   const filteredItems = libraryItems.filter(item => {
-    if (mediaFilter === 'all') return true;
-    return item.item_type === mediaFilter;
+    const matchesMedia = mediaFilter === 'all' || item.item_type === mediaFilter;
+    const matchesSearch = item.title.toLowerCase().includes(shelfSearchQuery.toLowerCase());
+    return matchesMedia && matchesSearch;
   });
 
   if (loading) {
@@ -396,29 +398,45 @@ export const Profile: React.FC = () => {
       {/* Tab Contents */}
       {activeTab === 'shelf' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-          {/* Media Filter Selectors */}
-          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-            {(() => {
-              const baseTypes = ['all', 'movie', 'series', 'book', 'comic', 'manga', 'game'] as const;
-              const allowedTypes = baseTypes.filter(type => {
-                if (type === 'all') return true;
-                return libraryItems.some(item => item.item_type === type);
-              });
-              return allowedTypes.map(type => (
-                <button
-                  key={type}
-                  onClick={() => setMediaFilter(type)}
-                  className={mediaFilter === type ? 'btn-primary' : 'btn-secondary'}
-                  style={{
-                    padding: '0.35rem 0.85rem',
-                    fontSize: '0.85rem',
-                    textTransform: 'capitalize'
-                  }}
-                >
-                  {t('media' + type.charAt(0).toUpperCase() + type.slice(1))}
-                </button>
-              ));
-            })()}
+          {/* Media Filter Selectors & Search Bar */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'flex-start' }}>
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              {(() => {
+                const baseTypes = ['all', 'movie', 'series', 'book', 'comic', 'manga', 'game'] as const;
+                const allowedTypes = baseTypes.filter(type => {
+                  if (type === 'all') return true;
+                  return libraryItems.some(item => item.item_type === type);
+                });
+                return allowedTypes.map(type => (
+                  <button
+                    key={type}
+                    onClick={() => setMediaFilter(type)}
+                    className={mediaFilter === type ? 'btn-primary' : 'btn-secondary'}
+                    style={{
+                      padding: '0.35rem 0.85rem',
+                      fontSize: '0.85rem',
+                      textTransform: 'capitalize'
+                    }}
+                  >
+                    {t('media' + type.charAt(0).toUpperCase() + type.slice(1))}
+                  </button>
+                ));
+              })()}
+            </div>
+            
+            <div style={{ width: '100%', maxWidth: '400px' }}>
+              <input
+                type="text"
+                className="input-field"
+                value={shelfSearchQuery}
+                onChange={(e) => {
+                  setShelfSearchQuery(e.target.value);
+                  setCurrentPage(1);
+                }}
+                placeholder={language === 'es' ? 'Buscar en mi estantería...' : 'Search my shelf...'}
+                style={{ width: '100%', padding: '0.5rem 1rem', fontSize: '0.9rem' }}
+              />
+            </div>
           </div>
 
           {filteredItems.length === 0 ? (
@@ -438,8 +456,8 @@ export const Profile: React.FC = () => {
                   style={{ padding: '0.4rem 1rem', fontSize: '0.85rem' }}
                 >
                   {isShelfExpanded
-                    ? (language === 'es' ? 'Contraer Estantería (1 fila)' : 'Collapse Shelf (1 row)')
-                    : (language === 'es' ? 'Expandir Estantería (3 filas)' : 'Expand Shelf (3 rows)')
+                    ? (language === 'es' ? 'Contraer' : 'Collapse')
+                    : (language === 'es' ? 'Expandir' : 'Expand')
                   }
                 </button>
               </div>
@@ -653,7 +671,12 @@ export const Profile: React.FC = () => {
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '2rem' }}>
               {favorites.map(item => (
-                <div key={item.id} className="glass-card" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', position: 'relative' }}>
+                <div
+                  key={item.id}
+                  className="glass-card"
+                  onClick={() => handleOpenItemDetails(item)}
+                  style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', position: 'relative', cursor: 'pointer' }}
+                >
                   <div style={{ position: 'absolute', top: '1.5rem', right: '1.5rem', background: 'rgba(124,58,237,0.9)', padding: '0.3rem', borderRadius: '50%', display: 'flex' }}>
                     <Heart size={16} fill="white" color="white" />
                   </div>
