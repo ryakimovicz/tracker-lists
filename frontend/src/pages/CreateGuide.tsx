@@ -70,11 +70,12 @@ export const CreateGuide: React.FC = () => {
   // Real-time search modal states (inside editor)
   const [searchTarget, setSearchTarget] = useState<{ elementId: string; subblockId?: string } | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchType, setSearchType] = useState('comic');
+  const [activeSearchTab, setActiveSearchTab] = useState<'all' | 'movie' | 'series' | 'anime' | 'book' | 'comic' | 'manga' | 'game'>('all');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [searchTab, setSearchTab] = useState<'search' | 'manual'>('search');
   const [manualTitle, setManualTitle] = useState('');
+  const [manualType, setManualType] = useState('comic');
 
   const [modalSuccessMsg, setModalSuccessMsg] = useState('');
   const [expandedMediaId, setExpandedMediaId] = useState<string | null>(null);
@@ -289,10 +290,11 @@ export const CreateGuide: React.FC = () => {
     setErrorMsg('');
     setManualTitle(searchQuery);
     try {
-      const response = await apiClient.get('/search/', {
-        params: { q: searchQuery, type: searchType }
+      const response = await apiClient.get('/search/all', {
+        params: { q: searchQuery }
       });
       setSearchResults(response.data);
+      setActiveSearchTab('all');
     } catch (err: any) {
       setErrorMsg(language === 'es' ? 'Error al buscar en la API.' : 'Search failed.');
     } finally {
@@ -863,23 +865,55 @@ export const CreateGuide: React.FC = () => {
                     />
                     <SearchIcon size={14} color="var(--text-muted)" style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)' }} />
                   </div>
-                  <select
-                    className="input-field"
-                    value={searchType}
-                    onChange={(e) => setSearchType(e.target.value)}
-                    style={{ width: '110px' }}
-                  >
-                    <option value="comic">{t('mediaComic')}</option>
-                    <option value="manga">{t('mediaManga')}</option>
-                    <option value="book">{t('mediaBook')}</option>
-                    <option value="game">{t('mediaGame')}</option>
-                    <option value="movie">{t('mediaMovie')}</option>
-                    <option value="series">{t('mediaSeries')}</option>
-                  </select>
                   <button type="submit" disabled={isSearching} className="btn-primary" style={{ padding: '0 1rem' }}>
                     {isSearching ? '...' : t('searchButton')}
                   </button>
                 </form>
+
+                {/* Category Tabs */}
+                {searchResults.length > 0 && (
+                  <div style={{
+                    display: 'flex',
+                    gap: '0.4rem',
+                    overflowX: 'auto',
+                    paddingBottom: '0.5rem',
+                    borderBottom: '1px solid var(--border-color)',
+                    marginBottom: '0.5rem',
+                    WebkitOverflowScrolling: 'touch'
+                  }}>
+                    {[
+                      { value: 'all', label: language === 'es' ? 'Todo' : 'All' },
+                      { value: 'movie', label: language === 'es' ? 'Películas' : 'Movies' },
+                      { value: 'series', label: language === 'es' ? 'Series' : 'Series' },
+                      { value: 'anime', label: language === 'es' ? 'Animes' : 'Anime' },
+                      { value: 'book', label: language === 'es' ? 'Libros' : 'Books' },
+                      { value: 'comic', label: language === 'es' ? 'Cómics' : 'Comics' },
+                      { value: 'manga', label: language === 'es' ? 'Mangas' : 'Manga' },
+                      { value: 'game', label: language === 'es' ? 'Juegos' : 'Games' }
+                    ].map(tab => (
+                      <button
+                        key={tab.value}
+                        type="button"
+                        onClick={() => setActiveSearchTab(tab.value as any)}
+                        style={{
+                          padding: '0.35rem 0.75rem',
+                          borderRadius: '15px',
+                          border: '1px solid',
+                          borderColor: activeSearchTab === tab.value ? 'var(--accent-primary)' : 'var(--border-color)',
+                          background: activeSearchTab === tab.value ? 'var(--accent-primary)' : 'transparent',
+                          color: activeSearchTab === tab.value ? '#ffffff' : 'var(--text-secondary)',
+                          cursor: 'pointer',
+                          fontWeight: 500,
+                          fontSize: '0.75rem',
+                          whiteSpace: 'nowrap',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        {tab.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
 
                 <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.75rem', paddingRight: '0.25rem', minHeight: '200px' }}>
                   {searchResults.length === 0 && !isSearching && (
@@ -887,8 +921,30 @@ export const CreateGuide: React.FC = () => {
                       {language === 'es' ? 'Escribe y busca para ver resultados.' : 'Type and search to display results.'}
                     </p>
                   )}
-                  {searchResults.map((media) => {
-                    const isExpanded = expandedMediaId === media.external_id;
+                  {(() => {
+                    const filtered = activeSearchTab === 'all'
+                      ? searchResults
+                      : searchResults.filter(item => {
+                          if (activeSearchTab === 'anime') return item.item_type === 'anime';
+                          if (activeSearchTab === 'series') return item.item_type === 'series';
+                          if (activeSearchTab === 'movie') return item.item_type === 'movie';
+                          if (activeSearchTab === 'book') return item.item_type === 'book';
+                          if (activeSearchTab === 'comic') return item.item_type === 'comic';
+                          if (activeSearchTab === 'manga') return item.item_type === 'manga';
+                          if (activeSearchTab === 'game') return item.item_type === 'game';
+                          return true;
+                        });
+                    
+                    if (filtered.length === 0 && searchResults.length > 0) {
+                      return (
+                        <p style={{ color: 'var(--text-secondary)', textAlign: 'center', margin: '2rem 0', fontSize: '0.85rem' }}>
+                          {language === 'es' ? 'No se encontraron elementos en esta categoría.' : 'No items found in this category.'}
+                        </p>
+                      );
+                    }
+                    
+                    return filtered.map((media) => {
+                      const isExpanded = expandedMediaId === media.external_id;
                     return (
                       <div
                         key={media.external_id}
@@ -993,7 +1049,8 @@ export const CreateGuide: React.FC = () => {
                         )}
                       </div>
                     );
-                  })}
+                    });
+                  })()}
                 </div>
               </>
             ) : (
@@ -1001,7 +1058,7 @@ export const CreateGuide: React.FC = () => {
                 e.preventDefault();
                 if (!manualTitle.trim()) return;
                 handleSelectMediaItem({
-                  item_type: searchType,
+                  item_type: manualType,
                   external_id: `manual-${Date.now()}`,
                   title: manualTitle.trim(),
                   image_url: '',
@@ -1023,8 +1080,8 @@ export const CreateGuide: React.FC = () => {
                   <label style={{ fontSize: '0.85rem', fontWeight: 500 }}>{language === 'es' ? 'Formato' : 'Format'}</label>
                   <select
                     className="input-field"
-                    value={searchType}
-                    onChange={(e) => setSearchType(e.target.value)}
+                    value={manualType}
+                    onChange={(e) => setManualType(e.target.value)}
                   >
                     <option value="comic">{t('mediaComic')}</option>
                     <option value="manga">{t('mediaManga')}</option>

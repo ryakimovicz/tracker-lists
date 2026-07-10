@@ -63,6 +63,25 @@ def search_all_media(
     combined.extend(games)
     combined.extend(mangas)
     combined.extend(comics)
+
+    query_clean = q.lower().strip()
+    query_words = set(query_clean.split())
+
+    def calculate_score(item: SearchResultItem):
+        title_clean = item.title.lower().strip()
+        score = 0
+        if title_clean == query_clean:
+            score += 100
+        elif title_clean.startswith(query_clean):
+            score += 50
+        elif query_clean in title_clean:
+            score += 30
+        title_words = set(title_clean.split())
+        common_words = query_words.intersection(title_words)
+        score += len(common_words) * 15
+        return score
+
+    combined.sort(key=calculate_score, reverse=True)
     return combined
 
 @router.get("/series/{series_id}/season/{season_number}")
