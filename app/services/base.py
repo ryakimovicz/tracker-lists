@@ -8,3 +8,4 @@ class SearchResultItem(BaseModel):
     description: Optional[str] = None
     item_type: str  # 'manga', 'comic', etc.
     release_date: Optional[str] = None
+    popularity: Optional[float] = 0.0

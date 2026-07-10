@@ -29,6 +29,7 @@ class AniListService:
                 month
                 day
               }
+              popularity
             }
           }
         }
@@ -75,6 +76,8 @@ class AniListService:
                             
                         desc = item.get("description") or ""
                         
+                        pop_val = float(item.get("popularity") or 0) / 1000.0
+                        
                         results.append(
                             SearchResultItem(
                                 external_id=f"anilist-{item.get('id')}",
@@ -82,7 +85,8 @@ class AniListService:
                                 image_url=image_url,
                                 description=desc,
                                 item_type="anime",
-                                release_date=release_date
+                                release_date=release_date,
+                                popularity=pop_val
                             )
                         )
                     return results

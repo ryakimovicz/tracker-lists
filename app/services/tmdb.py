@@ -56,6 +56,8 @@ class TMDBService:
                             if is_anime:
                                 item_type_val = "anime"
 
+                        pop_val = float(item.get("popularity") or 0)
+
                         results.append(
                             SearchResultItem(
                                 external_id=str(item.get("id")),
@@ -63,7 +65,8 @@ class TMDBService:
                                 image_url=image_url,
                                 description=item.get("overview"),
                                 item_type=item_type_val,
-                                release_date=item.get("release_date") or item.get("first_air_date")
+                                release_date=item.get("release_date") or item.get("first_air_date"),
+                                popularity=pop_val
                             )
                         )
                     return results

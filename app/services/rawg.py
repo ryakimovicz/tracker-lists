@@ -42,6 +42,7 @@ class RAWGService:
                         # RAWG returns background_image
                         image_url = item.get("background_image")
                         
+                        pop_val = float(item.get("added") or 0) / 10.0
                         results.append(
                             SearchResultItem(
                                 external_id=str(item.get("id")),
@@ -49,7 +50,8 @@ class RAWGService:
                                 image_url=image_url,
                                 description=f"Rating: {item.get('rating')}/5. Released: {item.get('released')}.",
                                 item_type="game",
-                                release_date=item.get("released")
+                                release_date=item.get("released"),
+                                popularity=pop_val
                             )
                         )
                     return results

@@ -87,6 +87,7 @@ const translations: Translations = {
   mediaBook: { en: 'Books', es: 'Libros' },
   mediaComic: { en: 'Comics', es: 'Cómics' },
   mediaManga: { en: 'Manga', es: 'Mangas' },
+  mediaAnime: { en: 'Anime', es: 'Anime' },
 
   // Search Page
   searchTitle: { en: 'Explore Media Database', es: 'Explorar Base de Datos' },

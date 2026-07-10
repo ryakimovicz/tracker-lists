@@ -43,21 +43,27 @@ def search_media(
             filtered_tmdb = [item for item in tmdb_res if item.item_type != "anime"]
             combined = filtered_tmdb + anilist_res
         
-        # Sort combined by relevance
         query_clean = q.lower().strip()
         query_words = set(query_clean.split())
         def calculate_score(item: SearchResultItem):
             title_clean = item.title.lower().strip()
-            score = 0
+            score = 0.0
             if title_clean == query_clean:
-                score += 100
+                score += 100.0
             elif title_clean.startswith(query_clean):
-                score += 50
+                score += 50.0
             elif query_clean in title_clean:
-                score += 30
+                score += 30.0
             title_words = set(title_clean.split())
             common_words = query_words.intersection(title_words)
-            score += len(common_words) * 15
+            score += len(common_words) * 15.0
+            
+            # Density boost: Shorter titles matching the query density get prioritized
+            if len(item.title) > 0:
+                score += (1.0 / len(item.title)) * 10.0
+                
+            # Popularity boost (capped at 100 to prevent overtaking text similarity but breaking ties)
+            score += min(item.popularity or 0.0, 100.0)
             return score
         combined.sort(key=calculate_score, reverse=True)
         return combined
@@ -109,16 +115,23 @@ def search_all_media(
 
     def calculate_score(item: SearchResultItem):
         title_clean = item.title.lower().strip()
-        score = 0
+        score = 0.0
         if title_clean == query_clean:
-            score += 100
+            score += 100.0
         elif title_clean.startswith(query_clean):
-            score += 50
+            score += 50.0
         elif query_clean in title_clean:
-            score += 30
+            score += 30.0
         title_words = set(title_clean.split())
         common_words = query_words.intersection(title_words)
-        score += len(common_words) * 15
+        score += len(common_words) * 15.0
+        
+        # Density boost: Shorter titles matching the query density get prioritized
+        if len(item.title) > 0:
+            score += (1.0 / len(item.title)) * 10.0
+            
+        # Popularity boost (capped at 100 to prevent overtaking text similarity but breaking ties)
+        score += min(item.popularity or 0.0, 100.0)
         return score
 
     combined.sort(key=calculate_score, reverse=True)
