@@ -57,7 +57,8 @@ class MangaDexService:
                                 title=title,
                                 image_url=image_url,
                                 description=description,
-                                item_type="manga"
+                                item_type="manga",
+                                release_date=str(attributes.get("year")) if attributes.get("year") else None
                             )
                         )
                     return results

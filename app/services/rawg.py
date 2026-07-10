@@ -48,7 +48,8 @@ class RAWGService:
                                 title=item.get("name") or "Untitled Game",
                                 image_url=image_url,
                                 description=f"Rating: {item.get('rating')}/5. Released: {item.get('released')}.",
-                                item_type="game"
+                                item_type="game",
+                                release_date=item.get("released")
                             )
                         )
                     return results

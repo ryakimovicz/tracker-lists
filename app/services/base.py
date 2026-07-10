@@ -7,3 +7,4 @@ class SearchResultItem(BaseModel):
     image_url: Optional[str] = None
     description: Optional[str] = None
     item_type: str  # 'manga', 'comic', etc.
+    release_date: Optional[str] = None

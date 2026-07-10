@@ -52,7 +52,8 @@ class TMDBService:
                                 title=title,
                                 image_url=image_url,
                                 description=item.get("overview"),
-                                item_type=type
+                                item_type=type,
+                                release_date=item.get("release_date") or item.get("first_air_date")
                             )
                         )
                     return results

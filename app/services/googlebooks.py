@@ -48,7 +48,8 @@ class GoogleBooksService:
                                 title=item.get("title") or "Untitled Book",
                                 image_url=image_url,
                                 description=desc,
-                                item_type="book"
+                                item_type="book",
+                                release_date=str(item.get("first_publish_year")) if item.get("first_publish_year") else None
                             )
                         )
                     return results

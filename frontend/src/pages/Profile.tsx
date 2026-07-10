@@ -176,7 +176,7 @@ export const Profile: React.FC = () => {
     }
   };
 
-  const findNextSeasonToSee = (items: any[]) => {
+  const findNextSeasonToSee = (items: any[], seasonsList: any[]) => {
     const completed = items.filter(ep => ep.is_completed);
     if (completed.length === 0) return 1;
     
@@ -184,7 +184,6 @@ export const Profile: React.FC = () => {
       const sA = parseInt(a.section?.match(/Season (\d+)/)?.[1] || '0');
       const sB = parseInt(b.section?.match(/Season (\d+)/)?.[1] || '0');
       if (sA !== sB) return sA - sB;
-      // Extract episode number if possible
       const epA = parseInt(a.title?.match(/E(\d+)/)?.[1] || '0');
       const epB = parseInt(b.title?.match(/E(\d+)/)?.[1] || '0');
       if (epA !== epB) return epA - epB;
@@ -193,16 +192,17 @@ export const Profile: React.FC = () => {
     
     const lastCompleted = sorted[sorted.length - 1];
     const lastSeasonNum = parseInt(lastCompleted.section?.match(/Season (\d+)/)?.[1] || '1');
+    const lastEpisodeNum = parseInt(lastCompleted.title?.match(/E(\d+)/)?.[1] || '1');
     
-    const hasUncompletedInLastSeason = items.some(ep => {
-      const sNum = parseInt(ep.section?.match(/Season (\d+)/)?.[1] || '0');
-      return sNum === lastSeasonNum && !ep.is_completed;
-    });
+    const seasonInfo = seasonsList.find(s => s.season_number === lastSeasonNum);
+    const maxEpisodes = seasonInfo ? seasonInfo.episode_count : 0;
     
-    if (hasUncompletedInLastSeason) {
+    if (lastEpisodeNum < maxEpisodes) {
       return lastSeasonNum;
     } else {
-      return lastSeasonNum + 1;
+      const nextSeasonNum = lastSeasonNum + 1;
+      const hasNextSeason = seasonsList.some(s => s.season_number === nextSeasonNum);
+      return hasNextSeason ? nextSeasonNum : lastSeasonNum;
     }
   };
 
@@ -258,7 +258,7 @@ export const Profile: React.FC = () => {
         }
         setSeasons(filteredSeasons);
 
-        const nextSeason = findNextSeasonToSee(itemsList);
+        const nextSeason = findNextSeasonToSee(itemsList, filteredSeasons);
         setActiveSeason(nextSeason);
 
         const cacheKeyS = `${item.external_id}_s${nextSeason}`;
@@ -305,20 +305,21 @@ export const Profile: React.FC = () => {
         if (!prev) return null;
         return {
           ...prev,
-          custom_notes: JSON.stringify({ description: cachedDesc })
+          custom_notes: JSON.stringify({ description: cachedDesc.description, release_date: cachedDesc.release_date })
         };
       });
     } else {
       apiClient.get('/search/', { params: { q: item.title, type: item.item_type } })
         .then(searchRes => {
           const match = searchRes.data.find((x: any) => x.external_id === item.external_id);
-          if (match && match.description) {
-            setCachedTMDB(descCacheKey, match.description);
+          if (match) {
+            const cachedVal = { description: match.description || '', release_date: match.release_date || null };
+            setCachedTMDB(descCacheKey, cachedVal);
             setSelectedItem((prev: any) => {
               if (!prev) return null;
               return {
                 ...prev,
-                custom_notes: JSON.stringify({ description: match.description })
+                custom_notes: JSON.stringify(cachedVal)
               };
             });
           }
@@ -1114,31 +1115,43 @@ export const Profile: React.FC = () => {
                       : cleanText;
 
                     return (
-                      <div>
-                        <h5 style={{ margin: '0 0 0.25rem 0', color: 'var(--text-secondary)' }}>{language === 'es' ? 'Descripción:' : 'Description:'}</h5>
-                        <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-primary)', lineHeight: '1.4' }}>
-                          {displayedText}
-                          {shouldTruncate && (
-                            <button
-                              onClick={() => setDescExpanded(!descExpanded)}
-                              style={{
-                                background: 'transparent',
-                                border: 'none',
-                                color: 'var(--accent-primary)',
-                                cursor: 'pointer',
-                                fontWeight: 600,
-                                fontSize: '0.82rem',
-                                marginLeft: '0.4rem',
-                                padding: 0
-                              }}
-                            >
-                              {descExpanded
-                                ? (language === 'es' ? 'Leer menos' : 'Read less')
-                                : (language === 'es' ? 'Leer más' : 'Read more')
-                              }
-                            </button>
-                          )}
-                        </p>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                        <div>
+                          <h5 style={{ margin: '0 0 0.25rem 0', color: 'var(--text-secondary)' }}>{language === 'es' ? 'Descripción:' : 'Description:'}</h5>
+                          <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-primary)', lineHeight: '1.4' }}>
+                            {displayedText}
+                            {shouldTruncate && (
+                              <button
+                                onClick={() => setDescExpanded(!descExpanded)}
+                                style={{
+                                  background: 'transparent',
+                                  border: 'none',
+                                  color: 'var(--accent-primary)',
+                                  cursor: 'pointer',
+                                  fontWeight: 600,
+                                  fontSize: '0.82rem',
+                                  marginLeft: '0.4rem',
+                                  padding: 0
+                                }}
+                              >
+                                {descExpanded
+                                  ? (language === 'es' ? 'Leer menos' : 'Read less')
+                                  : (language === 'es' ? 'Leer más' : 'Read more')
+                                }
+                              </button>
+                            )}
+                          </p>
+                        </div>
+                        {(selectedItem.release_date || notes.release_date) && (
+                          <div>
+                            <h5 style={{ margin: '0 0 0.25rem 0', color: 'var(--text-secondary)' }}>
+                              {language === 'es' ? 'Fecha de lanzamiento:' : 'Release Date:'}
+                            </h5>
+                            <span style={{ fontSize: '0.88rem', color: 'var(--text-primary)' }}>
+                              {selectedItem.release_date || notes.release_date}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     );
                   })()}
@@ -1427,7 +1440,8 @@ export const Profile: React.FC = () => {
                                           completed_at: dbEp?.completed_at,
                                           season_number: ep.season_number,
                                           episode_number: ep.episode_number,
-                                          rawEpisodeId: ep.id
+                                          rawEpisodeId: ep.id,
+                                          release_date: ep.air_date
                                         })}
                                         className="btn-secondary"
                                         style={{ padding: '0.2rem 0.4rem', fontSize: '0.74rem' }}
