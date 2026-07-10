@@ -63,6 +63,31 @@ class ComicVineService:
                                 item_type="comic"
                             )
                         )
+                    
+                    # Sort results using relevance scoring based on the query
+                    def get_relevance_score(title_str: str) -> float:
+                        t_lower = title_str.lower()
+                        q_lower = query.lower()
+                        
+                        # Perfect exact match
+                        if t_lower == q_lower:
+                            return 100.0
+                        
+                        # Prefix match (starts with the query name)
+                        if t_lower.startswith(q_lower):
+                            # Prioritize issue numbers sequence
+                            rem = t_lower[len(q_lower):].strip()
+                            if rem.startswith('#') or (rem and rem[0].isdigit()):
+                                return 80.0
+                            return 70.0
+                            
+                        # Substring match
+                        if q_lower in t_lower:
+                            return 40.0
+                            
+                        return 0.0
+
+                    results.sort(key=lambda x: get_relevance_score(x.title), reverse=True)
                     return results
         except Exception as e:
             print(f"Comic Vine API Error: {e}")
