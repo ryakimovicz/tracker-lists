@@ -37,8 +37,11 @@ def search_media(
             tmdb_res = future_tmdb.result()
             jikan_res = future_jikan.result()
         
-        filtered_tmdb = [item for item in tmdb_res if item.item_type != "anime"]
-        combined = filtered_tmdb + jikan_res
+        if jikan_res is None:
+            combined = tmdb_res
+        else:
+            filtered_tmdb = [item for item in tmdb_res if item.item_type != "anime"]
+            combined = filtered_tmdb + jikan_res
         
         # Sort combined by relevance
         query_clean = q.lower().strip()
@@ -88,12 +91,14 @@ def search_all_media(
         mangas = future_mangas.result()
         comics = future_comics.result()
         
-    filtered_series = [item for item in series if item.item_type != "anime"]
-    
     combined = []
     combined.extend(movies)
-    combined.extend(filtered_series)
-    combined.extend(animes)
+    if animes is None:
+        combined.extend(series)
+    else:
+        filtered_series = [item for item in series if item.item_type != "anime"]
+        combined.extend(filtered_series)
+        combined.extend(animes)
     combined.extend(books)
     combined.extend(games)
     combined.extend(mangas)

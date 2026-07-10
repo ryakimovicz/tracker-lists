@@ -55,5 +55,5 @@ class JikanService:
                     return results
         except Exception as e:
             print(f"Jikan API Search Error: {e}")
-            return []
+            return None
         return []
