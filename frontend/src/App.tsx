@@ -14,6 +14,7 @@ import { Home } from './pages/Home';
 import { Profile } from './pages/Profile';
 import { Social } from './pages/Social';
 import { CreateGuide } from './pages/CreateGuide';
+import { ViewGuide } from './pages/ViewGuide';
 
 import { LanguageProvider } from './context/LanguageContext';
 import { ThemeProvider } from './context/ThemeContext';
@@ -41,6 +42,14 @@ function AppRoutes() {
               element={
                 <RouteGuard>
                   <Profile />
+                </RouteGuard>
+              }
+            />
+            <Route
+              path="/guide/:id"
+              element={
+                <RouteGuard>
+                  <ViewGuide />
                 </RouteGuard>
               }
             />
