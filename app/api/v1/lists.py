@@ -240,6 +240,9 @@ def get_list_details(
         total_count=merged_total,
         progress_percentage=round(progress_percentage, 2),
         skipped_percentage=round(skipped_percentage, 2),
+        section_descriptions=reading_list.section_descriptions,
+        importance_labels=reading_list.importance_labels,
+        section_importances=reading_list.section_importances,
         items=merged_items
     )
 
