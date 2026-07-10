@@ -28,6 +28,7 @@ interface LibraryItem {
   created_at: string;
   completed_at?: string;
   updated_at?: string;
+  tracking_list_id?: number;
 }
 
 interface UserProfile {
@@ -69,6 +70,7 @@ export const Profile: React.FC = () => {
   const [userComment, setUserComment] = useState<string>('');
   const [isSavingReview, setIsSavingReview] = useState(false);
   const [descExpanded, setDescExpanded] = useState(false);
+  const [episodes, setEpisodes] = useState<any[]>([]);
 
   // Favorites state (local highlight mock for UX polish)
   const [favorites, setFavorites] = useState<LibraryItem[]>([]);
@@ -155,6 +157,17 @@ export const Profile: React.FC = () => {
     setItemReviews([]);
     setDescExpanded(false);
 
+    if (item.item_type === 'series' && item.tracking_list_id) {
+      try {
+        const listRes = await apiClient.get(`/lists/${item.tracking_list_id}`);
+        setEpisodes(listRes.data.items || []);
+      } catch (err) {
+        console.error("Failed to fetch episodes", err);
+      }
+    } else {
+      setEpisodes([]);
+    }
+
     try {
       const res = await apiClient.get(`/reviews/${item.item_type}/${item.external_id}`);
       setItemReviews(res.data);
@@ -204,6 +217,16 @@ export const Profile: React.FC = () => {
       setIsSavingReview(false);
     }
   };
+
+  const handleToggleEpisode = async (episodeId: number) => {
+    try {
+      await apiClient.post(`/lists/items/${episodeId}/toggle`);
+      setEpisodes(prev => prev.map(ep => ep.id === episodeId ? { ...ep, is_completed: !ep.is_completed } : ep));
+    } catch (err) {
+      console.error("Failed to toggle episode", err);
+    }
+  };
+
   const handleDeleteItem = async (itemId: number) => {
     if (!window.confirm(language === 'es' ? '¿Seguro que deseas eliminar este elemento?' : 'Are you sure you want to delete this item?')) return;
     setErrorMsg('');
@@ -537,7 +560,10 @@ export const Profile: React.FC = () => {
                           {/* Completion date if completed */}
                           {item.completed_at && (
                             <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontStyle: 'italic', display: 'block', marginTop: '-0.3rem' }}>
-                              {language === 'es' ? 'Terminado: ' : 'Completed: '}
+                              {item.item_type === 'movie'
+                                ? (language === 'es' ? 'Visto: ' : 'Watched: ')
+                                : (language === 'es' ? 'Terminado: ' : 'Completed: ')
+                              }
                               {formatDate(new Date(item.completed_at))}
                             </span>
                           )}
@@ -790,221 +816,298 @@ export const Profile: React.FC = () => {
       </div>
 
       {/* Standalone Item Details Modal (at the top) */}
-      {selectedItem && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0, left: 0, right: 0, bottom: 0,
-            background: 'rgba(0, 0, 0, 0.75)',
-            backdropFilter: 'blur(4px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 2000
-          }}
-        >
+      {selectedItem && (() => {
+        const isEpisode = !!(selectedItem.external_id?.startsWith('tmdb-ep-') || selectedItem.list_id);
+        return (
           <div
-            className="glass-card"
             style={{
-              width: '650px',
-              maxHeight: '90vh',
-              padding: '2rem',
+              position: 'fixed',
+              top: 0, left: 0, right: 0, bottom: 0,
+              background: 'rgba(0, 0, 0, 0.75)',
+              backdropFilter: 'blur(4px)',
               display: 'flex',
-              flexDirection: 'column',
-              gap: '1.5rem',
-              overflowY: 'auto',
-              textAlign: 'left'
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 2000
             }}
           >
-            {/* Modal Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem' }}>
-              <div>
-                <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700 }}>{selectedItem.title}</h2>
-                <span style={{ fontSize: '0.78rem', color: 'var(--accent-primary)', textTransform: 'uppercase', fontWeight: 700 }}>
-                  {t('media' + selectedItem.item_type.charAt(0).toUpperCase() + selectedItem.item_type.slice(1))}
-                </span>
+            <div
+              className="glass-card"
+              style={{
+                width: '650px',
+                maxHeight: '90vh',
+                padding: '2rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '1.5rem',
+                overflowY: 'auto',
+                textAlign: 'left'
+              }}
+            >
+              {/* Modal Header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem' }}>
+                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                  {isEpisode && (
+                    <button
+                      onClick={async () => {
+                        const mainSeriesItem = libraryItems.find(li => li.tracking_list_id === selectedItem.list_id);
+                        if (mainSeriesItem) {
+                          handleOpenItemDetails(mainSeriesItem);
+                        } else {
+                          // Try searching by name if no tracking_list_id matches directly
+                          setSelectedItem(null);
+                        }
+                      }}
+                      className="btn-secondary"
+                      style={{ padding: '0.2rem 0.5rem', fontSize: '0.78rem', display: 'flex', alignItems: 'center' }}
+                    >
+                      &larr; {language === 'es' ? 'Volver' : 'Back'}
+                    </button>
+                  )}
+                  <div>
+                    <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700 }}>{selectedItem.title}</h2>
+                    <span style={{ fontSize: '0.78rem', color: 'var(--accent-primary)', textTransform: 'uppercase', fontWeight: 700 }}>
+                      {t('media' + selectedItem.item_type.charAt(0).toUpperCase() + selectedItem.item_type.slice(1))}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setSelectedItem(null)}
+                  style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '0.2rem' }}
+                >
+                  <X size={20} />
+                </button>
               </div>
-              <button
-                onClick={() => setSelectedItem(null)}
-                style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '0.2rem' }}
-              >
-                <X size={20} />
-              </button>
-            </div>
 
-            {/* Modal Body Info */}
-            <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
-              {selectedItem.image_url && (
-                <img
-                  src={selectedItem.image_url}
-                  alt={selectedItem.title}
-                  onClick={() => setZoomedImage(selectedItem.image_url)}
-                  style={{ width: '130px', height: '190px', objectFit: 'cover', borderRadius: '8px', cursor: 'zoom-in', boxShadow: '0 5px 15px rgba(0,0,0,0.3)' }}
-                />
-              )}
-              
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem', minWidth: '250px' }}>
-                {/* Description info */}
-                {(() => {
-                  const parseNotes = (notes: string) => {
-                    try {
-                      if (notes.startsWith('{')) return JSON.parse(notes);
-                    } catch(e){}
-                    return { description: notes, sub_items: [] };
-                  };
-                  const stripHtml = (html: string) => {
-                    if (!html) return '';
-                    const clean = html.replace(/<[^>]*>/g, '');
-                    const txt = document.createElement('textarea');
-                    txt.innerHTML = clean;
-                    return txt.value;
-                  };
-                  const notes = parseNotes(selectedItem.custom_notes || '');
-                  if (!notes.description) return null;
-                  const cleanText = stripHtml(notes.description);
-                  const shouldTruncate = cleanText.length > 180;
-                  const displayedText = shouldTruncate && !descExpanded
-                    ? cleanText.slice(0, 180) + '...'
-                    : cleanText;
+              {/* Modal Body Info */}
+              <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
+                {selectedItem.image_url && (
+                  <img
+                    src={selectedItem.image_url}
+                    alt={selectedItem.title}
+                    onClick={() => setZoomedImage(selectedItem.image_url)}
+                    style={{ width: '130px', height: '190px', objectFit: 'cover', borderRadius: '8px', cursor: 'zoom-in', boxShadow: '0 5px 15px rgba(0,0,0,0.3)' }}
+                  />
+                )}
+                
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem', minWidth: '250px' }}>
+                  {/* Description info */}
+                  {(() => {
+                    const parseNotes = (notes: string) => {
+                      try {
+                        if (notes.startsWith('{')) return JSON.parse(notes);
+                      } catch(e){}
+                      return { description: notes, sub_items: [] };
+                    };
+                    const stripHtml = (html: string) => {
+                      if (!html) return '';
+                      const clean = html.replace(/<[^>]*>/g, '');
+                      const txt = document.createElement('textarea');
+                      txt.innerHTML = clean;
+                      return txt.value;
+                    };
+                    const notes = parseNotes(selectedItem.custom_notes || '');
+                    if (!notes.description) return null;
+                    const cleanText = stripHtml(notes.description);
+                    const shouldTruncate = cleanText.length > 180;
+                    const displayedText = shouldTruncate && !descExpanded
+                      ? cleanText.slice(0, 180) + '...'
+                      : cleanText;
 
-                  return (
-                    <div>
-                      <h5 style={{ margin: '0 0 0.25rem 0', color: 'var(--text-secondary)' }}>{language === 'es' ? 'Descripción:' : 'Description:'}</h5>
-                      <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-primary)', lineHeight: '1.4' }}>
-                        {displayedText}
-                        {shouldTruncate && (
-                          <button
-                            onClick={() => setDescExpanded(!descExpanded)}
-                            style={{
-                              background: 'transparent',
-                              border: 'none',
-                              color: 'var(--accent-primary)',
-                              cursor: 'pointer',
-                              fontWeight: 600,
-                              fontSize: '0.82rem',
-                              marginLeft: '0.4rem',
-                              padding: 0
-                            }}
-                          >
-                            {descExpanded
-                              ? (language === 'es' ? 'Leer menos' : 'Read less')
-                              : (language === 'es' ? 'Leer más' : 'Read more')
-                            }
-                          </button>
-                        )}
-                      </p>
+                    return (
+                      <div>
+                        <h5 style={{ margin: '0 0 0.25rem 0', color: 'var(--text-secondary)' }}>{language === 'es' ? 'Descripción:' : 'Description:'}</h5>
+                        <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-primary)', lineHeight: '1.4' }}>
+                          {displayedText}
+                          {shouldTruncate && (
+                            <button
+                              onClick={() => setDescExpanded(!descExpanded)}
+                              style={{
+                                background: 'transparent',
+                                border: 'none',
+                                color: 'var(--accent-primary)',
+                                cursor: 'pointer',
+                                fontWeight: 600,
+                                fontSize: '0.82rem',
+                                marginLeft: '0.4rem',
+                                padding: 0
+                              }}
+                            >
+                              {descExpanded
+                                ? (language === 'es' ? 'Leer menos' : 'Read less')
+                                : (language === 'es' ? 'Leer más' : 'Read more')
+                              }
+                            </button>
+                          )}
+                        </p>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Star rating selector */}
+                  <div>
+                    <h5 style={{ margin: '0 0 0.4rem 0', color: 'var(--text-secondary)' }}>{language === 'es' ? 'Tu Calificación:' : 'Your Rating:'}</h5>
+                    <div style={{ display: 'flex', gap: '0.25rem' }}>
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                          key={star}
+                          onClick={() => setUserRating(star)}
+                          style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 0 }}
+                        >
+                          <Star
+                            size={24}
+                            fill={star <= userRating ? '#f59e0b' : 'none'}
+                            color={star <= userRating ? '#f59e0b' : 'var(--text-muted)'}
+                          />
+                        </button>
+                      ))}
                     </div>
-                  );
-                })()}
+                  </div>
 
-                {/* Star rating selector */}
-                <div>
-                  <h5 style={{ margin: '0 0 0.4rem 0', color: 'var(--text-secondary)' }}>{language === 'es' ? 'Tu Calificación:' : 'Your Rating:'}</h5>
-                  <div style={{ display: 'flex', gap: '0.25rem' }}>
-                    {[1, 2, 3, 4, 5].map((star) => (
+                  {/* Favorite toggler */}
+                  {!isEpisode && (
+                    <div>
                       <button
-                        key={star}
-                        onClick={() => setUserRating(star)}
-                        style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 0 }}
+                        onClick={() => handleToggleFavorite(selectedItem.id, isFavorite)}
+                        className="btn-secondary"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.5rem',
+                          fontSize: '0.85rem',
+                          padding: '0.4rem 0.8rem',
+                          borderColor: isFavorite ? 'var(--accent-primary)' : 'var(--border-color)',
+                          background: isFavorite ? 'rgba(124, 58, 237, 0.1)' : 'transparent',
+                          color: isFavorite ? 'var(--accent-primary)' : 'var(--text-primary)'
+                        }}
                       >
-                        <Star
-                          size={24}
-                          fill={star <= userRating ? '#f59e0b' : 'none'}
-                          color={star <= userRating ? '#f59e0b' : 'var(--text-muted)'}
-                        />
+                        <Heart size={16} fill={isFavorite ? 'var(--accent-primary)' : 'none'} />
+                        {isFavorite
+                          ? (language === 'es' ? 'Destacado (Quitar)' : 'Featured (Remove)')
+                          : (language === 'es' ? 'Destacar (Favorito)' : 'Feature (Favorite)')
+                        }
                       </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* TV Series Episode Tracking */}
+              {selectedItem.item_type === 'series' && episodes.length > 0 && !isEpisode && (
+                <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <h4 style={{ margin: 0, fontSize: '1.1rem' }}>
+                    {language === 'es' ? 'Seguimiento de Capítulos' : 'Episode Tracking'}
+                  </h4>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '220px', overflowY: 'auto', paddingRight: '0.5rem' }}>
+                    {episodes.map((ep) => (
+                      <div
+                        key={ep.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '0.5rem 0.75rem',
+                          background: 'var(--bg-secondary)',
+                          border: '1px solid var(--border-color)',
+                          borderRadius: '6px',
+                          gap: '1rem'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                          <input
+                            type="checkbox"
+                            checked={!!ep.is_completed}
+                            onChange={() => handleToggleEpisode(ep.id)}
+                            style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                          />
+                          <span style={{ fontSize: '0.88rem', fontWeight: 500, color: 'var(--text-primary)' }}>
+                            {ep.title}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => handleOpenItemDetails({
+                            id: ep.id,
+                            list_id: ep.list_id,
+                            item_type: 'series',
+                            external_id: ep.external_id,
+                            title: ep.title,
+                            image_url: ep.image_url || selectedItem.image_url,
+                            custom_notes: ep.custom_notes
+                          })}
+                          className="btn-secondary"
+                          style={{ padding: '0.25rem 0.5rem', fontSize: '0.78rem' }}
+                        >
+                          {language === 'es' ? 'Ver Info' : 'View Info'}
+                        </button>
+                      </div>
                     ))}
                   </div>
                 </div>
+              )}
 
-                {/* Favorite toggler */}
-                <div>
-                  <button
-                    onClick={() => handleToggleFavorite(selectedItem.id, isFavorite)}
-                    className="btn-secondary"
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      fontSize: '0.85rem',
-                      padding: '0.4rem 0.8rem',
-                      borderColor: isFavorite ? 'var(--accent-primary)' : 'var(--border-color)',
-                      background: isFavorite ? 'rgba(124, 58, 237, 0.1)' : 'transparent',
-                      color: isFavorite ? 'var(--accent-primary)' : 'var(--text-primary)'
-                    }}
-                  >
-                    <Heart size={16} fill={isFavorite ? 'var(--accent-primary)' : 'none'} />
-                    {isFavorite
-                      ? (language === 'es' ? 'Destacado (Quitar)' : 'Featured (Remove)')
-                      : (language === 'es' ? 'Destacar (Favorito)' : 'Feature (Favorite)')
-                    }
-                  </button>
-                </div>
+              {/* Comment write area */}
+              <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <h4 style={{ margin: 0, fontSize: '1.1rem' }}>{language === 'es' ? 'Escribe tu reseña o comentario' : 'Write your review or comment'}</h4>
+                <textarea
+                  className="input-field"
+                  value={userComment}
+                  onChange={(e) => setUserComment(e.target.value)}
+                  placeholder={language === 'es' ? '¿Qué te pareció este elemento? Escribe aquí...' : 'What did you think of this item? Write here...'}
+                  style={{ width: '100%', minHeight: '80px', padding: '0.75rem', background: 'var(--bg-secondary)', resize: 'vertical' }}
+                />
+                <button
+                  onClick={handleSaveReview}
+                  className="btn-primary"
+                  disabled={isSavingReview}
+                  style={{ alignSelf: 'flex-end', padding: '0.4rem 1rem', fontSize: '0.85rem' }}
+                >
+                  {isSavingReview
+                    ? (language === 'es' ? 'Guardando...' : 'Saving...')
+                    : (language === 'es' ? 'Guardar Valoración' : 'Save Review')
+                  }
+                </button>
               </div>
-            </div>
 
-            {/* Comment write area */}
-            <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              <h4 style={{ margin: 0, fontSize: '1.1rem' }}>{language === 'es' ? 'Escribe tu reseña o comentario' : 'Write your review or comment'}</h4>
-              <textarea
-                className="input-field"
-                value={userComment}
-                onChange={(e) => setUserComment(e.target.value)}
-                placeholder={language === 'es' ? '¿Qué te pareció este elemento? Escribe aquí...' : 'What did you think of this item? Write here...'}
-                style={{ width: '100%', minHeight: '80px', padding: '0.75rem', background: 'var(--bg-secondary)', resize: 'vertical' }}
-              />
-              <button
-                onClick={handleSaveReview}
-                className="btn-primary"
-                disabled={isSavingReview}
-                style={{ alignSelf: 'flex-end', padding: '0.4rem 1rem', fontSize: '0.85rem' }}
-              >
-                {isSavingReview
-                  ? (language === 'es' ? 'Guardando...' : 'Saving...')
-                  : (language === 'es' ? 'Guardar Valoración' : 'Save Review')
-                }
-              </button>
-            </div>
-
-            {/* Community Reviews List */}
-            <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', textAlign: 'left' }}>
-              <h4 style={{ margin: 0, fontSize: '1.1rem' }}>{language === 'es' ? 'Comentarios de la Comunidad' : 'Community Comments'}</h4>
-              {itemReviews.length === 0 ? (
-                <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                  {language === 'es' ? 'Nadie ha comentado sobre esto aún.' : 'No comments on this item yet.'}
-                </p>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '180px', overflowY: 'auto' }}>
-                  {itemReviews.map((rev: any) => (
-                    <div key={rev.id} style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: '0.85rem', fontWeight: 600, textTransform: 'capitalize' }}>{rev.username}</span>
-                        {rev.rating && (
-                          <div style={{ display: 'flex', gap: '0.1rem' }}>
-                            {[1, 2, 3, 4, 5].map((star) => (
-                              <Star
-                                key={star}
-                                size={12}
-                                fill={star <= rev.rating ? '#f59e0b' : 'none'}
-                                color={star <= rev.rating ? '#f59e0b' : 'var(--text-muted)'}
-                              />
-                            ))}
-                          </div>
+              {/* Community Reviews List */}
+              <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', textAlign: 'left' }}>
+                <h4 style={{ margin: 0, fontSize: '1.1rem' }}>{language === 'es' ? 'Comentarios de la Comunidad' : 'Community Comments'}</h4>
+                {itemReviews.length === 0 ? (
+                  <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                    {language === 'es' ? 'Nadie ha comentado sobre esto aún.' : 'No comments on this item yet.'}
+                  </p>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '180px', overflowY: 'auto' }}>
+                    {itemReviews.map((rev: any) => (
+                      <div key={rev.id} style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: '0.85rem', fontWeight: 600, textTransform: 'capitalize' }}>{rev.username}</span>
+                          {rev.rating && (
+                            <div style={{ display: 'flex', gap: '0.1rem' }}>
+                              {[1, 2, 3, 4, 5].map((star) => (
+                                <Star
+                                  key={star}
+                                  size={12}
+                                  fill={star <= rev.rating ? '#f59e0b' : 'none'}
+                                  color={star <= rev.rating ? '#f59e0b' : 'var(--text-muted)'}
+                                />
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        {rev.content && (
+                          <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: '1.3' }}>
+                            {rev.content}
+                          </p>
                         )}
                       </div>
-                      {rev.content && (
-                        <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: '1.3' }}>
-                          {rev.content}
-                        </p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Image Zoom Modal */}
       {zoomedImage && (

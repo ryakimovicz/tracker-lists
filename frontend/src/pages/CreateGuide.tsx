@@ -80,6 +80,11 @@ export const CreateGuide: React.FC = () => {
   const [expandedMediaId, setExpandedMediaId] = useState<string | null>(null);
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
 
+  // TV Series episode search details
+  const [expandedSeriesId, setExpandedSeriesId] = useState<string | null>(null);
+  const [expandedEpisodes, setExpandedEpisodes] = useState<any[]>([]);
+  const [isLoadingEpisodes, setIsLoadingEpisodes] = useState(false);
+
   // Feedback states
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
@@ -292,6 +297,25 @@ export const CreateGuide: React.FC = () => {
       setErrorMsg(language === 'es' ? 'Error al buscar en la API.' : 'Search failed.');
     } finally {
       setIsSearching(false);
+    }
+  };
+
+  const handleLoadSeriesEpisodes = async (seriesId: string) => {
+    if (expandedSeriesId === seriesId) {
+      setExpandedSeriesId(null);
+      setExpandedEpisodes([]);
+      return;
+    }
+    setExpandedSeriesId(seriesId);
+    setIsLoadingEpisodes(true);
+    try {
+      const res = await apiClient.get(`/search/series/${seriesId}/season/1`);
+      setExpandedEpisodes(res.data || []);
+    } catch (err) {
+      console.error(err);
+      alert(language === 'es' ? 'Error al cargar los episodios.' : 'Error loading episodes.');
+    } finally {
+      setIsLoadingEpisodes(false);
     }
   };
 
@@ -893,6 +917,19 @@ export const CreateGuide: React.FC = () => {
                               >
                                 {isExpanded ? (language === 'es' ? 'Ocultar info' : 'Hide info') : (language === 'es' ? 'Ver info' : 'View info')}
                               </button>
+                              
+                              {media.item_type === 'series' && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleLoadSeriesEpisodes(media.external_id)}
+                                  style={{ background: 'transparent', border: 'none', color: 'var(--accent-primary)', fontSize: '0.75rem', padding: 0, cursor: 'pointer', textDecoration: 'underline' }}
+                                >
+                                  {expandedSeriesId === media.external_id 
+                                    ? (language === 'es' ? 'Ocultar capítulos' : 'Hide episodes') 
+                                    : (language === 'es' ? 'Ver capítulos' : 'View episodes')
+                                  }
+                                </button>
+                              )}
                             </div>
                           </div>
                           
@@ -909,6 +946,49 @@ export const CreateGuide: React.FC = () => {
                         {isExpanded && media.description && (
                           <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.5rem', padding: '0.5rem', background: 'var(--bg-primary)', borderRadius: '4px', maxHeight: '120px', overflowY: 'auto', borderLeft: '2px solid var(--accent-primary)', lineHeight: 1.4 }}>
                             {stripHtml(media.description)}
+                          </div>
+                        )}
+
+                        {expandedSeriesId === media.external_id && (
+                          <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '180px', overflowY: 'auto', background: 'var(--bg-primary)', padding: '0.5rem', borderRadius: '6px' }}>
+                            {isLoadingEpisodes ? (
+                              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', textAlign: 'center' }}>
+                                {language === 'es' ? 'Cargando capítulos...' : 'Loading episodes...'}
+                              </div>
+                            ) : expandedEpisodes.length === 0 ? (
+                              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', textAlign: 'center' }}>
+                                {language === 'es' ? 'No se encontraron capítulos.' : 'No episodes found.'}
+                              </div>
+                            ) : (
+                              expandedEpisodes.map((ep) => {
+                                const ep_num = ep.episode_number;
+                                const ep_name = ep.name || "Untitled Episode";
+                                const fullTitle = `${media.title} - S01E${ep_num < 10 ? '0' + ep_num : ep_num} - ${ep_name}`;
+                                const still = ep.still_path;
+                                const image_url = still ? `https://image.tmdb.org/t/p/w185${still}` : media.image_url;
+                                return (
+                                  <div key={ep.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.82rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.25rem' }}>
+                                    <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                      {ep_num}. {ep_name}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleSelectMediaItem({
+                                        item_type: 'series',
+                                        external_id: `tmdb-ep-${ep.id}`,
+                                        title: fullTitle,
+                                        image_url: image_url,
+                                        description: ep.overview
+                                      })}
+                                      className="btn-primary"
+                                      style={{ padding: '0.2rem 0.4rem', fontSize: '0.7rem', borderRadius: '4px' }}
+                                    >
+                                      {language === 'es' ? 'Añadir' : 'Add'}
+                                    </button>
+                                  </div>
+                                );
+                              })
+                            )}
                           </div>
                         )}
                       </div>
