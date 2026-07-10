@@ -90,6 +90,8 @@ export const CreateGuide: React.FC = () => {
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isAutoSaving, setIsAutoSaving] = useState(false);
+  const [lastSavedTime, setLastSavedTime] = useState<string | null>(null);
 
   const parseError = (err: any) => {
     const detail = err.response?.data?.detail;
@@ -101,12 +103,12 @@ export const CreateGuide: React.FC = () => {
   const [searchParams] = useSearchParams();
   const editId = searchParams.get('edit') || searchParams.get('id');
 
-  // Load existing guide if editing
+  // Load existing guide if editing (fetch the draft state)
   useEffect(() => {
     if (editId) {
       setIsSubmitting(true);
       setErrorMsg('');
-      apiClient.get(`/lists/${editId}`)
+      apiClient.get(`/lists/${editId}`, { params: { draft: true } })
         .then(response => {
           setGuide(response.data);
           setTitle(response.data.title);
@@ -125,13 +127,65 @@ export const CreateGuide: React.FC = () => {
   useEffect(() => {
     if (guide) {
       const savedStructure = guide.section_descriptions;
-      if (savedStructure && Array.isArray(savedStructure.flow)) {
-        setDocFlow(savedStructure.flow);
-      } else {
-        setDocFlow([]);
-      }
+      const flowToLoad = (savedStructure && Array.isArray(savedStructure.draft_flow))
+        ? savedStructure.draft_flow
+        : (savedStructure && Array.isArray(savedStructure.flow) ? savedStructure.flow : []);
+      setDocFlow(flowToLoad);
     }
   }, [guide]);
+
+  const getAddedExternalIds = () => {
+    const ids: string[] = [];
+    docFlow.forEach(el => {
+      if (el.type === 'block') {
+        (el.items || []).forEach(item => {
+          if (item.external_id) ids.push(item.external_id);
+        });
+        (el.subblocks || []).forEach(sub => {
+          (sub.items || []).forEach(item => {
+            if (item.external_id) ids.push(item.external_id);
+          });
+        });
+      }
+    });
+    return ids;
+  };
+  const addedIds = getAddedExternalIds();
+
+
+  // Debounced auto-save to database draft_flow in background
+  useEffect(() => {
+    if (!guide) return;
+
+    // Prevent immediate save on initial mount
+    if (!lastSavedTime && docFlow.length === 0 && title === guide.title) {
+      setLastSavedTime(new Date().toLocaleTimeString());
+      return;
+    }
+
+    setIsAutoSaving(true);
+    const delayDebounce = setTimeout(async () => {
+      try {
+        const updatedSecDesc = {
+          ...guide.section_descriptions,
+          draft_flow: docFlow,
+          draft_title: title.trim(),
+          draft_description: description.trim()
+        };
+        await apiClient.put(`/lists/${guide.id}`, {
+          section_descriptions: updatedSecDesc
+        });
+        setGuide(prev => prev ? { ...prev, section_descriptions: updatedSecDesc } : null);
+        setLastSavedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+      } catch (e) {
+        console.error("Auto-save failed", e);
+      } finally {
+        setIsAutoSaving(false);
+      }
+    }, 1500);
+
+    return () => clearTimeout(delayDebounce);
+  }, [docFlow, title, description, guide?.id]);
 
   const handleCreateGuideSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -151,12 +205,18 @@ export const CreateGuide: React.FC = () => {
       const response = await apiClient.post('/lists/', {
         title,
         description,
-        visibility,
+        visibility, // Enforced as draft in backend, which saves this value in intended_visibility
         importance_labels: importanceLabels,
-        section_descriptions: { flow: [] } // Initialize with empty document flow wrapped in a dictionary
+        section_descriptions: {
+          flow: [],
+          draft_flow: [],
+          draft_title: title.trim(),
+          draft_description: description.trim(),
+          intended_visibility: visibility
+        }
       });
       setGuide(response.data);
-      setSuccessMsg(language === 'es' ? '¡Lista/Guía creada con éxito!' : 'List/Guide created successfully!');
+      setSuccessMsg(language === 'es' ? '¡Guía creada con éxito en modo Borrador!' : 'Guide created successfully as Draft!');
       setTimeout(() => setSuccessMsg(''), 4000);
     } catch (err: any) {
       setErrorMsg(parseError(err));
@@ -165,19 +225,29 @@ export const CreateGuide: React.FC = () => {
     }
   };
 
-  const handleSaveDocumentFlow = async () => {
+  const handlePublishGuide = async () => {
     if (!guide) return;
     setIsSubmitting(true);
     setErrorMsg('');
     setSuccessMsg('');
     try {
+      const targetVis = guide.section_descriptions?.intended_visibility || 'public';
+      const updatedSecDesc = {
+        ...guide.section_descriptions,
+        flow: docFlow,
+        draft_flow: docFlow,
+        draft_title: title.trim(),
+        draft_description: description.trim()
+      };
+      
       const response = await apiClient.put(`/lists/${guide.id}`, {
         title: title.trim(),
         description: description.trim(),
-        section_descriptions: { flow: docFlow } // Save wrapped document flow list in a dict
+        visibility: targetVis,
+        section_descriptions: updatedSecDesc
       });
       setGuide(response.data);
-      setSuccessMsg(language === 'es' ? '¡Cambios guardados con éxito!' : 'Document changes saved successfully!');
+      setSuccessMsg(language === 'es' ? '¡Cambios publicados con éxito!' : 'Guide published successfully!');
       setTimeout(() => setSuccessMsg(''), 4000);
     } catch (err: any) {
       setErrorMsg(parseError(err));
@@ -441,10 +511,10 @@ export const CreateGuide: React.FC = () => {
       {/* STEP 1: CREATE GUIDE DETAILS FORM */}
       {!guide ? (
         <form onSubmit={handleCreateGuideSubmit} className="glass-card" style={{ padding: '2.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-          <h2>{language === 'es' ? 'Crear Nueva Lista/Guía' : 'Create New List/Guide'}</h2>
+          <h2>{language === 'es' ? 'Crear Nueva Guía' : 'Create New Guide'}</h2>
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-            <label style={{ fontSize: '0.9rem', fontWeight: 500 }}>{language === 'es' ? 'Título de la Lista/Guía' : 'List/Guide Title'}</label>
+            <label style={{ fontSize: '0.9rem', fontWeight: 500 }}>{language === 'es' ? 'Título de la Guía' : 'Guide Title'}</label>
             <input
               type="text"
               required
@@ -460,7 +530,7 @@ export const CreateGuide: React.FC = () => {
             <textarea
               className="input-field"
               rows={3}
-              placeholder={language === 'es' ? 'De qué se trata esta lista o guía...' : 'What this list or guide is about...'}
+              placeholder={language === 'es' ? 'De qué se trata esta guía...' : 'What this guide is about...'}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
             />
@@ -525,7 +595,7 @@ export const CreateGuide: React.FC = () => {
           </div>
 
           <button type="submit" disabled={isSubmitting} className="btn-primary" style={{ marginTop: '1rem' }}>
-            {language === 'es' ? 'Crear Lista/Guía' : 'Create List/Guide'} <ArrowRight size={18} />
+            {language === 'es' ? 'Crear Guía' : 'Create Guide'} <ArrowRight size={18} />
           </button>
         </form>
       ) : (
@@ -543,9 +613,43 @@ export const CreateGuide: React.FC = () => {
               </button>
             </div>
             
-            <button onClick={handleSaveDocumentFlow} disabled={isSubmitting} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1.5rem' }}>
-              <Save size={16} /> {isSubmitting ? '...' : language === 'es' ? 'Guardar Cambios' : 'Save Changes'}
-            </button>
+            {/* Auto-save status indicator */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+              {isAutoSaving ? (
+                <span>{language === 'es' ? 'Guardando borrador...' : 'Saving draft...'}</span>
+              ) : lastSavedTime ? (
+                <span>{language === 'es' ? `Borrador guardado: ${lastSavedTime}` : `Draft auto-saved: ${lastSavedTime}`}</span>
+              ) : null}
+            </div>
+
+            {/* Target visibility selector & Publish action */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <select
+                className="input-field"
+                value={guide?.section_descriptions?.intended_visibility || 'public'}
+                onChange={(e) => {
+                  const newInt = e.target.value;
+                  setGuide((prev: any) => {
+                    if (!prev) return null;
+                    return {
+                      ...prev,
+                      section_descriptions: {
+                        ...prev.section_descriptions,
+                        intended_visibility: newInt
+                      }
+                    };
+                  });
+                }}
+                style={{ width: '110px', fontSize: '0.82rem', padding: '0.25rem 0.5rem', height: '38px', margin: 0 }}
+              >
+                <option value="public">{language === 'es' ? 'Pública' : 'Public'}</option>
+                <option value="private">{language === 'es' ? 'Privada' : 'Private'}</option>
+              </select>
+
+              <button onClick={handlePublishGuide} disabled={isSubmitting} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1.25rem', height: '38px' }}>
+                <Save size={16} /> {isSubmitting ? '...' : language === 'es' ? 'Publicar Cambios' : 'Publish Changes'}
+              </button>
+            </div>
           </div>
 
           {/* Document Canvas Container */}
@@ -988,14 +1092,26 @@ export const CreateGuide: React.FC = () => {
                             </div>
                           </div>
                           
-                          <button
-                            type="button"
-                            onClick={() => handleSelectMediaItem(media)}
-                            className="btn-primary"
-                            style={{ padding: '0.35rem 0.75rem', fontSize: '0.75rem', borderRadius: '6px' }}
-                          >
-                            {language === 'es' ? 'Añadir' : 'Add'}
-                          </button>
+                          {(() => {
+                            const isAlreadyAdded = media.external_id && addedIds.includes(media.external_id);
+                            return (
+                              <button
+                                type="button"
+                                onClick={() => handleSelectMediaItem(media)}
+                                className="btn-primary"
+                                style={{
+                                  padding: '0.35rem 0.75rem',
+                                  fontSize: '0.75rem',
+                                  borderRadius: '6px',
+                                  background: isAlreadyAdded ? 'rgba(16, 185, 129, 0.15)' : 'var(--accent-primary)',
+                                  color: isAlreadyAdded ? '#10b981' : '#ffffff',
+                                  border: isAlreadyAdded ? '1px solid #10b981' : 'none'
+                                }}
+                              >
+                                {isAlreadyAdded ? (language === 'es' ? 'Añadido' : 'Added') : (language === 'es' ? 'Añadir' : 'Add')}
+                              </button>
+                            );
+                          })()}
                         </div>
                         
                         {isExpanded && media.description && (

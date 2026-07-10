@@ -52,14 +52,22 @@ def create_list(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    # Enforce draft state on initial creation, saving intended visibility inside section_descriptions
+    intended = list_in.visibility.value if list_in.visibility else "public"
     new_list = ReadingList(
         creator_id=current_user.id,
         title=list_in.title,
         description=list_in.description,
-        visibility=list_in.visibility,
+        visibility=VisibilityEnum.DRAFT,
         importance_labels=list_in.importance_labels,
         section_importances=list_in.section_importances,
-        section_descriptions=list_in.section_descriptions
+        section_descriptions={
+            "flow": [],
+            "draft_flow": [],
+            "draft_title": list_in.title,
+            "draft_description": list_in.description,
+            "intended_visibility": intended
+        }
     )
     db.add(new_list)
     db.commit()
@@ -71,18 +79,19 @@ def create_list(
 def get_list_details(
     list_id: int,
     current_user: Optional[User] = Depends(get_current_user_optional),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    draft: bool = Query(False)
 ):
     reading_list = db.query(ReadingList).filter(ReadingList.id == list_id).first()
     if not reading_list:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="List not found")
 
     # Access checks
-    if reading_list.visibility == VisibilityEnum.PRIVATE:
+    if reading_list.visibility in (VisibilityEnum.PRIVATE, VisibilityEnum.DRAFT):
         if not current_user or reading_list.creator_id != current_user.id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="You do not have access to this private list"
+                detail="You do not have access to this list"
             )
 
     # Check if saved by current user
@@ -231,11 +240,18 @@ def get_list_details(
         progress_percentage = (completed_count / merged_total) * 100.0
         skipped_percentage = (skipped_count / merged_total) * 100.0
 
+    list_title = reading_list.title
+    list_desc = reading_list.description
+    if draft and current_user and reading_list.creator_id == current_user.id:
+        sd = reading_list.section_descriptions or {}
+        list_title = sd.get("draft_title") or list_title
+        list_desc = sd.get("draft_description") or list_desc
+
     return ReadingListDetailsResponse(
         id=reading_list.id,
         creator_id=reading_list.creator_id,
-        title=reading_list.title,
-        description=reading_list.description,
+        title=list_title,
+        description=list_desc,
         visibility=reading_list.visibility,
         created_at=reading_list.created_at,
         creator_username=creator_username,

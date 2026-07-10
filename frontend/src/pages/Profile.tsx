@@ -894,8 +894,22 @@ export const Profile: React.FC = () => {
                         <h4 style={{ margin: 0, fontSize: '1.15rem' }}>{list.title}</h4>
                         <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: '0.25rem 0 0 0' }}>{list.description}</p>
                       </div>
-                      <span style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem', borderRadius: '4px', background: 'rgba(124, 58, 237, 0.1)', color: 'var(--accent-primary)', textTransform: 'capitalize' }}>
-                        {list.visibility}
+                      <span style={{
+                        fontSize: '0.75rem',
+                        padding: '0.2rem 0.5rem',
+                        borderRadius: '4px',
+                        background: list.visibility === 'draft' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(124, 58, 237, 0.1)',
+                        color: list.visibility === 'draft' ? '#f59e0b' : 'var(--accent-primary)',
+                        fontWeight: 600,
+                        textTransform: 'capitalize'
+                      }}>
+                        {list.visibility === 'draft'
+                          ? (language === 'es' ? 'Borrador' : 'Draft')
+                          : (list.visibility === 'private'
+                              ? (language === 'es' ? 'Privada' : 'Private')
+                              : (language === 'es' ? 'Pública' : 'Public')
+                            )
+                        }
                       </span>
                     </div>
 

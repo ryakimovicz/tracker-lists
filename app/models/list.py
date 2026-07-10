@@ -8,6 +8,7 @@ class VisibilityEnum(str, enum.Enum):
     PUBLIC = "public"
     PRIVATE = "private"
     UNLISTED = "unlisted"
+    DRAFT = "draft"
 
 class ReadingList(Base):
     __tablename__ = "reading_lists"
