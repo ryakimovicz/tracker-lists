@@ -8,9 +8,11 @@ class LibraryItemCreate(BaseModel):
     title: str
     image_url: Optional[str] = None
     status: UserLibraryStatusEnum = UserLibraryStatusEnum.PLAN_TO_READ
+    is_favorite: Optional[bool] = False
 
 class LibraryItemUpdate(BaseModel):
-    status: UserLibraryStatusEnum
+    status: Optional[UserLibraryStatusEnum] = None
+    is_favorite: Optional[bool] = None
 
 class LibraryItemResponse(BaseModel):
     id: int
@@ -20,6 +22,7 @@ class LibraryItemResponse(BaseModel):
     title: str
     image_url: Optional[str] = None
     status: UserLibraryStatusEnum
+    is_favorite: bool = False
     tracking_list_id: Optional[int] = None
 
     class Config:

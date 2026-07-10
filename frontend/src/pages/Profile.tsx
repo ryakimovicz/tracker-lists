@@ -22,6 +22,7 @@ interface LibraryItem {
   title: string;
   image_url: string;
   status: string;
+  is_favorite: boolean;
   created_at: string;
 }
 
@@ -50,6 +51,7 @@ export const Profile: React.FC = () => {
 
   // Viewer state for full list details
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
+  const [activities, setActivities] = useState<any[]>([]);
 
   // Favorites state (local highlight mock for UX polish)
   const [favorites, setFavorites] = useState<LibraryItem[]>([]);
@@ -76,11 +78,13 @@ export const Profile: React.FC = () => {
       const libraryRes = await apiClient.get('/library/');
       setLibraryItems(libraryRes.data);
 
-      // Local mockup favorites (e.g. items with 'completed' or 'read' status to showcase layout)
-      const finished = libraryRes.data.filter((item: LibraryItem) => 
-        ['completed', 'read'].includes(item.status)
-      );
-      setFavorites(finished.slice(0, 3));
+      // Set favorites state from items explicitly marked as favorites
+      const favs = libraryRes.data.filter((item: LibraryItem) => item.is_favorite);
+      setFavorites(favs);
+
+      // Fetch user activities
+      const activityRes = await apiClient.get('/users/me/activity');
+      setActivities(activityRes.data);
     } catch (err: any) {
       setErrorMsg(err.response?.data?.detail || 'Failed to fetch library information.');
     } finally {
@@ -96,11 +100,36 @@ export const Profile: React.FC = () => {
       setLibraryItems(prev => prev.map(item => item.id === itemId ? { ...item, status: newStatus } : item));
       setSuccessMsg(language === 'es' ? 'Estado actualizado con éxito.' : 'Status updated successfully.');
       setTimeout(() => setSuccessMsg(''), 3000);
+      
+      // Refresh activities
+      const actRes = await apiClient.get('/users/me/activity');
+      setActivities(actRes.data);
     } catch (err: any) {
       setErrorMsg(err.response?.data?.detail || 'Failed to update item status.');
     }
   };
+  const handleToggleFavorite = async (itemId: number, currentFav: boolean) => {
+    try {
+      await apiClient.put(`/library/${itemId}`, { is_favorite: !currentFav });
+      setLibraryItems(prev => prev.map(item => item.id === itemId ? { ...item, is_favorite: !currentFav } : item));
+      
+      setFavorites(prev => {
+        const item = libraryItems.find(li => li.id === itemId);
+        if (!item) return prev;
+        if (!currentFav) {
+          return [...prev, { ...item, is_favorite: true }];
+        } else {
+          return prev.filter(li => li.id !== itemId);
+        }
+      });
 
+      // Refresh activities
+      const actRes = await apiClient.get('/users/me/activity');
+      setActivities(actRes.data);
+    } catch(err) {
+      console.error(err);
+    }
+  };
   const handleDeleteItem = async (itemId: number) => {
     if (!window.confirm(language === 'es' ? '¿Seguro que deseas eliminar este elemento?' : 'Are you sure you want to delete this item?')) return;
     setErrorMsg('');
@@ -333,11 +362,35 @@ export const Profile: React.FC = () => {
             }}>
               {filteredItems.map(item => (
                 <div key={item.id} className="glass-card" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  <img
-                    src={item.image_url || 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=150'}
-                    alt={item.title}
-                    style={{ width: '100%', height: '240px', objectFit: 'cover', borderRadius: '8px' }}
-                  />
+                  <div style={{ position: 'relative' }}>
+                    <img
+                      src={item.image_url || 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=150'}
+                      alt={item.title}
+                      style={{ width: '100%', height: '240px', objectFit: 'cover', borderRadius: '8px' }}
+                    />
+                    <button
+                      onClick={() => handleToggleFavorite(item.id, item.is_favorite)}
+                      style={{
+                        position: 'absolute',
+                        top: '0.5rem',
+                        right: '0.5rem',
+                        background: 'rgba(9, 9, 12, 0.75)',
+                        border: 'none',
+                        borderRadius: '50%',
+                        width: '32px',
+                        height: '32px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        color: item.is_favorite ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                        transition: 'transform 0.2s ease'
+                      }}
+                      title={language === 'es' ? 'Destacar' : 'Favorite'}
+                    >
+                      <Heart size={16} fill={item.is_favorite ? 'var(--accent-primary)' : 'none'} />
+                    </button>
+                  </div>
                   <div style={{ flex: 1, textAlign: 'left' }}>
                     <h4 style={{ margin: '0 0 0.25rem 0', fontSize: '1rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.title}>
                       {item.title}
@@ -487,20 +540,73 @@ export const Profile: React.FC = () => {
       )}
 
       {/* History log mockup in footer to meet spec */}
+      {/* History log in footer */}
       <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '2rem', textAlign: 'left' }}>
         <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
           <History size={20} /> {language === 'es' ? 'Historial de Actividad' : 'Activity History'}
         </h3>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <div className="glass-card" style={{ padding: '1rem', display: 'flex', gap: '1rem', alignItems: 'center', fontSize: '0.9rem' }}>
-            <CheckCircle size={16} color="#10b981" />
-            <div>
-              <span>{language === 'es' ? 'Creaste tu cuenta de TrackerLists.' : 'Created your TrackerLists account.'}</span>
-              <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginLeft: '1rem' }}>
-                {profile ? formatDate(new Date(profile.created_at)) : formatDate(new Date())}
-              </span>
+          {activities.length === 0 ? (
+            <div className="glass-card" style={{ padding: '1rem', display: 'flex', gap: '1rem', alignItems: 'center', fontSize: '0.9rem' }}>
+              <CheckCircle size={16} color="#10b981" />
+              <div>
+                <span>{language === 'es' ? 'Creaste tu cuenta de TrackerLists.' : 'Created your TrackerLists account.'}</span>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginLeft: '1rem' }}>
+                  {profile ? formatDate(new Date(profile.created_at)) : formatDate(new Date())}
+                </span>
+              </div>
             </div>
-          </div>
+          ) : (
+            activities.map((act) => {
+              const getStatusLabel = (status: string) => {
+                const all = [
+                  { value: 'plan_to_play', label: language === 'es' ? 'Por Jugar' : 'Plan to Play' },
+                  { value: 'playing', label: language === 'es' ? 'Jugando' : 'Playing' },
+                  { value: 'completed', label: language === 'es' ? 'Terminado / Visto' : 'Completed / Watched' },
+                  { value: 'dropped', label: language === 'es' ? 'Abandonado' : 'Dropped' },
+                  { value: 'plan_to_watch', label: language === 'es' ? 'Por Ver' : 'Plan to Watch' },
+                  { value: 'watching', label: language === 'es' ? 'Viendo' : 'Watching' },
+                  { value: 'plan_to_read', label: language === 'es' ? 'Por Leer' : 'Plan to Read' },
+                  { value: 'reading', label: language === 'es' ? 'Leyendo' : 'Reading' },
+                  { value: 'read', label: language === 'es' ? 'Leído' : 'Read' }
+                ];
+                return all.find(s => s.value === status)?.label || status;
+              };
+
+              let msg = '';
+              if (act.activity_type === 'shelf_add') {
+                msg = language === 'es' 
+                  ? `Agregaste "${act.item_title}" a tu estantería como "${getStatusLabel(act.details)}".`
+                  : `Added "${act.item_title}" to shelf as "${getStatusLabel(act.details)}".`;
+              } else if (act.activity_type === 'shelf_status') {
+                msg = language === 'es'
+                  ? `Cambiaste el estado de "${act.item_title}" a "${getStatusLabel(act.details)}".`
+                  : `Changed status of "${act.item_title}" to "${getStatusLabel(act.details)}".`;
+              } else if (act.activity_type === 'shelf_favorite') {
+                msg = language === 'es'
+                  ? (act.details === 'starred' ? `Destacaste "${act.item_title}".` : `Quitaste de destacados a "${act.item_title}".`)
+                  : (act.details === 'starred' ? `Featured "${act.item_title}".` : `Removed "${act.item_title}" from featured.`);
+              } else if (act.activity_type === 'item_completed') {
+                msg = language === 'es'
+                  ? `Marcaste "${act.item_title}" como completado.`
+                  : `Marked "${act.item_title}" as completed.`;
+              } else {
+                msg = `${act.activity_type} - ${act.item_title}`;
+              }
+
+              return (
+                <div key={act.id} className="glass-card" style={{ padding: '1rem', display: 'flex', gap: '1rem', alignItems: 'center', fontSize: '0.9rem' }}>
+                  <CheckCircle size={16} color="#10b981" />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    <span>{msg}</span>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                      {formatDate(new Date(act.created_at))}
+                    </span>
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
       

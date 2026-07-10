@@ -12,6 +12,7 @@ from app.models.item_progress import ItemProgress
 from app.models.library import UserLibraryItem
 from app.models.addition import ListAddition, UserAdoptedAddition
 from app.core.security import verify_password, get_password_hash
+from app.models.activity import UserActivityLog
 from app.schemas.user import UserResponse, UserDashboardResponse
 from app.schemas.social import UpNextResponse, UpNextItemResponse
 from app.schemas.auth import PasswordChangeRequest, UsernameUpdateRequest
@@ -230,3 +231,25 @@ def delete_account(
     db.delete(current_user)
     db.commit()
     return None
+
+@router.get("/me/activity")
+def get_my_activity(
+    limit: int = 15,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    activities = db.query(UserActivityLog).filter(
+        UserActivityLog.user_id == current_user.id
+    ).order_by(UserActivityLog.created_at.desc()).limit(limit).all()
+    
+    return [
+        {
+            "id": act.id,
+            "activity_type": act.activity_type,
+            "item_title": act.item_title,
+            "item_type": act.item_type,
+            "details": act.details,
+            "created_at": act.created_at
+        }
+        for act in activities
+    ]

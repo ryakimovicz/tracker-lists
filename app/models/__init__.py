@@ -9,6 +9,7 @@ from app.models.library import UserLibraryItem, UserLibraryStatusEnum
 from app.models.social import ListVote, ListReport, Comment, CommentVote, CommentReport, Follow
 from app.models.review import MediaReview, MediaReviewVote, MediaReviewReport
 from app.models.addition import ListAddition, ListAdditionItem, UserAdoptedAddition, AdditionVote, AdditionComment
+from app.models.activity import UserActivityLog
 
 __all__ = [
     "Base",
@@ -34,5 +35,6 @@ __all__ = [
     "ListAdditionItem",
     "UserAdoptedAddition",
     "AdditionVote",
-    "AdditionComment"
+    "AdditionComment",
+    "UserActivityLog"
 ]

@@ -1,5 +1,5 @@
 import enum
-from sqlalchemy import Column, Integer, String, ForeignKey, Enum, UniqueConstraint
+from sqlalchemy import Column, Integer, String, ForeignKey, Enum, UniqueConstraint, Boolean
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 
@@ -24,6 +24,7 @@ class UserLibraryItem(Base):
     title = Column(String(250), nullable=False)
     image_url = Column(String(500), nullable=True)
     status = Column(Enum(UserLibraryStatusEnum), default=UserLibraryStatusEnum.PLAN_TO_READ, nullable=False)
+    is_favorite = Column(Boolean, default=False, nullable=False)
     tracking_list_id = Column(Integer, ForeignKey("reading_lists.id", ondelete="SET NULL"), nullable=True)
 
     # Relationships

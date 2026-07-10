@@ -10,6 +10,7 @@ from app.models.list_item import ListItem, ItemTypeEnum
 from app.models.library import UserLibraryItem, UserLibraryStatusEnum
 from app.schemas.library import LibraryItemCreate, LibraryItemUpdate, LibraryItemResponse
 from app.services.tmdb import TMDBService
+from app.models.activity import UserActivityLog
 
 router = APIRouter()
 
@@ -120,9 +121,21 @@ def add_to_library(
         title=item_in.title,
         image_url=item_in.image_url,
         status=item_in.status,
+        is_favorite=item_in.is_favorite if item_in.is_favorite is not None else False,
         tracking_list_id=tracking_list_id
     )
     db.add(new_lib_item)
+    
+    # Record activity log
+    activity = UserActivityLog(
+        user_id=current_user.id,
+        activity_type="shelf_add",
+        item_title=item_in.title,
+        item_type=item_in.item_type,
+        details=item_in.status.value if hasattr(item_in.status, "value") else str(item_in.status)
+    )
+    db.add(activity)
+    
     db.commit()
     db.refresh(new_lib_item)
     return new_lib_item
@@ -158,8 +171,33 @@ def update_library_item(
             detail="Library item not found"
         )
         
-    validate_media_status(lib_item.item_type, item_in.status)
-    lib_item.status = item_in.status
+    if item_in.status is not None:
+        validate_media_status(lib_item.item_type, item_in.status)
+        lib_item.status = item_in.status
+        
+        # Record activity log
+        activity = UserActivityLog(
+            user_id=current_user.id,
+            activity_type="shelf_status",
+            item_title=lib_item.title,
+            item_type=lib_item.item_type,
+            details=item_in.status.value if hasattr(item_in.status, "value") else str(item_in.status)
+        )
+        db.add(activity)
+        
+    if item_in.is_favorite is not None:
+        lib_item.is_favorite = item_in.is_favorite
+        
+        # Record activity log
+        activity = UserActivityLog(
+            user_id=current_user.id,
+            activity_type="shelf_favorite",
+            item_title=lib_item.title,
+            item_type=lib_item.item_type,
+            details="starred" if item_in.is_favorite else "unstarred"
+        )
+        db.add(activity)
+
     db.commit()
     db.refresh(lib_item)
     return lib_item

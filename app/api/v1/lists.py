@@ -13,6 +13,7 @@ from app.models.item_progress import ItemProgress
 from app.models.addition import ListAddition, UserAdoptedAddition
 from app.services.tmdb import TMDBService
 from app.models.library import UserLibraryItem, UserLibraryStatusEnum
+from app.models.activity import UserActivityLog
 from app.schemas.list import (
     ReadingListCreate,
     ReadingListUpdate,
@@ -490,6 +491,16 @@ def toggle_item_progress(
     if progress.is_completed:
         auto_add_to_library(db, current_user.id, item)
         
+        # Record activity log
+        activity = UserActivityLog(
+            user_id=current_user.id,
+            activity_type="item_completed",
+            item_title=item.title,
+            item_type=item.item_type,
+            details="completed"
+        )
+        db.add(activity)
+        
     db.commit()
     return {
         "item_id": item_id,
@@ -549,6 +560,16 @@ def bulk_toggle_items_progress(
             
         if req_body.completed:
             auto_add_to_library(db, current_user.id, item)
+            
+            # Record activity log
+            activity = UserActivityLog(
+                user_id=current_user.id,
+                activity_type="item_completed",
+                item_title=item.title,
+                item_type=item.item_type,
+                details="completed"
+            )
+            db.add(activity)
             
     db.commit()
     return {"status": "success"}

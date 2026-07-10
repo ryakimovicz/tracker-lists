@@ -30,6 +30,7 @@ export const ViewGuide: React.FC = () => {
   const [userRating, setUserRating] = useState<number>(0);
   const [userComment, setUserComment] = useState<string>('');
   const [isSavingReview, setIsSavingReview] = useState(false);
+  const [descExpanded, setDescExpanded] = useState(false);
 
   // Fetch guide details and profile information on mount
   useEffect(() => {
@@ -164,6 +165,7 @@ export const ViewGuide: React.FC = () => {
     setUserRating(0);
     setUserComment('');
     setItemReviews([]);
+    setDescExpanded(false);
 
     try {
       const res = await apiClient.get(`/reviews/${item.item_type}/${item.external_id}`);
@@ -186,25 +188,25 @@ export const ViewGuide: React.FC = () => {
     if (!selectedItem) return;
     try {
       const existing = libraryItems.find(li => li.item_type === selectedItem.item_type && li.external_id === selectedItem.external_id);
-      const isFav = existing && ['completed', 'read'].includes(existing.status);
-
-      let targetStatus: string;
-      if (['book', 'comic', 'manga'].includes(selectedItem.item_type)) {
-        targetStatus = isFav ? 'reading' : 'read';
-      } else {
-        targetStatus = isFav ? 'watching' : 'completed';
-      }
+      const isFav = existing && existing.is_favorite;
 
       if (existing) {
-        const res = await apiClient.put(`/library/${existing.id}`, { status: targetStatus });
+        const res = await apiClient.put(`/library/${existing.id}`, { is_favorite: !isFav });
         setLibraryItems(prev => prev.map(li => li.id === existing.id ? res.data : li));
       } else {
+        let defaultStatus = 'plan_to_watch';
+        if (['book', 'comic', 'manga'].includes(selectedItem.item_type)) {
+          defaultStatus = 'plan_to_read';
+        } else if (selectedItem.item_type === 'game') {
+          defaultStatus = 'plan_to_play';
+        }
         const res = await apiClient.post('/library/', {
           item_type: selectedItem.item_type,
           external_id: selectedItem.external_id,
           title: selectedItem.title,
           image_url: selectedItem.image_url,
-          status: targetStatus
+          status: defaultStatus,
+          is_favorite: true
         });
         setLibraryItems(prev => [...prev, res.data]);
       }
@@ -310,7 +312,7 @@ export const ViewGuide: React.FC = () => {
   const isFavorite = selectedItem && libraryItems.some(li =>
     li.item_type === selectedItem.item_type &&
     li.external_id === selectedItem.external_id &&
-    ['completed', 'read'].includes(li.status)
+    li.is_favorite
   );
 
   return (
@@ -650,11 +652,37 @@ export const ViewGuide: React.FC = () => {
                 {(() => {
                   const notes = parseNotes(selectedItem.custom_notes || '');
                   if (!notes.description) return null;
+                  const cleanText = stripHtml(notes.description);
+                  const shouldTruncate = cleanText.length > 180;
+                  const displayedText = shouldTruncate && !descExpanded
+                    ? cleanText.slice(0, 180) + '...'
+                    : cleanText;
+
                   return (
                     <div>
                       <h5 style={{ margin: '0 0 0.25rem 0', color: 'var(--text-secondary)' }}>{language === 'es' ? 'Descripción:' : 'Description:'}</h5>
                       <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-primary)', lineHeight: '1.4' }}>
-                        {stripHtml(notes.description)}
+                        {displayedText}
+                        {shouldTruncate && (
+                          <button
+                            onClick={() => setDescExpanded(!descExpanded)}
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              color: 'var(--accent-primary)',
+                              cursor: 'pointer',
+                              fontWeight: 600,
+                              fontSize: '0.82rem',
+                              marginLeft: '0.4rem',
+                              padding: 0
+                            }}
+                          >
+                            {descExpanded
+                              ? (language === 'es' ? 'Leer menos' : 'Read less')
+                              : (language === 'es' ? 'Leer más' : 'Read more')
+                            }
+                          </button>
+                        )}
                       </p>
                     </div>
                   );
