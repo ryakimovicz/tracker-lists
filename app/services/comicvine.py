@@ -32,7 +32,7 @@ class ComicVineService:
         global_results = []
 
         try:
-            # 1. Detect if the query ends with an issue number (e.g. "The New Teen Titans 39")
+            # 1. Detect if the query ends with an issue number (e.g. "The New Teen Titans 39" or "Justice League of America 9")
             issue_number_match = re.search(r'^(.*?)\s*#?\s*(\d+)$', cleaned_query)
             if issue_number_match:
                 series_name = issue_number_match.group(1).strip()
@@ -40,28 +40,45 @@ class ComicVineService:
                 
                 if series_name:
                     encoded_series = urllib.parse.quote(series_name)
-                    # Step A: Find the volume ID first by searching volumes matching the series name
-                    volume_search_url = f"https://comicvine.gamespot.com/api/search/?api_key={api_key}&format=json&resources=volume&query={encoded_series}"
+                    matching_volume_ids = []
+
+                    # Method A: Query the volumes endpoint directly filtering by name (highly precise)
+                    volumes_url = f"https://comicvine.gamespot.com/api/volumes/?api_key={api_key}&format=json&filter=name:{encoded_series}"
                     req_volumes = urllib.request.Request(
-                        volume_search_url,
+                        volumes_url,
                         headers={"User-Agent": "TrackerLists/1.0 (contact@trackerlists.com)"}
                     )
-                    
-                    matching_volume_ids = []
                     try:
-                        with urllib.request.urlopen(req_volumes, timeout=6) as response:
+                        with urllib.request.urlopen(req_volumes, timeout=5) as response:
                             if response.status == 200:
                                 v_data = json.loads(response.read().decode())
-                                # Get top 3 volume IDs that match closely
-                                for v_item in v_data.get("results", [])[:3]:
+                                for v_item in v_data.get("results", []):
                                     v_id = v_item.get("id")
                                     if v_id:
                                         matching_volume_ids.append(v_id)
                     except Exception as e:
-                        print(f"Comic Vine Volume Lookup Error: {e}")
+                        print(f"Comic Vine Volume Filter Error: {e}")
 
-                    # Step B: For each volume ID found, query the issues endpoint filtering by volume ID and issue number
-                    for vol_id in matching_volume_ids:
+                    # Fallback Method B: Query search endpoint for volumes if Method A returned nothing
+                    if not matching_volume_ids:
+                        volume_search_url = f"https://comicvine.gamespot.com/api/search/?api_key={api_key}&format=json&resources=volume&query={encoded_series}"
+                        req_volumes_search = urllib.request.Request(
+                            volume_search_url,
+                            headers={"User-Agent": "TrackerLists/1.0 (contact@trackerlists.com)"}
+                        )
+                        try:
+                            with urllib.request.urlopen(req_volumes_search, timeout=5) as response:
+                                if response.status == 200:
+                                    v_data = json.loads(response.read().decode())
+                                    for v_item in v_data.get("results", [])[:5]:
+                                        v_id = v_item.get("id")
+                                        if v_id and v_id not in matching_volume_ids:
+                                            matching_volume_ids.append(v_id)
+                        except Exception as e:
+                            print(f"Comic Vine Volume Search Fallback Error: {e}")
+
+                    # Step C: Query issues for all matched volume IDs
+                    for vol_id in matching_volume_ids[:4]: # Limit to top 4 volume matches to prevent slow requests
                         issues_url = f"https://comicvine.gamespot.com/api/issues/?api_key={api_key}&format=json&filter=volume:{vol_id},issue_number:{issue_number}"
                         req_issues = urllib.request.Request(
                             issues_url,

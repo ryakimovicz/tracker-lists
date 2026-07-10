@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from '../context/LanguageContext';
 import { apiClient } from '../api/client';
 import {
@@ -75,6 +76,9 @@ export const CreateGuide: React.FC = () => {
   const [searchTab, setSearchTab] = useState<'search' | 'manual'>('search');
   const [manualTitle, setManualTitle] = useState('');
 
+  const [modalSuccessMsg, setModalSuccessMsg] = useState('');
+  const [expandedMediaId, setExpandedMediaId] = useState<string | null>(null);
+
   // Feedback states
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
@@ -87,6 +91,26 @@ export const CreateGuide: React.FC = () => {
     }
     return detail || err.message || 'An error occurred';
   };
+  const [searchParams] = useSearchParams();
+  const editId = searchParams.get('edit') || searchParams.get('id');
+
+  // Load existing guide if editing
+  useEffect(() => {
+    if (editId) {
+      setIsSubmitting(true);
+      setErrorMsg('');
+      apiClient.get(`/lists/${editId}`)
+        .then(response => {
+          setGuide(response.data);
+        })
+        .catch(() => {
+          setErrorMsg(language === 'es' ? 'Error al cargar la guía.' : 'Error loading guide.');
+        })
+        .finally(() => {
+          setIsSubmitting(false);
+        });
+    }
+  }, [editId]);
 
   // Load document flow if it exists on the guide
   useEffect(() => {
@@ -316,9 +340,9 @@ export const CreateGuide: React.FC = () => {
         return el;
       }));
 
-      setSuccessMsg(language === 'es' ? `¡${media.title} añadido!` : `${media.title} added!`);
-      setSearchTarget(null);
-      setTimeout(() => setSuccessMsg(''), 3000);
+      setModalSuccessMsg(language === 'es' ? `¡${media.title} añadido!` : `${media.title} added!`);
+      setManualTitle('');
+      setTimeout(() => setModalSuccessMsg(''), 3000);
     } catch (err: any) {
       setErrorMsg(language === 'es' ? 'No se pudo guardar el elemento.' : 'Failed to save element.');
     }
@@ -613,7 +637,7 @@ export const CreateGuide: React.FC = () => {
                           ))}
 
                           <button type="button" onClick={() => openSearchModal(element.id)} className="btn-secondary" style={{ alignSelf: 'flex-start', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.35rem 0.75rem', marginTop: '0.25rem' }}>
-                            <SearchIcon size={14} /> {language === 'es' ? 'Añadir Obra (Buscar API)' : 'Add Media (Search API)'}
+                            <SearchIcon size={14} /> {language === 'es' ? 'Buscar y Añadir Obra' : 'Search & Add Item'}
                           </button>
                         </div>
 
@@ -714,7 +738,13 @@ export const CreateGuide: React.FC = () => {
           zIndex: 2000
         }}>
           <div className="glass-card" style={{ width: '500px', maxHeight: '80vh', padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-            <h3 style={{ margin: 0 }}>{language === 'es' ? 'Añadir Obra' : 'Add Media Item'}</h3>
+            <h3 style={{ margin: 0 }}>{language === 'es' ? 'Añadir Obra' : 'Add Item'}</h3>
+
+            {modalSuccessMsg && (
+              <div style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', padding: '0.5rem', borderRadius: '6px', textAlign: 'center', fontSize: '0.85rem', fontWeight: 600 }}>
+                {modalSuccessMsg}
+              </div>
+            )}
             
             {/* Tabs */}
             <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', marginBottom: '0.5rem' }}>
@@ -732,7 +762,7 @@ export const CreateGuide: React.FC = () => {
                   cursor: 'pointer'
                 }}
               >
-                {language === 'es' ? 'Buscar en API' : 'API Search'}
+                {language === 'es' ? 'Buscar' : 'Search'}
               </button>
               <button
                 type="button"
@@ -796,25 +826,52 @@ export const CreateGuide: React.FC = () => {
                       {language === 'es' ? 'Escribe y busca para ver resultados.' : 'Type and search to display results.'}
                     </p>
                   )}
-                  {searchResults.map((media) => (
-                    <div
-                      key={media.external_id}
-                      onClick={() => handleSelectMediaItem(media)}
-                      style={{
-                        display: 'flex', gap: '1rem', alignItems: 'center', padding: '0.5rem',
-                        background: 'var(--bg-secondary)', border: '1px solid var(--border-color)',
-                        borderRadius: '6px', cursor: 'pointer', transition: 'all 0.2s', textAlign: 'left'
-                      }}
-                      onMouseEnter={(e) => e.currentTarget.style.borderColor = 'var(--accent-primary)'}
-                      onMouseLeave={(e) => e.currentTarget.style.borderColor = 'var(--border-color)'}
-                    >
-                      <img src={media.image_url} alt={media.title} style={{ width: '40px', height: '55px', objectFit: 'cover', borderRadius: '4px' }} />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <h5 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{media.title}</h5>
-                        <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{stripHtml(media.description)}</p>
+                  {searchResults.map((media) => {
+                    const isExpanded = expandedMediaId === media.external_id;
+                    return (
+                      <div
+                        key={media.external_id}
+                        style={{
+                          display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.75rem',
+                          background: 'var(--bg-secondary)', border: '1px solid var(--border-color)',
+                          borderRadius: '8px', transition: 'all 0.2s', textAlign: 'left', position: 'relative'
+                        }}
+                      >
+                        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                          <img src={media.image_url} alt={media.title} style={{ width: '45px', height: '65px', objectFit: 'cover', borderRadius: '4px' }} />
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <h5 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{media.title}</h5>
+                            <span style={{ fontSize: '0.72rem', color: 'var(--accent-primary)', textTransform: 'capitalize', fontWeight: 600 }}>{media.item_type}</span>
+                            
+                            <div style={{ display: 'flex', gap: '1rem', marginTop: '0.25rem' }}>
+                              <button
+                                type="button"
+                                onClick={() => setExpandedMediaId(isExpanded ? null : media.external_id)}
+                                style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', fontSize: '0.75rem', padding: 0, cursor: 'pointer', textDecoration: 'underline' }}
+                              >
+                                {isExpanded ? (language === 'es' ? 'Ocultar info' : 'Hide info') : (language === 'es' ? 'Ver info' : 'View info')}
+                              </button>
+                            </div>
+                          </div>
+                          
+                          <button
+                            type="button"
+                            onClick={() => handleSelectMediaItem(media)}
+                            className="btn-primary"
+                            style={{ padding: '0.35rem 0.75rem', fontSize: '0.75rem', borderRadius: '6px' }}
+                          >
+                            {language === 'es' ? 'Añadir' : 'Add'}
+                          </button>
+                        </div>
+                        
+                        {isExpanded && media.description && (
+                          <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.5rem', padding: '0.5rem', background: 'var(--bg-primary)', borderRadius: '4px', maxHeight: '120px', overflowY: 'auto', borderLeft: '2px solid var(--accent-primary)', lineHeight: 1.4 }}>
+                            {stripHtml(media.description)}
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </>
             ) : (
@@ -830,7 +887,7 @@ export const CreateGuide: React.FC = () => {
                 });
               }} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', minHeight: '200px' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', textAlign: 'left' }}>
-                  <label style={{ fontSize: '0.85rem', fontWeight: 500 }}>{language === 'es' ? 'Título de la Obra' : 'Media Title'}</label>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 500 }}>{language === 'es' ? 'Título de la Obra' : 'Title'}</label>
                   <input
                     type="text"
                     required
