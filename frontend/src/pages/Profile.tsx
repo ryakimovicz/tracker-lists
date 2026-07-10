@@ -12,7 +12,9 @@ import {
   AlertCircle,
   CheckCircle,
   Eye,
-  Edit
+  Edit,
+  Star,
+  X
 } from 'lucide-react';
 
 interface LibraryItem {
@@ -52,6 +54,18 @@ export const Profile: React.FC = () => {
   // Viewer state for full list details
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
   const [activities, setActivities] = useState<any[]>([]);
+
+  // Shelf expansion & pagination states
+  const [isShelfExpanded, setIsShelfExpanded] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Overlay modal states for shelf items details
+  const [selectedItem, setSelectedItem] = useState<any | null>(null);
+  const [itemReviews, setItemReviews] = useState<any[]>([]);
+  const [userRating, setUserRating] = useState<number>(0);
+  const [userComment, setUserComment] = useState<string>('');
+  const [isSavingReview, setIsSavingReview] = useState(false);
+  const [descExpanded, setDescExpanded] = useState(false);
 
   // Favorites state (local highlight mock for UX polish)
   const [favorites, setFavorites] = useState<LibraryItem[]>([]);
@@ -128,6 +142,63 @@ export const Profile: React.FC = () => {
       setActivities(actRes.data);
     } catch(err) {
       console.error(err);
+    }
+  };
+
+  const handleOpenItemDetails = async (item: any) => {
+    setSelectedItem(item);
+    setUserRating(0);
+    setUserComment('');
+    setItemReviews([]);
+    setDescExpanded(false);
+
+    try {
+      const res = await apiClient.get(`/reviews/${item.item_type}/${item.external_id}`);
+      setItemReviews(res.data);
+      
+      if (profile) {
+        const myReview = res.data.find((r: any) => r.user_id === profile.id);
+        if (myReview) {
+          setUserRating(myReview.rating || 0);
+          setUserComment(myReview.content || '');
+        }
+      }
+    } catch(e) {
+      console.error(e);
+    }
+
+    apiClient.get('/search/', { params: { query: item.title, type: item.item_type } })
+      .then(searchRes => {
+        const match = searchRes.data.find((x: any) => x.external_id === item.external_id);
+        if (match && match.description) {
+          setSelectedItem((prev: any) => {
+            if (!prev) return null;
+            return {
+              ...prev,
+              custom_notes: JSON.stringify({ description: match.description })
+            };
+          });
+        }
+      })
+      .catch(e => console.error(e));
+  };
+
+  const handleSaveReview = async () => {
+    if (!selectedItem) return;
+    setIsSavingReview(true);
+    try {
+      await apiClient.post(`/reviews/${selectedItem.item_type}/${selectedItem.external_id}`, {
+        rating: userRating || null,
+        content: userComment || null
+      });
+      const revRes = await apiClient.get(`/reviews/${selectedItem.item_type}/${selectedItem.external_id}`);
+      setItemReviews(revRes.data);
+      alert(language === 'es' ? 'Valoración guardada con éxito.' : 'Review saved successfully.');
+    } catch(err) {
+      console.error(err);
+      alert(language === 'es' ? 'Error al guardar la valoración.' : 'Failed to save review.');
+    } finally {
+      setIsSavingReview(false);
     }
   };
   const handleDeleteItem = async (itemId: number) => {
@@ -355,86 +426,149 @@ export const Profile: React.FC = () => {
               {language === 'es' ? 'No hay elementos en esta categoría.' : 'No items found in this category.'}
             </div>
           ) : (
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-              gap: '1.5rem'
-            }}>
-              {filteredItems.map(item => (
-                <div key={item.id} className="glass-card" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  <div style={{ position: 'relative' }}>
-                    <img
-                      src={item.image_url || 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=150'}
-                      alt={item.title}
-                      style={{ width: '100%', height: '240px', objectFit: 'cover', borderRadius: '8px' }}
-                    />
-                    <button
-                      onClick={() => handleToggleFavorite(item.id, item.is_favorite)}
-                      style={{
-                        position: 'absolute',
-                        top: '0.5rem',
-                        right: '0.5rem',
-                        background: 'rgba(9, 9, 12, 0.75)',
-                        border: 'none',
-                        borderRadius: '50%',
-                        width: '32px',
-                        height: '32px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        cursor: 'pointer',
-                        color: item.is_favorite ? 'var(--accent-primary)' : 'var(--text-secondary)',
-                        transition: 'transform 0.2s ease'
-                      }}
-                      title={language === 'es' ? 'Destacar' : 'Favorite'}
-                    >
-                      <Heart size={16} fill={item.is_favorite ? 'var(--accent-primary)' : 'none'} />
-                    </button>
-                  </div>
-                  <div style={{ flex: 1, textAlign: 'left' }}>
-                    <h4 style={{ margin: '0 0 0.25rem 0', fontSize: '1rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.title}>
-                      {item.title}
-                    </h4>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--accent-primary)' }}>
-                      {t('media' + item.item_type.charAt(0).toUpperCase() + item.item_type.slice(1))}
-                    </span>
-                  </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              {/* Expand / Collapse Control */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <button
+                  onClick={() => {
+                    setIsShelfExpanded(!isShelfExpanded);
+                    setCurrentPage(1);
+                  }}
+                  className="btn-secondary"
+                  style={{ padding: '0.4rem 1rem', fontSize: '0.85rem' }}
+                >
+                  {isShelfExpanded
+                    ? (language === 'es' ? 'Contraer Estantería (1 fila)' : 'Collapse Shelf (1 row)')
+                    : (language === 'es' ? 'Expandir Estantería (3 filas)' : 'Expand Shelf (3 rows)')
+                  }
+                </button>
+              </div>
 
-                  {/* Status selection */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                    <select
-                      className="input-field"
-                      value={item.status}
-                      onChange={(e) => handleStatusChange(item.id, e.target.value)}
-                      style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}
-                    >
-                      {getAllowedStatuses(item.item_type).map(status => (
-                        <option key={status.value} value={status.value}>
-                          {status.label}
-                        </option>
+              {/* Grid of cards */}
+              {(() => {
+                const itemsPerRow = 5;
+                const itemsPerPage = 15;
+                const displayedItems = isShelfExpanded
+                  ? filteredItems.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+                  : filteredItems.slice(0, itemsPerRow);
+
+                return (
+                  <>
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+                      gap: '1.5rem'
+                    }}>
+                      {displayedItems.map(item => (
+                        <div key={item.id} className="glass-card" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                          <div style={{ position: 'relative', cursor: 'pointer' }} onClick={() => handleOpenItemDetails(item)}>
+                            <img
+                              src={item.image_url || 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=150'}
+                              alt={item.title}
+                              style={{ width: '100%', height: '240px', objectFit: 'cover', borderRadius: '8px' }}
+                            />
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleToggleFavorite(item.id, item.is_favorite);
+                              }}
+                              style={{
+                                position: 'absolute',
+                                top: '0.5rem',
+                                right: '0.5rem',
+                                background: 'rgba(9, 9, 12, 0.75)',
+                                border: 'none',
+                                borderRadius: '50%',
+                                width: '32px',
+                                height: '32px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                cursor: 'pointer',
+                                color: item.is_favorite ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                                transition: 'transform 0.2s ease'
+                              }}
+                              title={language === 'es' ? 'Destacar' : 'Favorite'}
+                            >
+                              <Heart size={16} fill={item.is_favorite ? 'var(--accent-primary)' : 'none'} />
+                            </button>
+                          </div>
+                          <div style={{ flex: 1, textAlign: 'left', cursor: 'pointer' }} onClick={() => handleOpenItemDetails(item)}>
+                            <h4 style={{ margin: '0 0 0.25rem 0', fontSize: '0.95rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.title}>
+                              {item.title}
+                            </h4>
+                            <span style={{ fontSize: '0.75rem', color: 'var(--accent-primary)' }}>
+                              {t('media' + item.item_type.charAt(0).toUpperCase() + item.item_type.slice(1))}
+                            </span>
+                          </div>
+
+                          {/* Status selection */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                            <select
+                              className="input-field"
+                              value={item.status}
+                              onChange={(e) => handleStatusChange(item.id, e.target.value)}
+                              style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}
+                            >
+                              {getAllowedStatuses(item.item_type).map(status => (
+                                <option key={status.value} value={status.value}>
+                                  {status.label}
+                                </option>
+                              ))}
+                            </select>
+
+                            <button
+                              onClick={() => handleDeleteItem(item.id)}
+                              className="btn-secondary"
+                              style={{
+                                padding: '0.25rem',
+                                fontSize: '0.8rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '0.25rem',
+                                color: '#ef4444',
+                                background: 'transparent',
+                                border: 'none'
+                              }}
+                            >
+                              <Trash2 size={14} /> {language === 'es' ? 'Quitar' : 'Remove'}
+                            </button>
+                          </div>
+                        </div>
                       ))}
-                    </select>
+                    </div>
 
-                    <button
-                      onClick={() => handleDeleteItem(item.id)}
-                      className="btn-secondary"
-                      style={{
-                        padding: '0.25rem',
-                        fontSize: '0.8rem',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '0.25rem',
-                        color: '#ef4444',
-                        background: 'transparent',
-                        border: 'none'
-                      }}
-                    >
-                      <Trash2 size={14} /> {language === 'es' ? 'Quitar' : 'Remove'}
-                    </button>
-                  </div>
-                </div>
-              ))}
+                    {/* Pagination controls */}
+                    {isShelfExpanded && filteredItems.length > itemsPerPage && (
+                      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '1rem', marginTop: '1rem' }}>
+                        <button
+                          onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                          className="btn-secondary"
+                          disabled={currentPage === 1}
+                          style={{ padding: '0.35rem 0.75rem', fontSize: '0.82rem' }}
+                        >
+                          {language === 'es' ? 'Anterior' : 'Previous'}
+                        </button>
+                        <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                          {language === 'es'
+                            ? `Página ${currentPage} de ${Math.ceil(filteredItems.length / itemsPerPage)}`
+                            : `Page ${currentPage} of ${Math.ceil(filteredItems.length / itemsPerPage)}`
+                          }
+                        </span>
+                        <button
+                          onClick={() => setCurrentPage(prev => Math.min(prev + 1, Math.ceil(filteredItems.length / itemsPerPage)))}
+                          className="btn-secondary"
+                          disabled={currentPage * itemsPerPage >= filteredItems.length}
+                          style={{ padding: '0.35rem 0.75rem', fontSize: '0.82rem' }}
+                        >
+                          {language === 'es' ? 'Siguiente' : 'Next'}
+                        </button>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
             </div>
           )}
         </div>
@@ -609,7 +743,224 @@ export const Profile: React.FC = () => {
           )}
         </div>
       </div>
-      
+
+      {/* Standalone Item Details Modal (at the top) */}
+      {selectedItem && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(0, 0, 0, 0.75)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 2000
+          }}
+        >
+          <div
+            className="glass-card"
+            style={{
+              width: '650px',
+              maxHeight: '90vh',
+              padding: '2rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '1.5rem',
+              overflowY: 'auto',
+              textAlign: 'left'
+            }}
+          >
+            {/* Modal Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem' }}>
+              <div>
+                <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700 }}>{selectedItem.title}</h2>
+                <span style={{ fontSize: '0.78rem', color: 'var(--accent-primary)', textTransform: 'uppercase', fontWeight: 700 }}>
+                  {t('media' + selectedItem.item_type.charAt(0).toUpperCase() + selectedItem.item_type.slice(1))}
+                </span>
+              </div>
+              <button
+                onClick={() => setSelectedItem(null)}
+                style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '0.2rem' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Modal Body Info */}
+            <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
+              {selectedItem.image_url && (
+                <img
+                  src={selectedItem.image_url}
+                  alt={selectedItem.title}
+                  onClick={() => setZoomedImage(selectedItem.image_url)}
+                  style={{ width: '130px', height: '190px', objectFit: 'cover', borderRadius: '8px', cursor: 'zoom-in', boxShadow: '0 5px 15px rgba(0,0,0,0.3)' }}
+                />
+              )}
+              
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem', minWidth: '250px' }}>
+                {/* Description info */}
+                {(() => {
+                  const parseNotes = (notes: string) => {
+                    try {
+                      if (notes.startsWith('{')) return JSON.parse(notes);
+                    } catch(e){}
+                    return { description: notes, sub_items: [] };
+                  };
+                  const stripHtml = (html: string) => {
+                    if (!html) return '';
+                    const clean = html.replace(/<[^>]*>/g, '');
+                    const txt = document.createElement('textarea');
+                    txt.innerHTML = clean;
+                    return txt.value;
+                  };
+                  const notes = parseNotes(selectedItem.custom_notes || '');
+                  if (!notes.description) return null;
+                  const cleanText = stripHtml(notes.description);
+                  const shouldTruncate = cleanText.length > 180;
+                  const displayedText = shouldTruncate && !descExpanded
+                    ? cleanText.slice(0, 180) + '...'
+                    : cleanText;
+
+                  return (
+                    <div>
+                      <h5 style={{ margin: '0 0 0.25rem 0', color: 'var(--text-secondary)' }}>{language === 'es' ? 'Descripción:' : 'Description:'}</h5>
+                      <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-primary)', lineHeight: '1.4' }}>
+                        {displayedText}
+                        {shouldTruncate && (
+                          <button
+                            onClick={() => setDescExpanded(!descExpanded)}
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              color: 'var(--accent-primary)',
+                              cursor: 'pointer',
+                              fontWeight: 600,
+                              fontSize: '0.82rem',
+                              marginLeft: '0.4rem',
+                              padding: 0
+                            }}
+                          >
+                            {descExpanded
+                              ? (language === 'es' ? 'Leer menos' : 'Read less')
+                              : (language === 'es' ? 'Leer más' : 'Read more')
+                            }
+                          </button>
+                        )}
+                      </p>
+                    </div>
+                  );
+                })()}
+
+                {/* Star rating selector */}
+                <div>
+                  <h5 style={{ margin: '0 0 0.4rem 0', color: 'var(--text-secondary)' }}>{language === 'es' ? 'Tu Calificación:' : 'Your Rating:'}</h5>
+                  <div style={{ display: 'flex', gap: '0.25rem' }}>
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        onClick={() => setUserRating(star)}
+                        style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 0 }}
+                      >
+                        <Star
+                          size={24}
+                          fill={star <= userRating ? '#f59e0b' : 'none'}
+                          color={star <= userRating ? '#f59e0b' : 'var(--text-muted)'}
+                        />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Favorite toggler */}
+                <div>
+                  <button
+                    onClick={() => handleToggleFavorite(selectedItem.id, selectedItem.is_favorite)}
+                    className="btn-secondary"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      fontSize: '0.85rem',
+                      padding: '0.4rem 0.8rem',
+                      borderColor: selectedItem.is_favorite ? 'var(--accent-primary)' : 'var(--border-color)',
+                      background: selectedItem.is_favorite ? 'rgba(124, 58, 237, 0.1)' : 'transparent',
+                      color: selectedItem.is_favorite ? 'var(--accent-primary)' : 'var(--text-primary)'
+                    }}
+                  >
+                    <Heart size={16} fill={selectedItem.is_favorite ? 'var(--accent-primary)' : 'none'} />
+                    {selectedItem.is_favorite
+                      ? (language === 'es' ? 'Destacado (Quitar)' : 'Featured (Remove)')
+                      : (language === 'es' ? 'Destacar (Favorito)' : 'Feature (Favorite)')
+                    }
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Comment write area */}
+            <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <h4 style={{ margin: 0, fontSize: '1.1rem' }}>{language === 'es' ? 'Escribe tu reseña o comentario' : 'Write your review or comment'}</h4>
+              <textarea
+                className="input-field"
+                value={userComment}
+                onChange={(e) => setUserComment(e.target.value)}
+                placeholder={language === 'es' ? '¿Qué te pareció este elemento? Escribe aquí...' : 'What did you think of this item? Write here...'}
+                style={{ width: '100%', minHeight: '80px', padding: '0.75rem', background: 'var(--bg-secondary)', resize: 'vertical' }}
+              />
+              <button
+                onClick={handleSaveReview}
+                className="btn-primary"
+                disabled={isSavingReview}
+                style={{ alignSelf: 'flex-end', padding: '0.4rem 1rem', fontSize: '0.85rem' }}
+              >
+                {isSavingReview
+                  ? (language === 'es' ? 'Guardando...' : 'Saving...')
+                  : (language === 'es' ? 'Guardar Valoración' : 'Save Review')
+                }
+              </button>
+            </div>
+
+            {/* Community Reviews List */}
+            <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', textAlign: 'left' }}>
+              <h4 style={{ margin: 0, fontSize: '1.1rem' }}>{language === 'es' ? 'Comentarios de la Comunidad' : 'Community Comments'}</h4>
+              {itemReviews.length === 0 ? (
+                <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                  {language === 'es' ? 'Nadie ha comentado sobre esto aún.' : 'No comments on this item yet.'}
+                </p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '180px', overflowY: 'auto' }}>
+                  {itemReviews.map((rev: any) => (
+                    <div key={rev.id} style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.85rem', fontWeight: 600, textTransform: 'capitalize' }}>{rev.username}</span>
+                        {rev.rating && (
+                          <div style={{ display: 'flex', gap: '0.1rem' }}>
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <Star
+                                key={star}
+                                size={12}
+                                fill={star <= rev.rating ? '#f59e0b' : 'none'}
+                                color={star <= rev.rating ? '#f59e0b' : 'var(--text-muted)'}
+                              />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      {rev.content && (
+                        <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: '1.3' }}>
+                          {rev.content}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Image Zoom Modal */}
       {zoomedImage && (
         <div
