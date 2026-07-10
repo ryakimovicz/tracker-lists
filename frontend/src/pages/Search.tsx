@@ -13,7 +13,10 @@ interface SearchResultItem {
 
 const stripHtml = (html: string) => {
   if (!html) return '';
-  return html.replace(/<[^>]*>/g, '');
+  const clean = html.replace(/<[^>]*>/g, '');
+  const txt = document.createElement('textarea');
+  txt.innerHTML = clean;
+  return txt.value;
 };
 
 export const Search: React.FC = () => {
