@@ -180,10 +180,15 @@ def add_to_library(
             # Log error but do not fail adding the show to the library
             print(f"Failed to auto-populate series episodes: {e}")
             
+    status_val = item_in.status
+    pages_val = item_in.pages_read if item_in.pages_read is not None else 0
+    if pages_val > 0 and status_val not in (UserLibraryStatusEnum.READ, UserLibraryStatusEnum.COMPLETED):
+        status_val = UserLibraryStatusEnum.READING
+
     from datetime import datetime, timezone
     completed_at_val = None
     last_title = None
-    if item_in.status in (UserLibraryStatusEnum.COMPLETED, UserLibraryStatusEnum.READ):
+    if status_val in (UserLibraryStatusEnum.COMPLETED, UserLibraryStatusEnum.READ):
         completed_at_val = datetime.now(timezone.utc)
         if item_in.item_type == "series" and tracking_list_id:
             last_title = bulk_complete_series_episodes(db, current_user.id, tracking_list_id, item_in.external_id, item_in.title)
@@ -194,10 +199,11 @@ def add_to_library(
         external_id=item_in.external_id,
         title=item_in.title,
         image_url=item_in.image_url,
-        status=item_in.status,
+        status=status_val,
         is_favorite=item_in.is_favorite if item_in.is_favorite is not None else False,
         completed_at=completed_at_val,
         last_seen_episode=last_title,
+        pages_read=pages_val,
         tracking_list_id=tracking_list_id
     )
     db.add(new_lib_item)
@@ -291,6 +297,20 @@ def update_library_item(
             details="starred" if item_in.is_favorite else "unstarred"
         )
         db.add(activity)
+
+    if item_in.pages_read is not None:
+        lib_item.pages_read = item_in.pages_read
+        lib_item.updated_at = datetime.now(timezone.utc)
+        if item_in.pages_read > 0 and lib_item.status not in (UserLibraryStatusEnum.READ, UserLibraryStatusEnum.COMPLETED):
+            lib_item.status = UserLibraryStatusEnum.READING
+            activity = UserActivityLog(
+                user_id=current_user.id,
+                activity_type="shelf_status",
+                item_title=lib_item.title,
+                item_type=lib_item.item_type,
+                details=lib_item.status.value
+            )
+            db.add(activity)
 
     db.commit()
     db.refresh(lib_item)

@@ -29,6 +29,7 @@ interface LibraryItem {
   completed_at?: string;
   updated_at?: string;
   last_seen_episode?: string;
+  pages_read?: number;
   tracking_list_id?: number;
 }
 
@@ -90,6 +91,7 @@ export const Profile: React.FC = () => {
   const [itemReviews, setItemReviews] = useState<any[]>([]);
   const [userRating, setUserRating] = useState<number>(0);
   const [userComment, setUserComment] = useState<string>('');
+  const [pagesReadVal, setPagesReadVal] = useState<number>(0);
   const [isSavingReview, setIsSavingReview] = useState(false);
   const [descExpanded, setDescExpanded] = useState(false);
   const [episodes, setEpisodes] = useState<any[]>([]);
@@ -261,6 +263,7 @@ export const Profile: React.FC = () => {
     setSelectedItem(item);
     setUserRating(0);
     setUserComment('');
+    setPagesReadVal(item.pages_read || 0);
     setItemReviews([]);
     setDescExpanded(false);
 
@@ -768,6 +771,13 @@ export const Profile: React.FC = () => {
                             {item.item_type === 'series' && item.last_seen_episode && (
                               <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 500, display: 'block', marginTop: '-0.3rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.last_seen_episode}>
                                 {item.last_seen_episode.includes(' - ') ? item.last_seen_episode.split(' - ').slice(1).join(' - ') : item.last_seen_episode}
+                              </span>
+                            )}
+
+                            {/* Pages read for books, comics, mangas */}
+                            {['book', 'comic', 'manga'].includes(item.item_type) && item.pages_read !== undefined && item.pages_read > 0 && (
+                              <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', display: 'block', marginTop: '-0.3rem' }}>
+                                {item.pages_read} {language === 'es' ? 'páginas leídas' : 'pages read'}
                               </span>
                             )}
 
@@ -1303,6 +1313,54 @@ export const Profile: React.FC = () => {
                           </option>
                         ))}
                       </select>
+                    </div>
+                  )}
+
+                  {/* Pages read input for books/comics/mangas */}
+                  {!isEpisode && selectedItem && ['book', 'comic', 'manga'].includes(selectedItem.item_type) && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.5rem' }}>
+                      <h5 style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                        {language === 'es' ? 'Páginas leídas:' : 'Pages read:'}
+                      </h5>
+                      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                        <input
+                          type="number"
+                          className="input-field"
+                          value={pagesReadVal}
+                          min={0}
+                          onChange={(e) => setPagesReadVal(parseInt(e.target.value) || 0)}
+                          style={{
+                            padding: '0.4rem 0.8rem',
+                            fontSize: '0.85rem',
+                            background: 'var(--bg-secondary)',
+                            border: '1px solid var(--border-color)',
+                            color: 'var(--text-primary)',
+                            borderRadius: '6px',
+                            maxWidth: '120px'
+                          }}
+                        />
+                        <button
+                          onClick={async () => {
+                            try {
+                              const res = await apiClient.put(`/library/${selectedItem.id}`, {
+                                pages_read: pagesReadVal
+                              });
+                              setSelectedItem((prev: any) => prev ? { ...prev, pages_read: res.data.pages_read, status: res.data.status } : null);
+                              const libraryRes = await apiClient.get('/library/');
+                              setLibraryItems(libraryRes.data);
+                              const actRes = await apiClient.get('/users/me/activity');
+                              setActivities(actRes.data);
+                              alert(language === 'es' ? 'Páginas actualizadas con éxito.' : 'Pages updated successfully.');
+                            } catch (err) {
+                              console.error("Failed to update pages read", err);
+                            }
+                          }}
+                          className="btn-secondary"
+                          style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}
+                        >
+                          {language === 'es' ? 'Guardar' : 'Save'}
+                        </button>
+                      </div>
                     </div>
                   )}
 
