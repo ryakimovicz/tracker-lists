@@ -70,12 +70,20 @@ export const CreateGuide: React.FC = () => {
   const [successMsg, setSuccessMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const parseError = (err: any) => {
+    const detail = err.response?.data?.detail;
+    if (Array.isArray(detail)) {
+      return detail.map(d => `${d.loc.join('.')}: ${d.msg}`).join(', ');
+    }
+    return detail || err.message || 'An error occurred';
+  };
+
   // Load document flow if it exists on the guide
   useEffect(() => {
     if (guide) {
       const savedStructure = guide.section_descriptions;
-      if (Array.isArray(savedStructure)) {
-        setDocFlow(savedStructure);
+      if (savedStructure && Array.isArray(savedStructure.flow)) {
+        setDocFlow(savedStructure.flow);
       } else {
         setDocFlow([]);
       }
@@ -102,13 +110,13 @@ export const CreateGuide: React.FC = () => {
         description,
         visibility,
         importance_labels: importanceLabels,
-        section_descriptions: [] // Initialize with empty document flow list
+        section_descriptions: { flow: [] } // Initialize with empty document flow wrapped in a dictionary
       });
       setGuide(response.data);
       setSuccessMsg(language === 'es' ? '¡Lista/Guía creada con éxito!' : 'List/Guide created successfully!');
       setTimeout(() => setSuccessMsg(''), 4000);
     } catch (err: any) {
-      setErrorMsg(err.response?.data?.detail || 'Failed to create guide.');
+      setErrorMsg(parseError(err));
     } finally {
       setIsSubmitting(false);
     }
@@ -121,13 +129,13 @@ export const CreateGuide: React.FC = () => {
     setSuccessMsg('');
     try {
       const response = await apiClient.put(`/lists/${guide.id}`, {
-        section_descriptions: docFlow
+        section_descriptions: { flow: docFlow } // Save wrapped document flow list in a dict
       });
       setGuide(response.data);
       setSuccessMsg(language === 'es' ? '¡Cambios guardados con éxito!' : 'Document changes saved successfully!');
       setTimeout(() => setSuccessMsg(''), 4000);
     } catch (err: any) {
-      setErrorMsg(err.response?.data?.detail || 'Failed to save document flow.');
+      setErrorMsg(parseError(err));
     } finally {
       setIsSubmitting(false);
     }
