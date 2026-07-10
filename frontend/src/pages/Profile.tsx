@@ -26,6 +26,8 @@ interface LibraryItem {
   status: string;
   is_favorite: boolean;
   created_at: string;
+  completed_at?: string;
+  updated_at?: string;
 }
 
 interface UserProfile {
@@ -279,11 +281,17 @@ export const Profile: React.FC = () => {
 
 
 
-  const filteredItems = libraryItems.filter(item => {
-    const matchesMedia = mediaFilter === 'all' || item.item_type === mediaFilter;
-    const matchesSearch = item.title.toLowerCase().includes(shelfSearchQuery.toLowerCase());
-    return matchesMedia && matchesSearch;
-  });
+  const filteredItems = libraryItems
+    .filter(item => {
+      const matchesMedia = mediaFilter === 'all' || item.item_type === mediaFilter;
+      const matchesSearch = item.title.toLowerCase().includes(shelfSearchQuery.toLowerCase());
+      return matchesMedia && matchesSearch;
+    })
+    .sort((a, b) => {
+      const dateA = new Date(a.completed_at || a.updated_at || 0).getTime();
+      const dateB = new Date(b.completed_at || b.updated_at || 0).getTime();
+      return dateB - dateA;
+    });
 
   const isFavorite = selectedItem && libraryItems.some(li =>
     li.item_type === selectedItem.item_type &&
@@ -525,6 +533,14 @@ export const Profile: React.FC = () => {
                               {t('media' + item.item_type.charAt(0).toUpperCase() + item.item_type.slice(1))}
                             </span>
                           </div>
+
+                          {/* Completion date if completed */}
+                          {item.completed_at && (
+                            <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontStyle: 'italic', display: 'block', marginTop: '-0.3rem' }}>
+                              {language === 'es' ? 'Terminado: ' : 'Completed: '}
+                              {formatDate(new Date(item.completed_at))}
+                            </span>
+                          )}
 
                           {/* Status selection */}
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>

@@ -1,7 +1,8 @@
 import enum
-from sqlalchemy import Column, Integer, String, ForeignKey, Enum, UniqueConstraint, Boolean
+from sqlalchemy import Column, Integer, String, ForeignKey, Enum, UniqueConstraint, Boolean, DateTime
 from sqlalchemy.orm import relationship
 from app.core.database import Base
+from datetime import datetime, timezone
 
 class UserLibraryStatusEnum(str, enum.Enum):
     PLAN_TO_WATCH = "plan_to_watch"
@@ -25,6 +26,8 @@ class UserLibraryItem(Base):
     image_url = Column(String(500), nullable=True)
     status = Column(Enum(UserLibraryStatusEnum), default=UserLibraryStatusEnum.PLAN_TO_READ, nullable=False)
     is_favorite = Column(Boolean, default=False, nullable=False)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
     tracking_list_id = Column(Integer, ForeignKey("reading_lists.id", ondelete="SET NULL"), nullable=True)
 
     # Relationships

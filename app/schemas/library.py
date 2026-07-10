@@ -1,6 +1,7 @@
 from typing import Optional
 from pydantic import BaseModel
 from app.models.library import UserLibraryStatusEnum
+from datetime import datetime
 
 class LibraryItemCreate(BaseModel):
     item_type: str
@@ -9,10 +10,12 @@ class LibraryItemCreate(BaseModel):
     image_url: Optional[str] = None
     status: UserLibraryStatusEnum = UserLibraryStatusEnum.PLAN_TO_READ
     is_favorite: Optional[bool] = False
+    completed_at: Optional[datetime] = None
 
 class LibraryItemUpdate(BaseModel):
     status: Optional[UserLibraryStatusEnum] = None
     is_favorite: Optional[bool] = None
+    completed_at: Optional[datetime] = None
 
 class LibraryItemResponse(BaseModel):
     id: int
@@ -23,6 +26,8 @@ class LibraryItemResponse(BaseModel):
     image_url: Optional[str] = None
     status: UserLibraryStatusEnum
     is_favorite: bool = False
+    completed_at: Optional[datetime] = None
+    updated_at: datetime
     tracking_list_id: Optional[int] = None
 
     class Config:

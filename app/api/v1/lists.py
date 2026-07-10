@@ -412,22 +412,26 @@ def auto_add_to_library(db: Session, user_id: int, item: ListItem):
         UserLibraryItem.item_type == item.item_type,
         UserLibraryItem.external_id == item.external_id
     ).first()
-    if not existing:
-        status_val = UserLibraryStatusEnum.COMPLETED
-        if item.item_type in ("book", "comic", "manga"):
-            status_val = UserLibraryStatusEnum.READ
-        elif item.item_type == "game":
-            status_val = UserLibraryStatusEnum.COMPLETED
-        elif item.item_type == "series":
-            status_val = UserLibraryStatusEnum.COMPLETED
-            
+    
+    status_val = UserLibraryStatusEnum.COMPLETED
+    if item.item_type in ("book", "comic", "manga"):
+        status_val = UserLibraryStatusEnum.READ
+        
+    from datetime import datetime, timezone
+    
+    if existing:
+        existing.status = status_val
+        existing.completed_at = datetime.now(timezone.utc)
+        existing.updated_at = datetime.now(timezone.utc)
+    else:
         lib_item = UserLibraryItem(
             user_id=user_id,
             item_type=item.item_type,
             external_id=item.external_id,
             title=item.title,
             image_url=item.image_url,
-            status=status_val
+            status=status_val,
+            completed_at=datetime.now(timezone.utc)
         )
         db.add(lib_item)
 

@@ -114,6 +114,11 @@ def add_to_library(
             # Log error but do not fail adding the show to the library
             print(f"Failed to auto-populate series episodes: {e}")
             
+    from datetime import datetime, timezone
+    completed_at_val = None
+    if item_in.status in (UserLibraryStatusEnum.COMPLETED, UserLibraryStatusEnum.READ):
+        completed_at_val = datetime.now(timezone.utc)
+
     new_lib_item = UserLibraryItem(
         user_id=current_user.id,
         item_type=item_in.item_type,
@@ -122,6 +127,7 @@ def add_to_library(
         image_url=item_in.image_url,
         status=item_in.status,
         is_favorite=item_in.is_favorite if item_in.is_favorite is not None else False,
+        completed_at=completed_at_val,
         tracking_list_id=tracking_list_id
     )
     db.add(new_lib_item)
@@ -148,9 +154,13 @@ def get_library(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    from sqlalchemy import desc, func
     query = db.query(UserLibraryItem).filter(UserLibraryItem.user_id == current_user.id)
     if status:
         query = query.filter(UserLibraryItem.status == status)
+    
+    # Sort by completed_at or updated_at, whichever is newer
+    query = query.order_by(desc(func.coalesce(UserLibraryItem.completed_at, UserLibraryItem.updated_at)))
     return query.offset(skip).limit(limit).all()
 
 @router.put("/{library_item_id}", response_model=LibraryItemResponse)
@@ -175,6 +185,15 @@ def update_library_item(
         validate_media_status(lib_item.item_type, item_in.status)
         lib_item.status = item_in.status
         
+        # Set completed_at date
+        from datetime import datetime, timezone
+        if item_in.status in (UserLibraryStatusEnum.COMPLETED, UserLibraryStatusEnum.READ):
+            lib_item.completed_at = datetime.now(timezone.utc)
+        else:
+            lib_item.completed_at = None
+            
+        lib_item.updated_at = datetime.now(timezone.utc)
+        
         # Record activity log
         activity = UserActivityLog(
             user_id=current_user.id,
@@ -187,6 +206,7 @@ def update_library_item(
         
     if item_in.is_favorite is not None:
         lib_item.is_favorite = item_in.is_favorite
+        lib_item.updated_at = datetime.now(timezone.utc)
         
         # Record activity log
         activity = UserActivityLog(
