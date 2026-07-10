@@ -78,6 +78,7 @@ export const CreateGuide: React.FC = () => {
 
   const [modalSuccessMsg, setModalSuccessMsg] = useState('');
   const [expandedMediaId, setExpandedMediaId] = useState<string | null>(null);
+  const [zoomedImage, setZoomedImage] = useState<string | null>(null);
 
   // Feedback states
   const [errorMsg, setErrorMsg] = useState('');
@@ -102,6 +103,8 @@ export const CreateGuide: React.FC = () => {
       apiClient.get(`/lists/${editId}`)
         .then(response => {
           setGuide(response.data);
+          setTitle(response.data.title);
+          setDescription(response.data.description);
         })
         .catch(() => {
           setErrorMsg(language === 'es' ? 'Error al cargar la guía.' : 'Error loading guide.');
@@ -163,6 +166,8 @@ export const CreateGuide: React.FC = () => {
     setSuccessMsg('');
     try {
       const response = await apiClient.put(`/lists/${guide.id}`, {
+        title: title.trim(),
+        description: description.trim(),
         section_descriptions: { flow: docFlow } // Save wrapped document flow list in a dict
       });
       setGuide(response.data);
@@ -180,8 +185,8 @@ export const CreateGuide: React.FC = () => {
     const newSec: DocElement = {
       id: `sec-${Date.now()}`,
       type: 'section',
-      title: language === 'es' ? 'NUEVA SECCIÓN / ETAPA' : 'NEW SECTION / STAGE',
-      description: language === 'es' ? 'Describe los objetivos o contexto de esta etapa...' : 'Describe the objectives or context of this stage...'
+      title: '',
+      description: ''
     };
     setDocFlow(prev => [...prev, newSec]);
   };
@@ -190,8 +195,8 @@ export const CreateGuide: React.FC = () => {
     const newBlk: DocElement = {
       id: `blk-${Date.now()}`,
       type: 'block',
-      title: language === 'es' ? 'Nuevo Bloque de Lectura' : 'New Reading Block',
-      description: language === 'es' ? 'Notas o sinopsis del bloque...' : 'Notes or synopsis of this block...',
+      title: '',
+      description: '',
       importance_rank: 3,
       items: [],
       subblocks: []
@@ -205,8 +210,8 @@ export const CreateGuide: React.FC = () => {
         const newSub: DocElement = {
           id: `sub-${Date.now()}`,
           type: 'subblock',
-          title: language === 'es' ? 'Nuevo Subbloque' : 'New Subblock',
-          description: language === 'es' ? 'Detalles de este subgrupo...' : 'Details of this subgroup...',
+          title: '',
+          description: '',
           importance_rank: 3,
           items: []
         };
@@ -521,9 +526,31 @@ export const CreateGuide: React.FC = () => {
           <div className="glass-card" style={{ padding: '3rem', minHeight: '600px', display: 'flex', flexDirection: 'column', gap: '2.5rem', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '12px' }}>
             
             {/* Title Block */}
-            <div style={{ borderBottom: '2px solid var(--border-color)', paddingBottom: '1.5rem', textAlign: 'left' }}>
-              <h1 style={{ fontSize: '2.25rem', fontWeight: 800, margin: '0 0 0.5rem 0' }}>{guide.title}</h1>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '1.05rem', margin: 0, fontStyle: 'italic' }}>{guide.description}</p>
+            <div style={{ borderBottom: '2px solid var(--border-color)', paddingBottom: '1.5rem', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => {
+                  setTitle(e.target.value);
+                  if (guide) {
+                    setGuide({ ...guide, title: e.target.value });
+                  }
+                }}
+                style={{ fontSize: '2.25rem', fontWeight: 800, color: 'var(--text-primary)', background: 'transparent', border: 'none', borderBottom: '1px dashed var(--border-color)', outline: 'none', width: '100%' }}
+                placeholder={language === 'es' ? 'Título de la Guía' : 'Guide Title'}
+              />
+              <textarea
+                value={description}
+                onChange={(e) => {
+                  setDescription(e.target.value);
+                  if (guide) {
+                    setGuide({ ...guide, description: e.target.value });
+                  }
+                }}
+                style={{ fontSize: '1.05rem', color: 'var(--text-secondary)', background: 'transparent', border: 'none', outline: 'none', width: '100%', resize: 'none', fontStyle: 'italic', lineHeight: 1.5 }}
+                placeholder={language === 'es' ? 'Escribe la descripción general de la guía...' : 'Write guide general description...'}
+                rows={2}
+              />
             </div>
 
             {/* Document Flow Elements */}
@@ -556,7 +583,7 @@ export const CreateGuide: React.FC = () => {
                           value={element.title}
                           onChange={(e) => updateDocElement(element.id, { title: e.target.value })}
                           style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--accent-primary)', background: 'transparent', border: 'none', borderBottom: '1px dashed var(--border-color)', outline: 'none', width: '80%', padding: '0.2rem 0' }}
-                          placeholder="TITULO DE LA SECCIÓN / ETAPA"
+                          placeholder={language === 'es' ? 'Nueva sección' : 'New section'}
                         />
 
                         {/* Description Input */}
@@ -564,7 +591,7 @@ export const CreateGuide: React.FC = () => {
                           value={element.description}
                           onChange={(e) => updateDocElement(element.id, { description: e.target.value })}
                           style={{ fontSize: '0.95rem', color: 'var(--text-secondary)', background: 'transparent', border: 'none', borderBottom: '1px dashed transparent', outline: 'none', width: '100%', resize: 'none', fontStyle: 'italic', lineHeight: 1.5 }}
-                          placeholder="Escribe la descripción o introducción de esta sección..."
+                          placeholder={language === 'es' ? 'Escribe la descripción de esta sección...' : 'Write description for this section...'}
                           rows={2}
                         />
                       </div>
@@ -583,14 +610,14 @@ export const CreateGuide: React.FC = () => {
                           <button onClick={() => removeDocElement(element.id)} className="btn-secondary" style={{ padding: '0.2rem 0.4rem', color: '#ef4444' }}><Trash2 size={14} /></button>
                         </div>
 
-                        {/* Top row: Title and importance */}
+                         {/* Top row: Title and importance */}
                         <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center', flexWrap: 'wrap', width: '85%' }}>
                           <input
                             type="text"
                             value={element.title}
                             onChange={(e) => updateDocElement(element.id, { title: e.target.value })}
                             style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--text-primary)', background: 'transparent', border: 'none', borderBottom: '1px dashed var(--border-color)', outline: 'none', flex: 1, padding: '0.2rem 0' }}
-                            placeholder="Título del Bloque"
+                            placeholder={language === 'es' ? 'Nuevo bloque' : 'New block'}
                           />
 
                           {/* Importance scale */}
@@ -615,7 +642,7 @@ export const CreateGuide: React.FC = () => {
                           value={element.description}
                           onChange={(e) => updateDocElement(element.id, { description: e.target.value })}
                           style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', background: 'transparent', border: 'none', outline: 'none', width: '100%', resize: 'none', lineHeight: 1.45 }}
-                          placeholder="Descripción o comentarios de este bloque de lectura..."
+                          placeholder={language === 'es' ? 'Escribe la descripción de este bloque...' : 'Write description for this block...'}
                           rows={2}
                         />
 
@@ -624,7 +651,12 @@ export const CreateGuide: React.FC = () => {
                           {(element.items || []).map((item) => (
                             <div key={item.id} style={{ display: 'flex', gap: '1rem', alignItems: 'center', background: 'var(--bg-secondary)', padding: '0.5rem 1rem', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
                               {item.image_url && (
-                                <img src={item.image_url} alt={item.title} style={{ width: '32px', height: '48px', objectFit: 'cover', borderRadius: '4px' }} />
+                                <img
+                                  src={item.image_url}
+                                  alt={item.title}
+                                  onClick={() => setZoomedImage(item.image_url)}
+                                  style={{ width: '32px', height: '48px', objectFit: 'cover', borderRadius: '4px', cursor: 'zoom-in' }}
+                                />
                               )}
                               <div style={{ flex: 1, minWidth: 0 }}>
                                 <h5 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</h5>
@@ -654,7 +686,7 @@ export const CreateGuide: React.FC = () => {
                                 value={sub.title}
                                 onChange={(e) => updateDocElement(element.id, { title: e.target.value }, sub.id)}
                                 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)', background: 'transparent', border: 'none', borderBottom: '1px dashed var(--border-color)', outline: 'none', flex: 1, padding: '0.2rem 0' }}
-                                placeholder="Título del Subbloque"
+                                placeholder={language === 'es' ? 'Nuevo subbloque' : 'New subblock'}
                               />
 
                               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -678,7 +710,7 @@ export const CreateGuide: React.FC = () => {
                               value={sub.description}
                               onChange={(e) => updateDocElement(element.id, { description: e.target.value }, sub.id)}
                               style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', background: 'transparent', border: 'none', outline: 'none', width: '100%', resize: 'none', lineHeight: 1.4 }}
-                              placeholder="Notas del subbloque..."
+                              placeholder={language === 'es' ? 'Escribe la descripción de este subbloque...' : 'Write description for this subblock...'}
                               rows={2}
                             />
 
@@ -687,7 +719,12 @@ export const CreateGuide: React.FC = () => {
                               {(sub.items || []).map((item) => (
                                 <div key={item.id} style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', background: 'var(--bg-secondary)', padding: '0.4rem 0.8rem', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
                                   {item.image_url && (
-                                    <img src={item.image_url} alt={item.title} style={{ width: '24px', height: '36px', objectFit: 'cover', borderRadius: '3px' }} />
+                                    <img
+                                      src={item.image_url}
+                                      alt={item.title}
+                                      onClick={() => setZoomedImage(item.image_url)}
+                                      style={{ width: '24px', height: '36px', objectFit: 'cover', borderRadius: '3px', cursor: 'zoom-in' }}
+                                    />
                                   )}
                                   <div style={{ flex: 1, minWidth: 0 }}>
                                     <h6 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</h6>
@@ -699,7 +736,7 @@ export const CreateGuide: React.FC = () => {
                               ))}
 
                               <button type="button" onClick={() => openSearchModal(element.id, sub.id)} className="btn-secondary" style={{ alignSelf: 'flex-start', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.25rem 0.5rem' }}>
-                                <SearchIcon size={12} /> {language === 'es' ? 'Añadir Obra' : 'Add Media'}
+                                <SearchIcon size={12} /> {language === 'es' ? 'Buscar y Añadir Obra' : 'Search & Add Item'}
                               </button>
                             </div>
 
@@ -838,7 +875,12 @@ export const CreateGuide: React.FC = () => {
                         }}
                       >
                         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                          <img src={media.image_url} alt={media.title} style={{ width: '45px', height: '65px', objectFit: 'cover', borderRadius: '4px' }} />
+                          <img
+                            src={media.image_url}
+                            alt={media.title}
+                            onClick={() => setZoomedImage(media.image_url)}
+                            style={{ width: '45px', height: '65px', objectFit: 'cover', borderRadius: '4px', cursor: 'zoom-in' }}
+                          />
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <h5 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{media.title}</h5>
                             <span style={{ fontSize: '0.72rem', color: 'var(--accent-primary)', textTransform: 'capitalize', fontWeight: 600 }}>{media.item_type}</span>
@@ -922,6 +964,29 @@ export const CreateGuide: React.FC = () => {
               {language === 'es' ? 'Cerrar' : 'Close'}
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Image Zoom Modal */}
+      {zoomedImage && (
+        <div
+          onClick={() => setZoomedImage(null)}
+          style={{
+            position: 'fixed',
+            top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(0,0,0,0.85)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 3000,
+            cursor: 'zoom-out'
+          }}
+        >
+          <img
+            src={zoomedImage}
+            alt="Zoomed preview"
+            style={{ maxHeight: '90vh', maxWidth: '90vw', objectFit: 'contain', borderRadius: '8px', boxShadow: '0 10px 30px rgba(0,0,0,0.5)' }}
+          />
         </div>
       )}
 
