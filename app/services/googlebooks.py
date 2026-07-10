@@ -11,8 +11,11 @@ class GoogleBooksService:
         if not query:
             return []
         try:
+            from app.core.config import settings
             encoded_query = urllib.parse.quote(query)
             url = f"https://www.googleapis.com/books/v1/volumes?q={encoded_query}&maxResults=15"
+            if settings.GOOGLE_BOOKS_API_KEY:
+                url += f"&key={settings.GOOGLE_BOOKS_API_KEY}"
             req = urllib.request.Request(
                 url,
                 headers={"User-Agent": "TrackerLists/1.0 (contact@trackerlists.com)"}

@@ -36,6 +36,7 @@ class Settings(BaseSettings):
     COMIC_VINE_API_KEY: str = ""
     TMDB_API_KEY: str = ""
     RAWG_API_KEY: str = ""
+    GOOGLE_BOOKS_API_KEY: str = ""
     
     # SMTP Email Settings
     SMTP_TLS: bool = True
