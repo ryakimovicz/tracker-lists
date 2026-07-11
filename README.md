@@ -1,144 +1,275 @@
-# TrackerLists 🌌
+# Pathd 🌌
 
-TrackerLists es una plataforma premium y unificada para la creación de guías de orden cronológico, seguimiento de bibliotecas personales (Estantería) y monitorización de consumo multimedia. Permite a los usuarios indexar, organizar y realizar un seguimiento de su progreso en **libros, mangas, cómics, series, animes y videojuegos** en una única interfaz cohesiva, complementada con modificaciones de la comunidad (Mods) e interacciones sociales en tiempo real.
+**Pathd** es una plataforma premium y unificada para la creación de guías de orden cronológico, seguimiento de bibliotecas personales y monitorización del consumo multimedia. Permite a los usuarios indexar, organizar y hacer seguimiento de su progreso en **libros, cómics, películas, series, animes y videojuegos** en una única interfaz cohesiva, complementada con modificaciones de la comunidad y un feed social en tiempo real.
 
 ---
 
 ## 🚀 Stack Tecnológico
 
 ### Backend
-* **Framework Principal**: FastAPI (Python 3.11+)
-* **Base de Datos y ORM**: PostgreSQL / SQLite (vía SQLAlchemy y migraciones con Alembic)
-* **Autenticación**: OAuth2 Password Bearer con tokens de acceso JWT + cookie HttpOnly segura para rotación de tokens de refresco (`refresh_token`)
-* **Límite de Peticiones (Rate Limiting)**: `slowapi` (limitadores basados en IP del cliente)
-* **Tareas en Segundo Plano**: FastAPI BackgroundTasks nativas para envío de correos por SMTP (enlaces de recuperación de contraseñas)
+- **Framework**: FastAPI (Python 3.11+)
+- **Base de Datos y ORM**: SQLite / PostgreSQL via SQLAlchemy
+- **Autenticación**: OAuth2 Password Bearer con JWT + cookie HttpOnly segura para renovación de token de refresco
+- **Rate Limiting**: `slowapi` con límites por IP
+- **Tareas en Segundo Plano**: FastAPI `BackgroundTasks` (envío de emails SMTP, actualización de estados de series)
 
 ### Frontend
-* **Biblioteca Principal**: React 19 + TypeScript + Vite 8
-* **Estilos**: Vanilla CSS moderno con un sistema de diseño basado en variables HSL globales, soportando temas Claro, Oscuro y Automático (según sistema operativo)
-* **Cliente de API**: Axios con interceptores para rotación automatizada de tokens
-* **Gestión de Estado**: Contextos de React (`AuthContext`, `LanguageContext`, `ThemeContext`)
-* **Localización (i18n)**: Inglés (por defecto) y Español, con selector dinámico y persistencia en cliente
+- **Framework**: React 19 + TypeScript + Vite
+- **Estilos**: Vanilla CSS con sistema de diseño basado en variables CSS (`--bg-primary`, `--accent-primary`, etc.) — paleta Slate/Indigo, soporte de modo oscuro y claro
+- **Cliente HTTP**: Axios con interceptores para renovación automática de tokens
+- **Estado Global**: Contextos de React (`AuthContext`, `LanguageContext`, `ThemeContext`)
+- **Localización**: Español e Inglés, con selector dinámico persistente
 
 ---
 
-## 📖 Arquitectura del Frontend y Secciones
+## 🌐 APIs Externas
 
-La interfaz de usuario está estructurada en torno a **cinco secciones principales**:
+| Servicio | Uso |
+|---|---|
+| [TMDB](https://www.themoviedb.org/documentation/api) | Películas, series y detección de animes |
+| [IGDB](https://api-docs.igdb.com/) | Videojuegos (autenticado via Twitch OAuth2) |
+| [Google Books](https://developers.google.com/books/docs/v1/using) | Libros |
+| [Comic Vine](https://comicvine.gamespot.com/api/) | Cómics |
 
-### 1. Home (Inicio y Seguimiento de Progreso)
-* **Progreso Activo**: Muestra las guías que el usuario está siguiendo activamente (lo que está leyendo, viendo o jugando).
-* **Panel Up Next**: Alimentado por el algoritmo del backend `/up-next`. Le dice al usuario exactamente qué cómic, libro, juego o episodio consumir a continuación, omitiendo las partes marcadas como "relleno" o saltadas.
-* **Alertas de Actualización**: Notificaciones cuando hay cambios o adiciones en las guías que sigue el usuario.
-
-### 2. Social (Timeline y Novedades)
-* **Timeline de Actividad**: Muestra de forma cronológica los avances, calificaciones (1-5 estrellas) y opiniones de los usuarios seguidos.
-* **Interacciones de Comunidad**: Opciones para dar me gusta, comentar y reportar guías, comentarios u opiniones.
-
-### 3. Crear (Creador de Guías)
-* **Cronologías Personalizadas**: Editor visual para arrastrar y ordenar contenido cronológicamente (mezclando distintos tipos de medios).
-* **Importador de TMDB**: Integración para importar temporadas completas de series y animes con un solo clic.
-* **Prioridad de Secciones e Ítems**: Permite definir una escala de importancia (1-5) para secciones enteras (ej. "Saga del Relleno" vs "Canon") con opción de sobreescribir la prioridad de elementos individuales.
-
-### 4. Explorar (Buscador y Recomendaciones)
-* **Buscador Global Unificado**: Un único buscador que conecta con las bases de datos de Comic Vine (cómics), MangaDex (manga), Open Library (libros), RAWG (juegos) y TMDB (películas, series y animes).
-* **Guías Recomendadas**: Listado de cronologías más votadas y populares de la comunidad, con filtros por creador y categoría.
-
-### 5. Perfil (Datos y Estantería Personal)
-* **Estadísticas de Usuario**: Número de seguidores y seguidos, fecha de registro e historial completo de acciones.
-* **Estantería (Library Shelf)**: Gestión del catálogo personal por estados de consumo (Por ver/leer/jugar, Viendo/leyendo/jugando, Terminado, Abandonado) con validación estricta de estados por tipo de categoría.
-* **Destacados / Favoritos**: Sección en el perfil para fijar tus obras favoritas de cada formato multimedia.
+> **Nota**: IGDB requiere credenciales de Twitch Developer (`TWITCH_CLIENT_ID` y `TWITCH_CLIENT_SECRET`). No se requiere ninguna URL de redirect ya que la autenticación es server-to-server (Client Credentials Flow).
 
 ---
 
-## ⚡ Referencia del Backend y API
+## 📖 Secciones del Frontend
 
-### 1. Autenticación y Usuarios
-* **`POST /api/v1/auth/register`**: Registra una nueva cuenta de usuario.
-* **`POST /api/v1/auth/login`**: Inicia sesión mediante Form URL-Encoded. Devuelve token JWT y establece cookie HttpOnly de refresco.
-* **`POST /api/v1/auth/refresh`**: Genera un nuevo token de acceso usando la cookie de refresco.
-* **`POST /api/v1/auth/logout`**: Cierra la sesión activa y elimina la cookie de refresco.
-* **`POST /api/v1/auth/google`**: Validación de token de Google. Registro automático si es el primer inicio. Soporta bypass de desarrollo local (`"mock-google-email-username"`).
-* **`POST /api/v1/auth/forgot-password`**: Envía un enlace de recuperación de contraseña al correo mediante una tarea en segundo plano.
-* **`POST /api/v1/auth/reset-password`**: Valida el token y actualiza la contraseña del usuario.
-* **`GET /api/v1/users/me`**: Retorna el perfil del usuario activo (guías creadas, guardadas y seguidos).
-* **`PUT /api/v1/users/me/username`** y **`PUT /api/v1/users/me/password`**: Permiten modificar credenciales.
-* **`GET /api/v1/users/search?q={query}`**: Busca otros usuarios por su nombre de usuario.
+La interfaz está estructurada en **cinco secciones principales** accesibles desde la barra de navegación:
 
-### 2. Buscador de Medios Unificado
-* **`GET /api/v1/search/?q={query}&type={type}`**: Estandariza la respuesta de APIs externas en un formato único (`SearchResultItem`).
-  * **Tipos**: `comic` (Comic Vine), `manga` (MangaDex), `book` (Open Library), `game` (RAWG), `movie` (TMDB), `series` (TMDB).
+### 🏠 Home (Inicio)
+Centro de control personal del usuario:
+- **En Progreso**: Obras que está viendo, leyendo o jugando actualmente
+- **Guías Seguidas**: Progreso en las guías cronológicas que el usuario sigue
+- **Actualizaciones**: Cambios recientes en guías seguidas
 
-### 3. Guías Cronológicas (Listas)
-* **`POST /api/v1/lists/`**: Crea una nueva guía con etiquetas de importancia personalizadas y pesos de sección por defecto.
-* **`GET /api/v1/lists/{list_id}`**: Retorna los detalles de la lista, elementos, marcas de completado y porcentaje de progreso.
-* **`POST /api/v1/lists/{list_id}/items`**: Añade ítems con prioridad individual (`importance_rank`).
-* **`POST /api/v1/lists/{list_id}/items/tv-import`**: Importa capítulos de TV/Anime en lote desde la API de TMDB.
-* **`POST /api/v1/lists/items/{item_id}/toggle`** y **`toggle-skip`**: Marca un elemento como completado o saltado.
-* **`POST /api/v1/lists/{list_id}/sections/bulk-action`**: Aplica acciones en lote (completar/saltar) a secciones enteras.
+### 📱 Social (Feed)
+Timeline comunitaria:
+- **Actividad de Seguidos**: Qué guías siguieron, qué marcaron como completado, calificaciones, etc.
+- **Interacciones**: Votos, comentarios y reportes en guías y opiniones
 
-### 4. Estantería Personal (Shelf)
-* **`POST /api/v1/library/`**: Añade obras al catálogo del usuario (`reading`, `playing`, `plan_to_watch`, etc.).
-* **`GET /api/v1/library/`**: Devuelve los elementos de la estantería del usuario con validación estricta.
-* **`PUT /api/v1/library/{library_item_id}`**: Cambia el estado de consumo del elemento.
-* **`DELETE /api/v1/library/{library_item_id}`**: Remueve el elemento de la estantería.
+### ✏️ Crear (Editor de Guías)
+Constructor de guías cronológicas:
+- **Editor Visual**: Ordenamiento manual de obras de distintos tipos de medios (películas, libros, cómics, juegos, etc.)
+- **Importador TMDB**: Importa temporadas completas de series con un clic
+- **Prioridad de Secciones**: Escala 1–5 para clasificar secciones como "Canon", "Recomendado", "Relleno", etc.
 
-### 5. Algoritmo Up Next
-* **`GET /api/v1/users/me/up-next`**: Calcula la siguiente obra o capítulo a consumir en base a las guías seguidas y series en seguimiento.
+### 🔍 Explorar (Buscador)
+Búsqueda y descubrimiento:
+- **Buscador Global**: Conecta con TMDB, IGDB, Google Books y Comic Vine desde un único campo de búsqueda con filtros por categoría (Películas, Series, Libros, Juegos)
+- **Búsqueda de Usuarios y Guías**: Encuentra usuarios de Pathd y guías públicas de la comunidad
+- **Guías Destacadas**: Las más votadas y recientes
 
-### 6. Interacción Social e Hilos
-* **`POST /api/v1/social/users/{user_id}/follow`** / **`DELETE`**: Seguir y dejar de seguir usuarios.
-* **`GET /api/v1/social/users/feed/activity`**: Feed de actividad social de las personas que sigues.
-* **`GET /api/v1/social/lists/feed/social`**: Novedades de nuevas guías públicas creadas en la red.
-* **`POST /api/v1/social/lists/{list_id}/comments`**: Comentar en guías.
-* **`POST /api/v1/social/lists/{list_id}/vote`** y **`report`**: Votar a favor o reportar guías.
-* **`POST /api/v1/reviews/{item_type}/{external_id}`**: Escribir reseñas y asignar calificación (1-5 estrellas) a obras individuales.
+### 👤 Perfil (Estantería Personal)
+Perfil público y gestión de biblioteca:
+- **Estadísticas**: Seguidores, seguidos, fecha de registro
+- **Estantería (Shelf)**: Catálogo personal organizado por estado de consumo:
+  - `plan_to_watch` / `plan_to_read` / `plan_to_play`
+  - `watching` / `reading` / `playing`
+  - `completed` / `abandoned`
+- **Marcado de Episodios**: Control granular por episodio/capítulo o temporada completa con actualización de progreso automática
+- **Favoritos / Destacados**: Obras marcadas como favoritas visibles en el perfil
+- **Historial de Actividad**: Log cronológico de todas las acciones del usuario
 
-### 7. Modificaciones (Mods)
-* **`POST /api/v1/additions/lists/{list_id}/additions`**: Crea un bloque de adiciones/modificaciones a una guía.
-* **`POST /api/v1/additions/additions/{addition_id}/items`**: Añade ítems personalizados anclados a elementos base de la guía.
-* **`GET /api/v1/additions/lists/{list_id}/additions/community`**: Consulta adiciones públicas sugeridas por otros usuarios.
-* **`POST /api/v1/additions/additions/{addition_id}/adopt`**: Adopta adiciones de terceros para integrarlas visualmente en tu propia vista de la guía.
+---
 
-### 8. Moderación de Administradores y Límites
-* **`GET /api/v1/admin/reports`**: Retorna reportes activos sobre opiniones, comentarios y listas.
-* **`DELETE /api/v1/admin/users/{user_id}`**: Banea y elimina cuentas de usuarios tóxicos.
-* **Límite de peticiones**: Las búsquedas globales están restringidas mediante slowapi a un máximo de **20 búsquedas por minuto por IP** para proteger las cuotas de las APIs externas.
+## ⚡ Referencia de la API
+
+### Autenticación (`/api/v1/auth`)
+| Método | Ruta | Descripción |
+|---|---|---|
+| POST | `/register` | Registro de nueva cuenta |
+| POST | `/login` | Inicio de sesión (devuelve JWT + cookie de refresco) |
+| POST | `/refresh` | Renovar token de acceso |
+| POST | `/logout` | Cerrar sesión y eliminar cookie |
+| POST | `/google` | Login/registro via token de Google |
+| POST | `/forgot-password` | Envía link de recuperación por email |
+| POST | `/reset-password` | Valida token y actualiza contraseña |
+
+### Usuarios (`/api/v1/users`)
+| Método | Ruta | Descripción |
+|---|---|---|
+| GET | `/me` | Perfil del usuario autenticado |
+| PUT | `/me/username` | Cambiar nombre de usuario |
+| PUT | `/me/password` | Cambiar contraseña |
+| GET | `/me/activity` | Historial de actividad del usuario |
+| GET | `/search?q={query}` | Buscar usuarios por username |
+
+### Búsqueda de Medios (`/api/v1/search`)
+| Método | Ruta | Descripción |
+|---|---|---|
+| GET | `/?q={query}&type={type}` | Búsqueda por tipo de medio |
+| GET | `/all?q={query}` | Búsqueda unificada en todas las fuentes |
+| GET | `/movie/{id}` | Detalle de película (TMDB) |
+| GET | `/series/{id}` | Detalle de serie (TMDB) |
+| GET | `/series/{id}/season/{n}` | Temporada específica de una serie |
+
+**Tipos disponibles**: `movie`, `series`, `book`, `game`
+
+> Los resultados de tipo `book` combinan Google Books y Comic Vine. Los resultados incluyen un campo `item_type` para diferenciar `book`, `comic`, `game`, `series`, `movie`, `user` y `guide`.
+
+### Guías Cronológicas (`/api/v1/lists`)
+| Método | Ruta | Descripción |
+|---|---|---|
+| POST | `/` | Crear nueva guía |
+| GET | `/{list_id}` | Detalle de guía con progreso |
+| PUT | `/{list_id}` | Editar guía |
+| DELETE | `/{list_id}` | Eliminar guía |
+| POST | `/{list_id}/items` | Añadir ítem a la guía |
+| POST | `/{list_id}/items/tv-import` | Importar temporada completa desde TMDB |
+| POST | `/items/{item_id}/toggle` | Marcar ítem como completado/pendiente |
+| POST | `/items/{item_id}/toggle-skip` | Marcar ítem como saltado |
+| POST | `/{list_id}/bulk-toggle-season` | Marcar toda una temporada de una vez |
+| POST | `/{list_id}/sections/bulk-action` | Acción masiva sobre una sección |
+| GET | `/following` | Guías de los usuarios que seguís |
+
+### Estantería Personal (`/api/v1/library`)
+| Método | Ruta | Descripción |
+|---|---|---|
+| POST | `/` | Añadir obra a la estantería |
+| GET | `/` | Obtener estantería del usuario |
+| PUT | `/{library_item_id}` | Actualizar estado de una obra |
+| DELETE | `/{library_item_id}` | Eliminar obra de la estantería |
+
+### Social (`/api/v1/social`)
+| Método | Ruta | Descripción |
+|---|---|---|
+| POST | `/users/{user_id}/follow` | Seguir usuario |
+| DELETE | `/users/{user_id}/follow` | Dejar de seguir usuario |
+| GET | `/users/{user_id}/followers` | Seguidores de un usuario |
+| GET | `/users/{user_id}/following` | Usuarios seguidos |
+| GET | `/feed/activity` | Feed de actividad de seguidos |
+| GET | `/lists/feed` | Nuevas guías públicas |
+| POST | `/lists/{list_id}/comments` | Comentar en una guía |
+| DELETE | `/lists/{list_id}/comments/{comment_id}` | Eliminar comentario |
+| POST | `/lists/{list_id}/vote` | Votar una guía |
+| POST | `/lists/{list_id}/report` | Reportar guía |
+
+### Reseñas (`/api/v1/reviews`)
+| Método | Ruta | Descripción |
+|---|---|---|
+| POST | `/{item_type}/{external_id}` | Escribir reseña y calificación (1–5 estrellas) |
+| GET | `/{item_type}/{external_id}` | Obtener reseñas de una obra |
+
+### Modificaciones / Mods (`/api/v1/additions`)
+| Método | Ruta | Descripción |
+|---|---|---|
+| POST | `/lists/{list_id}/additions` | Crear bloque de adiciones a una guía |
+| POST | `/additions/{addition_id}/items` | Añadir ítems a un bloque |
+| GET | `/lists/{list_id}/additions/community` | Consultar adiciones públicas de la comunidad |
+| POST | `/additions/{addition_id}/adopt` | Adoptar las adiciones de otro usuario |
+
+### Administración (`/api/v1/admin`)
+| Método | Ruta | Descripción |
+|---|---|---|
+| GET | `/reports` | Ver reportes activos |
+| DELETE | `/users/{user_id}` | Banear y eliminar cuenta |
 
 ---
 
 ## 🛠️ Instalación y Configuración
 
-### Ejecución del Backend
-1. Crea tu entorno virtual de Python:
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # En Windows: venv\Scripts\activate
-   ```
-2. Instala dependencias:
-   ```bash
-   pip install -r requirements.txt
-   ```
-3. Crea tu archivo `.env` tomando como base `.env.example` y rellena tus claves.
-4. Levanta el servidor local con Uvicorn:
-   ```bash
-   uvicorn app.main:app --reload
-   ```
+### Backend
 
-### Ejecución del Frontend
-1. Ve al directorio frontend:
-   ```bash
-   cd frontend
-   ```
-2. Instala los paquetes de Node:
-   ```bash
-   npm install
-   ```
-3. Ejecuta el servidor de desarrollo local de Vite:
-   ```bash
-   npm run dev
-   ```
-4. Genera el empaquetado para producción:
-   ```bash
-   npm run build
-   ```
+```bash
+# 1. Crear entorno virtual
+python -m venv venv
+venv\Scripts\activate      # Windows
+# source venv/bin/activate   # Linux / macOS
+
+# 2. Instalar dependencias
+pip install -r requirements.txt
+
+# 3. Configurar variables de entorno
+cp .env.example .env
+# Editar .env con tus claves (ver sección de Variables de Entorno)
+
+# 4. Levantar el servidor
+uvicorn app.main:app --reload
+```
+
+### Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev       # Servidor de desarrollo
+npm run build     # Build de producción
+```
+
+---
+
+## 🔑 Variables de Entorno
+
+Crea un archivo `.env` en la raíz del proyecto basado en `.env.example`:
+
+```env
+# App
+PROJECT_NAME="Pathd"
+API_V1_STR="/api/v1"
+
+# Base de Datos
+DATABASE_URL="sqlite:///./tracker_lists.db"
+# Para PostgreSQL: postgresql://user:password@localhost:5432/pathd
+
+# Seguridad
+SECRET_KEY="genera-una-clave-segura-con-openssl-rand-hex-32"
+ALGORITHM="HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES=11520
+
+# APIs Externas
+TMDB_API_KEY=""          # https://www.themoviedb.org/settings/api
+COMIC_VINE_API_KEY=""    # https://comicvine.gamespot.com/api/
+GOOGLE_BOOKS_API_KEY=""  # https://console.cloud.google.com/
+
+# IGDB (via Twitch Developer)
+# Crear app en https://dev.twitch.tv/console/apps
+# La Redirect URL puede ser cualquier HTTPS válida (ej: http://localhost)
+TWITCH_CLIENT_ID=""
+TWITCH_CLIENT_SECRET=""
+
+# CORS
+BACKEND_CORS_ORIGINS='["http://localhost:5173"]'
+
+# Email (opcional, para recuperación de contraseña)
+SMTP_HOST=""
+SMTP_PORT=587
+SMTP_USER=""
+SMTP_PASSWORD=""
+EMAILS_FROM_EMAIL="noreply@pathd.app"
+```
+
+---
+
+## 🗂️ Estructura del Proyecto
+
+```
+pathd/
+├── app/
+│   ├── api/v1/           # Endpoints REST (auth, lists, search, library, social, reviews, additions, admin)
+│   ├── core/             # Configuración, base de datos, seguridad, rate limiting
+│   ├── models/           # Modelos SQLAlchemy (User, ReadingList, UserLibraryItem, etc.)
+│   ├── schemas/          # Schemas Pydantic para validación de requests/responses
+│   └── services/         # Clientes de APIs externas (TMDB, IGDB, Google Books, Comic Vine)
+├── frontend/
+│   ├── src/
+│   │   ├── components/   # Componentes reutilizables (Navbar, etc.)
+│   │   ├── context/      # Contextos globales (Auth, Theme, Language)
+│   │   └── pages/        # Páginas principales (Home, Social, CreateGuide, Explore, Profile)
+│   └── index.html
+├── .env.example
+├── requirements.txt
+└── README.md
+```
+
+---
+
+## 📋 Roadmap
+
+- [ ] Página de Inicio (Home) con progreso personal y actualizaciones de guías
+- [ ] Feed Social con timeline de actividad de seguidos
+- [ ] Sistema de temas de color por suscripción (Indie, Cyberpunk, OLED)
+- [ ] Notificaciones en tiempo real (WebSockets)
+- [ ] Aplicación móvil (React Native)
