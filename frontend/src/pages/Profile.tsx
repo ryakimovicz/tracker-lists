@@ -578,6 +578,8 @@ export const Profile: React.FC = () => {
     li.is_favorite
   );
 
+  const visualLibraryItems = libraryItems.filter(item => !item.external_id?.startsWith('tmdb-ep-'));
+
   if (loading) {
     return <div style={{ textAlign: 'center', padding: '3rem' }}>Cargando información...</div>;
   }
