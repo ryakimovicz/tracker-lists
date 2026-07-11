@@ -97,16 +97,7 @@ class ComicVineService:
                                         title_parts = f"{vol_name} #{issue_num}"
                                         if issue_name:
                                             title_parts += f" ({issue_name})"
-                                        manga_kws = {"manga", "shonen", "shojo", "seinen", "josei", "viz media", "kodansha", "tokyopop", "yen press"}
-                                        is_manga = False
-                                        publisher_name = item.get("volume", {}).get("publisher", {}).get("name", "").lower() if item.get("volume") and item.get("volume").get("publisher") else ""
-                                        title_lower = title_parts.lower()
-                                        desc_lower = (item.get("description") or "").lower()
-                                        
-                                        if any(kw in publisher_name for kw in manga_kws) or any(kw in title_lower for kw in manga_kws) or any(kw in desc_lower for kw in manga_kws):
-                                            is_manga = True
-                                        
-                                        item_type_val = "manga" if is_manga else "comic"
+                                        item_type_val = "book"
 
                                         issue_results.append(
                                             SearchResultItem(
@@ -149,19 +140,7 @@ class ComicVineService:
                                 title = title_parts
                             else:
                                 title = item.get("name") or "Untitled Volume"
-                            manga_kws = {"manga", "shonen", "shojo", "seinen", "josei", "viz media", "kodansha", "tokyopop", "yen press"}
-                            is_manga = False
-                            publisher_name = item.get("publisher", {}).get("name", "").lower() if item.get("publisher") else ""
-                            if resource_type == "issue" and item.get("volume") and item.get("volume").get("publisher"):
-                                publisher_name = item.get("volume", {}).get("publisher", {}).get("name", "").lower()
-                                
-                            title_lower = title.lower()
-                            desc_lower = (item.get("description") or "").lower()
-                            
-                            if any(kw in publisher_name for kw in manga_kws) or any(kw in title_lower for kw in manga_kws) or any(kw in desc_lower for kw in manga_kws):
-                                is_manga = True
-                                
-                            item_type_val = "manga" if is_manga else "comic"
+                            item_type_val = "book"
 
                             global_results.append(
                                 SearchResultItem(

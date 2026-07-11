@@ -53,33 +53,7 @@ class GoogleBooksService:
                             
                         ext_id = f"googlebook-{item.get('id')}"
                         
-                        # Classify Book vs Manga/Comic
-                        categories = v_info.get("categories", [])
                         item_type = "book"
-                        manga_kws = {"manga", "shonen", "shojo", "seinen", "josei"}
-                        comic_kws = {"comic", "comics", "graphic novel", "graphic novels", "superhero", "superheroes"}
-                        
-                        is_manga = False
-                        is_comic = False
-                        for cat in categories:
-                            cat_lower = cat.lower()
-                            if any(kw in cat_lower for kw in manga_kws):
-                                is_manga = True
-                            if any(kw in cat_lower for kw in comic_kws):
-                                is_comic = True
-                                
-                        title_lower = title.lower()
-                        desc_lower = desc.lower() if desc else ""
-                        if not is_manga and not is_comic:
-                            if "manga" in title_lower or "manga" in desc_lower:
-                                is_manga = True
-                            elif "comic" in title_lower or "comic" in desc_lower or "graphic novel" in desc_lower:
-                                is_comic = True
-                                
-                        if is_manga:
-                            item_type = "manga"
-                        elif is_comic:
-                            item_type = "comic"
 
                         search_item = SearchResultItem(
                             external_id=ext_id,
@@ -133,33 +107,7 @@ class GoogleBooksService:
                         ext_id = f"openlibrary-{str(item.get('key', '')).replace('/works/', '')}"
                         
                         title = item.get("title") or "Untitled Book"
-                        # Classify Book vs Manga/Comic
-                        subjects = item.get("subject", [])
                         item_type = "book"
-                        manga_kws = {"manga", "shonen", "shojo", "seinen", "josei"}
-                        comic_kws = {"comic", "comics", "graphic novel", "graphic novels", "superhero", "superheroes"}
-                        
-                        is_manga = False
-                        is_comic = False
-                        for sub in subjects:
-                            sub_lower = sub.lower()
-                            if any(kw in sub_lower for kw in manga_kws):
-                                is_manga = True
-                            if any(kw in sub_lower for kw in comic_kws):
-                                is_comic = True
-                                
-                        title_lower = title.lower()
-                        desc_lower = desc.lower() if desc else ""
-                        if not is_manga and not is_comic:
-                            if "manga" in title_lower or "manga" in desc_lower:
-                                is_manga = True
-                            elif "comic" in title_lower or "comic" in desc_lower or "graphic novel" in desc_lower:
-                                is_comic = True
-                                
-                        if is_manga:
-                            item_type = "manga"
-                        elif is_comic:
-                            item_type = "comic"
 
                         search_item = SearchResultItem(
                             external_id=ext_id,

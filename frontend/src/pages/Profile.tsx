@@ -19,7 +19,7 @@ import {
 
 interface LibraryItem {
   id: number;
-  item_type: 'game' | 'movie' | 'series' | 'anime' | 'comic' | 'manga' | 'book';
+  item_type: 'game' | 'movie' | 'series' | 'anime' | 'book';
   external_id: string;
   title: string;
   image_url: string;
@@ -75,7 +75,7 @@ export const Profile: React.FC = () => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [libraryItems, setLibraryItems] = useState<LibraryItem[]>([]);
   const [activeTab, setActiveTab] = useState<'shelf' | 'guides' | 'favorites'>('shelf');
-  const [mediaFilter, setMediaFilter] = useState<'all' | 'game' | 'movie' | 'series' | 'book' | 'comic' | 'manga' | 'anime'>('all');
+  const [mediaFilter, setMediaFilter] = useState<'all' | 'game' | 'movie' | 'series' | 'anime' | 'book'>('all');
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [loading, setLoading] = useState(true);
@@ -559,8 +559,8 @@ export const Profile: React.FC = () => {
     .filter(item => {
       let matchesMedia = false;
       if (mediaFilter === 'all') matchesMedia = true;
-      else if (mediaFilter === 'series') matchesMedia = item.item_type === 'series' || item.item_type === 'anime';
-      else if (mediaFilter === 'book') matchesMedia = item.item_type === 'book' || item.item_type === 'comic' || item.item_type === 'manga';
+      else if (mediaFilter === 'series') matchesMedia = item.item_type === 'series';
+      else if (mediaFilter === 'anime') matchesMedia = item.item_type === 'anime';
       else matchesMedia = item.item_type === mediaFilter;
       const matchesSearch = item.title.toLowerCase().includes(shelfSearchQuery.toLowerCase());
       const isEp = item.external_id?.startsWith('tmdb-ep-');
@@ -695,11 +695,11 @@ export const Profile: React.FC = () => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'flex-start' }}>
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
               {(() => {
-                const baseTypes = ['all', 'movie', 'series', 'book', 'game'] as const;
+                const baseTypes = ['all', 'movie', 'series', 'anime', 'book', 'game'] as const;
                 const allowedTypes = baseTypes.filter(type => {
                   if (type === 'all') return true;
-                  if (type === 'series') return libraryItems.some(item => item.item_type === 'series' || item.item_type === 'anime');
-                  if (type === 'book') return libraryItems.some(item => item.item_type === 'book' || item.item_type === 'comic' || item.item_type === 'manga');
+                  if (type === 'series') return libraryItems.some(item => item.item_type === 'series');
+                  if (type === 'anime') return libraryItems.some(item => item.item_type === 'anime');
                   return libraryItems.some(item => item.item_type === type);
                 });
                 return allowedTypes.map(type => (

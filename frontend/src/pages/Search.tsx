@@ -9,7 +9,7 @@ interface SearchResultItem {
   title: string;
   image_url: string;
   description: string;
-  item_type: 'game' | 'movie' | 'series' | 'comic' | 'manga' | 'book' | 'anime' | 'user' | 'guide';
+  item_type: 'game' | 'movie' | 'series' | 'anime' | 'book' | 'user' | 'guide';
   release_date?: string;
 }
 
@@ -27,7 +27,7 @@ export const Search: React.FC = () => {
 
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResultItem[]>([]);
-  const [activeTab, setActiveTab] = useState<'all' | 'movie' | 'series' | 'anime' | 'book' | 'comic' | 'manga' | 'game' | 'user' | 'guide'>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'movie' | 'series' | 'anime' | 'book' | 'game' | 'user' | 'guide'>('all');
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [isSearching, setIsSearching] = useState(false);
@@ -494,9 +494,10 @@ export const Search: React.FC = () => {
   const filteredResults = activeTab === 'all'
     ? results
     : results.filter(item => {
-        if (activeTab === 'series') return item.item_type === 'series' || item.item_type === 'anime';
+        if (activeTab === 'series') return item.item_type === 'series';
+        if (activeTab === 'anime') return item.item_type === 'anime';
         if (activeTab === 'movie') return item.item_type === 'movie';
-        if (activeTab === 'book') return item.item_type === 'book' || item.item_type === 'comic' || item.item_type === 'manga';
+        if (activeTab === 'book') return item.item_type === 'book';
         if (activeTab === 'game') return item.item_type === 'game';
         if (activeTab === 'user') return item.item_type === 'user';
         if (activeTab === 'guide') return item.item_type === 'guide';
@@ -561,6 +562,7 @@ export const Search: React.FC = () => {
             { value: 'all', label: language === 'es' ? 'Todo' : 'All' },
             { value: 'movie', label: language === 'es' ? 'Películas' : 'Movies' },
             { value: 'series', label: language === 'es' ? 'Series' : 'Series' },
+            { value: 'anime', label: 'Anime' },
             { value: 'book', label: language === 'es' ? 'Libros' : 'Books' },
             { value: 'game', label: language === 'es' ? 'Juegos' : 'Games' },
             { value: 'user', label: language === 'es' ? 'Usuarios' : 'Users' },

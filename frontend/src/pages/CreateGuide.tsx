@@ -70,7 +70,7 @@ export const CreateGuide: React.FC = () => {
   // Real-time search modal states (inside editor)
   const [searchTarget, setSearchTarget] = useState<{ elementId: string; subblockId?: string } | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeSearchTab, setActiveSearchTab] = useState<'all' | 'movie' | 'series' | 'anime' | 'book' | 'comic' | 'manga' | 'game'>('all');
+  const [activeSearchTab, setActiveSearchTab] = useState<'all' | 'movie' | 'series' | 'anime' | 'book' | 'game'>('all');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [searchTab, setSearchTab] = useState<'search' | 'manual'>('search');
@@ -987,6 +987,7 @@ export const CreateGuide: React.FC = () => {
                       { value: 'all', label: language === 'es' ? 'Todo' : 'All' },
                       { value: 'movie', label: language === 'es' ? 'Películas' : 'Movies' },
                       { value: 'series', label: language === 'es' ? 'Series' : 'Series' },
+                      { value: 'anime', label: 'Anime' },
                       { value: 'book', label: language === 'es' ? 'Libros' : 'Books' },
                       { value: 'game', label: language === 'es' ? 'Juegos' : 'Games' }
                     ].map(tab => (
@@ -1024,9 +1025,10 @@ export const CreateGuide: React.FC = () => {
                     const filtered = activeSearchTab === 'all'
                       ? searchResults
                       : searchResults.filter(item => {
-                          if (activeSearchTab === 'series') return item.item_type === 'series' || item.item_type === 'anime';
+                          if (activeSearchTab === 'series') return item.item_type === 'series';
+                          if (activeSearchTab === 'anime') return item.item_type === 'anime';
                           if (activeSearchTab === 'movie') return item.item_type === 'movie';
-                          if (activeSearchTab === 'book') return item.item_type === 'book' || item.item_type === 'comic' || item.item_type === 'manga';
+                          if (activeSearchTab === 'book') return item.item_type === 'book';
                           if (activeSearchTab === 'game') return item.item_type === 'game';
                           return true;
                         });
