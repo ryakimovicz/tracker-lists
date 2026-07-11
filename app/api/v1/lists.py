@@ -1134,10 +1134,13 @@ def toggle_tmdb_episode(
         "completed_at": progress.completed_at.isoformat() if (progress.completed_at and progress.is_completed) else None
     }
 
+from fastapi import BackgroundTasks
+
 @router.post("/{list_id}/bulk-toggle-season", status_code=status.HTTP_200_OK)
 def bulk_toggle_season(
     list_id: int,
     req: BulkToggleSeasonRequest,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -1216,46 +1219,57 @@ def bulk_toggle_season(
     db.commit()
     
     if lib_item:
-        completed_episodes = db.query(ItemProgress).join(ListItem).filter(
+        completed_episodes_count = db.query(ItemProgress).join(ListItem).filter(
             ItemProgress.user_id == current_user.id,
             ListItem.list_id == list_id,
             ItemProgress.is_completed == True
-        ).all()
+        ).count()
         
-        completed_count = len(completed_episodes)
-        
-        if completed_count > 0:
-            total_episodes = 99999
-            try:
-                series_id = int(lib_item.external_id)
-                series_detail = TMDBService.get_series_detail(series_id)
-                total_episodes = series_detail.get("number_of_episodes") or 99999
-            except Exception:
-                pass
-                
-            if completed_count >= total_episodes:
-                lib_item.status = UserLibraryStatusEnum.COMPLETED
-                lib_item.completed_at = datetime.now(timezone.utc)
-            else:
-                lib_item.status = UserLibraryStatusEnum.WATCHING
-                lib_item.completed_at = None
-                
+        if completed_episodes_count > 0:
             last_completed = db.query(ListItem).join(ItemProgress).filter(
                 ListItem.list_id == list_id,
                 ItemProgress.user_id == current_user.id,
                 ItemProgress.is_completed == True
             ).order_by(ListItem.id.desc()).first()
-            
             if last_completed:
                 lib_item.last_seen_episode = last_completed.title
+            lib_item.updated_at = datetime.now(timezone.utc)
+            db.commit()
         else:
             lib_item.status = UserLibraryStatusEnum.PLAN_TO_WATCH
             lib_item.completed_at = None
             lib_item.last_seen_episode = None
-            
-        lib_item.updated_at = datetime.now(timezone.utc)
-        db.commit()
+            lib_item.updated_at = datetime.now(timezone.utc)
+            db.commit()
+
+        def check_series_completion(user_id, list_id, lib_item_id, ext_id):
+            import app.core.database
+            with app.core.database.SessionLocal() as session:
+                completed_eps = session.query(ItemProgress).join(ListItem).filter(
+                    ItemProgress.user_id == user_id,
+                    ListItem.list_id == list_id,
+                    ItemProgress.is_completed == True
+                ).count()
+                
+                if completed_eps > 0:
+                    try:
+                        series_id = int(ext_id)
+                        series_detail = TMDBService.get_series_detail(series_id)
+                        total_episodes = series_detail.get("number_of_episodes") or 99999
+                        lib_it = session.query(UserLibraryItem).filter(UserLibraryItem.id == lib_item_id).first()
+                        if lib_it:
+                            if completed_eps >= total_episodes:
+                                lib_it.status = UserLibraryStatusEnum.COMPLETED
+                                lib_it.completed_at = datetime.now(timezone.utc)
+                            else:
+                                lib_it.status = UserLibraryStatusEnum.WATCHING
+                                lib_it.completed_at = None
+                            session.commit()
+                    except Exception as e:
+                        print(f"Background check completion error: {e}")
         
+        background_tasks.add_task(check_series_completion, current_user.id, list_id, lib_item.id, lib_item.external_id)
+
     return {"message": "Season progress toggled successfully"}
 
 

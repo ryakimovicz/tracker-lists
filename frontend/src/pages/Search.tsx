@@ -306,7 +306,7 @@ export const Search: React.FC = () => {
       console.error("Failed to load item reviews", err);
     }
 
-    if (item.item_type === 'series') {
+    if (item.item_type === 'series' || item.item_type === 'anime') {
       try {
         let filteredSeasons = [];
         const cacheKey = `series_${item.external_id}`;
@@ -494,12 +494,9 @@ export const Search: React.FC = () => {
   const filteredResults = activeTab === 'all'
     ? results
     : results.filter(item => {
-        if (activeTab === 'anime') return item.item_type === 'anime';
-        if (activeTab === 'series') return item.item_type === 'series';
+        if (activeTab === 'series') return item.item_type === 'series' || item.item_type === 'anime';
         if (activeTab === 'movie') return item.item_type === 'movie';
-        if (activeTab === 'book') return item.item_type === 'book';
-        if (activeTab === 'comic') return item.item_type === 'comic';
-        if (activeTab === 'manga') return item.item_type === 'manga';
+        if (activeTab === 'book') return item.item_type === 'book' || item.item_type === 'comic' || item.item_type === 'manga';
         if (activeTab === 'game') return item.item_type === 'game';
         if (activeTab === 'user') return item.item_type === 'user';
         if (activeTab === 'guide') return item.item_type === 'guide';
@@ -564,10 +561,7 @@ export const Search: React.FC = () => {
             { value: 'all', label: language === 'es' ? 'Todo' : 'All' },
             { value: 'movie', label: language === 'es' ? 'Películas' : 'Movies' },
             { value: 'series', label: language === 'es' ? 'Series' : 'Series' },
-            { value: 'anime', label: language === 'es' ? 'Animes' : 'Anime' },
             { value: 'book', label: language === 'es' ? 'Libros' : 'Books' },
-            { value: 'comic', label: language === 'es' ? 'Cómics' : 'Comics' },
-            { value: 'manga', label: language === 'es' ? 'Mangas' : 'Manga' },
             { value: 'game', label: language === 'es' ? 'Juegos' : 'Games' },
             { value: 'user', label: language === 'es' ? 'Usuarios' : 'Users' },
             { value: 'guide', label: language === 'es' ? 'Guías' : 'Guides' }
@@ -948,7 +942,7 @@ export const Search: React.FC = () => {
             </div>
 
             {/* TV Series Season Accordion Tracking */}
-            {selectedItem.item_type === 'series' && seasons.length > 0 && (
+            {(selectedItem.item_type === 'series' || selectedItem.item_type === 'anime') && seasons.length > 0 && (
               <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', textAlign: 'left' }}>
                 <h4 style={{ margin: 0, fontSize: '1.1rem' }}>
                   {language === 'es' ? 'Seguimiento de Temporadas' : 'Season Tracking'}

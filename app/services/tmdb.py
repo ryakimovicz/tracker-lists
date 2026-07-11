@@ -50,8 +50,7 @@ class TMDBService:
                         if type == "series":
                             is_anime = (
                                 item.get("original_language") == "ja" or
-                                "JP" in item.get("origin_country", []) or
-                                16 in item.get("genre_ids", [])
+                                "JP" in item.get("origin_country", [])
                             )
                             if is_anime:
                                 item_type_val = "anime"

@@ -94,3 +94,41 @@ class AniListService:
             print(f"AniList API Search Error: {e}")
             return None
         return []
+
+    @staticmethod
+    def get_anime_title(anilist_id: int) -> str:
+        graphql_query = """
+        query ($id: Int) {
+          Media (id: $id, type: ANIME) {
+            title {
+              romaji
+              english
+            }
+          }
+        }
+        """
+        payload = {
+            "query": graphql_query,
+            "variables": {"id": anilist_id}
+        }
+        req = urllib.request.Request(
+            "https://graphql.anilist.co",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                "User-Agent": "TrackerLists/1.0"
+            },
+            method="POST"
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=5) as response:
+                if response.status == 200:
+                    data = json.loads(response.read().decode("utf-8"))
+                    media = data.get("data", {}).get("Media")
+                    if media and media.get("title"):
+                        title = media["title"].get("english") or media["title"].get("romaji")
+                        return title
+        except Exception as e:
+            print(f"Error fetching title from AniList: {e}")
+        return None

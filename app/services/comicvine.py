@@ -97,14 +97,24 @@ class ComicVineService:
                                         title_parts = f"{vol_name} #{issue_num}"
                                         if issue_name:
                                             title_parts += f" ({issue_name})"
+                                        manga_kws = {"manga", "shonen", "shojo", "seinen", "josei", "viz media", "kodansha", "tokyopop", "yen press"}
+                                        is_manga = False
+                                        publisher_name = item.get("volume", {}).get("publisher", {}).get("name", "").lower() if item.get("volume") and item.get("volume").get("publisher") else ""
+                                        title_lower = title_parts.lower()
+                                        desc_lower = (item.get("description") or "").lower()
                                         
+                                        if any(kw in publisher_name for kw in manga_kws) or any(kw in title_lower for kw in manga_kws) or any(kw in desc_lower for kw in manga_kws):
+                                            is_manga = True
+                                        
+                                        item_type_val = "manga" if is_manga else "comic"
+
                                         issue_results.append(
                                             SearchResultItem(
                                                 external_id=str(item.get("id")),
                                                 title=title_parts,
                                                 image_url=image_url,
                                                 description=item.get("description") or "",
-                                                item_type="comic",
+                                                item_type=item_type_val,
                                                 release_date=item.get("cover_date") or (str(item.get("start_year")) if item.get("start_year") else None)
                                             )
                                         )
@@ -139,6 +149,19 @@ class ComicVineService:
                                 title = title_parts
                             else:
                                 title = item.get("name") or "Untitled Volume"
+                            manga_kws = {"manga", "shonen", "shojo", "seinen", "josei", "viz media", "kodansha", "tokyopop", "yen press"}
+                            is_manga = False
+                            publisher_name = item.get("publisher", {}).get("name", "").lower() if item.get("publisher") else ""
+                            if resource_type == "issue" and item.get("volume") and item.get("volume").get("publisher"):
+                                publisher_name = item.get("volume", {}).get("publisher", {}).get("name", "").lower()
+                                
+                            title_lower = title.lower()
+                            desc_lower = (item.get("description") or "").lower()
+                            
+                            if any(kw in publisher_name for kw in manga_kws) or any(kw in title_lower for kw in manga_kws) or any(kw in desc_lower for kw in manga_kws):
+                                is_manga = True
+                                
+                            item_type_val = "manga" if is_manga else "comic"
 
                             global_results.append(
                                 SearchResultItem(
@@ -146,7 +169,7 @@ class ComicVineService:
                                     title=title,
                                     image_url=image_url,
                                     description=item.get("description") or "",
-                                    item_type="comic",
+                                    item_type=item_type_val,
                                     release_date=item.get("cover_date") or (str(item.get("start_year")) if item.get("start_year") else None)
                                 )
                             )

@@ -987,10 +987,7 @@ export const CreateGuide: React.FC = () => {
                       { value: 'all', label: language === 'es' ? 'Todo' : 'All' },
                       { value: 'movie', label: language === 'es' ? 'Películas' : 'Movies' },
                       { value: 'series', label: language === 'es' ? 'Series' : 'Series' },
-                      { value: 'anime', label: language === 'es' ? 'Animes' : 'Anime' },
                       { value: 'book', label: language === 'es' ? 'Libros' : 'Books' },
-                      { value: 'comic', label: language === 'es' ? 'Cómics' : 'Comics' },
-                      { value: 'manga', label: language === 'es' ? 'Mangas' : 'Manga' },
                       { value: 'game', label: language === 'es' ? 'Juegos' : 'Games' }
                     ].map(tab => (
                       <button
@@ -1027,12 +1024,9 @@ export const CreateGuide: React.FC = () => {
                     const filtered = activeSearchTab === 'all'
                       ? searchResults
                       : searchResults.filter(item => {
-                          if (activeSearchTab === 'anime') return item.item_type === 'anime';
-                          if (activeSearchTab === 'series') return item.item_type === 'series';
+                          if (activeSearchTab === 'series') return item.item_type === 'series' || item.item_type === 'anime';
                           if (activeSearchTab === 'movie') return item.item_type === 'movie';
-                          if (activeSearchTab === 'book') return item.item_type === 'book';
-                          if (activeSearchTab === 'comic') return item.item_type === 'comic';
-                          if (activeSearchTab === 'manga') return item.item_type === 'manga';
+                          if (activeSearchTab === 'book') return item.item_type === 'book' || item.item_type === 'comic' || item.item_type === 'manga';
                           if (activeSearchTab === 'game') return item.item_type === 'game';
                           return true;
                         });

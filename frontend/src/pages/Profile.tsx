@@ -280,7 +280,7 @@ export const Profile: React.FC = () => {
     setItemReviews([]);
     setDescExpanded(false);
 
-    if (item.item_type === 'series' && item.tracking_list_id) {
+    if ((item.item_type === 'series' || item.item_type === 'anime') && item.tracking_list_id) {
       try {
         const listRes = await apiClient.get(`/lists/${item.tracking_list_id}`);
         const itemsList = listRes.data.items || [];
@@ -557,7 +557,11 @@ export const Profile: React.FC = () => {
 
   const filteredItems = libraryItems
     .filter(item => {
-      const matchesMedia = mediaFilter === 'all' || item.item_type === mediaFilter;
+      let matchesMedia = false;
+      if (mediaFilter === 'all') matchesMedia = true;
+      else if (mediaFilter === 'series') matchesMedia = item.item_type === 'series' || item.item_type === 'anime';
+      else if (mediaFilter === 'book') matchesMedia = item.item_type === 'book' || item.item_type === 'comic' || item.item_type === 'manga';
+      else matchesMedia = item.item_type === mediaFilter;
       const matchesSearch = item.title.toLowerCase().includes(shelfSearchQuery.toLowerCase());
       const isEp = item.external_id?.startsWith('tmdb-ep-');
       return matchesMedia && matchesSearch && !isEp;
@@ -691,9 +695,11 @@ export const Profile: React.FC = () => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'flex-start' }}>
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
               {(() => {
-                const baseTypes = ['all', 'movie', 'series', 'book', 'comic', 'manga', 'game'] as const;
+                const baseTypes = ['all', 'movie', 'series', 'book', 'game'] as const;
                 const allowedTypes = baseTypes.filter(type => {
                   if (type === 'all') return true;
+                  if (type === 'series') return libraryItems.some(item => item.item_type === 'series' || item.item_type === 'anime');
+                  if (type === 'book') return libraryItems.some(item => item.item_type === 'book' || item.item_type === 'comic' || item.item_type === 'manga');
                   return libraryItems.some(item => item.item_type === type);
                 });
                 return allowedTypes.map(type => (
@@ -1065,6 +1071,10 @@ export const Profile: React.FC = () => {
                 msg = language === 'es' 
                   ? `Agregaste "${act.item_title}" a tu estantería como "${getStatusLabel(act.details)}".`
                   : `Added "${act.item_title}" to shelf as "${getStatusLabel(act.details)}".`;
+              } else if (act.activity_type === 'shelf_remove') {
+                msg = language === 'es'
+                  ? `Eliminaste "${act.item_title}" de tu estantería.`
+                  : `Removed "${act.item_title}" from your shelf.`;
               } else if (act.activity_type === 'shelf_status') {
                 msg = language === 'es'
                   ? `Cambiaste el estado de "${act.item_title}" a "${getStatusLabel(act.details)}".`
@@ -1077,6 +1087,30 @@ export const Profile: React.FC = () => {
                 msg = language === 'es'
                   ? `Marcaste "${act.item_title}" como completado.`
                   : `Marked "${act.item_title}" as completed.`;
+              } else if (act.activity_type === 'guide_created') {
+                msg = language === 'es'
+                  ? `Creaste una nueva guía: "${act.item_title}".`
+                  : `Created a new guide: "${act.item_title}".`;
+              } else if (act.activity_type === 'guide_published') {
+                msg = language === 'es'
+                  ? `Publicaste la guía: "${act.item_title}".`
+                  : `Published the guide: "${act.item_title}".`;
+              } else if (act.activity_type === 'guide_deleted') {
+                msg = language === 'es'
+                  ? `Eliminaste la guía: "${act.item_title}".`
+                  : `Deleted the guide: "${act.item_title}".`;
+              } else if (act.activity_type === 'guide_followed') {
+                msg = language === 'es'
+                  ? `Comenzaste a seguir la guía: "${act.item_title}".`
+                  : `Started following the guide: "${act.item_title}".`;
+              } else if (act.activity_type === 'guide_unfollowed') {
+                msg = language === 'es'
+                  ? `Dejaste de seguir la guía: "${act.item_title}".`
+                  : `Stopped following the guide: "${act.item_title}".`;
+              } else if (act.activity_type === 'item_reviewed' || act.activity_type === 'item_rated') {
+                msg = language === 'es'
+                  ? `Reseñaste o valoraste "${act.item_title}".`
+                  : `Reviewed or rated "${act.item_title}".`;
               } else {
                 msg = `${act.activity_type} - ${act.item_title}`;
               }

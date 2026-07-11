@@ -81,12 +81,12 @@ const translations: Translations = {
 
   // Media Categories
   mediaAll: { en: 'All', es: 'Todos' },
-  mediaGame: { en: 'Games', es: 'Videojuegos' },
-  mediaMovie: { en: 'Movies', es: 'Películas' },
-  mediaSeries: { en: 'Series', es: 'Series' },
-  mediaBook: { en: 'Books', es: 'Libros' },
-  mediaComic: { en: 'Comics', es: 'Cómics' },
-  mediaManga: { en: 'Manga', es: 'Mangas' },
+  mediaGame: { en: 'Game', es: 'Juego' },
+  mediaMovie: { en: 'Movie', es: 'Película' },
+  mediaSeries: { en: 'Series', es: 'Serie' },
+  mediaBook: { en: 'Book', es: 'Libro' },
+  mediaComic: { en: 'Book', es: 'Libro' },
+  mediaManga: { en: 'Book', es: 'Libro' },
   mediaAnime: { en: 'Anime', es: 'Anime' },
 
   // Search Page
