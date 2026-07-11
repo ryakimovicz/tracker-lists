@@ -85,8 +85,8 @@ const translations: Translations = {
   mediaMovie: { en: 'Movie', es: 'Película' },
   mediaSeries: { en: 'Series', es: 'Serie' },
   mediaBook: { en: 'Book', es: 'Libro' },
-  mediaComic: { en: 'Book', es: 'Libro' },
-  mediaManga: { en: 'Book', es: 'Libro' },
+  mediaComic: { en: 'Comic', es: 'Comic' },
+  mediaManga: { en: 'Manga', es: 'Manga' },
   mediaAnime: { en: 'Anime', es: 'Anime' },
 
   // Search Page
