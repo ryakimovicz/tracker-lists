@@ -608,7 +608,7 @@ export const Profile: React.FC = () => {
             <div style={{ display: 'flex', gap: '1.5rem', fontSize: '0.9rem' }}>
               <span><strong>0</strong> {language === 'es' ? 'Seguidores' : 'Followers'}</span>
               <span><strong>0</strong> {language === 'es' ? 'Seguidos' : 'Following'}</span>
-              <span><strong>{libraryItems.length}</strong> {language === 'es' ? 'En Estantería' : 'On Shelf'}</span>
+              <span><strong>{visualLibraryItems.length}</strong> {language === 'es' ? 'En Estantería' : 'On Shelf'}</span>
             </div>
           </div>
         </div>

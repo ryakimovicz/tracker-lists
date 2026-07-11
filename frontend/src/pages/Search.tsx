@@ -1012,7 +1012,7 @@ export const Search: React.FC = () => {
                                   let trackingListId = currentShelfItem?.tracking_list_id;
                                   if (!trackingListId) {
                                     await apiClient.post('/library/', {
-                                      item_type: 'series',
+                                      item_type: selectedItem.item_type,
                                       external_id: selectedItem.external_id,
                                       title: selectedItem.title,
                                       image_url: selectedItem.image_url,
@@ -1020,7 +1020,7 @@ export const Search: React.FC = () => {
                                     });
                                     const updatedShelf = await apiClient.get('/library/');
                                     setShelfItems(updatedShelf.data);
-                                    const freshItem = updatedShelf.data.find((x: any) => x.external_id === selectedItem.external_id && x.item_type === 'series');
+                                    const freshItem = updatedShelf.data.find((x: any) => x.external_id === selectedItem.external_id && x.item_type === selectedItem.item_type);
                                     trackingListId = freshItem?.tracking_list_id;
                                   }
 
@@ -1074,7 +1074,7 @@ export const Search: React.FC = () => {
                                             let trackingListId = currentShelfItem?.tracking_list_id;
                                             if (!trackingListId) {
                                               await apiClient.post('/library/', {
-                                                item_type: 'series',
+                                                item_type: selectedItem.item_type,
                                                 external_id: selectedItem.external_id,
                                                 title: selectedItem.title,
                                                 image_url: selectedItem.image_url,
@@ -1082,7 +1082,7 @@ export const Search: React.FC = () => {
                                               });
                                               const updatedShelf = await apiClient.get('/library/');
                                               setShelfItems(updatedShelf.data);
-                                              const freshItem = updatedShelf.data.find((x: any) => x.external_id === selectedItem.external_id && x.item_type === 'series');
+                                              const freshItem = updatedShelf.data.find((x: any) => x.external_id === selectedItem.external_id && x.item_type === selectedItem.item_type);
                                               trackingListId = freshItem?.tracking_list_id;
                                             }
 
