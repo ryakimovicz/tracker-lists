@@ -1043,7 +1043,7 @@ export const Profile: React.FC = () => {
             <div className="glass-card" style={{ padding: '1rem', display: 'flex', gap: '1rem', alignItems: 'center', fontSize: '0.9rem' }}>
               <CheckCircle size={16} color="#10b981" />
               <div>
-                <span>{language === 'es' ? 'Creaste tu cuenta de TrackerLists.' : 'Created your TrackerLists account.'}</span>
+                <span>{language === 'es' ? 'Creaste tu cuenta de Pathd.' : 'Created your Pathd account.'}</span>
                 <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginLeft: '1rem' }}>
                   {profile ? formatDate(new Date(profile.created_at)) : formatDate(new Date())}
                 </span>

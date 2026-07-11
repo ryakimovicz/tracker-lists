@@ -8,7 +8,7 @@ from app.services.base import SearchResultItem
 from app.services.comicvine import ComicVineService
 from app.services.tmdb import TMDBService
 from app.services.googlebooks import GoogleBooksService
-from app.services.rawg import RAWGService
+from app.services.igdb import IGDBService
 from app.services.anilist import AniListService
 from app.core.limiter import limiter
 
@@ -62,7 +62,7 @@ def search_media(
         combined.sort(key=calculate_score, reverse=True)
         return combined
     elif type_lower == "game":
-        return RAWGService.search_games(q)
+        return IGDBService.search_games(q)
     elif type_lower == "movie":
         return TMDBService.search_media(q, "movie")
     elif type_lower == "series":
@@ -110,7 +110,7 @@ def search_all_media(
         future_movies = executor.submit(TMDBService.search_media, q, "movie")
         future_series = executor.submit(TMDBService.search_media, q, "series")
         future_books = executor.submit(GoogleBooksService.search_books, q)
-        future_games = executor.submit(RAWGService.search_games, q)
+        future_games = executor.submit(IGDBService.search_games, q)
         future_comics = executor.submit(ComicVineService.search_comics, q)
         
         movies = future_movies.result()

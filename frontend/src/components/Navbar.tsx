@@ -57,7 +57,7 @@ export const Navbar: React.FC = () => {
           gap: '0.5rem'
         }}>
           <List size={24} color="#7c3aed" style={{ WebkitTextFillColor: 'initial' }} />
-          <span>TrackerLists</span>
+          <span>Pathd</span>
         </Link>
 
         {isAuthenticated && (
