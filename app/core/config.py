@@ -45,6 +45,6 @@ class Settings(BaseSettings):
     SMTP_HOST: str = ""
     SMTP_USER: str = ""
     SMTP_PASSWORD: str = ""
-    EMAILS_FROM_EMAIL: str = "noreply@trackerlists.com"
+    EMAILS_FROM_EMAIL: str = "noreply@pathd.app"
 
 settings = Settings()

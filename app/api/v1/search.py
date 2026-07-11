@@ -9,7 +9,6 @@ from app.services.comicvine import ComicVineService
 from app.services.tmdb import TMDBService
 from app.services.googlebooks import GoogleBooksService
 from app.services.igdb import IGDBService
-from app.services.anilist import AniListService
 from app.core.limiter import limiter
 
 router = APIRouter()

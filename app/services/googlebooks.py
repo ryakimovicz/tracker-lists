@@ -23,7 +23,7 @@ class GoogleBooksService:
                 url += f"&key={settings.GOOGLE_BOOKS_API_KEY}"
             req = urllib.request.Request(
                 url,
-                headers={"User-Agent": "TrackerLists/1.0 (contact@trackerlists.com)"}
+                headers={"User-Agent": "Pathd/1.0 (contact@pathd.app)"}
             )
             with urllib.request.urlopen(req, timeout=8) as response:
                 if response.status == 200:
@@ -108,7 +108,7 @@ class GoogleBooksService:
                 url = f"https://openlibrary.org/search.json?q={encoded_query}&limit=15"
             req = urllib.request.Request(
                 url,
-                headers={"User-Agent": "TrackerLists/1.0 (contact@trackerlists.com)"}
+                headers={"User-Agent": "Pathd/1.0 (contact@pathd.app)"}
             )
             with urllib.request.urlopen(req, timeout=10) as response:
                 if response.status == 200:

@@ -31,7 +31,7 @@ class TMDBService:
         req = urllib.request.Request(
             url,
             headers={
-                "User-Agent": "TrackerLists/1.0 (contact@trackerlists.com)"
+                "User-Agent": "Pathd/1.0 (contact@pathd.app)"
             }
         )
         
@@ -91,7 +91,7 @@ class TMDBService:
         url = f"https://api.themoviedb.org/3/tv/{series_id}/season/{season_number}?api_key={api_key}&language=en-US"
         req = urllib.request.Request(
             url,
-            headers={"User-Agent": "TrackerLists/1.0"}
+            headers={"User-Agent": "Pathd/1.0"}
         )
         
         try:
@@ -113,7 +113,7 @@ class TMDBService:
         url = f"https://api.themoviedb.org/3/tv/{series_id}/season/{season_number}/episode/{episode_number}?api_key={api_key}&language=en-US"
         req = urllib.request.Request(
             url,
-            headers={"User-Agent": "TrackerLists/1.0"}
+            headers={"User-Agent": "Pathd/1.0"}
         )
         
         try:
@@ -134,7 +134,7 @@ class TMDBService:
         url = f"https://api.themoviedb.org/3/tv/{series_id}?api_key={api_key}&language=en-US"
         req = urllib.request.Request(
             url,
-            headers={"User-Agent": "TrackerLists/1.0"}
+            headers={"User-Agent": "Pathd/1.0"}
         )
         
         try:

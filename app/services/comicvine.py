@@ -46,7 +46,7 @@ class ComicVineService:
                     volumes_url = f"https://comicvine.gamespot.com/api/volumes/?api_key={api_key}&format=json&filter=name:{encoded_series}"
                     req_volumes = urllib.request.Request(
                         volumes_url,
-                        headers={"User-Agent": "TrackerLists/1.0 (contact@trackerlists.com)"}
+                        headers={"User-Agent": "Pathd/1.0 (contact@pathd.app)"}
                     )
                     try:
                         with urllib.request.urlopen(req_volumes, timeout=5) as response:
@@ -64,7 +64,7 @@ class ComicVineService:
                         volume_search_url = f"https://comicvine.gamespot.com/api/search/?api_key={api_key}&format=json&resources=volume&query={encoded_series}"
                         req_volumes_search = urllib.request.Request(
                             volume_search_url,
-                            headers={"User-Agent": "TrackerLists/1.0 (contact@trackerlists.com)"}
+                            headers={"User-Agent": "Pathd/1.0 (contact@pathd.app)"}
                         )
                         try:
                             with urllib.request.urlopen(req_volumes_search, timeout=5) as response:
@@ -82,7 +82,7 @@ class ComicVineService:
                         issues_url = f"https://comicvine.gamespot.com/api/issues/?api_key={api_key}&format=json&filter=volume:{vol_id},issue_number:{issue_number}"
                         req_issues = urllib.request.Request(
                             issues_url,
-                            headers={"User-Agent": "TrackerLists/1.0 (contact@trackerlists.com)"}
+                            headers={"User-Agent": "Pathd/1.0 (contact@pathd.app)"}
                         )
                         try:
                             with urllib.request.urlopen(req_issues, timeout=5) as response:
@@ -127,7 +127,7 @@ class ComicVineService:
             
             req = urllib.request.Request(
                 url,
-                headers={"User-Agent": "TrackerLists/1.0 (contact@trackerlists.com)"}
+                headers={"User-Agent": "Pathd/1.0 (contact@pathd.app)"}
             )
             
             try:
