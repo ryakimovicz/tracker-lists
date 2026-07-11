@@ -1,6 +1,6 @@
 # Pathd 🌌
 
-**Pathd** es una plataforma premium y unificada para la creación de guías de orden cronológico, seguimiento de bibliotecas personales y monitorización del consumo multimedia. Permite a los usuarios indexar, organizar y hacer seguimiento de su progreso en **libros, cómics, películas, series, animes y videojuegos** en una única interfaz cohesiva, complementada con modificaciones de la comunidad y un feed social en tiempo real.
+**Pathd** es una plataforma premium y unificada para la creación de guías de orden cronológico, seguimiento de bibliotecas personales y monitorización del consumo multimedia. Permite a los usuarios indexar, organizar y hacer seguimiento de su progreso en **libros, mangas, cómics, películas, series, animes y videojuegos** en una única interfaz cohesiva, complementada con modificaciones de la comunidad y un feed social en tiempo real.
 
 ---
 
@@ -30,8 +30,6 @@
 | [IGDB](https://api-docs.igdb.com/) | Videojuegos (autenticado via Twitch OAuth2) |
 | [Google Books](https://developers.google.com/books/docs/v1/using) | Libros |
 | [Comic Vine](https://comicvine.gamespot.com/api/) | Cómics |
-
-> **Nota**: IGDB requiere credenciales de Twitch Developer (`TWITCH_CLIENT_ID` y `TWITCH_CLIENT_SECRET`). No se requiere ninguna URL de redirect ya que la autenticación es server-to-server (Client Credentials Flow).
 
 ---
 
