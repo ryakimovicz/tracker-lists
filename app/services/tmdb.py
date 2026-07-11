@@ -48,11 +48,12 @@ class TMDBService:
                         
                         item_type_val = type
                         if type == "series":
-                            is_anime = (
+                            is_japanese = (
                                 item.get("original_language") == "ja" or
                                 "JP" in item.get("origin_country", [])
                             )
-                            if is_anime:
+                            is_animation = 16 in item.get("genre_ids", [])
+                            if is_japanese and is_animation:
                                 item_type_val = "anime"
 
                         pop_val = float(item.get("popularity") or 0)
