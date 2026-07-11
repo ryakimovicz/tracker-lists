@@ -228,6 +228,7 @@ def add_to_library(
 
 @router.get("/", response_model=List[LibraryItemResponse])
 def get_library(
+    user_id: Optional[int] = Query(None, description="Get library of a specific user"),
     status: Optional[UserLibraryStatusEnum] = Query(None, description="Filter library by status"),
     skip: int = 0,
     limit: int = 50,
@@ -235,7 +236,8 @@ def get_library(
     db: Session = Depends(get_db)
 ):
     from sqlalchemy import desc, func
-    query = db.query(UserLibraryItem).filter(UserLibraryItem.user_id == current_user.id)
+    target_user_id = user_id if user_id is not None else current_user.id
+    query = db.query(UserLibraryItem).filter(UserLibraryItem.user_id == target_user_id)
     if status:
         query = query.filter(UserLibraryItem.status == status)
     

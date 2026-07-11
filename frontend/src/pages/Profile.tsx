@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from '../context/LanguageContext';
 import { apiClient } from '../api/client';
 import {
@@ -68,6 +68,9 @@ interface UserProfile {
 export const Profile: React.FC = () => {
   const { t, language } = useTranslation();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const userIdParam = searchParams.get('user_id');
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [libraryItems, setLibraryItems] = useState<LibraryItem[]>([]);
@@ -76,6 +79,8 @@ export const Profile: React.FC = () => {
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [loading, setLoading] = useState(true);
+
+  const isOwnProfile = !userIdParam || String(profile?.id) === String(currentUser?.id);
 
   // Viewer state for full list details
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
@@ -143,10 +148,15 @@ export const Profile: React.FC = () => {
     setLoading(true);
     setErrorMsg('');
     try {
-      const profileRes = await apiClient.get('/users/me');
+      const meRes = await apiClient.get('/users/me');
+      setCurrentUser(meRes.data);
+
+      const targetProfileUrl = userIdParam ? `/users/profile/${userIdParam}` : '/users/me';
+      const profileRes = await apiClient.get(targetProfileUrl);
       setProfile(profileRes.data);
 
-      const libraryRes = await apiClient.get('/library/');
+      const targetLibraryUrl = userIdParam ? `/library/?user_id=${userIdParam}` : '/library/';
+      const libraryRes = await apiClient.get(targetLibraryUrl);
       setLibraryItems(libraryRes.data);
 
       // Set favorites state from items explicitly marked as favorites
@@ -154,7 +164,8 @@ export const Profile: React.FC = () => {
       setFavorites(favs);
 
       // Fetch user activities
-      const activityRes = await apiClient.get('/users/me/activity');
+      const targetActivityUrl = userIdParam ? `/users/${userIdParam}/activity` : '/users/me/activity';
+      const activityRes = await apiClient.get(targetActivityUrl);
       setActivities(activityRes.data);
     } catch (err: any) {
       setErrorMsg(err.response?.data?.detail || 'Failed to fetch library information.');
@@ -173,7 +184,8 @@ export const Profile: React.FC = () => {
       setTimeout(() => setSuccessMsg(''), 3000);
       
       // Refresh activities
-      const actRes = await apiClient.get('/users/me/activity');
+      const targetActivityUrl = userIdParam ? `/users/${userIdParam}/activity` : '/users/me/activity';
+      const actRes = await apiClient.get(targetActivityUrl);
       setActivities(actRes.data);
     } catch (err: any) {
       setErrorMsg(err.response?.data?.detail || 'Failed to update item status.');
@@ -195,7 +207,8 @@ export const Profile: React.FC = () => {
       });
 
       // Refresh activities
-      const actRes = await apiClient.get('/users/me/activity');
+      const targetActivityUrl = userIdParam ? `/users/${userIdParam}/activity` : '/users/me/activity';
+      const actRes = await apiClient.get(targetActivityUrl);
       setActivities(actRes.data);
     } catch(err) {
       console.error(err);
@@ -428,10 +441,11 @@ export const Profile: React.FC = () => {
         setSelectedItem((prev: any) => prev ? { ...prev, completed_at: res.data.completed_at } : null);
       }
       
-      const libraryRes = await apiClient.get('/library/');
+      const libraryRes = await apiClient.get(userIdParam ? `/library/?user_id=${userIdParam}` : '/library/');
       setLibraryItems(libraryRes.data);
       
-      const actRes = await apiClient.get('/users/me/activity');
+      const targetActivityUrl = userIdParam ? `/users/${userIdParam}/activity` : '/users/me/activity';
+      const actRes = await apiClient.get(targetActivityUrl);
       setActivities(actRes.data);
     } catch (err) {
       console.error("Failed to toggle episode", err);
@@ -445,9 +459,10 @@ export const Profile: React.FC = () => {
         pages_read: val
       });
       setSelectedItem((prev: any) => prev ? { ...prev, pages_read: res.data.pages_read, status: res.data.status } : null);
-      const libraryRes = await apiClient.get('/library/');
+      const libraryRes = await apiClient.get(userIdParam ? `/library/?user_id=${userIdParam}` : '/library/');
       setLibraryItems(libraryRes.data);
-      const actRes = await apiClient.get('/users/me/activity');
+      const targetActivityUrl = userIdParam ? `/users/${userIdParam}/activity` : '/users/me/activity';
+      const actRes = await apiClient.get(targetActivityUrl);
       setActivities(actRes.data);
     } catch (err) {
       console.error("Failed to update pages read", err);
@@ -463,7 +478,8 @@ export const Profile: React.FC = () => {
       setLibraryItems(prev => prev.filter(item => item.id !== itemId));
       setSuccessMsg(language === 'es' ? 'Elemento eliminado de la estantería.' : 'Item removed from shelf.');
       
-      const actRes = await apiClient.get('/users/me/activity');
+      const targetActivityUrl = userIdParam ? `/users/${userIdParam}/activity` : '/users/me/activity';
+      const actRes = await apiClient.get(targetActivityUrl);
       setActivities(actRes.data);
       
       setTimeout(() => setSuccessMsg(''), 3000);
@@ -493,7 +509,8 @@ export const Profile: React.FC = () => {
         };
       });
 
-      const actRes = await apiClient.get('/users/me/activity');
+      const targetActivityUrl = userIdParam ? `/users/${userIdParam}/activity` : '/users/me/activity';
+      const actRes = await apiClient.get(targetActivityUrl);
       setActivities(actRes.data);
 
       setSuccessMsg(language === 'es' ? 'Guía eliminada con éxito.' : 'Guide deleted successfully.');
@@ -816,6 +833,7 @@ export const Profile: React.FC = () => {
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                             <select
                               className="input-field"
+                              disabled={!isOwnProfile}
                               value={item.status}
                               onChange={(e) => handleStatusChange(item.id, e.target.value)}
                               style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}
@@ -827,23 +845,25 @@ export const Profile: React.FC = () => {
                               ))}
                             </select>
 
-                            <button
-                              onClick={() => handleDeleteItem(item.id)}
-                              className="btn-secondary"
-                              style={{
-                                padding: '0.25rem',
-                                fontSize: '0.8rem',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: '0.25rem',
-                                color: '#ef4444',
-                                background: 'transparent',
-                                border: 'none'
-                              }}
-                            >
-                              <Trash2 size={14} /> {language === 'es' ? 'Quitar' : 'Remove'}
-                            </button>
+                            {isOwnProfile && (
+                              <button
+                                onClick={() => handleDeleteItem(item.id)}
+                                className="btn-secondary"
+                                style={{
+                                  padding: '0.25rem',
+                                  fontSize: '0.8rem',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '0.25rem',
+                                  color: '#ef4444',
+                                  background: 'transparent',
+                                  border: 'none'
+                                }}
+                              >
+                                <Trash2 size={14} /> {language === 'es' ? 'Quitar' : 'Remove'}
+                              </button>
+                            )}
                           </div>
                         </div>
                       ))}
@@ -924,12 +944,16 @@ export const Profile: React.FC = () => {
                       <button onClick={() => handleOpenGuide(list.id)} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', padding: '0.35rem 0.75rem' }}>
                         <Eye size={14} /> {language === 'es' ? 'Ver' : 'View'}
                       </button>
-                      <button onClick={() => navigate(`/create?edit=${list.id}`)} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', padding: '0.35rem 0.75rem' }}>
-                        <Edit size={14} /> {language === 'es' ? 'Editar' : 'Edit'}
-                      </button>
-                      <button onClick={() => handleDeleteGuide(list.id)} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', padding: '0.35rem 0.75rem', color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.2)' }}>
-                        <Trash2 size={14} /> {language === 'es' ? 'Eliminar' : 'Delete'}
-                      </button>
+                      {isOwnProfile && (
+                        <>
+                          <button onClick={() => navigate(`/create?edit=${list.id}`)} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', padding: '0.35rem 0.75rem' }}>
+                            <Edit size={14} /> {language === 'es' ? 'Editar' : 'Edit'}
+                          </button>
+                          <button onClick={() => handleDeleteGuide(list.id)} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', padding: '0.35rem 0.75rem', color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.2)' }}>
+                            <Trash2 size={14} /> {language === 'es' ? 'Eliminar' : 'Delete'}
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -1260,8 +1284,9 @@ export const Profile: React.FC = () => {
                       {[1, 2, 3, 4, 5].map((star) => (
                         <button
                           key={star}
+                          disabled={!isOwnProfile}
                           onClick={() => handleSaveRating(star)}
-                          style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 0 }}
+                          style={{ background: 'transparent', border: 'none', cursor: isOwnProfile ? 'pointer' : 'default', padding: 0 }}
                         >
                           <Star
                             size={24}
@@ -1270,7 +1295,7 @@ export const Profile: React.FC = () => {
                           />
                         </button>
                       ))}
-                      {userRating > 0 && (
+                      {isOwnProfile && userRating > 0 && (
                         <button
                           onClick={handleDeleteRating}
                           style={{
@@ -1291,7 +1316,7 @@ export const Profile: React.FC = () => {
                   </div>
 
                   {/* Favorite toggler */}
-                  {!isEpisode && (
+                  {isOwnProfile && !isEpisode && (
                     <div>
                       <button
                         onClick={() => handleToggleFavorite(selectedItem.id, isFavorite)}
@@ -1324,6 +1349,7 @@ export const Profile: React.FC = () => {
                       </h5>
                       <select
                         className="input-field"
+                        disabled={!isOwnProfile}
                         value={selectedItem.status || ''}
                         onChange={async (e) => {
                           const newStatus = e.target.value;
@@ -1363,6 +1389,7 @@ export const Profile: React.FC = () => {
                         <input
                           type="number"
                           className="input-field"
+                          disabled={!isOwnProfile}
                           value={pagesReadVal}
                           min={0}
                           onFocus={() => {
@@ -1405,6 +1432,7 @@ export const Profile: React.FC = () => {
                       <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.88rem', fontWeight: 600 }}>
                         <input
                           type="checkbox"
+                          disabled={!isOwnProfile}
                           checked={!!selectedItem.completed_at}
                           onChange={async () => {
                             await handleToggleEpisode(selectedItem.list_id, {
@@ -1416,7 +1444,7 @@ export const Profile: React.FC = () => {
                               episode_number: selectedItem.episode_number
                             });
                           }}
-                          style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                          style={{ width: '18px', height: '18px', cursor: isOwnProfile ? 'pointer' : 'default' }}
                         />
                         {language === 'es' ? 'Marcar como visto' : 'Mark as seen'}
                       </label>
@@ -1469,6 +1497,7 @@ export const Profile: React.FC = () => {
                             <span>
                               <input
                                 type="checkbox"
+                                disabled={!isOwnProfile}
                                 checked={(() => {
                                   const listSeps = episodes.filter(x => x.section === `Season ${s.season_number}`);
                                   const cacheKey = `${selectedItem.external_id}_s${s.season_number}`;
@@ -1547,9 +1576,10 @@ export const Profile: React.FC = () => {
                                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                                         <input
                                           type="checkbox"
+                                          disabled={!isOwnProfile}
                                           checked={isCompleted}
                                           onChange={() => handleToggleEpisode(selectedItem.tracking_list_id, ep)}
-                                          style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                                          style={{ width: '18px', height: '18px', cursor: isOwnProfile ? 'pointer' : 'default' }}
                                         />
                                         <span style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-primary)' }}>
                                           {ep.episode_number}. {ep.name || 'Untitled'}

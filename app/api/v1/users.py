@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.api.deps import get_current_user
 from app.models.user import User
-from app.models.list import ReadingList
+from app.models.list import ReadingList, VisibilityEnum
 from app.models.list_item import ListItem
 from app.models.saved_list import SavedList
 from app.models.item_progress import ItemProgress
@@ -240,6 +240,67 @@ def get_my_activity(
 ):
     activities = db.query(UserActivityLog).filter(
         UserActivityLog.user_id == current_user.id
+    ).order_by(UserActivityLog.created_at.desc()).limit(limit).all()
+    
+    return [
+        {
+            "id": act.id,
+            "activity_type": act.activity_type,
+            "item_title": act.item_title,
+            "item_type": act.item_type,
+            "details": act.details,
+            "created_at": act.created_at
+        }
+        for act in activities
+    ]
+
+@router.get("/profile/{user_id}", response_model=UserDashboardResponse)
+def get_any_user_profile(
+    user_id: int,
+    db: Session = Depends(get_db)
+):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    # Exclude tracking lists (personal series/episode trackers)
+    tracker_list_ids_query = db.query(UserLibraryItem.tracking_list_id).filter(
+        UserLibraryItem.user_id == user.id,
+        UserLibraryItem.tracking_list_id.isnot(None)
+    )
+    
+    created_lists = db.query(ReadingList).filter(
+        ReadingList.creator_id == user.id,
+        ReadingList.visibility == VisibilityEnum.PUBLIC,
+        ~ReadingList.id.in_(tracker_list_ids_query)
+    ).all()
+    
+    saved_lists = db.query(ReadingList).join(
+        SavedList, SavedList.list_id == ReadingList.id
+    ).filter(
+        SavedList.user_id == user.id,
+        ReadingList.visibility == VisibilityEnum.PUBLIC
+    ).all()
+    
+    return UserDashboardResponse(
+        id=user.id,
+        username=user.username,
+        email=user.email,
+        created_at=user.created_at,
+        photo_url=user.photo_url,
+        is_admin=user.is_admin,
+        created_lists=created_lists,
+        saved_lists=saved_lists
+    )
+
+@router.get("/{user_id}/activity")
+def get_user_activity(
+    user_id: int,
+    limit: int = 15,
+    db: Session = Depends(get_db)
+):
+    activities = db.query(UserActivityLog).filter(
+        UserActivityLog.user_id == user_id
     ).order_by(UserActivityLog.created_at.desc()).limit(limit).all()
     
     return [

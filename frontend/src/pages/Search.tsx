@@ -604,7 +604,7 @@ export const Search: React.FC = () => {
               const isFollowing = followingUsers.some(u => String(u.id) === item.external_id);
               const isMe = currentUser && String(currentUser.id) === item.external_id;
               return (
-                <div key={item.external_id} className="glass-card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', textAlign: 'center' }}>
+                <div key={item.external_id} className="glass-card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', textAlign: 'center', cursor: 'pointer' }} onClick={() => navigate(`/profile?user_id=${item.external_id}`)}>
                   <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'var(--bg-secondary)', border: '2px solid var(--accent-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
                     {item.image_url ? (
                       <img src={item.image_url} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -669,10 +669,10 @@ export const Search: React.FC = () => {
                         handleToggleSaveGuide(parseInt(item.external_id), isSaved);
                       }}
                       className="btn-secondary"
-                      style={{ flex: 1, fontSize: '0.82rem', padding: '0.4rem', color: isSaved ? '#ef4444' : 'var(--text-primary)', borderColor: isSaved ? 'rgba(239, 68, 68, 0.2)' : 'var(--border-color)' }}
+                      style={{ flex: 1, fontSize: '0.82rem', padding: '0.4rem', color: isSaved ? 'var(--accent-primary)' : 'var(--text-primary)', borderColor: isSaved ? 'var(--accent-primary)' : 'var(--border-color)', background: isSaved ? 'rgba(124, 58, 237, 0.1)' : 'transparent' }}
                     >
                       {isSaved 
-                        ? (language === 'es' ? 'Dejar de seguir' : 'Unfollow') 
+                        ? (language === 'es' ? 'Siguiendo' : 'Following') 
                         : (language === 'es' ? 'Seguir' : 'Follow')
                       }
                     </button>
@@ -738,7 +738,7 @@ export const Search: React.FC = () => {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 2000
+          zIndex: 2100
         }}>
           <div className="glass-card" style={{ width: '400px', padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
             <h3 style={{ margin: 0, textAlign: 'left' }}>{t('searchSelectStatus')}</h3>
@@ -956,8 +956,8 @@ export const Search: React.FC = () => {
                 {!currentShelfItem && (
                   <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--accent-primary)', fontStyle: 'italic' }}>
                     {language === 'es' 
-                      ? 'Para marcar capítulos como vistos, primero debes añadir esta serie a tu estantería.' 
-                      : 'To mark episodes as watched, you must first add this series to your shelf.'}
+                      ? 'Al marcar capítulos, la serie se añadirá automáticamente a tu estantería.' 
+                      : 'Checking episodes will automatically add this series to your shelf.'}
                   </p>
                 )}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
