@@ -34,19 +34,19 @@ def validate_media_status(item_type: str, status_val: UserLibraryStatusEnum):
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid status for movie. Must be 'plan_to_watch', 'completed', or 'dropped'."
             )
-    elif t_lower == "series":
+    elif t_lower in ("series", "anime"):
         allowed = {UserLibraryStatusEnum.PLAN_TO_WATCH, UserLibraryStatusEnum.WATCHING, UserLibraryStatusEnum.COMPLETED}
         if status_val not in allowed:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid status for series. Must be 'plan_to_watch', 'watching', 'completed', or 'dropped'."
             )
-    elif t_lower in ("comic", "manga", "book"):
+    elif t_lower == "book":
         allowed = {UserLibraryStatusEnum.PLAN_TO_READ, UserLibraryStatusEnum.READING, UserLibraryStatusEnum.READ}
         if status_val not in allowed:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid status for book/manga/comic. Must be 'plan_to_read', 'reading', 'read', or 'dropped'."
+                detail="Invalid status for book. Must be 'plan_to_read', 'reading', 'read', or 'dropped'."
             )
 
 def bulk_complete_series_episodes(db: Session, user_id: int, tracking_list_id: int, external_id: str, title: str):
@@ -121,8 +121,7 @@ def add_to_library(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    if item_in.item_type == "anime":
-        item_in.item_type = "series"
+    # anime is stored as-is but treated like series for episode tracking
     validate_media_status(item_in.item_type, item_in.status)
 
     # Check if already exists in library
@@ -140,8 +139,8 @@ def add_to_library(
         
     tracking_list_id = None
     
-    # If it is a TV series, automatically create a private reading list for episode tracking
-    if item_in.item_type == "series":
+    # If it is a TV series or anime, automatically create a private reading list for episode tracking
+    if item_in.item_type in ("series", "anime"):
         # Create private reading list representing this show
         private_list = ReadingList(
             creator_id=current_user.id,

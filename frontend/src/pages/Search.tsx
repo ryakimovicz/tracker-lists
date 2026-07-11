@@ -190,7 +190,7 @@ export const Search: React.FC = () => {
       // If modal details is open, refresh its shelf state
       if (selectedItem && selectedItem.external_id === selectedItemForShelf.external_id) {
         const updatedShelf = await apiClient.get('/library/');
-        const fresh = updatedShelf.data.find((x: any) => x.external_id === selectedItem.external_id && x.item_type === (selectedItem.item_type === 'anime' ? 'series' : selectedItem.item_type));
+        const fresh = updatedShelf.data.find((x: any) => x.external_id === selectedItem.external_id && x.item_type === selectedItem.item_type);
         if (fresh) {
           setPagesReadVal(fresh.pages_read || 0);
         }
@@ -288,8 +288,8 @@ export const Search: React.FC = () => {
     setActiveSeason(null);
     setSeasonEpisodes({});
 
-    const normType = item.item_type === 'anime' ? 'series' : item.item_type;
-    const matchedShelf = shelfItems.find(x => x.external_id === item.external_id && x.item_type === normType);
+    const normType = item.item_type;
+    const matchedShelf = shelfItems.find(x => x.external_id === item.external_id && x.item_type === item.item_type);
     if (matchedShelf) {
       setPagesReadVal(matchedShelf.pages_read || 0);
     }
@@ -505,7 +505,7 @@ export const Search: React.FC = () => {
       });
 
   const normType = selectedItem ? (selectedItem.item_type === 'anime' ? 'series' : selectedItem.item_type) : '';
-  const currentShelfItem = selectedItem ? shelfItems.find(x => x.external_id === selectedItem.external_id && x.item_type === normType) : null;
+  const currentShelfItem = selectedItem ? shelfItems.find(x => x.external_id === selectedItem.external_id && x.item_type === selectedItem.item_type) : null;
 
   return (
     <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '2rem 0', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
@@ -677,7 +677,7 @@ export const Search: React.FC = () => {
               );
             }
 
-            const onShelf = shelfItems.some(x => x.external_id === item.external_id && x.item_type === (item.item_type === 'anime' ? 'series' : item.item_type));
+            const onShelf = shelfItems.some(x => x.external_id === item.external_id && x.item_type === item.item_type);
             return (
               <div key={item.external_id} className="glass-card" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', cursor: 'pointer' }} onClick={() => handleOpenItemDetails(item)}>
                 <img
