@@ -4,8 +4,7 @@ from sqlalchemy.orm import relationship
 from app.core.database import Base
 
 class ItemTypeEnum(str, enum.Enum):
-    COMIC = "comic"
-    MANGA = "manga"
+    ANIME = "anime"
     BOOK = "book"
     MOVIE = "movie"
     SERIES = "series"

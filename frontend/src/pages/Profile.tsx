@@ -811,13 +811,10 @@ export const Profile: React.FC = () => {
                               {item.title}
                             </h4>
                             <span style={{ fontSize: '0.75rem', color: 'var(--accent-primary)' }}>
-                              {(() => {
-                                const displayType = (item.item_type === 'comic' || item.item_type === 'manga') ? 'book' : item.item_type;
-                                return t('media' + displayType.charAt(0).toUpperCase() + displayType.slice(1));
-                              })()}
+                              {t('media' + item.item_type.charAt(0).toUpperCase() + item.item_type.slice(1))}
                             </span>
                             {/* Last completed episode for series */}
-                            {(item.item_type === 'series' || item.item_type === 'anime') && item.last_seen_episode && (
+                            {item.item_type === 'series' && item.last_seen_episode && (
                               <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 500, display: 'block', marginTop: '-0.3rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.last_seen_episode}>
                                 {item.last_seen_episode.includes(' - ') ? item.last_seen_episode.split(' - ').slice(1).join(' - ') : item.last_seen_episode}
                               </span>
@@ -1026,7 +1023,7 @@ export const Profile: React.FC = () => {
                   />
                   <h4>{item.title}</h4>
                   <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                    {t('media' + (item.item_type === 'comic' || item.item_type === 'manga' ? 'book' : item.item_type).charAt(0).toUpperCase() + (item.item_type === 'comic' || item.item_type === 'manga' ? 'book' : item.item_type).slice(1))}
+                    {t('media' + item.item_type.charAt(0).toUpperCase() + item.item_type.slice(1))}
                   </span>
                 </div>
               ))}
@@ -1189,7 +1186,7 @@ export const Profile: React.FC = () => {
                     <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700 }}>{selectedItem.title}</h2>
                     <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
                       <span style={{ fontSize: '0.78rem', color: 'var(--accent-primary)', textTransform: 'uppercase', fontWeight: 700 }}>
-                        {t('media' + (selectedItem.item_type === 'comic' || selectedItem.item_type === 'manga' ? 'book' : selectedItem.item_type).charAt(0).toUpperCase() + (selectedItem.item_type === 'comic' || selectedItem.item_type === 'manga' ? 'book' : selectedItem.item_type).slice(1))}
+                        {t('media' + selectedItem.item_type.charAt(0).toUpperCase() + selectedItem.item_type.slice(1))}
                       </span>
                       {avgRating && (
                         <span style={{ fontSize: '0.78rem', color: '#f59e0b', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.1rem' }}>
@@ -1198,7 +1195,7 @@ export const Profile: React.FC = () => {
                       )}
                       {selectedItem.completed_at && (
                         <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
-                          • {selectedItem.item_type === 'movie' || selectedItem.item_type === 'series' || selectedItem.item_type === 'anime'
+                          • {selectedItem.item_type === 'movie' || selectedItem.item_type === 'series'
                             ? (language === 'es' ? 'Visto el: ' : 'Watched on: ')
                             : (language === 'es' ? 'Terminado el: ' : 'Completed on: ')
                           }
@@ -1392,7 +1389,7 @@ export const Profile: React.FC = () => {
                           const newStatus = e.target.value;
                           await handleStatusChange(selectedItem.id, newStatus);
                           setSelectedItem((prev: any) => prev ? { ...prev, status: newStatus } : null);
-                          if ((selectedItem.item_type === 'series' || selectedItem.item_type === 'anime') && newStatus === 'completed' && selectedItem.tracking_list_id) {
+                          if (selectedItem.item_type === 'series' && newStatus === 'completed' && selectedItem.tracking_list_id) {
                             const listRes = await apiClient.get(`/lists/${selectedItem.tracking_list_id}`);
                             setEpisodes(listRes.data.items || []);
                           }
@@ -1497,7 +1494,7 @@ export const Profile: React.FC = () => {
               </div>
 
               {/* TV Series Season Accordion Tracking */}
-              {(selectedItem.item_type === 'series' || selectedItem.item_type === 'anime') && seasons.length > 0 && !isEpisode && (
+              {selectedItem.item_type === 'series' && seasons.length > 0 && !isEpisode && (
                 <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                   <h4 style={{ margin: 0, fontSize: '1.1rem' }}>
                     {language === 'es' ? 'Seguimiento de Temporadas' : 'Season Tracking'}
