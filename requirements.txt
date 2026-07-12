@@ -9,3 +9,4 @@ python-dotenv>=1.0.1
 pydantic-settings>=2.2.1
 pydantic[email]>=2.6.0
 python-multipart>=0.0.9
+slowapi>=0.1.9
