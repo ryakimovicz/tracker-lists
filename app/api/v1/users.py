@@ -254,6 +254,42 @@ def get_my_activity(
         for act in activities
     ]
 
+@router.get("/me/feed/guides-updates")
+def get_guides_updates(
+    limit: int = 15,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    saved_list_ids = db.query(SavedList.list_id).filter(SavedList.user_id == current_user.id)
+    saved_ids_set = {r[0] for r in saved_list_ids.all()}
+    
+    activities = db.query(UserActivityLog).filter(
+        UserActivityLog.activity_type == 'item_added'
+    ).order_by(UserActivityLog.created_at.desc()).limit(100).all()
+    
+    result = []
+    for a in activities:
+        if a.details and a.details.startswith('list_id:'):
+            try:
+                lid = int(a.details.split(':')[1])
+                if lid in saved_ids_set:
+                    rlist = db.query(ReadingList).filter(ReadingList.id == lid).first()
+                    result.append({
+                        'id': a.id,
+                        'user_id': a.user_id,
+                        'username': a.user.username if a.user else 'Unknown',
+                        'item_title': a.item_title,
+                        'item_type': a.item_type,
+                        'list_id': lid,
+                        'list_title': rlist.title if rlist else 'Unknown',
+                        'created_at': a.created_at
+                    })
+                    if len(result) >= limit:
+                        break
+            except Exception:
+                pass
+    return result
+
 @router.get("/profile/{user_id}", response_model=UserDashboardResponse)
 def get_any_user_profile(
     user_id: int,

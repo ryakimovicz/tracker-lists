@@ -389,6 +389,17 @@ def add_item_to_list(
     db.add(new_item)
     db.commit()
     db.refresh(new_item)
+
+    activity = UserActivityLog(
+        user_id=current_user.id,
+        activity_type="item_added",
+        item_title=item_in.title,
+        item_type=item_in.item_type,
+        details=f"list_id:{list_id}"
+    )
+    db.add(activity)
+    db.commit()
+
     return new_item
 
 # 7. Delete item from list
@@ -716,6 +727,15 @@ def import_tv_items(
         )
         db.add(item)
         created_items.append(item)
+
+        activity = UserActivityLog(
+            user_id=current_user.id,
+            activity_type="item_added",
+            item_title=series.get("name") or "Untitled Series",
+            item_type="series",
+            details=f"list_id:{list_id}"
+        )
+        db.add(activity)
         
     elif import_req.import_type == TVImportType.SEASON:
         if import_req.season_number is None:
@@ -748,6 +768,16 @@ def import_tv_items(
             )
             db.add(item)
             created_items.append(item)
+            
+            activity = UserActivityLog(
+                user_id=current_user.id,
+                activity_type="item_added",
+                item_title=title,
+                item_type="series",
+                details=f"list_id:{list_id}"
+            )
+            db.add(activity)
+
             order_idx += 1
             
     elif import_req.import_type == TVImportType.EPISODE:
@@ -779,6 +809,15 @@ def import_tv_items(
         )
         db.add(item)
         created_items.append(item)
+        
+        activity = UserActivityLog(
+            user_id=current_user.id,
+            activity_type="item_added",
+            item_title=title,
+            item_type="series",
+            details=f"list_id:{list_id}"
+        )
+        db.add(activity)
         
     db.commit()
     for item in created_items:
