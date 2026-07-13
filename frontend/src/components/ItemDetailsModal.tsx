@@ -171,7 +171,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     if (seasonEpisodes[seasonNumber]) return;
     const cacheKey = `${seriesId}_s${seasonNumber}`;
     const cached = getCachedTMDB(cacheKey);
-    if (cached) {
+    if (cached && Array.isArray(cached)) {
       setSeasonEpisodes(prev => ({
         ...prev,
         [seasonNumber]: cached
@@ -209,20 +209,38 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
         try {
           let itemsList: any[] = [];
           if (item.tracking_list_id) {
-            const listRes = await apiClient.get(`/lists/${item.tracking_list_id}`);
-            itemsList = listRes.data.items || [];
-            setEpisodes(itemsList);
+            try {
+              const listRes = await apiClient.get(`/lists/${item.tracking_list_id}`);
+              itemsList = listRes.data.items || [];
+              setEpisodes(itemsList);
+            } catch (err) {
+              console.error("Failed to fetch tracking list", err);
+              // Continue loading TMDB data even if list fails
+            }
           }
           
           let filteredSeasons = [];
           const cacheKey = `series_${item.external_id}`;
           const cached = getCachedTMDB(cacheKey);
-          if (cached) {
-            filteredSeasons = cached;
+          let seriesData = null;
+          
+          if (cached && cached.seasons) {
+            seriesData = cached;
+            filteredSeasons = cached.seasons;
           } else {
             const seriesRes = await apiClient.get(`/search/series/${item.external_id}`);
-            filteredSeasons = (seriesRes.data.seasons || []).filter((s: any) => s.season_number > 0);
-            setCachedTMDB(cacheKey, filteredSeasons);
+            seriesData = seriesRes.data;
+            filteredSeasons = (seriesData.seasons || []).filter((s: any) => s.season_number > 0);
+            setCachedTMDB(cacheKey, { ...seriesData, seasons: filteredSeasons });
+          }
+          
+          if (!item.description || !item.release_date) {
+            setSelectedItem((prev: any) => prev ? {
+              ...prev,
+              description: prev.description || seriesData.overview,
+              release_date: prev.release_date || seriesData.first_air_date,
+              image_url: prev.image_url || (seriesData.poster_path ? `https://image.tmdb.org/t/p/w185${seriesData.poster_path}` : null)
+            } : null);
           }
           setSeasons(filteredSeasons);
 
@@ -231,14 +249,14 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
           const cacheKeyS = `${item.external_id}_s${nextSeason}`;
           const cachedS = getCachedTMDB(cacheKeyS);
-          if (cachedS) {
-            setSeasonEpisodes({ [nextSeason]: cachedS });
+          if (cachedS && Array.isArray(cachedS)) {
+            setSeasonEpisodes(prev => ({ ...prev, [nextSeason]: cachedS }));
           } else {
             setIsLoadingSeasonEpisodes(true);
             apiClient.get(`/search/series/${item.external_id}/season/${nextSeason}`)
               .then(res => {
                 setCachedTMDB(cacheKeyS, res.data);
-                setSeasonEpisodes({ [nextSeason]: res.data || [] });
+                setSeasonEpisodes(prev => ({ ...prev, [nextSeason]: res.data || [] }));
               })
               .catch(e => console.error(e))
               .finally(() => setIsLoadingSeasonEpisodes(false));
@@ -697,7 +715,9 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         value={selectedItem.status || ''}
                         onChange={async (e) => {
                           const newStatus = e.target.value;
-                          await onStatusChange && onStatusChange(selectedItem.id, newStatus);
+                          if (onStatusChange) {
+                            await onStatusChange(selectedItem.id, newStatus);
+                          }
                           setSelectedItem((prev: any) => prev ? { ...prev, status: newStatus } : null);
                           if ((selectedItem.item_type === 'series' || selectedItem.item_type === 'anime') && newStatus === 'completed' && selectedItem.tracking_list_id) {
                             const listRes = await apiClient.get(`/lists/${selectedItem.tracking_list_id}`);

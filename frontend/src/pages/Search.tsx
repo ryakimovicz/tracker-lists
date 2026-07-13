@@ -181,11 +181,7 @@ export const Search: React.FC = () => {
       
       // If modal details is open, refresh its shelf state
       if (selectedItem && selectedItem.external_id === selectedItemForShelf.external_id) {
-        const updatedShelf = await apiClient.get('/library/');
-        const fresh = updatedShelf.data.find((x: any) => x.external_id === selectedItem.external_id && x.item_type === selectedItem.item_type);
-        if (fresh) {
-          setPagesReadVal(fresh.pages_read || 0);
-        }
+        // Shelf is already reloaded via loadShelfItems() above.
       }
       setTimeout(() => setSuccessMsg(''), 4000);
     } catch (err: any) {
@@ -194,8 +190,8 @@ export const Search: React.FC = () => {
   };
 
   const handleOpenItemDetails = (item: SearchResultItem) => {
-    if (item.id && item.list_title && !item.external_id) {
-      navigate(`/guide/${item.id}`);
+    if ((item as any).id && (item as any).list_title && !item.external_id) {
+      navigate(`/guide/${(item as any).id}`);
       return;
     }
     setSelectedItem(item);

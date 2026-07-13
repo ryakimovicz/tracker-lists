@@ -19,8 +19,13 @@ const ActiveSeriesCard = ({ item, onClick, onUpdate, language }: { item: any, on
     }
     setIsLoading(true);
     try {
-      const listRes = await apiClient.get(`/lists/${item.tracking_list_id}`);
-      const trackedEpisodes = listRes.data.items || [];
+      let trackedEpisodes: any[] = [];
+      try {
+        const listRes = await apiClient.get(`/lists/${item.tracking_list_id}`);
+        trackedEpisodes = listRes.data.items || [];
+      } catch (err) {
+        console.error("Failed to load tracking list for Home card", err);
+      }
 
       // Parse season/episode numbers from title (e.g. "Show - S01E02 - Title")
       const parseEpInfo = (ep: any): { season: number; episode: number } => {
@@ -33,12 +38,12 @@ const ActiveSeriesCard = ({ item, onClick, onUpdate, language }: { item: any, on
       let filteredSeasons: any[] = [];
       const cacheKey = `series_${item.external_id}`;
       const cached = getCachedTMDB(cacheKey);
-      if (cached) {
-        filteredSeasons = cached;
+      if (cached && cached.seasons) {
+        filteredSeasons = cached.seasons;
       } else {
         const seriesRes = await apiClient.get(`/search/series/${item.external_id}`);
         filteredSeasons = (seriesRes.data.seasons || []).filter((s: any) => s.season_number > 0);
-        setCachedTMDB(cacheKey, filteredSeasons);
+        setCachedTMDB(cacheKey, { ...seriesRes.data, seasons: filteredSeasons });
       }
 
       if (filteredSeasons.length === 0) return;
@@ -74,7 +79,7 @@ const ActiveSeriesCard = ({ item, onClick, onUpdate, language }: { item: any, on
       const cacheKeyS = `${item.external_id}_s${nextSeasonNum}`;
       const cachedS = getCachedTMDB(cacheKeyS);
       let targetEp = null;
-      if (cachedS) {
+      if (cachedS && Array.isArray(cachedS)) {
         targetEp = cachedS.find((e: any) => e.episode_number === nextEpNum);
       } else {
         const res = await apiClient.get(`/search/series/${item.external_id}/season/${nextSeasonNum}`);
@@ -113,8 +118,8 @@ const ActiveSeriesCard = ({ item, onClick, onUpdate, language }: { item: any, on
       const updatedList = listRes.data.items || [];
       const cacheKey = `series_${item.external_id}`;
       const cached = getCachedTMDB(cacheKey);
-      if (cached) {
-        const totalEps = cached.reduce((acc: number, s: any) => acc + (s.episode_count || 0), 0);
+      if (cached && cached.seasons) {
+        const totalEps = cached.seasons.reduce((acc: number, s: any) => acc + (s.episode_count || 0), 0);
         const completed = updatedList.filter((ep: any) => ep.is_completed).length;
         if (totalEps > 0 && completed >= totalEps) {
           await apiClient.put(`/library/${item.id}`, { status: 'completed' });
