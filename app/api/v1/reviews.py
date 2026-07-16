@@ -5,10 +5,10 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.api.deps import get_current_user, get_current_user_optional
-from app.models.user import User
-from app.models.library import UserLibraryItem
-from app.models.activity import UserActivityLog
-from app.models.review import MediaReview, MediaReviewVote, MediaReviewReport
+from ...models.user import User
+from ...models.library import UserLibraryItem
+from ...models.activity import UserActivityLog
+from ...models.review import MediaReview, MediaReviewVote, MediaReviewReport
 from app.schemas.review import MediaReviewCreate, MediaReviewResponse, ReviewReportCreate
 
 router = APIRouter()
