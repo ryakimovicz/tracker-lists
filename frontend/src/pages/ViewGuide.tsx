@@ -625,7 +625,7 @@ export const ViewGuide: React.FC = () => {
               <div>
                 <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700 }}>{selectedItem.title}</h2>
                 <span style={{ fontSize: '0.78rem', color: 'var(--accent-primary)', textTransform: 'uppercase', fontWeight: 700 }}>
-                  {t('media' + selectedItem.item_type.charAt(0).toUpperCase() + selectedItem.item_type.slice(1))}
+                  {selectedItem.item_type === 'comic' ? (language === 'es' ? 'Cómic' : 'Comic') : selectedItem.item_type === 'manga' ? 'Manga' : t('media' + selectedItem.item_type.charAt(0).toUpperCase() + selectedItem.item_type.slice(1))}
                 </span>
               </div>
               <button

@@ -70,7 +70,7 @@ export const CreateGuide: React.FC = () => {
   // Real-time search modal states (inside editor)
   const [searchTarget, setSearchTarget] = useState<{ elementId: string; subblockId?: string } | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeSearchTab, setActiveSearchTab] = useState<'all' | 'movie' | 'series' | 'anime' | 'book' | 'game'>('all');
+  const [activeSearchTab, setActiveSearchTab] = useState<'all' | 'movie' | 'series' | 'anime' | 'book' | 'comic' | 'manga' | 'game'>('all');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [searchTab, setSearchTab] = useState<'search' | 'manual'>('search');
@@ -989,6 +989,8 @@ export const CreateGuide: React.FC = () => {
                       { value: 'series', label: language === 'es' ? 'Series' : 'Series' },
                       { value: 'anime', label: 'Anime' },
                       { value: 'book', label: language === 'es' ? 'Libros' : 'Books' },
+                      { value: 'comic', label: language === 'es' ? 'Cómic' : 'Comic' },
+                      { value: 'manga', label: 'Manga' },
                       { value: 'game', label: language === 'es' ? 'Juegos' : 'Games' }
                     ].map(tab => (
                       <button
@@ -1029,6 +1031,8 @@ export const CreateGuide: React.FC = () => {
                           if (activeSearchTab === 'anime') return item.item_type === 'anime';
                           if (activeSearchTab === 'movie') return item.item_type === 'movie';
                           if (activeSearchTab === 'book') return item.item_type === 'book';
+                          if (activeSearchTab === 'comic') return item.item_type === 'comic';
+                          if (activeSearchTab === 'manga') return item.item_type === 'manga';
                           if (activeSearchTab === 'game') return item.item_type === 'game';
                           return true;
                         });

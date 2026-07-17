@@ -9,6 +9,7 @@ from app.services.comicvine import ComicVineService
 from app.services.tmdb import TMDBService
 from app.services.googlebooks import GoogleBooksService
 from app.services.igdb import IGDBService
+from app.services.anilist import AnilistService
 from app.core.limiter import limiter
 
 router = APIRouter()
@@ -60,6 +61,8 @@ def search_media(
             
         combined.sort(key=calculate_score, reverse=True)
         return combined
+    elif type_lower == "manga":
+        return AnilistService.search_manga(q)
     elif type_lower == "game":
         return IGDBService.search_games(q)
     elif type_lower == "movie":
@@ -105,18 +108,20 @@ def search_all_media(
     db: Session = Depends(get_db)
 ):
     import concurrent.futures
-    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
         future_movies = executor.submit(TMDBService.search_media, q, "movie")
         future_series = executor.submit(TMDBService.search_media, q, "series")
         future_books = executor.submit(GoogleBooksService.search_books, q)
         future_games = executor.submit(IGDBService.search_games, q)
         future_comics = executor.submit(ComicVineService.search_comics, q)
+        future_manga = executor.submit(AnilistService.search_manga, q)
         
         movies = future_movies.result()
         series = future_series.result()
         books = future_books.result()
         games = future_games.result()
         comics = future_comics.result()
+        mangas = future_manga.result()
         
     combined = []
     combined.extend(movies)
@@ -124,6 +129,7 @@ def search_all_media(
     combined.extend(books)
     combined.extend(games)
     combined.extend(comics)
+    combined.extend(mangas)
 
     # Search users and guides in database
     search_pattern = f"%{q.lower()}%"

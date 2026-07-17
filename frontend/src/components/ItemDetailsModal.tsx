@@ -514,7 +514,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                     <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700 }}>{selectedItem.title}</h2>
                     <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
                       <span style={{ fontSize: '0.78rem', color: 'var(--accent-primary)', textTransform: 'uppercase', fontWeight: 700 }}>
-                        {t('media' + (selectedItem?.item_type || 'movie').charAt(0).toUpperCase() + (selectedItem?.item_type || 'movie').slice(1))}
+                        {selectedItem?.item_type === 'comic' ? (language === 'es' ? 'Cómic' : 'Comic') : selectedItem?.item_type === 'manga' ? 'Manga' : t('media' + (selectedItem?.item_type || 'movie').charAt(0).toUpperCase() + (selectedItem?.item_type || 'movie').slice(1))}
                       </span>
                       {avgRating && (
                         <span style={{ fontSize: '0.78rem', color: '#f59e0b', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.1rem' }}>

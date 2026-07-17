@@ -151,7 +151,7 @@ const ActiveSeriesCard = ({ item, onClick, onUpdate, language }: { item: any, on
       'series': language === 'es' ? 'Serie' : 'Series',
       'anime': 'Anime',
       'book': language === 'es' ? 'Libro' : 'Book',
-      'comic': 'Cómic',
+      'comic': language === 'es' ? 'Cómic' : 'Comic',
       'manga': 'Manga'
     };
     return map[type] || type;
