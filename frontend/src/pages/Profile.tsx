@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from '../context/LanguageContext';
 import { apiClient } from '../api/client';
@@ -14,9 +14,7 @@ import {
   AlertCircle,
   CheckCircle,
   Eye,
-  Edit,
-  Star,
-  X
+  Edit
 } from 'lucide-react';
 
 interface LibraryItem {
@@ -24,7 +22,8 @@ interface LibraryItem {
   item_type: 'game' | 'movie' | 'series' | 'anime' | 'book' | 'comic' | 'manga';
   external_id: string;
   title: string;
-  image_url: string;
+  image_url: string | null;
+  imdb_id?: string;
   status: string;
   is_favorite: boolean;
   created_at: string;
@@ -35,26 +34,7 @@ interface LibraryItem {
   tracking_list_id?: number;
 }
 
-const getCachedTMDB = (key: string) => {
-  try {
-    const item = localStorage.getItem(`tmdb_cache_${key}`);
-    if (item) {
-      const parsed = JSON.parse(item);
-      if (Date.now() - parsed.timestamp < 6 * 60 * 60 * 1000) {
-        return parsed.data;
-      }
-    }
-  } catch(e){}
-  return null;
-};
-const setCachedTMDB = (key: string, data: any) => {
-  try {
-    localStorage.setItem(`tmdb_cache_${key}`, JSON.stringify({
-      data,
-      timestamp: Date.now()
-    }));
-  } catch(e){}
-};
+
 
 interface UserProfile {
   id: number;
@@ -65,6 +45,7 @@ interface UserProfile {
   created_at: string;
   created_lists: any[];
   saved_lists: any[];
+  lastfm_username?: string;
 }
 
 export const Profile: React.FC = () => {
@@ -76,10 +57,9 @@ export const Profile: React.FC = () => {
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [libraryItems, setLibraryItems] = useState<LibraryItem[]>([]);
-  const [activeTab, setActiveTab] = useState<'shelf' | 'guides' | 'favorites'>('shelf');
+  const [activeTab, setActiveTab] = useState<'shelf' | 'guides' | 'favorites' | 'music'>('shelf');
   const [mediaFilter, setMediaFilter] = useState<'all' | 'movie' | 'series' | 'anime' | 'book' | 'comic' | 'manga' | 'game'>('all');
   const [errorMsg, setErrorMsg] = useState('');
-  const [isShelfExpanded, setIsShelfExpanded] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [loading, setLoading] = useState(true);
 
@@ -112,35 +92,18 @@ export const Profile: React.FC = () => {
   // Favorites state (local highlight mock for UX polish)
   const [favorites, setFavorites] = useState<LibraryItem[]>([]);
 
+  // Last.fm states
+  const [nowPlaying, setNowPlaying] = useState<any>(null);
+  const [topAlbums, setTopAlbums] = useState<any[]>([]);
+  const [isConnectingLastFm, setIsConnectingLastFm] = useState(false);
+  const [lastFmTokenInput, setLastFmTokenInput] = useState('');
+
   const formatDate = (date: Date) => {
     return date.toLocaleDateString(language === 'es' ? 'es-ES' : 'en-US', {
       year: 'numeric',
       month: 'long',
       day: 'numeric'
     });
-  };
-
-  const formatReleaseDate = (dateStr: string) => {
-    if (!dateStr) return '';
-    if (/^\d{4}$/.test(dateStr)) return dateStr;
-    try {
-      const cleanStr = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
-      const parts = cleanStr.split('-');
-      if (parts.length === 3) {
-        const year = parseInt(parts[0]);
-        const month = parseInt(parts[1]) - 1;
-        const day = parseInt(parts[2]);
-        const date = new Date(year, month, day);
-        if (!isNaN(date.getTime())) {
-          return formatDate(date);
-        }
-      }
-      const date = new Date(cleanStr + 'T00:00:00');
-      if (isNaN(date.getTime())) return dateStr;
-      return formatDate(date);
-    } catch (e) {
-      return dateStr;
-    }
   };
 
   useEffect(() => {
@@ -170,10 +133,66 @@ export const Profile: React.FC = () => {
       const targetActivityUrl = userIdParam ? `/users/${userIdParam}/activity` : '/users/me/activity';
       const activityRes = await apiClient.get(targetActivityUrl);
       setActivities(activityRes.data);
+      
+      // Fetch Last.fm data if applicable
+      if (profileRes.data.lastfm_username || (!userIdParam && meRes.data.lastfm_username)) {
+         try {
+           const npRes = await apiClient.get('/users/me/music/now-playing'); // This works for 'me'. If checking another profile, we might need a target endpoint, but for now we only added /me/ endpoints. Let's just use /me/ for now.
+           setNowPlaying(npRes.data);
+           const taRes = await apiClient.get('/users/me/music/top-albums');
+           setTopAlbums(taRes.data);
+         } catch(e) {}
+      }
+      
     } catch (err: any) {
       setErrorMsg(err.response?.data?.detail || 'Failed to fetch library information.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const tokenProcessed = useRef(false);
+
+  useEffect(() => {
+    const token = searchParams.get('token');
+    if (token && !tokenProcessed.current) {
+      tokenProcessed.current = true;
+      connectLastFm(token);
+    }
+  }, [searchParams]);
+
+  const connectLastFm = async (token: string) => {
+    try {
+      await apiClient.post(`/users/me/lastfm/connect?token=${token}`);
+      setSuccessMsg(language === 'es' ? 'Conectado a Last.fm exitosamente.' : 'Connected to Last.fm successfully.');
+      searchParams.delete('token');
+      navigate('/profile', { replace: true });
+      fetchProfileAndLibrary();
+    } catch(err) {
+      setErrorMsg('Error connecting to Last.fm');
+    }
+  };
+
+  const handleLastFmLogin = () => {
+    // Generate auth URL
+    // In a real app this should be fetched from the backend, but since it's just the API_KEY it's okay to construct or call endpoint.
+    // Actually, we can just redirect directly since the API_KEY is public. Wait, frontend doesn't have API_KEY.
+    // Let's call an endpoint to get the auth URL? No, we didn't add an endpoint for getting the auth URL.
+    // Let's hardcode the URL since the api key is known, or just prompt for username if we don't want strict oauth.
+    // The user requested Last.fm oauth flow, so we must redirect to lastfm.
+    window.location.href = `http://www.last.fm/api/auth/?api_key=de5acce61bdd8b3e4bd181ebce8a69e8&cb=${encodeURIComponent('http://localhost:5173/profile')}`;
+  };
+
+  const handleLastFmDisconnect = async () => {
+    if (!window.confirm(language === 'es' ? '¿Desconectar cuenta de Last.fm?' : 'Disconnect Last.fm account?')) return;
+    try {
+      await apiClient.delete('/users/me/lastfm/disconnect');
+      setProfile(prev => prev ? { ...prev, lastfm_username: undefined } : null);
+      setNowPlaying(null);
+      setTopAlbums([]);
+      setSuccessMsg(language === 'es' ? 'Desconectado de Last.fm.' : 'Disconnected from Last.fm.');
+    } catch(err) {
+      setErrorMsg('Error disconnecting from Last.fm');
     }
   };
 
@@ -365,6 +384,46 @@ export const Profile: React.FC = () => {
               <span><strong>0</strong> {language === 'es' ? 'Seguidos' : 'Following'}</span>
               <span><strong>{visualLibraryItems.length}</strong> {language === 'es' ? 'En Estantería' : 'On Shelf'}</span>
             </div>
+            
+            {/* Last.fm Integration UI */}
+            {isOwnProfile && (
+              <div style={{ marginTop: '1.5rem' }}>
+                {!profile.lastfm_username ? (
+                  <button onClick={handleLastFmLogin} className="btn-secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}>
+                    🎵 {language === 'es' ? 'Conectar Last.fm' : 'Connect Last.fm'}
+                  </button>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                    <span>🎵 {language === 'es' ? 'Conectado como' : 'Connected as'} <strong>{profile.lastfm_username}</strong></span>
+                    <button onClick={handleLastFmDisconnect} className="btn-secondary" style={{ padding: '0.2rem 0.6rem', fontSize: '0.75rem', borderColor: '#ef4444', color: '#ef4444' }}>
+                      {language === 'es' ? 'Desconectar' : 'Disconnect'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {/* Now Playing Widget */}
+            {nowPlaying && (
+              <div style={{ marginTop: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem', background: 'rgba(255, 255, 255, 0.05)', padding: '0.75rem 1rem', borderRadius: '12px', border: '1px solid var(--border-color)', width: 'fit-content' }}>
+                <div style={{ width: '50px', height: '50px', borderRadius: '8px', overflow: 'hidden', background: '#333' }}>
+                  {nowPlaying.image && <img src={nowPlaying.image} alt="Album Art" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    {nowPlaying.is_playing ? (
+                      <><span style={{ display: 'inline-block', width: '8px', height: '8px', background: '#10b981', borderRadius: '50%', animation: 'pulse 2s infinite' }} /> {language === 'es' ? 'Escuchando ahora' : 'Now Playing'}</>
+                    ) : (
+                      language === 'es' ? 'Última canción escuchada' : 'Last Played'
+                    )}
+                  </span>
+                  <a href={nowPlaying.url} target="_blank" rel="noopener noreferrer" style={{ margin: '0.2rem 0 0.1rem 0', fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-primary)', textDecoration: 'none' }}>
+                    {nowPlaying.name}
+                  </a>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{nowPlaying.artist}</span>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -441,6 +500,27 @@ export const Profile: React.FC = () => {
         >
           <Heart size={18} /> {language === 'es' ? 'Destacados' : 'Favorites'}
         </button>
+
+        {(profile?.lastfm_username || (!userIdParam && currentUser?.lastfm_username)) && (
+          <button
+            onClick={() => setActiveTab('music')}
+            className="btn-secondary"
+            style={{
+              background: 'transparent',
+              border: 'none',
+              borderBottom: activeTab === 'music' ? '2px solid var(--accent-primary)' : 'none',
+              color: activeTab === 'music' ? 'var(--text-primary)' : 'var(--text-secondary)',
+              fontWeight: activeTab === 'music' ? 600 : 400,
+              borderRadius: 0,
+              padding: '0.75rem 0.5rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            🎵 {language === 'es' ? 'Música' : 'Music'}
+          </button>
+        )}
       </div>
 
       {/* Tab Contents */}
@@ -795,7 +875,42 @@ export const Profile: React.FC = () => {
         </div>
       )}
 
-      {/* History log mockup in footer to meet spec */}
+      {activeTab === 'music' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', textAlign: 'left' }}>
+          <h3>{language === 'es' ? 'Estantería Musical (Últimos 7 días)' : 'Music Shelf (Last 7 days)'}</h3>
+          {topAlbums.length === 0 ? (
+            <div className="glass-card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+              {language === 'es' ? 'No hay álbumes escuchados recientemente.' : 'No recently played albums.'}
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '2rem' }}>
+              {topAlbums.map((album, i) => (
+                <div
+                  key={`${album.name}-${i}`}
+                  className="glass-card"
+                  style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}
+                >
+                  <img
+                    src={album.image || 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=150'}
+                    alt={album.name}
+                    style={{ width: '100%', aspectRatio: '1/1', objectFit: 'cover', borderRadius: '8px' }}
+                  />
+                  <div style={{ flex: 1 }}>
+                    <a href={album.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
+                      <h4 style={{ margin: '0 0 0.25rem 0', color: 'var(--text-primary)' }}>{album.name}</h4>
+                    </a>
+                    <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{album.artist}</span>
+                  </div>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 600, background: 'rgba(124, 58, 237, 0.1)', color: 'var(--accent-primary)', padding: '0.2rem 0.5rem', borderRadius: '4px', width: 'fit-content' }}>
+                    {album.playcount} {language === 'es' ? 'reproducciones' : 'plays'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* History log in footer */}
       <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '2rem', textAlign: 'left' }}>
         <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>

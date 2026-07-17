@@ -14,6 +14,8 @@ class User(Base):
     reset_token = Column(String(250), nullable=True)
     reset_token_expires = Column(DateTime(timezone=True), nullable=True)
     refresh_token = Column(String(250), nullable=True)
+    lastfm_username = Column(String(100), nullable=True)
+    lastfm_session_key = Column(String(100), nullable=True)
     is_admin = Column(Boolean, default=False, nullable=False)
 
     # Relationships

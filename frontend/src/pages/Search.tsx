@@ -13,6 +13,7 @@ interface SearchResultItem {
   description: string;
   item_type: 'game' | 'movie' | 'series' | 'anime' | 'book' | 'user' | 'guide' | 'comic' | 'manga';
   release_date?: string;
+  imdb_id?: string;
 }
 
 const stripHtml = (html: string) => {
@@ -173,6 +174,7 @@ export const Search: React.FC = () => {
         external_id: selectedItemForShelf.external_id,
         title: selectedItemForShelf.title,
         image_url: selectedItemForShelf.image_url,
+        imdb_id: selectedItemForShelf.imdb_id,
         status: shelfStatus
       });
       setSuccessMsg(t('searchItemAdded'));
@@ -357,7 +359,7 @@ export const Search: React.FC = () => {
               const isFollowing = followingUsers.some(u => String(u.id) === item.external_id);
               const isMe = currentUser && String(currentUser.id) === item.external_id;
               return (
-                <div key={item.external_id} className="glass-card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', textAlign: 'center', cursor: 'pointer' }} onClick={() => navigate(`/profile?user_id=${item.external_id}`)}>
+                <div key={`${item.external_id}-${item.item_type}`} className="glass-card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', textAlign: 'center', cursor: 'pointer' }} onClick={() => navigate(`/profile?user_id=${item.external_id}`)}>
                   <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'var(--bg-secondary)', border: '2px solid var(--accent-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
                     {item.image_url ? (
                       <img src={item.image_url} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -393,7 +395,7 @@ export const Search: React.FC = () => {
             if (item.item_type === 'guide') {
               const isSaved = savedGuides.some(g => String(g.id) === item.external_id);
               return (
-                <div key={item.external_id} className="glass-card" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', textAlign: 'left' }}>
+                <div key={`${item.external_id}-${item.item_type}`} className="glass-card" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', textAlign: 'left' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <BookOpen size={18} color="var(--accent-primary)" />
                     <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 600 }}>
@@ -436,7 +438,7 @@ export const Search: React.FC = () => {
 
             const onShelf = shelfItems.some(x => x.external_id === item.external_id && x.item_type === item.item_type);
             return (
-              <div key={item.external_id} className="glass-card" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', cursor: 'pointer', position: 'relative' }} onClick={() => handleOpenItemDetails(item)}>
+              <div key={`${item.external_id}-${item.item_type}`} className="glass-card" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', cursor: 'pointer', position: 'relative' }} onClick={() => handleOpenItemDetails(item)}>
 
                 <img
                   src={item.image_url || 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=150'}

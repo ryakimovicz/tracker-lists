@@ -22,6 +22,7 @@ class UserLibraryItem(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     item_type = Column(String(50), nullable=False)  # comic, manga, book, movie, series, custom
     external_id = Column(String(100), nullable=False)
+    imdb_id = Column(String(100), nullable=True)
     title = Column(String(250), nullable=False)
     image_url = Column(String(500), nullable=True)
     status = Column(Enum(UserLibraryStatusEnum), default=UserLibraryStatusEnum.PLAN_TO_READ, nullable=False)

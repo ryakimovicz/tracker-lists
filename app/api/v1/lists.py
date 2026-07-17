@@ -11,7 +11,7 @@ from app.models.list_item import ListItem, ItemTypeEnum
 from app.models.saved_list import SavedList
 from app.models.item_progress import ItemProgress
 from app.models.addition import ListAddition, UserAdoptedAddition
-from app.services.tmdb import TMDBService
+from app.services.tvmaze import TVMazeService
 from app.models.library import UserLibraryItem, UserLibraryStatusEnum
 from app.models.activity import UserActivityLog
 from app.schemas.list import (
@@ -708,9 +708,9 @@ def import_tv_items(
     order_idx = import_req.starting_order_index
     
     if import_req.import_type == TVImportType.SERIES:
-        series = TMDBService.get_series_detail(import_req.series_id)
+        series = TVMazeService.get_series_detail(import_req.series_id)
         if not series:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Series not found in TMDB")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Series not found in TVMaze")
             
         poster = series.get("poster_path")
         image_url = f"https://image.tmdb.org/t/p/w185{poster}" if poster else None
@@ -741,12 +741,12 @@ def import_tv_items(
         if import_req.season_number is None:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="season_number is required for season imports")
             
-        series = TMDBService.get_series_detail(import_req.series_id)
+        series = TVMazeService.get_series_detail(import_req.series_id)
         series_name = series.get("name") if series else "Series"
         
-        episodes = TMDBService.get_season_episodes(import_req.series_id, import_req.season_number)
+        episodes = TVMazeService.get_season_episodes(import_req.series_id, import_req.season_number)
         if not episodes:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No episodes found for this season in TMDB")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No episodes found for this season in TVMaze")
             
         for ep in episodes:
             ep_num = ep.get("episode_number")
@@ -784,12 +784,12 @@ def import_tv_items(
         if import_req.season_number is None or import_req.episode_number is None:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="season_number and episode_number are required for episode imports")
             
-        series = TMDBService.get_series_detail(import_req.series_id)
+        series = TVMazeService.get_series_detail(import_req.series_id)
         series_name = series.get("name") if series else "Series"
         
-        ep = TMDBService.get_episode_detail(import_req.series_id, import_req.season_number, import_req.episode_number)
+        ep = TVMazeService.get_episode_detail(import_req.series_id, import_req.season_number, import_req.episode_number)
         if not ep:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Episode not found in TMDB")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Episode not found in TVMaze")
             
         ep_name = ep.get("name") or "Untitled Episode"
         title = f"{series_name} - S{import_req.season_number:02d}E{import_req.episode_number:02d} - {ep_name}"
@@ -1138,7 +1138,7 @@ def toggle_tmdb_episode(
             total_episodes = 99999
             try:
                 series_id = int(lib_item.external_id)
-                series_detail = TMDBService.get_series_detail(series_id)
+                series_detail = TVMazeService.get_series_detail(series_id)
                 total_episodes = series_detail.get("number_of_episodes") or 99999
             except Exception:
                 pass
@@ -1202,7 +1202,7 @@ def bulk_toggle_season(
         if lib_item and lib_item.external_id:
             try:
                 series_id = int(lib_item.external_id)
-                episodes_list = TMDBService.get_season_episodes(series_id, req.season_number) or []
+                episodes_list = TVMazeService.get_season_episodes(series_id, req.season_number) or []
             except Exception as e:
                 print(f"Failed to fetch episodes for bulk toggle in backend: {e}")
                 episodes_list = []
@@ -1293,7 +1293,7 @@ def bulk_toggle_season(
                 if completed_eps > 0:
                     try:
                         series_id = int(ext_id)
-                        series_detail = TMDBService.get_series_detail(series_id)
+                        series_detail = TVMazeService.get_series_detail(series_id)
                         total_episodes = series_detail.get("number_of_episodes") or 99999
                         lib_it = session.query(UserLibraryItem).filter(UserLibraryItem.id == lib_item_id).first()
                         if lib_it:

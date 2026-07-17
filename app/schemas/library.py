@@ -6,6 +6,7 @@ from datetime import datetime
 class LibraryItemCreate(BaseModel):
     item_type: str
     external_id: str
+    imdb_id: Optional[str] = None
     title: str
     image_url: Optional[str] = None
     status: UserLibraryStatusEnum = UserLibraryStatusEnum.PLAN_TO_READ
@@ -25,6 +26,7 @@ class LibraryItemResponse(BaseModel):
     user_id: int
     item_type: str
     external_id: str
+    imdb_id: Optional[str] = None
     title: str
     image_url: Optional[str] = None
     status: UserLibraryStatusEnum

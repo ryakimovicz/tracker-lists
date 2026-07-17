@@ -9,3 +9,4 @@ class SearchResultItem(BaseModel):
     item_type: str  # 'manga', 'comic', etc.
     release_date: Optional[str] = None
     popularity: Optional[float] = 0.0
+    imdb_id: Optional[str] = None

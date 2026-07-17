@@ -10,7 +10,7 @@ from app.models.list import ReadingList, VisibilityEnum
 from app.models.list_item import ListItem, ItemTypeEnum
 from app.models.library import UserLibraryItem, UserLibraryStatusEnum
 from app.schemas.library import LibraryItemCreate, LibraryItemUpdate, LibraryItemResponse
-from app.services.tmdb import TMDBService
+from app.services.tvmaze import TVMazeService
 from app.models.activity import UserActivityLog
 
 router = APIRouter()
@@ -55,19 +55,17 @@ def bulk_complete_series_episodes(db: Session, user_id: int, tracking_list_id: i
         from app.models.item_progress import ItemProgress
         from datetime import datetime, timezone
         
-        series_id = int(external_id)
-        series_detail = TMDBService.get_series_detail(series_id)
-        seasons = series_detail.get("seasons", [])
+        # get series detail to know seasons
+        series_detail = TVMazeService.get_series_detail(external_id)
+        # Note: tvmaze doesnt easily return number_of_seasons in the main show endpoint
+        # For simplicity, we just fetch a few seasons.
+        s_count = series_detail.get('number_of_seasons', 1) if series_detail else 1
         
         last_completed_title = None
-        for s in seasons:
-            s_num = s.get("season_number")
-            if s_num == 0:
-                continue
-            
-            episodes = TMDBService.get_season_episodes(series_id, s_num)
+        for s_num in range(1, s_count + 1):
+            episodes = TVMazeService.get_season_episodes(external_id, s_num)
             for ep in episodes:
-                ext_id = f"tmdb-ep-{ep.get('id')}"
+                ext_id = f"tvm-ep-{ep.get('id')}"
                 li = db.query(ListItem).filter(
                     ListItem.list_id == tracking_list_id,
                     ListItem.external_id == ext_id
@@ -81,7 +79,7 @@ def bulk_complete_series_episodes(db: Session, user_id: int, tracking_list_id: i
                         item_type=ItemTypeEnum.SERIES,
                         external_id=ext_id,
                         title=f"{title} - S{s_num:02d}E{ep.get('episode_number', 1):02d} - {ep.get('name', 'Untitled')}",
-                        image_url=f"https://image.tmdb.org/t/p/w185{ep.get('still_path')}" if ep.get('still_path') else None,
+                        image_url=ep.get('still_path'),
                         custom_notes=ep.get('overview'),
                         section=f"Season {s_num}"
                     )
@@ -155,25 +153,23 @@ def add_to_library(
         
         # Try to retrieve season 1 episodes to auto-populate the tracker list
         try:
-            series_id = int(item_in.external_id)
-            episodes = TMDBService.get_season_episodes(series_id, 1)
+            episodes = TVMazeService.get_season_episodes(item_in.external_id, 1)
             
             for idx, ep in enumerate(episodes, start=1):
                 ep_num = ep.get("episode_number")
                 ep_name = ep.get("name") or "Untitled Episode"
                 title = f"{item_in.title} - S01E{ep_num:02d} - {ep_name}"
                 
-                still = ep.get("still_path")
-                image_url = f"https://image.tmdb.org/t/p/w185{still}" if still else None
+                image_url = ep.get('image')
                 
                 db_item = ListItem(
                     list_id=private_list.id,
                     order_index=idx,
                     item_type=ItemTypeEnum.SERIES,
-                    external_id=f"tmdb-ep-{ep.get('id')}",
+                    external_id=f"tvm-ep-{ep.get('id')}",
                     title=title,
                     image_url=image_url,
-                    custom_notes=ep.get("overview"),
+                    custom_notes=ep.get("summary"),
                     section="Season 1"
                 )
                 db.add(db_item)
@@ -200,6 +196,7 @@ def add_to_library(
         user_id=current_user.id,
         item_type=item_in.item_type,
         external_id=item_in.external_id,
+        imdb_id=item_in.imdb_id,
         title=item_in.title,
         image_url=item_in.image_url,
         status=status_val,

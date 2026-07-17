@@ -13,6 +13,7 @@ class UserResponse(UserBase):
     created_at: datetime
     photo_url: str
     is_admin: bool = False
+    lastfm_username: str | None = None
 
     class Config:
         from_attributes = True
@@ -34,6 +35,7 @@ class UserDashboardResponse(BaseModel):
     created_at: datetime
     photo_url: str
     is_admin: bool = False
+    lastfm_username: str | None = None
     created_lists: List[ReadingListResponse] = []
     saved_lists: List[ReadingListResponse] = []
 

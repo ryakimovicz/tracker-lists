@@ -39,6 +39,13 @@ class Settings(BaseSettings):
     TWITCH_CLIENT_ID: str = ""
     TWITCH_CLIENT_SECRET: str = ""
     
+    # New Added APIs
+    TVMAZE_API_KEY: str = ""
+    OMDB_API_KEY: str = ""
+    FANART_API_KEY: str = ""
+    LASTFM_API_KEY: str = ""
+    LASTFM_SHARED_SECRET: str = ""
+    
     # SMTP Email Settings
     SMTP_TLS: bool = True
     SMTP_PORT: int = 587

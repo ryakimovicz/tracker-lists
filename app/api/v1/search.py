@@ -6,7 +6,8 @@ from app.models.user import User
 from app.models.list import ReadingList, VisibilityEnum
 from app.services.base import SearchResultItem
 from app.services.comicvine import ComicVineService
-from app.services.tmdb import TMDBService
+from app.services.tvmaze import TVMazeService
+from app.services.omdb import OMDbService
 from app.services.googlebooks import GoogleBooksService
 from app.services.igdb import IGDBService
 from app.services.anilist import AnilistService
@@ -32,9 +33,11 @@ def search_media(
     elif type_lower == "game":
         return IGDBService.search_games(q)
     elif type_lower == "movie":
-        return TMDBService.search_media(q, "movie")
+        return OMDbService.search_movies(q)
+    elif type_lower == "anime":
+        return TVMazeService.search_shows(q, is_anime=True)
     elif type_lower == "series":
-        combined = TMDBService.search_media(q, "series")
+        combined = TVMazeService.search_shows(q, is_anime=False)
         
         query_clean = q.lower().strip()
         query_words = set(query_clean.split())
@@ -74,9 +77,10 @@ def search_all_media(
     db: Session = Depends(get_db)
 ):
     import concurrent.futures
-    with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
-        future_movies = executor.submit(TMDBService.search_media, q, "movie")
-        future_series = executor.submit(TMDBService.search_media, q, "series")
+    with concurrent.futures.ThreadPoolExecutor(max_workers=7) as executor:
+        future_movies = executor.submit(OMDbService.search_movies, q)
+        future_series = executor.submit(TVMazeService.search_shows, q, False)
+        future_anime = executor.submit(TVMazeService.search_shows, q, True)
         future_books = executor.submit(GoogleBooksService.search_books, q)
         future_games = executor.submit(IGDBService.search_games, q)
         future_comics = executor.submit(ComicVineService.search_comics, q)
@@ -84,6 +88,7 @@ def search_all_media(
         
         movies = future_movies.result()
         series = future_series.result()
+        anime = future_anime.result()
         books = future_books.result()
         games = future_games.result()
         comics = future_comics.result()
@@ -92,6 +97,7 @@ def search_all_media(
     combined = []
     combined.extend(movies)
     combined.extend(series)
+    combined.extend(anime)
     combined.extend(books)
     combined.extend(games)
     combined.extend(comics)
@@ -159,7 +165,7 @@ def get_series_season_episodes(
     season_number: int
 ):
     try:
-        return TMDBService.get_season_episodes(series_id, season_number)
+        return TVMazeService.get_season_episodes(series_id, season_number)
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -171,7 +177,7 @@ def get_series_detail(
     series_id: int
 ):
     try:
-        return TMDBService.get_series_detail(series_id)
+        return TVMazeService.get_series_detail(series_id)
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

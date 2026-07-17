@@ -12,6 +12,7 @@ from app.models.item_progress import ItemProgress
 from app.models.library import UserLibraryItem
 from app.models.addition import ListAddition, UserAdoptedAddition
 from app.core.security import verify_password, get_password_hash
+from app.services.lastfm import LastFMService
 from app.models.activity import UserActivityLog
 from app.schemas.user import UserResponse, UserDashboardResponse
 from app.schemas.social import UpNextResponse, UpNextItemResponse
@@ -49,9 +50,47 @@ def get_user_dashboard(
         created_at=current_user.created_at,
         photo_url=current_user.photo_url,
         is_admin=current_user.is_admin,
+        lastfm_username=current_user.lastfm_username,
         created_lists=created_lists,
         saved_lists=saved_lists
     )
+
+@router.post("/me/lastfm/connect")
+def connect_lastfm(
+    token: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    session_data = LastFMService.get_session(token)
+    if not session_data:
+        raise HTTPException(status_code=400, detail="Failed to connect to Last.fm")
+        
+    current_user.lastfm_username = session_data["name"]
+    current_user.lastfm_session_key = session_data["key"]
+    db.commit()
+    return {"message": "Last.fm connected successfully", "username": session_data["name"]}
+
+@router.delete("/me/lastfm/disconnect")
+def disconnect_lastfm(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    current_user.lastfm_username = None
+    current_user.lastfm_session_key = None
+    db.commit()
+    return {"message": "Last.fm disconnected successfully"}
+
+@router.get("/me/music/now-playing")
+def get_now_playing(current_user: User = Depends(get_current_user)):
+    if not current_user.lastfm_username:
+        return None
+    return LastFMService.get_now_playing(current_user.lastfm_username)
+
+@router.get("/me/music/top-albums")
+def get_top_albums(current_user: User = Depends(get_current_user)):
+    if not current_user.lastfm_username:
+        return []
+    return LastFMService.get_top_albums(current_user.lastfm_username)
 
 @router.get("/me/up-next", response_model=UpNextResponse)
 def get_user_up_next(
@@ -325,6 +364,7 @@ def get_any_user_profile(
         created_at=user.created_at,
         photo_url=user.photo_url,
         is_admin=user.is_admin,
+        lastfm_username=user.lastfm_username,
         created_lists=created_lists,
         saved_lists=saved_lists
     )
