@@ -1,6 +1,6 @@
 # Pathd 🌌
 
-**Pathd** es una plataforma premium y unificada para el seguimiento de bibliotecas personales y monitorización del consumo multimedia. Permite a los usuarios indexar, organizar y hacer seguimiento de su progreso en **libros, mangas, cómics, películas, series, animes y videojuegos** en una única interfaz cohesiva, complementada con modificaciones de la comunidad y un feed social en tiempo real.
+**Pathd** es una plataforma premium y unificada para el seguimiento de bibliotecas personales y monitorización del consumo multimedia. Permite a los usuarios indexar, organizar y hacer seguimiento de su progreso en **libros, mangas, cómics, películas, series, animes, música y videojuegos** en una única interfaz cohesiva, complementada con modificaciones de la comunidad y un feed social en tiempo real.
 
 ---
 
@@ -26,7 +26,9 @@
 
 | Servicio | Uso |
 |---|---|
-| [TMDB](https://www.themoviedb.org/documentation/api) | Películas, series, animes y detalle de episodios/temporadas |
+| [TVMaze](https://www.tvmaze.com/api) | Series, animes y detalle de episodios/temporadas |
+| [OMDb](https://www.omdbapi.com/) + [Fanart.tv](https://fanart.tv/) | Películas y pósters en HD |
+| [Last.fm](https://www.last.fm/api) | Música, álbumes destacados y scrobbling en tiempo real |
 | [IGDB](https://api-docs.igdb.com/) | Videojuegos (autenticado via Twitch OAuth2) |
 | [Google Books](https://developers.google.com/books/docs/v1/using) | Libros |
 | [Comic Vine](https://comicvine.gamespot.com/api/) | Cómics y mangas |
@@ -51,12 +53,12 @@ Timeline comunitaria:
 ### ✏️ Crear (Editor de Guías)
 Constructor de guías cronológicas:
 - **Editor Visual**: Ordenamiento manual de obras de distintos tipos de medios (películas, libros, cómics, juegos, etc.)
-- **Importador TMDB**: Importa temporadas completas de series con un clic
+- **Importador de Temporadas**: Importa temporadas completas de series con un clic
 - **Prioridad de Secciones**: Escala 1–5 para clasificar secciones como "Canon", "Recomendado", "Relleno", etc.
 
 ### 🔍 Explorar (Buscador)
 Búsqueda y descubrimiento:
-- **Buscador Global**: Conecta con TMDB, IGDB, Google Books y Comic Vine desde un único campo de búsqueda con filtros por categoría (Películas, Series, Animes, Libros, Cómics, Mangas, Juegos)
+- **Buscador Global**: Conecta con TVMaze, OMDb, IGDB, Google Books y Comic Vine desde un único campo de búsqueda con filtros por categoría (Películas, Series, Animes, Libros, Cómics, Mangas, Juegos)
 - **Modal de Detalle**: Al seleccionar cualquier resultado se abre una ficha con información completa, control de estado (`plan_to_watch`, `watching`, `completed`, etc.) y — para series y animes — listado de temporadas y episodios con marcado individual o por temporada completa
 - **Búsqueda de Usuarios y Guías**: Encuentra usuarios de Pathd y guías públicas de la comunidad
 - **Guías Destacadas**: Las más votadas y recientes
@@ -101,6 +103,10 @@ Gestión de contenido moderado:
 | GET | `/me/activity` | Historial de actividad del usuario |
 | GET | `/me/up-next` | Próximos ítems pendientes en guías seguidas |
 | GET | `/me/feed/guides-updates` | Actualizaciones recientes de guías seguidas |
+| POST | `/me/lastfm/connect` | Conectar cuenta de Last.fm |
+| DELETE | `/me/lastfm/disconnect` | Desconectar cuenta de Last.fm |
+| GET | `/me/music/now-playing` | Obtener canción que se está escuchando ahora |
+| GET | `/me/music/top-albums` | Obtener los álbumes más escuchados de la semana |
 | GET | `/profile/{user_id}` | Perfil público de otro usuario |
 | GET | `/{user_id}/activity` | Historial de actividad de otro usuario |
 | GET | `/search?q={query}` | Buscar usuarios por username |
@@ -110,12 +116,12 @@ Gestión de contenido moderado:
 |---|---|---|
 | GET | `/?q={query}&type={type}` | Búsqueda por tipo de medio |
 | GET | `/all?q={query}` | Búsqueda unificada en todas las fuentes |
-| GET | `/series/{id}` | Detalle de serie/anime (TMDB) con temporadas |
+| GET | `/series/{id}` | Detalle de serie/anime (TVMaze) con temporadas |
 | GET | `/series/{id}/season/{n}` | Episodios de una temporada específica |
 
 **Tipos disponibles**: `movie`, `series`, `anime`, `book`, `comic`, `manga`, `game`
 
-> Los resultados incluyen un campo `item_type` para diferenciar entre tipos. Series y animes se diferencian por género en TMDB.
+> Los resultados incluyen un campo `item_type` para diferenciar entre tipos. Además, se asocia automáticamente el `imdb_id` a series y películas para crear un nexo universal.
 
 ### Guías Cronológicas (`/api/v1/lists`)
 | Método | Ruta | Descripción |
@@ -130,9 +136,9 @@ Gestión de contenido moderado:
 | POST | `/{list_id}/items` | Añadir ítem a la guía |
 | PUT | `/{list_id}/items/{item_id}` | Editar ítem de la guía |
 | DELETE | `/{list_id}/items/{item_id}` | Eliminar ítem de la guía |
-| POST | `/{list_id}/items/tv-import` | Importar temporada completa desde TMDB |
+| POST | `/{list_id}/items/tv-import` | Importar temporada completa desde TVMaze |
 | POST | `/{list_id}/items/bulk-toggle` | Marcar múltiples ítems de una vez |
-| POST | `/{list_id}/toggle-tmdb-episode` | Marcar/desmarcar episodio TMDB individual |
+| POST | `/{list_id}/toggle-tv-episode` | Marcar/desmarcar episodio individual |
 | POST | `/{list_id}/bulk-toggle-season` | Marcar toda una temporada de una vez |
 | POST | `/{list_id}/sections/bulk-action` | Acción masiva sobre una sección |
 | POST | `/items/{item_id}/toggle` | Marcar ítem como completado/pendiente |
@@ -246,7 +252,11 @@ ALGORITHM="HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES=11520
 
 # APIs Externas
-TMDB_API_KEY=""          # https://www.themoviedb.org/settings/api
+TVMAZE_API_KEY=""        # https://www.tvmaze.com/api
+OMDB_API_KEY=""          # https://www.omdbapi.com/
+FANART_API_KEY=""        # https://fanart.tv/
+LASTFM_API_KEY=""        # https://www.last.fm/api/account/create
+LASTFM_SHARED_SECRET=""
 COMIC_VINE_API_KEY=""    # https://comicvine.gamespot.com/api/
 GOOGLE_BOOKS_API_KEY=""  # https://console.cloud.google.com/
 
@@ -286,7 +296,7 @@ pathd/
 │   ├── core/             # Configuración, base de datos, seguridad, rate limiting
 │   ├── models/           # Modelos SQLAlchemy (User, ReadingList, UserLibraryItem, etc.)
 │   ├── schemas/          # Schemas Pydantic para validación de requests/responses
-│   └── services/         # Clientes de APIs externas (TMDB, IGDB, Google Books, Comic Vine)
+│   └── services/         # Clientes de APIs externas (TVMaze, OMDb, Last.fm, IGDB, Google Books, Comic Vine)
 ├── frontend/
 │   ├── src/
 │   │   ├── api/          # Cliente Axios con interceptores de autenticación

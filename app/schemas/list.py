@@ -27,6 +27,7 @@ class ListItemUpdate(BaseModel):
 class ListItemResponse(ListItemBase):
     id: int
     list_id: int
+    is_nsfw: bool = False
 
     class Config:
         from_attributes = True
@@ -84,7 +85,7 @@ class TVImportType(str, enum.Enum):
     EPISODE = "episode"
 
 class TVImportRequest(BaseModel):
-    series_id: int
+    series_id: str
     import_type: TVImportType
     season_number: Optional[int] = None
     episode_number: Optional[int] = None

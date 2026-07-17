@@ -10,3 +10,4 @@ class SearchResultItem(BaseModel):
     release_date: Optional[str] = None
     popularity: Optional[float] = 0.0
     imdb_id: Optional[str] = None
+    is_nsfw: bool = False

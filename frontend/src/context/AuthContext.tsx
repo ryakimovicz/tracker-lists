@@ -7,6 +7,7 @@ interface UserProfile {
   email: string;
   photo_url: string;
   is_admin: boolean;
+  show_nsfw: boolean;
 }
 
 interface AuthContextType {

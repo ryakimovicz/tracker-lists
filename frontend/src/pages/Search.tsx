@@ -443,7 +443,13 @@ export const Search: React.FC = () => {
                 <img
                   src={item.image_url || 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=150'}
                   alt={item.title}
-                  style={{ width: '100%', height: '260px', objectFit: 'cover', borderRadius: '8px' }}
+                  style={{ 
+                    width: '100%', 
+                    height: '260px', 
+                    objectFit: 'cover', 
+                    borderRadius: '8px',
+                    filter: item.is_nsfw && !currentUser?.show_nsfw ? 'blur(15px)' : 'none'
+                  }}
                 />
                 <div style={{ flex: 1, textAlign: 'left' }}>
                   <h4 style={{ margin: '0 0 0.25rem 0', fontSize: '1rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.title}>
@@ -534,7 +540,14 @@ export const Search: React.FC = () => {
           isOwnProfile={true}
           profileId={currentUser?.id}
           onClose={() => setSelectedItem(null)}
-          onUpdate={() => {
+          onUpdate={(updatedItem) => {
+            if (updatedItem && updatedItem.is_nsfw !== undefined) {
+              setResults(prev => prev.map(r => 
+                r.item_type === selectedItem.item_type && r.external_id === selectedItem.external_id 
+                ? { ...r, ...updatedItem } 
+                : r
+              ));
+            }
             // Re-fetch shelf items to reflect status/favorite changes
             apiClient.get('/library/').then(res => setShelfItems(res.data));
           }}

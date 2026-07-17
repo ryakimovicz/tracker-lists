@@ -40,3 +40,10 @@ def root():
         "project": settings.PROJECT_NAME
     }
 # Trigger uvicorn hot-reload configuration update (v7)
+# Trigger uvicorn reload
+
+@app.on_event("startup")
+def write_routes():
+    import json
+    with open("debug_routes.txt", "w") as f:
+        f.write(json.dumps(list(app.openapi()["paths"].keys())))

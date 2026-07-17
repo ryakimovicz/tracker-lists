@@ -42,6 +42,7 @@ interface UserProfile {
   email: string;
   photo_url: string;
   is_admin: boolean;
+  show_nsfw: boolean;
   created_at: string;
   created_lists: any[];
   saved_lists: any[];
@@ -193,6 +194,18 @@ export const Profile: React.FC = () => {
       setSuccessMsg(language === 'es' ? 'Desconectado de Last.fm.' : 'Disconnected from Last.fm.');
     } catch(err) {
       setErrorMsg('Error disconnecting from Last.fm');
+    }
+  };
+
+  const handleToggleNsfw = async () => {
+    try {
+      const currentVal = profile?.show_nsfw || false;
+      await apiClient.put('/users/me', { show_nsfw: !currentVal });
+      setProfile(prev => prev ? { ...prev, show_nsfw: !currentVal } : null);
+      setSuccessMsg(language === 'es' ? 'Preferencia actualizada.' : 'Preference updated.');
+      setTimeout(() => setSuccessMsg(''), 3000);
+    } catch(err) {
+      setErrorMsg('Error updating preference');
     }
   };
 
@@ -387,7 +400,18 @@ export const Profile: React.FC = () => {
             
             {/* Last.fm Integration UI */}
             {isOwnProfile && (
-              <div style={{ marginTop: '1.5rem' }}>
+              <div style={{ marginTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', cursor: 'pointer' }}>
+                    <input 
+                      type="checkbox" 
+                      checked={profile.show_nsfw} 
+                      onChange={handleToggleNsfw}
+                      style={{ cursor: 'pointer' }}
+                    />
+                    {language === 'es' ? 'Mostrar contenido explícito/NSFW en portadas' : 'Show NSFW/Explicit covers'}
+                  </label>
+                </div>
                 {!profile.lastfm_username ? (
                   <button onClick={handleLastFmLogin} className="btn-secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}>
                     🎵 {language === 'es' ? 'Conectar Last.fm' : 'Connect Last.fm'}

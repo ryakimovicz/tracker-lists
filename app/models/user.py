@@ -17,6 +17,7 @@ class User(Base):
     lastfm_username = Column(String(100), nullable=True)
     lastfm_session_key = Column(String(100), nullable=True)
     is_admin = Column(Boolean, default=False, nullable=False)
+    show_nsfw = Column(Boolean, default=False, nullable=False)
 
     # Relationships
     lists = relationship("ReadingList", back_populates="creator", cascade="all, delete-orphan")

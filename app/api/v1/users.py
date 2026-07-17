@@ -1,4 +1,5 @@
 from typing import List
+from pydantic import BaseModel
 from fastapi import APIRouter, Depends, Query, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -240,6 +241,22 @@ def update_username(
         )
         
     current_user.username = req.username
+    db.commit()
+    db.refresh(current_user)
+    return current_user
+
+class UserSettingsUpdate(BaseModel):
+    show_nsfw: bool | None = None
+
+@router.put("/me", response_model=UserResponse)
+def update_user_settings(
+    req: UserSettingsUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if req.show_nsfw is not None:
+        current_user.show_nsfw = req.show_nsfw
+    
     db.commit()
     db.refresh(current_user)
     return current_user

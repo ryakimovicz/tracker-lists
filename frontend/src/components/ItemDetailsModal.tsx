@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from '../context/LanguageContext';
 import { apiClient } from '../api/client';
-import { Star, Heart, X } from 'lucide-react';
+import { Star, Heart, X, Flag, CheckCircle } from 'lucide-react';
 import { getCachedTMDB, setCachedTMDB } from '../utils/tmdbCache';
+import { useAuth } from '../context/AuthContext';
 
 
 
@@ -12,7 +13,7 @@ interface ItemDetailsModalProps {
   userIdParam?: string | null;
   profileId?: number;
   onClose: () => void;
-  onUpdate: () => void; // Triggered when item details/status changes
+  onUpdate: (updatedItem?: any) => void; // Triggered when item details/status changes
   onOpenItem?: (item: any) => void;
   isFavorite?: boolean; // Prop from parent
   onToggleFavorite?: (itemId: number, currentFav: boolean) => void;
@@ -56,8 +57,13 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   onStatusChange
 }) => {
   const { t, language } = useTranslation();
+  const { user } = useAuth();
   
   const [selectedItem, setSelectedItem] = useState<any>(initialItem);
+  const [isCoverPeek, setIsCoverPeek] = useState(false);
+  const [reportStatus, setReportStatus] = useState<'none'|'pending'|'success'>('none');
+  
+  const shouldBlurCover = selectedItem?.is_nsfw && !user?.show_nsfw && !isCoverPeek;
   const [itemReviews, setItemReviews] = useState<any[]>([]);
   const [userRating, setUserRating] = useState<number>(0);
   const [userComment, setUserComment] = useState<string>('');
@@ -220,7 +226,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
           }
           
           let filteredSeasons = [];
-          const cacheKey = `series_${item.external_id}`;
+          const cacheKey = `tvmaze_series_${item.external_id}`;
           const cached = getCachedTMDB(cacheKey);
           let seriesData = null;
           
@@ -337,6 +343,39 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     }
   };
 
+  const handleReportCover = async () => {
+    if (!user) return;
+    setReportStatus('pending');
+    try {
+      await apiClient.post('/nsfw/report', {
+        item_type: selectedItem.item_type,
+        external_id: selectedItem.external_id
+      });
+      setReportStatus('success');
+      setTimeout(() => setReportStatus('none'), 3000);
+      const updated = { ...selectedItem, is_nsfw: true };
+      setSelectedItem(updated);
+      if (onUpdate) onUpdate(updated);
+    } catch(err) {
+      setReportStatus('none');
+    }
+  };
+
+  const handleToggleFavoriteInner = async () => {
+    if (!selectedItem) return;
+    setUserRating(0);
+    try {
+      await apiClient.post(`/reviews/${selectedItem.item_type}/${selectedItem.external_id}`, {
+        rating: null,
+        content: userComment || null
+      });
+      const revRes = await apiClient.get(`/reviews/${selectedItem.item_type}/${selectedItem.external_id}`);
+      setItemReviews(revRes.data);
+    } catch (err) {
+      console.error("Failed to delete rating", err);
+    }
+  };
+
   const handleDeleteRating = async () => {
     if (!selectedItem) return;
     setUserRating(0);
@@ -391,7 +430,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
         ...prev,
         ...newItem
       }));
-      onUpdate && onUpdate();
+      onUpdate && onUpdate(newItem);
       return newItem.tracking_list_id;
     } catch (e) {
       console.error("Failed to add to library", e);
@@ -544,13 +583,34 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
               {/* Modal Body Info */}
               <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
                 {selectedItem.image_url && (
-                  <img
-                    src={selectedItem.image_url}
-                    alt={selectedItem.title}
-                    onClick={() => setZoomedImage(selectedItem.image_url)}
-                    style={{ width: '130px', height: '190px', objectFit: 'cover', borderRadius: '8px', cursor: 'zoom-in', boxShadow: '0 5px 15px rgba(0,0,0,0.3)' }}
-                  />
-                )}
+                    <div style={{ position: 'relative', width: '130px', height: '190px' }}>
+                      <img
+                        src={selectedItem.image_url}
+                        alt={selectedItem.title}
+                        onClick={() => {
+                          if (shouldBlurCover) setIsCoverPeek(true);
+                          else setZoomedImage(selectedItem.image_url);
+                        }}
+                        style={{ 
+                          width: '100%', height: '100%', objectFit: 'cover', borderRadius: '8px', 
+                          cursor: shouldBlurCover ? 'pointer' : 'zoom-in', 
+                          boxShadow: '0 5px 15px rgba(0,0,0,0.3)',
+                          filter: shouldBlurCover ? 'blur(15px)' : 'none',
+                          transition: 'filter 0.3s'
+                        }}
+                      />
+                      {shouldBlurCover && (
+                        <div style={{
+                          position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          background: 'rgba(0,0,0,0.3)', borderRadius: '8px', pointerEvents: 'none',
+                          color: 'white', fontSize: '0.8rem', fontWeight: 'bold', textAlign: 'center', padding: '0.5rem'
+                        }}>
+                          Haz clic para ver portada
+                        </div>
+                      )}
+                    </div>
+                  )}
                 
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem', minWidth: '250px' }}>
                   {/* Description info */}
@@ -578,8 +638,22 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                               <div className="skeleton" style={{ height: '0.85rem', width: '100%' }}></div>
                               <div className="skeleton" style={{ height: '0.85rem', width: '92%' }}></div>
                               <div className="skeleton" style={{ height: '0.85rem', width: '95%' }}></div>
-                              <div className="skeleton" style={{ height: '0.85rem', width: '45%' }}></div>
+                              {selectedItem.genres && <p style={{ margin: '0 0 0.5rem 0' }}><strong>{language === 'es' ? 'Géneros' : 'Genres'}:</strong> {selectedItem.genres}</p>}
                             </div>
+                            
+                            {user && (
+                              <div style={{ marginTop: '0.5rem' }}>
+                                <button 
+                                  onClick={handleReportCover} 
+                                  className="btn-secondary" 
+                                  style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', borderColor: '#ef4444', color: '#ef4444', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+                                  disabled={reportStatus !== 'none'}
+                                >
+                                  {reportStatus === 'pending' ? '...' : reportStatus === 'success' ? <><CheckCircle size={12}/> Reportado</> : <><Flag size={12} /> {language === 'es' ? 'Reportar Portada NSFW' : 'Report NSFW Cover'}</>}
+                                </button>
+                              </div>
+                            )}
+
                           </div>
                           <div>
                             <h5 style={{ margin: '0 0 0.4rem 0', color: 'var(--text-secondary)' }}>{language === 'es' ? 'Fecha de lanzamiento:' : 'Release Date:'}</h5>
@@ -590,8 +664,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                     }
 
                     const notes = parseNotes(selectedItem.custom_notes || '');
-                    if (!notes.description) return null;
-                    const cleanText = stripHtml(notes.description);
+                    const cleanText = stripHtml(notes.description || '');
                     const shouldTruncate = cleanText.length > 180;
                     const displayedText = shouldTruncate && !descExpanded
                       ? cleanText.slice(0, 180) + '...'
@@ -599,32 +672,34 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
                     return (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                        <div>
-                          <h5 style={{ margin: '0 0 0.25rem 0', color: 'var(--text-secondary)' }}>{language === 'es' ? 'Descripción:' : 'Description:'}</h5>
-                          <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-primary)', lineHeight: '1.4' }}>
-                            {displayedText}
-                            {shouldTruncate && (
-                              <button
-                                onClick={() => setDescExpanded(!descExpanded)}
-                                style={{
-                                  background: 'transparent',
-                                  border: 'none',
-                                  color: 'var(--accent-primary)',
-                                  cursor: 'pointer',
-                                  fontWeight: 600,
-                                  fontSize: '0.82rem',
-                                  marginLeft: '0.4rem',
-                                  padding: 0
-                                }}
-                              >
-                                {descExpanded
-                                  ? (language === 'es' ? 'Leer menos' : 'Read less')
-                                  : (language === 'es' ? 'Leer más' : 'Read more')
-                                }
-                              </button>
-                            )}
-                          </p>
-                        </div>
+                        {cleanText && (
+                          <div>
+                            <h5 style={{ margin: '0 0 0.25rem 0', color: 'var(--text-secondary)' }}>{language === 'es' ? 'Descripción:' : 'Description:'}</h5>
+                            <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-primary)', lineHeight: '1.4' }}>
+                              {displayedText}
+                              {shouldTruncate && (
+                                <button
+                                  onClick={() => setDescExpanded(!descExpanded)}
+                                  style={{
+                                    background: 'transparent',
+                                    border: 'none',
+                                    color: 'var(--accent-primary)',
+                                    cursor: 'pointer',
+                                    fontWeight: 600,
+                                    fontSize: '0.82rem',
+                                    marginLeft: '0.4rem',
+                                    padding: 0
+                                  }}
+                                >
+                                  {descExpanded
+                                    ? (language === 'es' ? 'Leer menos' : 'Read less')
+                                    : (language === 'es' ? 'Leer más' : 'Read more')
+                                  }
+                                </button>
+                              )}
+                            </p>
+                          </div>
+                        )}
                         {(selectedItem.release_date || notes.release_date) && (
                           <div>
                             <h5 style={{ margin: '0 0 0.25rem 0', color: 'var(--text-secondary)' }}>
@@ -635,6 +710,20 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                             </span>
                           </div>
                         )}
+
+                        {user && (
+                          <div style={{ marginTop: '0.5rem' }}>
+                            <button 
+                              onClick={handleReportCover} 
+                              className="btn-secondary" 
+                              style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', borderColor: '#ef4444', color: '#ef4444', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+                              disabled={reportStatus !== 'none'}
+                            >
+                              {reportStatus === 'pending' ? '...' : reportStatus === 'success' ? <><CheckCircle size={12}/> Reportado</> : <><Flag size={12} /> {language === 'es' ? 'Reportar Portada NSFW' : 'Report NSFW Cover'}</>}
+                            </button>
+                          </div>
+                        )}
+
                       </div>
                     );
                   })()}

@@ -11,6 +11,7 @@ from app.models.list_item import ListItem, ItemTypeEnum
 from app.models.library import UserLibraryItem, UserLibraryStatusEnum
 from app.schemas.library import LibraryItemCreate, LibraryItemUpdate, LibraryItemResponse
 from app.services.tvmaze import TVMazeService
+from app.services.nsfw import enrich_with_nsfw_status
 from app.models.activity import UserActivityLog
 
 router = APIRouter()
@@ -239,7 +240,8 @@ def get_library(
     
     # Sort by completed_at or updated_at, whichever is newer
     query = query.order_by(desc(func.coalesce(UserLibraryItem.completed_at, UserLibraryItem.updated_at)))
-    return query.offset(skip).limit(limit).all()
+    items = query.offset(skip).limit(limit).all()
+    return enrich_with_nsfw_status(db, items, current_user.id)
 
 @router.put("/{library_item_id}", response_model=LibraryItemResponse)
 def update_library_item(

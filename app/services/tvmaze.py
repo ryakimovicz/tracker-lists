@@ -78,10 +78,27 @@ class TVMazeService:
             with urllib.request.urlopen(req, timeout=5) as response:
                 if response.status == 200:
                     data = json.loads(response.read().decode())
+                    seasons = []
+                    try:
+                        with urllib.request.urlopen(f"https://api.tvmaze.com/shows/{real_id}/seasons", timeout=5) as s_response:
+                            if s_response.status == 200:
+                                seasons_data = json.loads(s_response.read().decode())
+                                for s in seasons_data:
+                                    num = s.get("number")
+                                    if num is not None and num > 0:
+                                        seasons.append({
+                                            "id": s.get("id"),
+                                            "season_number": num,
+                                            "episode_count": s.get("episodeOrder") or 999
+                                        })
+                    except Exception:
+                        pass
+                    
                     return {
                         "id": series_id,
                         "name": data.get("name"),
-                        "number_of_seasons": 1 # We will fetch seasons dynamically or just use episode list
+                        "number_of_seasons": len(seasons),
+                        "seasons": seasons
                     }
         except Exception:
             pass

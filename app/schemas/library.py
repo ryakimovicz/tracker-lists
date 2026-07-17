@@ -36,6 +36,7 @@ class LibraryItemResponse(BaseModel):
     last_seen_episode: Optional[str] = None
     pages_read: int = 0
     tracking_list_id: Optional[int] = None
+    is_nsfw: bool = False
 
     class Config:
         from_attributes = True

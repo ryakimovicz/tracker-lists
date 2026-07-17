@@ -8,6 +8,8 @@ from app.models.user import User
 from app.models.list import ReadingList
 from app.models.social import ListReport, Comment, CommentReport
 from app.models.review import MediaReview, MediaReviewReport
+from app.models.nsfw import MediaCoverReport, ReportStatusEnum
+from pydantic import BaseModel
 
 router = APIRouter()
 
@@ -22,6 +24,7 @@ def get_all_reports(
     list_reports = db.query(ListReport).all()
     comment_reports = db.query(CommentReport).all()
     review_reports = db.query(MediaReviewReport).all()
+    cover_reports = db.query(MediaCoverReport).all()
     
     # Format responses cleanly
     formatted_lists = []
@@ -56,10 +59,22 @@ def get_all_reports(
             "created_at": r.created_at
         })
         
+    formatted_covers = []
+    for r in cover_reports:
+        formatted_covers.append({
+            "report_id": r.id,
+            "item_type": r.item_type.value if hasattr(r.item_type, 'value') else r.item_type,
+            "external_id": r.external_id,
+            "reporter_username": r.reporter.username if r.reporter else "Unknown",
+            "status": r.status.value if hasattr(r.status, 'value') else r.status,
+            "created_at": r.created_at
+        })
+        
     return {
         "lists": formatted_lists,
         "comments": formatted_comments,
-        "reviews": formatted_reviews
+        "reviews": formatted_reviews,
+        "covers": formatted_covers
     }
 
 @router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -119,3 +134,25 @@ def admin_delete_review(
     db.delete(review)
     db.commit()
     return None
+
+class CoverReportStatusUpdate(BaseModel):
+    status: str
+
+@router.put("/reports/covers/{report_id}", status_code=status.HTTP_200_OK)
+def update_cover_report(
+    report_id: int,
+    status_update: CoverReportStatusUpdate,
+    current_admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    report = db.query(MediaCoverReport).filter(MediaCoverReport.id == report_id).first()
+    if not report:
+        raise HTTPException(status_code=404, detail="Cover report not found")
+        
+    try:
+        new_status = ReportStatusEnum(status_update.status)
+        report.status = new_status
+        db.commit()
+        return {"message": "Report status updated"}
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid status")

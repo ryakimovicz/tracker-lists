@@ -8,6 +8,7 @@ from app.api.v1.social import router as social_router
 from app.api.v1.reviews import router as reviews_router
 from app.api.v1.additions import router as additions_router
 from app.api.v1.admin import router as admin_router
+from app.api.v1.nsfw import router as nsfw_router
 
 api_router = APIRouter()
 
@@ -20,4 +21,5 @@ api_router.include_router(social_router, prefix="/social", tags=["social"])
 api_router.include_router(reviews_router, prefix="/reviews", tags=["reviews"])
 api_router.include_router(additions_router, prefix="/additions", tags=["additions"])
 api_router.include_router(admin_router, prefix="/admin", tags=["admin"])
+api_router.include_router(nsfw_router, prefix="/nsfw", tags=["nsfw"])
 

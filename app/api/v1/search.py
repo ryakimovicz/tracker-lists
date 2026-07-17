@@ -2,6 +2,9 @@ from typing import List
 from fastapi import APIRouter, Query, HTTPException, status, Request, Depends
 from sqlalchemy.orm import Session
 from app.core.database import get_db
+from app.api.deps import get_current_user, get_current_user_optional
+from app.models.user import User
+from app.services.nsfw import enrich_with_nsfw_status
 from app.models.user import User
 from app.models.list import ReadingList, VisibilityEnum
 from app.services.base import SearchResultItem
@@ -20,7 +23,9 @@ router = APIRouter()
 def search_media(
     request: Request,
     q: str = Query(..., min_length=1, description="The search query term"),
-    type: str = Query("movie", description="The type of media to search for")
+    type: str = Query("movie", description="The type of media to search for"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_optional)
 ):
     type_lower = type.lower()
     
@@ -62,7 +67,8 @@ def search_media(
             score += min(item.popularity or 0.0, 100.0)
             return score
         combined.sort(key=calculate_score, reverse=True)
-        return combined
+        user_id = current_user.id if current_user else None
+        return enrich_with_nsfw_status(db, combined, user_id)
     else:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -74,7 +80,8 @@ def search_media(
 def search_all_media(
     request: Request,
     q: str = Query(..., min_length=1, description="The search query term"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_optional)
 ):
     import concurrent.futures
     with concurrent.futures.ThreadPoolExecutor(max_workers=7) as executor:
@@ -157,11 +164,12 @@ def search_all_media(
         return score
 
     combined.sort(key=calculate_score, reverse=True)
-    return combined
+    user_id = current_user.id if current_user else None
+    return enrich_with_nsfw_status(db, combined, user_id)
 
 @router.get("/series/{series_id}/season/{season_number}")
-def get_series_season_episodes(
-    series_id: int,
+def get_season_episodes(
+    series_id: str,
     season_number: int
 ):
     try:
@@ -174,7 +182,7 @@ def get_series_season_episodes(
 
 @router.get("/series/{series_id}")
 def get_series_detail(
-    series_id: int
+    series_id: str
 ):
     try:
         return TVMazeService.get_series_detail(series_id)

@@ -163,6 +163,7 @@ const ActiveSeriesCard = ({ item, onClick, onUpdate, language }: { item: any, on
       title={item.title}
       imageUrl={item.image_url}
       typeLabel={getTypeLabel(item.item_type)}
+      isNsfw={item.is_nsfw}
       progressText={codeText}
       subtitle={titleText || undefined}
       actionLabel={nextEp ? (language === 'es' ? 'Visto' : 'Seen') : undefined}
@@ -297,6 +298,7 @@ export const Home: React.FC = () => {
                     title={item.title}
                     imageUrl={item.image_url}
                     typeLabel={getTypeLabel(item.item_type)}
+                    isNsfw={item.is_nsfw}
                     progressText={nextGuideItem.title}
                     actionLabel={getActionLabel(item.item_type)}
                     onAction={() => handleMarkDone(nextGuideItem)}
@@ -324,6 +326,7 @@ export const Home: React.FC = () => {
                   title={item.title}
                   imageUrl={item.image_url}
                   typeLabel={getTypeLabel(item.item_type)}
+                  isNsfw={item.is_nsfw}
                   progressText={getStatusLabel(item.status)}
                   onClick={() => setSelectedItem(item)}
                 />
@@ -355,6 +358,7 @@ export const Home: React.FC = () => {
                 title={item.title}
                 imageUrl={item.image_url}
                 typeLabel={getTypeLabel(item.item_type)}
+                isNsfw={item.is_nsfw}
                 subtitle={item.list_title}
                 progressText="Siguiente a consumir"
                 actionLabel={getActionLabel(item.item_type)}

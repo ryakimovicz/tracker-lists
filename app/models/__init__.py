@@ -10,6 +10,7 @@ from app.models.social import ListVote, ListReport, Comment, CommentVote, Commen
 from app.models.review import MediaReview, MediaReviewVote, MediaReviewReport
 from app.models.addition import ListAddition, ListAdditionItem, UserAdoptedAddition, AdditionVote, AdditionComment
 from app.models.activity import UserActivityLog
+from app.models.nsfw import MediaCoverReport, ReportStatusEnum
 
 __all__ = [
     "Base",
@@ -36,5 +37,7 @@ __all__ = [
     "UserAdoptedAddition",
     "AdditionVote",
     "AdditionComment",
-    "UserActivityLog"
+    "UserActivityLog",
+    "MediaCoverReport",
+    "ReportStatusEnum"
 ]

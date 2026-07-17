@@ -7,6 +7,7 @@ from app.core.database import get_db
 from app.api.deps import get_current_user, get_current_user_optional
 from app.models.user import User
 from app.models.list import ReadingList, VisibilityEnum
+from app.services.nsfw import enrich_with_nsfw_status
 from app.models.list_item import ListItem, ItemTypeEnum
 from app.models.saved_list import SavedList
 from app.models.item_progress import ItemProgress
@@ -262,6 +263,9 @@ def get_list_details(
         sd = reading_list.section_descriptions or {}
         list_title = sd.get("draft_title") or list_title
         list_desc = sd.get("draft_description") or list_desc
+            
+    user_id = current_user.id if current_user else None
+    merged_items = enrich_with_nsfw_status(db, merged_items, user_id)
 
     return ReadingListDetailsResponse(
         id=reading_list.id,

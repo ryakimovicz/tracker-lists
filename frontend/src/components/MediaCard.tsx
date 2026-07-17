@@ -1,5 +1,6 @@
 import React from 'react';
 import { Star, Check } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 interface MediaCardProps {
   id: string | number;
@@ -13,6 +14,7 @@ interface MediaCardProps {
   actionLabel?: string;
   onAction?: (e: React.MouseEvent) => void;
   isLoading?: boolean;
+  isNsfw?: boolean;
 }
 
 export const MediaCard: React.FC<MediaCardProps> = ({
@@ -25,18 +27,34 @@ export const MediaCard: React.FC<MediaCardProps> = ({
   style,
   actionLabel,
   onAction,
-  isLoading
+  isLoading,
+  isNsfw
 }) => {
+  const { user } = useAuth();
+  const [isPeek, setIsPeek] = React.useState(false);
+  
+  const shouldBlur = isNsfw && !user?.show_nsfw;
+  const currentlyBlurred = shouldBlur && !isPeek;
+
+  const handleCardClick = (e: React.MouseEvent) => {
+    if (currentlyBlurred) {
+      e.stopPropagation();
+      setIsPeek(true);
+      return;
+    }
+    if (onClick) onClick();
+  };
+
   return (
     <div
       className="glass-card"
-      onClick={onClick}
+      onClick={handleCardClick}
       style={{
         padding: '0.75rem',
         display: 'flex',
         flexDirection: 'column',
         gap: '0.75rem',
-        cursor: onClick ? 'pointer' : 'default',
+        cursor: (onClick || currentlyBlurred) ? 'pointer' : 'default',
         minWidth: '160px',
         width: '160px',
         transition: 'transform 0.2s',
@@ -53,8 +71,25 @@ export const MediaCard: React.FC<MediaCardProps> = ({
         <img
           src={imageUrl || 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=150'}
           alt={title}
-          style={{ width: '100%', height: '220px', objectFit: 'cover', borderRadius: '8px' }}
+          style={{ 
+            width: '100%', 
+            height: '220px', 
+            objectFit: 'cover', 
+            borderRadius: '8px',
+            filter: currentlyBlurred ? 'blur(15px)' : 'none',
+            transition: 'filter 0.3s'
+          }}
         />
+        {currentlyBlurred && (
+          <div style={{
+            position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(0,0,0,0.3)', borderRadius: '8px',
+            color: 'white', fontSize: '0.8rem', fontWeight: 'bold', textAlign: 'center', padding: '0.5rem'
+          }}>
+            Haz clic para ver portada
+          </div>
+        )}
         {typeLabel && (
           <span style={{
             position: 'absolute',
