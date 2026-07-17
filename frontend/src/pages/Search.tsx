@@ -14,6 +14,7 @@ interface SearchResultItem {
   item_type: 'game' | 'movie' | 'series' | 'anime' | 'book' | 'user' | 'guide' | 'comic' | 'manga';
   release_date?: string;
   imdb_id?: string;
+  is_nsfw?: boolean;
 }
 
 const stripHtml = (html: string) => {
