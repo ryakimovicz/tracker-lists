@@ -26,41 +26,7 @@ def search_media(
     if type_lower == "comic":
         return ComicVineService.search_comics(q)
     elif type_lower == "book":
-        import concurrent.futures
-        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-            future_books = executor.submit(GoogleBooksService.search_books, q)
-            future_comics = executor.submit(ComicVineService.search_comics, q)
-            books_res = future_books.result()
-            comics_res = future_comics.result()
-            
-        combined = []
-        if books_res:
-            combined.extend(books_res)
-        if comics_res:
-            combined.extend(comics_res)
-            
-        # Re-sort combined results by score since they were fetched separately
-        query_clean = q.lower().strip()
-        query_words = set(query_clean.split())
-        def calculate_score(item: SearchResultItem):
-            title_clean = item.title.lower().strip()
-            score = 0.0
-            if title_clean == query_clean:
-                score += 100.0
-            elif title_clean.startswith(query_clean):
-                score += 50.0
-            elif query_clean in title_clean:
-                score += 30.0
-            title_words = set(title_clean.split())
-            common_words = query_words.intersection(title_words)
-            score += len(common_words) * 15.0
-            if len(item.title) > 0:
-                score += (1.0 / len(item.title)) * 10.0
-            score += min(item.popularity or 0.0, 100.0)
-            return score
-            
-        combined.sort(key=calculate_score, reverse=True)
-        return combined
+        return GoogleBooksService.search_books(q)
     elif type_lower == "manga":
         return AnilistService.search_manga(q)
     elif type_lower == "game":
