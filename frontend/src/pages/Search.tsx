@@ -11,7 +11,7 @@ interface SearchResultItem {
   title: string;
   image_url: string;
   description: string;
-  item_type: 'game' | 'movie' | 'series' | 'anime' | 'book' | 'user' | 'guide';
+  item_type: 'game' | 'movie' | 'series' | 'anime' | 'book' | 'user' | 'guide' | 'comic' | 'manga';
   release_date?: string;
 }
 
@@ -29,7 +29,7 @@ export const Search: React.FC = () => {
 
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResultItem[]>([]);
-  const [activeTab, setActiveTab] = useState<'all' | 'movie' | 'series' | 'anime' | 'book' | 'game' | 'user' | 'guide'>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'movie' | 'series' | 'anime' | 'book' | 'game' | 'user' | 'guide' | 'comic' | 'manga'>('all');
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [isSearching, setIsSearching] = useState(false);

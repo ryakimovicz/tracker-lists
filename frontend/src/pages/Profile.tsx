@@ -21,7 +21,7 @@ import {
 
 interface LibraryItem {
   id: number;
-  item_type: 'game' | 'movie' | 'series' | 'anime' | 'book';
+  item_type: 'game' | 'movie' | 'series' | 'anime' | 'book' | 'comic' | 'manga';
   external_id: string;
   title: string;
   image_url: string;
@@ -77,8 +77,9 @@ export const Profile: React.FC = () => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [libraryItems, setLibraryItems] = useState<LibraryItem[]>([]);
   const [activeTab, setActiveTab] = useState<'shelf' | 'guides' | 'favorites'>('shelf');
-  const [mediaFilter, setMediaFilter] = useState<'all' | 'game' | 'movie' | 'series' | 'anime' | 'book'>('all');
+  const [mediaFilter, setMediaFilter] = useState<'all' | 'movie' | 'series' | 'anime' | 'book' | 'comic' | 'manga' | 'game'>('all');
   const [errorMsg, setErrorMsg] = useState('');
+  const [isShelfExpanded, setIsShelfExpanded] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [loading, setLoading] = useState(true);
 
