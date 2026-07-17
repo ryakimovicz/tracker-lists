@@ -467,7 +467,14 @@ export const Profile: React.FC = () => {
                       textTransform: 'capitalize'
                     }}
                   >
-                    {type === 'comic' ? (language === 'es' ? 'Cómic' : 'Comic') : type === 'manga' ? 'Manga' : t('media' + type.charAt(0).toUpperCase() + type.slice(1))}
+                    {type === 'all' ? (language === 'es' ? 'Todo' : 'All') :
+                     type === 'movie' ? (language === 'es' ? 'Películas' : 'Movies') :
+                     type === 'series' ? (language === 'es' ? 'Series' : 'Series') :
+                     type === 'anime' ? 'Anime' :
+                     type === 'book' ? (language === 'es' ? 'Libros' : 'Books') :
+                     type === 'comic' ? (language === 'es' ? 'Cómics' : 'Comics') :
+                     type === 'manga' ? 'Mangas' :
+                     type === 'game' ? (language === 'es' ? 'Juegos' : 'Games') : type}
                   </button>
                 ));
               })()}

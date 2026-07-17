@@ -319,8 +319,8 @@ export const Search: React.FC = () => {
             { value: 'series', label: language === 'es' ? 'Series' : 'Series' },
             { value: 'anime', label: 'Anime' },
             { value: 'book', label: language === 'es' ? 'Libros' : 'Books' },
-            { value: 'comic', label: language === 'es' ? 'Cómic' : 'Comic' },
-            { value: 'manga', label: 'Manga' },
+            { value: 'comic', label: language === 'es' ? 'Cómics' : 'Comics' },
+            { value: 'manga', label: 'Mangas' },
             { value: 'game', label: language === 'es' ? 'Juegos' : 'Games' },
             { value: 'user', label: language === 'es' ? 'Usuarios' : 'Users' },
             { value: 'guide', label: language === 'es' ? 'Guías' : 'Guides' }

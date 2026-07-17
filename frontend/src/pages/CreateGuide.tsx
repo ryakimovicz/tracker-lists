@@ -989,8 +989,8 @@ export const CreateGuide: React.FC = () => {
                       { value: 'series', label: language === 'es' ? 'Series' : 'Series' },
                       { value: 'anime', label: 'Anime' },
                       { value: 'book', label: language === 'es' ? 'Libros' : 'Books' },
-                      { value: 'comic', label: language === 'es' ? 'Cómic' : 'Comic' },
-                      { value: 'manga', label: 'Manga' },
+                      { value: 'comic', label: language === 'es' ? 'Cómics' : 'Comics' },
+                      { value: 'manga', label: 'Mangas' },
                       { value: 'game', label: language === 'es' ? 'Juegos' : 'Games' }
                     ].map(tab => (
                       <button
@@ -1065,7 +1065,7 @@ export const CreateGuide: React.FC = () => {
                           />
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <h5 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{media.title}</h5>
-                            <span style={{ fontSize: '0.72rem', color: 'var(--accent-primary)', textTransform: 'capitalize', fontWeight: 600 }}>{t('media' + media.item_type.charAt(0).toUpperCase() + media.item_type.slice(1))}</span>
+                            <span style={{ fontSize: '0.72rem', color: 'var(--accent-primary)', textTransform: 'capitalize', fontWeight: 600 }}>{media.item_type === 'comic' ? (language === 'es' ? 'Cómic' : 'Comic') : media.item_type === 'manga' ? 'Manga' : t('media' + media.item_type.charAt(0).toUpperCase() + media.item_type.slice(1))}</span>
                             
                             <div style={{ display: 'flex', gap: '1rem', marginTop: '0.25rem' }}>
                               <button
@@ -1197,8 +1197,8 @@ export const CreateGuide: React.FC = () => {
                     value={manualType}
                     onChange={(e) => setManualType(e.target.value)}
                   >
-                    <option value="comic">{t('mediaComic')}</option>
-                    <option value="manga">{t('mediaManga')}</option>
+                    <option value="comic">{language === 'es' ? 'Cómic' : 'Comic'}</option>
+                    <option value="manga">Manga</option>
                     <option value="book">{t('mediaBook')}</option>
                     <option value="game">{t('mediaGame')}</option>
                     <option value="movie">{t('mediaMovie')}</option>
