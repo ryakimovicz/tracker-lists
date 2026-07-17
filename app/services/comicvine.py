@@ -97,7 +97,7 @@ class ComicVineService:
                                         title_parts = f"{vol_name} #{issue_num}"
                                         if issue_name:
                                             title_parts += f" ({issue_name})"
-                                        item_type_val = "book"
+                                        item_type_val = "comic"
 
                                         issue_results.append(
                                             SearchResultItem(
@@ -140,7 +140,7 @@ class ComicVineService:
                                 title = title_parts
                             else:
                                 title = item.get("name") or "Untitled Volume"
-                            item_type_val = "book"
+                            item_type_val = "comic"
 
                             global_results.append(
                                 SearchResultItem(

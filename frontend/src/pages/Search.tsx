@@ -437,11 +437,7 @@ export const Search: React.FC = () => {
             const onShelf = shelfItems.some(x => x.external_id === item.external_id && x.item_type === item.item_type);
             return (
               <div key={item.external_id} className="glass-card" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', cursor: 'pointer', position: 'relative' }} onClick={() => handleOpenItemDetails(item)}>
-                {activeTab === 'all' && (item.item_type === 'comic' || item.item_type === 'manga' || item.item_type === 'book' || item.item_type === 'anime') && (
-                  <div style={{ position: 'absolute', top: '1.5rem', right: '1.5rem', background: 'var(--accent-primary)', color: 'white', padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 600, zIndex: 10, textTransform: 'uppercase' }}>
-                    {item.item_type === 'comic' ? (language === 'es' ? 'Cómic' : 'Comic') : item.item_type}
-                  </div>
-                )}
+
                 <img
                   src={item.image_url || 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=150'}
                   alt={item.title}
@@ -452,7 +448,7 @@ export const Search: React.FC = () => {
                     {item.title}
                   </h4>
                   <span style={{ fontSize: '0.75rem', color: 'var(--accent-primary)', display: 'block', marginBottom: '0.4rem' }}>
-                    {t('media' + item.item_type.charAt(0).toUpperCase() + item.item_type.slice(1))}
+                    {item.item_type === 'comic' ? (language === 'es' ? 'Cómic' : 'Comic') : item.item_type === 'manga' ? 'Manga' : t('media' + item.item_type.charAt(0).toUpperCase() + item.item_type.slice(1))}
                   </span>
                   <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', margin: 0, height: '3.2rem', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' }}>
                     {stripHtml(item.description)}

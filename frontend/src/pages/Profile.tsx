@@ -529,11 +529,7 @@ export const Profile: React.FC = () => {
                       {displayedItems.map(item => (
                         <div key={item.id} className="glass-card" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                           <div style={{ position: 'relative', cursor: 'pointer' }} onClick={() => handleOpenItemDetails(item)}>
-                            {mediaFilter === 'all' && (item.item_type === 'comic' || item.item_type === 'manga' || item.item_type === 'book' || item.item_type === 'anime') && (
-                              <div style={{ position: 'absolute', top: '0.5rem', left: '0.5rem', background: 'var(--accent-primary)', color: 'white', padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.65rem', fontWeight: 600, zIndex: 10, textTransform: 'uppercase' }}>
-                                {item.item_type === 'comic' ? (language === 'es' ? 'Cómic' : 'Comic') : item.item_type}
-                              </div>
-                            )}
+
                             <img
                               src={item.image_url || 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=150'}
                               alt={item.title}
