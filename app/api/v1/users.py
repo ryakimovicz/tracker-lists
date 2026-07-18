@@ -51,6 +51,9 @@ def get_user_dashboard(
         created_at=current_user.created_at,
         photo_url=current_user.photo_url,
         is_admin=current_user.is_admin,
+        show_nsfw=current_user.show_nsfw,
+        is_pro=current_user.is_pro,
+        profile_color=current_user.profile_color,
         lastfm_username=current_user.lastfm_username,
         created_lists=created_lists,
         saved_lists=saved_lists
@@ -381,6 +384,9 @@ def get_any_user_profile(
         created_at=user.created_at,
         photo_url=user.photo_url,
         is_admin=user.is_admin,
+        show_nsfw=user.show_nsfw,
+        is_pro=user.is_pro,
+        profile_color=user.profile_color,
         lastfm_username=user.lastfm_username,
         created_lists=created_lists,
         saved_lists=saved_lists
@@ -407,3 +413,33 @@ def get_user_activity(
         }
         for act in activities
     ]
+
+class MockProRequest(BaseModel):
+    is_pro: bool
+
+@router.post("/me/mock-pro")
+def mock_pro_status(
+    req: MockProRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    current_user.is_pro = req.is_pro
+    db.commit()
+    db.refresh(current_user)
+    return {"message": f"User is now {'Pro' if req.is_pro else 'Free'}", "is_pro": req.is_pro}
+
+class ColorUpdateRequest(BaseModel):
+    color: str | None
+
+@router.put("/me/color")
+def update_profile_color(
+    req: ColorUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if not current_user.is_pro:
+        raise HTTPException(status_code=403, detail="Only Pro users can set profile colors")
+    current_user.profile_color = req.color
+    db.commit()
+    db.refresh(current_user)
+    return {"message": "Color updated successfully", "color": req.color}

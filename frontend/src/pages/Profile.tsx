@@ -14,7 +14,9 @@ import {
   AlertCircle,
   CheckCircle,
   Eye,
-  Edit
+  Edit,
+  Settings,
+  Star
 } from 'lucide-react';
 
 interface LibraryItem {
@@ -46,6 +48,8 @@ interface UserProfile {
   created_at: string;
   created_lists: any[];
   saved_lists: any[];
+  is_pro?: boolean;
+  profile_color?: string;
   lastfm_username?: string;
 }
 
@@ -96,6 +100,20 @@ export const Profile: React.FC = () => {
   // Last.fm states
   const [nowPlaying, setNowPlaying] = useState<any>(null);
   const [topAlbums, setTopAlbums] = useState<any[]>([]);
+
+  // Premium Cosmetics
+  const [showColorModal, setShowColorModal] = useState(false);
+  const [selectedColor, setSelectedColor] = useState('#8b5cf6'); // default violet
+
+  const COLORS = [
+    { name: 'Violet', hex: '#8b5cf6' },
+    { name: 'Neon Pink', hex: '#f472b6' },
+    { name: 'Crimson', hex: '#ef4444' },
+    { name: 'Amber', hex: '#f59e0b' },
+    { name: 'Emerald', hex: '#10b981' },
+    { name: 'Cyan', hex: '#06b6d4' },
+    { name: 'Blue', hex: '#3b82f6' }
+  ];
   const [isConnectingLastFm, setIsConnectingLastFm] = useState(false);
   const [lastFmTokenInput, setLastFmTokenInput] = useState('');
 
@@ -209,6 +227,19 @@ export const Profile: React.FC = () => {
     }
   };
 
+  const handleUpdateColor = async (hex: string) => {
+    try {
+      await apiClient.put('/users/me/color', { profile_color: hex });
+      setProfile(prev => prev ? { ...prev, profile_color: hex } : null);
+      setSelectedColor(hex);
+      setShowColorModal(false);
+      setSuccessMsg(language === 'es' ? 'Color actualizado.' : 'Color updated.');
+      setTimeout(() => setSuccessMsg(''), 3000);
+    } catch(err: any) {
+      setErrorMsg(err.response?.data?.detail || 'Error updating color');
+    }
+  };
+
   const handleStatusChange = async (itemId: number, newStatus: string) => {
     setErrorMsg('');
     setSuccessMsg('');
@@ -227,6 +258,11 @@ export const Profile: React.FC = () => {
     }
   };
   const handleToggleFavorite = async (itemId: number, currentFav: boolean) => {
+    if (!currentFav && !profile?.is_pro && favorites.length >= 4) {
+      setErrorMsg(language === 'es' ? 'Límite de destacados alcanzado. Hazte Pro para tener destacados ilimitados.' : 'Favorites limit reached. Become Pro for unlimited favorites.');
+      return;
+    }
+    
     try {
       await apiClient.put(`/library/${itemId}`, { is_favorite: !currentFav });
       setLibraryItems(prev => prev.map(item => item.id === itemId ? { ...item, is_favorite: !currentFav } : item));
@@ -370,7 +406,17 @@ export const Profile: React.FC = () => {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem', maxWidth: '1000px', margin: '0 auto', padding: '2rem 0' }}>
+    <div 
+      style={{ 
+        display: 'flex', 
+        flexDirection: 'column', 
+        gap: '2.5rem', 
+        maxWidth: '1000px', 
+        margin: '0 auto', 
+        padding: '2rem 0',
+        ...(profile?.is_pro && profile?.profile_color ? { '--accent-primary': profile.profile_color } as React.CSSProperties : {})
+      }}
+    >
       
       {/* Profile Header Card */}
       {profile && (
@@ -383,6 +429,11 @@ export const Profile: React.FC = () => {
           <div style={{ flex: 1, minWidth: 250, textAlign: 'left' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.4rem' }}>
               <h1 style={{ margin: 0, fontSize: '2rem', fontWeight: 800 }}>{profile.username}</h1>
+              {profile.is_pro && (
+                <span style={{ fontSize: '0.75rem', background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.2rem' }} title="Pathd Pro">
+                  <Star size={12} fill="#f59e0b" /> PRO
+                </span>
+              )}
               {profile.is_admin && (
                 <span style={{ fontSize: '0.75rem', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: 600 }}>
                   ADMIN
@@ -446,6 +497,19 @@ export const Profile: React.FC = () => {
                   </a>
                   <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{nowPlaying.artist}</span>
                 </div>
+                {isOwnProfile && currentUser?.is_pro && (
+                  <button 
+                    onClick={() => {
+                      setSelectedColor(profile?.profile_color || '#8b5cf6');
+                      setShowColorModal(true);
+                    }}
+                    className="btn-secondary" 
+                    style={{ padding: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem' }}
+                    title={language === 'es' ? 'Cambiar color del perfil' : 'Change profile color'}
+                  >
+                    <Settings size={18} />
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -1083,6 +1147,53 @@ export const Profile: React.FC = () => {
             alt="Zoomed preview"
             style={{ maxHeight: '90vh', maxWidth: '90vw', objectFit: 'contain', borderRadius: '8px', boxShadow: '0 10px 30px rgba(0,0,0,0.5)' }}
           />
+        </div>
+      )}
+
+      {/* Profile Cosmetics Modal */}
+      {showColorModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 4000
+        }} onClick={() => setShowColorModal(false)}>
+          <div className="glass-card" style={{ width: '400px', padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }} onClick={e => e.stopPropagation()}>
+            <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Settings size={22} color="var(--accent-primary)" /> {language === 'es' ? 'Personalizar Perfil' : 'Customize Profile'}
+            </h2>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: 0 }}>
+              {language === 'es' ? 'Elige el color principal (Accent Color) que se aplicará en todo tu perfil para que otros lo vean.' : 'Choose the accent color that will be applied throughout your profile for others to see.'}
+            </p>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem' }}>
+              {COLORS.map(color => (
+                <button
+                  key={color.hex}
+                  onClick={() => setSelectedColor(color.hex)}
+                  title={color.name}
+                  style={{
+                    width: '100%',
+                    aspectRatio: '1',
+                    borderRadius: '50%',
+                    background: color.hex,
+                    border: selectedColor === color.hex ? '3px solid white' : 'none',
+                    outline: selectedColor === color.hex ? `2px solid ${color.hex}` : 'none',
+                    cursor: 'pointer',
+                    transition: 'transform 0.2s ease',
+                    transform: selectedColor === color.hex ? 'scale(1.1)' : 'scale(1)'
+                  }}
+                />
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+              <button className="btn-secondary" style={{ flex: 1 }} onClick={() => setShowColorModal(false)}>
+                {language === 'es' ? 'Cancelar' : 'Cancel'}
+              </button>
+              <button className="btn-primary" style={{ flex: 1 }} onClick={() => handleUpdateColor(selectedColor)}>
+                {language === 'es' ? 'Guardar' : 'Save'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

@@ -8,6 +8,8 @@ interface UserProfile {
   photo_url: string;
   is_admin: boolean;
   show_nsfw: boolean;
+  is_pro?: boolean;
+  profile_color?: string;
 }
 
 interface AuthContextType {

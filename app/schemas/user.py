@@ -14,6 +14,8 @@ class UserResponse(UserBase):
     photo_url: str
     is_admin: bool = False
     show_nsfw: bool = False
+    is_pro: bool = False
+    profile_color: str | None = None
     lastfm_username: str | None = None
 
     class Config:
@@ -37,6 +39,8 @@ class UserDashboardResponse(BaseModel):
     photo_url: str
     is_admin: bool = False
     show_nsfw: bool = False
+    is_pro: bool = False
+    profile_color: str | None = None
     lastfm_username: str | None = None
     created_lists: List[ReadingListResponse] = []
     saved_lists: List[ReadingListResponse] = []

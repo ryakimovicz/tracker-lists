@@ -39,6 +39,10 @@ def root():
         "docs_url": "/docs",
         "project": settings.PROJECT_NAME
     }
+
+@app.get("/ping")
+def ping_test():
+    return {"ping": "pong"}
 # Trigger uvicorn hot-reload configuration update (v7)
 # Trigger uvicorn reload
 

@@ -18,6 +18,8 @@ class User(Base):
     lastfm_session_key = Column(String(100), nullable=True)
     is_admin = Column(Boolean, default=False, nullable=False)
     show_nsfw = Column(Boolean, default=False, nullable=False)
+    is_pro = Column(Boolean, default=False, nullable=False)
+    profile_color = Column(String(20), nullable=True)
 
     # Relationships
     lists = relationship("ReadingList", back_populates="creator", cascade="all, delete-orphan")

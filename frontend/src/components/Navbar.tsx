@@ -3,13 +3,16 @@ import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
 import type { Theme } from '../context/ThemeContext';
-import { LogOut, List, Shield, Globe, Sun, Moon, Monitor, Home, Users, PlusCircle, Compass, User } from 'lucide-react';
+import { LogOut, List, Shield, Globe, Sun, Moon, Monitor, Home, Users, PlusCircle, Compass, User, Star } from 'lucide-react';
+import { useState } from 'react';
+import { ProModal } from './ProModal';
 
 export const Navbar: React.FC = () => {
   const { user, isAuthenticated, logout } = useAuth();
   const { language, setLanguage, t } = useTranslation();
   const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
+  const [showProModal, setShowProModal] = useState(false);
 
   const handleLogout = async () => {
     await logout();
@@ -132,6 +135,26 @@ export const Navbar: React.FC = () => {
               />
               <span style={{ fontWeight: 500, fontSize: '0.95rem' }}>{user.username}</span>
             </div>
+            
+            {!user.is_pro && (
+              <button
+                onClick={() => setShowProModal(true)}
+                className="btn-primary"
+                style={{
+                  padding: '0.3rem 0.8rem',
+                  fontSize: '0.8rem',
+                  background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                  border: 'none',
+                  color: '#fff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.3rem'
+                }}
+              >
+                <Star size={14} fill="#fff" /> Upgrade
+              </button>
+            )}
+
             <button
               onClick={handleLogout}
               className="btn-secondary"
@@ -151,6 +174,8 @@ export const Navbar: React.FC = () => {
           </div>
         )}
       </div>
+
+      {showProModal && <ProModal onClose={() => setShowProModal(false)} />}
     </nav>
   );
 };

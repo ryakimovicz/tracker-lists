@@ -12,7 +12,7 @@ export const Register: React.FC = () => {
 
   useEffect(() => {
     if (isAuthenticated) {
-      navigate('/dashboard');
+      navigate('/profile');
     }
   }, [isAuthenticated, navigate]);
 

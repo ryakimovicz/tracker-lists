@@ -14,8 +14,10 @@ import {
   LayoutGrid,
   Save,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Lock
 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 interface CreatedGuide {
   id: number;
@@ -48,6 +50,7 @@ const stripHtml = (html: string) => {
 
 export const CreateGuide: React.FC = () => {
   const { t, language } = useTranslation();
+  const { user: currentUser } = useAuth();
 
   // Step 1: Create Guide state
   const [guide, setGuide] = useState<CreatedGuide | null>(null);
@@ -537,14 +540,23 @@ export const CreateGuide: React.FC = () => {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
             <label style={{ fontSize: '0.9rem', fontWeight: 500 }}>{language === 'es' ? 'Visibilidad' : 'Visibility'}</label>
-            <select
-              className="input-field"
-              value={visibility}
-              onChange={(e: any) => setVisibility(e.target.value)}
-            >
-              <option value="public">{language === 'es' ? 'Pública' : 'Public'}</option>
-              <option value="private">{language === 'es' ? 'Privada' : 'Private'}</option>
-            </select>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <select
+                className="input-field"
+                value={visibility}
+                onChange={(e: any) => setVisibility(e.target.value)}
+                style={{ flex: 1 }}
+              >
+                <option value="public">{language === 'es' ? 'Pública' : 'Public'}</option>
+                <option value="unlisted" disabled={!currentUser?.is_pro}>{language === 'es' ? 'No Listada (Pro)' : 'Unlisted (Pro)'}</option>
+                <option value="private" disabled={!currentUser?.is_pro}>{language === 'es' ? 'Privada (Pro)' : 'Private (Pro)'}</option>
+              </select>
+            </div>
+            {!currentUser?.is_pro && (
+              <p style={{ margin: 0, fontSize: '0.8rem', color: '#f59e0b', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                <Lock size={12} /> {language === 'es' ? 'Hazte Pro para guías ocultas.' : 'Go Pro for hidden guides.'}
+              </p>
+            )}
           </div>
 
           {/* Scale customization checkbox */}

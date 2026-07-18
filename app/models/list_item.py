@@ -5,6 +5,7 @@ from app.core.database import Base
 
 class ItemTypeEnum(str, enum.Enum):
     ANIME = "anime"
+    MANGA = "manga"
     BOOK = "book"
     MOVIE = "movie"
     SERIES = "series"
