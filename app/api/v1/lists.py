@@ -7,7 +7,6 @@ from app.core.database import get_db
 from app.api.deps import get_current_user, get_current_user_optional
 from app.models.user import User
 from app.models.list import ReadingList, VisibilityEnum
-from app.services.nsfw import enrich_with_nsfw_status
 from app.models.list_item import ListItem, ItemTypeEnum
 from app.models.saved_list import SavedList
 from app.models.item_progress import ItemProgress
@@ -60,7 +59,6 @@ def create_list(
         title=list_in.title,
         description=list_in.description,
         visibility=VisibilityEnum.DRAFT,
-        importance_labels=list_in.importance_labels,
         section_importances=list_in.section_importances,
         section_descriptions={
             "flow": [],
@@ -264,8 +262,7 @@ def get_list_details(
         list_title = sd.get("draft_title") or list_title
         list_desc = sd.get("draft_description") or list_desc
             
-    user_id = current_user.id if current_user else None
-    merged_items = enrich_with_nsfw_status(db, merged_items, user_id)
+
 
     return ReadingListDetailsResponse(
         id=reading_list.id,
@@ -282,7 +279,6 @@ def get_list_details(
         progress_percentage=round(progress_percentage, 2),
         skipped_percentage=round(skipped_percentage, 2),
         section_descriptions=reading_list.section_descriptions,
-        importance_labels=reading_list.importance_labels,
         section_importances=reading_list.section_importances,
         items=merged_items
     )
@@ -327,7 +323,20 @@ def update_list(
             details="published" if act_type == "guide_published" else "updated"
         )
         db.add(activity)
-        db.commit()
+        
+    if "section_descriptions" in update_data:
+        # Assuming block_edited if section_descriptions is updated
+        # We can just say "un bloque" as we don't know exactly which block was edited from the diff
+        activity_block = UserActivityLog(
+            user_id=current_user.id,
+            activity_type="block_edited",
+            item_title=reading_list.title,
+            item_type="guide",
+            details=f"list_id:{reading_list.id}"
+        )
+        db.add(activity_block)
+        
+    db.commit()
 
     return reading_list
 
@@ -429,6 +438,16 @@ def remove_item_from_list(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found in this list")
         
     db.delete(item)
+    
+    activity = UserActivityLog(
+        user_id=current_user.id,
+        activity_type="item_removed",
+        item_title=item.title,
+        item_type=item.item_type,
+        details=f"list_id:{list_id}"
+    )
+    db.add(activity)
+    
     db.commit()
     return None
 
@@ -506,33 +525,67 @@ def unsave_list_from_library(
 def auto_add_to_library(db: Session, user_id: int, item: ListItem):
     if not item.external_id:
         return
+        
+    target_item_type = item.item_type
+    target_external_id = item.external_id
+    target_title = item.title
+    target_image_url = item.image_url
+    
+    if item.external_id.startswith("tmdb-ep-"):
+        ep_id = item.external_id.replace("tmdb-ep-", "")
+        import urllib.request, json
+        url = f"https://api.tvmaze.com/episodes/{ep_id}?embed=show"
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "TrackerLists/1.0"})
+            with urllib.request.urlopen(req, timeout=5) as response:
+                if response.status == 200:
+                    data = json.loads(response.read().decode())
+                    show = data.get("_embedded", {}).get("show", {})
+                    if show:
+                        target_item_type = "series"
+                        target_external_id = f"tvm_{show.get('id')}"
+                        target_title = show.get("name")
+                        img = show.get("image")
+                        target_image_url = img.get("original") if img else None
+                    else:
+                        return
+                else:
+                    return
+        except Exception:
+            return
+
     existing = db.query(UserLibraryItem).filter(
         UserLibraryItem.user_id == user_id,
-        UserLibraryItem.item_type == item.item_type,
-        UserLibraryItem.external_id == item.external_id
+        UserLibraryItem.item_type == target_item_type,
+        UserLibraryItem.external_id == target_external_id
     ).first()
     
     status_val = UserLibraryStatusEnum.COMPLETED
-    if item.item_type in ("book", "comic", "manga"):
+    if target_item_type in ("book", "comic", "manga"):
         status_val = UserLibraryStatusEnum.READ
+    elif item.external_id.startswith("tmdb-ep-"):
+        status_val = UserLibraryStatusEnum.PLAN_TO_WATCH
         
     from datetime import datetime, timezone
     
     if existing:
-        existing.status = status_val
-        existing.completed_at = datetime.now(timezone.utc)
-        existing.updated_at = datetime.now(timezone.utc)
+        if not item.external_id.startswith("tmdb-ep-"):
+            existing.status = status_val
+            existing.completed_at = datetime.now(timezone.utc)
+            existing.updated_at = datetime.now(timezone.utc)
     else:
         lib_item = UserLibraryItem(
             user_id=user_id,
-            item_type=item.item_type,
-            external_id=item.external_id,
-            title=item.title,
-            image_url=item.image_url,
+            item_type=target_item_type,
+            external_id=target_external_id,
+            title=target_title,
+            image_url=target_image_url,
             status=status_val,
-            completed_at=datetime.now(timezone.utc)
+            completed_at=datetime.now(timezone.utc) if not item.external_id.startswith("tmdb-ep-") else None
         )
         db.add(lib_item)
+        
+    db.commit()
 
 @router.post("/items/{item_id}/toggle", status_code=status.HTTP_200_OK)
 def toggle_item_progress(
@@ -870,6 +923,16 @@ def update_list_item(
     for field, value in update_data.items():
         setattr(item, field, value)
         
+    if "order_index" in update_data:
+        activity = UserActivityLog(
+            user_id=current_user.id,
+            activity_type="item_moved",
+            item_title=item.title,
+            item_type=item.item_type,
+            details=f"list_id:{list_id}"
+        )
+        db.add(activity)
+        
     db.commit()
     db.refresh(item)
     return item
@@ -1170,6 +1233,9 @@ def toggle_tmdb_episode(
             
         lib_item.updated_at = datetime.now(timezone.utc)
         db.commit()
+    else:
+        if progress.is_completed:
+            auto_add_to_library(db, current_user.id, item)
         
     return {
         "item_id": item.id,

@@ -61,7 +61,6 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   
   const [selectedItem, setSelectedItem] = useState<any>(initialItem);
   const [isCoverPeek, setIsCoverPeek] = useState(false);
-  const [reportStatus, setReportStatus] = useState<'none'|'pending'|'success'>('none');
   
   const shouldBlurCover = selectedItem?.is_nsfw && !user?.show_nsfw && !isCoverPeek;
   const [itemReviews, setItemReviews] = useState<any[]>([]);
@@ -75,6 +74,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   const [seasons, setSeasons] = useState<any[]>([]);
   const [activeSeason, setActiveSeason] = useState<number | null>(null);
   const [seasonEpisodes, setSeasonEpisodes] = useState<{ [seasonNumber: number]: any[] }>({});
+  const [globalProgress, setGlobalProgress] = useState<Record<string, boolean>>({});
   const [isLoadingSeasonEpisodes, setIsLoadingSeasonEpisodes] = useState(false);
   const [isLoadingMetadata, setIsLoadingMetadata] = useState(false);
   
@@ -175,24 +175,37 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
   const handleLoadSeasonEpisodes = async (seriesId: string, seasonNumber: number) => {
     if (seasonEpisodes[seasonNumber]) return;
-    const cacheKey = `${seriesId}_s${seasonNumber}`;
-    const cached = getCachedTMDB(cacheKey);
-    if (cached && Array.isArray(cached)) {
-      setSeasonEpisodes(prev => ({
-        ...prev,
-        [seasonNumber]: cached
-      }));
+    const cacheKeyAll = `${seriesId}_all_episodes`;
+    const cachedAll = getCachedTMDB(cacheKeyAll);
+    
+    const processAllEps = (allEps: any[]) => {
+      const extIds = allEps.map(e => `tmdb-ep-${e.id}`);
+      if (extIds.length > 0) {
+        apiClient.post('/users/me/progress/bulk-check', { external_ids: extIds })
+          .then(progRes => {
+            setGlobalProgress(prev => ({ ...prev, ...progRes.data }));
+          })
+          .catch(e => console.error("Failed to fetch global progress", e));
+      }
+
+      const grouped: Record<number, any[]> = {};
+      allEps.forEach(ep => {
+        if (!grouped[ep.season_number]) grouped[ep.season_number] = [];
+        grouped[ep.season_number].push(ep);
+      });
+      setSeasonEpisodes(prev => ({ ...prev, ...grouped }));
+    };
+
+    if (cachedAll && Array.isArray(cachedAll)) {
+      processAllEps(cachedAll);
       return;
     }
 
     setIsLoadingSeasonEpisodes(true);
     try {
-      const res = await apiClient.get(`/search/series/${seriesId}/season/${seasonNumber}`);
-      setCachedTMDB(cacheKey, res.data);
-      setSeasonEpisodes(prev => ({
-        ...prev,
-        [seasonNumber]: res.data || []
-      }));
+      const res = await apiClient.get(`/search/series/${seriesId}/episodes`);
+      setCachedTMDB(cacheKeyAll, res.data);
+      processAllEps(res.data || []);
     } catch (err) {
       console.error("Failed to load season episodes", err);
     } finally {
@@ -253,16 +266,35 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
           const nextSeason = item.tracking_list_id ? findNextSeasonToSee(itemsList, filteredSeasons) : (filteredSeasons.length > 0 ? filteredSeasons[0].season_number : 1);
           setActiveSeason(nextSeason);
 
-          const cacheKeyS = `${item.external_id}_s${nextSeason}`;
-          const cachedS = getCachedTMDB(cacheKeyS);
-          if (cachedS && Array.isArray(cachedS)) {
-            setSeasonEpisodes(prev => ({ ...prev, [nextSeason]: cachedS }));
+          const cacheKeyAll = `${item.external_id}_all_episodes`;
+          const cachedAll = getCachedTMDB(cacheKeyAll);
+          
+          const processAllEps = (allEps: any[]) => {
+            const extIds = allEps.map(e => `tmdb-ep-${e.id}`);
+            if (extIds.length > 0) {
+              apiClient.post('/users/me/progress/bulk-check', { external_ids: extIds })
+                .then(progRes => {
+                  setGlobalProgress(prev => ({ ...prev, ...progRes.data }));
+                })
+                .catch(e => console.error("Failed to fetch global progress", e));
+            }
+
+            const grouped: Record<number, any[]> = {};
+            allEps.forEach(ep => {
+              if (!grouped[ep.season_number]) grouped[ep.season_number] = [];
+              grouped[ep.season_number].push(ep);
+            });
+            setSeasonEpisodes(prev => ({ ...prev, ...grouped }));
+          };
+
+          if (cachedAll && Array.isArray(cachedAll)) {
+            processAllEps(cachedAll);
           } else {
             setIsLoadingSeasonEpisodes(true);
-            apiClient.get(`/search/series/${item.external_id}/season/${nextSeason}`)
+            apiClient.get(`/search/series/${item.external_id}/episodes`)
               .then(res => {
-                setCachedTMDB(cacheKeyS, res.data);
-                setSeasonEpisodes(prev => ({ ...prev, [nextSeason]: res.data || [] }));
+                setCachedTMDB(cacheKeyAll, res.data);
+                processAllEps(res.data || []);
               })
               .catch(e => console.error(e))
               .finally(() => setIsLoadingSeasonEpisodes(false));
@@ -301,6 +333,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
             custom_notes: JSON.stringify({ description: cachedDesc.description, release_date: cachedDesc.release_date })
           };
         });
+      } else if (item.item_type === 'episode') {
+        setIsLoadingMetadata(false);
       } else {
         setIsLoadingMetadata(true);
         apiClient.get('/search/', { params: { q: item.title, type: item.item_type === 'anime' ? 'series' : item.item_type } })
@@ -340,24 +374,6 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       setItemReviews(revRes.data);
     } catch (err) {
       console.error("Failed to save rating", err);
-    }
-  };
-
-  const handleReportCover = async () => {
-    if (!user) return;
-    setReportStatus('pending');
-    try {
-      await apiClient.post('/nsfw/report', {
-        item_type: selectedItem.item_type,
-        external_id: selectedItem.external_id
-      });
-      setReportStatus('success');
-      setTimeout(() => setReportStatus('none'), 3000);
-      const updated = { ...selectedItem, is_nsfw: true };
-      setSelectedItem(updated);
-      if (onUpdate) onUpdate(updated);
-    } catch(err) {
-      setReportStatus('none');
     }
   };
 
@@ -466,7 +482,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       const res = await apiClient.post(`/lists/${effectiveListId}/toggle-tmdb-episode`, {
         tmdb_episode_id: ep.id,
         title: ep.title || `${selectedItem.title} - S${ep.season_number < 10 ? '0' + ep.season_number : ep.season_number}E${ep.episode_number < 10 ? '0' + ep.episode_number : ep.episode_number} - ${ep.name || 'Untitled Episode'}`,
-        image_url: ep.image_url || (ep.still_path ? `https://image.tmdb.org/t/p/w185${ep.still_path}` : null),
+        image_url: ep.image_url || ep.image?.original || ep.image?.medium || (ep.still_path ? (ep.still_path.startsWith('http') ? ep.still_path : `https://image.tmdb.org/t/p/w185${ep.still_path}`) : selectedItem.image_url),
         overview: ep.custom_notes || ep.overview,
         season_number: ep.season_number,
         episode_number: ep.episode_number
@@ -536,13 +552,32 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                 <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
                   {isEpisode && (
                     <button
-                      onClick={async () => {
-                        if (onOpenItem) {
-                          onOpenItem(selectedItem);
-                        } else {
-                          onClose();
-                        }
-                      }}
+                        onClick={async () => {
+                          if (selectedItem.parent_series && onOpenItem) {
+                            onOpenItem(selectedItem.parent_series);
+                          } else if (onOpenItem && selectedItem.external_id && selectedItem.external_id.startsWith('tmdb-ep-')) {
+                            try {
+                               const epId = selectedItem.external_id.replace('tmdb-ep-', '');
+                               const res = await fetch(`https://api.tvmaze.com/episodes/${epId}?embed=show`);
+                               const data = await res.json();
+                               if (data._embedded && data._embedded.show) {
+                                   const show = data._embedded.show;
+                                   onOpenItem({
+                                       external_id: `tvm_${show.id}`,
+                                       title: show.name,
+                                       image_url: show.image?.original || null,
+                                       item_type: 'series'
+                                   });
+                               } else {
+                                   onClose();
+                               }
+                            } catch {
+                               onClose();
+                            }
+                          } else {
+                            onClose();
+                          }
+                        }}
                       className="btn-secondary"
                       style={{ padding: '0.2rem 0.5rem', fontSize: '0.78rem', display: 'flex', alignItems: 'center' }}
                     >
@@ -552,9 +587,11 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                   <div>
                     <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700 }}>{selectedItem.title}</h2>
                     <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: '0.78rem', color: 'var(--accent-primary)', textTransform: 'uppercase', fontWeight: 700 }}>
-                        {selectedItem?.item_type === 'comic' ? (language === 'es' ? 'Cómic' : 'Comic') : selectedItem?.item_type === 'manga' ? 'Manga' : t('media' + (selectedItem?.item_type || 'movie').charAt(0).toUpperCase() + (selectedItem?.item_type || 'movie').slice(1))}
-                      </span>
+                      {selectedItem?.item_type !== 'episode' && (
+                        <span style={{ fontSize: '0.78rem', color: 'var(--accent-primary)', textTransform: 'uppercase', fontWeight: 700 }}>
+                          {selectedItem?.item_type === 'comic' ? (language === 'es' ? 'Cómic' : 'Comic') : selectedItem?.item_type === 'manga' ? 'Manga' : t('media' + (selectedItem?.item_type || 'movie').charAt(0).toUpperCase() + (selectedItem?.item_type || 'movie').slice(1))}
+                        </span>
+                      )}
                       {avgRating && (
                         <span style={{ fontSize: '0.78rem', color: '#f59e0b', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.1rem' }}>
                           ★ {avgRating} / 5 ({ratings.length} {language === 'es' ? 'val.' : 'ratings'})
@@ -587,6 +624,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                       <img
                         src={selectedItem.image_url}
                         alt={selectedItem.title}
+                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
                         onClick={() => {
                           if (shouldBlurCover) setIsCoverPeek(true);
                           else setZoomedImage(selectedItem.image_url);
@@ -602,7 +640,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                       {shouldBlurCover && (
                         <div style={{
                           position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                           background: 'rgba(0,0,0,0.3)', borderRadius: '8px', pointerEvents: 'none',
                           color: 'white', fontSize: '0.8rem', fontWeight: 'bold', textAlign: 'center', padding: '0.5rem'
                         }}>
@@ -640,20 +678,6 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                               <div className="skeleton" style={{ height: '0.85rem', width: '95%' }}></div>
                               {selectedItem.genres && <p style={{ margin: '0 0 0.5rem 0' }}><strong>{language === 'es' ? 'Géneros' : 'Genres'}:</strong> {selectedItem.genres}</p>}
                             </div>
-                            
-                            {user && (
-                              <div style={{ marginTop: '0.5rem' }}>
-                                <button 
-                                  onClick={handleReportCover} 
-                                  className="btn-secondary" 
-                                  style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', borderColor: '#ef4444', color: '#ef4444', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
-                                  disabled={reportStatus !== 'none'}
-                                >
-                                  {reportStatus === 'pending' ? '...' : reportStatus === 'success' ? <><CheckCircle size={12}/> Reportado</> : <><Flag size={12} /> {language === 'es' ? 'Reportar Portada NSFW' : 'Report NSFW Cover'}</>}
-                                </button>
-                              </div>
-                            )}
-
                           </div>
                           <div>
                             <h5 style={{ margin: '0 0 0.4rem 0', color: 'var(--text-secondary)' }}>{language === 'es' ? 'Fecha de lanzamiento:' : 'Release Date:'}</h5>
@@ -710,20 +734,6 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                             </span>
                           </div>
                         )}
-
-                        {user && (
-                          <div style={{ marginTop: '0.5rem' }}>
-                            <button 
-                              onClick={handleReportCover} 
-                              className="btn-secondary" 
-                              style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', borderColor: '#ef4444', color: '#ef4444', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
-                              disabled={reportStatus !== 'none'}
-                            >
-                              {reportStatus === 'pending' ? '...' : reportStatus === 'success' ? <><CheckCircle size={12}/> Reportado</> : <><Flag size={12} /> {language === 'es' ? 'Reportar Portada NSFW' : 'Report NSFW Cover'}</>}
-                            </button>
-                          </div>
-                        )}
-
                       </div>
                     );
                   })()}
@@ -953,13 +963,12 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                 disabled={!isOwnProfile}
                                 checked={(() => {
                                   const listSeps = (episodes || []).filter(x => x.section === `Season ${s.season_number}`);
-                                  const cacheKey = `${selectedItem.external_id}_s${s.season_number}`;
-                                  const tmdbEps = getCachedTMDB(cacheKey) || [];
+                                  const tmdbEps = seasonEpisodes[s.season_number] || [];
                                   if (!Array.isArray(tmdbEps)) return false;
                                   if (tmdbEps.length === 0) {
                                     return listSeps.length > 0 && listSeps.every(x => x.is_completed);
                                   }
-                                  return tmdbEps.every((te: any) => (episodes || []).some(x => x.external_id === `tmdb-ep-${te.id}` && x.is_completed));
+                                  return tmdbEps.every((te: any) => globalProgress[`tmdb-ep-${te.id}`] || (episodes || []).some(x => x.external_id === `tmdb-ep-${te.id}` && x.is_completed));
                                 })()}
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -1016,7 +1025,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                               ) : (
                                 (Array.isArray(seasonEpisodes[s.season_number]) ? seasonEpisodes[s.season_number] : []).map((ep: any) => {
                                   const dbEp = (episodes || []).find(x => x.external_id === `tmdb-ep-${ep.id}`);
-                                  const isCompleted = !!dbEp?.is_completed;
+                                  const isCompleted = !!globalProgress[`tmdb-ep-${ep.id}`] || !!dbEp?.is_completed;
                                   return (
                                     <div
                                       key={ep.id}
@@ -1036,7 +1045,11 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                           type="checkbox"
                                           disabled={!isOwnProfile}
                                           checked={isCompleted}
-                                          onChange={() => handleToggleEpisode(selectedItem.tracking_list_id, ep)}
+                                          onChange={() => {
+                                            const currentIsCompleted = !!globalProgress[`tmdb-ep-${ep.id}`] || !!dbEp?.is_completed;
+                                            setGlobalProgress(prev => ({ ...prev, [`tmdb-ep-${ep.id}`]: !currentIsCompleted }));
+                                            handleToggleEpisode(selectedItem.tracking_list_id, ep);
+                                          }}
                                           style={{ width: '18px', height: '18px', cursor: isOwnProfile ? 'pointer' : 'default' }}
                                         />
                                         <span style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-primary)' }}>
@@ -1047,16 +1060,17 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                         onClick={() => onOpenItem && onOpenItem({
                                           id: dbEp ? dbEp.id : ep.id,
                                           list_id: selectedItem.tracking_list_id,
-                                          item_type: 'series',
+                                          item_type: 'episode',
                                           external_id: `tmdb-ep-${ep.id}`,
                                           title: `${selectedItem.title} - S${ep.season_number < 10 ? '0' + ep.season_number : ep.season_number}E${ep.episode_number < 10 ? '0' + ep.episode_number : ep.episode_number} - ${ep.name || 'Untitled'}`,
-                                          image_url: ep.still_path ? `https://image.tmdb.org/t/p/w185${ep.still_path}` : selectedItem.image_url,
+                                          image_url: ep.image_url || ep.image?.original || ep.image?.medium || (ep.still_path ? (ep.still_path.startsWith('http') ? ep.still_path : `https://image.tmdb.org/t/p/w185${ep.still_path}`) : selectedItem.image_url),
                                           custom_notes: ep.overview,
                                           completed_at: dbEp?.completed_at,
                                           season_number: ep.season_number,
                                           episode_number: ep.episode_number,
                                           rawEpisodeId: ep.id,
-                                          release_date: ep.air_date
+                                          release_date: ep.air_date,
+                                          parent_series: selectedItem
                                         })}
                                         className="btn-secondary"
                                         style={{ padding: '0.2rem 0.4rem', fontSize: '0.74rem' }}

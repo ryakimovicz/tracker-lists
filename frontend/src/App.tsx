@@ -1,6 +1,6 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { Navbar } from './components/Navbar';
+import { Sidebar } from './components/Sidebar';
 import { RouteGuard } from './components/RouteGuard';
 import { Landing } from './pages/Landing';
 import { Login } from './pages/Login';
@@ -25,7 +25,7 @@ function AppRoutes() {
   return (
     <Router>
       <div className="app-container">
-        <Navbar />
+        <Sidebar />
         <main className="main-content">
           <Routes>
             {/* Conditional homepage depending on authentication status */}

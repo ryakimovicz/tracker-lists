@@ -45,7 +45,6 @@ class ReadingListBase(BaseModel):
     title: str = Field(..., min_length=1, max_length=150)
     description: Optional[str] = None
     visibility: VisibilityEnum = VisibilityEnum.PUBLIC
-    importance_labels: Optional[dict] = None
     section_importances: Optional[dict] = None
     section_descriptions: Optional[dict] = None
 
@@ -56,7 +55,6 @@ class ReadingListUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
     visibility: Optional[VisibilityEnum] = None
-    importance_labels: Optional[dict] = None
     section_importances: Optional[dict] = None
     section_descriptions: Optional[dict] = None
 

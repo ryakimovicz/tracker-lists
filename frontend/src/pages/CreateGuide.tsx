@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from '../context/LanguageContext';
 import { apiClient } from '../api/client';
+import { SearchPanel } from '../components/SearchPanel';
 import {
   ArrowRight,
   PlusCircle,
@@ -15,7 +16,10 @@ import {
   Save,
   ChevronDown,
   ChevronUp,
-  Lock
+  Lock,
+  Plus,
+  Scissors,
+  ClipboardPaste
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -40,12 +44,65 @@ interface DocElement {
   subblocks?: DocElement[]; // Nested subblocks (only inside blocks)
 }
 
-const stripHtml = (html: string) => {
-  if (!html) return '';
-  const clean = html.replace(/<[^>]*>/g, '');
-  const txt = document.createElement('textarea');
-  txt.innerHTML = clean;
-  return txt.value;
+interface ClipboardState {
+  action: 'cut';
+  type: 'section' | 'block' | 'subblock' | 'item';
+  items: Array<{
+    data: any;
+    sourceId: string | number;
+    sourceParentId?: string;
+    sourceGrandparentId?: string;
+  }>;
+}
+
+interface SelectedElementsState {
+  parentId: string | null; // null if selecting root sections
+  type: 'section' | 'block' | 'subblock' | 'item' | null;
+  ids: (string | number)[];
+}
+
+const PasteZone = ({ 
+  targetId, 
+  index, 
+  label, 
+  actionTargetType,
+  canPaste,
+  handlePaste
+}: { 
+  type: 'section' | 'block' | 'subblock' | 'item', 
+  targetId?: string, 
+  index?: number, 
+  label: string, 
+  actionTargetType: 'root' | 'section' | 'block' | 'subblock',
+  canPaste: boolean,
+  handlePaste: (targetType: 'root' | 'section' | 'block' | 'subblock', targetId?: string, insertIndex?: number) => void
+}) => {
+  const [isHovered, setIsHovered] = useState(false);
+
+  if (!canPaste) return null;
+
+  return (
+    <div 
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      onClick={() => handlePaste(actionTargetType, targetId, index)}
+      style={{
+        height: isHovered ? '32px' : '12px',
+        width: '100%',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        transition: 'all 0.2s ease',
+        cursor: 'pointer',
+        background: isHovered ? 'rgba(124, 58, 237, 0.1)' : 'transparent',
+        borderRadius: '6px',
+        margin: '0.2rem 0',
+        border: isHovered ? '1px dashed var(--accent-primary)' : '1px solid transparent'
+      }}
+    >
+      {isHovered && <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}><ClipboardPaste size={14} /> {label}</span>}
+    </div>
+  );
 };
 
 export const CreateGuide: React.FC = () => {
@@ -58,36 +115,18 @@ export const CreateGuide: React.FC = () => {
   const [description, setDescription] = useState('');
   const [visibility, setVisibility] = useState<'public' | 'private'>('public');
 
-  const [showCustomLabels, setShowCustomLabels] = useState(false);
-
-  // Custom priority labels state
-  const [label1, setLabel1] = useState(language === 'es' ? 'Lectura Opcional' : 'Optional Reading');
-  const [label2, setLabel2] = useState(language === 'es' ? 'Lectura Recomendada' : 'Recommended Reading');
-  const [label3, setLabel3] = useState(language === 'es' ? 'Lectura Altamente Recomendada' : 'Highly Recommended');
-  const [label4, setLabel4] = useState(language === 'es' ? 'Lectura Importante' : 'Important Reading');
-  const [label5, setLabel5] = useState(language === 'es' ? 'Lectura Obligatoria' : 'Mandatory Reading');
-
   // Step 2: Word-style Document Flow Editor state
   const [docFlow, setDocFlow] = useState<DocElement[]>([]);
 
   // Real-time search modal states (inside editor)
   const [searchTarget, setSearchTarget] = useState<{ elementId: string; subblockId?: string } | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [activeSearchTab, setActiveSearchTab] = useState<'all' | 'movie' | 'series' | 'anime' | 'book' | 'comic' | 'manga' | 'game'>('all');
-  const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [searchTab, setSearchTab] = useState<'search' | 'manual'>('search');
-  const [manualTitle, setManualTitle] = useState('');
-  const [manualType, setManualType] = useState('comic');
+  const [searchPanels, setSearchPanels] = useState<string[]>(['initial']); // array of panel IDs
+
+  const [clipboard, setClipboard] = useState<ClipboardState | null>(null);
+  const [selectedElements, setSelectedElements] = useState<SelectedElementsState>({ parentId: null, type: null, ids: [] });
 
   const [modalSuccessMsg, setModalSuccessMsg] = useState('');
-  const [expandedMediaId, setExpandedMediaId] = useState<string | null>(null);
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
-
-  // TV Series episode search details
-  const [expandedSeriesId, setExpandedSeriesId] = useState<string | null>(null);
-  const [expandedEpisodes, setExpandedEpisodes] = useState<any[]>([]);
-  const [isLoadingEpisodes, setIsLoadingEpisodes] = useState(false);
 
   // Feedback states
   const [errorMsg, setErrorMsg] = useState('');
@@ -197,19 +236,10 @@ export const CreateGuide: React.FC = () => {
     setIsSubmitting(true);
     setErrorMsg('');
     try {
-      const importanceLabels = {
-        "1": label1,
-        "2": label2,
-        "3": label3,
-        "4": label4,
-        "5": label5
-      };
-
       const response = await apiClient.post('/lists/', {
         title,
         description,
         visibility, // Enforced as draft in backend, which saves this value in intended_visibility
-        importance_labels: importanceLabels,
         section_descriptions: {
           flow: [],
           draft_flow: [],
@@ -346,51 +376,256 @@ export const CreateGuide: React.FC = () => {
     });
   };
 
+  const regenerateIds = (element: DocElement): DocElement => {
+    const newId = `${element.type}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    const newElement = { ...element, id: newId };
+    if (newElement.subblocks) {
+      newElement.subblocks = newElement.subblocks.map(regenerateIds);
+    }
+    return newElement;
+  };
+
+  const toggleSelection = (type: 'section' | 'block' | 'subblock' | 'item', id: string | number, parentId: string | null = null) => {
+    setSelectedElements(prev => {
+      // If something is already selected and this is a different type or parent, ignore the click (it should be disabled in UI)
+      if (prev.ids.length > 0 && (prev.type !== type || prev.parentId !== parentId)) {
+        return prev;
+      }
+      if (prev.type !== type || prev.parentId !== parentId) {
+        return { type, parentId, ids: [id] };
+      }
+      if (prev.ids.includes(id as never)) {
+        const nextIds = prev.ids.filter(i => i !== id);
+        if (nextIds.length === 0) return { parentId: null, type: null, ids: [] };
+        return { ...prev, ids: nextIds };
+      }
+      return { ...prev, ids: [...prev.ids, id] };
+    });
+  };
+
+  const handleDeleteMulti = () => {
+    if (selectedElements.ids.length === 0 || !selectedElements.type) return;
+
+    setDocFlow(prev => {
+      let newFlow = JSON.parse(JSON.stringify(prev)) as DocElement[];
+      
+      selectedElements.ids.forEach(selId => {
+        if (selectedElements.type === 'item') {
+          docFlow.forEach(el => {
+            if (el.id === selectedElements.parentId && el.items) {
+              const block = newFlow.find(b => b.id === el.id);
+              if (block && block.items) {
+                block.items = block.items.filter(i => i.id !== selId);
+              }
+            } else if (el.subblocks) {
+              el.subblocks.forEach(sub => {
+                if (sub.id === selectedElements.parentId && sub.items) {
+                  const block = newFlow.find(b => b.id === el.id);
+                  if (block && block.subblocks) {
+                    const newSub = block.subblocks.find(s => s.id === sub.id);
+                    if (newSub && newSub.items) {
+                      newSub.items = newSub.items.filter(i => i.id !== selId);
+                    }
+                  }
+                }
+              });
+            }
+          });
+        } else if (selectedElements.type === 'subblock') {
+          const block = newFlow.find(el => el.id === selectedElements.parentId);
+          if (block && block.subblocks) {
+            block.subblocks = block.subblocks.filter(s => s.id !== selId);
+          }
+        } else {
+          newFlow = newFlow.filter(el => el.id !== selId);
+        }
+      });
+      return newFlow;
+    });
+
+    setSelectedElements({ parentId: null, type: null, ids: [] });
+  };
+
+  const handleCutMulti = () => {
+    if (selectedElements.ids.length === 0 || !selectedElements.type) return;
+
+    let itemsToCut: any[] = [];
+    
+    // We need to gather the data for each selected element
+    selectedElements.ids.forEach(selId => {
+      if (selectedElements.type === 'item') {
+        docFlow.forEach(el => {
+          if (el.id === selectedElements.parentId && el.items) {
+            const item = el.items.find(i => i.id === selId);
+            if (item) itemsToCut.push({ data: item, sourceId: item.id, sourceParentId: el.id });
+          } else if (el.subblocks) {
+            el.subblocks.forEach(sub => {
+              if (sub.id === selectedElements.parentId && sub.items) {
+                const item = sub.items.find(i => i.id === selId);
+                if (item) itemsToCut.push({ data: item, sourceId: item.id, sourceParentId: el.id, sourceGrandparentId: sub.id });
+              }
+            });
+          }
+        });
+      } else if (selectedElements.type === 'subblock') {
+        docFlow.forEach(el => {
+          if (el.id === selectedElements.parentId && el.subblocks) {
+            const sub = el.subblocks.find(s => s.id === selId);
+            if (sub) itemsToCut.push({ data: sub, sourceId: sub.id, sourceParentId: el.id });
+          }
+        });
+      } else {
+        const el = docFlow.find(e => e.id === selId);
+        if (el) itemsToCut.push({ data: el, sourceId: el.id });
+      }
+    });
+
+    setClipboard({
+      action: 'cut',
+      type: selectedElements.type,
+      items: itemsToCut
+    });
+    setSelectedElements({ parentId: null, type: null, ids: [] });
+  };
+
+  const handleCut = (
+    type: 'section' | 'block' | 'subblock' | 'item',
+    data: any,
+    sourceId: string | number,
+    sourceParentId?: string,
+    sourceGrandparentId?: string
+  ) => {
+    setClipboard({
+      action: 'cut',
+      type,
+      items: [{ data, sourceId, sourceParentId, sourceGrandparentId }]
+    });
+  };
+
+  const handlePaste = (targetType: 'root' | 'section' | 'block' | 'subblock', targetId?: string, insertIndex?: number) => {
+    if (!clipboard) return;
+
+    setDocFlow(prev => {
+      let newFlow = JSON.parse(JSON.stringify(prev)) as DocElement[];
+
+      // 1. Remove from source
+      clipboard.items.forEach(clipboardItem => {
+        if (clipboard.type === 'item') {
+          if (clipboardItem.sourceGrandparentId) {
+            const block = newFlow.find(el => el.id === clipboardItem.sourceParentId);
+            if (block && block.subblocks) {
+              const sub = block.subblocks.find(s => s.id === clipboardItem.sourceGrandparentId);
+              if (sub && sub.items) {
+                sub.items = sub.items.filter(item => item.id !== clipboardItem.sourceId);
+              }
+            }
+          } else {
+            const block = newFlow.find(el => el.id === clipboardItem.sourceParentId);
+            if (block && block.items) {
+              block.items = block.items.filter(item => item.id !== clipboardItem.sourceId);
+            }
+          }
+        } else {
+          if (clipboardItem.sourceParentId) {
+            const block = newFlow.find(el => el.id === clipboardItem.sourceParentId);
+            if (block && block.subblocks) {
+              block.subblocks = block.subblocks.filter(s => s.id !== clipboardItem.sourceId);
+            }
+          } else {
+            newFlow = newFlow.filter(el => el.id !== clipboardItem.sourceId);
+          }
+        }
+      });
+
+      // 2. Prepare data to paste
+      const pasteDatas = clipboard.items.map(clipboardItem => {
+        if (clipboard.type === 'item') {
+          return { ...clipboardItem.data };
+        } else {
+          const pData = regenerateIds(clipboardItem.data);
+          if (targetType === 'section' && clipboard.type === 'subblock') {
+            pData.type = 'block';
+          }
+          return pData;
+        }
+      });
+
+      // Helper to safely insert at index or push
+      const insertOrPush = (arr: any[], dataArray: any[], idx?: number) => {
+        if (idx !== undefined && idx >= 0 && idx <= arr.length) {
+          arr.splice(idx, 0, ...dataArray);
+        } else {
+          arr.push(...dataArray);
+        }
+      };
+
+      // 3. Insert into target
+      if (targetType === 'root' && (clipboard.type === 'section' || clipboard.type === 'block')) {
+        insertOrPush(newFlow, pasteDatas, insertIndex);
+      } else if (targetType === 'section' && (clipboard.type === 'block' || clipboard.type === 'subblock')) {
+        let insertPos = -1;
+        if (insertIndex !== undefined) {
+           // insertIndex here is relative to the blocks inside this section
+           // but our newFlow is flat. So we need to find the correct absolute index.
+           let sectionFound = false;
+           let relativeIdx = 0;
+           for (let i = 0; i < newFlow.length; i++) {
+             if (newFlow[i].id === targetId) {
+               sectionFound = true;
+               if (insertIndex === 0) { insertPos = i + 1; break; }
+             } else if (sectionFound) {
+               if (newFlow[i].type === 'section') {
+                 insertPos = i; break;
+               }
+               relativeIdx++;
+               if (relativeIdx === insertIndex) {
+                 insertPos = i + 1; break;
+               }
+             }
+           }
+           if (sectionFound && insertPos === -1) insertPos = newFlow.length;
+        } else {
+           // Just after the section header
+           insertPos = newFlow.findIndex(el => el.id === targetId) + 1;
+        }
+
+        if (insertPos !== -1) {
+          newFlow.splice(insertPos, 0, ...pasteDatas);
+        }
+      } else if (targetType === 'block' && clipboard.type === 'subblock') {
+        const block = newFlow.find(el => el.id === targetId);
+        if (block) {
+          if (!block.subblocks) block.subblocks = [];
+          insertOrPush(block.subblocks, pasteDatas, insertIndex);
+        }
+      } else if (targetType === 'block' && clipboard.type === 'item') {
+        const block = newFlow.find(el => el.id === targetId);
+        if (block) {
+          if (!block.items) block.items = [];
+          insertOrPush(block.items, pasteDatas, insertIndex);
+        }
+      } else if (targetType === 'subblock' && clipboard.type === 'item') {
+        for (const block of newFlow) {
+          if (block.type === 'block' && block.subblocks) {
+            const sub = block.subblocks.find(s => s.id === targetId);
+            if (sub) {
+              if (!sub.items) sub.items = [];
+              insertOrPush(sub.items, pasteDatas, insertIndex);
+              break;
+            }
+          }
+        }
+      }
+
+      return newFlow;
+    });
+
+    setClipboard(null);
+  };
+
   // Media API search handlers
   const openSearchModal = (elementId: string, subblockId?: string) => {
     setSearchTarget({ elementId, subblockId });
-    setSearchQuery('');
-    setSearchResults([]);
-    setSearchTab('search');
-    setManualTitle('');
-  };
-
-  const triggerSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!searchQuery.trim()) return;
-
-    setIsSearching(true);
-    setErrorMsg('');
-    setManualTitle(searchQuery);
-    try {
-      const response = await apiClient.get('/search/all', {
-        params: { q: searchQuery }
-      });
-      setSearchResults(response.data);
-    } catch (err: any) {
-      setErrorMsg(language === 'es' ? 'Error al buscar en la API.' : 'Search failed.');
-    } finally {
-      setIsSearching(false);
-    }
-  };
-
-  const handleLoadSeriesEpisodes = async (seriesId: string) => {
-    if (expandedSeriesId === seriesId) {
-      setExpandedSeriesId(null);
-      setExpandedEpisodes([]);
-      return;
-    }
-    setExpandedSeriesId(seriesId);
-    setIsLoadingEpisodes(true);
-    try {
-      const res = await apiClient.get(`/search/series/${seriesId}/season/1`);
-      setExpandedEpisodes(res.data || []);
-    } catch (err) {
-      console.error(err);
-      alert(language === 'es' ? 'Error al cargar los episodios.' : 'Error loading episodes.');
-    } finally {
-      setIsLoadingEpisodes(false);
-    }
   };
 
   const handleSelectMediaItem = async (media: any) => {
@@ -444,7 +679,6 @@ export const CreateGuide: React.FC = () => {
       }));
 
       setModalSuccessMsg(language === 'es' ? `¡${media.title} añadido!` : `${media.title} added!`);
-      setManualTitle('');
       setTimeout(() => setModalSuccessMsg(''), 3000);
     } catch (err: any) {
       setErrorMsg(language === 'es' ? 'No se pudo guardar el elemento.' : 'Failed to save element.');
@@ -559,52 +793,6 @@ export const CreateGuide: React.FC = () => {
             )}
           </div>
 
-          {/* Scale customization checkbox */}
-          <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <input
-                type="checkbox"
-                id="customScaleCheck"
-                checked={showCustomLabels}
-                onChange={(e) => setShowCustomLabels(e.target.checked)}
-                style={{ width: '16px', height: '16px', cursor: 'pointer' }}
-              />
-              <label htmlFor="customScaleCheck" style={{ fontSize: '0.9rem', cursor: 'pointer', fontWeight: 500 }}>
-                {language === 'es' ? 'Personalizar escala de importancia' : 'Customize importance scale'}
-              </label>
-            </div>
-
-            {showCustomLabels && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '0.5rem' }}>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: 0 }}>
-                  {language === 'es' ? 'Asigna nombres específicos a las 5 prioridades de tu lista/guía.' : 'Assign specific names to the 5 priorities of your list/guide.'}
-                </p>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '1rem' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                    <label style={{ fontSize: '0.8rem' }}>{language === 'es' ? 'Nivel 1' : 'Level 1'}</label>
-                    <input type="text" className="input-field" value={label1} onChange={(e) => setLabel1(e.target.value)} />
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                    <label style={{ fontSize: '0.8rem' }}>{language === 'es' ? 'Nivel 2' : 'Level 2'}</label>
-                    <input type="text" className="input-field" value={label2} onChange={(e) => setLabel2(e.target.value)} />
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                    <label style={{ fontSize: '0.8rem' }}>{language === 'es' ? 'Nivel 3' : 'Level 3'}</label>
-                    <input type="text" className="input-field" value={label3} onChange={(e) => setLabel3(e.target.value)} />
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                    <label style={{ fontSize: '0.8rem' }}>{language === 'es' ? 'Nivel 4' : 'Level 4'}</label>
-                    <input type="text" className="input-field" value={label4} onChange={(e) => setLabel4(e.target.value)} />
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                    <label style={{ fontSize: '0.8rem' }}>{language === 'es' ? 'Nivel 5' : 'Level 5'}</label>
-                    <input type="text" className="input-field" value={label5} onChange={(e) => setLabel5(e.target.value)} />
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
           <button type="submit" disabled={isSubmitting} className="btn-primary" style={{ marginTop: '1rem' }}>
             {language === 'es' ? 'Crear Guía' : 'Create Guide'} <ArrowRight size={18} />
           </button>
@@ -622,6 +810,11 @@ export const CreateGuide: React.FC = () => {
               <button onClick={addBlock} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem' }}>
                 <LayoutGrid size={16} /> {language === 'es' ? '+ Nuevo Bloque' : '+ New Block'}
               </button>
+              {clipboard && clipboard.type === 'section' && (
+                <button onClick={() => handlePaste('root')} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem' }}>
+                  <ClipboardPaste size={16} /> {language === 'es' ? 'Pegar Sección' : 'Paste Section'}
+                </button>
+              )}
             </div>
             
             {/* Auto-save status indicator */}
@@ -705,14 +898,35 @@ export const CreateGuide: React.FC = () => {
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
                 {docFlow.map((element, index) => {
+                  const rootPasteZone = (
+                    <PasteZone 
+                      type={element.type === 'section' ? 'section' : 'block'} 
+                      actionTargetType="root" 
+                      index={index} 
+                      label={language === 'es' ? 'Pegar Aquí' : 'Paste Here'} 
+                      canPaste={clipboard?.type === 'section' || clipboard?.type === 'block'} 
+                      handlePaste={handlePaste} 
+                    />
+                  );
                   
                   // SECTION ELEMENT RENDER
                   if (element.type === 'section') {
                     return (
-                      <div key={element.id} className="document-section-block" style={{ padding: '1.5rem', background: 'rgba(124,58,237,0.03)', borderLeft: '4px solid var(--accent-primary)', position: 'relative', display: 'flex', flexDirection: 'column', gap: '0.75rem', borderRadius: '0 8px 8px 0' }}>
+                      <React.Fragment key={element.id}>
+                        {rootPasteZone}
+                        <div className="document-section-block" style={{ padding: '1.5rem', background: 'rgba(124,58,237,0.03)', borderLeft: '4px solid var(--accent-primary)', position: 'relative', display: 'flex', flexDirection: 'column', gap: '0.75rem', borderRadius: '0 8px 8px 0' }}>
                         
                         {/* Control actions */}
+                        <div style={{ position: 'absolute', top: '1rem', left: '1rem' }}>
+                          <input type="checkbox" disabled={selectedElements.ids.length > 0 && (selectedElements.type !== 'section' || selectedElements.parentId !== null)} checked={selectedElements.type === 'section' && selectedElements.ids.includes(element.id)} onChange={() => toggleSelection('section', element.id)} style={{ transform: 'scale(1.2)', cursor: 'pointer' }} />
+                        </div>
                         <div style={{ position: 'absolute', top: '1rem', right: '1rem', display: 'flex', gap: '0.35rem' }}>
+                          {clipboard && (clipboard.type === 'block' || clipboard.type === 'subblock') && (
+                            <button onClick={() => handlePaste('section', element.id)} className="btn-primary" style={{ padding: '0.2rem 0.4rem', marginRight: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+                              <ClipboardPaste size={14} /> {language === 'es' ? 'Pegar' : 'Paste'}
+                            </button>
+                          )}
+                          <button onClick={() => handleCut('section', element, element.id)} className="btn-secondary" style={{ padding: '0.2rem 0.4rem', color: '#f59e0b' }}><Scissors size={14} /></button>
                           <button onClick={() => moveDocElement(index, 'up')} disabled={index === 0} className="btn-secondary" style={{ padding: '0.2rem 0.4rem' }}><ChevronUp size={14} /></button>
                           <button onClick={() => moveDocElement(index, 'down')} disabled={index === docFlow.length - 1} className="btn-secondary" style={{ padding: '0.2rem 0.4rem' }}><ChevronDown size={14} /></button>
                           <button onClick={() => removeDocElement(element.id)} className="btn-secondary" style={{ padding: '0.2rem 0.4rem', color: '#ef4444' }}><Trash2 size={14} /></button>
@@ -736,16 +950,28 @@ export const CreateGuide: React.FC = () => {
                           rows={2}
                         />
                       </div>
+                      </React.Fragment>
                     );
                   }
 
                   // BLOCK ELEMENT RENDER
                   if (element.type === 'block') {
                     return (
-                      <div key={element.id} style={{ padding: '2rem', border: '1px solid var(--border-color)', borderRadius: '12px', background: 'var(--bg-primary)', position: 'relative', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                      <React.Fragment key={element.id}>
+                        {rootPasteZone}
+                      <div style={{ padding: '2rem', border: '1px solid var(--border-color)', borderRadius: '12px', background: 'var(--bg-primary)', position: 'relative', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                         
                         {/* Control actions */}
+                        <div style={{ position: 'absolute', top: '1rem', left: '1rem' }}>
+                          <input type="checkbox" disabled={selectedElements.ids.length > 0 && (selectedElements.type !== 'block' || selectedElements.parentId !== null)} checked={selectedElements.type === 'block' && selectedElements.ids.includes(element.id)} onChange={() => toggleSelection('block', element.id)} style={{ transform: 'scale(1.2)', cursor: 'pointer' }} />
+                        </div>
                         <div style={{ position: 'absolute', top: '1rem', right: '1rem', display: 'flex', gap: '0.35rem' }}>
+                          {clipboard && (clipboard.type === 'subblock' || clipboard.type === 'item') && (
+                            <button onClick={() => handlePaste('block', element.id)} className="btn-primary" style={{ padding: '0.2rem 0.4rem', marginRight: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+                              <ClipboardPaste size={14} /> {language === 'es' ? 'Pegar' : 'Paste'}
+                            </button>
+                          )}
+                          <button onClick={() => handleCut('block', element, element.id)} className="btn-secondary" style={{ padding: '0.2rem 0.4rem', color: '#f59e0b' }}><Scissors size={14} /></button>
                           <button onClick={() => moveDocElement(index, 'up')} disabled={index === 0} className="btn-secondary" style={{ padding: '0.2rem 0.4rem' }}><ChevronUp size={14} /></button>
                           <button onClick={() => moveDocElement(index, 'down')} disabled={index === docFlow.length - 1} className="btn-secondary" style={{ padding: '0.2rem 0.4rem' }}><ChevronDown size={14} /></button>
                           <button onClick={() => removeDocElement(element.id)} className="btn-secondary" style={{ padding: '0.2rem 0.4rem', color: '#ef4444' }}><Trash2 size={14} /></button>
@@ -769,11 +995,12 @@ export const CreateGuide: React.FC = () => {
                               onChange={(e) => updateDocElement(element.id, { importance_rank: e.target.value ? parseInt(e.target.value) : null })}
                               style={{ padding: '0.2rem 0.5rem', fontSize: '0.8rem', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', borderRadius: '4px' }}
                             >
-                              <option value="1">1 - {label1}</option>
-                              <option value="2">2 - {label2}</option>
-                              <option value="3">3 - {label3}</option>
-                              <option value="4">4 - {label4}</option>
-                              <option value="5">5 - {label5}</option>
+                              <option value="">{language === 'es' ? 'Sin importancia' : 'No importance'}</option>
+                              <option value="1">1 - {language === 'es' ? 'Extra' : 'Extra'}</option>
+                              <option value="2">2 - {language === 'es' ? 'Opcional' : 'Optional'}</option>
+                              <option value="3">3 - {language === 'es' ? 'Recomendado' : 'Recommended'}</option>
+                              <option value="4">4 - {language === 'es' ? 'Importante' : 'Important'}</option>
+                              <option value="5">5 - {language === 'es' ? 'Obligatorio' : 'Mandatory'}</option>
                             </select>
                           </div>
                         </div>
@@ -789,8 +1016,19 @@ export const CreateGuide: React.FC = () => {
 
                         {/* List of Media items in Block */}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                          {(element.items || []).map((item) => (
-                            <div key={item.id} style={{ display: 'flex', gap: '1rem', alignItems: 'center', background: 'var(--bg-secondary)', padding: '0.5rem 1rem', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                          {(element.items || []).map((item, itemIndex) => (
+                            <React.Fragment key={item.id}>
+                              <PasteZone 
+                                type="item" 
+                                actionTargetType="block" 
+                                targetId={element.id} 
+                                index={itemIndex} 
+                                label={language === 'es' ? 'Pegar Aquí' : 'Paste Here'} 
+                                canPaste={clipboard?.type === 'item'} 
+                                handlePaste={handlePaste} 
+                              />
+                            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', background: 'var(--bg-secondary)', padding: '0.5rem 1rem', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                              <input type="checkbox" disabled={selectedElements.ids.length > 0 && (selectedElements.type !== 'item' || selectedElements.parentId !== element.id)} checked={selectedElements.type === 'item' && selectedElements.ids.includes(item.id)} onChange={() => toggleSelection('item', item.id, element.id)} style={{ transform: 'scale(1.1)', cursor: 'pointer' }} />
                               {item.image_url && (
                                 <img
                                   src={item.image_url}
@@ -803,11 +1041,26 @@ export const CreateGuide: React.FC = () => {
                                 <h5 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</h5>
                                 <span style={{ fontSize: '0.7rem', color: 'var(--accent-primary)', textTransform: 'capitalize' }}>{item.item_type}</span>
                               </div>
-                              <button onClick={() => removeMediaItem(element.id, item.id)} className="btn-secondary" style={{ padding: '0.2rem 0.4rem', border: 'none', background: 'transparent', color: '#ef4444' }}>
-                                <Trash2 size={16} />
-                              </button>
+                              <div style={{ display: 'flex', gap: '0.35rem' }}>
+                                <button onClick={() => handleCut('item', item, item.id, element.id)} className="btn-secondary" style={{ padding: '0.2rem 0.4rem', border: 'none', background: 'transparent', color: '#f59e0b' }}>
+                                  <Scissors size={16} />
+                                </button>
+                                <button onClick={() => removeMediaItem(element.id, item.id)} className="btn-secondary" style={{ padding: '0.2rem 0.4rem', border: 'none', background: 'transparent', color: '#ef4444' }}>
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
                             </div>
+                            </React.Fragment>
                           ))}
+                          <PasteZone 
+                            type="item" 
+                            actionTargetType="block" 
+                            targetId={element.id} 
+                            index={(element.items || []).length} 
+                            label={language === 'es' ? 'Pegar Aquí' : 'Paste Here'} 
+                            canPaste={clipboard?.type === 'item'} 
+                            handlePaste={handlePaste} 
+                          />
 
                           <button type="button" onClick={() => openSearchModal(element.id)} className="btn-secondary" style={{ alignSelf: 'flex-start', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.35rem 0.75rem', marginTop: '0.25rem' }}>
                             <SearchIcon size={14} /> {language === 'es' ? 'Buscar y Añadir Obra' : 'Search & Add Item'}
@@ -815,10 +1068,30 @@ export const CreateGuide: React.FC = () => {
                         </div>
 
                         {/* Nested Subblocks */}
-                        {(element.subblocks || []).map((sub) => (
-                          <div key={sub.id} style={{ marginLeft: '2rem', padding: '1.25rem', borderLeft: '2px dashed var(--border-color)', display: 'flex', flexDirection: 'column', gap: '1rem', position: 'relative' }}>
-                            
-                            <button onClick={() => removeDocElement(element.id, sub.id)} className="btn-secondary" style={{ position: 'absolute', top: '0.5rem', right: '0.5rem', padding: '0.2rem 0.4rem', color: '#ef4444', border: 'none', background: 'transparent' }}><Trash2 size={14} /></button>
+                        {(element.subblocks || []).map((sub, subIndex) => (
+                          <React.Fragment key={sub.id}>
+                            <PasteZone 
+                              type="subblock" 
+                              actionTargetType="block" 
+                              targetId={element.id} 
+                              index={subIndex} 
+                              label={language === 'es' ? 'Pegar Aquí' : 'Paste Here'} 
+                              canPaste={clipboard?.type === 'subblock'} 
+                              handlePaste={handlePaste} 
+                            />
+                          <div style={{ marginLeft: '2rem', padding: '1.25rem', borderLeft: '2px dashed var(--border-color)', display: 'flex', flexDirection: 'column', gap: '1rem', position: 'relative' }}>
+                            <div style={{ position: 'absolute', top: '1.25rem', left: '0.5rem' }}>
+                              <input type="checkbox" disabled={selectedElements.ids.length > 0 && (selectedElements.type !== 'subblock' || selectedElements.parentId !== element.id)} checked={selectedElements.type === 'subblock' && selectedElements.ids.includes(sub.id)} onChange={() => toggleSelection('subblock', sub.id, element.id)} style={{ transform: 'scale(1.1)', cursor: 'pointer' }} />
+                            </div>
+                            <div style={{ position: 'absolute', top: '0.5rem', right: '0.5rem', display: 'flex', gap: '0.35rem' }}>
+                              {clipboard && clipboard.type === 'item' && (
+                                <button onClick={() => handlePaste('subblock', sub.id)} className="btn-primary" style={{ padding: '0.2rem 0.4rem', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+                                  <ClipboardPaste size={14} /> {language === 'es' ? 'Pegar' : 'Paste'}
+                                </button>
+                              )}
+                              <button onClick={() => handleCut('subblock', sub, sub.id, element.id)} className="btn-secondary" style={{ padding: '0.2rem 0.4rem', color: '#f59e0b', border: 'none', background: 'transparent' }}><Scissors size={14} /></button>
+                              <button onClick={() => removeDocElement(element.id, sub.id)} className="btn-secondary" style={{ padding: '0.2rem 0.4rem', color: '#ef4444', border: 'none', background: 'transparent' }}><Trash2 size={14} /></button>
+                            </div>
 
                             {/* Subblock Top row: Title and importance */}
                             <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap', width: '90%' }}>
@@ -837,11 +1110,12 @@ export const CreateGuide: React.FC = () => {
                                   onChange={(e) => updateDocElement(element.id, { importance_rank: e.target.value ? parseInt(e.target.value) : null }, sub.id)}
                                   style={{ padding: '0.15rem 0.4rem', fontSize: '0.75rem', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', borderRadius: '4px' }}
                                 >
-                                  <option value="1">1 - {label1}</option>
-                                  <option value="2">2 - {label2}</option>
-                                  <option value="3">3 - {label3}</option>
-                                  <option value="4">4 - {label4}</option>
-                                  <option value="5">5 - {label5}</option>
+                                  <option value="">--</option>
+                                  <option value="1">1 - {language === 'es' ? 'Extra' : 'Extra'}</option>
+                                  <option value="2">2 - {language === 'es' ? 'Opcional' : 'Optional'}</option>
+                                  <option value="3">3 - {language === 'es' ? 'Recomendado' : 'Recommended'}</option>
+                                  <option value="4">4 - {language === 'es' ? 'Importante' : 'Important'}</option>
+                                  <option value="5">5 - {language === 'es' ? 'Obligatorio' : 'Mandatory'}</option>
                                 </select>
                               </div>
                             </div>
@@ -857,8 +1131,19 @@ export const CreateGuide: React.FC = () => {
 
                             {/* Subblock Items list */}
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                              {(sub.items || []).map((item) => (
-                                <div key={item.id} style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', background: 'var(--bg-secondary)', padding: '0.4rem 0.8rem', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
+                              {(sub.items || []).map((item, itemIndex) => (
+                                <React.Fragment key={item.id}>
+                                  <PasteZone 
+                                    type="item" 
+                                    actionTargetType="subblock" 
+                                    targetId={sub.id} 
+                                    index={itemIndex} 
+                                    label={language === 'es' ? 'Pegar Aquí' : 'Paste Here'} 
+                                    canPaste={clipboard?.type === 'item'} 
+                                    handlePaste={handlePaste} 
+                                  />
+                                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', background: 'var(--bg-secondary)', padding: '0.4rem 0.8rem', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
+                                  <input type="checkbox" disabled={selectedElements.ids.length > 0 && (selectedElements.type !== 'item' || selectedElements.parentId !== sub.id)} checked={selectedElements.type === 'item' && selectedElements.ids.includes(item.id)} onChange={() => toggleSelection('item', item.id, sub.id)} style={{ transform: 'scale(1.1)', cursor: 'pointer' }} />
                                   {item.image_url && (
                                     <img
                                       src={item.image_url}
@@ -870,11 +1155,26 @@ export const CreateGuide: React.FC = () => {
                                   <div style={{ flex: 1, minWidth: 0 }}>
                                     <h6 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</h6>
                                   </div>
-                                  <button onClick={() => removeMediaItem(element.id, item.id, sub.id)} className="btn-secondary" style={{ padding: '0.2rem 0.4rem', border: 'none', background: 'transparent', color: '#ef4444' }}>
-                                    <Trash2 size={14} />
-                                  </button>
+                                  <div style={{ display: 'flex', gap: '0.35rem' }}>
+                                    <button onClick={() => handleCut('item', item, item.id, element.id, sub.id)} className="btn-secondary" style={{ padding: '0.2rem 0.4rem', border: 'none', background: 'transparent', color: '#f59e0b' }}>
+                                      <Scissors size={14} />
+                                    </button>
+                                    <button onClick={() => removeMediaItem(element.id, item.id, sub.id)} className="btn-secondary" style={{ padding: '0.2rem 0.4rem', border: 'none', background: 'transparent', color: '#ef4444' }}>
+                                      <Trash2 size={14} />
+                                    </button>
+                                  </div>
                                 </div>
+                                </React.Fragment>
                               ))}
+                              <PasteZone 
+                                type="item" 
+                                actionTargetType="subblock" 
+                                targetId={sub.id} 
+                                index={(sub.items || []).length} 
+                                label={language === 'es' ? 'Pegar Aquí' : 'Paste Here'} 
+                                canPaste={clipboard?.type === 'item'} 
+                                handlePaste={handlePaste} 
+                              />
 
                               <button type="button" onClick={() => openSearchModal(element.id, sub.id)} className="btn-secondary" style={{ alignSelf: 'flex-start', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.25rem 0.5rem' }}>
                                 <SearchIcon size={12} /> {language === 'es' ? 'Buscar y Añadir Obra' : 'Search & Add Item'}
@@ -882,24 +1182,75 @@ export const CreateGuide: React.FC = () => {
                             </div>
 
                           </div>
+                          </React.Fragment>
                         ))}
+                        <PasteZone 
+                          type="subblock" 
+                          actionTargetType="block" 
+                          targetId={element.id} 
+                          index={(element.subblocks || []).length} 
+                          label={language === 'es' ? 'Pegar Aquí' : 'Paste Here'} 
+                          canPaste={clipboard?.type === 'subblock'} 
+                          handlePaste={handlePaste} 
+                        />
 
                         {/* Add subblock trigger button */}
                         <button type="button" onClick={() => addSubblock(element.id)} className="btn-secondary" style={{ alignSelf: 'flex-start', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.35rem 0.75rem', borderStyle: 'dashed', marginTop: '0.5rem' }}>
                           <PlusCircle size={14} /> {language === 'es' ? 'Crear Subbloque' : 'Create Subblock'}
                         </button>
 
-                      </div>
-                    );
-                  }
+                        </div>
+                        </React.Fragment>
+                      );
+                    }
 
-                  return null;
-                })}
-              </div>
-            )}
+                    return null;
+                  })}
+                  <PasteZone 
+                    type="section" 
+                    actionTargetType="root" 
+                    index={docFlow.length} 
+                    label={language === 'es' ? 'Pegar Aquí' : 'Paste Here'} 
+                    canPaste={clipboard?.type === 'section' || clipboard?.type === 'block'} 
+                    handlePaste={handlePaste} 
+                  />
+                </div>
+              )}
 
           </div>
 
+        </div>
+      )}
+
+      {/* Floating Action Bar for Multi-Selection */}
+      {selectedElements.ids.length > 0 && (
+        <div style={{
+          position: 'fixed',
+          bottom: '2rem',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: 'var(--bg-secondary)',
+          border: '1px solid var(--border-color)',
+          borderRadius: '24px',
+          padding: '0.75rem 1.5rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '1.5rem',
+          boxShadow: '0 10px 25px rgba(0,0,0,0.3)',
+          zIndex: 1000
+        }}>
+          <span style={{ fontWeight: 600 }}>{selectedElements.ids.length} {language === 'es' ? 'seleccionados' : 'selected'}</span>
+          <div style={{ display: 'flex', gap: '0.75rem' }}>
+            <button onClick={handleCutMulti} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.4rem 1rem' }}>
+              <Scissors size={16} /> {language === 'es' ? 'Cortar' : 'Cut'}
+            </button>
+            <button onClick={handleDeleteMulti} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.4rem 1rem', color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.2)' }}>
+              <Trash2 size={16} /> {language === 'es' ? 'Eliminar' : 'Delete'}
+            </button>
+            <button onClick={() => setSelectedElements({ parentId: null, type: null, ids: [] })} className="btn-secondary" style={{ padding: '0.4rem 1rem' }}>
+              {language === 'es' ? 'Cancelar' : 'Cancel'}
+            </button>
+          </div>
         </div>
       )}
 
@@ -915,8 +1266,26 @@ export const CreateGuide: React.FC = () => {
           justifyContent: 'center',
           zIndex: 2000
         }}>
-          <div className="glass-card" style={{ width: '500px', maxHeight: '80vh', padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-            <h3 style={{ margin: 0 }}>{language === 'es' ? 'Añadir Obra' : 'Add Item'}</h3>
+          <div className="glass-card" style={{ width: '90vw', maxWidth: '1400px', maxHeight: '90vh', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', overflow: 'hidden' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ margin: 0 }}>{language === 'es' ? 'Añadir Obra' : 'Add Item'}</h3>
+              <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                <button 
+                  type="button" 
+                  onClick={() => {
+                    if (searchPanels.length < 10) setSearchPanels([...searchPanels, `panel-${Date.now()}`]);
+                  }}
+                  disabled={searchPanels.length >= 10}
+                  className="btn-primary" 
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.4rem 0.8rem', opacity: searchPanels.length >= 10 ? 0.5 : 1 }}
+                >
+                  <Plus size={14} /> {language === 'es' ? 'Nueva Búsqueda' : 'New Search'}
+                </button>
+                <button type="button" className="btn-secondary" onClick={() => { setSearchTarget(null); setSearchPanels(['initial']); }} style={{ padding: '0.4rem 0.8rem' }}>
+                  {language === 'es' ? 'Cerrar' : 'Close'}
+                </button>
+              </div>
+            </div>
 
             {modalSuccessMsg && (
               <div style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', padding: '0.5rem', borderRadius: '6px', textAlign: 'center', fontSize: '0.85rem', fontWeight: 600 }}>
@@ -924,308 +1293,29 @@ export const CreateGuide: React.FC = () => {
               </div>
             )}
             
-            {/* Tabs */}
-            <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', marginBottom: '0.5rem' }}>
-              <button
-                type="button"
-                onClick={() => setSearchTab('search')}
-                style={{
-                  flex: 1,
-                  padding: '0.5rem',
-                  background: 'transparent',
-                  border: 'none',
-                  borderBottom: searchTab === 'search' ? '2px solid var(--accent-primary)' : '2px solid transparent',
-                  color: searchTab === 'search' ? 'var(--text-primary)' : 'var(--text-secondary)',
-                  fontWeight: 600,
-                  cursor: 'pointer'
-                }}
-              >
-                {language === 'es' ? 'Buscar' : 'Search'}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setSearchTab('manual');
-                  if (!manualTitle && searchQuery) {
-                    setManualTitle(searchQuery);
-                  }
-                }}
-                style={{
-                  flex: 1,
-                  padding: '0.5rem',
-                  background: 'transparent',
-                  border: 'none',
-                  borderBottom: searchTab === 'manual' ? '2px solid var(--accent-primary)' : '2px solid transparent',
-                  color: searchTab === 'manual' ? 'var(--text-primary)' : 'var(--text-secondary)',
-                  fontWeight: 600,
-                  cursor: 'pointer'
-                }}
-              >
-                {language === 'es' ? 'Añadir Manualmente' : 'Add Manually'}
-              </button>
+            <div style={{
+              display: 'flex',
+              gap: '1rem',
+              overflowX: 'auto',
+              overflowY: 'auto',
+              padding: '0.5rem 0',
+              flexWrap: 'wrap',
+              justifyContent: 'center'
+            }}>
+              {searchPanels.map((panelId) => (
+                <SearchPanel
+                  key={panelId}
+                  id={panelId}
+                  onRemove={(id) => setSearchPanels(prev => prev.filter(p => p !== id))}
+                  canRemove={searchPanels.length > 1}
+                  language={language}
+                  t={t}
+                  addedIds={addedIds}
+                  onSelectItem={handleSelectMediaItem}
+                  setZoomedImage={setZoomedImage}
+                />
+              ))}
             </div>
-
-            {searchTab === 'search' ? (
-              <>
-                <form onSubmit={triggerSearch} style={{ display: 'flex', gap: '0.5rem' }}>
-                  <div style={{ flex: 1, position: 'relative' }}>
-                    <input
-                      type="text"
-                      required
-                      className="input-field"
-                      placeholder={language === 'es' ? 'Ej. Batman, Star Wars...' : 'e.g. Batman, Star Wars...'}
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      style={{ paddingLeft: '2.25rem' }}
-                    />
-                    <SearchIcon size={14} color="var(--text-muted)" style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)' }} />
-                  </div>
-                  <button type="submit" disabled={isSearching} className="btn-primary" style={{ padding: '0 1rem' }}>
-                    {isSearching ? '...' : t('searchButton')}
-                  </button>
-                </form>
-
-                {/* Category Tabs */}
-                {searchResults.length > 0 && (
-                  <div style={{
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    gap: '0.4rem',
-                    borderBottom: '1px solid var(--border-color)',
-                    marginBottom: '0.5rem',
-                    paddingBottom: '0.5rem'
-                  }}>
-                    {[
-                      { value: 'all', label: language === 'es' ? 'Todo' : 'All' },
-                      { value: 'movie', label: language === 'es' ? 'Películas' : 'Movies' },
-                      { value: 'series', label: language === 'es' ? 'Series' : 'Series' },
-                      { value: 'anime', label: 'Anime' },
-                      { value: 'book', label: language === 'es' ? 'Libros' : 'Books' },
-                      { value: 'comic', label: language === 'es' ? 'Cómics' : 'Comics' },
-                      { value: 'manga', label: 'Mangas' },
-                      { value: 'game', label: language === 'es' ? 'Juegos' : 'Games' }
-                    ].map(tab => (
-                      <button
-                        key={tab.value}
-                        type="button"
-                        onClick={() => setActiveSearchTab(tab.value as any)}
-                        style={{
-                          padding: '0.35rem 0.75rem',
-                          borderRadius: '15px',
-                          border: '1px solid',
-                          borderColor: activeSearchTab === tab.value ? 'var(--accent-primary)' : 'var(--border-color)',
-                          background: activeSearchTab === tab.value ? 'var(--accent-primary)' : 'transparent',
-                          color: activeSearchTab === tab.value ? '#ffffff' : 'var(--text-secondary)',
-                          cursor: 'pointer',
-                          fontWeight: 500,
-                          fontSize: '0.75rem',
-                          whiteSpace: 'nowrap',
-                          transition: 'all 0.15s ease'
-                        }}
-                      >
-                        {tab.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.75rem', paddingRight: '0.25rem', minHeight: '200px' }}>
-                  {searchResults.length === 0 && !isSearching && (
-                    <p style={{ color: 'var(--text-secondary)', textAlign: 'center', margin: '2rem 0' }}>
-                      {language === 'es' ? 'Escribe y busca para ver resultados.' : 'Type and search to display results.'}
-                    </p>
-                  )}
-                  {(() => {
-                    const filtered = activeSearchTab === 'all'
-                      ? searchResults
-                      : searchResults.filter(item => {
-                          if (activeSearchTab === 'series') return item.item_type === 'series';
-                          if (activeSearchTab === 'anime') return item.item_type === 'anime';
-                          if (activeSearchTab === 'movie') return item.item_type === 'movie';
-                          if (activeSearchTab === 'book') return item.item_type === 'book';
-                          if (activeSearchTab === 'comic') return item.item_type === 'comic';
-                          if (activeSearchTab === 'manga') return item.item_type === 'manga';
-                          if (activeSearchTab === 'game') return item.item_type === 'game';
-                          return true;
-                        });
-                    
-                    if (filtered.length === 0 && searchResults.length > 0) {
-                      return (
-                        <p style={{ color: 'var(--text-secondary)', textAlign: 'center', margin: '2rem 0', fontSize: '0.85rem' }}>
-                          {language === 'es' ? 'No se encontraron elementos en esta categoría.' : 'No items found in this category.'}
-                        </p>
-                      );
-                    }
-                    
-                    return filtered.map((media) => {
-                      const isExpanded = expandedMediaId === media.external_id;
-                    return (
-                      <div
-                        key={media.external_id}
-                        style={{
-                          display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.75rem',
-                          background: 'var(--bg-secondary)', border: '1px solid var(--border-color)',
-                          borderRadius: '8px', transition: 'all 0.2s', textAlign: 'left', position: 'relative'
-                        }}
-                      >
-                        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                          <img
-                            src={media.image_url}
-                            alt={media.title}
-                            onClick={() => setZoomedImage(media.image_url)}
-                            style={{ width: '45px', height: '65px', objectFit: 'cover', borderRadius: '4px', cursor: 'zoom-in' }}
-                          />
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <h5 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{media.title}</h5>
-                            <span style={{ fontSize: '0.72rem', color: 'var(--accent-primary)', textTransform: 'capitalize', fontWeight: 600 }}>{media.item_type === 'comic' ? (language === 'es' ? 'Cómic' : 'Comic') : media.item_type === 'manga' ? 'Manga' : t('media' + media.item_type.charAt(0).toUpperCase() + media.item_type.slice(1))}</span>
-                            
-                            <div style={{ display: 'flex', gap: '1rem', marginTop: '0.25rem' }}>
-                              <button
-                                type="button"
-                                onClick={() => setExpandedMediaId(isExpanded ? null : media.external_id)}
-                                style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', fontSize: '0.75rem', padding: 0, cursor: 'pointer', textDecoration: 'underline' }}
-                              >
-                                {isExpanded ? (language === 'es' ? 'Ocultar info' : 'Hide info') : (language === 'es' ? 'Ver info' : 'View info')}
-                              </button>
-                              
-                              {media.item_type === 'series' && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleLoadSeriesEpisodes(media.external_id)}
-                                  style={{ background: 'transparent', border: 'none', color: 'var(--accent-primary)', fontSize: '0.75rem', padding: 0, cursor: 'pointer', textDecoration: 'underline' }}
-                                >
-                                  {expandedSeriesId === media.external_id 
-                                    ? (language === 'es' ? 'Ocultar capítulos' : 'Hide episodes') 
-                                    : (language === 'es' ? 'Ver capítulos' : 'View episodes')
-                                  }
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                          
-                          {(() => {
-                            const isAlreadyAdded = media.external_id && addedIds.includes(media.external_id);
-                            return (
-                              <button
-                                type="button"
-                                onClick={() => handleSelectMediaItem(media)}
-                                className="btn-primary"
-                                style={{
-                                  padding: '0.35rem 0.75rem',
-                                  fontSize: '0.75rem',
-                                  borderRadius: '6px',
-                                  background: isAlreadyAdded ? 'rgba(16, 185, 129, 0.15)' : 'var(--accent-primary)',
-                                  color: isAlreadyAdded ? '#10b981' : '#ffffff',
-                                  border: isAlreadyAdded ? '1px solid #10b981' : 'none'
-                                }}
-                              >
-                                {isAlreadyAdded ? (language === 'es' ? 'Añadido' : 'Added') : (language === 'es' ? 'Añadir' : 'Add')}
-                              </button>
-                            );
-                          })()}
-                        </div>
-                        
-                        {isExpanded && media.description && (
-                          <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.5rem', padding: '0.5rem', background: 'var(--bg-primary)', borderRadius: '4px', maxHeight: '120px', overflowY: 'auto', borderLeft: '2px solid var(--accent-primary)', lineHeight: 1.4 }}>
-                            {stripHtml(media.description)}
-                          </div>
-                        )}
-
-                        {expandedSeriesId === media.external_id && (
-                          <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '180px', overflowY: 'auto', background: 'var(--bg-primary)', padding: '0.5rem', borderRadius: '6px' }}>
-                            {isLoadingEpisodes ? (
-                              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', textAlign: 'center' }}>
-                                {language === 'es' ? 'Cargando capítulos...' : 'Loading episodes...'}
-                              </div>
-                            ) : expandedEpisodes.length === 0 ? (
-                              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', textAlign: 'center' }}>
-                                {language === 'es' ? 'No se encontraron capítulos.' : 'No episodes found.'}
-                              </div>
-                            ) : (
-                              expandedEpisodes.map((ep) => {
-                                const ep_num = ep.episode_number;
-                                const ep_name = ep.name || "Untitled Episode";
-                                const fullTitle = `${media.title} - S01E${ep_num < 10 ? '0' + ep_num : ep_num} - ${ep_name}`;
-                                const still = ep.still_path;
-                                const image_url = still ? `https://image.tmdb.org/t/p/w185${still}` : media.image_url;
-                                return (
-                                  <div key={ep.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.82rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.25rem' }}>
-                                    <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                      {ep_num}. {ep_name}
-                                    </span>
-                                    <button
-                                      type="button"
-                                      onClick={() => handleSelectMediaItem({
-                                        item_type: 'series',
-                                        external_id: `tmdb-ep-${ep.id}`,
-                                        title: fullTitle,
-                                        image_url: image_url,
-                                        description: ep.overview
-                                      })}
-                                      className="btn-primary"
-                                      style={{ padding: '0.2rem 0.4rem', fontSize: '0.7rem', borderRadius: '4px' }}
-                                    >
-                                      {language === 'es' ? 'Añadir' : 'Add'}
-                                    </button>
-                                  </div>
-                                );
-                              })
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    );
-                    });
-                  })()}
-                </div>
-              </>
-            ) : (
-              <form onSubmit={(e) => {
-                e.preventDefault();
-                if (!manualTitle.trim()) return;
-                handleSelectMediaItem({
-                  item_type: manualType,
-                  external_id: `manual-${Date.now()}`,
-                  title: manualTitle.trim(),
-                  image_url: '',
-                  description: ''
-                });
-              }} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', minHeight: '200px' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', textAlign: 'left' }}>
-                  <label style={{ fontSize: '0.85rem', fontWeight: 500 }}>{language === 'es' ? 'Título de la Obra' : 'Title'}</label>
-                  <input
-                    type="text"
-                    required
-                    className="input-field"
-                    placeholder={language === 'es' ? 'Ej. Justice League of America #9' : 'e.g. Justice League of America #9'}
-                    value={manualTitle}
-                    onChange={(e) => setManualTitle(e.target.value)}
-                  />
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', textAlign: 'left' }}>
-                  <label style={{ fontSize: '0.85rem', fontWeight: 500 }}>{language === 'es' ? 'Formato' : 'Format'}</label>
-                  <select
-                    className="input-field"
-                    value={manualType}
-                    onChange={(e) => setManualType(e.target.value)}
-                  >
-                    <option value="comic">{language === 'es' ? 'Cómic' : 'Comic'}</option>
-                    <option value="manga">Manga</option>
-                    <option value="book">{t('mediaBook')}</option>
-                    <option value="game">{t('mediaGame')}</option>
-                    <option value="movie">{t('mediaMovie')}</option>
-                    <option value="series">{t('mediaSeries')}</option>
-                  </select>
-                </div>
-                <button type="submit" className="btn-primary" style={{ marginTop: 'auto' }}>
-                  {language === 'es' ? 'Añadir al Canvas' : 'Add to Canvas'}
-                </button>
-              </form>
-            )}
-
-            <button type="button" className="btn-secondary" onClick={() => setSearchTarget(null)} style={{ alignSelf: 'flex-end', marginTop: '0.5rem' }}>
-              {language === 'es' ? 'Cerrar' : 'Close'}
-            </button>
           </div>
         </div>
       )}

@@ -4,7 +4,6 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.api.deps import get_current_user, get_current_user_optional
 from app.models.user import User
-from app.services.nsfw import enrich_with_nsfw_status
 from app.models.user import User
 from app.models.list import ReadingList, VisibilityEnum
 from app.services.base import SearchResultItem
@@ -67,8 +66,7 @@ def search_media(
             score += min(item.popularity or 0.0, 100.0)
             return score
         combined.sort(key=calculate_score, reverse=True)
-        user_id = current_user.id if current_user else None
-        return enrich_with_nsfw_status(db, combined, user_id)
+        return combined
     else:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -164,20 +162,18 @@ def search_all_media(
         return score
 
     combined.sort(key=calculate_score, reverse=True)
-    user_id = current_user.id if current_user else None
-    return enrich_with_nsfw_status(db, combined, user_id)
+    return combined
 
-@router.get("/series/{series_id}/season/{season_number}")
-def get_season_episodes(
-    series_id: str,
-    season_number: int
+@router.get("/series/{series_id}/episodes")
+def get_all_episodes(
+    series_id: str
 ):
     try:
-        return TVMazeService.get_season_episodes(series_id, season_number)
+        return TVMazeService.get_all_episodes(series_id)
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Failed to fetch season episodes: {str(e)}"
+            detail=f"Failed to fetch episodes: {str(e)}"
         )
 
 @router.get("/series/{series_id}")

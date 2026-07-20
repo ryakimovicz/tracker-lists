@@ -11,7 +11,6 @@ from app.models.list_item import ListItem, ItemTypeEnum
 from app.models.library import UserLibraryItem, UserLibraryStatusEnum
 from app.schemas.library import LibraryItemCreate, LibraryItemUpdate, LibraryItemResponse
 from app.services.tvmaze import TVMazeService
-from app.services.nsfw import enrich_with_nsfw_status
 from app.models.activity import UserActivityLog
 
 router = APIRouter()
@@ -131,10 +130,11 @@ def add_to_library(
     ).first()
     
     if existing:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="This item is already in your library"
-        )
+        if existing.tracking_list_id is not None or item_in.item_type not in ("series", "anime"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="This item is already in your library"
+            )
         
     tracking_list_id = None
     
@@ -193,21 +193,33 @@ def add_to_library(
         if item_in.item_type == "series" and tracking_list_id:
             last_title = bulk_complete_series_episodes(db, current_user.id, tracking_list_id, item_in.external_id, item_in.title)
 
-    new_lib_item = UserLibraryItem(
-        user_id=current_user.id,
-        item_type=item_in.item_type,
-        external_id=item_in.external_id,
-        imdb_id=item_in.imdb_id,
-        title=item_in.title,
-        image_url=item_in.image_url,
-        status=status_val,
-        is_favorite=item_in.is_favorite if item_in.is_favorite is not None else False,
-        completed_at=completed_at_val,
-        last_seen_episode=last_title,
-        pages_read=pages_val,
-        tracking_list_id=tracking_list_id
-    )
-    db.add(new_lib_item)
+    if existing:
+        existing.status = status_val
+        if item_in.is_favorite is not None:
+            existing.is_favorite = item_in.is_favorite
+        existing.completed_at = completed_at_val
+        existing.last_seen_episode = last_title
+        existing.pages_read = pages_val
+        existing.tracking_list_id = tracking_list_id
+        new_lib_item = existing
+    else:
+        new_lib_item = UserLibraryItem(
+            user_id=current_user.id,
+            item_type=item_in.item_type,
+            external_id=item_in.external_id,
+            imdb_id=item_in.imdb_id,
+            title=item_in.title,
+            image_url=item_in.image_url,
+            status=status_val,
+            is_favorite=item_in.is_favorite if item_in.is_favorite is not None else False,
+            completed_at=completed_at_val,
+            last_seen_episode=last_title,
+            pages_read=pages_val,
+            tracking_list_id=tracking_list_id
+        )
+        db.add(new_lib_item)
+    
+    db.commit()
     
     # Record activity log
     activity = UserActivityLog(
@@ -241,7 +253,7 @@ def get_library(
     # Sort by completed_at or updated_at, whichever is newer
     query = query.order_by(desc(func.coalesce(UserLibraryItem.completed_at, UserLibraryItem.updated_at)))
     items = query.offset(skip).limit(limit).all()
-    return enrich_with_nsfw_status(db, items, current_user.id)
+    return items
 
 @router.put("/{library_item_id}", response_model=LibraryItemResponse)
 def update_library_item(

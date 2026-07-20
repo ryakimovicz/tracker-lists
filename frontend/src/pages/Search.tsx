@@ -363,7 +363,7 @@ export const Search: React.FC = () => {
                 <div key={`${item.external_id}-${item.item_type}`} className="glass-card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', textAlign: 'center', cursor: 'pointer' }} onClick={() => navigate(`/profile?user_id=${item.external_id}`)}>
                   <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'var(--bg-secondary)', border: '2px solid var(--accent-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
                     {item.image_url ? (
-                      <img src={item.image_url} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      <img src={item.image_url} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { e.currentTarget.style.display = 'none'; }} />
                     ) : (
                       <Users size={40} color="var(--accent-primary)" />
                     )}
@@ -444,6 +444,7 @@ export const Search: React.FC = () => {
                 <img
                   src={item.image_url || 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=150'}
                   alt={item.title}
+                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
                   style={{ 
                     width: '100%', 
                     height: '260px', 
@@ -541,6 +542,7 @@ export const Search: React.FC = () => {
           isOwnProfile={true}
           profileId={currentUser?.id}
           onClose={() => setSelectedItem(null)}
+          onOpenItem={(item) => setSelectedItem(item)}
           onUpdate={(updatedItem) => {
             if (updatedItem && updatedItem.is_nsfw !== undefined) {
               setResults(prev => prev.map(r => 

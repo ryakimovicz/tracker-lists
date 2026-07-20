@@ -32,6 +32,18 @@ export const ViewGuide: React.FC = () => {
   const [isSavingReview, setIsSavingReview] = useState(false);
   const [descExpanded, setDescExpanded] = useState(false);
 
+  const getPriorityLabel = (rank: number | null, lang: string) => {
+    if (!rank) return '';
+    switch (rank) {
+      case 1: return lang === 'es' ? 'Extra' : 'Extra';
+      case 2: return lang === 'es' ? 'Opcional' : 'Optional';
+      case 3: return lang === 'es' ? 'Recomendado' : 'Recommended';
+      case 4: return lang === 'es' ? 'Importante' : 'Important';
+      case 5: return lang === 'es' ? 'Obligatorio' : 'Mandatory';
+      default: return '';
+    }
+  };
+
   // Fetch guide details and profile information on mount
   useEffect(() => {
     if (!id) return;
@@ -436,9 +448,7 @@ export const ViewGuide: React.FC = () => {
                 const isBlockCompleted = allBlockIds.length > 0 && allBlockIds.every((id: number) => itemsList.find((i: any) => i.id === id)?.is_completed);
                 const isCollapsed = collapsedNodes[el.id] || false;
                 
-                const priorityLabel = el.importance_rank && guide.importance_labels
-                  ? guide.importance_labels[el.importance_rank.toString()]
-                  : '';
+                const priorityLabel = getPriorityLabel(el.importance_rank, language);
 
                 return (
                   <div key={el.id} style={{ paddingLeft: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
@@ -512,9 +522,7 @@ export const ViewGuide: React.FC = () => {
                           const isSubblockCompleted = allSubblockIds.length > 0 && allSubblockIds.every((id: number) => itemsList.find((i: any) => i.id === id)?.is_completed);
                           const isSubCollapsed = collapsedNodes[sub.id] || false;
                           
-                          const subPriorityLabel = sub.importance_rank && guide.importance_labels
-                            ? guide.importance_labels[sub.importance_rank.toString()]
-                            : '';
+                          const subPriorityLabel = getPriorityLabel(sub.importance_rank, language);
 
                           return (
                             <div key={sub.id} style={{ marginLeft: '1.5rem', paddingLeft: '0.75rem', borderLeft: '2px dashed var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>

@@ -65,13 +65,25 @@ body {
 /* Premium Layout Wrappers */
 .app-container {
   display: flex;
-  flex-direction: column;
   min-height: 100vh;
+}
+
+.sidebar {
+  width: 250px;
+  flex-shrink: 0;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border-color);
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 1.5rem;
 }
 
 .main-content {
   flex: 1;
-  width: 100%;
+  width: calc(100% - 250px);
   max-width: 1300px;
   margin: 0 auto;
   padding: 2rem 1.5rem;
@@ -221,4 +233,22 @@ h1, h2, h3, h4, h5, h6 {
   animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   background-color: var(--border-color);
   border-radius: 6px;
+}
+
+/* Custom Card Elements */
+.card-series-title {
+  transition: color 0.2s ease;
+}
+.card-series-title:hover {
+  color: var(--accent-primary);
+}
+
+.btn-check-seen {
+  transition: all 0.2s ease;
+}
+.btn-check-seen:not(:disabled):hover {
+  background: var(--accent-primary) !important;
+  border-color: var(--accent-primary) !important;
+  color: #fff !important;
+  transform: scale(1.1);
 }

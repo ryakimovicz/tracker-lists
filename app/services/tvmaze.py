@@ -105,7 +105,7 @@ class TVMazeService:
         return None
 
     @staticmethod
-    def get_season_episodes(series_id: str, season_number: int) -> List[dict]:
+    def get_all_episodes(series_id: str) -> List[dict]:
         real_id = series_id.replace('tvm_', '') if str(series_id).startswith('tvm_') else series_id
         url = f"https://api.tvmaze.com/shows/{real_id}/episodes"
         req = urllib.request.Request(url, headers={"User-Agent": "TrackerLists/1.0"})
@@ -116,16 +116,15 @@ class TVMazeService:
                 if response.status == 200:
                     data = json.loads(response.read().decode())
                     for ep in data:
-                        if ep.get("season") == season_number:
-                            img = ep.get("image")
-                            episodes.append({
-                                "id": ep.get("id"),
-                                "name": ep.get("name"),
-                                "episode_number": ep.get("number"),
-                                "season_number": ep.get("season"),
-                                "still_path": img.get("original") if img else None,
-                                "overview": ep.get("summary", "")
-                            })
+                        img = ep.get("image")
+                        episodes.append({
+                            "id": ep.get("id"),
+                            "name": ep.get("name"),
+                            "episode_number": ep.get("number"),
+                            "season_number": ep.get("season"),
+                            "still_path": img.get("original") if img else None,
+                            "overview": ep.get("summary", "")
+                        })
         except Exception:
             pass
         return episodes

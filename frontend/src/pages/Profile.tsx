@@ -215,15 +215,17 @@ export const Profile: React.FC = () => {
     }
   };
 
-  const handleToggleNsfw = async () => {
+
+
+  const handleRemovePro = async () => {
+    if (!isOwnProfile) return;
     try {
-      const currentVal = profile?.show_nsfw || false;
-      await apiClient.put('/users/me', { show_nsfw: !currentVal });
-      setProfile(prev => prev ? { ...prev, show_nsfw: !currentVal } : null);
-      setSuccessMsg(language === 'es' ? 'Preferencia actualizada.' : 'Preference updated.');
+      await apiClient.put('/users/me', { is_pro: false });
+      setProfile(prev => prev ? { ...prev, is_pro: false } : null);
+      setSuccessMsg(language === 'es' ? 'Plan Pro removido.' : 'Pro plan removed.');
       setTimeout(() => setSuccessMsg(''), 3000);
-    } catch(err) {
-      setErrorMsg('Error updating preference');
+    } catch (err) {
+      setErrorMsg('Error updating status');
     }
   };
 
@@ -430,10 +432,14 @@ export const Profile: React.FC = () => {
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.4rem' }}>
               <h1 style={{ margin: 0, fontSize: '2rem', fontWeight: 800 }}>{profile.username}</h1>
               {profile.is_pro && (
-                <span style={{ fontSize: '0.75rem', background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.2rem' }} title="Pathd Pro">
-                  <Star size={12} fill="#f59e0b" /> PRO
-                </span>
-              )}
+                  <span 
+                    onClick={isOwnProfile ? handleRemovePro : undefined}
+                    style={{ fontSize: '0.75rem', background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.2rem', cursor: isOwnProfile ? 'pointer' : 'default' }} 
+                    title={isOwnProfile ? (language === 'es' ? 'Quitar plan Pro' : 'Remove Pro plan') : 'Pathd Pro'}
+                  >
+                    <Star size={12} fill="#f59e0b" /> PRO
+                  </span>
+                )}
               {profile.is_admin && (
                 <span style={{ fontSize: '0.75rem', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: 600 }}>
                   ADMIN
@@ -452,17 +458,6 @@ export const Profile: React.FC = () => {
             {/* Last.fm Integration UI */}
             {isOwnProfile && (
               <div style={{ marginTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', cursor: 'pointer' }}>
-                    <input 
-                      type="checkbox" 
-                      checked={profile.show_nsfw} 
-                      onChange={handleToggleNsfw}
-                      style={{ cursor: 'pointer' }}
-                    />
-                    {language === 'es' ? 'Mostrar contenido explícito/NSFW en portadas' : 'Show NSFW/Explicit covers'}
-                  </label>
-                </div>
                 {!profile.lastfm_username ? (
                   <button onClick={handleLastFmLogin} className="btn-secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}>
                     🎵 {language === 'es' ? 'Conectar Last.fm' : 'Connect Last.fm'}

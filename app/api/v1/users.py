@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Dict, Any
 from pydantic import BaseModel
 from fastapi import APIRouter, Depends, Query, HTTPException, status
 from sqlalchemy.orm import Session
@@ -250,6 +250,7 @@ def update_username(
 
 class UserSettingsUpdate(BaseModel):
     show_nsfw: bool | None = None
+    is_pro: bool | None = None
 
 @router.put("/me", response_model=UserResponse)
 def update_user_settings(
@@ -260,6 +261,9 @@ def update_user_settings(
     if req.show_nsfw is not None:
         current_user.show_nsfw = req.show_nsfw
     
+    if req.is_pro is not None:
+        current_user.is_pro = req.is_pro
+        
     db.commit()
     db.refresh(current_user)
     return current_user
@@ -323,7 +327,7 @@ def get_guides_updates(
     saved_ids_set = {r[0] for r in saved_list_ids.all()}
     
     activities = db.query(UserActivityLog).filter(
-        UserActivityLog.activity_type == 'item_added'
+        UserActivityLog.activity_type.in_(['item_added', 'item_removed', 'item_moved', 'block_edited'])
     ).order_by(UserActivityLog.created_at.desc()).limit(100).all()
     
     result = []
@@ -337,6 +341,8 @@ def get_guides_updates(
                         'id': a.id,
                         'user_id': a.user_id,
                         'username': a.user.username if a.user else 'Unknown',
+                        'photo_url': a.user.photo_url if a.user else None,
+                        'activity_type': a.activity_type,
                         'item_title': a.item_title,
                         'item_type': a.item_type,
                         'list_id': lid,
@@ -443,3 +449,29 @@ def update_profile_color(
     db.commit()
     db.refresh(current_user)
     return {"message": "Color updated successfully", "color": req.color}
+
+class BulkCheckRequest(BaseModel):
+    external_ids: List[str]
+
+@router.post("/me/progress/bulk-check")
+def bulk_check_progress(
+    req: BulkCheckRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if not req.external_ids:
+        return {}
+        
+    records = db.query(ItemProgress).filter(
+        ItemProgress.user_id == current_user.id,
+        ItemProgress.external_id.in_(req.external_ids),
+        ItemProgress.is_completed == True
+    ).all()
+    
+    result = {ext_id: False for ext_id in req.external_ids}
+    for record in records:
+        if record.external_id:
+            result[record.external_id] = True
+            
+    return result
+
