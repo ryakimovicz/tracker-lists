@@ -37,7 +37,7 @@
 
 ## 📖 Secciones del Frontend
 
-La interfaz está estructurada en **seis secciones principales** accesibles desde la barra de navegación:
+La interfaz está estructurada en **seis secciones principales** accesibles desde la barra lateral (Sidebar):
 
 ### 🏠 Home (Inicio)
 Centro de control personal del usuario:
@@ -53,6 +53,7 @@ Timeline comunitaria:
 ### ✏️ Crear (Editor de Guías)
 Constructor de guías cronológicas:
 - **Editor Visual**: Ordenamiento manual de obras de distintos tipos de medios (películas, libros, cómics, juegos, etc.)
+- **Gestión Avanzada**: Cortar, copiar y pegar elementos entre diferentes secciones y bloques para una organización más rápida.
 - **Importador de Temporadas**: Importa temporadas completas de series con un clic
 - **Prioridad de Secciones**: Escala 1–5 para clasificar secciones como "Canon", "Recomendado", "Relleno", etc.
 
@@ -117,7 +118,7 @@ Gestión de contenido moderado:
 | GET | `/?q={query}&type={type}` | Búsqueda por tipo de medio |
 | GET | `/all?q={query}` | Búsqueda unificada en todas las fuentes |
 | GET | `/series/{id}` | Detalle de serie/anime (TVMaze) con temporadas |
-| GET | `/series/{id}/season/{n}` | Episodios de una temporada específica |
+| GET | `/series/{id}/episodes` | Episodios de una serie (TVMaze) |
 
 **Tipos disponibles**: `movie`, `series`, `anime`, `book`, `comic`, `manga`, `game`
 
@@ -300,10 +301,10 @@ pathd/
 ├── frontend/
 │   ├── src/
 │   │   ├── api/          # Cliente Axios con interceptores de autenticación
-│   │   ├── components/   # Componentes reutilizables (Navbar, MediaCard, ItemDetailsModal, RouteGuard)
+│   │   ├── components/   # Componentes reutilizables (Sidebar, SearchPanel, MediaCard, ItemDetailsModal)
 │   │   ├── context/      # Contextos globales (AuthContext, ThemeContext, LanguageContext)
 │   │   ├── pages/        # Páginas (Home, Social, CreateGuide, Search, Profile, ViewGuide, AdminPanel, etc.)
-│   │   └── utils/        # Utilidades (tmdbCache para caché de datos de TMDB)
+│   │   └── utils/        # Utilidades (Caché local para llamadas a APIs externas como TVMaze)
 │   └── index.html
 ├── .env.example
 ├── requirements.txt
