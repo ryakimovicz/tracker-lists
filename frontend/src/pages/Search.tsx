@@ -29,6 +29,14 @@ export const Search: React.FC = () => {
   const { t, language } = useTranslation();
   const navigate = useNavigate();
 
+  const getTagClass = (type: string) => {
+    if (['movie', 'series'].includes(type)) return 'tag-badge tag-movie';
+    if (['book', 'comic', 'manga'].includes(type)) return 'tag-badge tag-book';
+    if (type === 'game') return 'tag-badge tag-game';
+    if (type === 'guide') return 'tag-badge tag-guide';
+    return 'tag-badge';
+  };
+
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResultItem[]>([]);
   const [activeTab, setActiveTab] = useState<'all' | 'movie' | 'series' | 'anime' | 'book' | 'game' | 'user' | 'guide' | 'comic' | 'manga'>('all');
@@ -532,7 +540,7 @@ export const Search: React.FC = () => {
                   <h4 style={{ margin: '0 0 0.25rem 0', fontSize: '1rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.title}>
                     {item.title}
                   </h4>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--accent-primary)', display: 'block', marginBottom: '0.4rem' }}>
+                  <span className={getTagClass(item.item_type)} style={{ marginBottom: '0.5rem', alignSelf: 'flex-start' }}>
                     {item.item_type === 'comic' ? (language === 'es' ? 'CÃ³mic' : 'Comic') : item.item_type === 'manga' ? 'Manga' : t('media' + item.item_type.charAt(0).toUpperCase() + item.item_type.slice(1))}
                   </span>
                   <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', margin: 0, height: '3.2rem', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' }}>
@@ -631,10 +639,7 @@ export const Search: React.FC = () => {
             // Re-fetch shelf items to reflect status/favorite changes
             apiClient.get('/library/').then(res => setShelfItems(res.data));
           }}
-          onOpenItem={(item) => {
-            // For nested items like episodes, search handles them internally or just logs
-            console.log("Open nested item", item);
-          }}
+
         />
       )}
 
