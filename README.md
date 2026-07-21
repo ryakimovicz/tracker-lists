@@ -15,7 +15,7 @@
 
 ### Frontend
 - **Framework**: React 19 + TypeScript + Vite
-- **Estilos**: Vanilla CSS con sistema de diseño basado en variables CSS (`--bg-primary`, `--accent-primary`, etc.) — paleta Slate/Indigo, soporte de modo oscuro y claro
+- **Estilos**: Vanilla CSS con sistema de diseño premium "Galería Cultural" basado en variables CSS (Tonos Pizarra y Acentos Pastel), *Glassmorphism* (tarjetas translúcidas con desenfoque) y tipografía Inter.
 - **Cliente HTTP**: Axios con interceptores para renovación automática de tokens
 - **Estado Global**: Contextos de React (`AuthContext`, `LanguageContext`, `ThemeContext`)
 - **Localización**: Español e Inglés, con selector dinámico persistente
@@ -46,8 +46,8 @@ Centro de control personal del usuario:
 - **Actualizaciones**: Cambios recientes en guías seguidas
 
 ### 📱 Social (Feed)
-Timeline comunitaria:
-- **Actividad de Seguidos**: Qué guías siguieron, qué marcaron como completado, calificaciones, etc.
+Timeline comunitaria unificada:
+- **Muro Cronológico**: Un único feed que agrupa en tiempo real toda la actividad de la comunidad (nuevas guías, ítems marcados, progreso, votos, finalizaciones) ordenado de más reciente a más antiguo, de forma similar a redes sociales modernas.
 - **Interacciones**: Votos, comentarios y reportes en guías y opiniones
 
 ### ✏️ Crear (Editor de Guías)
@@ -59,10 +59,10 @@ Constructor de guías cronológicas:
 
 ### 🔍 Explorar (Buscador)
 Búsqueda y descubrimiento:
-- **Buscador Global**: Conecta con TVMaze, OMDb, IGDB, Google Books y Comic Vine desde un único campo de búsqueda con filtros por categoría (Películas, Series, Animes, Libros, Cómics, Mangas, Juegos)
-- **Modal de Detalle**: Al seleccionar cualquier resultado se abre una ficha con información completa, control de estado (`plan_to_watch`, `watching`, `completed`, etc.) y — para series y animes — listado de temporadas y episodios con marcado individual o por temporada completa
-- **Búsqueda de Usuarios y Guías**: Encuentra usuarios de Pathd y guías públicas de la comunidad
-- **Guías Destacadas**: Las más votadas y recientes
+- **Dashboard de Recomendaciones (Explorar)**: Un panel inicial inteligente que presenta contenido personalizado, incluyendo tendencias globales (basado en popularidad reciente), guías destacadas (con más movimiento en la comunidad) y recomendaciones "Para Ti" (generadas combinando los intereses y la biblioteca personal del usuario).
+- **Buscador Global**: Conecta con TVMaze, OMDb, IGDB, Google Books y Comic Vine desde un único campo de búsqueda con filtros por categoría (Películas, Series, Animes, Libros, Cómics, Mangas, Juegos).
+- **Modal de Detalle**: Al seleccionar cualquier resultado se abre una ficha con información completa, control de estado (`plan_to_watch`, `watching`, `completed`, etc.) y — para series y animes — listado de temporadas y episodios con marcado individual o por temporada completa.
+- **Búsqueda de Usuarios y Guías**: Encuentra usuarios de Pathd y guías públicas de la comunidad.
 
 ### 👤 Perfil (Estantería Personal)
 Perfil público y gestión de biblioteca:
