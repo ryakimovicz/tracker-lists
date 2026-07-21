@@ -22,14 +22,17 @@ class ReportCreate(BaseModel):
     reason: str = Field(..., min_length=5, max_length=500)
 
 class ActivityFeedItemResponse(BaseModel):
+    id: int
     user_id: int
     username: str
-    item_id: int
-    item_title: str
-    item_type: str
-    list_id: int
-    list_title: str
-    completed_at: datetime
+    activity_type: str
+    item_title: Optional[str] = None
+    item_type: Optional[str] = None
+    external_id: Optional[str] = None
+    list_id: Optional[int] = None
+    image_url: Optional[str] = None
+    details: Optional[str] = None
+    created_at: datetime
 
     class Config:
         from_attributes = True

@@ -187,3 +187,217 @@ def get_series_detail(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Failed to fetch series detail: {str(e)}"
         )
+from datetime import datetime, timedelta, timezone
+from sqlalchemy import func
+import random
+from typing import Optional, Dict, Any
+from app.models.activity import UserActivityLog
+from app.models.library import UserLibraryItem
+from app.models.list import ReadingList
+from app.models.user import User
+from pydantic import BaseModel
+
+class RecommendationResponse(BaseModel):
+    for_you: List[SearchResultItem]
+    trending: List[SearchResultItem]
+    featured_guides: List[Dict[str, Any]]
+
+@router.get("/explore/recommendations", response_model=RecommendationResponse)
+@limiter.limit("30/minute")
+def get_explore_recommendations(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_optional)
+):
+    now = datetime.now(timezone.utc)
+    
+    # 1. TENDENCIAS GLOBALES
+    # Buscamos en UserActivityLog (últimos 7 días)
+    week_ago = now - timedelta(days=7)
+    trending_logs = db.query(
+        UserActivityLog.external_id, 
+        UserActivityLog.item_type,
+        UserActivityLog.item_title,
+        UserActivityLog.image_url,
+        func.count(UserActivityLog.id).label('count')
+    ).filter(
+        UserActivityLog.created_at >= week_ago,
+        UserActivityLog.activity_type.in_(['shelf_add', 'item_completed', 'item_added']),
+        UserActivityLog.external_id.isnot(None)
+    ).group_by(
+        UserActivityLog.external_id, 
+        UserActivityLog.item_type,
+        UserActivityLog.item_title,
+        UserActivityLog.image_url
+    ).order_by(func.count(UserActivityLog.id).desc()).limit(15).all()
+
+    # Si hay pocos (arranque en frío), buscamos histórico
+    if len(trending_logs) < 5:
+        trending_logs = db.query(
+            UserActivityLog.external_id, 
+            UserActivityLog.item_type,
+            UserActivityLog.item_title,
+            UserActivityLog.image_url,
+            func.count(UserActivityLog.id).label('count')
+        ).filter(
+            UserActivityLog.activity_type.in_(['shelf_add', 'item_completed', 'item_added']),
+            UserActivityLog.external_id.isnot(None)
+        ).group_by(
+            UserActivityLog.external_id, 
+            UserActivityLog.item_type,
+            UserActivityLog.item_title,
+            UserActivityLog.image_url
+        ).order_by(func.count(UserActivityLog.id).desc()).limit(15).all()
+
+    trending = []
+    for log in trending_logs:
+        trending.append(SearchResultItem(
+            external_id=log.external_id,
+            title=log.item_title,
+            item_type=log.item_type or "unknown",
+            image_url=log.image_url or "",
+            description=""
+        ))
+
+    # 2. GUÍAS DESTACADAS
+    # Buscamos guías públicas con más actividad reciente (últimos 30 días)
+    month_ago = now - timedelta(days=30)
+    featured_guide_logs = db.query(
+        UserActivityLog.list_id,
+        func.count(UserActivityLog.id).label('count')
+    ).filter(
+        UserActivityLog.created_at >= month_ago,
+        UserActivityLog.activity_type.in_(['guide_followed', 'item_added', 'guide_commented']),
+        UserActivityLog.list_id.isnot(None)
+    ).group_by(
+        UserActivityLog.list_id
+    ).order_by(func.count(UserActivityLog.id).desc()).limit(10).all()
+
+    featured_guides = []
+    if not featured_guide_logs:
+        # Fallback histórico
+        fallback_guides = db.query(ReadingList).filter(ReadingList.visibility == VisibilityEnum.PUBLIC).limit(10).all()
+        for g in fallback_guides:
+            user = db.query(User).filter(User.id == g.creator_id).first()
+            featured_guides.append({
+                "id": g.id,
+                "title": g.title,
+                "description": g.description,
+                "creator_name": user.username if user else "Unknown"
+            })
+    else:
+        for log in featured_guide_logs:
+            g = db.query(ReadingList).filter(ReadingList.id == log.list_id, ReadingList.visibility == VisibilityEnum.PUBLIC).first()
+            if g:
+                user = db.query(User).filter(User.id == g.creator_id).first()
+                featured_guides.append({
+                    "id": g.id,
+                    "title": g.title,
+                    "description": g.description,
+                    "creator_name": user.username if user else "Unknown"
+                })
+
+    # 3. PARA TI (Filtrado Colaborativo o Fallback)
+    for_you = []
+    
+    # Intento de filtrado colaborativo
+    if current_user:
+        # Obtenemos los items del usuario
+        user_items = db.query(UserLibraryItem.external_id).filter(UserLibraryItem.user_id == current_user.id).all()
+        user_ext_ids = [i[0] for i in user_items if i[0]]
+        
+        if user_ext_ids:
+            # Buscamos usuarios que tengan al menos uno de esos items
+            similar_users = db.query(UserLibraryItem.user_id).filter(
+                UserLibraryItem.external_id.in_(user_ext_ids),
+                UserLibraryItem.user_id != current_user.id
+            ).distinct().all()
+            sim_user_ids = [u[0] for u in similar_users]
+            
+            if sim_user_ids:
+                # Buscamos los items más comunes de esos usuarios, que el usuario actual NO tenga
+                recommended = db.query(
+                    UserLibraryItem.external_id,
+                    UserLibraryItem.title,
+                    UserLibraryItem.item_type,
+                    UserLibraryItem.image_url,
+                    func.count(UserLibraryItem.id).label('count')
+                ).filter(
+                    UserLibraryItem.user_id.in_(sim_user_ids),
+                    ~UserLibraryItem.external_id.in_(user_ext_ids)
+                ).group_by(
+                    UserLibraryItem.external_id,
+                    UserLibraryItem.title,
+                    UserLibraryItem.item_type,
+                    UserLibraryItem.image_url
+                ).order_by(func.count(UserLibraryItem.id).desc()).limit(15).all()
+                
+                for r in recommended:
+                    for_you.append(SearchResultItem(
+                        external_id=r.external_id,
+                        title=r.title,
+                        item_type=r.item_type,
+                        image_url=r.image_url or "",
+                        description=""
+                    ))
+
+    # Si "Para ti" está vacío (arranque en frío), rellenamos con APIs externas!
+    if len(for_you) < 5:
+        # Usamos consultas populares como fallback
+        fallback_queries = [
+            ("movie", "Avengers"),
+            ("movie", "Star Wars"),
+            ("anime", "Naruto"),
+            ("anime", "Dragon Ball"),
+            ("game", "Mario"),
+            ("game", "Zelda"),
+            ("series", "Breaking Bad"),
+            ("series", "Game of Thrones")
+        ]
+        q_type, q_term = random.choice(fallback_queries)
+        
+        try:
+            if q_type == "movie":
+                results = OMDbService.search_movies(q_term)
+            elif q_type == "anime":
+                results = TVMazeService.search_shows(q_term, is_anime=True)
+            elif q_type == "game":
+                results = IGDBService.search_games(q_term)
+            elif q_type == "series":
+                results = TVMazeService.search_shows(q_term, is_anime=False)
+            else:
+                results = []
+                
+                        # Agregamos los resultados asegurandonos de no duplicar
+            existing_ids = set([str(i.external_id) for i in for_you])
+            existing_titles = set([i.title.lower() for i in for_you])
+            added_count = 0
+            for res in results:
+                if str(res.external_id) not in existing_ids and res.title.lower() not in existing_titles:
+                    for_you.append(res)
+                    existing_ids.add(str(res.external_id))
+                    existing_titles.add(res.title.lower())
+                    added_count += 1
+                if added_count >= 10:
+                    break
+        except Exception as e:
+            print(f"Error en fallback de recomendaciones: {e}")
+            
+    # Si sigue estando muy vacío, le sumamos las tendencias
+    if len(for_you) < 5:
+        for t in trending:
+            for_you.append(t)
+            
+    # De-duplicar "Para ti"
+    seen = set()
+    final_for_you = []
+    for item in for_you:
+        if item.external_id not in seen:
+            seen.add(item.external_id)
+            final_for_you.append(item)
+
+    return RecommendationResponse(
+        for_you=final_for_you,
+        trending=trending,
+        featured_guides=featured_guides
+    )

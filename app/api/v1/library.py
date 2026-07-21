@@ -223,10 +223,12 @@ def add_to_library(
     
     # Record activity log
     activity = UserActivityLog(
-        user_id=current_user.id,
+            user_id=current_user.id,
         activity_type="shelf_add",
         item_title=item_in.title,
         item_type=item_in.item_type,
+        external_id=item_in.external_id,
+        image_url=item_in.image_url,
         details=item_in.status.value if hasattr(item_in.status, "value") else str(item_in.status)
     )
     db.add(activity)
@@ -295,6 +297,8 @@ def update_library_item(
             activity_type="shelf_status",
             item_title=lib_item.title,
             item_type=lib_item.item_type,
+            external_id=lib_item.external_id,
+            image_url=lib_item.image_url,
             details=item_in.status.value if hasattr(item_in.status, "value") else str(item_in.status)
         )
         db.add(activity)
@@ -309,6 +313,8 @@ def update_library_item(
             activity_type="shelf_favorite",
             item_title=lib_item.title,
             item_type=lib_item.item_type,
+            external_id=lib_item.external_id,
+            image_url=lib_item.image_url,
             details="starred" if item_in.is_favorite else "unstarred"
         )
         db.add(activity)
@@ -320,21 +326,25 @@ def update_library_item(
             lib_item.status = UserLibraryStatusEnum.READING
             activity = UserActivityLog(
                 user_id=current_user.id,
-                activity_type="shelf_status",
-                item_title=lib_item.title,
-                item_type=lib_item.item_type,
-                details=lib_item.status.value
-            )
+            activity_type="shelf_status",
+            item_title=lib_item.title,
+            item_type=lib_item.item_type,
+            external_id=lib_item.external_id,
+            image_url=lib_item.image_url,
+            details=lib_item.status.value
+        )
             db.add(activity)
         elif item_in.pages_read == 0 and lib_item.status in (UserLibraryStatusEnum.READING, UserLibraryStatusEnum.READ):
             lib_item.status = UserLibraryStatusEnum.PLAN_TO_READ
             activity = UserActivityLog(
-                user_id=current_user.id,
-                activity_type="shelf_status",
-                item_title=lib_item.title,
-                item_type=lib_item.item_type,
-                details=lib_item.status.value
-            )
+            user_id=current_user.id,
+            activity_type="shelf_status",
+            item_title=lib_item.title,
+            item_type=lib_item.item_type,
+            external_id=lib_item.external_id,
+            image_url=lib_item.image_url,
+            details=lib_item.status.value
+        )
             db.add(activity)
 
     db.commit()
@@ -364,6 +374,8 @@ def delete_from_library(
         activity_type="shelf_remove",
         item_title=lib_item.title,
         item_type=lib_item.item_type,
+        external_id=lib_item.external_id,
+        image_url=lib_item.image_url,
         details="removed"
     )
     db.add(activity)

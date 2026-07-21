@@ -78,12 +78,13 @@ def create_list(
 
     # Record activity log
     activity = UserActivityLog(
-        user_id=current_user.id,
-        activity_type="guide_created",
-        item_title=new_list.title,
-        item_type="guide",
-        details="created"
-    )
+            user_id=current_user.id,
+            activity_type="guide_created",
+            item_title=new_list.title,
+            item_type="guide",
+            list_id=new_list.id,
+            details="created"
+        )
     db.add(activity)
     db.commit()
 
@@ -320,6 +321,7 @@ def update_list(
             activity_type=act_type,
             item_title=reading_list.title,
             item_type="guide",
+            list_id=reading_list.id,
             details="published" if act_type == "guide_published" else "updated"
         )
         db.add(activity)
@@ -332,6 +334,7 @@ def update_list(
             activity_type="block_edited",
             item_title=reading_list.title,
             item_type="guide",
+            list_id=reading_list.id,
             details=f"list_id:{reading_list.id}"
         )
         db.add(activity_block)
@@ -359,12 +362,13 @@ def delete_list(
         
     # Record activity log before deletion
     activity = UserActivityLog(
-        user_id=current_user.id,
-        activity_type="guide_deleted",
-        item_title=reading_list.title,
-        item_type="guide",
-        details="deleted"
-    )
+            user_id=current_user.id,
+            activity_type="guide_deleted",
+            item_title=reading_list.title,
+            item_type="guide",
+            list_id=reading_list.id,
+            details="deleted"
+        )
     db.add(activity)
     db.delete(reading_list)
     db.commit()
@@ -404,8 +408,8 @@ def add_item_to_list(
     db.refresh(new_item)
 
     activity = UserActivityLog(
-        user_id=current_user.id,
-        activity_type="item_added",
+            user_id=current_user.id,
+            activity_type="item_added",
         item_title=item_in.title,
         item_type=item_in.item_type,
         details=f"list_id:{list_id}"
@@ -442,10 +446,12 @@ def remove_item_from_list(
     activity = UserActivityLog(
         user_id=current_user.id,
         activity_type="item_removed",
-        item_title=item.title,
-        item_type=item.item_type,
-        details=f"list_id:{list_id}"
-    )
+            item_title=item.title,
+            item_type=item.item_type,
+            external_id=item.external_id,
+            image_url=item.image_url,
+            details=f"list_id:{list_id}"
+        )
     db.add(activity)
     
     db.commit()
@@ -480,12 +486,13 @@ def save_list_to_library(
 
     # Record activity log
     activity = UserActivityLog(
-        user_id=current_user.id,
-        activity_type="guide_followed",
-        item_title=reading_list.title,
-        item_type="guide",
-        details="followed"
-    )
+            user_id=current_user.id,
+            activity_type="guide_followed",
+            item_title=reading_list.title,
+            item_type="guide",
+            list_id=reading_list.id,
+            details="followed"
+        )
     db.add(activity)
     db.commit()
     return {"message": "List saved to library successfully"}
@@ -568,12 +575,9 @@ def auto_add_to_library(db: Session, user_id: int, item: ListItem):
         
     from datetime import datetime, timezone
     
-    if existing:
-        if not item.external_id.startswith("tmdb-ep-"):
-            existing.status = status_val
-            existing.completed_at = datetime.now(timezone.utc)
-            existing.updated_at = datetime.now(timezone.utc)
-    else:
+    tracking_list_id = existing.tracking_list_id if existing else None
+    
+    if not existing:
         lib_item = UserLibraryItem(
             user_id=user_id,
             item_type=target_item_type,
@@ -583,9 +587,59 @@ def auto_add_to_library(db: Session, user_id: int, item: ListItem):
             status=status_val,
             completed_at=datetime.now(timezone.utc) if not item.external_id.startswith("tmdb-ep-") else None
         )
-        db.add(lib_item)
         
-    db.commit()
+        if target_item_type in ("series", "anime"):
+            private_list = ReadingList(
+                creator_id=user_id,
+                title=f"Tracker: {target_title}",
+                description=f"Auto-generated episode tracking for '{target_title}'",
+                visibility=VisibilityEnum.PRIVATE
+            )
+            db.add(private_list)
+            db.commit()
+            db.refresh(private_list)
+            tracking_list_id = private_list.id
+            lib_item.tracking_list_id = tracking_list_id
+            
+        db.add(lib_item)
+        db.commit()
+    else:
+        if not item.external_id.startswith("tmdb-ep-"):
+            existing.status = status_val
+            existing.completed_at = datetime.now(timezone.utc)
+            existing.updated_at = datetime.now(timezone.utc)
+            db.commit()
+            
+    if tracking_list_id and item.external_id.startswith("tmdb-ep-"):
+        # Ensure the episode is in the tracking list
+        ep_in_tracker = db.query(ListItem).filter(
+            ListItem.list_id == tracking_list_id,
+            ListItem.external_id == item.external_id
+        ).first()
+        
+        if not ep_in_tracker:
+            item_count = db.query(ListItem).filter(ListItem.list_id == tracking_list_id).count()
+            ep_item = ListItem(
+                list_id=tracking_list_id,
+                order_index=item_count + 1,
+                item_type=ItemTypeEnum.SERIES,
+                external_id=item.external_id,
+                title=item.title,
+                image_url=item.image_url,
+                custom_notes=""
+            )
+            db.add(ep_item)
+            db.commit()
+            db.refresh(ep_item)
+            
+            # also link progress to this list item
+            progress = db.query(ItemProgress).filter(
+                ItemProgress.user_id == user_id,
+                ItemProgress.external_id == item.external_id
+            ).first()
+            if progress and not progress.list_item_id:
+                progress.list_item_id = ep_item.id
+                db.commit()
 
 @router.post("/items/{item_id}/toggle", status_code=status.HTTP_200_OK)
 def toggle_item_progress(
@@ -653,6 +707,8 @@ def toggle_item_progress(
             activity_type="item_completed",
             item_title=item.title,
             item_type=item.item_type,
+            external_id=item.external_id,
+            image_url=item.image_url,
             details="completed"
         )
         db.add(activity)
@@ -719,12 +775,14 @@ def bulk_toggle_items_progress(
             
             # Record activity log
             activity = UserActivityLog(
-                user_id=current_user.id,
-                activity_type="item_completed",
-                item_title=item.title,
-                item_type=item.item_type,
-                details="completed"
-            )
+            user_id=current_user.id,
+            activity_type="item_completed",
+            item_title=item.title,
+            item_type=item.item_type,
+            external_id=item.external_id,
+            image_url=item.image_url,
+            details="completed"
+        )
             db.add(activity)
             
     db.commit()
@@ -929,6 +987,8 @@ def update_list_item(
             activity_type="item_moved",
             item_title=item.title,
             item_type=item.item_type,
+            external_id=item.external_id,
+            image_url=item.image_url,
             details=f"list_id:{list_id}"
         )
         db.add(activity)

@@ -11,6 +11,9 @@ class UserActivityLog(Base):
     activity_type = Column(String(50), nullable=False) # status_change, item_progress
     item_title = Column(String(250), nullable=True)
     item_type = Column(String(50), nullable=True)
+    external_id = Column(String(100), nullable=True)
+    list_id = Column(Integer, nullable=True)
+    image_url = Column(String(500), nullable=True)
     details = Column(String(250), nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 

@@ -91,12 +91,13 @@ def add_comment(
     
     # Record activity log
     activity = UserActivityLog(
-        user_id=current_user.id,
-        activity_type="guide_commented",
-        item_title=reading_list.title,
-        item_type="guide",
-        details=comment_in.content[:100]
-    )
+            user_id=current_user.id,
+            activity_type="guide_commented",
+            item_title=reading_list.title,
+            item_type="guide",
+            list_id=reading_list.id,
+            details=comment_in.content[:100]
+        )
     db.add(activity)
     db.commit()
     db.refresh(new_comment)
@@ -289,35 +290,33 @@ def get_followed_activity_feed(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    # Fetch all progress completions from followed users
+    # Fetch all activities from followed users
     followed_ids_query = db.query(Follow.followed_id).filter(Follow.follower_id == current_user.id)
     
-    # Query progress records for followed users, ordering by completion timestamp
-    progress_records = db.query(ItemProgress).filter(
-        ItemProgress.user_id.in_(followed_ids_query),
-        ItemProgress.is_completed == True
-    ).order_by(ItemProgress.completed_at.desc()).offset(skip).limit(limit).all()
+    # Query activity logs for followed users, ordering by created timestamp
+    activity_records = db.query(UserActivityLog).filter(
+        UserActivityLog.user_id.in_(followed_ids_query)
+    ).order_by(UserActivityLog.created_at.desc()).offset(skip).limit(limit).all()
     
     feed = []
-    for r in progress_records:
+    for r in activity_records:
         user = db.query(User).filter(User.id == r.user_id).first()
-        item = db.query(ListItem).filter(ListItem.id == r.list_item_id).first()
-        if not (user and item):
+        if not user:
             continue
             
-        reading_list = db.query(ReadingList).filter(ReadingList.id == item.list_id).first()
-        list_title = reading_list.title if reading_list else "Unknown List"
-        
         feed.append(
             ActivityFeedItemResponse(
+                id=r.id,
                 user_id=r.user_id,
                 username=user.username,
-                item_id=item.id,
-                item_title=item.title,
-                item_type=item.item_type,
-                list_id=item.list_id,
-                list_title=list_title,
-                completed_at=r.completed_at
+                activity_type=r.activity_type,
+                item_title=r.item_title,
+                item_type=r.item_type,
+                external_id=r.external_id,
+                list_id=r.list_id,
+                image_url=r.image_url,
+                details=r.details,
+                created_at=r.created_at
             )
         )
     return feed

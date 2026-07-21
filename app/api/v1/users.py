@@ -151,6 +151,14 @@ def get_user_up_next(
             (ItemProgress.is_completed == True) | (ItemProgress.is_skipped == True)
         ).all()
     }
+    completed_or_skipped_external_ids = {
+        p.external_id for p in 
+        db.query(ItemProgress).filter(
+            ItemProgress.user_id == current_user.id,
+            ItemProgress.external_id.isnot(None),
+            (ItemProgress.is_completed == True) | (ItemProgress.is_skipped == True)
+        ).all()
+    }
     
     for rlist in all_user_lists:
         addition_items = []
@@ -158,8 +166,39 @@ def get_user_up_next(
             addition_items.extend(add.items)
         addition_items.sort(key=lambda x: x.order_index)
         
+        flow = rlist.section_descriptions.get("flow", []) if rlist.section_descriptions else []
+        
+        def extract_flow_item_ids(elements):
+            ids = []
+            if not elements:
+                return ids
+            for el in elements:
+                if el.get("type") == "section":
+                    ids.extend(extract_flow_item_ids(el.get("blocks", [])))
+                elif el.get("type") == "block":
+                    for item in el.get("items", []):
+                        if "id" in item:
+                            ids.append(item["id"])
+                    ids.extend(extract_flow_item_ids(el.get("subblocks", [])))
+                elif el.get("type") == "subblock":
+                    for item in el.get("items", []):
+                        if "id" in item:
+                            ids.append(item["id"])
+            return ids
+            
+        flow_item_ids = extract_flow_item_ids(flow)
+        
+        base_items_dict = {item.id: item for item in rlist.items}
+        ordered_base_items = []
+        for item_id in flow_item_ids:
+            if item_id in base_items_dict:
+                ordered_base_items.append(base_items_dict.pop(item_id))
+        
+        # Append any remaining items (if flow is out of sync or for personal lists)
+        ordered_base_items.extend(sorted(base_items_dict.values(), key=lambda x: x.order_index))
+        
         merged_items = []
-        for item in rlist.items:
+        for item in ordered_base_items:
             merged_items.append((item.id, item, False, None, None))
             
         for ai in addition_items:
@@ -179,14 +218,20 @@ def get_user_up_next(
         # Find the first item in the merged list that is NOT completed or skipped
         first_uncompleted = None
         for item_id, item, is_addition, add_id, add_item_id in merged_items:
+            is_completed = False
             if is_addition:
-                if item_id not in completed_or_skipped_addition_ids:
-                    first_uncompleted = (item, is_addition, add_id, add_item_id)
-                    break
+                if item_id in completed_or_skipped_addition_ids:
+                    is_completed = True
             else:
-                if item_id not in completed_or_skipped_item_ids:
-                    first_uncompleted = (item, is_addition, None, None)
-                    break
+                if item_id in completed_or_skipped_item_ids:
+                    is_completed = True
+                    
+            if not is_completed and item.external_id and item.external_id in completed_or_skipped_external_ids:
+                is_completed = True
+                
+            if not is_completed:
+                first_uncompleted = (item, is_addition, add_id, add_item_id)
+                break
                     
         if first_uncompleted:
             item, is_addition, add_id, add_item_id = first_uncompleted

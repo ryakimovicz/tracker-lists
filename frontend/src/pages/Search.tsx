@@ -36,6 +36,9 @@ export const Search: React.FC = () => {
   const [successMsg, setSuccessMsg] = useState('');
   const [isSearching, setIsSearching] = useState(false);
 
+  const [exploreData, setExploreData] = useState<any>(null);
+  const [loadingExplore, setLoadingExplore] = useState(false);
+
   // Shelf tracking states
   const [shelfItems, setShelfItems] = useState<any[]>([]);
   const [selectedItemForShelf, setSelectedItemForShelf] = useState<SearchResultItem | null>(null);
@@ -100,6 +103,23 @@ export const Search: React.FC = () => {
     loadSocialMetadata();
   }, []);
 
+  useEffect(() => {
+    if (query === '') {
+      const fetchExplore = async () => {
+        try {
+          setLoadingExplore(true);
+          const res = await apiClient.get('/search/explore/recommendations');
+          setExploreData(res.data);
+        } catch (err) {
+          console.error("Failed to load recommendations", err);
+        } finally {
+          setLoadingExplore(false);
+        }
+      };
+      fetchExplore();
+    }
+  }, [query]);
+
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!query.trim()) return;
@@ -151,7 +171,7 @@ export const Search: React.FC = () => {
     return [
       { value: 'plan_to_read', label: language === 'es' ? 'Por Leer' : 'Plan to Read' },
       { value: 'reading', label: language === 'es' ? 'Leyendo' : 'Reading' },
-      { value: 'read', label: language === 'es' ? 'Leído' : 'Read' },
+      { value: 'read', label: language === 'es' ? 'LeÃ­do' : 'Read' },
       { value: 'dropped', label: language === 'es' ? 'Abandonado' : 'Dropped' }
     ];
   };
@@ -218,10 +238,10 @@ export const Search: React.FC = () => {
     try {
       if (isSaved) {
         await apiClient.delete(`/lists/${guideId}/save`);
-        setSuccessMsg(language === 'es' ? 'Guía quitada de tu biblioteca.' : 'Guide removed from library.');
+        setSuccessMsg(language === 'es' ? 'GuÃ­a quitada de tu biblioteca.' : 'Guide removed from library.');
       } else {
         await apiClient.post(`/lists/${guideId}/save`);
-        setSuccessMsg(language === 'es' ? 'Guía guardada en tu biblioteca.' : 'Guide saved to library.');
+        setSuccessMsg(language === 'es' ? 'GuÃ­a guardada en tu biblioteca.' : 'Guide saved to library.');
       }
       await loadSocialMetadata();
       setTimeout(() => setSuccessMsg(''), 3000);
@@ -292,6 +312,61 @@ export const Search: React.FC = () => {
         </form>
       </section>
 
+      {query === '' ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '3rem', marginTop: '1rem' }}>
+          {loadingExplore ? (
+            <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '3rem' }}>Cargando recomendaciones...</div>
+          ) : exploreData ? (
+            <>
+              {exploreData.for_you && exploreData.for_you.length > 0 && (
+                <section>
+                  <h3 style={{ marginBottom: '1rem', fontSize: '1.4rem' }}>Para ti</h3>
+                  <div style={{ display: 'flex', gap: '1rem', overflowX: 'auto', paddingBottom: '1rem' }}>
+                    {exploreData.for_you.map((item: any, idx: number) => (
+                      <div key={idx} className="glass-card" style={{ minWidth: '160px', width: '160px', padding: '0.75rem', cursor: 'pointer' }} onClick={() => handleOpenItemDetails(item)}>
+                        <img src={item.image_url || 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=150'} alt={item.title} style={{ width: '100%', height: '220px', objectFit: 'cover', borderRadius: '8px' }} onError={(e) => e.currentTarget.style.display='none'} />
+                        <h4 style={{ margin: '0.5rem 0 0 0', fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</h4>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+              {exploreData.trending && exploreData.trending.length > 0 && (
+                <section>
+                  <h3 style={{ marginBottom: '1rem', fontSize: '1.4rem' }}>Tendencias Globales</h3>
+                  <div style={{ display: 'flex', gap: '1rem', overflowX: 'auto', paddingBottom: '1rem' }}>
+                    {exploreData.trending.map((item: any, idx: number) => (
+                      <div key={idx} className="glass-card" style={{ minWidth: '160px', width: '160px', padding: '0.75rem', cursor: 'pointer' }} onClick={() => handleOpenItemDetails(item)}>
+                        <img src={item.image_url || 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=150'} alt={item.title} style={{ width: '100%', height: '220px', objectFit: 'cover', borderRadius: '8px' }} onError={(e) => e.currentTarget.style.display='none'} />
+                        <h4 style={{ margin: '0.5rem 0 0 0', fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</h4>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+              {exploreData.featured_guides && exploreData.featured_guides.length > 0 && (
+                <section>
+                  <h3 style={{ marginBottom: '1rem', fontSize: '1.4rem' }}>Guías Destacadas</h3>
+                  <div style={{ display: 'flex', gap: '1rem', overflowX: 'auto', paddingBottom: '1rem' }}>
+                    {exploreData.featured_guides.map((g: any, idx: number) => (
+                      <div key={idx} className="glass-card" style={{ minWidth: '250px', width: '250px', padding: '1rem', cursor: 'pointer', display: 'flex', flexDirection: 'column' }} onClick={() => navigate(`/guide/` + g.id)}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                          <BookOpen size={16} color="var(--accent-primary)" />
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Por {g.creator_name}</span>
+                        </div>
+                        <h4 style={{ margin: '0 0 0.5rem 0' }}>{g.title}</h4>
+                        <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' }}>{g.description}</p>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+            </>
+          ) : null}
+        </div>
+      ) : (
+        <>
+
       {errorMsg && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', padding: '0.75rem', borderRadius: 8, fontSize: '0.9rem', textAlign: 'left' }}>
           <AlertCircle size={18} />
@@ -318,15 +393,15 @@ export const Search: React.FC = () => {
         }}>
           {[
             { value: 'all', label: language === 'es' ? 'Todo' : 'All' },
-            { value: 'movie', label: language === 'es' ? 'Películas' : 'Movies' },
+            { value: 'movie', label: language === 'es' ? 'PelÃ­culas' : 'Movies' },
             { value: 'series', label: language === 'es' ? 'Series' : 'Series' },
             { value: 'anime', label: 'Anime' },
             { value: 'book', label: language === 'es' ? 'Libros' : 'Books' },
-            { value: 'comic', label: language === 'es' ? 'Cómics' : 'Comics' },
+            { value: 'comic', label: language === 'es' ? 'CÃ³mics' : 'Comics' },
             { value: 'manga', label: 'Mangas' },
             { value: 'game', label: language === 'es' ? 'Juegos' : 'Games' },
             { value: 'user', label: language === 'es' ? 'Usuarios' : 'Users' },
-            { value: 'guide', label: language === 'es' ? 'Guías' : 'Guides' }
+            { value: 'guide', label: language === 'es' ? 'GuÃ­as' : 'Guides' }
           ].map(tab => (
             <button
               key={tab.value}
@@ -400,7 +475,7 @@ export const Search: React.FC = () => {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <BookOpen size={18} color="var(--accent-primary)" />
                     <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 600 }}>
-                      {language === 'es' ? 'Guía Pública' : 'Public Guide'}
+                      {language === 'es' ? 'GuÃ­a PÃºblica' : 'Public Guide'}
                     </span>
                   </div>
                   <div style={{ flex: 1 }}>
@@ -458,7 +533,7 @@ export const Search: React.FC = () => {
                     {item.title}
                   </h4>
                   <span style={{ fontSize: '0.75rem', color: 'var(--accent-primary)', display: 'block', marginBottom: '0.4rem' }}>
-                    {item.item_type === 'comic' ? (language === 'es' ? 'Cómic' : 'Comic') : item.item_type === 'manga' ? 'Manga' : t('media' + item.item_type.charAt(0).toUpperCase() + item.item_type.slice(1))}
+                    {item.item_type === 'comic' ? (language === 'es' ? 'CÃ³mic' : 'Comic') : item.item_type === 'manga' ? 'Manga' : t('media' + item.item_type.charAt(0).toUpperCase() + item.item_type.slice(1))}
                   </span>
                   <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', margin: 0, height: '3.2rem', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' }}>
                     {stripHtml(item.description)}
@@ -467,7 +542,7 @@ export const Search: React.FC = () => {
 
                 {onShelf ? (
                   <div style={{ fontSize: '0.82rem', color: '#10b981', textAlign: 'center', padding: '0.4rem', fontWeight: 500 }}>
-                    {language === 'es' ? '✓ En estantería' : '✓ On shelf'}
+                    {language === 'es' ? 'âœ“ En estanterÃ­a' : 'âœ“ On shelf'}
                   </div>
                 ) : (
                   <button onClick={(e) => handleOpenAddShelf(item, e)} className="btn-secondary" style={{ width: '100%', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}>
@@ -482,7 +557,7 @@ export const Search: React.FC = () => {
 
       {results.length > 0 && filteredResults.length === 0 && (
         <div className="glass-card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-          {language === 'es' ? 'No se encontraron elementos en esta categoría.' : 'No items found in this category.'}
+          {language === 'es' ? 'No se encontraron elementos en esta categorÃ­a.' : 'No items found in this category.'}
         </div>
       )}
 
@@ -490,6 +565,8 @@ export const Search: React.FC = () => {
         <div className="glass-card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
           {t('searchNoResults')}
         </div>
+      )}
+      </>
       )}
 
       {/* Add To Shelf Overlay Modal */}
@@ -565,3 +642,4 @@ export const Search: React.FC = () => {
   );
 };
 export default Search;
+
