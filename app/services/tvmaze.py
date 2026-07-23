@@ -130,6 +130,11 @@ class TVMazeService:
         return episodes
 
     @staticmethod
+    def get_season_episodes(series_id: str, season_number: int) -> List[dict]:
+        all_eps = TVMazeService.get_all_episodes(series_id)
+        return [ep for ep in all_eps if ep.get("season_number") == season_number]
+
+    @staticmethod
     def get_episode_detail(series_id: str, season_number: int, episode_number: int) -> dict:
         real_id = series_id.replace('tvm_', '') if str(series_id).startswith('tvm_') else series_id
         url = f"https://api.tvmaze.com/shows/{real_id}/episodebynumber?season={season_number}&number={episode_number}"

@@ -21,7 +21,7 @@ import {
 
 interface LibraryItem {
   id: number;
-  item_type: 'game' | 'movie' | 'series' | 'anime' | 'book' | 'comic' | 'manga';
+  item_type: 'game' | 'movie' | 'series' | 'anime' | 'book' | 'comic' | 'manga' | 'episode' | 'season' | string;
   external_id: string;
   title: string;
   image_url: string | null;
@@ -378,16 +378,32 @@ export const Profile: React.FC = () => {
 
 
 
+  const isLooseEpisodeOrSeason = (item: LibraryItem) => {
+    const isLooseType = item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tmdb-ep-') || item.external_id?.startsWith('tvm-ep-');
+    if (!isLooseType) return false;
+    
+    const parentTitle = item.last_seen_episode || '';
+    const followsParentSeries = libraryItems.some(li => 
+      (li.item_type === 'series' || li.item_type === 'anime') && 
+      (li.title === parentTitle || item.title.startsWith(li.title))
+    );
+    return isLooseType && !followsParentSeries;
+  };
+
   const filteredItems = libraryItems
     .filter(item => {
       let matchesMedia = false;
       if (mediaFilter === 'all') matchesMedia = true;
-      else if (mediaFilter === 'series') matchesMedia = item.item_type === 'series';
+      else if (mediaFilter === 'series') matchesMedia = item.item_type === 'series' || item.item_type === 'episode' || item.item_type === 'season';
       else if (mediaFilter === 'anime') matchesMedia = item.item_type === 'anime';
       else matchesMedia = item.item_type === mediaFilter;
+      
       const matchesSearch = item.title.toLowerCase().includes(shelfSearchQuery.toLowerCase());
-      const isEp = item.external_id?.startsWith('tmdb-ep-');
-      return matchesMedia && matchesSearch && !isEp;
+      
+      const isLoose = isLooseEpisodeOrSeason(item);
+      const isSeriesOrRegular = item.item_type !== 'episode' && item.item_type !== 'season' && !item.external_id?.startsWith('tmdb-ep-') && !item.external_id?.startsWith('tvm-ep-');
+
+      return matchesMedia && matchesSearch && (isSeriesOrRegular || isLoose);
     })
     .sort((a, b) => {
       const dateA = new Date(a.completed_at || a.updated_at || 0).getTime();
@@ -401,7 +417,16 @@ export const Profile: React.FC = () => {
     li.is_favorite
   );
 
-  const visualLibraryItems = libraryItems.filter(item => !item.external_id?.startsWith('tmdb-ep-'));
+  const visualLibraryItems = libraryItems.filter(item => {
+    const isLooseType = item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tmdb-ep-') || item.external_id?.startsWith('tvm-ep-');
+    if (!isLooseType) return true;
+    const parentTitle = item.last_seen_episode || '';
+    const followsParentSeries = libraryItems.some(li => 
+      (li.item_type === 'series' || li.item_type === 'anime') && 
+      (li.title === parentTitle || item.title.startsWith(li.title))
+    );
+    return !followsParentSeries;
+  });
 
   if (loading) {
     return <div style={{ textAlign: 'center', padding: '3rem' }}>Cargando información...</div>;
@@ -616,7 +641,7 @@ export const Profile: React.FC = () => {
                 const baseTypes = ['all', 'movie', 'series', 'anime', 'book', 'comic', 'manga', 'game'] as const;
                 const allowedTypes = baseTypes.filter(type => {
                   if (type === 'all') return true;
-                  if (type === 'series') return libraryItems.some(item => item.item_type === 'series');
+                  if (type === 'series') return libraryItems.some(item => item.item_type === 'series' || item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tmdb-ep-') || item.external_id?.startsWith('tvm-ep-'));
                   if (type === 'anime') return libraryItems.some(item => item.item_type === 'anime');
                   return libraryItems.some(item => item.item_type === type);
                 });
@@ -734,69 +759,84 @@ export const Profile: React.FC = () => {
                           </div>
                           <div style={{ flex: 1, textAlign: 'left', cursor: 'pointer' }} onClick={() => handleOpenItemDetails(item)}>
                             <h4 style={{ margin: '0 0 0.25rem 0', fontSize: '0.95rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.title}>
-                              {item.title}
+                              {(() => {
+                                const isEpOrSeason = item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tmdb-ep-') || item.external_id?.startsWith('tvm-ep-');
+                                if (isEpOrSeason && item.last_seen_episode && item.title.toLowerCase().startsWith(item.last_seen_episode.toLowerCase() + ' - ')) {
+                                  return item.title.slice(item.last_seen_episode.length + 3);
+                                }
+                                return item.title;
+                              })()}
                             </h4>
                             <span style={{ fontSize: '0.75rem', color: 'var(--accent-primary)' }}>
-                              {item.item_type === 'comic' ? (language === 'es' ? 'Cómic' : 'Comic') : item.item_type === 'manga' ? 'Manga' : t('media' + item.item_type.charAt(0).toUpperCase() + item.item_type.slice(1))}
+                              {(item.item_type === 'episode' || item.external_id?.startsWith('tmdb-ep-') || item.external_id?.startsWith('tvm-ep-'))
+                                ? (language === 'es' ? 'Episodio' : 'Episode')
+                                : item.item_type === 'season'
+                                ? (language === 'es' ? 'Temporada' : 'Season')
+                                : item.item_type === 'comic' ? (language === 'es' ? 'Cómic' : 'Comic') : item.item_type === 'manga' ? 'Manga' : t('media' + item.item_type.charAt(0).toUpperCase() + item.item_type.slice(1))
+                              }
                             </span>
-                            {/* Last completed episode for series */}
+                            {/* Standalone episode/season series title */}
+                            {(item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tmdb-ep-') || item.external_id?.startsWith('tvm-ep-')) && item.last_seen_episode && (
+                              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500, display: 'block', marginTop: '0.1rem' }}>
+                                {language === 'es' ? 'Serie: ' : 'Show: '}{item.last_seen_episode}
+                              </span>
+                            )}
+
+                            {/* Followed series last completed episode */}
                             {(item.item_type === 'series' || item.item_type === 'anime') && item.last_seen_episode && (
-                              <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 500, display: 'block', marginTop: '-0.3rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.last_seen_episode}>
-                                {item.last_seen_episode.includes(' - ') ? item.last_seen_episode.split(' - ').slice(1).join(' - ') : item.last_seen_episode}
+                              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500, display: 'block', marginTop: '0.1rem' }}>
+                                {language === 'es' ? 'Último visto: ' : 'Last seen: '}
+                                {(() => {
+                                  const match = item.last_seen_episode.match(/S\d+E\d+/i);
+                                  return match ? match[0].toUpperCase() : item.last_seen_episode;
+                                })()}
                               </span>
                             )}
 
-                            {/* Pages read for books, comics, mangas */}
-                            {['book', 'comic', 'manga'].includes(item.item_type) && item.pages_read !== undefined && item.pages_read > 0 && (
-                              <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', display: 'block', marginTop: '-0.3rem' }}>
-                                {item.pages_read} {language === 'es' ? 'páginas leídas' : 'pages read'}
+                            {/* Status Badge (Dropped) */}
+                            {item.status === 'dropped' && (
+                              <span style={{
+                                fontSize: '0.72rem',
+                                background: 'rgba(245, 158, 11, 0.15)',
+                                color: '#f59e0b',
+                                padding: '0.15rem 0.4rem',
+                                borderRadius: '4px',
+                                fontWeight: 600,
+                                display: 'inline-block',
+                                marginTop: '0.3rem'
+                              }}>
+                                🚫 {language === 'es' ? 'Abandonado' : 'Dropped'}
                               </span>
                             )}
 
-                            {/* Completion date if completed */}
-                            {item.completed_at && (
-                              <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontStyle: 'italic', display: 'block', marginTop: '-0.3rem' }}>
-                                {formatDate(new Date(item.completed_at))}
+                            {/* Formatted Date */}
+                            {(item.completed_at || item.updated_at) && (
+                              <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontStyle: 'italic', display: 'block', marginTop: '0.3rem' }}>
+                                {formatDate(new Date(item.completed_at || item.updated_at))}
                               </span>
                             )}
                           </div>
 
-                          {/* Status selection */}
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                            <select
-                              className="input-field"
-                              disabled={!isOwnProfile}
-                              value={item.status}
-                              onChange={(e) => handleStatusChange(item.id, e.target.value)}
-                              style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}
+                          {isOwnProfile && (
+                            <button
+                              onClick={() => handleDeleteItem(item.id)}
+                              className="btn-secondary"
+                              style={{
+                                padding: '0.25rem',
+                                fontSize: '0.8rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '0.25rem',
+                                color: '#ef4444',
+                                background: 'transparent',
+                                border: 'none',
+                                cursor: 'pointer'
+                              }}
                             >
-                              {getAllowedStatuses(item.item_type).map(status => (
-                                <option key={status.value} value={status.value}>
-                                  {status.label}
-                                </option>
-                              ))}
-                            </select>
-
-                            {isOwnProfile && (
-                              <button
-                                onClick={() => handleDeleteItem(item.id)}
-                                className="btn-secondary"
-                                style={{
-                                  padding: '0.25rem',
-                                  fontSize: '0.8rem',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  gap: '0.25rem',
-                                  color: '#ef4444',
-                                  background: 'transparent',
-                                  border: 'none'
-                                }}
-                              >
-                                <Trash2 size={14} /> {language === 'es' ? 'Quitar' : 'Remove'}
-                              </button>
-                            )}
-                          </div>
+                              <Trash2 size={14} /> {language === 'es' ? 'Quitar' : 'Remove'}
+                            </button>
+                          )}
                         </div>
                       ))}
                     </div>

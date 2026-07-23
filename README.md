@@ -41,44 +41,48 @@ La interfaz está estructurada en **seis secciones principales** accesibles desd
 
 ### 🏠 Home (Inicio)
 Centro de control personal del usuario:
-- **Continuar**: Series y animes en progreso mostrando el siguiente episodio a ver (`S01E03 – Nombre`), con botón para marcarlo como visto directamente desde la tarjeta
-- **Guías Seguidas**: Progreso en las guías cronológicas que el usuario sigue
-- **Actualizaciones**: Cambios recientes en guías seguidas
+- **Continuar viendo**: Series y animes en progreso que muestran permanentemente el siguiente episodio por ver (`S01E01`, `S01E02`...), con un botón circular `✓` para marcarlo como visto directamente desde la tarjeta.
+- **Continuar guías**: Progreso activo en las guías cronológicas que el usuario sigue.
+- **Actualizaciones**: Cambios recientes en las guías seguidas.
 
 ### 📱 Social (Feed)
 Timeline comunitaria unificada:
 - **Muro Cronológico**: Un único feed que agrupa en tiempo real toda la actividad de la comunidad (nuevas guías, ítems marcados, progreso, votos, finalizaciones) ordenado de más reciente a más antiguo, de forma similar a redes sociales modernas.
-- **Interacciones**: Votos, comentarios y reportes en guías y opiniones
+- **Interacciones**: Votos, comentarios y reportes en guías y opiniones.
 
 ### ✏️ Crear (Editor de Guías)
 Constructor de guías cronológicas:
-- **Editor Visual**: Ordenamiento manual de obras de distintos tipos de medios (películas, libros, cómics, juegos, etc.)
-- **Gestión Avanzada**: Cortar, copiar y pegar elementos entre diferentes secciones y bloques para una organización más rápida.
-- **Importador de Temporadas**: Importa temporadas completas de series con un clic
+- **Editor Visual**: Ordenamiento manual de obras de distintos tipos de medios (películas, libros, cómics, juegos, etc.).
+- **Gestión Avanzada**: Cortar, copiar, pegar (*"Pegar Arriba"*, *"Pegar Abajo"*) mediante menú contextual de acción o pulsación larga (`useLongPress`).
+- **Importador de Temporadas**: Importa temporadas completas de series con un clic.
 - **Prioridad de Secciones**: Escala 1–5 para clasificar secciones como "Canon", "Recomendado", "Relleno", etc.
 
 ### 🔍 Explorar (Buscador)
 Búsqueda y descubrimiento:
-- **Dashboard de Recomendaciones (Explorar)**: Un panel inicial inteligente que presenta contenido personalizado, incluyendo tendencias globales (basado en popularidad reciente), guías destacadas (con más movimiento en la comunidad) y recomendaciones "Para Ti" (generadas combinando los intereses y la biblioteca personal del usuario).
-- **Buscador Global**: Conecta con TVMaze, OMDb, IGDB, Google Books y Comic Vine desde un único campo de búsqueda con filtros por categoría (Películas, Series, Animes, Libros, Cómics, Mangas, Juegos).
-- **Modal de Detalle**: Al seleccionar cualquier resultado se abre una ficha con información completa, control de estado (`plan_to_watch`, `watching`, `completed`, etc.) y — para series y animes — listado de temporadas y episodios con marcado individual o por temporada completa.
+- **Dashboard de Recomendaciones**: Panel inicial con tendencias globales, guías destacadas y recomendaciones personalizadas "Para Ti".
+- **Buscador Global**: Conecta con TVMaze, OMDb, IGDB, Google Books y Comic Vine con filtros por categoría (Películas, Series, Animes, Libros, Cómics, Mangas, Juegos).
+- **Modal de Detalle del Ítem**: Ficha completa del elemento con:
+  - Botón `+` en la barra superior para añadir/seguir la obra en la estantería (creando automáticamente una lista privada de seguimiento para series/animes).
+  - Menú `⋮` (3 puntos verticales) con opciones para *"Marcar como abandonado"* o *"Quitar de estantería"*.
+  - Botón `X` de cierre posicionado en la esquina superior para no entorpecer los botones de acción.
+  - Botón de tick `✓` en el cuerpo del modal (alineado a la derecha, bajo la calificación) para marcar como visto/leído/jugado sin desplegables de estado.
+  - Para series y animes: acordeón de temporadas y capítulos con marcado mediante botones circulares `✓` individuales o masivos por temporada.
 - **Búsqueda de Usuarios y Guías**: Encuentra usuarios de Pathd y guías públicas de la comunidad.
 
 ### 👤 Perfil (Estantería Personal)
 Perfil público y gestión de biblioteca:
-- **Estadísticas**: Seguidores, seguidos, fecha de registro
-- **Estantería (Shelf)**: Catálogo personal organizado por estado de consumo:
-  - `plan_to_watch` / `plan_to_read` / `plan_to_play`
-  - `watching` / `reading` / `playing`
-  - `completed` / `abandoned`
-- **Marcado de Episodios**: Control granular por episodio/capítulo o temporada completa con actualización de progreso automática; en series y animes muestra el último episodio visto en la tarjeta
-- **Favoritos**: Obras marcadas como favoritas visibles en el perfil
-- **Historial de Actividad**: Log cronológico de todas las acciones del usuario
+- **Estadísticas**: Seguidores, seguidos, fecha de registro e historial de actividad.
+- **Estantería (Shelf)**: Catálogo personal organizado por categoría y estado de consumo, sin desplegables de estado en las tarjetas:
+  - Marcado de fecha (sin hora) en que el usuario completó/marcó el elemento.
+  - Distintivo visual claro para elementos marcados como `🚫 Abandonado`.
+  - **Tarjetas de Series**: Muestran limpiamente el último capítulo visto (ej: `Último visto: S01E03`).
+  - **Episodios y Temporadas Sueltas**: Si el usuario marca un capítulo o temporada en una guía sin seguir la serie completa, se crea una tarjeta individual en la estantería indicando la serie a la que pertenece y la fecha. Si posteriormente se sigue la serie completa, las tarjetas sueltas se agrupan automáticamente en la tarjeta principal de la serie.
+- **Favoritos**: Obras destacadas visibles en el perfil.
 
 ### 🛡️ Panel de Administración
 Gestión de contenido moderado:
-- Ver y resolver reportes activos (guías, comentarios, reseñas)
-- Banear usuarios y eliminar contenido inapropiado
+- Ver y resolver reportes activos (guías, comentarios, reseñas).
+- Banear usuarios y eliminar contenido inapropiado.
 
 ---
 
@@ -102,7 +106,7 @@ Gestión de contenido moderado:
 | PUT | `/me/password` | Cambiar contraseña |
 | DELETE | `/me` | Eliminar cuenta |
 | GET | `/me/activity` | Historial de actividad del usuario |
-| GET | `/me/up-next` | Próximos ítems pendientes en guías seguidas |
+| GET | `/me/up-next` | Próximos ítems pendientes en guías seguidas y listas personales |
 | GET | `/me/feed/guides-updates` | Actualizaciones recientes de guías seguidas |
 | POST | `/me/lastfm/connect` | Conectar cuenta de Last.fm |
 | DELETE | `/me/lastfm/disconnect` | Desconectar cuenta de Last.fm |
@@ -122,8 +126,6 @@ Gestión de contenido moderado:
 
 **Tipos disponibles**: `movie`, `series`, `anime`, `book`, `comic`, `manga`, `game`
 
-> Los resultados incluyen un campo `item_type` para diferenciar entre tipos. Además, se asocia automáticamente el `imdb_id` a series y películas para crear un nexo universal.
-
 ### Guías Cronológicas (`/api/v1/lists`)
 | Método | Ruta | Descripción |
 |---|---|---|
@@ -139,7 +141,7 @@ Gestión de contenido moderado:
 | DELETE | `/{list_id}/items/{item_id}` | Eliminar ítem de la guía |
 | POST | `/{list_id}/items/tv-import` | Importar temporada completa desde TVMaze |
 | POST | `/{list_id}/items/bulk-toggle` | Marcar múltiples ítems de una vez |
-| POST | `/{list_id}/toggle-tv-episode` | Marcar/desmarcar episodio individual |
+| POST | `/{list_id}/toggle-tmdb-episode` | Marcar/desmarcar episodio individual |
 | POST | `/{list_id}/bulk-toggle-season` | Marcar toda una temporada de una vez |
 | POST | `/{list_id}/sections/bulk-action` | Acción masiva sobre una sección |
 | POST | `/items/{item_id}/toggle` | Marcar ítem como completado/pendiente |
@@ -150,9 +152,9 @@ Gestión de contenido moderado:
 ### Estantería Personal (`/api/v1/library`)
 | Método | Ruta | Descripción |
 |---|---|---|
-| POST | `/` | Añadir obra a la estantería |
+| POST | `/` | Añadir obra a la estantería (sincronizando progreso previo) |
 | GET | `/` | Obtener estantería del usuario |
-| PUT | `/{library_item_id}` | Actualizar estado de una obra |
+| PUT | `/{library_item_id}` | Actualizar estado u opciones de una obra |
 | DELETE | `/{library_item_id}` | Eliminar obra de la estantería |
 
 ### Social (`/api/v1/social`)
@@ -217,7 +219,6 @@ pip install -r requirements.txt
 
 # 3. Configurar variables de entorno
 cp .env.example .env
-# Editar .env con tus claves (ver sección de Variables de Entorno)
 
 # 4. Levantar el servidor
 uvicorn app.main:app --reload
@@ -245,7 +246,6 @@ API_V1_STR="/api/v1"
 
 # Base de Datos
 DATABASE_URL="sqlite:///./tracker_lists.db"
-# Para PostgreSQL: postgresql://user:password@localhost:5432/pathd
 
 # Seguridad
 SECRET_KEY="genera-una-clave-segura-con-openssl-rand-hex-32"
@@ -253,23 +253,22 @@ ALGORITHM="HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES=11520
 
 # APIs Externas
-TVMAZE_API_KEY=""        # https://www.tvmaze.com/api
-OMDB_API_KEY=""          # https://www.omdbapi.com/
-FANART_API_KEY=""        # https://fanart.tv/
-LASTFM_API_KEY=""        # https://www.last.fm/api/account/create
+TVMAZE_API_KEY=""
+OMDB_API_KEY=""
+FANART_API_KEY=""
+LASTFM_API_KEY=""
 LASTFM_SHARED_SECRET=""
-COMIC_VINE_API_KEY=""    # https://comicvine.gamespot.com/api/
-GOOGLE_BOOKS_API_KEY=""  # https://console.cloud.google.com/
+COMIC_VINE_API_KEY=""
+GOOGLE_BOOKS_API_KEY=""
 
 # IGDB (via Twitch Developer)
-# Crear app en https://dev.twitch.tv/console/apps
 TWITCH_CLIENT_ID=""
 TWITCH_CLIENT_SECRET=""
 
 # CORS
 BACKEND_CORS_ORIGINS='["http://localhost:5173"]'
 
-# Email (opcional, para recuperación de contraseña)
+# Email (para recuperación de contraseña)
 SMTP_HOST=""
 SMTP_PORT=587
 SMTP_USER=""
@@ -282,7 +281,7 @@ EMAILS_FROM_EMAIL="noreply@pathd.app"
 ## 🗂️ Estructura del Proyecto
 
 ```
-pathd/
+tracker-lists/
 ├── app/
 │   ├── api/v1/           # Endpoints REST
 │   │   ├── auth.py       # Autenticación y recuperación de contraseña
@@ -303,18 +302,11 @@ pathd/
 │   │   ├── api/          # Cliente Axios con interceptores de autenticación
 │   │   ├── components/   # Componentes reutilizables (Sidebar, SearchPanel, MediaCard, ItemDetailsModal)
 │   │   ├── context/      # Contextos globales (AuthContext, ThemeContext, LanguageContext)
+│   │   ├── hooks/        # Custom hooks (useLongPress)
 │   │   ├── pages/        # Páginas (Home, Social, CreateGuide, Search, Profile, ViewGuide, AdminPanel, etc.)
-│   │   └── utils/        # Utilidades (Caché local para llamadas a APIs externas como TVMaze)
+│   │   └── utils/        # Utilidades y caché de TMDB/APIs
 │   └── index.html
 ├── .env.example
 ├── requirements.txt
 └── README.md
 ```
-
----
-
-## 📋 Roadmap
-
-- [ ] Sistema de temas de color (Indie, Cyberpunk, OLED)
-- [ ] Notificaciones en tiempo real (WebSockets)
-- [ ] Aplicación móvil (React Native)

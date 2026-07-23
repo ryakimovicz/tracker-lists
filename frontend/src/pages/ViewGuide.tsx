@@ -8,7 +8,8 @@ import {
   ArrowLeft,
   Star,
   Heart,
-  X
+  X,
+  Check
 } from 'lucide-react';
 
 export const ViewGuide: React.FC = () => {
@@ -422,12 +423,26 @@ export const ViewGuide: React.FC = () => {
                       {isCollapsed ? <ChevronRight size={18} /> : <ChevronDown size={18} />}
                     </button>
                     {sectionIds.length > 0 && (
-                      <input
-                        type="checkbox"
-                        checked={isSectionCompleted}
-                        onChange={() => handleBulkToggle(sectionIds, !isSectionCompleted)}
-                        style={{ width: '20px', height: '20px', cursor: 'pointer' }}
-                      />
+                      <button
+                        type="button"
+                        onClick={() => handleBulkToggle(sectionIds, !isSectionCompleted)}
+                        style={{
+                          background: isSectionCompleted ? '#10b981' : 'transparent',
+                          border: isSectionCompleted ? 'none' : '1px solid var(--border-color)',
+                          borderRadius: '50%',
+                          width: '22px',
+                          height: '22px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          color: isSectionCompleted ? 'white' : 'transparent',
+                          transition: 'all 0.2s ease',
+                          padding: 0
+                        }}
+                      >
+                        <Check size={14} strokeWidth={3} />
+                      </button>
                     )}
                     <div style={{ flex: 1 }}>
                       <h3 style={{ color: 'var(--accent-primary)', fontSize: '1.25rem', margin: 0, fontWeight: 800 }}>
@@ -460,12 +475,26 @@ export const ViewGuide: React.FC = () => {
                         {isCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
                       </button>
                       {allBlockIds.length > 0 && (
-                        <input
-                          type="checkbox"
-                          checked={isBlockCompleted}
-                          onChange={() => handleBulkToggle(allBlockIds, !isBlockCompleted)}
-                          style={{ width: '18px', height: '18px', cursor: 'pointer' }}
-                        />
+                        <button
+                          type="button"
+                          onClick={() => handleBulkToggle(allBlockIds, !isBlockCompleted)}
+                          style={{
+                            background: isBlockCompleted ? '#10b981' : 'transparent',
+                            border: isBlockCompleted ? 'none' : '1px solid var(--border-color)',
+                            borderRadius: '50%',
+                            width: '20px',
+                            height: '20px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                            color: isBlockCompleted ? 'white' : 'transparent',
+                            transition: 'all 0.2s ease',
+                            padding: 0
+                          }}
+                        >
+                          <Check size={12} strokeWidth={3} />
+                        </button>
                       )}
                       <div style={{ flex: 1 }}>
                         <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', flexWrap: 'wrap' }}>
@@ -484,12 +513,26 @@ export const ViewGuide: React.FC = () => {
                             return (
                               <div key={item.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.6rem', background: 'var(--bg-secondary)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
                                 <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                                  <input
-                                    type="checkbox"
-                                    checked={item.is_completed}
-                                    onChange={() => handleToggleItemProgress(item.id)}
-                                    style={{ width: '18px', height: '18px', cursor: 'pointer' }}
-                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => handleToggleItemProgress(item.id)}
+                                    style={{
+                                      background: item.is_completed ? '#10b981' : 'transparent',
+                                      border: item.is_completed ? 'none' : '1px solid var(--border-color)',
+                                      borderRadius: '50%',
+                                      width: '20px',
+                                      height: '20px',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      cursor: 'pointer',
+                                      color: item.is_completed ? 'white' : 'transparent',
+                                      transition: 'all 0.2s ease',
+                                      padding: 0
+                                    }}
+                                  >
+                                    <Check size={12} strokeWidth={3} />
+                                  </button>
                                   {item.image_url && (
                                     <img
                                       src={item.image_url}
@@ -534,12 +577,26 @@ export const ViewGuide: React.FC = () => {
                                   {isSubCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
                                 </button>
                                 {allSubblockIds.length > 0 && (
-                                  <input
-                                    type="checkbox"
-                                    checked={isSubblockCompleted}
-                                    onChange={() => handleBulkToggle(allSubblockIds, !isSubblockCompleted)}
-                                    style={{ width: '16px', height: '16px', cursor: 'pointer' }}
-                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => handleBulkToggle(allSubblockIds, !isSubblockCompleted)}
+                                    style={{
+                                      background: isSubblockCompleted ? '#10b981' : 'transparent',
+                                      border: isSubblockCompleted ? 'none' : '1px solid var(--border-color)',
+                                      borderRadius: '50%',
+                                      width: '18px',
+                                      height: '18px',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      cursor: 'pointer',
+                                      color: isSubblockCompleted ? 'white' : 'transparent',
+                                      transition: 'all 0.2s ease',
+                                      padding: 0
+                                    }}
+                                  >
+                                    <Check size={12} strokeWidth={3} />
+                                  </button>
                                 )}
                                 <div style={{ flex: 1 }}>
                                   <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', flexWrap: 'wrap' }}>
@@ -557,12 +614,26 @@ export const ViewGuide: React.FC = () => {
                                     return (
                                       <div key={item.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.4rem 0.8rem', background: 'var(--bg-secondary)', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
                                         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                                          <input
-                                            type="checkbox"
-                                            checked={item.is_completed}
-                                            onChange={() => handleToggleItemProgress(item.id)}
-                                            style={{ width: '16px', height: '16px', cursor: 'pointer' }}
-                                          />
+                                          <button
+                                            type="button"
+                                            onClick={() => handleToggleItemProgress(item.id)}
+                                            style={{
+                                              background: item.is_completed ? '#10b981' : 'transparent',
+                                              border: item.is_completed ? 'none' : '1px solid var(--border-color)',
+                                              borderRadius: '50%',
+                                              width: '18px',
+                                              height: '18px',
+                                              display: 'inline-flex',
+                                              alignItems: 'center',
+                                              justifyContent: 'center',
+                                              cursor: 'pointer',
+                                              color: item.is_completed ? 'white' : 'transparent',
+                                              transition: 'all 0.2s ease',
+                                              padding: 0
+                                            }}
+                                          >
+                                            <Check size={12} strokeWidth={3} />
+                                          </button>
                                           {item.image_url && (
                                             <img
                                               src={item.image_url}

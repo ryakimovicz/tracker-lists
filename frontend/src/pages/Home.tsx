@@ -441,9 +441,11 @@ export const Home: React.FC = () => {
 
   let filteredItems: any[] = [];
   if (activeTab === "watching") {
-    filteredItems = libraryItems.filter(i => ["watching", "reading", "playing"].includes(i.status));
+    filteredItems = libraryItems.filter(i => 
+      (["watching", "reading", "playing"].includes(i.status) || ((i.item_type === "series" || i.item_type === "anime") && i.status !== "completed" && i.status !== "dropped"))
+    );
   } else if (activeTab === "plan_to_watch") {
-    filteredItems = libraryItems.filter(i => i.status === "plan_to_watch");
+    filteredItems = libraryItems.filter(i => i.status === "plan_to_watch" && i.item_type !== "series" && i.item_type !== "anime");
   } else if (activeTab === "completed") {
     filteredItems = libraryItems.filter(i => i.status === "completed");
   }

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from '../context/LanguageContext';
 import { apiClient } from '../api/client';
-import { Star, Heart, X, Flag, CheckCircle } from 'lucide-react';
+import { Star, Heart, X, Flag, CheckCircle, Check, Plus, MoreVertical, Trash2 } from 'lucide-react';
 import { getCachedTMDB, setCachedTMDB } from '../utils/tmdbCache';
 import { useAuth } from '../context/AuthContext';
 
@@ -79,6 +79,73 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   const [isLoadingMetadata, setIsLoadingMetadata] = useState(false);
   
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
+  const [showMenu, setShowMenu] = useState(false);
+
+  const getDefaultStatus = (type: string) => {
+    if (type === 'series' || type === 'anime') return 'watching';
+    if (type === 'game') return 'plan_to_play';
+    if (['book', 'comic', 'manga'].includes(type)) return 'plan_to_read';
+    return 'plan_to_watch';
+  };
+
+  const getCompletedStatus = (type: string) => {
+    if (['book', 'comic', 'manga'].includes(type)) return 'read';
+    return 'completed';
+  };
+
+  const handleAddToShelf = async () => {
+    if (!selectedItem) return;
+    const defaultStatus = getDefaultStatus(selectedItem.item_type);
+    const resId = await ensureTracked(defaultStatus);
+    if (resId) {
+      onUpdate && onUpdate();
+    }
+  };
+
+  const handleMarkCompleted = async () => {
+    if (!selectedItem) return;
+    const compStatus = getCompletedStatus(selectedItem.item_type);
+    if (selectedItem.id) {
+      try {
+        await apiClient.put(`/library/${selectedItem.id}`, { status: compStatus });
+        setSelectedItem((prev: any) => prev ? { ...prev, status: compStatus, completed_at: new Date().toISOString() } : null);
+        onUpdate && onUpdate();
+      } catch (e) {
+        console.error(e);
+      }
+    } else {
+      await ensureTracked(compStatus);
+    }
+  };
+
+  const handleMarkDropped = async () => {
+    if (!selectedItem) return;
+    setShowMenu(false);
+    if (selectedItem.id) {
+      try {
+        await apiClient.put(`/library/${selectedItem.id}`, { status: 'dropped' });
+        setSelectedItem((prev: any) => prev ? { ...prev, status: 'dropped' } : null);
+        onUpdate && onUpdate();
+      } catch (e) {
+        console.error(e);
+      }
+    } else {
+      await ensureTracked('dropped');
+    }
+  };
+
+  const handleRemoveFromShelf = async () => {
+    if (!selectedItem || !selectedItem.id) return;
+    setShowMenu(false);
+    try {
+      await apiClient.delete(`/library/${selectedItem.id}`);
+      setSelectedItem(null);
+      onClose();
+      onUpdate && onUpdate();
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   const formatDate = (date: Date) => {
     return date.toLocaleDateString(language === 'es' ? 'es-ES' : 'en-US', {
@@ -537,6 +604,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
             <div
               className="glass-card"
               style={{
+                position: 'relative',
                 width: '650px',
                 maxHeight: '90vh',
                 padding: '2rem',
@@ -609,12 +677,137 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                     </div>
                   </div>
                 </div>
-                <button
-                  onClick={() => onClose()}
-                  style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '0.2rem' }}
-                >
-                  <X size={20} />
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  {/* Button + (Add to Shelf / Follow) */}
+                  {isOwnProfile && (
+                    <button
+                      type="button"
+                      onClick={handleAddToShelf}
+                      className="btn-secondary"
+                      title={language === 'es' ? 'Añadir a Estantería' : 'Add to Shelf'}
+                      style={{
+                        padding: '0.4rem',
+                        borderRadius: '50%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        background: selectedItem?.id ? 'rgba(16, 185, 129, 0.15)' : 'var(--bg-tertiary)',
+                        borderColor: selectedItem?.id ? '#10b981' : 'var(--border-color)',
+                        color: selectedItem?.id ? '#10b981' : 'var(--text-primary)',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <Plus size={18} />
+                    </button>
+                  )}
+
+
+
+                  {/* Button ⋮ (Vertical 3 dots menu) */}
+                  {isOwnProfile && (
+                    <div style={{ position: 'relative' }}>
+                      <button
+                        type="button"
+                        onClick={() => setShowMenu(!showMenu)}
+                        className="btn-secondary"
+                        title={language === 'es' ? 'Más opciones' : 'More options'}
+                        style={{
+                          padding: '0.4rem',
+                          borderRadius: '50%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <MoreVertical size={18} />
+                      </button>
+
+                      {showMenu && (
+                        <div
+                          className="glass-card"
+                          style={{
+                            position: 'absolute',
+                            top: '100%',
+                            right: 0,
+                            marginTop: '0.5rem',
+                            zIndex: 3000,
+                            padding: '0.5rem',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '0.4rem',
+                            minWidth: '170px',
+                            boxShadow: '0 10px 25px rgba(0,0,0,0.5)'
+                          }}
+                        >
+                          <button
+                            type="button"
+                            onClick={handleMarkDropped}
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              color: '#f59e0b',
+                              textAlign: 'left',
+                              padding: '0.4rem 0.6rem',
+                              cursor: 'pointer',
+                              fontSize: '0.85rem',
+                              borderRadius: '4px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.4rem'
+                            }}
+                          >
+                            🚫 {language === 'es' ? 'Marcar como abandonado' : 'Mark as dropped'}
+                          </button>
+                          {selectedItem?.id && (
+                            <button
+                              type="button"
+                              onClick={handleRemoveFromShelf}
+                              style={{
+                                background: 'transparent',
+                                border: 'none',
+                                color: '#ef4444',
+                                textAlign: 'left',
+                                padding: '0.4rem 0.6rem',
+                                cursor: 'pointer',
+                                fontSize: '0.85rem',
+                                borderRadius: '4px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.4rem'
+                              }}
+                            >
+                              <Trash2 size={14} />
+                              {language === 'es' ? 'Quitar de estantería' : 'Remove from shelf'}
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => onClose()}
+                    title={language === 'es' ? 'Cerrar' : 'Close'}
+                    style={{
+                      position: 'absolute',
+                      top: '1.25rem',
+                      right: '1.25rem',
+                      background: 'transparent',
+                      border: 'none',
+                      color: 'var(--text-secondary)',
+                      cursor: 'pointer',
+                      padding: '0.25rem',
+                      borderRadius: '50%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
               </div>
 
               {/* Modal Body Info */}
@@ -802,45 +995,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                     </div>
                   )}
 
-                  {/* Status selection inside modal */}
-                  {!isEpisode && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.5rem' }}>
-                      <h5 style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-                        {language === 'es' ? 'Estado:' : 'Status:'}
-                      </h5>
-                      <select
-                        className="input-field"
-                        disabled={!isOwnProfile}
-                        value={selectedItem.status || ''}
-                        onChange={async (e) => {
-                          const newStatus = e.target.value;
-                          if (onStatusChange) {
-                            await onStatusChange(selectedItem.id, newStatus);
-                          }
-                          setSelectedItem((prev: any) => prev ? { ...prev, status: newStatus } : null);
-                          if ((selectedItem.item_type === 'series' || selectedItem.item_type === 'anime') && newStatus === 'completed' && selectedItem.tracking_list_id) {
-                            const listRes = await apiClient.get(`/lists/${selectedItem.tracking_list_id}`);
-                            setEpisodes(listRes.data.items || []);
-                          }
-                        }}
-                        style={{
-                          padding: '0.4rem 0.8rem',
-                          fontSize: '0.85rem',
-                          background: 'var(--bg-secondary)',
-                          border: '1px solid var(--border-color)',
-                          color: 'var(--text-primary)',
-                          borderRadius: '6px',
-                          maxWidth: '200px'
-                        }}
-                      >
-                        {getAllowedStatuses(selectedItem.item_type).map(status => (
-                          <option key={status.value} value={status.value}>
-                            {status.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
+
 
                   {/* Pages read input for books/comics/mangas */}
                   {!isEpisode && selectedItem && ['book', 'comic', 'manga'].includes(selectedItem.item_type) && (
@@ -889,34 +1044,45 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                     </div>
                   )}
 
-                  {/* Episode seen checkbox and date completed */}
-                  {isEpisode && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.5rem' }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.88rem', fontWeight: 600 }}>
-                        <input
-                          type="checkbox"
-                          disabled={!isOwnProfile}
-                          checked={!!selectedItem.completed_at}
-                          onChange={async () => {
-                            await handleToggleEpisode(selectedItem.list_id, {
-                              id: selectedItem.rawEpisodeId,
-                              title: selectedItem.title,
-                              image_url: selectedItem.image_url,
-                              custom_notes: selectedItem.custom_notes,
-                              season_number: selectedItem.season_number,
-                              episode_number: selectedItem.episode_number
-                            });
-                          }}
-                          style={{ width: '18px', height: '18px', cursor: isOwnProfile ? 'pointer' : 'default' }}
-                        />
-                        {language === 'es' ? 'Marcar como visto' : 'Mark as seen'}
-                      </label>
-                      {selectedItem.completed_at && (
-                        <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
-                          {language === 'es' ? 'Visto el: ' : 'Watched on: '}
-                          {formatDate(new Date(selectedItem.completed_at))}
+                  {/* Completion Tick Button (Right aligned below rating / Destacar) */}
+                  {isOwnProfile && selectedItem?.item_type !== 'series' && selectedItem?.item_type !== 'anime' && (
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginTop: '0.75rem' }}>
+                      <button
+                        type="button"
+                        disabled={!isOwnProfile}
+                        onClick={isEpisode ? async () => {
+                          await handleToggleEpisode(selectedItem.list_id, {
+                            id: selectedItem.rawEpisodeId,
+                            title: selectedItem.title,
+                            image_url: selectedItem.image_url,
+                            custom_notes: selectedItem.custom_notes,
+                            season_number: selectedItem.season_number,
+                            episode_number: selectedItem.episode_number
+                          });
+                        } : handleMarkCompleted}
+                        style={{
+                          background: (isEpisode ? selectedItem.completed_at : (selectedItem?.status === 'completed' || selectedItem?.status === 'read')) ? '#10b981' : 'var(--bg-tertiary)',
+                          border: (isEpisode ? selectedItem.completed_at : (selectedItem?.status === 'completed' || selectedItem?.status === 'read')) ? 'none' : '1px solid var(--border-color)',
+                          borderRadius: '20px',
+                          padding: '0.45rem 1rem',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.5rem',
+                          cursor: isOwnProfile ? 'pointer' : 'default',
+                          color: (isEpisode ? selectedItem.completed_at : (selectedItem?.status === 'completed' || selectedItem?.status === 'read')) ? 'white' : 'var(--text-primary)',
+                          fontSize: '0.85rem',
+                          fontWeight: 600,
+                          transition: 'all 0.2s ease'
+                        }}
+                      >
+                        <Check size={16} strokeWidth={3} />
+                        <span>
+                          {(isEpisode ? selectedItem.completed_at : (selectedItem?.status === 'completed' || selectedItem?.status === 'read'))
+                            ? (['book', 'comic', 'manga'].includes(selectedItem.item_type) ? (language === 'es' ? 'Leído' : 'Read') : selectedItem.item_type === 'game' ? (language === 'es' ? 'Jugado' : 'Played') : (language === 'es' ? 'Visto' : 'Watched'))
+                            : (['book', 'comic', 'manga'].includes(selectedItem.item_type) ? (language === 'es' ? 'Marcar como leído' : 'Mark as read') : selectedItem.item_type === 'game' ? (language === 'es' ? 'Marcar como jugado' : 'Mark as played') : (language === 'es' ? 'Marcar como visto' : 'Mark as seen'))
+                          }
                         </span>
-                      )}
+                      </button>
                     </div>
                   )}
                 </div>
@@ -933,8 +1099,9 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                       const isSeasonActive = activeSeason === s.season_number;
                       return (
                         <div key={s.id || s.season_number} style={{ border: '1px solid var(--border-color)', borderRadius: '6px', overflow: 'hidden' }}>
-                          <button
-                            type="button"
+                          <div
+                            role="button"
+                            tabIndex={0}
                             onClick={() => {
                               if (isSeasonActive) {
                                 setActiveSeason(null);
@@ -958,22 +1125,10 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                             }}
                           >
                             <span>
-                              <input
-                                type="checkbox"
-                                disabled={!isOwnProfile}
-                                checked={(() => {
-                                  const listSeps = (episodes || []).filter(x => x.section === `Season ${s.season_number}`);
-                                  const tmdbEps = seasonEpisodes[s.season_number] || [];
-                                  if (!Array.isArray(tmdbEps)) return false;
-                                  if (tmdbEps.length === 0) {
-                                    return listSeps.length > 0 && listSeps.every(x => x.is_completed);
-                                  }
-                                  return tmdbEps.every((te: any) => globalProgress[`tmdb-ep-${te.id}`] || (episodes || []).some(x => x.external_id === `tmdb-ep-${te.id}` && x.is_completed));
-                                })()}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                }}
-                                onChange={async (e) => {
+                              <span
+                                role="button"
+                                tabIndex={0}
+                                onClick={async (e) => {
                                   e.stopPropagation();
                                   let effectiveListId = selectedItem.tracking_list_id;
                                   if (!effectiveListId) {
@@ -982,7 +1137,17 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                     effectiveListId = newId;
                                   }
                                   
-                                  const checkedVal = e.target.checked;
+                                  const isSeasonDone = (() => {
+                                    const listSeps = (episodes || []).filter(x => x.section === `Season ${s.season_number}`);
+                                    const tmdbEps = seasonEpisodes[s.season_number] || [];
+                                    if (!Array.isArray(tmdbEps)) return false;
+                                    if (tmdbEps.length === 0) {
+                                      return listSeps.length > 0 && listSeps.every(x => x.is_completed);
+                                    }
+                                    return tmdbEps.every((te: any) => globalProgress[`tmdb-ep-${te.id}`] || (episodes || []).some(x => x.external_id === `tmdb-ep-${te.id}` && x.is_completed));
+                                  })();
+
+                                  const checkedVal = !isSeasonDone;
                                   const cacheKey = `${selectedItem.external_id}_s${s.season_number}`;
                                   const tmdbEps = getCachedTMDB(cacheKey);
                                   
@@ -1002,15 +1167,43 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                     console.error("Bulk toggle failed", err);
                                   }
                                 }}
-                                style={{ width: '16px', height: '16px', cursor: 'pointer', marginRight: '0.6rem', verticalAlign: 'middle' }}
-                              />
+                                style={{
+                                  background: (() => {
+                                    const listSeps = (episodes || []).filter(x => x.section === `Season ${s.season_number}`);
+                                    const tmdbEps = seasonEpisodes[s.season_number] || [];
+                                    if (!Array.isArray(tmdbEps)) return false;
+                                    if (tmdbEps.length === 0) return listSeps.length > 0 && listSeps.every(x => x.is_completed);
+                                    return tmdbEps.every((te: any) => globalProgress[`tmdb-ep-${te.id}`] || (episodes || []).some(x => x.external_id === `tmdb-ep-${te.id}` && x.is_completed));
+                                  })() ? '#10b981' : 'transparent',
+                                  border: (() => {
+                                    const listSeps = (episodes || []).filter(x => x.section === `Season ${s.season_number}`);
+                                    const tmdbEps = seasonEpisodes[s.season_number] || [];
+                                    if (!Array.isArray(tmdbEps)) return false;
+                                    if (tmdbEps.length === 0) return listSeps.length > 0 && listSeps.every(x => x.is_completed);
+                                    return tmdbEps.every((te: any) => globalProgress[`tmdb-ep-${te.id}`] || (episodes || []).some(x => x.external_id === `tmdb-ep-${te.id}` && x.is_completed));
+                                  })() ? 'none' : '1px solid var(--border-color)',
+                                  borderRadius: '50%',
+                                  width: '20px',
+                                  height: '20px',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  cursor: 'pointer',
+                                  marginRight: '0.6rem',
+                                  verticalAlign: 'middle',
+                                  color: 'white',
+                                  padding: 0
+                                }}
+                              >
+                                <Check size={12} strokeWidth={3} />
+                              </span>
                               {language === 'es' ? `Temporada ${s.season_number}` : `Season ${s.season_number}`}
                               <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginLeft: '0.5rem', fontWeight: 400 }}>
                                 ({s.episode_count} {language === 'es' ? 'capítulos' : 'episodes'})
                               </span>
                             </span>
                             <span>{isSeasonActive ? '▼' : '►'}</span>
-                          </button>
+                          </div>
 
                           {isSeasonActive && (
                             <div style={{ padding: '0.5rem', background: 'var(--bg-primary)', display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '220px', overflowY: 'auto' }}>
@@ -1041,17 +1234,31 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                       }}
                                     >
                                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                                        <input
-                                          type="checkbox"
-                                          disabled={!isOwnProfile}
-                                          checked={isCompleted}
-                                          onChange={() => {
-                                            const currentIsCompleted = !!globalProgress[`tmdb-ep-${ep.id}`] || !!dbEp?.is_completed;
-                                            setGlobalProgress(prev => ({ ...prev, [`tmdb-ep-${ep.id}`]: !currentIsCompleted }));
-                                            handleToggleEpisode(selectedItem.tracking_list_id, ep);
-                                          }}
-                                          style={{ width: '18px', height: '18px', cursor: isOwnProfile ? 'pointer' : 'default' }}
-                                        />
+                                        <button
+                                           type="button"
+                                           disabled={!isOwnProfile}
+                                           onClick={() => {
+                                             const currentIsCompleted = !!globalProgress[`tmdb-ep-${ep.id}`] || !!dbEp?.is_completed;
+                                             setGlobalProgress(prev => ({ ...prev, [`tmdb-ep-${ep.id}`]: !currentIsCompleted }));
+                                             handleToggleEpisode(selectedItem.tracking_list_id, ep);
+                                           }}
+                                           style={{
+                                             background: isCompleted ? '#10b981' : 'transparent',
+                                             border: isCompleted ? 'none' : '1px solid var(--border-color)',
+                                             borderRadius: '50%',
+                                             width: '20px',
+                                             height: '20px',
+                                             display: 'inline-flex',
+                                             alignItems: 'center',
+                                             justifyContent: 'center',
+                                             cursor: isOwnProfile ? 'pointer' : 'default',
+                                             color: isCompleted ? 'white' : 'transparent',
+                                             transition: 'all 0.2s ease',
+                                             padding: 0
+                                           }}
+                                         >
+                                           <Check size={12} strokeWidth={3} />
+                                         </button>
                                         <span style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-primary)' }}>
                                           {ep.episode_number}. {ep.name || 'Untitled'}
                                         </span>

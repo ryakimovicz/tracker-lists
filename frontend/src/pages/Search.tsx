@@ -179,7 +179,7 @@ export const Search: React.FC = () => {
     return [
       { value: 'plan_to_read', label: language === 'es' ? 'Por Leer' : 'Plan to Read' },
       { value: 'reading', label: language === 'es' ? 'Leyendo' : 'Reading' },
-      { value: 'read', label: language === 'es' ? 'LeÃ­do' : 'Read' },
+      { value: 'read', label: language === 'es' ? 'Leído' : 'Read' },
       { value: 'dropped', label: language === 'es' ? 'Abandonado' : 'Dropped' }
     ];
   };
@@ -246,10 +246,10 @@ export const Search: React.FC = () => {
     try {
       if (isSaved) {
         await apiClient.delete(`/lists/${guideId}/save`);
-        setSuccessMsg(language === 'es' ? 'GuÃ­a quitada de tu biblioteca.' : 'Guide removed from library.');
+        setSuccessMsg(language === 'es' ? 'Guía quitada de tu biblioteca.' : 'Guide removed from library.');
       } else {
         await apiClient.post(`/lists/${guideId}/save`);
-        setSuccessMsg(language === 'es' ? 'GuÃ­a guardada en tu biblioteca.' : 'Guide saved to library.');
+        setSuccessMsg(language === 'es' ? 'Guía guardada en tu biblioteca.' : 'Guide saved to library.');
       }
       await loadSocialMetadata();
       setTimeout(() => setSuccessMsg(''), 3000);
@@ -401,15 +401,15 @@ export const Search: React.FC = () => {
         }}>
           {[
             { value: 'all', label: language === 'es' ? 'Todo' : 'All' },
-            { value: 'movie', label: language === 'es' ? 'PelÃ­culas' : 'Movies' },
+            { value: 'movie', label: language === 'es' ? 'Películas' : 'Movies' },
             { value: 'series', label: language === 'es' ? 'Series' : 'Series' },
             { value: 'anime', label: 'Anime' },
             { value: 'book', label: language === 'es' ? 'Libros' : 'Books' },
-            { value: 'comic', label: language === 'es' ? 'CÃ³mics' : 'Comics' },
+            { value: 'comic', label: language === 'es' ? 'Cómics' : 'Comics' },
             { value: 'manga', label: 'Mangas' },
             { value: 'game', label: language === 'es' ? 'Juegos' : 'Games' },
             { value: 'user', label: language === 'es' ? 'Usuarios' : 'Users' },
-            { value: 'guide', label: language === 'es' ? 'GuÃ­as' : 'Guides' }
+            { value: 'guide', label: language === 'es' ? 'Guías' : 'Guides' }
           ].map(tab => (
             <button
               key={tab.value}
@@ -483,7 +483,7 @@ export const Search: React.FC = () => {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <BookOpen size={18} color="var(--accent-primary)" />
                     <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 600 }}>
-                      {language === 'es' ? 'GuÃ­a PÃºblica' : 'Public Guide'}
+                      {language === 'es' ? 'Guía Pública' : 'Public Guide'}
                     </span>
                   </div>
                   <div style={{ flex: 1 }}>
@@ -541,7 +541,7 @@ export const Search: React.FC = () => {
                     {item.title}
                   </h4>
                   <span className={getTagClass(item.item_type)} style={{ marginBottom: '0.5rem', alignSelf: 'flex-start' }}>
-                    {item.item_type === 'comic' ? (language === 'es' ? 'CÃ³mic' : 'Comic') : item.item_type === 'manga' ? 'Manga' : t('media' + item.item_type.charAt(0).toUpperCase() + item.item_type.slice(1))}
+                    {item.item_type === 'comic' ? (language === 'es' ? 'Cómic' : 'Comic') : item.item_type === 'manga' ? 'Manga' : t('media' + item.item_type.charAt(0).toUpperCase() + item.item_type.slice(1))}
                   </span>
                   <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', margin: 0, height: '3.2rem', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' }}>
                     {stripHtml(item.description)}
@@ -550,7 +550,7 @@ export const Search: React.FC = () => {
 
                 {onShelf ? (
                   <div style={{ fontSize: '0.82rem', color: '#10b981', textAlign: 'center', padding: '0.4rem', fontWeight: 500 }}>
-                    {language === 'es' ? 'âœ“ En estanterÃ­a' : 'âœ“ On shelf'}
+                    {language === 'es' ? '✓ En estantería' : '✓ On shelf'}
                   </div>
                 ) : (
                   <button onClick={(e) => handleOpenAddShelf(item, e)} className="btn-secondary" style={{ width: '100%', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}>
@@ -565,7 +565,7 @@ export const Search: React.FC = () => {
 
       {results.length > 0 && filteredResults.length === 0 && (
         <div className="glass-card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-          {language === 'es' ? 'No se encontraron elementos en esta categorÃ­a.' : 'No items found in this category.'}
+          {language === 'es' ? 'No se encontraron elementos en esta categoría.' : 'No items found in this category.'}
         </div>
       )}
 

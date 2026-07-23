@@ -249,7 +249,7 @@ def get_user_up_next(
                 addition_item_id=add_item_id
             )
             
-            if rlist.id in personal_tracker_ids:
+            if rlist.id in personal_tracker_ids or (rlist.title and rlist.title.startswith("Tracker: ")):
                 personal_up_next.append(up_next_item)
             else:
                 guides_up_next.append(up_next_item)

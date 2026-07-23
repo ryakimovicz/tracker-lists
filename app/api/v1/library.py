@@ -9,6 +9,7 @@ from app.models.user import User
 from app.models.list import ReadingList, VisibilityEnum
 from app.models.list_item import ListItem, ItemTypeEnum
 from app.models.library import UserLibraryItem, UserLibraryStatusEnum
+from app.models.item_progress import ItemProgress
 from app.schemas.library import LibraryItemCreate, LibraryItemUpdate, LibraryItemResponse
 from app.services.tvmaze import TVMazeService
 from app.models.activity import UserActivityLog
@@ -17,7 +18,7 @@ router = APIRouter()
 
 def validate_media_status(item_type: str, status_val: UserLibraryStatusEnum):
     t_lower = item_type.lower()
-    if status_val == UserLibraryStatusEnum.DROPPED:
+    if status_val == UserLibraryStatusEnum.DROPPED or t_lower in ("episode", "season"):
         return
         
     if t_lower == "game":
@@ -113,16 +114,89 @@ def bulk_complete_series_episodes(db: Session, user_id: int, tracking_list_id: i
         print(f"Failed to bulk complete series episodes: {e}")
         return None
 
+def sync_show_episodes_and_get_last_seen(db: Session, user_id: int, tracking_list_id: Optional[int], show_title: str) -> Optional[str]:
+    import re
+    user_progs = db.query(ItemProgress).filter(
+        ItemProgress.user_id == user_id,
+        ItemProgress.is_completed == True
+    ).all()
+
+    completed_eps = []
+    for prog in user_progs:
+        ep_title = None
+        ext_id = prog.external_id
+        
+        if prog.list_item_id:
+            li = db.query(ListItem).filter(ListItem.id == prog.list_item_id).first()
+            if li:
+                ep_title = li.title
+                ext_id = li.external_id or ext_id
+
+        if not ep_title and ext_id:
+            li = db.query(ListItem).filter(ListItem.external_id == ext_id).first()
+            if li:
+                ep_title = li.title
+
+        if ep_title and (show_title.lower() in ep_title.lower()):
+            match = re.search(r'S(\d+)E(\d+)', ep_title, re.IGNORECASE)
+            if match:
+                s_num = int(match.group(1))
+                e_num = int(match.group(2))
+                ep_code = f"S{s_num:02d}E{e_num:02d}"
+                completed_eps.append((s_num, e_num, ep_code, ext_id, ep_title))
+
+                if tracking_list_id:
+                    track_li = db.query(ListItem).filter(
+                        ListItem.list_id == tracking_list_id,
+                        ListItem.external_id == ext_id
+                    ).first()
+                    if not track_li:
+                        count = db.query(ListItem).filter(ListItem.list_id == tracking_list_id).count()
+                        track_li = ListItem(
+                            list_id=tracking_list_id,
+                            order_index=count + 1,
+                            item_type=ItemTypeEnum.SERIES,
+                            external_id=ext_id,
+                            title=ep_title,
+                            section=f"Season {s_num}"
+                        )
+                        db.add(track_li)
+                        db.commit()
+                        db.refresh(track_li)
+
+                    tp = db.query(ItemProgress).filter(
+                        ItemProgress.user_id == user_id,
+                        (ItemProgress.list_item_id == track_li.id) | (ItemProgress.external_id == ext_id)
+                    ).first()
+                    if tp:
+                        tp.list_item_id = track_li.id
+                        tp.is_completed = True
+                    else:
+                        tp = ItemProgress(
+                            user_id=user_id,
+                            list_item_id=track_li.id,
+                            external_id=ext_id,
+                            item_type=ItemTypeEnum.SERIES,
+                            is_completed=True,
+                            completed_at=prog.completed_at or datetime.now(timezone.utc)
+                        )
+                        db.add(tp)
+                    db.commit()
+
+    if not completed_eps:
+        return None
+
+    completed_eps.sort(key=lambda x: (x[0], x[1]))
+    return completed_eps[-1][2]
+
 @router.post("/", response_model=LibraryItemResponse, status_code=status.HTTP_201_CREATED)
 def add_to_library(
     item_in: LibraryItemCreate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    # anime is stored as-is but treated like series for episode tracking
     validate_media_status(item_in.item_type, item_in.status)
 
-    # Check if already exists in library
     existing = db.query(UserLibraryItem).filter(
         UserLibraryItem.user_id == current_user.id,
         UserLibraryItem.item_type == item_in.item_type,
@@ -136,11 +210,9 @@ def add_to_library(
                 detail="This item is already in your library"
             )
         
-    tracking_list_id = None
+    tracking_list_id = existing.tracking_list_id if existing else None
     
-    # If it is a TV series or anime, automatically create a private reading list for episode tracking
-    if item_in.item_type in ("series", "anime"):
-        # Create private reading list representing this show
+    if item_in.item_type in ("series", "anime") and not tracking_list_id:
         private_list = ReadingList(
             creator_id=current_user.id,
             title=f"Tracker: {item_in.title}",
@@ -152,17 +224,13 @@ def add_to_library(
         db.refresh(private_list)
         tracking_list_id = private_list.id
         
-        # Try to retrieve season 1 episodes to auto-populate the tracker list
         try:
             episodes = TVMazeService.get_season_episodes(item_in.external_id, 1)
-            
             for idx, ep in enumerate(episodes, start=1):
                 ep_num = ep.get("episode_number")
                 ep_name = ep.get("name") or "Untitled Episode"
                 title = f"{item_in.title} - S01E{ep_num:02d} - {ep_name}"
-                
                 image_url = ep.get('image')
-                
                 db_item = ListItem(
                     list_id=private_list.id,
                     order_index=idx,
@@ -176,10 +244,12 @@ def add_to_library(
                 db.add(db_item)
             db.commit()
         except Exception as e:
-            # Log error but do not fail adding the show to the library
             print(f"Failed to auto-populate series episodes: {e}")
             
     status_val = item_in.status
+    if item_in.item_type in ("series", "anime") and status_val == UserLibraryStatusEnum.PLAN_TO_WATCH:
+        status_val = UserLibraryStatusEnum.WATCHING
+
     pages_val = item_in.pages_read if item_in.pages_read is not None else 0
     if pages_val > 0 and status_val not in (UserLibraryStatusEnum.READ, UserLibraryStatusEnum.COMPLETED):
         status_val = UserLibraryStatusEnum.READING
@@ -190,15 +260,23 @@ def add_to_library(
     last_title = None
     if status_val in (UserLibraryStatusEnum.COMPLETED, UserLibraryStatusEnum.READ):
         completed_at_val = datetime.now(timezone.utc)
-        if item_in.item_type == "series" and tracking_list_id:
+        if item_in.item_type in ("series", "anime") and tracking_list_id:
             last_title = bulk_complete_series_episodes(db, current_user.id, tracking_list_id, item_in.external_id, item_in.title)
+
+    if item_in.item_type in ("series", "anime"):
+        sync_last = sync_show_episodes_and_get_last_seen(db, current_user.id, tracking_list_id, item_in.title)
+        if sync_last:
+            last_title = sync_last
+            if status_val == UserLibraryStatusEnum.PLAN_TO_WATCH:
+                status_val = UserLibraryStatusEnum.WATCHING
 
     if existing:
         existing.status = status_val
         if item_in.is_favorite is not None:
             existing.is_favorite = item_in.is_favorite
         existing.completed_at = completed_at_val
-        existing.last_seen_episode = last_title
+        if last_title:
+            existing.last_seen_episode = last_title
         existing.pages_read = pages_val
         existing.tracking_list_id = tracking_list_id
         new_lib_item = existing
@@ -219,6 +297,15 @@ def add_to_library(
         )
         db.add(new_lib_item)
     
+    if item_in.item_type in ("series", "anime"):
+        loose_items = db.query(UserLibraryItem).filter(
+            UserLibraryItem.user_id == current_user.id,
+            UserLibraryItem.item_type.in_(["episode", "season"]),
+            UserLibraryItem.last_seen_episode == item_in.title
+        ).all()
+        for loose in loose_items:
+            db.delete(loose)
+            
     db.commit()
     
     # Record activity log
