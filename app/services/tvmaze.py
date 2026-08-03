@@ -123,7 +123,8 @@ class TVMazeService:
                             "episode_number": ep.get("number"),
                             "season_number": ep.get("season"),
                             "still_path": img.get("original") if img else None,
-                            "overview": ep.get("summary", "")
+                            "overview": ep.get("summary", ""),
+                            "air_date": ep.get("airdate")
                         })
         except Exception:
             pass
@@ -151,7 +152,8 @@ class TVMazeService:
                         "episode_number": ep.get("number"),
                         "season_number": ep.get("season"),
                         "still_path": img.get("original") if img else None,
-                        "overview": ep.get("summary", "")
+                        "overview": ep.get("summary", ""),
+                        "air_date": ep.get("airdate")
                     }
         except Exception:
             pass
