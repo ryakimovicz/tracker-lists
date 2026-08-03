@@ -663,7 +663,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                 position: 'relative',
                 width: '650px',
                 maxHeight: '90vh',
-                padding: '3rem 2rem 2rem 2rem',
+                padding: '4rem 2rem 2rem 2rem',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '1.5rem',
@@ -708,8 +708,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                     }}
                   style={{ 
                     position: 'absolute',
-                    top: '1rem',
-                    left: '1rem',
+                    top: '1.25rem',
+                    left: '1.25rem',
                     background: 'transparent', border: 'none', color: 'var(--text-secondary)',
                     cursor: 'pointer', padding: '0.25rem', display: 'flex', alignItems: 'center',
                     justifyContent: 'center', borderRadius: '50%'
@@ -897,8 +897,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                     title={language === 'es' ? 'Cerrar' : 'Close'}
                     style={{
                       position: 'absolute',
-                      top: '1rem',
-                      right: '1rem',
+                      top: '1.25rem',
+                      right: '1.25rem',
                       background: 'transparent',
                       border: 'none',
                       color: 'var(--text-secondary)',
