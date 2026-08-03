@@ -242,7 +242,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
   const handleLoadSeasonEpisodes = async (seriesId: string, seasonNumber: number) => {
     if (seasonEpisodes[seasonNumber]) return;
-    const cacheKeyAll = `${seriesId}_all_episodes`;
+    const cacheKeyAll = `${seriesId}_all_episodes_v2`;
     const cachedAll = getCachedTMDB(cacheKeyAll);
     
     const processAllEps = (allEps: any[]) => {
