@@ -624,15 +624,29 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         onClick={async () => {
                           if (selectedItem.parent_series && onOpenItem) {
                             onOpenItem(selectedItem.parent_series);
-                          } else if (onOpenItem && (selectedItem.list_id || selectedItem.tracking_list_id)) {
+                          } else if (onOpenItem && (selectedItem.list_id || selectedItem.tracking_list_id || selectedItem.last_seen_episode)) {
                             try {
-                               const listId = selectedItem.list_id || selectedItem.tracking_list_id;
-                               const res = await apiClient.get(`/lists/${listId}`);
-                               if (res.data && res.data.external_id) {
-                                   onOpenItem(res.data);
-                               } else {
-                                   onClose();
+                               const libRes = await apiClient.get('/library/');
+                               const libraryItems = libRes.data || [];
+                               const parentSeriesInLib = libraryItems.find((li: any) => 
+                                 (li.item_type === 'series' || li.item_type === 'anime') && 
+                                 li.tracking_list_id && 
+                                 (li.tracking_list_id === selectedItem.tracking_list_id || li.tracking_list_id === selectedItem.list_id)
+                               );
+                               if (parentSeriesInLib) {
+                                  onOpenItem(parentSeriesInLib);
+                                  return;
                                }
+                               
+                               const seriesName = selectedItem.series_title || selectedItem.last_seen_episode;
+                               if (seriesName) {
+                                  const searchRes = await apiClient.get(`/search?q=${encodeURIComponent(seriesName)}&type=series`);
+                                  if (searchRes.data && searchRes.data.length > 0) {
+                                     onOpenItem(searchRes.data[0]);
+                                     return;
+                                  }
+                               }
+                               onClose();
                             } catch {
                                onClose();
                             }
@@ -716,7 +730,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                       title={language === 'es' ? 'Marcar como visto' : 'Mark as seen'}
                       style={{
                         background: selectedItem.completed_at ? `var(--color-${selectedItem.item_type || 'movie'})` : 'transparent',
-                        border: selectedItem.completed_at ? 'none' : '1px solid var(--border-color)',
+                        border: selectedItem.completed_at ? 'none' : '2px solid var(--text-muted)',
                         borderRadius: '50%',
                         width: '32px',
                         height: '32px',
