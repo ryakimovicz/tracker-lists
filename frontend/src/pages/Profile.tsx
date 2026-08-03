@@ -1171,12 +1171,7 @@ export const Profile: React.FC = () => {
             apiClient.get(userIdParam ? `/users/${userIdParam}/activity` : '/users/me/activity').then(res => setActivities(res.data));
           }}
           onOpenItem={(item) => {
-            const mainSeriesItem = libraryItems.find(li => li.tracking_list_id === item.list_id);
-            if (mainSeriesItem) {
-              handleOpenItemDetails(mainSeriesItem);
-            } else {
-              setSelectedItem(null);
-            }
+            setSelectedItem(item);
           }}
           isFavorite={isFavorite}
           onToggleFavorite={handleToggleFavorite}
