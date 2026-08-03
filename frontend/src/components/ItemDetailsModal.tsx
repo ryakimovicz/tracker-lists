@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from '../context/LanguageContext';
 import { apiClient } from '../api/client';
-import { Star, Heart, X, Flag, CheckCircle, Check, Plus, MoreVertical, Trash2 } from 'lucide-react';
+import { Star, Heart, X, Flag, CheckCircle, Check, Plus, MoreVertical, Trash2, ArrowLeft } from 'lucide-react';
 import { getCachedTMDB, setCachedTMDB } from '../utils/tmdbCache';
 import { useAuth } from '../context/AuthContext';
 
@@ -624,19 +624,12 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         onClick={async () => {
                           if (selectedItem.parent_series && onOpenItem) {
                             onOpenItem(selectedItem.parent_series);
-                          } else if (onOpenItem && selectedItem.external_id && selectedItem.external_id.startsWith('tmdb-ep-')) {
+                          } else if (onOpenItem && (selectedItem.list_id || selectedItem.tracking_list_id)) {
                             try {
-                               const epId = selectedItem.external_id.replace('tmdb-ep-', '');
-                               const res = await fetch(`https://api.tvmaze.com/episodes/${epId}?embed=show`);
-                               const data = await res.json();
-                               if (data._embedded && data._embedded.show) {
-                                   const show = data._embedded.show;
-                                   onOpenItem({
-                                       external_id: `tvm_${show.id}`,
-                                       title: show.name,
-                                       image_url: show.image?.original || null,
-                                       item_type: 'series'
-                                   });
+                               const listId = selectedItem.list_id || selectedItem.tracking_list_id;
+                               const res = await apiClient.get(`/lists/${listId}`);
+                               if (res.data && res.data.external_id) {
+                                   onOpenItem(res.data);
                                } else {
                                    onClose();
                                }
@@ -647,10 +640,13 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                             onClose();
                           }
                         }}
-                      className="btn-secondary"
-                      style={{ padding: '0.2rem 0.5rem', fontSize: '0.78rem', display: 'flex', alignItems: 'center' }}
+                      style={{ 
+                        background: 'transparent', border: 'none', color: 'var(--text-secondary)',
+                        cursor: 'pointer', padding: '0.2rem', display: 'flex', alignItems: 'center'
+                      }}
+                      title={language === 'es' ? 'Volver a la serie' : 'Back to series'}
                     >
-                      &larr; {language === 'es' ? 'Volver' : 'Back'}
+                      <ArrowLeft size={20} />
                     </button>
                   )}
                   <div>
@@ -681,7 +677,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                   {/* Button + (Add to Shelf / Follow) */}
-                  {isOwnProfile && (
+                  {isOwnProfile && !isEpisode && (
                     <button
                       type="button"
                       onClick={handleAddToShelf}
@@ -703,10 +699,43 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                     </button>
                   )}
 
-
+                  {/* Completion Tick Button for Episodes (Top Right) */}
+                  {isOwnProfile && isEpisode && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        await handleToggleEpisode(selectedItem.list_id || selectedItem.tracking_list_id, {
+                          id: selectedItem.rawEpisodeId || (selectedItem.external_id ? parseInt(selectedItem.external_id.replace('tmdb-ep-', '')) : selectedItem.id),
+                          title: selectedItem.title,
+                          image_url: selectedItem.image_url,
+                          custom_notes: selectedItem.custom_notes,
+                          season_number: selectedItem.season_number,
+                          episode_number: selectedItem.episode_number
+                        });
+                      }}
+                      title={language === 'es' ? 'Marcar como visto' : 'Mark as seen'}
+                      style={{
+                        background: selectedItem.completed_at ? `var(--color-${selectedItem.item_type || 'movie'})` : 'transparent',
+                        border: selectedItem.completed_at ? 'none' : '1px solid var(--border-color)',
+                        borderRadius: '50%',
+                        width: '32px',
+                        height: '32px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        color: selectedItem.completed_at ? `var(--color-text-${selectedItem.item_type || 'movie'})` : 'var(--text-muted)',
+                        opacity: selectedItem.completed_at ? 1 : 0.6,
+                        transition: 'all 0.2s ease',
+                        padding: 0
+                      }}
+                    >
+                      <Check size={18} strokeWidth={3} />
+                    </button>
+                  )}
 
                   {/* Button ⋮ (Vertical 3 dots menu) */}
-                  {isOwnProfile && (
+                  {isOwnProfile && !isEpisode && (
                     <div style={{ position: 'relative' }}>
                       <button
                         type="button"
@@ -1047,31 +1076,22 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                   )}
 
                   {/* Completion Tick Button (Right aligned below rating / Destacar) */}
-                  {isOwnProfile && selectedItem?.item_type !== 'series' && selectedItem?.item_type !== 'anime' && (
+                  {isOwnProfile && !isEpisode && selectedItem?.item_type !== 'series' && selectedItem?.item_type !== 'anime' && (
                     <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginTop: '0.75rem' }}>
                       <button
                         type="button"
                         disabled={!isOwnProfile}
-                        onClick={isEpisode ? async () => {
-                          await handleToggleEpisode(selectedItem.list_id, {
-                            id: selectedItem.rawEpisodeId,
-                            title: selectedItem.title,
-                            image_url: selectedItem.image_url,
-                            custom_notes: selectedItem.custom_notes,
-                            season_number: selectedItem.season_number,
-                            episode_number: selectedItem.episode_number
-                          });
-                        } : handleMarkCompleted}
+                        onClick={handleMarkCompleted}
                         style={{
-                          background: (isEpisode ? selectedItem.completed_at : (selectedItem?.status === 'completed' || selectedItem?.status === 'read')) ? `var(--color-${selectedItem.item_type || 'movie'})` : 'var(--bg-tertiary)',
-                          border: (isEpisode ? selectedItem.completed_at : (selectedItem?.status === 'completed' || selectedItem?.status === 'read')) ? 'none' : '1px solid var(--border-color)',
+                          background: (selectedItem?.status === 'completed' || selectedItem?.status === 'read') ? `var(--color-${selectedItem.item_type || 'movie'})` : 'var(--bg-tertiary)',
+                          border: (selectedItem?.status === 'completed' || selectedItem?.status === 'read') ? 'none' : '1px solid var(--border-color)',
                           borderRadius: '20px',
                           padding: '0.45rem 1rem',
                           display: 'inline-flex',
                           alignItems: 'center',
                           gap: '0.5rem',
                           cursor: isOwnProfile ? 'pointer' : 'default',
-                          color: (isEpisode ? selectedItem.completed_at : (selectedItem?.status === 'completed' || selectedItem?.status === 'read')) ? `var(--color-text-${selectedItem.item_type || 'movie'})` : 'var(--text-primary)',
+                          color: (selectedItem?.status === 'completed' || selectedItem?.status === 'read') ? `var(--color-text-${selectedItem.item_type || 'movie'})` : 'var(--text-primary)',
                           fontSize: '0.85rem',
                           fontWeight: 600,
                           transition: 'all 0.2s ease'
@@ -1079,7 +1099,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                       >
                         <Check size={16} strokeWidth={3} />
                         <span>
-                          {(isEpisode ? selectedItem.completed_at : (selectedItem?.status === 'completed' || selectedItem?.status === 'read'))
+                          {(selectedItem?.status === 'completed' || selectedItem?.status === 'read')
                             ? (['book', 'comic', 'manga'].includes(selectedItem.item_type) ? (language === 'es' ? 'Leído' : 'Read') : selectedItem.item_type === 'game' ? (language === 'es' ? 'Jugado' : 'Played') : (language === 'es' ? 'Visto' : 'Watched'))
                             : (['book', 'comic', 'manga'].includes(selectedItem.item_type) ? (language === 'es' ? 'Marcar como leído' : 'Mark as read') : selectedItem.item_type === 'game' ? (language === 'es' ? 'Marcar como jugado' : 'Mark as played') : (language === 'es' ? 'Marcar como visto' : 'Mark as seen'))
                           }
