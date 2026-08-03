@@ -670,7 +670,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                 overflowY: 'auto',
                 textAlign: 'left'
               }}
-                         {isEpisode && (
+            >
+              {isEpisode && (
                 <button
                     onClick={async () => {
                       if (selectedItem.parent_series && onOpenItem) {
