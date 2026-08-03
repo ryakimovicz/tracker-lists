@@ -6,9 +6,6 @@ import {
   ChevronDown,
   ChevronRight,
   ArrowLeft,
-  Star,
-  Heart,
-  X,
   Check
 } from 'lucide-react';
 import { ItemDetailsModal } from '../components/ItemDetailsModal';
@@ -16,7 +13,7 @@ import { ItemDetailsModal } from '../components/ItemDetailsModal';
 export const ViewGuide: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { t, language } = useTranslation();
+  const { language } = useTranslation();
 
   const [guide, setGuide] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
@@ -27,7 +24,6 @@ export const ViewGuide: React.FC = () => {
   // Standalone details modal states
   const [selectedItem, setSelectedItem] = useState<any | null>(null);
   const [currentUser, setCurrentUser] = useState<any | null>(null);
-  const [libraryItems, setLibraryItems] = useState<any[]>([]);
 
   const getPriorityLabel = (rank: number | null, lang: string) => {
     if (!rank) return '';
@@ -59,6 +55,9 @@ export const ViewGuide: React.FC = () => {
       })
       .catch(() => {
         setErrorMsg(language === 'es' ? 'Error al cargar los detalles de la guía.' : 'Error loading guide details.');
+      })
+      .finally(() => {
+        setLoading(false);
       });
   };
 
@@ -71,11 +70,6 @@ export const ViewGuide: React.FC = () => {
     // Fetch user profile
     apiClient.get('/users/me')
       .then(res => setCurrentUser(res.data))
-      .catch(e => console.error(e));
-
-    // Fetch shelf library items
-    apiClient.get('/library/')
-      .then(res => setLibraryItems(res.data))
       .catch(e => console.error(e));
   }, [id, language]);
 
@@ -117,11 +111,6 @@ export const ViewGuide: React.FC = () => {
         };
       });
 
-      // Refresh local library shelf since checking an item adds it to the shelf
-      apiClient.get('/library/')
-        .then(res => setLibraryItems(res.data))
-        .catch(e => console.error(e));
-
     } catch (err: any) {
       setErrorMsg(language === 'es' ? 'Error al actualizar el progreso.' : 'Failed to toggle item progress.');
     }
@@ -155,11 +144,6 @@ export const ViewGuide: React.FC = () => {
           progress_percentage: Math.round(progressPercentage * 100) / 100
         };
       });
-
-      // Refresh local library shelf
-      apiClient.get('/library/')
-        .then(res => setLibraryItems(res.data))
-        .catch(e => console.error(e));
 
     } catch (err: any) {
       setErrorMsg(language === 'es' ? 'Error al actualizar el progreso.' : 'Failed to update bulk progress.');
