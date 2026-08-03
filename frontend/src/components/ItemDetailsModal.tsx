@@ -758,7 +758,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                       }}
                       title={language === 'es' ? 'Marcar como visto' : 'Mark as seen'}
                       style={{
-                        background: (selectedItem.completed_at || selectedItem.is_completed) ? `var(--color-${selectedItem.item_type || 'movie'})` : 'transparent',
+                        background: (selectedItem.completed_at || selectedItem.is_completed) ? `var(--color-${selectedItem.item_type === 'episode' ? 'series' : (selectedItem.item_type || 'movie')})` : 'transparent',
                         border: (selectedItem.completed_at || selectedItem.is_completed) ? 'none' : '2px solid var(--text-muted)',
                         borderRadius: '50%',
                         width: '32px',
@@ -767,8 +767,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         alignItems: 'center',
                         justifyContent: 'center',
                         cursor: 'pointer',
-                        color: selectedItem.completed_at ? `var(--color-text-${selectedItem.item_type || 'movie'})` : 'var(--text-muted)',
-                        opacity: selectedItem.completed_at ? 1 : 0.6,
+                        color: (selectedItem.completed_at || selectedItem.is_completed) ? `var(--color-text-${selectedItem.item_type === 'episode' ? 'series' : (selectedItem.item_type || 'movie')})` : 'var(--text-muted)',
+                        opacity: (selectedItem.completed_at || selectedItem.is_completed) ? 1 : 0.6,
                         transition: 'all 0.2s ease',
                         padding: 0
                       }}
