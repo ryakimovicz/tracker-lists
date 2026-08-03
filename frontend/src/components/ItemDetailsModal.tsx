@@ -893,8 +893,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                     title={language === 'es' ? 'Cerrar' : 'Close'}
                     style={{
                       position: 'absolute',
-                      top: '1.25rem',
-                      right: '1.25rem',
+                      top: '0.6rem',
+                      right: '0.6rem',
                       background: 'transparent',
                       border: 'none',
                       color: 'var(--text-secondary)',
