@@ -30,11 +30,18 @@ export const Search: React.FC = () => {
   const navigate = useNavigate();
 
   const getTagClass = (type: string) => {
-    if (['movie', 'series'].includes(type)) return 'tag-badge tag-movie';
-    if (['book', 'comic', 'manga'].includes(type)) return 'tag-badge tag-book';
-    if (type === 'game') return 'tag-badge tag-game';
-    if (type === 'guide') return 'tag-badge tag-guide';
-    return 'tag-badge';
+    switch (type) {
+      case 'movie': return 'tag-badge tag-movie';
+      case 'series': return 'tag-badge tag-series';
+      case 'anime': return 'tag-badge tag-anime';
+      case 'book': return 'tag-badge tag-book';
+      case 'comic': return 'tag-badge tag-comic';
+      case 'manga': return 'tag-badge tag-manga';
+      case 'game': return 'tag-badge tag-game';
+      case 'guide': return 'tag-badge tag-guide';
+      case 'user': return 'tag-badge tag-user';
+      default: return 'tag-badge';
+    }
   };
 
   const [query, setQuery] = useState('');

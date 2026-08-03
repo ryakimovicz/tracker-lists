@@ -53,6 +53,21 @@ interface UserProfile {
   lastfm_username?: string;
 }
 
+export const getTagClass = (type: string) => {
+  switch (type) {
+    case 'movie': return 'tag-badge tag-movie';
+    case 'series': return 'tag-badge tag-series';
+    case 'anime': return 'tag-badge tag-anime';
+    case 'book': return 'tag-badge tag-book';
+    case 'comic': return 'tag-badge tag-comic';
+    case 'manga': return 'tag-badge tag-manga';
+    case 'game': return 'tag-badge tag-game';
+    case 'guide': return 'tag-badge tag-guide';
+    case 'user': return 'tag-badge tag-user';
+    default: return 'tag-badge tag-series';
+  }
+};
+
 export const Profile: React.FC = () => {
   const { t, language } = useTranslation();
   const navigate = useNavigate();
@@ -731,6 +746,16 @@ export const Profile: React.FC = () => {
                               alt={item.title}
                               style={{ width: '100%', height: '240px', objectFit: 'cover', borderRadius: '8px' }}
                             />
+                            
+                            <div className={getTagClass(item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tmdb-ep-') || item.external_id?.startsWith('tvm-ep-') ? 'series' : item.item_type)} style={{ position: "absolute", bottom: "0.25rem", left: "0.5rem", padding: "0.1rem 0.4rem", borderRadius: "4px", fontSize: "0.7rem", fontWeight: 600, opacity: 0.85, backdropFilter: 'blur(4px)' }}>
+                              {(item.item_type === 'episode' || item.external_id?.startsWith('tmdb-ep-') || item.external_id?.startsWith('tvm-ep-'))
+                                ? (language === 'es' ? 'Serie' : 'Series')
+                                : item.item_type === 'season'
+                                ? (language === 'es' ? 'Temporada' : 'Season')
+                                : item.item_type === 'comic' ? (language === 'es' ? 'Cómic' : 'Comic') : item.item_type === 'manga' ? 'Manga' : t('media' + item.item_type.charAt(0).toUpperCase() + item.item_type.slice(1))
+                              }
+                            </div>
+                            
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -767,14 +792,6 @@ export const Profile: React.FC = () => {
                                 return item.title;
                               })()}
                             </h4>
-                            <span style={{ fontSize: '0.75rem', color: 'var(--accent-primary)' }}>
-                              {(item.item_type === 'episode' || item.external_id?.startsWith('tmdb-ep-') || item.external_id?.startsWith('tvm-ep-'))
-                                ? (language === 'es' ? 'Episodio' : 'Episode')
-                                : item.item_type === 'season'
-                                ? (language === 'es' ? 'Temporada' : 'Season')
-                                : item.item_type === 'comic' ? (language === 'es' ? 'Cómic' : 'Comic') : item.item_type === 'manga' ? 'Manga' : t('media' + item.item_type.charAt(0).toUpperCase() + item.item_type.slice(1))
-                              }
-                            </span>
                             {/* Standalone episode/season series title */}
                             {(item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tmdb-ep-') || item.external_id?.startsWith('tvm-ep-')) && item.last_seen_episode && (
                               <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500, display: 'block', marginTop: '0.1rem' }}>

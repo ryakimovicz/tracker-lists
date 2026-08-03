@@ -254,12 +254,12 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 
-/* Cultural Gallery Pastel Tags */
+/* Cultural Gallery Category Tags */
 .tag-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0.25rem 0.6rem;
+  padding: 0.25rem 0.65rem;
   border-radius: 9999px;
   font-size: 0.75rem;
   font-weight: 600;
@@ -269,46 +269,121 @@ h1, h2, h3, h4, h5, h6 {
   transition: all 0.2s ease;
 }
 
-[data-theme="dark"] .tag-movie {
-  color: var(--pastel-movie);
-  background: rgba(103, 232, 249, 0.1);
-  border-color: rgba(103, 232, 249, 0.2);
+/* Light Theme (Fondo Blanco / Gris Claro) - Texto Oscuro #1E293B */
+[data-theme="light"] .tag-movie,
+.tag-movie {
+  background-color: #C2F0D5;
+  color: #1E293B;
+  border-color: rgba(30, 41, 59, 0.08);
 }
-[data-theme="light"] .tag-movie {
-  color: #0891b2;
-  background: rgba(8, 145, 178, 0.1);
-  border-color: rgba(8, 145, 178, 0.2);
+
+[data-theme="light"] .tag-series,
+.tag-series {
+  background-color: #FEF08A;
+  color: #1E293B;
+  border-color: rgba(30, 41, 59, 0.08);
+}
+
+[data-theme="light"] .tag-anime,
+.tag-anime {
+  background-color: #FED7AA;
+  color: #1E293B;
+  border-color: rgba(30, 41, 59, 0.08);
+}
+
+[data-theme="light"] .tag-book,
+.tag-book {
+  background-color: #E7D4C1;
+  color: #1E293B;
+  border-color: rgba(30, 41, 59, 0.08);
+}
+
+[data-theme="light"] .tag-comic,
+.tag-comic {
+  background-color: #FCA5A5;
+  color: #1E293B;
+  border-color: rgba(30, 41, 59, 0.08);
+}
+
+[data-theme="light"] .tag-manga,
+.tag-manga {
+  background-color: #BFDBFE;
+  color: #1E293B;
+  border-color: rgba(30, 41, 59, 0.08);
+}
+
+[data-theme="light"] .tag-game,
+.tag-game {
+  background-color: #E9D5FF;
+  color: #1E293B;
+  border-color: rgba(30, 41, 59, 0.08);
+}
+
+[data-theme="light"] .tag-guide,
+.tag-guide {
+  background-color: #E2E8F0;
+  color: #1E293B;
+  border-color: rgba(30, 41, 59, 0.08);
+}
+
+[data-theme="light"] .tag-user,
+.tag-user {
+  background-color: #FCE7F3;
+  color: #1E293B;
+  border-color: rgba(30, 41, 59, 0.08);
+}
+
+/* Dark Theme (Fondo Negro / Gris Oscuro) - Texto Claro / Alto Contraste */
+[data-theme="dark"] .tag-movie {
+  background-color: #4ADE80;
+  color: #0F172A;
+  border-color: rgba(74, 222, 128, 0.3);
+}
+
+[data-theme="dark"] .tag-series {
+  background-color: #FACC15;
+  color: #0F172A;
+  border-color: rgba(250, 204, 21, 0.3);
+}
+
+[data-theme="dark"] .tag-anime {
+  background-color: #FB923C;
+  color: #0F172A;
+  border-color: rgba(251, 146, 60, 0.3);
 }
 
 [data-theme="dark"] .tag-book {
-  color: var(--pastel-book);
-  background: rgba(252, 211, 77, 0.1);
-  border-color: rgba(252, 211, 77, 0.2);
+  background-color: #B45309;
+  color: #FFFFFF;
+  border-color: rgba(180, 83, 9, 0.4);
 }
-[data-theme="light"] .tag-book {
-  color: #d97706;
-  background: rgba(217, 119, 6, 0.1);
-  border-color: rgba(217, 119, 6, 0.2);
+
+[data-theme="dark"] .tag-comic {
+  background-color: #F87171;
+  color: #0F172A;
+  border-color: rgba(248, 113, 113, 0.3);
+}
+
+[data-theme="dark"] .tag-manga {
+  background-color: #60A5FA;
+  color: #0F172A;
+  border-color: rgba(96, 165, 250, 0.3);
 }
 
 [data-theme="dark"] .tag-game {
-  color: var(--pastel-game);
-  background: rgba(110, 231, 183, 0.1);
-  border-color: rgba(110, 231, 183, 0.2);
-}
-[data-theme="light"] .tag-game {
-  color: #059669;
-  background: rgba(5, 150, 105, 0.1);
-  border-color: rgba(5, 150, 105, 0.2);
+  background-color: #C084FC;
+  color: #0F172A;
+  border-color: rgba(192, 132, 252, 0.3);
 }
 
 [data-theme="dark"] .tag-guide {
-  color: var(--pastel-guide);
-  background: rgba(244, 114, 182, 0.1);
-  border-color: rgba(244, 114, 182, 0.2);
+  background-color: #475569;
+  color: #FFFFFF;
+  border-color: rgba(71, 85, 105, 0.4);
 }
-[data-theme="light"] .tag-guide {
-  color: #db2777;
-  background: rgba(219, 39, 119, 0.1);
-  border-color: rgba(219, 39, 119, 0.2);
+
+[data-theme="dark"] .tag-user {
+  background-color: #F472B6;
+  color: #0F172A;
+  border-color: rgba(244, 114, 182, 0.3);
 }

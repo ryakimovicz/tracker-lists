@@ -7,6 +7,21 @@ import { ItemDetailsModal } from '../components/ItemDetailsModal';
 import { ChevronLeft, ChevronRight, Check } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
+export const getTagClass = (type: string) => {
+  switch (type) {
+    case 'movie': return 'tag-badge tag-movie';
+    case 'series': return 'tag-badge tag-series';
+    case 'anime': return 'tag-badge tag-anime';
+    case 'book': return 'tag-badge tag-book';
+    case 'comic': return 'tag-badge tag-comic';
+    case 'manga': return 'tag-badge tag-manga';
+    case 'game': return 'tag-badge tag-game';
+    case 'guide': return 'tag-badge tag-guide';
+    case 'user': return 'tag-badge tag-user';
+    default: return 'tag-badge tag-series';
+  }
+};
+
 // --- Helper Components ---
 
 const ScrollRow = ({ children, title }: { children: React.ReactNode, title?: string }) => {
@@ -100,7 +115,7 @@ const CustomCard = ({
           </div>
         )}
         {coverBottomText && (
-          <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "0.5rem", background: "linear-gradient(to top, rgba(0,0,0,0.8), transparent)", color: "#fff", fontSize: "0.75rem", fontWeight: 600, textShadow: "0 1px 3px rgba(0,0,0,0.8)", textAlign: "right" }}>
+          <div className={getTagClass(coverBottomText.toLowerCase())} style={{ position: "absolute", bottom: "0.25rem", left: "0.5rem", padding: "0.1rem 0.4rem", borderRadius: "4px", fontSize: "0.7rem", fontWeight: 600, opacity: 0.85, backdropFilter: 'blur(4px)' }}>
             {coverBottomText}
           </div>
         )}
@@ -329,7 +344,7 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries }: { item: an
             <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: "2rem", filter: currentlyBlurred ? "blur(15px)" : "none" }}>?</div>
           )}
           
-          <div style={{ position: "absolute", bottom: "0.25rem", left: "0.5rem", background: "rgba(0,0,0,0.6)", padding: "0.1rem 0.4rem", borderRadius: "4px", fontSize: "0.7rem", fontWeight: 600, color: "#fff" }}>
+          <div className={getTagClass(item.item_type)} style={{ position: "absolute", bottom: "0.25rem", left: "0.5rem", padding: "0.1rem 0.4rem", borderRadius: "4px", fontSize: "0.7rem", fontWeight: 600, opacity: 0.85, backdropFilter: 'blur(4px)' }}>
             {categoryLabel}
           </div>
         </div>
@@ -500,7 +515,7 @@ export const Home: React.FC = () => {
                 key={item.id}
                 title={item.title}
                 coverUrl={item.image_url}
-                subtitle1={getTypeCat(item.item_type)}
+                coverBottomText={item.item_type}
                 subtitle2={item.status === "completed" ? "Completado" : "Progreso..."}
                 onCheck={item.status !== "completed" ? (e) => handleMarkDone(e, item) : undefined}
                 onClick={() => setSelectedItem(item)}
@@ -545,7 +560,7 @@ export const Home: React.FC = () => {
                   title={g.list_title}
                   coverUrl={g.image_url}
                   coverTopText={insideTop}
-                  coverBottomText={coverBottom}
+                  coverBottomText={g.item_type}
                   subtitle1={bottomText1}
                   subtitle2={bottomText2}
                   onCheck={(e) => handleMarkDone(e, g)}
