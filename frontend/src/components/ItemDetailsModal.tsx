@@ -1353,6 +1353,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                           image_url: ep.image_url || ep.image?.original || ep.image?.medium || (ep.still_path ? (ep.still_path.startsWith('http') ? ep.still_path : `https://image.tmdb.org/t/p/w185${ep.still_path}`) : selectedItem.image_url),
                                           custom_notes: ep.overview,
                                           completed_at: dbEp?.completed_at,
+                                          is_completed: isCompleted,
                                           season_number: ep.season_number,
                                           episode_number: ep.episode_number,
                                           rawEpisodeId: ep.id,
