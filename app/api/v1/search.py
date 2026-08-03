@@ -15,7 +15,25 @@ from app.services.igdb import IGDBService
 from app.services.anilist import AnilistService
 from app.core.limiter import limiter
 
+import re
+import concurrent.futures
+
 router = APIRouter()
+
+def get_query_variations(q: str) -> List[str]:
+    pattern = r'\b(y|and)\b|\s+&\s+'
+    if not re.search(pattern, q, re.IGNORECASE):
+        return [q.strip()]
+    v1 = re.sub(pattern, ' y ', q, flags=re.IGNORECASE).strip()
+    v2 = re.sub(pattern, ' and ', q, flags=re.IGNORECASE).strip()
+    v3 = re.sub(pattern, ' & ', q, flags=re.IGNORECASE).strip()
+    
+    vars_set = []
+    for v in [q.strip(), v1, v2, v3]:
+        v = re.sub(r'\s+', ' ', v).strip()
+        if v and v not in vars_set:
+            vars_set.append(v)
+    return vars_set
 
 @router.get("/", response_model=List[SearchResultItem])
 @limiter.limit("30/minute")
@@ -28,21 +46,46 @@ def search_media(
 ):
     type_lower = type.lower()
     
-    if type_lower == "comic":
-        return ComicVineService.search_comics(q)
-    elif type_lower == "book":
-        return GoogleBooksService.search_books(q)
-    elif type_lower == "manga":
-        return AnilistService.search_manga(q)
-    elif type_lower == "game":
-        return IGDBService.search_games(q)
-    elif type_lower == "movie":
-        return OMDbService.search_movies(q)
-    elif type_lower == "anime":
-        return TVMazeService.search_shows(q, is_anime=True)
-    elif type_lower == "series":
-        combined = TVMazeService.search_shows(q, is_anime=False)
+    if type_lower not in ["comic", "book", "manga", "game", "movie", "anime", "series"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid search type. Must be 'comic', 'book', 'manga', 'game', 'movie', 'anime' or 'series'."
+        )
         
+    variations = get_query_variations(q)
+    combined = []
+    seen = set()
+    
+    def fetch_var(var):
+        if type_lower == "comic":
+            return ComicVineService.search_comics(var)
+        elif type_lower == "book":
+            return GoogleBooksService.search_books(var)
+        elif type_lower == "manga":
+            return AnilistService.search_manga(var)
+        elif type_lower == "game":
+            return IGDBService.search_games(var)
+        elif type_lower == "movie":
+            return OMDbService.search_movies(var)
+        elif type_lower == "anime":
+            return TVMazeService.search_shows(var, is_anime=True)
+        elif type_lower == "series":
+            return TVMazeService.search_shows(var, is_anime=False)
+        return []
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, len(variations))) as executor:
+        future_to_var = {executor.submit(fetch_var, var): var for var in variations}
+        for future in concurrent.futures.as_completed(future_to_var):
+            try:
+                res = future.result()
+                for r in res:
+                    if r.external_id not in seen:
+                        seen.add(r.external_id)
+                        combined.append(r)
+            except Exception as e:
+                print(f"Error fetching var {future_to_var[future]}: {e}")
+
+    if type_lower == "series":
         query_clean = q.lower().strip()
         query_words = set(query_clean.split())
         def calculate_score(item: SearchResultItem):
@@ -58,20 +101,14 @@ def search_media(
             common_words = query_words.intersection(title_words)
             score += len(common_words) * 15.0
             
-            # Density boost: Shorter titles matching the query density get prioritized
             if len(item.title) > 0:
                 score += (1.0 / len(item.title)) * 10.0
                 
-            # Popularity boost (capped at 100 to prevent overtaking text similarity but breaking ties)
             score += min(item.popularity or 0.0, 100.0)
             return score
         combined.sort(key=calculate_score, reverse=True)
-        return combined
-    else:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid search type. Must be 'comic', 'book', 'game', 'movie' or 'series'."
-        )
+        
+    return combined
 
 @router.get("/all", response_model=List[SearchResultItem])
 @limiter.limit("20/minute")
@@ -81,61 +118,72 @@ def search_all_media(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_optional)
 ):
-    import concurrent.futures
-    with concurrent.futures.ThreadPoolExecutor(max_workers=7) as executor:
-        future_movies = executor.submit(OMDbService.search_movies, q)
-        future_series = executor.submit(TVMazeService.search_shows, q, False)
-        future_anime = executor.submit(TVMazeService.search_shows, q, True)
-        future_books = executor.submit(GoogleBooksService.search_books, q)
-        future_games = executor.submit(IGDBService.search_games, q)
-        future_comics = executor.submit(ComicVineService.search_comics, q)
-        future_manga = executor.submit(AnilistService.search_manga, q)
-        
-        movies = future_movies.result()
-        series = future_series.result()
-        anime = future_anime.result()
-        books = future_books.result()
-        games = future_games.result()
-        comics = future_comics.result()
-        mangas = future_manga.result()
-        
+    variations = get_query_variations(q)
     combined = []
-    combined.extend(movies)
-    combined.extend(series)
-    combined.extend(anime)
-    combined.extend(books)
-    combined.extend(games)
-    combined.extend(comics)
-    combined.extend(mangas)
+    seen = set()
 
-    # Search users and guides in database
-    search_pattern = f"%{q.lower()}%"
-    db_users = db.query(User).filter(User.username.like(search_pattern)).limit(20).all()
-    db_guides = db.query(ReadingList).filter(
-        ReadingList.visibility == VisibilityEnum.PUBLIC,
-        (ReadingList.title.like(search_pattern) | ReadingList.description.like(search_pattern))
-    ).limit(20).all()
-    
-    for u in db_users:
-        combined.append(SearchResultItem(
-            external_id=str(u.id),
-            title=u.username,
-            image_url=u.photo_url or "",
-            description="Usuario de Pathd",
-            item_type="user",
-            popularity=0.0
-        ))
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max(7, len(variations) * 7)) as executor:
+        futures = []
+        for var in variations:
+            futures.append(executor.submit(OMDbService.search_movies, var))
+            futures.append(executor.submit(TVMazeService.search_shows, var, False))
+            futures.append(executor.submit(TVMazeService.search_shows, var, True))
+            futures.append(executor.submit(GoogleBooksService.search_books, var))
+            futures.append(executor.submit(IGDBService.search_games, var))
+            futures.append(executor.submit(ComicVineService.search_comics, var))
+            futures.append(executor.submit(AnilistService.search_manga, var))
+            
+        for future in concurrent.futures.as_completed(futures):
+            try:
+                res = future.result()
+                for r in res:
+                    if r.external_id not in seen:
+                        seen.add(r.external_id)
+                        combined.append(r)
+            except Exception as e:
+                print(f"Error fetching in all search: {e}")
+
+    # Search users and guides in database for all variations
+    seen_users = set()
+    seen_guides = set()
+    for var in variations:
+        search_pattern = f"%{var.lower()}%"
+        db_users = db.query(User).filter(User.username.like(search_pattern)).limit(20).all()
+        db_guides = db.query(ReadingList).filter(
+            ReadingList.visibility == VisibilityEnum.PUBLIC,
+            (ReadingList.title.like(search_pattern) | ReadingList.description.like(search_pattern))
+        ).limit(20).all()
         
-    for g in db_guides:
-        creator_name = g.creator.username if g.creator else "Usuario"
-        combined.append(SearchResultItem(
-            external_id=str(g.id),
-            title=g.title,
-            image_url="",
-            description=g.description or f"Guía creada por {creator_name}",
-            item_type="guide",
-            popularity=10.0
-        ))
+        for u in db_users:
+            if u.id not in seen_users:
+                seen_users.add(u.id)
+                ext_id = str(u.id)
+                if ext_id not in seen:
+                    seen.add(ext_id)
+                    combined.append(SearchResultItem(
+                        external_id=ext_id,
+                        title=u.username,
+                        image_url=u.photo_url or "",
+                        description="Usuario de Pathd",
+                        item_type="user",
+                        popularity=0.0
+                    ))
+            
+        for g in db_guides:
+            if g.id not in seen_guides:
+                seen_guides.add(g.id)
+                ext_id = str(g.id)
+                if ext_id not in seen:
+                    seen.add(ext_id)
+                    creator_name = g.creator.username if g.creator else "Usuario"
+                    combined.append(SearchResultItem(
+                        external_id=ext_id,
+                        title=g.title,
+                        image_url="",
+                        description=g.description or f"Guía creada por {creator_name}",
+                        item_type="guide",
+                        popularity=10.0
+                    ))
 
     query_clean = q.lower().strip()
     query_words = set(query_clean.split())
@@ -153,11 +201,9 @@ def search_all_media(
         common_words = query_words.intersection(title_words)
         score += len(common_words) * 15.0
         
-        # Density boost: Shorter titles matching the query density get prioritized
         if len(item.title) > 0:
             score += (1.0 / len(item.title)) * 10.0
             
-        # Popularity boost (capped at 100 to prevent overtaking text similarity but breaking ties)
         score += min(item.popularity or 0.0, 100.0)
         return score
 

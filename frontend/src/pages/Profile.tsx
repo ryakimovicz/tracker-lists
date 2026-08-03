@@ -413,7 +413,12 @@ export const Profile: React.FC = () => {
       else if (mediaFilter === 'anime') matchesMedia = item.item_type === 'anime';
       else matchesMedia = item.item_type === mediaFilter;
       
-      const matchesSearch = item.title.toLowerCase().includes(shelfSearchQuery.toLowerCase());
+      const normalizeSearch = (str: string) => {
+        return str.toLowerCase().replace(/\b(y|and)\b|\s+&\s+/g, ' & ').replace(/\s+/g, ' ').trim();
+      };
+      
+      const normalizedQuery = normalizeSearch(shelfSearchQuery);
+      const matchesSearch = normalizeSearch(item.title).includes(normalizedQuery);
       
       const isLoose = isLooseEpisodeOrSeason(item);
       const isSeriesOrRegular = item.item_type !== 'episode' && item.item_type !== 'season' && !item.external_id?.startsWith('tmdb-ep-') && !item.external_id?.startsWith('tvm-ep-');
