@@ -539,6 +539,7 @@ def auto_add_to_library(db: Session, user_id: int, item: ListItem):
     target_image_url = item.image_url
     show_name = None
     
+    show_ext_id = None
     if item.external_id.startswith("tmdb-ep-") or item.external_id.startswith("tvm-ep-"):
         ep_id = item.external_id.replace("tmdb-ep-", "").replace("tvm-ep-", "")
         import urllib.request, json
@@ -580,7 +581,8 @@ def auto_add_to_library(db: Session, user_id: int, item: ListItem):
                 image_url=item.image_url,
                 last_seen_episode=show_name or "Serie",
                 status=UserLibraryStatusEnum.COMPLETED,
-                completed_at=datetime.now(timezone.utc)
+                completed_at=datetime.now(timezone.utc),
+                imdb_id=show_ext_id
             )
             db.add(lib_item)
             db.commit()

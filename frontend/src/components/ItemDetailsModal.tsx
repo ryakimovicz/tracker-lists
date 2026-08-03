@@ -401,8 +401,34 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
             custom_notes: JSON.stringify({ description: cachedDesc.description, release_date: cachedDesc.release_date })
           };
         });
-      } else if (item.item_type === 'episode') {
-        setIsLoadingMetadata(false);
+      } else if (item.item_type === 'episode' || isActualEpisode) {
+        if (item.imdb_id && (item.imdb_id.startsWith('tvm_') || item.imdb_id.startsWith('tmdb_'))) {
+          setIsLoadingMetadata(true);
+          apiClient.get(`/search/series/${item.imdb_id}/episodes`)
+            .then(res => {
+              const allEps = res.data || [];
+              const epIdNumStr = item.external_id.replace('tvm-ep-', '').replace('tmdb-ep-', '');
+              const matchedEp = allEps.find((e: any) => e.id.toString() === epIdNumStr);
+              if (matchedEp) {
+                setSelectedItem((prev: any) => prev ? {
+                  ...prev,
+                  custom_notes: JSON.stringify({ description: matchedEp.overview || '', release_date: matchedEp.air_date || null }),
+                  season_number: matchedEp.season_number,
+                  episode_number: matchedEp.episode_number,
+                  parent_series: prev.parent_series || { external_id: item.imdb_id, title: item.last_seen_episode || 'Serie' }
+                } : null);
+              } else if (!item.parent_series) {
+                setSelectedItem((prev: any) => prev ? {
+                  ...prev,
+                  parent_series: { external_id: item.imdb_id, title: item.last_seen_episode || 'Serie' }
+                } : null);
+              }
+            })
+            .catch(e => console.error(e))
+            .finally(() => setIsLoadingMetadata(false));
+        } else {
+          setIsLoadingMetadata(false);
+        }
       } else {
         setIsLoadingMetadata(true);
         apiClient.get('/search/', { params: { q: item.title, type: item.item_type === 'anime' ? 'series' : item.item_type } })
