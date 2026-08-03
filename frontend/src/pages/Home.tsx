@@ -63,7 +63,8 @@ const CustomCard = ({
   coverBottomText,
   onCheck, 
   onClick, 
-  isNsfw 
+  isNsfw,
+  language
 }: { 
   title: string; 
   coverUrl?: string; 
@@ -74,6 +75,7 @@ const CustomCard = ({
   onCheck?: (e: React.MouseEvent) => void;
   onClick?: () => void;
   isNsfw?: boolean;
+  language?: string;
 }) => {
   const { user } = useAuth();
   const [isPeek, setIsPeek] = useState(false);
@@ -116,7 +118,15 @@ const CustomCard = ({
         )}
         {coverBottomText && (
           <div className={getTagClass(coverBottomText.toLowerCase())} style={{ position: "absolute", bottom: "0.25rem", left: "0.5rem", padding: "0.1rem 0.4rem", borderRadius: "4px", fontSize: "0.7rem", fontWeight: 600, opacity: 0.85, backdropFilter: 'blur(4px)' }}>
-            {coverBottomText}
+            {(() => {
+              if (language === 'es') {
+                const map: any = { "movie": "Película", "series": "Serie", "anime": "Anime", "game": "Videojuego", "book": "Libro", "comic": "Cómic", "manga": "Manga", "guide": "Guía", "user": "Usuario" };
+                return map[coverBottomText.toLowerCase()] || coverBottomText;
+              } else {
+                const map: any = { "movie": "Movie", "series": "Series", "anime": "Anime", "game": "Game", "book": "Book", "comic": "Comic", "manga": "Manga", "guide": "Guide", "user": "User" };
+                return map[coverBottomText.toLowerCase()] || coverBottomText;
+              }
+            })()}
           </div>
         )}
       </div>
@@ -520,6 +530,7 @@ export const Home: React.FC = () => {
                 onCheck={item.status !== "completed" ? (e) => handleMarkDone(e, item) : undefined}
                 onClick={() => setSelectedItem(item)}
                 isNsfw={item.is_nsfw}
+                language={language}
               />
             );
           })}
@@ -566,6 +577,7 @@ export const Home: React.FC = () => {
                   onCheck={(e) => handleMarkDone(e, g)}
                   onClick={() => navigate(`/guide/${g.list_id}`)}
                   isNsfw={g.is_nsfw}
+                  language={language}
                 />
               );
             })}
