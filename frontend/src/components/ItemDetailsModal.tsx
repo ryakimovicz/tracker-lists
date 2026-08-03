@@ -1097,6 +1097,13 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                     {seasons.map((s) => {
                       const isSeasonActive = activeSeason === s.season_number;
+                      const isSeasonDone = (() => {
+                        const listSeps = (episodes || []).filter(x => x.section === `Season ${s.season_number}`);
+                        const tmdbEps = seasonEpisodes[s.season_number] || [];
+                        if (!Array.isArray(tmdbEps)) return false;
+                        if (tmdbEps.length === 0) return listSeps.length > 0 && listSeps.every(x => x.is_completed);
+                        return tmdbEps.every((te: any) => globalProgress[`tmdb-ep-${te.id}`] || (episodes || []).some(x => x.external_id === `tmdb-ep-${te.id}` && x.is_completed));
+                      })();
                       return (
                         <div key={s.id || s.season_number} style={{ border: '1px solid var(--border-color)', borderRadius: '6px', overflow: 'hidden' }}>
                           <div
@@ -1137,16 +1144,6 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                     effectiveListId = newId;
                                   }
                                   
-                                  const isSeasonDone = (() => {
-                                    const listSeps = (episodes || []).filter(x => x.section === `Season ${s.season_number}`);
-                                    const tmdbEps = seasonEpisodes[s.season_number] || [];
-                                    if (!Array.isArray(tmdbEps)) return false;
-                                    if (tmdbEps.length === 0) {
-                                      return listSeps.length > 0 && listSeps.every(x => x.is_completed);
-                                    }
-                                    return tmdbEps.every((te: any) => globalProgress[`tmdb-ep-${te.id}`] || (episodes || []).some(x => x.external_id === `tmdb-ep-${te.id}` && x.is_completed));
-                                  })();
-
                                   const checkedVal = !isSeasonDone;
                                   const cacheKey = `${selectedItem.external_id}_s${s.season_number}`;
                                   const tmdbEps = getCachedTMDB(cacheKey);
@@ -1168,20 +1165,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                   }
                                 }}
                                 style={{
-                                  background: (() => {
-                                    const listSeps = (episodes || []).filter(x => x.section === `Season ${s.season_number}`);
-                                    const tmdbEps = seasonEpisodes[s.season_number] || [];
-                                    if (!Array.isArray(tmdbEps)) return false;
-                                    if (tmdbEps.length === 0) return listSeps.length > 0 && listSeps.every(x => x.is_completed);
-                                    return tmdbEps.every((te: any) => globalProgress[`tmdb-ep-${te.id}`] || (episodes || []).some(x => x.external_id === `tmdb-ep-${te.id}` && x.is_completed));
-                                  })() ? '#10b981' : 'transparent',
-                                  border: (() => {
-                                    const listSeps = (episodes || []).filter(x => x.section === `Season ${s.season_number}`);
-                                    const tmdbEps = seasonEpisodes[s.season_number] || [];
-                                    if (!Array.isArray(tmdbEps)) return false;
-                                    if (tmdbEps.length === 0) return listSeps.length > 0 && listSeps.every(x => x.is_completed);
-                                    return tmdbEps.every((te: any) => globalProgress[`tmdb-ep-${te.id}`] || (episodes || []).some(x => x.external_id === `tmdb-ep-${te.id}` && x.is_completed));
-                                  })() ? 'none' : '1px solid var(--border-color)',
+                                  background: isSeasonDone ? '#10b981' : 'transparent',
+                                  border: isSeasonDone ? 'none' : '1px solid var(--border-color)',
                                   borderRadius: '50%',
                                   width: '20px',
                                   height: '20px',
@@ -1191,8 +1176,10 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                   cursor: 'pointer',
                                   marginRight: '0.6rem',
                                   verticalAlign: 'middle',
-                                  color: 'white',
-                                  padding: 0
+                                  color: isSeasonDone ? 'white' : 'var(--text-muted)',
+                                  opacity: isSeasonDone ? 1 : 0.6,
+                                  padding: 0,
+                                  transition: 'all 0.2s ease'
                                 }}
                               >
                                 <Check size={12} strokeWidth={3} />
@@ -1252,7 +1239,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                              alignItems: 'center',
                                              justifyContent: 'center',
                                              cursor: isOwnProfile ? 'pointer' : 'default',
-                                             color: isCompleted ? 'white' : 'transparent',
+                                             color: isCompleted ? 'white' : 'var(--text-muted)',
+                                             opacity: isCompleted ? 1 : 0.6,
                                              transition: 'all 0.2s ease',
                                              padding: 0
                                            }}
