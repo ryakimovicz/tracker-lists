@@ -663,62 +663,65 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                 position: 'relative',
                 width: '650px',
                 maxHeight: '90vh',
-                padding: '2rem',
+                padding: '3rem 2rem 2rem 2rem',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '1.5rem',
                 overflowY: 'auto',
                 textAlign: 'left'
               }}
-            >
+                         {isEpisode && (
+                <button
+                    onClick={async () => {
+                      if (selectedItem.parent_series && onOpenItem) {
+                        onOpenItem(selectedItem.parent_series);
+                      } else if (onOpenItem && (selectedItem.list_id || selectedItem.tracking_list_id || selectedItem.last_seen_episode)) {
+                        try {
+                           const libRes = await apiClient.get('/library/');
+                           const libraryItems = libRes.data || [];
+                           const parentSeriesInLib = libraryItems.find((li: any) => 
+                             (li.item_type === 'series' || li.item_type === 'anime') && 
+                             li.tracking_list_id && 
+                             (li.tracking_list_id === selectedItem.tracking_list_id || li.tracking_list_id === selectedItem.list_id)
+                           );
+                           if (parentSeriesInLib) {
+                              onOpenItem(parentSeriesInLib);
+                              return;
+                           }
+                           
+                           const seriesName = selectedItem.series_title || selectedItem.last_seen_episode;
+                           if (seriesName) {
+                              const searchRes = await apiClient.get(`/search?q=${encodeURIComponent(seriesName)}&type=series`);
+                              if (searchRes.data && searchRes.data.length > 0) {
+                                 onOpenItem(searchRes.data[0]);
+                                 return;
+                              }
+                           }
+                           onClose();
+                        } catch {
+                           onClose();
+                        }
+                      } else {
+                        onClose();
+                      }
+                    }}
+                  style={{ 
+                    position: 'absolute',
+                    top: '1rem',
+                    left: '1rem',
+                    background: 'transparent', border: 'none', color: 'var(--text-secondary)',
+                    cursor: 'pointer', padding: '0.25rem', display: 'flex', alignItems: 'center',
+                    justifyContent: 'center', borderRadius: '50%'
+                  }}
+                  title={language === 'es' ? 'Volver a la serie' : 'Back to series'}
+                >
+                  <ArrowLeft size={20} />
+                </button>
+              )}
+
               {/* Modal Header */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem' }}>
                 <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                  {isEpisode && (
-
-                    <button
-                        onClick={async () => {
-                          if (selectedItem.parent_series && onOpenItem) {
-                            onOpenItem(selectedItem.parent_series);
-                          } else if (onOpenItem && (selectedItem.list_id || selectedItem.tracking_list_id || selectedItem.last_seen_episode)) {
-                            try {
-                               const libRes = await apiClient.get('/library/');
-                               const libraryItems = libRes.data || [];
-                               const parentSeriesInLib = libraryItems.find((li: any) => 
-                                 (li.item_type === 'series' || li.item_type === 'anime') && 
-                                 li.tracking_list_id && 
-                                 (li.tracking_list_id === selectedItem.tracking_list_id || li.tracking_list_id === selectedItem.list_id)
-                               );
-                               if (parentSeriesInLib) {
-                                  onOpenItem(parentSeriesInLib);
-                                  return;
-                               }
-                               
-                               const seriesName = selectedItem.series_title || selectedItem.last_seen_episode;
-                               if (seriesName) {
-                                  const searchRes = await apiClient.get(`/search?q=${encodeURIComponent(seriesName)}&type=series`);
-                                  if (searchRes.data && searchRes.data.length > 0) {
-                                     onOpenItem(searchRes.data[0]);
-                                     return;
-                                  }
-                               }
-                               onClose();
-                            } catch {
-                               onClose();
-                            }
-                          } else {
-                            onClose();
-                          }
-                        }}
-                      style={{ 
-                        background: 'transparent', border: 'none', color: 'var(--text-secondary)',
-                        cursor: 'pointer', padding: '0.2rem', display: 'flex', alignItems: 'center'
-                      }}
-                      title={language === 'es' ? 'Volver a la serie' : 'Back to series'}
-                    >
-                      <ArrowLeft size={20} />
-                    </button>
-                  )}
                   <div>
                     <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700 }}>{selectedItem.title}</h2>
                     <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -893,8 +896,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                     title={language === 'es' ? 'Cerrar' : 'Close'}
                     style={{
                       position: 'absolute',
-                      top: '0.15rem',
-                      right: '0.15rem',
+                      top: '1rem',
+                      right: '1rem',
                       background: 'transparent',
                       border: 'none',
                       color: 'var(--text-secondary)',
