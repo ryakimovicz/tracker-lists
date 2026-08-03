@@ -291,7 +291,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       setItemReviews([]);
       setDescExpanded(false);
 
-      if (item.item_type === 'series' || item.item_type === 'anime') {
+      const isActualEpisode = item.external_id && (item.external_id.startsWith('tmdb-ep-') || item.external_id.startsWith('tvm-ep-'));
+      if ((item.item_type === 'series' || item.item_type === 'anime') && !isActualEpisode) {
         try {
           let itemsList: any[] = [];
           if (item.tracking_list_id) {
