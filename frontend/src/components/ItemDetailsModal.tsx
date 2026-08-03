@@ -540,9 +540,38 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   const handleToggleEpisode = async (listId: number, ep: any) => {
     let effectiveListId = listId;
     if (!effectiveListId) {
-      const newId = await ensureTracked('watching');
-      if (!newId) return;
-      effectiveListId = newId;
+      if (selectedItem.parent_series) {
+        try {
+          const res = await apiClient.post('/library/', {
+            external_id: selectedItem.parent_series.external_id,
+            title: selectedItem.parent_series.title,
+            image_url: selectedItem.parent_series.image_url,
+            item_type: selectedItem.parent_series.item_type,
+            status: 'watching'
+          });
+          effectiveListId = res.data.tracking_list_id;
+        } catch (e) {
+          console.error("Failed to track parent series", e);
+        }
+      }
+
+      if (!effectiveListId && selectedItem.id && selectedItem.item_type === 'episode') {
+        try {
+           const isComplete = !!(selectedItem.completed_at || selectedItem.is_completed);
+           const res = await apiClient.put(`/library/${selectedItem.id}`, { completed_at: isComplete ? null : new Date().toISOString() });
+           setSelectedItem((prev: any) => prev ? { ...prev, completed_at: res.data.completed_at, is_completed: !!res.data.completed_at } : null);
+           onUpdate && onUpdate();
+           return;
+        } catch (e) {
+           console.error("Failed to update standalone episode", e);
+           return;
+        }
+      }
+
+      if (!effectiveListId) {
+        alert(language === 'es' ? 'Debes añadir la serie a tu estantería para marcar episodios como vistos.' : 'You must add the series to your shelf to mark episodes as seen.');
+        return;
+      }
     }
     
     try {
@@ -559,8 +588,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       const updatedList = listRes.data.items || [];
       setEpisodes(updatedList);
 
-      if (selectedItem && (selectedItem.external_id === `tmdb-ep-${ep.id}` || selectedItem.id === ep.id)) {
-        setSelectedItem((prev: any) => prev ? { ...prev, completed_at: res.data.completed_at } : null);
+      if (selectedItem && (selectedItem.external_id === `tmdb-ep-${ep.id}` || selectedItem.id === ep.id || selectedItem.rawEpisodeId === ep.id)) {
+        setSelectedItem((prev: any) => prev ? { ...prev, completed_at: res.data.completed_at, is_completed: res.data.is_completed } : null);
       }
       
       onUpdate();
@@ -729,8 +758,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                       }}
                       title={language === 'es' ? 'Marcar como visto' : 'Mark as seen'}
                       style={{
-                        background: selectedItem.completed_at ? `var(--color-${selectedItem.item_type || 'movie'})` : 'transparent',
-                        border: selectedItem.completed_at ? 'none' : '2px solid var(--text-muted)',
+                        background: (selectedItem.completed_at || selectedItem.is_completed) ? `var(--color-${selectedItem.item_type || 'movie'})` : 'transparent',
+                        border: (selectedItem.completed_at || selectedItem.is_completed) ? 'none' : '2px solid var(--text-muted)',
                         borderRadius: '50%',
                         width: '32px',
                         height: '32px',
