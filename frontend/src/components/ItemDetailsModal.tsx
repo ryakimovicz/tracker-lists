@@ -619,6 +619,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem' }}>
                 <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
                   {isEpisode && (
+
                     <button
                         onClick={async () => {
                           if (selectedItem.parent_series && onOpenItem) {
@@ -656,10 +657,11 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                     <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700 }}>{selectedItem.title}</h2>
                     <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
                       {selectedItem?.item_type !== 'episode' && (
-                        <span style={{ fontSize: '0.78rem', color: 'var(--accent-primary)', textTransform: 'uppercase', fontWeight: 700 }}>
+                        <span className={`tag-badge tag-${selectedItem?.item_type || 'movie'}`} style={{ fontSize: '0.7rem' }}>
                           {selectedItem?.item_type === 'comic' ? (language === 'es' ? 'Cómic' : 'Comic') : selectedItem?.item_type === 'manga' ? 'Manga' : t('media' + (selectedItem?.item_type || 'movie').charAt(0).toUpperCase() + (selectedItem?.item_type || 'movie').slice(1))}
                         </span>
                       )}
+
                       {avgRating && (
                         <span style={{ fontSize: '0.78rem', color: '#f59e0b', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.1rem' }}>
                           ★ {avgRating} / 5 ({ratings.length} {language === 'es' ? 'val.' : 'ratings'})
@@ -691,9 +693,9 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        background: selectedItem?.id ? 'rgba(16, 185, 129, 0.15)' : 'var(--bg-tertiary)',
-                        borderColor: selectedItem?.id ? '#10b981' : 'var(--border-color)',
-                        color: selectedItem?.id ? '#10b981' : 'var(--text-primary)',
+                        background: selectedItem?.id ? `var(--color-${selectedItem.item_type || 'movie'})` : 'var(--bg-tertiary)',
+                        borderColor: selectedItem?.id ? `var(--color-${selectedItem.item_type || 'movie'})` : 'var(--border-color)',
+                        color: selectedItem?.id ? `var(--color-text-${selectedItem.item_type || 'movie'})` : 'var(--text-primary)',
                         cursor: 'pointer'
                       }}
                     >
@@ -1061,7 +1063,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                           });
                         } : handleMarkCompleted}
                         style={{
-                          background: (isEpisode ? selectedItem.completed_at : (selectedItem?.status === 'completed' || selectedItem?.status === 'read')) ? '#10b981' : 'var(--bg-tertiary)',
+                          background: (isEpisode ? selectedItem.completed_at : (selectedItem?.status === 'completed' || selectedItem?.status === 'read')) ? `var(--color-${selectedItem.item_type || 'movie'})` : 'var(--bg-tertiary)',
                           border: (isEpisode ? selectedItem.completed_at : (selectedItem?.status === 'completed' || selectedItem?.status === 'read')) ? 'none' : '1px solid var(--border-color)',
                           borderRadius: '20px',
                           padding: '0.45rem 1rem',
@@ -1069,7 +1071,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                           alignItems: 'center',
                           gap: '0.5rem',
                           cursor: isOwnProfile ? 'pointer' : 'default',
-                          color: (isEpisode ? selectedItem.completed_at : (selectedItem?.status === 'completed' || selectedItem?.status === 'read')) ? 'white' : 'var(--text-primary)',
+                          color: (isEpisode ? selectedItem.completed_at : (selectedItem?.status === 'completed' || selectedItem?.status === 'read')) ? `var(--color-text-${selectedItem.item_type || 'movie'})` : 'var(--text-primary)',
                           fontSize: '0.85rem',
                           fontWeight: 600,
                           transition: 'all 0.2s ease'
@@ -1165,7 +1167,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                   }
                                 }}
                                 style={{
-                                  background: isSeasonDone ? '#10b981' : 'transparent',
+                                  background: isSeasonDone ? `var(--color-${selectedItem.item_type || 'movie'})` : 'transparent',
                                   border: isSeasonDone ? 'none' : '1px solid var(--border-color)',
                                   borderRadius: '50%',
                                   width: '20px',
@@ -1176,7 +1178,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                   cursor: 'pointer',
                                   marginRight: '0.6rem',
                                   verticalAlign: 'middle',
-                                  color: isSeasonDone ? 'white' : 'var(--text-muted)',
+                                  color: isSeasonDone ? `var(--color-text-${selectedItem.item_type || 'movie'})` : 'var(--text-muted)',
                                   opacity: isSeasonDone ? 1 : 0.6,
                                   padding: 0,
                                   transition: 'all 0.2s ease'
@@ -1230,7 +1232,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                              handleToggleEpisode(selectedItem.tracking_list_id, ep);
                                            }}
                                            style={{
-                                             background: isCompleted ? '#10b981' : 'transparent',
+                                             background: isCompleted ? `var(--color-${selectedItem.item_type || 'movie'})` : 'transparent',
                                              border: isCompleted ? 'none' : '1px solid var(--border-color)',
                                              borderRadius: '50%',
                                              width: '20px',
@@ -1239,7 +1241,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                              alignItems: 'center',
                                              justifyContent: 'center',
                                              cursor: isOwnProfile ? 'pointer' : 'default',
-                                             color: isCompleted ? 'white' : 'var(--text-muted)',
+                                             color: isCompleted ? `var(--color-text-${selectedItem.item_type || 'movie'})` : 'var(--text-muted)',
                                              opacity: isCompleted ? 1 : 0.6,
                                              transition: 'all 0.2s ease',
                                              padding: 0
