@@ -247,8 +247,6 @@ def add_to_library(
             print(f"Failed to auto-populate series episodes: {e}")
             
     status_val = item_in.status
-    if item_in.item_type in ("series", "anime") and status_val == UserLibraryStatusEnum.PLAN_TO_WATCH:
-        status_val = UserLibraryStatusEnum.WATCHING
 
     pages_val = item_in.pages_read if item_in.pages_read is not None else 0
     if pages_val > 0 and status_val not in (UserLibraryStatusEnum.READ, UserLibraryStatusEnum.COMPLETED):

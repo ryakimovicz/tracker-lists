@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from '../context/LanguageContext';
 import { apiClient } from '../api/client';
 import { Star, Heart, X, Flag, CheckCircle, Check, Plus, MoreVertical, Trash2, ArrowLeft } from 'lucide-react';
-import { getCachedTMDB, setCachedTMDB } from '../utils/tmdbCache';
+import { getCachedSeries, setCachedSeries } from '../utils/seriesCache';
 import { useAuth } from '../context/AuthContext';
 
 
@@ -82,7 +82,6 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   const [showMenu, setShowMenu] = useState(false);
 
   const getDefaultStatus = (type: string) => {
-    if (type === 'series' || type === 'anime') return 'watching';
     if (type === 'game') return 'plan_to_play';
     if (['book', 'comic', 'manga'].includes(type)) return 'plan_to_read';
     return 'plan_to_watch';
@@ -243,10 +242,10 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   const handleLoadSeasonEpisodes = async (seriesId: string, seasonNumber: number) => {
     if (seasonEpisodes[seasonNumber]) return;
     const cacheKeyAll = `${seriesId}_all_episodes_v2`;
-    const cachedAll = getCachedTMDB(cacheKeyAll);
+    const cachedAll = getCachedSeries(cacheKeyAll);
     
     const processAllEps = (allEps: any[]) => {
-      const extIds = allEps.map(e => `tmdb-ep-${e.id}`);
+      const extIds = allEps.map(e => `tvm-ep-${e.id}`);
       if (extIds.length > 0) {
         apiClient.post('/users/me/progress/bulk-check', { external_ids: extIds })
           .then(progRes => {
@@ -271,7 +270,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     setIsLoadingSeasonEpisodes(true);
     try {
       const res = await apiClient.get(`/search/series/${seriesId}/episodes`);
-      setCachedTMDB(cacheKeyAll, res.data);
+      setCachedSeries(cacheKeyAll, res.data);
       processAllEps(res.data || []);
     } catch (err) {
       console.error("Failed to load season episodes", err);
@@ -291,7 +290,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       setItemReviews([]);
       setDescExpanded(false);
 
-      const isActualEpisode = item.external_id && (item.external_id.startsWith('tmdb-ep-') || item.external_id.startsWith('tvm-ep-'));
+      const isActualEpisode = item.external_id && item.external_id.startsWith('tvm-ep-');
       if ((item.item_type === 'series' || item.item_type === 'anime') && !isActualEpisode) {
         try {
           let itemsList: any[] = [];
@@ -302,31 +301,31 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
               setEpisodes(itemsList);
             } catch (err) {
               console.error("Failed to fetch tracking list", err);
-              // Continue loading TMDB data even if list fails
+              // Continue loading series data even if list fails
             }
           }
           
           let filteredSeasons = [];
           const cacheKey = `tvmaze_series_${item.external_id}`;
-          const cached = getCachedTMDB(cacheKey);
+          const cached = getCachedSeries(cacheKey);
           let seriesData = null;
           
-          if (cached && cached.seasons) {
+          if (cached && cached.seasons && cached.image_url !== undefined) {
             seriesData = cached;
             filteredSeasons = cached.seasons;
           } else {
             const seriesRes = await apiClient.get(`/search/series/${item.external_id}`);
             seriesData = seriesRes.data;
             filteredSeasons = (seriesData.seasons || []).filter((s: any) => s.season_number > 0);
-            setCachedTMDB(cacheKey, { ...seriesData, seasons: filteredSeasons });
+            setCachedSeries(cacheKey, { ...seriesData, seasons: filteredSeasons });
           }
           
-          if (!item.description || !item.release_date) {
+          if (!item.description || !item.release_date || !item.image_url) {
             setSelectedItem((prev: any) => prev ? {
               ...prev,
               description: prev.description || seriesData.overview,
               release_date: prev.release_date || seriesData.first_air_date,
-              image_url: prev.image_url || (seriesData.poster_path ? `https://image.tmdb.org/t/p/w185${seriesData.poster_path}` : null)
+              image_url: prev.image_url || seriesData.image_url || null
             } : null);
           }
           setSeasons(filteredSeasons);
@@ -335,10 +334,10 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
           setActiveSeason(nextSeason);
 
           const cacheKeyAll = `${item.external_id}_all_episodes`;
-          const cachedAll = getCachedTMDB(cacheKeyAll);
+          const cachedAll = getCachedSeries(cacheKeyAll);
           
           const processAllEps = (allEps: any[]) => {
-            const extIds = allEps.map(e => `tmdb-ep-${e.id}`);
+            const extIds = allEps.map(e => `tvm-ep-${e.id}`);
             if (extIds.length > 0) {
               apiClient.post('/users/me/progress/bulk-check', { external_ids: extIds })
                 .then(progRes => {
@@ -361,7 +360,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
             setIsLoadingSeasonEpisodes(true);
             apiClient.get(`/search/series/${item.external_id}/episodes`)
               .then(res => {
-                setCachedTMDB(cacheKeyAll, res.data);
+                setCachedSeries(cacheKeyAll, res.data);
                 processAllEps(res.data || []);
               })
               .catch(e => console.error(e))
@@ -391,7 +390,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       }
 
       const descCacheKey = `desc_${item.item_type}_${item.external_id}`;
-      const cachedDesc = getCachedTMDB(descCacheKey);
+      const cachedDesc = getCachedSeries(descCacheKey);
       if (cachedDesc) {
         setIsLoadingMetadata(false);
         setSelectedItem((prev: any) => {
@@ -402,12 +401,12 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
           };
         });
       } else if (item.item_type === 'episode' || isActualEpisode) {
-        if (item.imdb_id && (item.imdb_id.startsWith('tvm_') || item.imdb_id.startsWith('tmdb_'))) {
+        if (item.imdb_id && item.imdb_id.startsWith('tvm_')) {
           setIsLoadingMetadata(true);
           apiClient.get(`/search/series/${item.imdb_id}/episodes`)
             .then(res => {
               const allEps = res.data || [];
-              const epIdNumStr = item.external_id.replace('tvm-ep-', '').replace('tmdb-ep-', '');
+              const epIdNumStr = item.external_id.replace('tvm-ep-', '');
               const matchedEp = allEps.find((e: any) => e.id.toString() === epIdNumStr);
               if (matchedEp) {
                 setSelectedItem((prev: any) => prev ? {
@@ -440,7 +439,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                   apiClient.get(`/search/series/${actualSeriesId}/episodes`)
                     .then(res => {
                       const allEps = res.data || [];
-                      const epIdNumStr = item.external_id ? item.external_id.replace('tvm-ep-', '').replace('tmdb-ep-', '') : null;
+                      const epIdNumStr = item.external_id ? item.external_id.replace('tvm-ep-', '') : null;
                       const matchedEp = allEps.find((e: any) => 
                         (epIdNumStr && e.id.toString() === epIdNumStr) ||
                         (e.season_number === parseInt(match[2]) && e.episode_number === parseInt(match[3]))
@@ -473,7 +472,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
             const match = searchRes.data.find((x: any) => x.external_id === item.external_id);
             if (match) {
               const cachedVal = { description: match.description || '', release_date: match.release_date || null };
-              setCachedTMDB(descCacheKey, cachedVal);
+              setCachedSeries(descCacheKey, cachedVal);
               setSelectedItem((prev: any) => {
                 if (!prev) return null;
                 return {
@@ -633,16 +632,20 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       }
 
       if (!effectiveListId) {
-        alert(language === 'es' ? 'Debes añadir la serie a tu estantería para marcar episodios como vistos.' : 'You must add the series to your shelf to mark episodes as seen.');
-        return;
+        try {
+          effectiveListId = await ensureTracked('watching');
+        } catch (err) {
+          console.error("Failed to track series automatically", err);
+          return;
+        }
       }
     }
     
     try {
-      const res = await apiClient.post(`/lists/${effectiveListId}/toggle-tmdb-episode`, {
-        tmdb_episode_id: ep.id,
+      const res = await apiClient.post(`/lists/${effectiveListId}/toggle-series-episode`, {
+        episode_id: ep.id,
         title: ep.title || `${selectedItem.title} - S${ep.season_number < 10 ? '0' + ep.season_number : ep.season_number}E${ep.episode_number < 10 ? '0' + ep.episode_number : ep.episode_number} - ${ep.name || 'Untitled Episode'}`,
-        image_url: ep.image_url || ep.image?.original || ep.image?.medium || (ep.still_path ? (ep.still_path.startsWith('http') ? ep.still_path : `https://image.tmdb.org/t/p/w185${ep.still_path}`) : selectedItem.image_url),
+        image_url: ep.image_url || ep.image?.original || ep.image?.medium || ep.still_path || selectedItem.image_url,
         overview: ep.custom_notes || ep.overview,
         season_number: ep.season_number,
         episode_number: ep.episode_number
@@ -652,7 +655,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       const updatedList = listRes.data.items || [];
       setEpisodes(updatedList);
 
-      if (selectedItem && (selectedItem.external_id === `tmdb-ep-${ep.id}` || selectedItem.id === ep.id || selectedItem.rawEpisodeId === ep.id)) {
+      if (selectedItem && (selectedItem.external_id === `tvm-ep-${ep.id}` || selectedItem.id === ep.id || selectedItem.rawEpisodeId === ep.id)) {
         setSelectedItem((prev: any) => prev ? { ...prev, completed_at: res.data.completed_at, is_completed: res.data.is_completed } : null);
       }
       
@@ -675,7 +678,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     }
   };
 
-  const isEpisode = !!(String(selectedItem?.external_id || '').startsWith('tmdb-ep-') || selectedItem?.list_id);
+  const isEpisode = !!(String(selectedItem?.external_id || '').startsWith('tvm-ep-') || selectedItem?.list_id);
   const ratings = (itemReviews || []).filter(r => r.rating !== null && r.rating !== 0).map(r => r.rating);
   const avgRating = ratings.length > 0 ? (ratings.reduce((a: number, b: number) => a + b, 0) / ratings.length).toFixed(1) : null;
 
@@ -735,7 +738,13 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                            if (seriesName) {
                               const searchRes = await apiClient.get(`/search?q=${encodeURIComponent(seriesName)}&type=series`);
                               if (searchRes.data && searchRes.data.length > 0) {
-                                 onOpenItem(searchRes.data[0]);
+                                 const matchedSeries = searchRes.data[0];
+                                 const libRes2 = await apiClient.get('/library/');
+                                 const libSeries = (libRes2.data || []).find((li: any) => 
+                                    li.external_id === matchedSeries.external_id || 
+                                    ( (li.item_type === 'series' || li.item_type === 'anime') && li.title.toLowerCase() === matchedSeries.title.toLowerCase() )
+                                 );
+                                 onOpenItem(libSeries || matchedSeries);
                                  return;
                               }
                            }
@@ -797,7 +806,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                       type="button"
                       onClick={handleAddToShelf}
                       className="btn-secondary"
-                      title={language === 'es' ? 'Añadir a Estantería' : 'Add to Shelf'}
+                      title={language === 'es' ? 'Seguir / Añadir' : 'Follow / Add'}
                       style={{
                         padding: '0.4rem',
                         borderRadius: '50%',
@@ -820,7 +829,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                       type="button"
                       onClick={async () => {
                         await handleToggleEpisode(selectedItem.list_id || selectedItem.tracking_list_id, {
-                          id: selectedItem.rawEpisodeId || (selectedItem.external_id ? parseInt(selectedItem.external_id.replace('tmdb-ep-', '')) : selectedItem.id),
+                          id: selectedItem.rawEpisodeId || (selectedItem.external_id ? parseInt(selectedItem.external_id.replace('tvm-ep-', '')) : selectedItem.id),
                           title: selectedItem.title,
                           image_url: selectedItem.image_url,
                           custom_notes: selectedItem.custom_notes,
@@ -1236,10 +1245,10 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                       const isSeasonActive = activeSeason === s.season_number;
                       const isSeasonDone = (() => {
                         const listSeps = (episodes || []).filter(x => x.section === `Season ${s.season_number}`);
-                        const tmdbEps = seasonEpisodes[s.season_number] || [];
-                        if (!Array.isArray(tmdbEps)) return false;
-                        if (tmdbEps.length === 0) return listSeps.length > 0 && listSeps.every(x => x.is_completed);
-                        return tmdbEps.every((te: any) => globalProgress[`tmdb-ep-${te.id}`] || (episodes || []).some(x => x.external_id === `tmdb-ep-${te.id}` && x.is_completed));
+                        const seriesEps = seasonEpisodes[s.season_number] || [];
+                        if (!Array.isArray(seriesEps)) return false;
+                        if (seriesEps.length === 0) return listSeps.length > 0 && listSeps.every(x => x.is_completed);
+                        return seriesEps.every((te: any) => globalProgress[`tvm-ep-${te.id}`] || (episodes || []).some(x => x.external_id === `tvm-ep-${te.id}` && x.is_completed));
                       })();
                       return (
                         <div key={s.id || s.season_number} style={{ border: '1px solid var(--border-color)', borderRadius: '6px', overflow: 'hidden' }}>
@@ -1283,12 +1292,12 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                   
                                   const checkedVal = !isSeasonDone;
                                   const cacheKey = `${selectedItem.external_id}_s${s.season_number}`;
-                                  const tmdbEps = getCachedTMDB(cacheKey);
+                                  const seriesEps = getCachedSeries(cacheKey);
                                   
                                   try {
                                     await apiClient.post(`/lists/${effectiveListId}/bulk-toggle-season`, {
                                       season_number: s.season_number,
-                                      episodes: tmdbEps || null,
+                                      episodes: seriesEps || null,
                                       completed: checkedVal
                                     });
                                     
@@ -1341,8 +1350,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                 </div>
                               ) : (
                                 (Array.isArray(seasonEpisodes[s.season_number]) ? seasonEpisodes[s.season_number] : []).map((ep: any) => {
-                                  const dbEp = (episodes || []).find(x => x.external_id === `tmdb-ep-${ep.id}`);
-                                  const isCompleted = !!globalProgress[`tmdb-ep-${ep.id}`] || !!dbEp?.is_completed;
+                                  const dbEp = (episodes || []).find(x => x.external_id === `tvm-ep-${ep.id}`);
+                                  const isCompleted = !!globalProgress[`tvm-ep-${ep.id}`] || !!dbEp?.is_completed;
                                   return (
                                     <div
                                       key={ep.id}
@@ -1362,8 +1371,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                            type="button"
                                            disabled={!isOwnProfile}
                                            onClick={() => {
-                                             const currentIsCompleted = !!globalProgress[`tmdb-ep-${ep.id}`] || !!dbEp?.is_completed;
-                                             setGlobalProgress(prev => ({ ...prev, [`tmdb-ep-${ep.id}`]: !currentIsCompleted }));
+                                             const currentIsCompleted = !!globalProgress[`tvm-ep-${ep.id}`] || !!dbEp?.is_completed;
+                                             setGlobalProgress(prev => ({ ...prev, [`tvm-ep-${ep.id}`]: !currentIsCompleted }));
                                              handleToggleEpisode(selectedItem.tracking_list_id, ep);
                                            }}
                                            style={{
@@ -1393,9 +1402,9 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                           id: dbEp ? dbEp.id : ep.id,
                                           list_id: selectedItem.tracking_list_id,
                                           item_type: 'episode',
-                                          external_id: `tmdb-ep-${ep.id}`,
+                                          external_id: `tvm-ep-${ep.id}`,
                                           title: `${selectedItem.title} - S${ep.season_number < 10 ? '0' + ep.season_number : ep.season_number}E${ep.episode_number < 10 ? '0' + ep.episode_number : ep.episode_number} - ${ep.name || 'Untitled'}`,
-                                          image_url: ep.image_url || ep.image?.original || ep.image?.medium || (ep.still_path ? (ep.still_path.startsWith('http') ? ep.still_path : `https://image.tmdb.org/t/p/w185${ep.still_path}`) : selectedItem.image_url),
+                                          image_url: ep.image_url || ep.image?.original || ep.image?.medium || ep.still_path || selectedItem.image_url,
                                           custom_notes: JSON.stringify({ description: ep.overview || '', release_date: ep.air_date || null }),
                                           completed_at: dbEp?.completed_at,
                                           is_completed: isCompleted,

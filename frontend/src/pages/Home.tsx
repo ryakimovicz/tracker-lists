@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import { useTranslation } from '../context/LanguageContext';
-import { getCachedTMDB, setCachedTMDB } from '../utils/tmdbCache';
+import { getCachedSeries, setCachedSeries } from '../utils/seriesCache';
 import { ItemDetailsModal } from '../components/ItemDetailsModal';
 import { ChevronLeft, ChevronRight, Check } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -59,6 +59,7 @@ const CustomCard = ({
   coverUrl, 
   subtitle1, 
   subtitle2, 
+  preSubtitle,
   coverTopText,
   coverBottomText,
   onCheck, 
@@ -71,6 +72,7 @@ const CustomCard = ({
   coverUrl?: string; 
   subtitle1?: string; 
   subtitle2?: string; 
+  preSubtitle?: string;
   coverTopText?: string;
   coverBottomText?: string;
   onCheck?: (e: React.MouseEvent) => void;
@@ -137,6 +139,7 @@ const CustomCard = ({
         )}
       </div>
       <div style={{ padding: "0.75rem", display: "flex", flexDirection: "column", gap: "0.25rem", flex: 1, minHeight: "2.5rem", paddingRight: onCheck && !currentlyBlurred ? "40px" : "0.75rem" }}>
+        {preSubtitle && <div style={{ fontSize: "0.95rem", color: "var(--text-primary)", fontWeight: 800, lineHeight: 1.2, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{preSubtitle}</div>}
         {subtitle1 && <div style={{ fontSize: "0.9rem", color: "var(--text-primary)", fontWeight: 700 }}>{subtitle1}</div>}
         {subtitle2 && <div style={{ fontSize: "0.8rem", color: "var(--text-secondary)", fontWeight: 500, lineHeight: 1.2, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{subtitle2}</div>}
       </div>
@@ -164,7 +167,6 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries }: { item: an
   const [nextEp, setNextEp] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isPeek, setIsPeek] = useState(false);
-  const [episodeItemForModal, setEpisodeItemForModal] = useState<any>(null);
 
   const shouldBlur = item.is_nsfw && !user?.show_nsfw;
   const currentlyBlurred = shouldBlur && !isPeek;
@@ -192,13 +194,13 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries }: { item: an
 
       let filteredSeasons: any[] = [];
       const cacheKey = `series_${item.external_id}`;
-      const cached = getCachedTMDB(cacheKey);
+      const cached = getCachedSeries(cacheKey);
       if (cached && cached.seasons) {
         filteredSeasons = cached.seasons;
       } else {
         const seriesRes = await apiClient.get(`/search/series/${item.external_id}`);
         filteredSeasons = (seriesRes.data.seasons || []).filter((s: any) => s.season_number > 0);
-        setCachedTMDB(cacheKey, { ...seriesRes.data, seasons: filteredSeasons });
+        setCachedSeries(cacheKey, { ...seriesRes.data, seasons: filteredSeasons });
       }
 
       if (filteredSeasons.length === 0) return;
@@ -231,13 +233,13 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries }: { item: an
       }
 
       const cacheKeyAll = `${item.external_id}_all_episodes`;
-      const cachedAll = getCachedTMDB(cacheKeyAll);
+      const cachedAll = getCachedSeries(cacheKeyAll);
       let targetEp = null;
       if (cachedAll && Array.isArray(cachedAll)) {
         targetEp = cachedAll.find((e: any) => e.season_number === nextSeasonNum && e.episode_number === nextEpNum);
       } else {
         const res = await apiClient.get(`/search/series/${item.external_id}/episodes`);
-        setCachedTMDB(cacheKeyAll, res.data);
+        setCachedSeries(cacheKeyAll, res.data);
         targetEp = res.data.find((e: any) => e.season_number === nextSeasonNum && e.episode_number === nextEpNum);
       }
 
@@ -260,10 +262,10 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries }: { item: an
     if (!nextEp) return;
     setIsLoading(true);
     try {
-      await apiClient.post(`/lists/${item.tracking_list_id}/toggle-tmdb-episode`, {
-        tmdb_episode_id: nextEp.id,
+      await apiClient.post(`/lists/${item.tracking_list_id}/toggle-series-episode`, {
+        episode_id: nextEp.id,
         title: nextEp.title || `${item.title} - S${pad(nextEp.season_number)}E${pad(nextEp.episode_number)} - ${nextEp.name || 'Untitled'}`,
-        image_url: nextEp.image_url || (nextEp.still_path ? (nextEp.still_path.startsWith('http') ? nextEp.still_path : `https://image.tmdb.org/t/p/w185${nextEp.still_path}`) : null),
+        image_url: nextEp.still_path || null,
         overview: nextEp.overview,
         season_number: nextEp.season_number,
         episode_number: nextEp.episode_number
@@ -271,7 +273,7 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries }: { item: an
       const listRes = await apiClient.get(`/lists/${item.tracking_list_id}`);
       const updatedList = listRes.data.items || [];
       const cacheKey = `series_${item.external_id}`;
-      const cached = getCachedTMDB(cacheKey);
+      const cached = getCachedSeries(cacheKey);
       if (cached && cached.seasons) {
         const totalEps = cached.seasons.reduce((acc: number, s: any) => acc + (s.episode_count || 0), 0);
         const completed = updatedList.filter((ep: any) => ep.is_completed).length;
@@ -297,12 +299,12 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries }: { item: an
       return;
     }
     if (nextEp) {
-      setEpisodeItemForModal({
+      onOpenSeries({
         id: nextEp.id,
         item_type: 'episode',
         title: nextEp.name || `Episode ${nextEp.episode_number}`,
-        external_id: `tmdb-ep-${nextEp.id}`,
-        image_url: nextEp.still_path ? (nextEp.still_path.startsWith('http') ? nextEp.still_path : `https://image.tmdb.org/t/p/w500${nextEp.still_path}`) : null,
+        external_id: `tvm-ep-${nextEp.id}`,
+        image_url: nextEp.still_path || null,
         custom_notes: JSON.stringify({ description: nextEp.overview || '', release_date: nextEp.air_date || null }),
         parent_series: item
       });
@@ -313,10 +315,7 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries }: { item: an
 
   const getCoverUrl = () => {
     if (nextEp?.still_path) {
-      if (nextEp.still_path.startsWith('http')) {
-        return nextEp.still_path;
-      }
-      return `https://image.tmdb.org/t/p/w300${nextEp.still_path}`;
+      return nextEp.still_path;
     }
     return item.image_url;
   };
@@ -394,16 +393,6 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries }: { item: an
           </button>
         )}
       </div>
-
-      {episodeItemForModal && (
-        <ItemDetailsModal
-          item={episodeItemForModal}
-          isOwnProfile={true}
-          onClose={() => setEpisodeItemForModal(null)}
-          onUpdate={onUpdate}
-          onOpenItem={(item) => setEpisodeItemForModal(item)}
-        />
-      )}
     </>
   );
 };
@@ -472,13 +461,11 @@ export const Home: React.FC = () => {
 
   let filteredItems: any[] = [];
   if (activeTab === "watching") {
-    filteredItems = libraryItems.filter(i => 
-      (["watching", "reading", "playing"].includes(i.status) || ((i.item_type === "series" || i.item_type === "anime") && i.status !== "completed" && i.status !== "dropped"))
-    );
+    filteredItems = libraryItems.filter(i => ["watching", "reading", "playing"].includes(i.status));
   } else if (activeTab === "plan_to_watch") {
-    filteredItems = libraryItems.filter(i => i.status === "plan_to_watch" && i.item_type !== "series" && i.item_type !== "anime");
+    filteredItems = libraryItems.filter(i => ["plan_to_watch", "plan_to_play", "plan_to_read"].includes(i.status));
   } else if (activeTab === "completed") {
-    filteredItems = libraryItems.filter(i => i.status === "completed");
+    filteredItems = libraryItems.filter(i => ["completed", "read"].includes(i.status));
   }
 
   const getTypeCat = (type: string) => {
@@ -515,7 +502,7 @@ export const Home: React.FC = () => {
       {filteredItems.length > 0 ? (
         <ScrollRow>
           {filteredItems.map(item => {
-            if (activeTab === "watching" && (item.item_type === "series" || item.item_type === "anime")) {
+            if ((activeTab === "watching" || activeTab === "plan_to_watch") && (item.item_type === "series" || item.item_type === "anime")) {
               return (
                 <ActiveSeriesCard 
                   key={item.id}
@@ -576,7 +563,7 @@ export const Home: React.FC = () => {
                   key={g.item_id}
                   title={g.list_title}
                   coverUrl={g.image_url}
-                  coverTopText={insideTop}
+                  preSubtitle={insideTop}
                   coverBottomText={g.item_type}
                   subtitle1={bottomText1}
                   subtitle2={bottomText2}

@@ -151,7 +151,7 @@ export const ViewGuide: React.FC = () => {
   };
 
   const handleOpenItemDetails = (item: any) => {
-    setSelectedItem(item);
+    setSelectedItem({ ...item, list_id: parseInt(id as string, 10) });
   };
 
   if (loading) {
@@ -547,7 +547,7 @@ export const ViewGuide: React.FC = () => {
 
       {selectedItem && (
         <ItemDetailsModal
-          item={{ ...selectedItem, list_id: parseInt(id as string, 10) }}
+          item={selectedItem}
           isOwnProfile={!!currentUser}
           onClose={() => setSelectedItem(null)}
           onUpdate={() => fetchListDetails()}

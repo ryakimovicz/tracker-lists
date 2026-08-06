@@ -71,7 +71,7 @@ class TVMazeService:
     @staticmethod
     def get_series_detail(series_id: str) -> dict:
         # TVMaze id is like tvm_123, we need to extract 123
-        real_id = series_id.replace('tvm_', '') if str(series_id).startswith('tvm_') else series_id
+        real_id = str(series_id).replace('tvm_', '').replace('tvm-', '')
         url = f"https://api.tvmaze.com/shows/{real_id}"
         req = urllib.request.Request(url, headers={"User-Agent": "TrackerLists/1.0"})
         try:
@@ -98,7 +98,10 @@ class TVMazeService:
                         "id": series_id,
                         "name": data.get("name"),
                         "number_of_seasons": len(seasons),
-                        "seasons": seasons
+                        "seasons": seasons,
+                        "overview": data.get("summary", ""),
+                        "first_air_date": data.get("premiered"),
+                        "image_url": data.get("image", {}).get("original") if data.get("image") else None
                     }
         except Exception:
             pass
@@ -106,7 +109,7 @@ class TVMazeService:
 
     @staticmethod
     def get_all_episodes(series_id: str) -> List[dict]:
-        real_id = series_id.replace('tvm_', '') if str(series_id).startswith('tvm_') else series_id
+        real_id = str(series_id).replace('tvm_', '').replace('tvm-', '')
         url = f"https://api.tvmaze.com/shows/{real_id}/episodes"
         req = urllib.request.Request(url, headers={"User-Agent": "TrackerLists/1.0"})
         

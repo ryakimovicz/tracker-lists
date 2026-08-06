@@ -555,14 +555,10 @@ export const Search: React.FC = () => {
                   </p>
                 </div>
 
-                {onShelf ? (
+                {onShelf && (
                   <div style={{ fontSize: '0.82rem', color: '#10b981', textAlign: 'center', padding: '0.4rem', fontWeight: 500 }}>
                     {language === 'es' ? '✓ En estantería' : '✓ On shelf'}
                   </div>
-                ) : (
-                  <button onClick={(e) => handleOpenAddShelf(item, e)} className="btn-secondary" style={{ width: '100%', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}>
-                    <Plus size={16} /> {t('searchAddShelf')}
-                  </button>
                 )}
               </div>
             );

@@ -28,7 +28,7 @@ from app.schemas.list import (
     TVImportType,
     SectionBulkActionRequest,
     BulkToggleRequest,
-    ToggleTMDBEpisodeRequest,
+    ToggleSeriesEpisodeRequest,
     BulkToggleSeasonRequest
 )
 
@@ -541,8 +541,8 @@ def auto_add_to_library(db: Session, user_id: int, item: ListItem):
     show_name = None
     
     show_ext_id = None
-    if item.external_id.startswith("tmdb-ep-") or item.external_id.startswith("tvm-ep-"):
-        ep_id = item.external_id.replace("tmdb-ep-", "").replace("tvm-ep-", "")
+    if item.external_id.startswith("tvm-ep-"):
+        ep_id = item.external_id.replace("tvm-ep-", "")
         import urllib.request, json
         url = f"https://api.tvmaze.com/episodes/{ep_id}?embed=show"
         try:
@@ -566,7 +566,7 @@ def auto_add_to_library(db: Session, user_id: int, item: ListItem):
             UserLibraryItem.title == show_name
         ).first()
 
-    if (item.external_id.startswith("tmdb-ep-") or item.external_id.startswith("tvm-ep-")) and not existing_series:
+    if item.external_id.startswith("tvm-ep-") and not existing_series:
         # Add loose episode card to library
         existing_ep = db.query(UserLibraryItem).filter(
             UserLibraryItem.user_id == user_id,
@@ -589,9 +589,12 @@ def auto_add_to_library(db: Session, user_id: int, item: ListItem):
             db.commit()
         return
 
-    if existing_series and (item.external_id.startswith("tmdb-ep-") or item.external_id.startswith("tvm-ep-")):
+    if existing_series and item.external_id.startswith("tvm-ep-"):
         existing_series.last_seen_episode = item.title
         existing_series.updated_at = datetime.now(timezone.utc)
+        if existing_series.status in (UserLibraryStatusEnum.PLAN_TO_WATCH, UserLibraryStatusEnum.COMPLETED):
+            existing_series.status = UserLibraryStatusEnum.WATCHING
+            existing_series.completed_at = None
         if existing_series.tracking_list_id:
             ep_in_tracker = db.query(ListItem).filter(
                 ListItem.list_id == existing_series.tracking_list_id,
@@ -840,7 +843,7 @@ def import_tv_items(
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Series not found in TVMaze")
             
         poster = series.get("poster_path")
-        image_url = f"https://image.tmdb.org/t/p/w185{poster}" if poster else None
+        image_url = poster if poster else None
         
         item = ListItem(
             list_id=list_id,
@@ -881,13 +884,13 @@ def import_tv_items(
             title = f"{series_name} - S{import_req.season_number:02d}E{ep_num:02d} - {ep_name}"
             
             still = ep.get("still_path")
-            image_url = f"https://image.tmdb.org/t/p/w185{still}" if still else None
+            image_url = still if still else None
             
             item = ListItem(
                 list_id=list_id,
                 order_index=order_idx,
                 item_type=ItemTypeEnum.SERIES,
-                external_id=f"tmdb-ep-{ep.get('id')}",
+                external_id=f"tvm-ep-{ep.get('id')}",
                 title=title,
                 image_url=image_url,
                 custom_notes=ep.get("overview"),
@@ -922,13 +925,13 @@ def import_tv_items(
         title = f"{series_name} - S{import_req.season_number:02d}E{import_req.episode_number:02d} - {ep_name}"
         
         still = ep.get("still_path")
-        image_url = f"https://image.tmdb.org/t/p/w185{still}" if still else None
+        image_url = still if still else None
         
         item = ListItem(
             list_id=list_id,
             order_index=order_idx,
             item_type=ItemTypeEnum.SERIES,
-            external_id=f"tmdb-ep-{ep.get('id')}",
+            external_id=f"tvm-ep-{ep.get('id')}",
             title=title,
             image_url=image_url,
             custom_notes=ep.get("overview"),
@@ -1182,10 +1185,10 @@ def bulk_section_action(
     db.commit()
     return {"message": f"Section '{action_req.section_name}' items updated successfully with action '{action}'"}
 
-@router.post("/{list_id}/toggle-tmdb-episode", status_code=status.HTTP_200_OK)
-def toggle_tmdb_episode(
+@router.post("/{list_id}/toggle-series-episode", status_code=status.HTTP_200_OK)
+def toggle_series_episode(
     list_id: int,
-    ep_req: ToggleTMDBEpisodeRequest,
+    ep_req: ToggleSeriesEpisodeRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -1196,7 +1199,7 @@ def toggle_tmdb_episode(
     if reading_list.creator_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You do not have access to this list")
         
-    ext_id = f"tmdb-ep-{ep_req.tmdb_episode_id}"
+    ext_id = f"tvm-ep-{ep_req.episode_id}"
     
     # Check if ListItem already exists
     item = db.query(ListItem).filter(
@@ -1294,7 +1297,7 @@ def toggle_tmdb_episode(
             lib_item.status = UserLibraryStatusEnum.WATCHING
         else:
             lib_item.last_seen_episode = None
-            lib_item.status = UserLibraryStatusEnum.WATCHING
+            lib_item.status = UserLibraryStatusEnum.PLAN_TO_WATCH
             
         lib_item.updated_at = datetime.now(timezone.utc)
         db.commit()
@@ -1331,7 +1334,7 @@ def bulk_toggle_season(
     
     series_title = lib_item.title if lib_item else "Series"
     
-    # Resolve episodes list (fetch from TMDB directly if not supplied)
+    # Resolve episodes list (fetch directly if not supplied)
     episodes_list = req.episodes
     if not episodes_list:
         if lib_item and lib_item.external_id:
@@ -1348,7 +1351,7 @@ def bulk_toggle_season(
     item_count = db.query(ListItem).filter(ListItem.list_id == list_id).count()
 
     for ep in episodes_list:
-        ext_id = f"tmdb-ep-{ep.get('id')}"
+        ext_id = f"tvm-ep-{ep.get('id')}"
         item = db.query(ListItem).filter(
             ListItem.list_id == list_id,
             ListItem.external_id == ext_id
@@ -1362,7 +1365,7 @@ def bulk_toggle_season(
                 item_type=ItemTypeEnum.SERIES,
                 external_id=ext_id,
                 title=f"{series_title} - S{req.season_number:02d}E{ep.get('episode_number', 1):02d} - {ep.get('name', 'Untitled')}",
-                image_url=f"https://image.tmdb.org/t/p/w185{ep.get('still_path')}" if ep.get('still_path') else None,
+                image_url=ep.get('still_path') if ep.get('still_path') else None,
                 custom_notes=json.dumps({"description": ep.get('overview') or "", "release_date": ep.get('air_date') or None}),
                 section=f"Season {req.season_number}"
             )
@@ -1410,7 +1413,7 @@ def bulk_toggle_season(
             lib_item.updated_at = datetime.now(timezone.utc)
             db.commit()
         else:
-            lib_item.status = UserLibraryStatusEnum.WATCHING
+            lib_item.status = UserLibraryStatusEnum.PLAN_TO_WATCH
             lib_item.completed_at = None
             lib_item.last_seen_episode = None
             lib_item.updated_at = datetime.now(timezone.utc)

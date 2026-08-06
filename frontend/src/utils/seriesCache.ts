@@ -1,6 +1,6 @@
-export const getCachedTMDB = (key: string) => {
+export const getCachedSeries = (key: string) => {
   try {
-    const item = localStorage.getItem(`tmdb_cache_${key}`);
+    const item = localStorage.getItem(`series_cache_${key}`);
     if (item) {
       const parsed = JSON.parse(item);
       // Cache expires after 24h
@@ -14,9 +14,9 @@ export const getCachedTMDB = (key: string) => {
   return null;
 };
 
-export const setCachedTMDB = (key: string, data: any) => {
+export const setCachedSeries = (key: string, data: any) => {
   try {
-    localStorage.setItem(`tmdb_cache_${key}`, JSON.stringify({
+    localStorage.setItem(`series_cache_${key}`, JSON.stringify({
       timestamp: Date.now(),
       data
     }));

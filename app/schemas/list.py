@@ -97,8 +97,8 @@ class BulkToggleRequest(BaseModel):
     item_ids: List[int]
     completed: bool
 
-class ToggleTMDBEpisodeRequest(BaseModel):
-    tmdb_episode_id: int
+class ToggleSeriesEpisodeRequest(BaseModel):
+    episode_id: int
     title: str
     image_url: Optional[str] = None
     overview: Optional[str] = None

@@ -394,7 +394,7 @@ export const Profile: React.FC = () => {
 
 
   const isLooseEpisodeOrSeason = (item: LibraryItem) => {
-    const isLooseType = item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tmdb-ep-') || item.external_id?.startsWith('tvm-ep-');
+    const isLooseType = item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tvm-ep-');
     if (!isLooseType) return false;
     
     const parentTitle = item.last_seen_episode || '';
@@ -421,9 +421,11 @@ export const Profile: React.FC = () => {
       const matchesSearch = normalizeSearch(item.title).includes(normalizedQuery);
       
       const isLoose = isLooseEpisodeOrSeason(item);
-      const isSeriesOrRegular = item.item_type !== 'episode' && item.item_type !== 'season' && !item.external_id?.startsWith('tmdb-ep-') && !item.external_id?.startsWith('tvm-ep-');
+      const isSeriesOrRegular = item.item_type !== 'episode' && item.item_type !== 'season' && !item.external_id?.startsWith('tvm-ep-');
+      const isNotStartedSeries = (item.item_type === 'series' || item.item_type === 'anime') && !item.last_seen_episode;
+      const isPlanToStatus = ['plan_to_watch', 'plan_to_play', 'plan_to_read'].includes(item.status);
 
-      return matchesMedia && matchesSearch && (isSeriesOrRegular || isLoose);
+      return matchesMedia && matchesSearch && (isSeriesOrRegular || isLoose) && !isNotStartedSeries && !isPlanToStatus;
     })
     .sort((a, b) => {
       const dateA = new Date(a.completed_at || a.updated_at || 0).getTime();
@@ -438,7 +440,13 @@ export const Profile: React.FC = () => {
   );
 
   const visualLibraryItems = libraryItems.filter(item => {
-    const isLooseType = item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tmdb-ep-') || item.external_id?.startsWith('tvm-ep-');
+    const isPlanToStatus = ['plan_to_watch', 'plan_to_play', 'plan_to_read'].includes(item.status);
+    if (isPlanToStatus) return false;
+
+    const isNotStartedSeries = (item.item_type === 'series' || item.item_type === 'anime') && !item.last_seen_episode;
+    if (isNotStartedSeries) return false;
+    
+    const isLooseType = item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tvm-ep-');
     if (!isLooseType) return true;
     const parentTitle = item.last_seen_episode || '';
     const followsParentSeries = libraryItems.some(li => 
@@ -661,7 +669,7 @@ export const Profile: React.FC = () => {
                 const baseTypes = ['all', 'movie', 'series', 'anime', 'book', 'comic', 'manga', 'game'] as const;
                 const allowedTypes = baseTypes.filter(type => {
                   if (type === 'all') return true;
-                  if (type === 'series') return libraryItems.some(item => item.item_type === 'series' || item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tmdb-ep-') || item.external_id?.startsWith('tvm-ep-'));
+                  if (type === 'series') return libraryItems.some(item => item.item_type === 'series' || item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tvm-ep-'));
                   if (type === 'anime') return libraryItems.some(item => item.item_type === 'anime');
                   return libraryItems.some(item => item.item_type === type);
                 });
@@ -752,8 +760,8 @@ export const Profile: React.FC = () => {
                               style={{ width: '100%', height: '240px', objectFit: 'cover', borderRadius: '8px' }}
                             />
                             
-                            <div className={getTagClass(item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tmdb-ep-') || item.external_id?.startsWith('tvm-ep-') ? 'series' : item.item_type)} style={{ position: "absolute", bottom: "0.25rem", left: "0.5rem", padding: "0.1rem 0.4rem", borderRadius: "4px", fontSize: "0.7rem", fontWeight: 600, opacity: 0.85, backdropFilter: 'blur(4px)' }}>
-                              {(item.item_type === 'episode' || item.external_id?.startsWith('tmdb-ep-') || item.external_id?.startsWith('tvm-ep-'))
+                            <div className={getTagClass(item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tvm-ep-') ? 'series' : item.item_type)} style={{ position: "absolute", bottom: "0.25rem", left: "0.5rem", padding: "0.1rem 0.4rem", borderRadius: "4px", fontSize: "0.7rem", fontWeight: 600, opacity: 0.85, backdropFilter: 'blur(4px)' }}>
+                              {(item.item_type === 'episode' || item.external_id?.startsWith('tvm-ep-'))
                                 ? (language === 'es' ? 'Serie' : 'Series')
                                 : item.item_type === 'season'
                                 ? (language === 'es' ? 'Temporada' : 'Season')
@@ -790,7 +798,7 @@ export const Profile: React.FC = () => {
                           <div style={{ flex: 1, textAlign: 'left', cursor: 'pointer' }} onClick={() => handleOpenItemDetails(item)}>
                             <h4 style={{ margin: '0 0 0.25rem 0', fontSize: '0.95rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.title}>
                               {(() => {
-                                const isEpOrSeason = item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tmdb-ep-') || item.external_id?.startsWith('tvm-ep-');
+                                const isEpOrSeason = item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tvm-ep-');
                                 if (isEpOrSeason && item.last_seen_episode && item.title.toLowerCase().startsWith(item.last_seen_episode.toLowerCase() + ' - ')) {
                                   return item.title.slice(item.last_seen_episode.length + 3);
                                 }
@@ -798,7 +806,7 @@ export const Profile: React.FC = () => {
                               })()}
                             </h4>
                             {/* Standalone episode/season series title */}
-                            {(item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tmdb-ep-') || item.external_id?.startsWith('tvm-ep-')) && item.last_seen_episode && (
+                            {(item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tvm-ep-')) && item.last_seen_episode && (
                               <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500, display: 'block', marginTop: '0.1rem' }}>
                                 {language === 'es' ? 'Serie: ' : 'Show: '}{item.last_seen_episode}
                               </span>
