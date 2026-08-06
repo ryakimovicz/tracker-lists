@@ -43,8 +43,10 @@ class UpNextItemResponse(BaseModel):
     list_title: str
     order_index: int
     item_type: str
+    external_id: Optional[str] = None
     title: str
     image_url: Optional[str] = None
+    custom_notes: Optional[str] = None
     section: Optional[str] = None
     is_addition: bool = False
     addition_id: Optional[int] = None

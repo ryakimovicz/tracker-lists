@@ -415,19 +415,56 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                   custom_notes: JSON.stringify({ description: matchedEp.overview || '', release_date: matchedEp.air_date || null }),
                   season_number: matchedEp.season_number,
                   episode_number: matchedEp.episode_number,
-                  parent_series: prev.parent_series || { external_id: item.imdb_id, title: item.last_seen_episode || 'Serie' }
+                  parent_series: prev.parent_series || { external_id: item.imdb_id, title: item.last_seen_episode || 'Serie', item_type: 'series' }
                 } : null);
               } else if (!item.parent_series) {
                 setSelectedItem((prev: any) => prev ? {
                   ...prev,
-                  parent_series: { external_id: item.imdb_id, title: item.last_seen_episode || 'Serie' }
+                  parent_series: { external_id: item.imdb_id, title: item.last_seen_episode || 'Serie', item_type: 'series' }
                 } : null);
               }
             })
             .catch(e => console.error(e))
             .finally(() => setIsLoadingMetadata(false));
         } else {
-          setIsLoadingMetadata(false);
+          // If we don't have imdb_id, try to infer the series name from the title
+          const match = item.title?.match(/^(.*?)\s*-\s*S(\d+)E(\d+)/i);
+          if (match) {
+            const seriesName = match[1].trim();
+            setIsLoadingMetadata(true);
+            apiClient.get('/search/', { params: { q: seriesName, type: 'series' } })
+              .then(searchRes => {
+                const possibleSeries = searchRes.data[0];
+                if (possibleSeries) {
+                  const actualSeriesId = possibleSeries.external_id;
+                  apiClient.get(`/search/series/${actualSeriesId}/episodes`)
+                    .then(res => {
+                      const allEps = res.data || [];
+                      const epIdNumStr = item.external_id ? item.external_id.replace('tvm-ep-', '').replace('tmdb-ep-', '') : null;
+                      const matchedEp = allEps.find((e: any) => 
+                        (epIdNumStr && e.id.toString() === epIdNumStr) ||
+                        (e.season_number === parseInt(match[2]) && e.episode_number === parseInt(match[3]))
+                      );
+                      if (matchedEp) {
+                        setSelectedItem((prev: any) => prev ? {
+                          ...prev,
+                          custom_notes: JSON.stringify({ description: matchedEp.overview || '', release_date: matchedEp.air_date || null }),
+                          season_number: matchedEp.season_number,
+                          episode_number: matchedEp.episode_number,
+                          parent_series: prev.parent_series || { external_id: actualSeriesId, title: seriesName, item_type: 'series' }
+                        } : null);
+                      }
+                    })
+                    .catch(e => console.error(e))
+                    .finally(() => setIsLoadingMetadata(false));
+                } else {
+                  setIsLoadingMetadata(false);
+                }
+              })
+              .catch(e => { console.error(e); setIsLoadingMetadata(false); });
+          } else {
+            setIsLoadingMetadata(false);
+          }
         }
       } else {
         setIsLoadingMetadata(true);
@@ -674,23 +711,27 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
               {isEpisode && (
                 <button
                     onClick={async () => {
-                      if (selectedItem.parent_series && onOpenItem) {
+                      if (selectedItem.parent_series && selectedItem.parent_series.external_id && onOpenItem) {
                         onOpenItem(selectedItem.parent_series);
-                      } else if (onOpenItem && (selectedItem.list_id || selectedItem.tracking_list_id || selectedItem.last_seen_episode)) {
+                      } else if (onOpenItem) {
                         try {
-                           const libRes = await apiClient.get('/library/');
-                           const libraryItems = libRes.data || [];
-                           const parentSeriesInLib = libraryItems.find((li: any) => 
-                             (li.item_type === 'series' || li.item_type === 'anime') && 
-                             li.tracking_list_id && 
-                             (li.tracking_list_id === selectedItem.tracking_list_id || li.tracking_list_id === selectedItem.list_id)
-                           );
-                           if (parentSeriesInLib) {
-                              onOpenItem(parentSeriesInLib);
-                              return;
+                           if (selectedItem.list_id || selectedItem.tracking_list_id) {
+                             const libRes = await apiClient.get('/library/');
+                             const libraryItems = libRes.data || [];
+                             const parentSeriesInLib = libraryItems.find((li: any) => 
+                               (li.item_type === 'series' || li.item_type === 'anime') && 
+                               li.tracking_list_id && 
+                               (li.tracking_list_id === selectedItem.tracking_list_id || li.tracking_list_id === selectedItem.list_id)
+                             );
+                             if (parentSeriesInLib) {
+                                onOpenItem(parentSeriesInLib);
+                                return;
+                             }
                            }
                            
-                           const seriesName = selectedItem.series_title || selectedItem.last_seen_episode;
+                           const match = selectedItem.title?.match(/^(.*?)\s*-\s*S(\d+)E(\d+)/i);
+                           const seriesName = selectedItem.parent_series?.title || selectedItem.series_title || selectedItem.last_seen_episode || (match ? match[1].trim() : null);
+                           
                            if (seriesName) {
                               const searchRes = await apiClient.get(`/search?q=${encodeURIComponent(seriesName)}&type=series`);
                               if (searchRes.data && searchRes.data.length > 0) {
@@ -1355,7 +1396,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                           external_id: `tmdb-ep-${ep.id}`,
                                           title: `${selectedItem.title} - S${ep.season_number < 10 ? '0' + ep.season_number : ep.season_number}E${ep.episode_number < 10 ? '0' + ep.episode_number : ep.episode_number} - ${ep.name || 'Untitled'}`,
                                           image_url: ep.image_url || ep.image?.original || ep.image?.medium || (ep.still_path ? (ep.still_path.startsWith('http') ? ep.still_path : `https://image.tmdb.org/t/p/w185${ep.still_path}`) : selectedItem.image_url),
-                                          custom_notes: ep.overview,
+                                          custom_notes: JSON.stringify({ description: ep.overview || '', release_date: ep.air_date || null }),
                                           completed_at: dbEp?.completed_at,
                                           is_completed: isCompleted,
                                           season_number: ep.season_number,

@@ -63,6 +63,7 @@ const CustomCard = ({
   coverBottomText,
   onCheck, 
   onClick, 
+  onTitleClick,
   isNsfw,
   language
 }: { 
@@ -74,6 +75,7 @@ const CustomCard = ({
   coverBottomText?: string;
   onCheck?: (e: React.MouseEvent) => void;
   onClick?: () => void;
+  onTitleClick?: (e: React.MouseEvent) => void;
   isNsfw?: boolean;
   language?: string;
 }) => {
@@ -102,7 +104,11 @@ const CustomCard = ({
       }}
       className="activity-card"
     >
-      <div style={{ padding: "0.5rem 0.75rem", fontSize: "0.85rem", fontWeight: 600, borderBottom: "1px solid var(--border-color)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+      <div 
+        onClick={onTitleClick ? (e) => { e.stopPropagation(); onTitleClick(e); } : undefined}
+        style={{ padding: "0.5rem 0.75rem", fontSize: "0.85rem", fontWeight: 600, borderBottom: "1px solid var(--border-color)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", cursor: onTitleClick ? "pointer" : "inherit" }}
+        title={title}
+      >
         {title}
       </div>
       <div style={{ width: "100%", height: "240px", background: "var(--bg-tertiary)", position: "relative" }}>
@@ -297,7 +303,7 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries }: { item: an
         title: nextEp.name || `Episode ${nextEp.episode_number}`,
         external_id: `tmdb-ep-${nextEp.id}`,
         image_url: nextEp.still_path ? (nextEp.still_path.startsWith('http') ? nextEp.still_path : `https://image.tmdb.org/t/p/w500${nextEp.still_path}`) : null,
-        custom_notes: nextEp.overview,
+        custom_notes: JSON.stringify({ description: nextEp.overview || '', release_date: nextEp.air_date || null }),
         parent_series: item
       });
     } else {
@@ -541,7 +547,7 @@ export const Home: React.FC = () => {
 
         {/* Guides Row */}
         {activeTab === "watching" && upNextGuides.length > 0 && (
-          <ScrollRow title="Continuar guias">
+          <ScrollRow title="Continuar guías">
             {upNextGuides.map(g => {
               let insideTop = g.title;
               let bottomText1 = '';
@@ -575,7 +581,8 @@ export const Home: React.FC = () => {
                   subtitle1={bottomText1}
                   subtitle2={bottomText2}
                   onCheck={(e) => handleMarkDone(e, g)}
-                  onClick={() => navigate(`/guide/${g.list_id}`)}
+                  onClick={() => setSelectedItem({ ...g, id: g.item_id })}
+                  onTitleClick={(e) => { e.stopPropagation(); navigate(`/guide/${g.list_id}`); }}
                   isNsfw={g.is_nsfw}
                   language={language}
                 />

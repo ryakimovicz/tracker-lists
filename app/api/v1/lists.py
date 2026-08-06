@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
-from typing import List, Optional
+import json
+from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 
@@ -1214,7 +1215,7 @@ def toggle_tmdb_episode(
             external_id=ext_id,
             title=ep_req.title,
             image_url=ep_req.image_url,
-            custom_notes=ep_req.overview,
+            custom_notes=json.dumps({"description": ep_req.overview or "", "release_date": None}),
             section=f"Season {ep_req.season_number}"
         )
         db.add(item)
@@ -1362,7 +1363,7 @@ def bulk_toggle_season(
                 external_id=ext_id,
                 title=f"{series_title} - S{req.season_number:02d}E{ep.get('episode_number', 1):02d} - {ep.get('name', 'Untitled')}",
                 image_url=f"https://image.tmdb.org/t/p/w185{ep.get('still_path')}" if ep.get('still_path') else None,
-                custom_notes=ep.get('overview'),
+                custom_notes=json.dumps({"description": ep.get('overview') or "", "release_date": ep.get('air_date') or None}),
                 section=f"Season {req.season_number}"
             )
             db.add(item)
