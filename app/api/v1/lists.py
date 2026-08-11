@@ -303,6 +303,7 @@ def update_list(
             detail="Only the creator can modify this list"
         )
         
+    old_title = reading_list.title
     old_visibility = reading_list.visibility
     old_flow = reading_list.section_descriptions.get("flow", []) if reading_list.section_descriptions else []
     update_data = list_in.model_dump(exclude_unset=True)
@@ -312,8 +313,11 @@ def update_list(
     db.commit()
     db.refresh(reading_list)
 
-    # Log activity only on explicit publish (when metadata/visibility are updated)
-    if "title" in update_data or "visibility" in update_data:
+    # Log activity only on explicit publish or title change
+    title_changed = "title" in update_data and old_title != update_data["title"]
+    visibility_changed = "visibility" in update_data and old_visibility != update_data["visibility"]
+    
+    if title_changed or visibility_changed:
         act_type = "guide_updated"
         if old_visibility == VisibilityEnum.DRAFT and reading_list.visibility in (VisibilityEnum.PUBLIC, VisibilityEnum.PRIVATE):
             act_type = "guide_published"
@@ -330,10 +334,10 @@ def update_list(
         
     if "section_descriptions" in update_data:
         new_flow = update_data["section_descriptions"].get("flow", [])
-        new_flow = update_data["section_descriptions"].get("flow", [])
         edited_title = reading_list.title
         edited_type = "block"
         edited_id = ""
+        block_changed = False
         
         def extract_elements(flow):
             els = {}
@@ -354,28 +358,36 @@ def update_list(
                 edited_title = new_el.get("title") or ""
                 edited_type = new_el.get("type", "block")
                 edited_id = el_id
+                block_changed = True
                 break
-            elif new_el != old_els[el_id]:
-                edited_title = new_el.get("title") or ""
-                edited_type = new_el.get("type", "block")
-                edited_id = el_id
-                break
+            else:
+                old_el_no_items = {k: v for k, v in old_els[el_id].items() if k != 'items'}
+                new_el_no_items = {k: v for k, v in new_el.items() if k != 'items'}
+                if old_el_no_items != new_el_no_items:
+                    edited_title = new_el.get("title") or ""
+                    edited_type = new_el.get("type", "block")
+                    edited_id = el_id
+                    block_changed = True
+                    break
                 
-        if edited_title == reading_list.title and len(old_els) != len(new_els):
+        if not block_changed and len(old_els) != len(new_els):
+            # A block was removed
             edited_title = ""
             edited_type = "block"
+            block_changed = True
             
-        activity_title = f"type:{edited_type}|id:{edited_id}|title:{edited_title}" if edited_title != reading_list.title else reading_list.title
+        if block_changed:
+            activity_title = f"type:{edited_type}|id:{edited_id}|title:{edited_title}" if edited_title != reading_list.title else reading_list.title
 
-        activity_block = UserActivityLog(
-            user_id=current_user.id,
-            activity_type="block_edited",
-            item_title=activity_title,
-            item_type="guide",
-            list_id=reading_list.id,
-            details=f"list_id:{reading_list.id}"
-        )
-        db.add(activity_block)
+            activity_block = UserActivityLog(
+                user_id=current_user.id,
+                activity_type="block_edited",
+                item_title=activity_title,
+                item_type="guide",
+                list_id=reading_list.id,
+                details=f"list_id:{reading_list.id}"
+            )
+            db.add(activity_block)
         
     db.commit()
 
