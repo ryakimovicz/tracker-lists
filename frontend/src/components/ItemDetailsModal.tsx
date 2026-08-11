@@ -862,33 +862,35 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                             boxShadow: '0 10px 25px rgba(0,0,0,0.5)'
                           }}
                         >
-                          <button
-                            type="button"
-                            onClick={handleMarkConsumedAgain}
-                            style={{
-                              background: 'transparent',
-                              border: 'none',
-                              color: 'var(--text-primary)',
-                              textAlign: 'left',
-                              padding: '0.4rem 0.6rem',
-                              cursor: 'pointer',
-                              fontSize: '0.85rem',
-                              borderRadius: '4px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '0.4rem'
-                            }}
-                          >
-                            <span>🔁</span>
-                            {selectedItem.item_type === 'movie' 
-                              ? (language === 'es' ? 'Volver a marcar como vista' : 'Mark as seen again')
-                              : selectedItem.item_type === 'game'
-                              ? (language === 'es' ? 'Volver a marcar como jugado' : 'Mark as played again')
-                              : ['book', 'comic', 'manga'].includes(selectedItem.item_type)
-                              ? (language === 'es' ? 'Volver a marcar como leído' : 'Mark as read again')
-                              : (language === 'es' ? 'Volver a marcar' : 'Mark again')
-                            }
-                          </button>
+                          {selectedItem.item_type !== 'series' && selectedItem.item_type !== 'anime' && (
+                            <button
+                              type="button"
+                              onClick={handleMarkConsumedAgain}
+                              style={{
+                                background: 'transparent',
+                                border: 'none',
+                                color: 'var(--text-primary)',
+                                textAlign: 'left',
+                                padding: '0.4rem 0.6rem',
+                                cursor: 'pointer',
+                                fontSize: '0.85rem',
+                                borderRadius: '4px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.4rem'
+                              }}
+                            >
+                              <span>🔁</span>
+                              {selectedItem.item_type === 'movie' 
+                                ? (language === 'es' ? 'Volver a marcar como vista' : 'Mark as seen again')
+                                : selectedItem.item_type === 'game'
+                                ? (language === 'es' ? 'Volver a marcar como jugado' : 'Mark as played again')
+                                : ['book', 'comic', 'manga'].includes(selectedItem.item_type)
+                                ? (language === 'es' ? 'Volver a marcar como leído' : 'Mark as read again')
+                                : (language === 'es' ? 'Volver a marcar' : 'Mark again')
+                              }
+                            </button>
+                          )}
                           
                           <button
                             type="button"
