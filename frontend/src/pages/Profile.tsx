@@ -1142,6 +1142,41 @@ export const Profile: React.FC = () => {
                 msg = language === 'es'
                   ? `Reseñaste o valoraste "${act.item_title}".`
                   : `Reviewed or rated "${act.item_title}".`;
+              } else if (act.activity_type === 'item_added') {
+                msg = language === 'es'
+                  ? `Agregaste "${act.item_title}" a una guía.`
+                  : `Added "${act.item_title}" to a guide.`;
+              } else if (act.activity_type === 'item_removed') {
+                msg = language === 'es'
+                  ? `Eliminaste "${act.item_title}" de una guía.`
+                  : `Removed "${act.item_title}" from a guide.`;
+              } else if (act.activity_type === 'item_moved') {
+                msg = language === 'es'
+                  ? `Moviste "${act.item_title}" en una guía.`
+                  : `Moved "${act.item_title}" in a guide.`;
+              } else if (act.activity_type === 'block_edited') {
+                if (act.item_title === "un bloque") {
+                  msg = language === 'es' ? `Editaste un bloque en una guía.` : `Edited a block in a guide.`;
+                } else if (act.item_title.startsWith("type:")) {
+                  const typeMatch = act.item_title.match(/type:([^|]*)(?:\|id:([^|]*))?\|title:(.*)/);
+                  if (typeMatch) {
+                    const elType = typeMatch[1];
+                    const elTitle = typeMatch[3];
+                    let typeName = language === 'es' ? 'un bloque' : 'a block';
+                    if (elType === 'section') typeName = language === 'es' ? 'una sección' : 'a section';
+                    else if (elType === 'subblock') typeName = language === 'es' ? 'un sub-bloque' : 'a sub-block';
+                    
+                    if (elTitle) {
+                      msg = language === 'es' ? `Editaste ${typeName === 'una sección' ? 'la sección' : typeName === 'un sub-bloque' ? 'el sub-bloque' : 'el bloque'} '${elTitle}' en una guía.` : `Edited the ${elType} '${elTitle}' in a guide.`;
+                    } else {
+                      msg = language === 'es' ? `Editaste ${typeName} sin título en una guía.` : `Edited an untitled ${elType} in a guide.`;
+                    }
+                  } else {
+                    msg = language === 'es' ? `Editaste un bloque en una guía.` : `Edited a block in a guide.`;
+                  }
+                } else {
+                  msg = language === 'es' ? `Editaste el bloque '${act.item_title}' en una guía.` : `Edited the block '${act.item_title}' in a guide.`;
+                }
               } else {
                 msg = `${act.activity_type} - ${act.item_title}`;
               }

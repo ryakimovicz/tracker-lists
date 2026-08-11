@@ -387,3 +387,20 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--color-text-user);
   border-color: rgba(0, 0, 0, 0.08);
 }
+
+/* Feed Updates Hover Effects */
+.feed-update-card:hover:not(:has(.feed-update-user-link:hover)) .feed-update-guide {
+  color: var(--accent-primary);
+}
+.feed-update-user-link:hover {
+  color: var(--accent-primary);
+}
+
+@keyframes highlightFade {
+  0% { background-color: rgba(124, 58, 237, 0.4) !important; box-shadow: 0 0 10px rgba(124, 58, 237, 0.5) !important; }
+  100% { background-color: transparent !important; box-shadow: none !important; }
+}
+
+.highlight-animation {
+  animation: highlightFade 2.5s ease-out forwards;
+}

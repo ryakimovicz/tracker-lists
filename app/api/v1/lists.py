@@ -304,6 +304,7 @@ def update_list(
         )
         
     old_visibility = reading_list.visibility
+    old_flow = reading_list.section_descriptions.get("flow", []) if reading_list.section_descriptions else []
     update_data = list_in.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(reading_list, field, value)
@@ -328,12 +329,48 @@ def update_list(
         db.add(activity)
         
     if "section_descriptions" in update_data:
-        # Assuming block_edited if section_descriptions is updated
-        # We can just say "un bloque" as we don't know exactly which block was edited from the diff
+        new_flow = update_data["section_descriptions"].get("flow", [])
+        new_flow = update_data["section_descriptions"].get("flow", [])
+        edited_title = reading_list.title
+        edited_type = "block"
+        edited_id = ""
+        
+        def extract_elements(flow):
+            els = {}
+            for el in flow:
+                if "id" in el:
+                    els[el["id"]] = el
+                if "subblocks" in el:
+                    for sub in el["subblocks"]:
+                        if "id" in sub:
+                            els[sub["id"]] = sub
+            return els
+            
+        old_els = extract_elements(old_flow)
+        new_els = extract_elements(new_flow)
+        
+        for el_id, new_el in reversed(list(new_els.items())):
+            if el_id not in old_els:
+                edited_title = new_el.get("title") or ""
+                edited_type = new_el.get("type", "block")
+                edited_id = el_id
+                break
+            elif new_el != old_els[el_id]:
+                edited_title = new_el.get("title") or ""
+                edited_type = new_el.get("type", "block")
+                edited_id = el_id
+                break
+                
+        if edited_title == reading_list.title and len(old_els) != len(new_els):
+            edited_title = ""
+            edited_type = "block"
+            
+        activity_title = f"type:{edited_type}|id:{edited_id}|title:{edited_title}" if edited_title != reading_list.title else reading_list.title
+
         activity_block = UserActivityLog(
             user_id=current_user.id,
             activity_type="block_edited",
-            item_title=reading_list.title,
+            item_title=activity_title,
             item_type="guide",
             list_id=reading_list.id,
             details=f"list_id:{reading_list.id}"
@@ -534,7 +571,7 @@ def auto_add_to_library(db: Session, user_id: int, item: ListItem):
     if not item.external_id:
         return
         
-    target_item_type = item.item_type
+    target_item_type = item.item_type.value if hasattr(item.item_type, 'value') else item.item_type
     target_external_id = item.external_id
     target_title = item.title
     target_image_url = item.image_url
@@ -678,9 +715,14 @@ def toggle_item_progress(
     if item.external_id:
         progress = db.query(ItemProgress).filter(
             ItemProgress.user_id == current_user.id,
-            ItemProgress.item_type == item.item_type,
+            ItemProgress.item_type == (item.item_type.value if hasattr(item.item_type, 'value') else item.item_type),
             ItemProgress.external_id == item.external_id
         ).first()
+        if not progress:
+            progress = db.query(ItemProgress).filter(
+                ItemProgress.user_id == current_user.id,
+                ItemProgress.list_item_id == item_id
+            ).first()
     else:
         progress = db.query(ItemProgress).filter(
             ItemProgress.user_id == current_user.id,
@@ -696,7 +738,7 @@ def toggle_item_progress(
         if item.external_id:
             progress = ItemProgress(
                 user_id=current_user.id,
-                item_type=item.item_type,
+                item_type=item.item_type.value if hasattr(item.item_type, 'value') else item.item_type,
                 external_id=item.external_id,
                 list_item_id=item_id, # Link for reference
                 is_completed=True,
@@ -721,7 +763,7 @@ def toggle_item_progress(
             user_id=current_user.id,
             activity_type="item_completed",
             item_title=item.title,
-            item_type=item.item_type,
+            item_type=item.item_type.value if item.item_type else None,
             external_id=item.external_id,
             image_url=item.image_url,
             details="completed"

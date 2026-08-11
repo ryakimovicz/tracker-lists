@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from '../context/LanguageContext';
 import { apiClient } from '../api/client';
 import {
@@ -13,6 +13,7 @@ import { ItemDetailsModal } from '../components/ItemDetailsModal';
 export const ViewGuide: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { hash } = useLocation();
   const { language } = useTranslation();
 
   const [guide, setGuide] = useState<any | null>(null);
@@ -72,6 +73,21 @@ export const ViewGuide: React.FC = () => {
       .then(res => setCurrentUser(res.data))
       .catch(e => console.error(e));
   }, [id, language]);
+
+  useEffect(() => {
+    const currentFlow = guide?.section_descriptions?.flow;
+    if (hash && currentFlow && currentFlow.length > 0) {
+      setTimeout(() => {
+        const elId = hash.replace('#', '');
+        const element = document.getElementById(elId);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          element.classList.add('highlight-animation');
+          setTimeout(() => element.classList.remove('highlight-animation'), 2500);
+        }
+      }, 500);
+    }
+  }, [hash, guide]);
 
   const toggleNodeCollapse = (nodeId: string) => {
     if (!guide) return;
@@ -291,7 +307,7 @@ export const ViewGuide: React.FC = () => {
                 currentSectionCollapsed = isCollapsed;
                 
                 return (
-                  <div key={el.id} style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem', marginTop: '0.5rem', display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                  <div id={el.id} key={el.id} style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem', marginTop: '0.5rem', display: 'flex', gap: '0.75rem', alignItems: 'center', transition: 'background-color 2.5s ease-out' }}>
                     <button
                       onClick={() => toggleNodeCollapse(el.id)}
                       style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: 0, display: 'flex' }}
@@ -334,7 +350,7 @@ export const ViewGuide: React.FC = () => {
                 if (currentSectionCollapsed) return null;
 
                 const blockItemsIds = (el.items || []).map((i: any) => i.id);
-                const blockItems = itemsList.filter((item: any) => blockItemsIds.includes(item.id));
+                const blockItems = blockItemsIds.map((id: number) => itemsList.find((i: any) => i.id === id)).filter(Boolean);
                 const allBlockIds = getBlockItemIds(el);
                 const isBlockCompleted = allBlockIds.length > 0 && allBlockIds.every((id: number) => itemsList.find((i: any) => i.id === id)?.is_completed);
                 const isCollapsed = collapsedNodes[el.id] || false;
@@ -342,7 +358,7 @@ export const ViewGuide: React.FC = () => {
                 const priorityLabel = getPriorityLabel(el.importance_rank, language);
 
                 return (
-                  <div key={el.id} style={{ paddingLeft: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <div id={el.id} key={el.id} style={{ paddingLeft: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', transition: 'background-color 2.5s ease-out', borderRadius: '8px' }}>
                     <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
                       <button
                         onClick={() => toggleNodeCollapse(el.id)}
@@ -434,7 +450,7 @@ export const ViewGuide: React.FC = () => {
 
                         {(el.subblocks || []).map((sub: any) => {
                           const subItemsIds = (sub.items || []).map((i: any) => i.id);
-                          const subItems = itemsList.filter((item: any) => subItemsIds.includes(item.id));
+                          const subItems = subItemsIds.map((id: number) => itemsList.find((i: any) => i.id === id)).filter(Boolean);
                           const allSubblockIds = getSubblockItemIds(sub);
                           const isSubblockCompleted = allSubblockIds.length > 0 && allSubblockIds.every((id: number) => itemsList.find((i: any) => i.id === id)?.is_completed);
                           const isSubCollapsed = collapsedNodes[sub.id] || false;
@@ -442,7 +458,7 @@ export const ViewGuide: React.FC = () => {
                           const subPriorityLabel = getPriorityLabel(sub.importance_rank, language);
 
                           return (
-                            <div key={sub.id} style={{ marginLeft: '1.5rem', paddingLeft: '0.75rem', borderLeft: '2px dashed var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                            <div id={sub.id} key={sub.id} style={{ marginLeft: '1.5rem', paddingLeft: '0.75rem', borderLeft: '2px dashed var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.5rem', transition: 'background-color 2.5s ease-out', borderRadius: '8px' }}>
                               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                                 <button
                                   onClick={() => toggleNodeCollapse(sub.id)}
