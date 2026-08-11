@@ -693,9 +693,12 @@ def auto_add_to_library(db: Session, user_id: int, item: ListItem):
         existing.updated_at = datetime.now(timezone.utc)
         db.commit()
 
+from typing import Optional
+
 @router.post("/items/{item_id}/toggle", status_code=status.HTTP_200_OK)
 def toggle_item_progress(
     item_id: int,
+    action: Optional[str] = None, # None=toggle, 'mark_again', 'remove'
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -729,12 +732,39 @@ def toggle_item_progress(
             ItemProgress.list_item_id == item_id
         ).first()
     
+    # Needs to be imported inside or at the top
+    from app.models.consumption import ConsumptionHistory
+    
+    now_dt = datetime.now(timezone.utc)
+    just_marked_completed = False
+    
     if progress:
-        progress.is_completed = not progress.is_completed
-        if progress.is_completed:
-            progress.is_skipped = False
-        progress.completed_at = datetime.now(timezone.utc) if progress.is_completed else None
+        if action == "mark_again":
+            progress.is_completed = True
+            progress.completed_at = now_dt
+            just_marked_completed = True
+        elif action == "remove":
+            progress.is_completed = False
+            progress.completed_at = None
+            
+            # Also try to remove from user library if it's an episode that was added automatically
+            if item.external_id and item.external_id.startswith("tvm-ep-"):
+                db.query(UserLibraryItem).filter(
+                    UserLibraryItem.user_id == current_user.id,
+                    UserLibraryItem.external_id == item.external_id
+                ).delete()
+        else:
+            # Default toggle
+            progress.is_completed = not progress.is_completed
+            if progress.is_completed:
+                progress.is_skipped = False
+            progress.completed_at = now_dt if progress.is_completed else None
+            just_marked_completed = progress.is_completed
     else:
+        # Prevent "remove" or "mark_again" if no progress exists (though shouldn't happen from UI)
+        if action == "remove":
+            return {"item_id": item_id, "is_completed": False}
+            
         if item.external_id:
             progress = ItemProgress(
                 user_id=current_user.id,
@@ -743,7 +773,7 @@ def toggle_item_progress(
                 list_item_id=item_id, # Link for reference
                 is_completed=True,
                 is_skipped=False,
-                completed_at=datetime.now(timezone.utc)
+                completed_at=now_dt
             )
         else:
             progress = ItemProgress(
@@ -751,19 +781,30 @@ def toggle_item_progress(
                 list_item_id=item_id,
                 is_completed=True,
                 is_skipped=False,
-                completed_at=datetime.now(timezone.utc)
+                completed_at=now_dt
             )
         db.add(progress)
+        just_marked_completed = True
         
-    if progress.is_completed:
+    if just_marked_completed:
         auto_add_to_library(db, current_user.id, item)
+        
+        # Add to ConsumptionHistory
+        ch = ConsumptionHistory(
+            user_id=current_user.id,
+            item_type=item.item_type.value if hasattr(item.item_type, 'value') else item.item_type,
+            external_id=item.external_id,
+            list_item_id=item_id,
+            consumed_at=now_dt
+        )
+        db.add(ch)
         
         # Record activity log
         activity = UserActivityLog(
             user_id=current_user.id,
             activity_type="item_completed",
             item_title=item.title,
-            item_type=item.item_type.value if item.item_type else None,
+            item_type=item.item_type.value if hasattr(item.item_type, 'value') else item.item_type,
             external_id=item.external_id,
             image_url=item.image_url,
             details="completed"
@@ -1231,6 +1272,7 @@ def bulk_section_action(
 def toggle_series_episode(
     list_id: int,
     ep_req: ToggleSeriesEpisodeRequest,
+    action: Optional[str] = None, # None=toggle, 'mark_again', 'remove'
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -1273,11 +1315,35 @@ def toggle_series_episode(
         ItemProgress.external_id == ext_id
     ).first()
     
+    from app.models.consumption import ConsumptionHistory
+    now_dt = datetime.now(timezone.utc)
+    just_marked = False
+    
     if progress:
-        progress.is_completed = not progress.is_completed
-        progress.list_item_id = item.id
-        progress.completed_at = datetime.now(timezone.utc) if progress.is_completed else None
+        if action == "mark_again":
+            progress.is_completed = True
+            progress.list_item_id = item.id
+            progress.completed_at = now_dt
+            just_marked = True
+        elif action == "remove":
+            progress.is_completed = False
+            progress.list_item_id = item.id
+            progress.completed_at = None
+            
+            # Remove from user library
+            db.query(UserLibraryItem).filter(
+                UserLibraryItem.user_id == current_user.id,
+                UserLibraryItem.external_id == ext_id
+            ).delete()
+        else:
+            progress.is_completed = not progress.is_completed
+            progress.list_item_id = item.id
+            progress.completed_at = now_dt if progress.is_completed else None
+            just_marked = progress.is_completed
     else:
+        if action == "remove":
+            return {"is_completed": False, "completed_at": None}
+            
         progress = ItemProgress(
             user_id=current_user.id,
             item_type=ItemTypeEnum.SERIES,
@@ -1285,17 +1351,31 @@ def toggle_series_episode(
             list_item_id=item.id,
             is_completed=True,
             is_skipped=False,
-            completed_at=datetime.now(timezone.utc)
+            completed_at=now_dt
         )
         db.add(progress)
+        just_marked = True
         
-    if progress.is_completed:
+    if just_marked:
+        auto_add_to_library(db, current_user.id, item)
+        
+        ch = ConsumptionHistory(
+            user_id=current_user.id,
+            item_type=item.item_type.value if hasattr(item.item_type, 'value') else item.item_type,
+            external_id=item.external_id,
+            list_item_id=item.id,
+            consumed_at=now_dt
+        )
+        db.add(ch)
+        
         # Record activity log
         activity = UserActivityLog(
             user_id=current_user.id,
             activity_type="item_completed",
             item_title=item.title,
-            item_type="series",
+            item_type=item.item_type.value if hasattr(item.item_type, 'value') else item.item_type,
+            external_id=item.external_id,
+            image_url=item.image_url,
             details="completed"
         )
         db.add(activity)

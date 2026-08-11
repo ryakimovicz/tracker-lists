@@ -846,27 +846,6 @@ export const Profile: React.FC = () => {
                               </span>
                             )}
                           </div>
-
-                          {isOwnProfile && (
-                            <button
-                              onClick={() => handleDeleteItem(item.id)}
-                              className="btn-secondary"
-                              style={{
-                                padding: '0.25rem',
-                                fontSize: '0.8rem',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: '0.25rem',
-                                color: '#ef4444',
-                                background: 'transparent',
-                                border: 'none',
-                                cursor: 'pointer'
-                              }}
-                            >
-                              <Trash2 size={14} /> {language === 'es' ? 'Quitar' : 'Remove'}
-                            </button>
-                          )}
                         </div>
                       ))}
                     </div>

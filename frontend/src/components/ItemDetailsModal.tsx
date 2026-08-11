@@ -80,6 +80,9 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
   const [showMenu, setShowMenu] = useState(false);
+  const [showShelfMenu, setShowShelfMenu] = useState(false);
+  const [showEpisodeMenu, setShowEpisodeMenu] = useState(false);
+  const [openEpisodeMenuId, setOpenEpisodeMenuId] = useState<number | null>(null);
 
   const getDefaultStatus = (type: string) => {
     if (type === 'game') return 'plan_to_play';
@@ -94,10 +97,15 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
   const handleAddToShelf = async () => {
     if (!selectedItem) return;
-    const defaultStatus = getDefaultStatus(selectedItem.item_type);
-    const resId = await ensureTracked(defaultStatus);
-    if (resId) {
-      onUpdate && onUpdate();
+    if (selectedItem.id) {
+      // Already in shelf, show menu
+      setShowShelfMenu(!showShelfMenu);
+    } else {
+      const defaultStatus = getDefaultStatus(selectedItem.item_type);
+      const resId = await ensureTracked(defaultStatus);
+      if (resId) {
+        onUpdate && onUpdate();
+      }
     }
   };
 
@@ -133,9 +141,22 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     }
   };
 
+  const handleMarkConsumedAgain = async () => {
+    if (!selectedItem || !selectedItem.id) return;
+    setShowShelfMenu(false);
+    try {
+      const res = await apiClient.post(`/library/${selectedItem.id}/mark-consumed`);
+      setSelectedItem((prev: any) => prev ? { ...prev, ...res.data } : null);
+      onUpdate && onUpdate();
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   const handleRemoveFromShelf = async () => {
     if (!selectedItem || !selectedItem.id) return;
     setShowMenu(false);
+    setShowShelfMenu(false);
     try {
       await apiClient.delete(`/library/${selectedItem.id}`);
       setSelectedItem(null);
@@ -600,7 +621,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     }
   };
 
-  const handleToggleEpisode = async (listId: number, ep: any) => {
+  const handleToggleEpisode = async (listId: number, ep: any, action?: string) => {
     let effectiveListId = listId;
     if (!effectiveListId) {
       if (selectedItem.parent_series) {
@@ -642,7 +663,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     }
     
     try {
-      const res = await apiClient.post(`/lists/${effectiveListId}/toggle-series-episode`, {
+      const url = action ? `/lists/${effectiveListId}/toggle-series-episode?action=${action}` : `/lists/${effectiveListId}/toggle-series-episode`;
+      const res = await apiClient.post(url, {
         episode_id: ep.id,
         title: ep.title || `${selectedItem.title} - S${ep.season_number < 10 ? '0' + ep.season_number : ep.season_number}E${ep.episode_number < 10 ? '0' + ep.episode_number : ep.episode_number} - ${ep.name || 'Untitled Episode'}`,
         image_url: ep.image_url || ep.image?.original || ep.image?.medium || ep.still_path || selectedItem.image_url,
@@ -802,41 +824,117 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                   {/* Button + (Add to Shelf / Follow) */}
                   {isOwnProfile && !isEpisode && (
-                    <button
-                      type="button"
-                      onClick={handleAddToShelf}
-                      className="btn-secondary"
-                      title={language === 'es' ? 'Seguir / Añadir' : 'Follow / Add'}
-                      style={{
-                        padding: '0.4rem',
-                        borderRadius: '50%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        background: selectedItem?.id ? `var(--color-${selectedItem.item_type || 'movie'})` : 'var(--bg-tertiary)',
-                        borderColor: selectedItem?.id ? `var(--color-${selectedItem.item_type || 'movie'})` : 'var(--border-color)',
-                        color: selectedItem?.id ? `var(--color-text-${selectedItem.item_type || 'movie'})` : 'var(--text-primary)',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      <Plus size={18} />
-                    </button>
+                    <div style={{ position: 'relative' }}>
+                      <button
+                        type="button"
+                        onClick={handleAddToShelf}
+                        className="btn-secondary"
+                        title={language === 'es' ? 'Seguir / Añadir' : 'Follow / Add'}
+                        style={{
+                          padding: '0.4rem',
+                          borderRadius: '50%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          background: selectedItem?.id ? `var(--color-${selectedItem.item_type || 'movie'})` : 'var(--bg-tertiary)',
+                          borderColor: selectedItem?.id ? `var(--color-${selectedItem.item_type || 'movie'})` : 'var(--border-color)',
+                          color: selectedItem?.id ? `var(--color-text-${selectedItem.item_type || 'movie'})` : 'var(--text-primary)',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <Plus size={18} />
+                      </button>
+
+                      {showShelfMenu && selectedItem?.id && (
+                        <div
+                          className="glass-card"
+                          style={{
+                            position: 'absolute',
+                            top: '100%',
+                            right: 0,
+                            marginTop: '0.5rem',
+                            zIndex: 3000,
+                            padding: '0.5rem',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '0.4rem',
+                            minWidth: '220px',
+                            boxShadow: '0 10px 25px rgba(0,0,0,0.5)'
+                          }}
+                        >
+                          <button
+                            type="button"
+                            onClick={handleMarkConsumedAgain}
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              color: 'var(--text-primary)',
+                              textAlign: 'left',
+                              padding: '0.4rem 0.6rem',
+                              cursor: 'pointer',
+                              fontSize: '0.85rem',
+                              borderRadius: '4px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.4rem'
+                            }}
+                          >
+                            <span>🔁</span>
+                            {selectedItem.item_type === 'movie' 
+                              ? (language === 'es' ? 'Volver a marcar como vista' : 'Mark as seen again')
+                              : selectedItem.item_type === 'game'
+                              ? (language === 'es' ? 'Volver a marcar como jugado' : 'Mark as played again')
+                              : ['book', 'comic', 'manga'].includes(selectedItem.item_type)
+                              ? (language === 'es' ? 'Volver a marcar como leído' : 'Mark as read again')
+                              : (language === 'es' ? 'Volver a marcar' : 'Mark again')
+                            }
+                          </button>
+                          
+                          <button
+                            type="button"
+                            onClick={handleRemoveFromShelf}
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              color: '#ef4444',
+                              textAlign: 'left',
+                              padding: '0.4rem 0.6rem',
+                              cursor: 'pointer',
+                              fontSize: '0.85rem',
+                              borderRadius: '4px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.4rem'
+                            }}
+                          >
+                            <Trash2 size={14} />
+                            {language === 'es' ? 'Quitar de estantería' : 'Remove from shelf'}
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   )}
 
                   {/* Completion Tick Button for Episodes (Top Right) */}
                   {isOwnProfile && isEpisode && (
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        await handleToggleEpisode(selectedItem.list_id || selectedItem.tracking_list_id, {
-                          id: selectedItem.rawEpisodeId || (selectedItem.external_id ? parseInt(selectedItem.external_id.replace('tvm-ep-', '')) : selectedItem.id),
-                          title: selectedItem.title,
-                          image_url: selectedItem.image_url,
-                          custom_notes: selectedItem.custom_notes,
-                          season_number: selectedItem.season_number,
-                          episode_number: selectedItem.episode_number
-                        });
-                      }}
+                    <div style={{ position: 'relative' }}>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const isComplete = !!(selectedItem.completed_at || selectedItem.is_completed);
+                          if (isComplete) {
+                            setShowEpisodeMenu(!showEpisodeMenu);
+                          } else {
+                            await handleToggleEpisode(selectedItem.list_id || selectedItem.tracking_list_id, {
+                              id: selectedItem.rawEpisodeId || (selectedItem.external_id ? parseInt(selectedItem.external_id.replace('tvm-ep-', '')) : selectedItem.id),
+                              title: selectedItem.title,
+                              image_url: selectedItem.image_url,
+                              custom_notes: selectedItem.custom_notes,
+                              season_number: selectedItem.season_number,
+                              episode_number: selectedItem.episode_number
+                            });
+                          }
+                        }}
                       title={language === 'es' ? 'Marcar como visto' : 'Mark as seen'}
                       style={{
                         background: (selectedItem.completed_at || selectedItem.is_completed) ? `var(--color-${selectedItem.item_type === 'episode' ? 'series' : (selectedItem.item_type || 'movie')})` : 'transparent',
@@ -856,6 +954,88 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                     >
                       <Check size={18} strokeWidth={3} />
                     </button>
+
+                    {showEpisodeMenu && (selectedItem.completed_at || selectedItem.is_completed) && (
+                        <div
+                          className="glass-card"
+                          style={{
+                            position: 'absolute',
+                            top: '100%',
+                            right: 0,
+                            marginTop: '0.5rem',
+                            zIndex: 3000,
+                            padding: '0.5rem',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '0.4rem',
+                            minWidth: '220px',
+                            boxShadow: '0 10px 25px rgba(0,0,0,0.5)'
+                          }}
+                        >
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              setShowEpisodeMenu(false);
+                              await handleToggleEpisode(selectedItem.list_id || selectedItem.tracking_list_id, {
+                                id: selectedItem.rawEpisodeId || (selectedItem.external_id ? parseInt(selectedItem.external_id.replace('tvm-ep-', '')) : selectedItem.id),
+                                title: selectedItem.title,
+                                image_url: selectedItem.image_url,
+                                custom_notes: selectedItem.custom_notes,
+                                season_number: selectedItem.season_number,
+                                episode_number: selectedItem.episode_number
+                              }, 'mark_again');
+                            }}
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              color: 'var(--text-primary)',
+                              textAlign: 'left',
+                              padding: '0.4rem 0.6rem',
+                              cursor: 'pointer',
+                              fontSize: '0.85rem',
+                              borderRadius: '4px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.4rem'
+                            }}
+                          >
+                            <span>🔁</span>
+                            {language === 'es' ? 'Volver a marcar como visto' : 'Mark as seen again'}
+                          </button>
+                          
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              setShowEpisodeMenu(false);
+                              await handleToggleEpisode(selectedItem.list_id || selectedItem.tracking_list_id, {
+                                id: selectedItem.rawEpisodeId || (selectedItem.external_id ? parseInt(selectedItem.external_id.replace('tvm-ep-', '')) : selectedItem.id),
+                                title: selectedItem.title,
+                                image_url: selectedItem.image_url,
+                                custom_notes: selectedItem.custom_notes,
+                                season_number: selectedItem.season_number,
+                                episode_number: selectedItem.episode_number
+                              }, 'remove');
+                            }}
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              color: '#ef4444',
+                              textAlign: 'left',
+                              padding: '0.4rem 0.6rem',
+                              cursor: 'pointer',
+                              fontSize: '0.85rem',
+                              borderRadius: '4px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.4rem'
+                            }}
+                          >
+                            <Trash2 size={14} />
+                            {language === 'es' ? 'Desmarcar / Quitar' : 'Unwatch / Remove'}
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   )}
 
                   {/* Button ⋮ (Vertical 3 dots menu) */}
@@ -1367,32 +1547,106 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                       }}
                                     >
                                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                                        <button
-                                           type="button"
-                                           disabled={!isOwnProfile}
-                                           onClick={() => {
-                                             const currentIsCompleted = !!globalProgress[`tvm-ep-${ep.id}`] || !!dbEp?.is_completed;
-                                             setGlobalProgress(prev => ({ ...prev, [`tvm-ep-${ep.id}`]: !currentIsCompleted }));
-                                             handleToggleEpisode(selectedItem.tracking_list_id, ep);
-                                           }}
-                                           style={{
-                                             background: isCompleted ? `var(--color-${selectedItem.item_type || 'movie'})` : 'transparent',
-                                             border: isCompleted ? 'none' : '1px solid var(--border-color)',
-                                             borderRadius: '50%',
-                                             width: '20px',
-                                             height: '20px',
-                                             display: 'inline-flex',
-                                             alignItems: 'center',
-                                             justifyContent: 'center',
-                                             cursor: isOwnProfile ? 'pointer' : 'default',
-                                             color: isCompleted ? `var(--color-text-${selectedItem.item_type || 'movie'})` : 'var(--text-muted)',
-                                             opacity: isCompleted ? 1 : 0.6,
-                                             transition: 'all 0.2s ease',
-                                             padding: 0
-                                           }}
-                                         >
-                                           <Check size={12} strokeWidth={3} />
-                                         </button>
+                                        <div style={{ position: 'relative' }}>
+                                          <button
+                                            type="button"
+                                            disabled={!isOwnProfile}
+                                            onClick={() => {
+                                              const currentIsCompleted = !!globalProgress[`tvm-ep-${ep.id}`] || !!dbEp?.is_completed;
+                                              if (currentIsCompleted) {
+                                                setOpenEpisodeMenuId(openEpisodeMenuId === ep.id ? null : ep.id);
+                                              } else {
+                                                setGlobalProgress(prev => ({ ...prev, [`tvm-ep-${ep.id}`]: true }));
+                                                handleToggleEpisode(selectedItem.tracking_list_id, ep);
+                                              }
+                                            }}
+                                            style={{
+                                              background: isCompleted ? `var(--color-${selectedItem.item_type || 'movie'})` : 'transparent',
+                                              border: isCompleted ? 'none' : '1px solid var(--border-color)',
+                                              borderRadius: '50%',
+                                              width: '20px',
+                                              height: '20px',
+                                              display: 'inline-flex',
+                                              alignItems: 'center',
+                                              justifyContent: 'center',
+                                              cursor: isOwnProfile ? 'pointer' : 'default',
+                                              color: isCompleted ? `var(--color-text-${selectedItem.item_type || 'movie'})` : 'var(--text-muted)',
+                                              opacity: isCompleted ? 1 : 0.6,
+                                              transition: 'all 0.2s ease',
+                                              padding: 0
+                                            }}
+                                          >
+                                            <Check size={12} strokeWidth={3} />
+                                          </button>
+
+                                          {openEpisodeMenuId === ep.id && isCompleted && (
+                                            <div
+                                              className="glass-card"
+                                              style={{
+                                                position: 'absolute',
+                                                top: '100%',
+                                                left: 0,
+                                                marginTop: '0.5rem',
+                                                zIndex: 3000,
+                                                padding: '0.5rem',
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                gap: '0.4rem',
+                                                minWidth: '220px',
+                                                boxShadow: '0 10px 25px rgba(0,0,0,0.5)'
+                                              }}
+                                            >
+                                              <button
+                                                type="button"
+                                                onClick={async () => {
+                                                  setOpenEpisodeMenuId(null);
+                                                  await handleToggleEpisode(selectedItem.tracking_list_id, ep, 'mark_again');
+                                                }}
+                                                style={{
+                                                  background: 'transparent',
+                                                  border: 'none',
+                                                  color: 'var(--text-primary)',
+                                                  textAlign: 'left',
+                                                  padding: '0.4rem 0.6rem',
+                                                  cursor: 'pointer',
+                                                  fontSize: '0.85rem',
+                                                  borderRadius: '4px',
+                                                  display: 'flex',
+                                                  alignItems: 'center',
+                                                  gap: '0.4rem'
+                                                }}
+                                              >
+                                                <span>🔁</span>
+                                                {language === 'es' ? 'Volver a marcar como visto' : 'Mark as seen again'}
+                                              </button>
+                                              
+                                              <button
+                                                type="button"
+                                                onClick={async () => {
+                                                  setOpenEpisodeMenuId(null);
+                                                  setGlobalProgress(prev => ({ ...prev, [`tvm-ep-${ep.id}`]: false }));
+                                                  await handleToggleEpisode(selectedItem.tracking_list_id, ep, 'remove');
+                                                }}
+                                                style={{
+                                                  background: 'transparent',
+                                                  border: 'none',
+                                                  color: '#ef4444',
+                                                  textAlign: 'left',
+                                                  padding: '0.4rem 0.6rem',
+                                                  cursor: 'pointer',
+                                                  fontSize: '0.85rem',
+                                                  borderRadius: '4px',
+                                                  display: 'flex',
+                                                  alignItems: 'center',
+                                                  gap: '0.4rem'
+                                                }}
+                                              >
+                                                <Trash2 size={14} />
+                                                {language === 'es' ? 'Desmarcar / Quitar' : 'Unwatch / Remove'}
+                                              </button>
+                                            </div>
+                                          )}
+                                        </div>
                                         <span style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-primary)' }}>
                                           {ep.episode_number}. {ep.name || 'Untitled'}
                                         </span>

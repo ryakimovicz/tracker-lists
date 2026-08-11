@@ -189,6 +189,45 @@ def sync_show_episodes_and_get_last_seen(db: Session, user_id: int, tracking_lis
     completed_eps.sort(key=lambda x: (x[0], x[1]))
     return completed_eps[-1][2]
 
+@router.post("/{item_id}/mark-consumed", response_model=LibraryItemResponse, status_code=status.HTTP_200_OK)
+def mark_library_item_consumed(
+    item_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    item = db.query(UserLibraryItem).filter(
+        UserLibraryItem.id == item_id,
+        UserLibraryItem.user_id == current_user.id
+    ).first()
+    
+    if not item:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Library item not found")
+        
+    # Mark as completed (or read/played) and update date
+    if item.item_type in ['book', 'comic', 'manga']:
+        item.status = UserLibraryStatusEnum.READ
+    elif item.item_type == 'game':
+        item.status = UserLibraryStatusEnum.COMPLETED
+    else:
+        item.status = UserLibraryStatusEnum.COMPLETED
+        
+    now_dt = datetime.now(timezone.utc)
+    item.completed_at = now_dt
+    
+    # Import locally
+    from app.models.consumption import ConsumptionHistory
+    
+    ch = ConsumptionHistory(
+        user_id=current_user.id,
+        item_type=item.item_type.value if hasattr(item.item_type, 'value') else item.item_type,
+        external_id=item.external_id,
+        consumed_at=now_dt
+    )
+    db.add(ch)
+    db.commit()
+    db.refresh(item)
+    return item
+
 @router.post("/", response_model=LibraryItemResponse, status_code=status.HTTP_201_CREATED)
 def add_to_library(
     item_in: LibraryItemCreate,
