@@ -311,7 +311,7 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
                               
                               {(() => {
                                 const seasonEps = expandedEpisodes.filter(ep => ep.season_number === selectedSeason);
-                                const seasonIds = seasonEps.map(ep => `tmdb-ep-${ep.id}`);
+                                const seasonIds = seasonEps.map(ep => `tvm-ep-${ep.id}`);
                                 const seasonExtId = `season-${media.external_id}-${selectedSeason}`;
                                 const isSeasonAdded = addedIds.includes(seasonExtId) || (seasonIds.length > 0 && seasonIds.every(id => addedIds.includes(id)));
                                 
@@ -351,7 +351,7 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
                               const still = ep.still_path;
                               const image_url = still ? (still.startsWith('http') ? still : `https://image.tmdb.org/t/p/w185${still}`) : media.image_url;
                               
-                              const ext_id = `tmdb-ep-${ep.id}`;
+                              const ext_id = `tvm-ep-${ep.id}`;
                               const isEpAdded = addedIds.includes(ext_id);
                               
                               return (
