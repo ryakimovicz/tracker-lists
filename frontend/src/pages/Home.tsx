@@ -36,19 +36,19 @@ const ScrollRow = ({ children, title }: { children: React.ReactNode, title?: str
 
   return (
     <div style={{ position: "relative", marginBottom: "2rem" }}>
-      {title && <h3 style={{ fontSize: "1.2rem", marginBottom: "1rem", fontWeight: 600 }}>{title}</h3>}
+      {title && <h3 style={{ fontSize: "1.2rem", marginBottom: "1rem", fontWeight: 600, paddingLeft: "45px" }}>{title}</h3>}
       <button 
         onClick={() => scroll("left")}
-        style={{ position: "absolute", left: "-20px", top: "50%", transform: "translateY(-50%)", zIndex: 10, background: "var(--bg-tertiary)", border: "1px solid var(--border-color)", borderRadius: "50%", width: "40px", height: "40px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
+        style={{ position: "absolute", left: "0px", top: "50%", transform: "translateY(-50%)", zIndex: 10, background: "var(--bg-tertiary)", border: "1px solid var(--border-color)", borderRadius: "50%", width: "40px", height: "40px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", boxShadow: "0 4px 6px rgba(0,0,0,0.3)" }}
       ><ChevronLeft size={20} color="var(--text-primary)" /></button>
       
-      <div ref={scrollRef} style={{ display: "flex", gap: "1rem", overflowX: "auto", scrollbarWidth: "none", msOverflowStyle: "none", paddingBottom: "1rem" }}>
+      <div ref={scrollRef} style={{ display: "flex", gap: "1rem", overflowX: "auto", scrollbarWidth: "none", msOverflowStyle: "none", paddingBottom: "1rem", paddingLeft: "45px", paddingRight: "45px" }}>
         {children}
       </div>
 
       <button 
         onClick={() => scroll("right")}
-        style={{ position: "absolute", right: "-20px", top: "50%", transform: "translateY(-50%)", zIndex: 10, background: "var(--bg-tertiary)", border: "1px solid var(--border-color)", borderRadius: "50%", width: "40px", height: "40px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
+        style={{ position: "absolute", right: "0px", top: "50%", transform: "translateY(-50%)", zIndex: 10, background: "var(--bg-tertiary)", border: "1px solid var(--border-color)", borderRadius: "50%", width: "40px", height: "40px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", boxShadow: "0 4px 6px rgba(0,0,0,0.3)" }}
       ><ChevronRight size={20} color="var(--text-primary)" /></button>
     </div>
   );
