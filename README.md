@@ -27,11 +27,11 @@
 | Servicio | Uso |
 |---|---|
 | [TVMaze](https://www.tvmaze.com/api) | Series, animes y detalle de episodios/temporadas |
-| [OMDb](https://www.omdbapi.com/) + [Fanart.tv](https://fanart.tv/) | Películas y pósters en HD |
+| [OMDb](https://www.omdbapi.com/) + [Fanart.tv](https://fanart.tv/) | Películas (con duración y sinopsis completas) y pósters en HD |
 | [Last.fm](https://www.last.fm/api) | Música, álbumes destacados y scrobbling en tiempo real |
 | [IGDB](https://api-docs.igdb.com/) | Videojuegos (autenticado via Twitch OAuth2) |
-| [Google Books](https://developers.google.com/books/docs/v1/using) + [Open Library](https://openlibrary.org/developers/api) | Libros |
-| [Comic Vine](https://comicvine.gamespot.com/api/) | Cómics y mangas |
+| [Google Books](https://developers.google.com/books/docs/v1/using) + [Open Library](https://openlibrary.org/developers/api) | Libros (con tracking de páginas) |
+| [Comic Vine](https://comicvine.gamespot.com/api/) | Cómics y mangas (con tracking de páginas) |
 | [Google Translate](https://translate.google.com/) | Traducción dinámica de sinopsis (vía `deep-translator`) |
 
 ---
@@ -64,9 +64,9 @@ Búsqueda y descubrimiento:
 - **Buscador Global**: Conecta con TVMaze, OMDb, IGDB, Google Books y Comic Vine con filtros por categoría (Películas, Series, Animes, Libros, Cómics, Mangas, Juegos).
 - **Modal de Detalle del Ítem**: Ficha completa del elemento con:
   - Botón `+` en la barra superior para añadir/seguir la obra en la estantería (creando automáticamente una lista privada de seguimiento para series/animes).
-  - Menú `⋮` (3 puntos verticales) con opciones para *"Marcar como abandonado"* o *"Quitar de estantería"*.
-  - Botón `X` de cierre posicionado en la esquina superior para no entorpecer los botones de acción.
-  - Botón de tick `✓` en el cuerpo del modal (alineado a la derecha, bajo la calificación) para marcar como visto/leído/jugado sin desplegables de estado.
+  - Sistema intuitivo de 3 botones principales integrados: **Leído/Completado, Pausa, Abandonado**, que añaden automáticamente el elemento a la estantería al activarse.
+  - Para libros, cómics y mangas: **Tracking detallado de progreso por página** (Páginas leídas vs. Totales), que se auto-completa al marcar la obra como Leída.
+  - Botón interactivo **"🌐 Ver traducción"** debajo de las sinopsis en inglés (cuando la interfaz está en Español), con sistema inteligente de caché en base de datos.
   - Para series y animes: acordeón de temporadas y capítulos con marcado mediante botones circulares `✓` individuales o masivos por temporada.
   - Botón interactivo **"🌐 Ver traducción"** debajo de las sinopsis en inglés (cuando la interfaz está en Español), con sistema inteligente de caché en base de datos.
 - **Búsqueda de Usuarios y Guías**: Encuentra usuarios de Pathd y guías públicas de la comunidad.
@@ -76,7 +76,7 @@ Perfil público y gestión de biblioteca:
 - **Estadísticas**: Seguidores, seguidos, fecha de registro e historial de actividad.
 - **Estantería (Shelf)**: Catálogo personal organizado por categoría y estado de consumo, sin desplegables de estado en las tarjetas:
   - Marcado de fecha (sin hora) en que el usuario completó/marcó el elemento.
-  - Distintivo visual claro para elementos marcados como `🚫 Abandonado`.
+  - Ocultamiento inteligente de elementos marcados como `🚫 Abandonado` para mantener la estantería limpia.
   - **Tarjetas de Series**: Muestran limpiamente el último capítulo visto (ej: `Último visto: S01E03`).
   - **Episodios y Temporadas Sueltas**: Si el usuario marca un capítulo o temporada en una guía sin seguir la serie completa, se crea una tarjeta individual en la estantería indicando la serie a la que pertenece y la fecha. Si posteriormente se sigue la serie completa, las tarjetas sueltas se agrupan automáticamente en la tarjeta principal de la serie.
 - **Favoritos**: Obras destacadas visibles en el perfil.
