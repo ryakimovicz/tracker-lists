@@ -417,7 +417,7 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries }: { item: an
   );
 };
 
-const ActiveMovieCard = ({ item, onUpdate, language, onOpenMovie }: { item: any, onUpdate: () => void, language: string, onOpenMovie: (item: any) => void }) => {
+const ActiveItemCard = ({ item, onUpdate, language, onOpenItem }: { item: any, onUpdate: () => void, language: string, onOpenItem: (item: any) => void }) => {
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [isPeek, setIsPeek] = useState(false);
@@ -429,7 +429,7 @@ const ActiveMovieCard = ({ item, onUpdate, language, onOpenMovie }: { item: any,
     e.stopPropagation();
     setIsLoading(true);
     try {
-      await apiClient.put(`/library/${item.id}`, { status: 'completed' });
+      await apiClient.put(`/library/${item.id}`, { status: ['book', 'comic', 'manga'].includes(item.item_type) ? 'read' : 'completed' });
       onUpdate();
     } catch (err) {
       console.error(err);
@@ -444,7 +444,7 @@ const ActiveMovieCard = ({ item, onUpdate, language, onOpenMovie }: { item: any,
       setIsPeek(true);
       return;
     }
-    onOpenMovie(item);
+    onOpenItem(item);
   };
 
   return (
@@ -459,7 +459,7 @@ const ActiveMovieCard = ({ item, onUpdate, language, onOpenMovie }: { item: any,
       className="activity-card"
     >
       <div 
-        onClick={(e) => { e.stopPropagation(); onOpenMovie(item); }}
+        onClick={(e) => { e.stopPropagation(); onOpenItem(item); }}
         className="card-series-title"
         style={{ padding: "0.5rem 0.75rem", fontSize: "0.85rem", fontWeight: 600, borderBottom: "1px solid var(--border-color)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between" }}
       >
@@ -474,14 +474,24 @@ const ActiveMovieCard = ({ item, onUpdate, language, onOpenMovie }: { item: any,
           <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: "2rem", filter: currentlyBlurred ? "blur(15px)" : "none" }}>?</div>
         )}
         
-        <div className="tag-movie" style={{ position: "absolute", bottom: "0.25rem", left: "0.5rem", padding: "0.1rem 0.4rem", borderRadius: "4px", fontSize: "0.7rem", fontWeight: 600, opacity: 0.85, backdropFilter: 'blur(4px)' }}>
-          {language === 'es' ? 'Película' : 'Movie'}
+        <div className={getTagClass(item.item_type)} style={{ position: "absolute", bottom: "0.25rem", left: "0.5rem", padding: "0.1rem 0.4rem", borderRadius: "4px", fontSize: "0.7rem", fontWeight: 600, opacity: 0.85, backdropFilter: 'blur(4px)' }}>
+          {(() => {
+            if (language === 'es') {
+              const map: any = { "movie": "Película", "series": "Serie", "anime": "Anime", "game": "Videojuego", "book": "Libro", "comic": "Cómic", "manga": "Manga", "guide": "Guía", "user": "Usuario" };
+              return map[item.item_type.toLowerCase()] || item.item_type;
+            } else {
+              const map: any = { "movie": "Movie", "series": "Series", "anime": "Anime", "game": "Game", "book": "Book", "comic": "Comic", "manga": "Manga", "guide": "Guide", "user": "User" };
+              return map[item.item_type.toLowerCase()] || item.item_type;
+            }
+          })()}
         </div>
       </div>
       
       <div style={{ padding: "0.75rem", display: "flex", flexDirection: "column", gap: "0.25rem", flex: 1 }}>
-        <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text-secondary)", marginTop: "auto", marginBottom: "auto" }}>
-          {item.status === 'completed' ? (language === 'es' ? 'Visto' : 'Watched') : (language === 'es' ? 'En pausa' : 'Paused')}
+        <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text-secondary)", marginTop: "auto", marginBottom: "auto", minHeight: "1.2em" }}>
+          {item.status === 'completed' || item.status === 'read' ? (language === 'es' ? (['book', 'comic', 'manga'].includes(item.item_type) ? 'Terminado' : 'Visto') : 'Completed') : 
+           ['plan_to_watch', 'plan_to_read', 'plan_to_play'].includes(item.status) ? (['book', 'comic', 'manga'].includes(item.item_type) ? (item.total_pages ? `${item.total_pages} ${language === 'es' ? 'páginas' : 'pages'}` : '\u00A0') : (item.item_type === 'movie' && item.total_pages ? `${item.total_pages} min` : (language === 'es' ? (item.item_type === 'game' ? 'Por jugar' : 'Por ver') : 'Plan to'))) :
+           (language === 'es' ? (['book', 'comic', 'manga'].includes(item.item_type) ? 'Leyendo' : (item.item_type === 'game' ? 'Jugando' : 'En pausa')) : 'Paused')}
         </div>
       </div>
       
@@ -570,11 +580,11 @@ export const Home: React.FC = () => {
 
   let filteredItems: any[] = [];
   if (activeTab === "watching") {
-    filteredItems = libraryItems.filter(i => ["watching", "reading", "playing"].includes(i.status) && (i.item_type === "series" || i.item_type === "anime" || i.item_type === "movie"));
+    filteredItems = libraryItems.filter(i => ["watching", "reading", "playing"].includes(i.status) && i.item_type !== "custom");
   } else if (activeTab === "plan_to_watch") {
-    filteredItems = libraryItems.filter(i => ["plan_to_watch", "plan_to_play", "plan_to_read"].includes(i.status) && (i.item_type === "series" || i.item_type === "anime" || i.item_type === "movie"));
+    filteredItems = libraryItems.filter(i => ["plan_to_watch", "plan_to_play", "plan_to_read"].includes(i.status) && i.item_type !== "custom");
   } else if (activeTab === "completed") {
-    filteredItems = libraryItems.filter(i => ["completed", "read"].includes(i.status) && (i.item_type === "series" || i.item_type === "anime" || i.item_type === "movie"));
+    filteredItems = libraryItems.filter(i => ["completed", "read"].includes(i.status) && i.item_type !== "custom");
   }
 
   const getTypeCat = (type: string) => {
@@ -589,8 +599,8 @@ export const Home: React.FC = () => {
       <div style={{ display: "flex", gap: "2rem", borderBottom: "1px solid var(--border-color)", paddingBottom: "0.5rem", position: "relative" }}>
         {["watching", "plan_to_watch", "completed"].map((tab) => {
           const labels: any = language === 'es'
-            ? { "watching": "Continuar viendo", "plan_to_watch": "No comenzado", "completed": "Terminado" }
-            : { "watching": "Continue watching", "plan_to_watch": "Not started", "completed": "Completed" };
+            ? { "watching": "Continuar", "plan_to_watch": "No comenzado", "completed": "Terminado" }
+            : { "watching": "Continue", "plan_to_watch": "Not started", "completed": "Completed" };
           const isActive = activeTab === tab;
           return (
             <div 
@@ -624,14 +634,14 @@ export const Home: React.FC = () => {
                 />
               );
             }
-            if ((activeTab === "watching" || activeTab === "plan_to_watch") && item.item_type === "movie") {
+            if ((activeTab === "watching" || activeTab === "plan_to_watch") && item.item_type !== "series" && item.item_type !== "anime") {
               return (
-                <ActiveMovieCard
+                <ActiveItemCard
                   key={item.id}
                   item={item}
                   language={language}
                   onUpdate={() => fetchDashboard(true)}
-                  onOpenMovie={(movieItem) => setSelectedItem(movieItem)}
+                  onOpenItem={(i) => setSelectedItem(i)}
                 />
               );
             }
@@ -641,8 +651,8 @@ export const Home: React.FC = () => {
                 title={item.title}
                 coverUrl={item.image_url}
                 coverBottomText={item.item_type}
-                subtitle2={item.status === "completed" ? "Completado" : "Progreso..."}
-                onCheck={item.status !== "completed" ? (e) => handleMarkDone(e, item) : undefined}
+                subtitle2={['completed', 'read'].includes(item.status) ? "Completado" : "Progreso..."}
+                onCheck={!['completed', 'read'].includes(item.status) ? (e) => handleMarkDone(e, item) : undefined}
                 onClick={() => setSelectedItem(item)}
                 isNsfw={item.is_nsfw}
                 language={language}

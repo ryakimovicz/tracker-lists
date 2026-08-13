@@ -12,3 +12,4 @@ class SearchResultItem(BaseModel):
     imdb_id: Optional[str] = None
     status: Optional[str] = None
     is_nsfw: bool = False
+    page_count: Optional[int] = None

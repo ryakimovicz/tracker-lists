@@ -61,7 +61,8 @@ class GoogleBooksService:
                             image_url=img_url,
                             description=desc,
                             item_type=item_type,
-                            release_date=pub_date
+                            release_date=pub_date,
+                            page_count=v_info.get("pageCount")
                         )
                         results.append((search_item, isbns))
                     return results
@@ -115,7 +116,8 @@ class GoogleBooksService:
                             image_url=image_url,
                             description=desc,
                             item_type=item_type,
-                            release_date=str(first_publish) if first_publish else None
+                            release_date=str(first_publish) if first_publish else None,
+                            page_count=item.get("number_of_pages_median") or item.get("number_of_pages")
                         )
                         results.append((search_item, isbns))
                     return results

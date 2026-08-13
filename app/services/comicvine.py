@@ -106,7 +106,8 @@ class ComicVineService:
                                                 image_url=image_url,
                                                 description=item.get("description") or "",
                                                 item_type=item_type_val,
-                                                release_date=item.get("cover_date") or (str(item.get("start_year")) if item.get("start_year") else None)
+                                                release_date=item.get("cover_date") or (str(item.get("start_year")) if item.get("start_year") else None),
+                                                page_count=item.get("count_of_pages") or item.get("count_of_issues")
                                             )
                                         )
                         except Exception as e:
@@ -149,7 +150,8 @@ class ComicVineService:
                                     image_url=image_url,
                                     description=item.get("description") or "",
                                     item_type=item_type_val,
-                                    release_date=item.get("cover_date") or (str(item.get("start_year")) if item.get("start_year") else None)
+                                    release_date=item.get("cover_date") or (str(item.get("start_year")) if item.get("start_year") else None),
+                                    page_count=item.get("count_of_pages") or item.get("count_of_issues")
                                 )
                             )
             except Exception as e:

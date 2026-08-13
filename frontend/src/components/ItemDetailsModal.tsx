@@ -67,6 +67,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   const [userRating, setUserRating] = useState<number>(0);
   const [userComment, setUserComment] = useState<string>('');
   const [pagesReadVal, setPagesReadVal] = useState<number | ''>(0);
+  const [totalPagesVal, setTotalPagesVal] = useState<number | ''>('');
   const [isSavingReview, setIsSavingReview] = useState(false);
   const [descExpanded, setDescExpanded] = useState(false);
   const [translatedDesc, setTranslatedDesc] = useState<string | null>(null);
@@ -166,7 +167,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   const handleToggleStatus = async (statusId: string) => {
     if (!selectedItem) return;
     const isCurrentlyActive = selectedItem.status === statusId;
-    const newStatus = isCurrentlyActive ? 'plan_to_watch' : statusId;
+    const newStatus = isCurrentlyActive ? getDefaultStatus(selectedItem.item_type) : statusId;
     
     if (selectedItem.id) {
       try {
@@ -348,6 +349,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       setUserRating(0);
       setUserComment('');
       setPagesReadVal(item.pages_read || 0);
+      setTotalPagesVal(item.total_pages || item.page_count || '');
       setItemReviews([]);
       setDescExpanded(false);
 
@@ -629,6 +631,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
         description: selectedItem.description,
         item_type: selectedItem.item_type,
         release_date: selectedItem.release_date,
+        total_pages: totalPagesVal !== '' ? totalPagesVal : (selectedItem.total_pages || selectedItem.page_count || null),
+        pages_read: (status === 'read' && totalPagesVal !== '') ? totalPagesVal : (pagesReadVal !== '' ? pagesReadVal : 0),
         status: status
       });
       
@@ -1414,7 +1418,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                   {/* Favorite toggler moved to 3-dots menu */}
 
                   {/* Pages read input for books/comics/mangas */}
-                  {!isEpisode && selectedItem && ['book', 'comic', 'manga'].includes(selectedItem.item_type) && (
+                  {!isEpisode && selectedItem && ['book', 'comic', 'manga'].includes(selectedItem.item_type) && ['read', 'reading', 'dropped'].includes(selectedItem.status) && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.5rem' }}>
                       <h5 style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
                         {language === 'es' ? 'Páginas leídas:' : 'Pages read:'}
@@ -1426,6 +1430,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                           disabled={!isOwnProfile}
                           value={pagesReadVal}
                           min={0}
+                          max={totalPagesVal !== '' ? totalPagesVal : undefined}
                           onFocus={() => {
                             if (pagesReadVal === 0) setPagesReadVal('');
                           }}
@@ -1443,7 +1448,10 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                             }
                           }}
                           onChange={(e) => {
-                            const val = e.target.value === '' ? '' : parseInt(e.target.value) || 0;
+                            let val: number | '' = e.target.value === '' ? '' : parseInt(e.target.value) || 0;
+                            if (val !== '' && totalPagesVal !== '' && val > totalPagesVal) {
+                              val = totalPagesVal;
+                            }
                             setPagesReadVal(val);
                           }}
                           style={{
@@ -1453,7 +1461,55 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                             border: '1px solid var(--border-color)',
                             color: 'var(--text-primary)',
                             borderRadius: '6px',
-                            maxWidth: '120px'
+                            maxWidth: '100px'
+                          }}
+                        />
+                        <span style={{ color: 'var(--text-muted)' }}>{language === 'es' ? 'de' : 'of'}</span>
+                        <input
+                          type="number"
+                          className="input-field"
+                          disabled={!isOwnProfile}
+                          value={totalPagesVal}
+                          min={0}
+                          placeholder={language === 'es' ? 'Total' : 'Total'}
+                          onFocus={() => {
+                            if (totalPagesVal === 0) setTotalPagesVal('');
+                          }}
+                          onBlur={() => {
+                            const finalVal = totalPagesVal === '' ? null : totalPagesVal;
+                            setTotalPagesVal(totalPagesVal);
+                            if (selectedItem.id) {
+                              apiClient.put(`/library/${selectedItem.id}`, { total_pages: finalVal }).then(() => {
+                                setSelectedItem((prev: any) => prev ? { ...prev, total_pages: finalVal } : null);
+                                onUpdate && onUpdate();
+                              });
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              const finalVal = totalPagesVal === '' ? null : totalPagesVal;
+                              setTotalPagesVal(totalPagesVal);
+                              if (selectedItem.id) {
+                                apiClient.put(`/library/${selectedItem.id}`, { total_pages: finalVal }).then(() => {
+                                  setSelectedItem((prev: any) => prev ? { ...prev, total_pages: finalVal } : null);
+                                  onUpdate && onUpdate();
+                                });
+                              }
+                              (e.target as HTMLInputElement).blur();
+                            }
+                          }}
+                          onChange={(e) => {
+                            const val = e.target.value === '' ? '' : parseInt(e.target.value) || 0;
+                            setTotalPagesVal(val);
+                          }}
+                          style={{
+                            padding: '0.4rem 0.8rem',
+                            fontSize: '0.85rem',
+                            background: 'var(--bg-secondary)',
+                            border: '1px solid var(--border-color)',
+                            color: 'var(--text-primary)',
+                            borderRadius: '6px',
+                            maxWidth: '100px'
                           }}
                         />
                       </div>
@@ -1463,43 +1519,53 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                   {/* Completion / Status Buttons */}
                   {isOwnProfile && !isEpisode && selectedItem?.item_type !== 'series' && selectedItem?.item_type !== 'anime' && (
                     <div style={{ marginTop: '0.75rem' }}>
-                      {selectedItem?.item_type === 'movie' ? (
+                      {['movie', 'book', 'comic', 'manga'].includes(selectedItem?.item_type) ? (
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
                           <button
                             type="button"
-                            onClick={() => handleToggleStatus('completed')}
+                            onClick={() => {
+                              const isCurrentlyActive = selectedItem.status === (['book', 'comic', 'manga'].includes(selectedItem.item_type) ? 'read' : 'completed');
+                              if (!isCurrentlyActive && ['book', 'comic', 'manga'].includes(selectedItem.item_type) && totalPagesVal !== '') {
+                                // Auto-fill pages_read to totalPagesVal
+                                setPagesReadVal(totalPagesVal);
+                                if (selectedItem.id) {
+                                  apiClient.put(`/library/${selectedItem.id}`, { pages_read: totalPagesVal }).catch(console.error);
+                                }
+                              }
+                              handleToggleStatus(['book', 'comic', 'manga'].includes(selectedItem.item_type) ? 'read' : 'completed');
+                            }}
                             style={{
-                              background: selectedItem?.status === 'completed' ? 'var(--color-movie)' : 'var(--bg-tertiary)',
-                              border: selectedItem?.status === 'completed' ? 'none' : '1px solid var(--border-color)',
+                              background: ['completed', 'read'].includes(selectedItem?.status) ? (selectedItem.item_type === 'movie' ? 'var(--color-movie)' : 'var(--color-book)') : 'var(--bg-tertiary)',
+                              border: ['completed', 'read'].includes(selectedItem?.status) ? 'none' : '1px solid var(--border-color)',
                               borderRadius: '8px',
                               padding: '0.5rem',
                               textAlign: 'center',
                               cursor: 'pointer',
-                              color: selectedItem?.status === 'completed' ? 'var(--color-text-movie)' : 'var(--text-primary)',
+                              color: ['completed', 'read'].includes(selectedItem?.status) ? '#ffffff' : 'var(--text-primary)',
                               fontSize: '0.85rem',
                               fontWeight: 600,
                               transition: 'all 0.2s ease'
                             }}
                           >
-                            {language === 'es' ? 'Visto' : 'Watched'}
+                            {['book', 'comic', 'manga'].includes(selectedItem.item_type) ? (language === 'es' ? 'Leído' : 'Read') : (language === 'es' ? 'Visto' : 'Watched')}
                           </button>
                           <button
                             type="button"
-                            onClick={() => handleToggleStatus('watching')}
+                            onClick={() => handleToggleStatus(['book', 'comic', 'manga'].includes(selectedItem.item_type) ? 'reading' : 'watching')}
                             style={{
-                              background: selectedItem?.status === 'watching' ? '#3b82f6' : 'var(--bg-tertiary)',
-                              border: selectedItem?.status === 'watching' ? 'none' : '1px solid var(--border-color)',
+                              background: ['watching', 'reading'].includes(selectedItem?.status) ? '#3b82f6' : 'var(--bg-tertiary)',
+                              border: ['watching', 'reading'].includes(selectedItem?.status) ? 'none' : '1px solid var(--border-color)',
                               borderRadius: '8px',
                               padding: '0.5rem',
                               textAlign: 'center',
                               cursor: 'pointer',
-                              color: selectedItem?.status === 'watching' ? '#ffffff' : 'var(--text-primary)',
+                              color: ['watching', 'reading'].includes(selectedItem?.status) ? '#ffffff' : 'var(--text-primary)',
                               fontSize: '0.85rem',
                               fontWeight: 600,
                               transition: 'all 0.2s ease'
                             }}
                           >
-                            {language === 'es' ? 'Pausa' : 'Paused'}
+                            {['book', 'comic', 'manga'].includes(selectedItem.item_type) ? (language === 'es' ? 'Pausa' : 'Paused') : (language === 'es' ? 'Pausa' : 'Paused')}
                           </button>
                           <button
                             type="button"
@@ -1544,8 +1610,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                             <Check size={16} strokeWidth={3} />
                             <span>
                               {(selectedItem?.status === 'completed' || selectedItem?.status === 'read')
-                                ? (['book', 'comic', 'manga'].includes(selectedItem.item_type) ? (language === 'es' ? 'Leído' : 'Read') : selectedItem.item_type === 'game' ? (language === 'es' ? 'Jugado' : 'Played') : (language === 'es' ? 'Visto' : 'Watched'))
-                                : (['book', 'comic', 'manga'].includes(selectedItem.item_type) ? (language === 'es' ? 'Marcar como leído' : 'Mark as read') : selectedItem.item_type === 'game' ? (language === 'es' ? 'Marcar como jugado' : 'Mark as played') : (language === 'es' ? 'Marcar como visto' : 'Mark as seen'))
+                                ? (selectedItem.item_type === 'game' ? (language === 'es' ? 'Jugado' : 'Played') : (language === 'es' ? 'Visto' : 'Watched'))
+                                : (selectedItem.item_type === 'game' ? (language === 'es' ? 'Marcar como jugado' : 'Mark as played') : (language === 'es' ? 'Marcar como visto' : 'Mark as seen'))
                               }
                             </span>
                           </button>

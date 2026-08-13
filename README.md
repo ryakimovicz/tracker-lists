@@ -30,7 +30,7 @@
 | [OMDb](https://www.omdbapi.com/) + [Fanart.tv](https://fanart.tv/) | Películas y pósters en HD |
 | [Last.fm](https://www.last.fm/api) | Música, álbumes destacados y scrobbling en tiempo real |
 | [IGDB](https://api-docs.igdb.com/) | Videojuegos (autenticado via Twitch OAuth2) |
-| [Google Books](https://developers.google.com/books/docs/v1/using) | Libros |
+| [Google Books](https://developers.google.com/books/docs/v1/using) + [Open Library](https://openlibrary.org/developers/api) | Libros |
 | [Comic Vine](https://comicvine.gamespot.com/api/) | Cómics y mangas |
 | [Google Translate](https://translate.google.com/) | Traducción dinámica de sinopsis (vía `deep-translator`) |
 

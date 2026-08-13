@@ -13,6 +13,7 @@ class LibraryItemCreate(BaseModel):
     is_favorite: Optional[bool] = False
     completed_at: Optional[datetime] = None
     pages_read: Optional[int] = 0
+    total_pages: Optional[int] = None
 
 class LibraryItemUpdate(BaseModel):
     status: Optional[UserLibraryStatusEnum] = None
@@ -20,6 +21,7 @@ class LibraryItemUpdate(BaseModel):
     completed_at: Optional[datetime] = None
     last_seen_episode: Optional[str] = None
     pages_read: Optional[int] = None
+    total_pages: Optional[int] = None
 
 class LibraryItemResponse(BaseModel):
     id: int
@@ -34,7 +36,8 @@ class LibraryItemResponse(BaseModel):
     completed_at: Optional[datetime] = None
     updated_at: datetime
     last_seen_episode: Optional[str] = None
-    pages_read: int = 0
+    pages_read: int
+    total_pages: Optional[int] = None
     tracking_list_id: Optional[int] = None
     is_nsfw: bool = False
 

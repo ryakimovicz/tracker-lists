@@ -1473,7 +1473,10 @@ def bulk_toggle_season(
     if not episodes_list:
         if lib_item and lib_item.external_id:
             try:
-                series_id = int(lib_item.external_id)
+                clean_id = lib_item.external_id
+                if clean_id.startswith('tvm_'):
+                    clean_id = clean_id.replace('tvm_', '')
+                series_id = int(clean_id)
                 episodes_list = TVMazeService.get_season_episodes(series_id, req.season_number) or []
             except Exception as e:
                 print(f"Failed to fetch episodes for bulk toggle in backend: {e}")

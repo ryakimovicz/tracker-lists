@@ -43,7 +43,7 @@ class OMDbService:
             return cls.get_fanart_poster(imdb_id)
             
         def get_omdb_plot():
-            if not cls.API_KEY or not imdb_id: return ""
+            if not cls.API_KEY or not imdb_id: return "", None
             url = f"http://www.omdbapi.com/?i={imdb_id}&plot=short&apikey={cls.API_KEY}"
             try:
                 req = urllib.request.Request(url, headers={"User-Agent": "TrackerLists/1.0"})
@@ -51,16 +51,23 @@ class OMDbService:
                     if res.status == 200:
                         data = json.loads(res.read().decode())
                         plot = data.get("Plot")
-                        return plot if plot and plot != "N/A" else ""
+                        runtime_str = data.get("Runtime")
+                        runtime_min = None
+                        if runtime_str and runtime_str != "N/A":
+                            try:
+                                runtime_min = int(runtime_str.split()[0])
+                            except ValueError:
+                                pass
+                        return (plot if plot and plot != "N/A" else ""), runtime_min
             except Exception:
                 pass
-            return ""
+            return "", None
             
         with concurrent.futures.ThreadPoolExecutor(max_workers=2) as ex:
             f1 = ex.submit(get_fanart)
             f2 = ex.submit(get_omdb_plot)
             poster = f1.result()
-            plot = f2.result()
+            plot, runtime = f2.result()
             
         if not poster:
             omdb_poster = item.get("Poster")
@@ -73,7 +80,8 @@ class OMDbService:
             description=plot,
             item_type="movie",
             release_date=item.get("Year"),
-            imdb_id=imdb_id
+            imdb_id=imdb_id,
+            page_count=runtime
         )
 
     @classmethod

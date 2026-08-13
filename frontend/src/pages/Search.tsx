@@ -400,15 +400,15 @@ export const Search: React.FC = () => {
                             <img src={item.image_url || 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=300'} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => e.currentTarget.style.display='none'} />
                             
                             {/* Status Badge */}
-                            {item.status && ['completed', 'watching', 'dropped'].includes(item.status) && (
+                            {item.status && ['completed', 'watching', 'dropped', 'read', 'reading'].includes(item.status) && (
                               <div style={{ 
                                 position: 'absolute', top: '0.5rem', right: '0.5rem', 
                                 padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600,
-                                background: item.status === 'completed' ? 'var(--color-movie)' : item.status === 'watching' ? '#3b82f6' : '#ef4444',
-                                color: item.status === 'completed' ? 'var(--color-text-movie)' : '#ffffff',
+                                background: (item.status === 'completed' || item.status === 'read') ? 'var(--color-movie)' : (item.status === 'watching' || item.status === 'reading') ? '#3b82f6' : '#ef4444',
+                                color: (item.status === 'completed' || item.status === 'read') ? 'var(--color-text-movie)' : '#ffffff',
                                 boxShadow: '0 2px 4px rgba(0,0,0,0.5)'
                               }}>
-                                {item.status === 'completed' ? (language === 'es' ? 'Visto' : 'Watched') : item.status === 'watching' ? (language === 'es' ? 'En pausa' : 'Paused') : (language === 'es' ? 'Abandonado' : 'Dropped')}
+                                {(item.status === 'completed' || item.status === 'read') ? (item.item_type === 'series' || item.item_type === 'anime' ? (language === 'es' ? 'Terminado' : 'Completed') : ['book', 'comic', 'manga'].includes(item.item_type) ? (language === 'es' ? 'Leído' : 'Read') : (language === 'es' ? 'Visto' : 'Watched')) : (item.status === 'watching' || item.status === 'reading') ? (item.item_type === 'movie' ? (language === 'es' ? 'En pausa' : 'Paused') : ['book', 'comic', 'manga'].includes(item.item_type) ? (language === 'es' ? 'Leyendo' : 'Reading') : (language === 'es' ? 'Viendo' : 'Watching')) : (language === 'es' ? 'Abandonado' : 'Dropped')}
                               </div>
                             )}
 

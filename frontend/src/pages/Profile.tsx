@@ -425,8 +425,9 @@ export const Profile: React.FC = () => {
       const isNotStartedSeries = (item.item_type === 'series' || item.item_type === 'anime') && !item.last_seen_episode;
       const isPlanToStatus = ['plan_to_watch', 'plan_to_play', 'plan_to_read'].includes(item.status);
       const isInvalidMovie = (item.item_type || '').toLowerCase() === 'movie' && item.status !== 'completed';
+      const isDroppedReading = ['book', 'comic', 'manga'].includes(item.item_type) && item.status === 'dropped';
 
-      return matchesMedia && matchesSearch && (isSeriesOrRegular || isLoose) && !isNotStartedSeries && !isPlanToStatus && !isInvalidMovie;
+      return matchesMedia && matchesSearch && (isSeriesOrRegular || isLoose) && !isNotStartedSeries && !isPlanToStatus && !isInvalidMovie && !isDroppedReading;
     })
     .sort((a, b) => {
       const dateA = new Date(a.completed_at || a.updated_at || 0).getTime();
@@ -445,6 +446,8 @@ export const Profile: React.FC = () => {
     if (isPlanToStatus) return false;
 
     if ((item.item_type || '').toLowerCase() === 'movie' && item.status !== 'completed') return false;
+    
+    if (['book', 'comic', 'manga'].includes(item.item_type) && item.status === 'dropped') return false;
 
     const isNotStartedSeries = (item.item_type === 'series' || item.item_type === 'anime') && !item.last_seen_episode;
     if (isNotStartedSeries) return false;
