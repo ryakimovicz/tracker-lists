@@ -32,6 +32,7 @@
 | [IGDB](https://api-docs.igdb.com/) | Videojuegos (autenticado via Twitch OAuth2) |
 | [Google Books](https://developers.google.com/books/docs/v1/using) | Libros |
 | [Comic Vine](https://comicvine.gamespot.com/api/) | Cómics y mangas |
+| [Google Translate](https://translate.google.com/) | Traducción dinámica de sinopsis (vía `deep-translator`) |
 
 ---
 
@@ -67,6 +68,7 @@ Búsqueda y descubrimiento:
   - Botón `X` de cierre posicionado en la esquina superior para no entorpecer los botones de acción.
   - Botón de tick `✓` en el cuerpo del modal (alineado a la derecha, bajo la calificación) para marcar como visto/leído/jugado sin desplegables de estado.
   - Para series y animes: acordeón de temporadas y capítulos con marcado mediante botones circulares `✓` individuales o masivos por temporada.
+  - Botón interactivo **"🌐 Ver traducción"** debajo de las sinopsis en inglés (cuando la interfaz está en Español), con sistema inteligente de caché en base de datos.
 - **Búsqueda de Usuarios y Guías**: Encuentra usuarios de Pathd y guías públicas de la comunidad.
 
 ### 👤 Perfil (Estantería Personal)
@@ -202,6 +204,11 @@ Gestión de contenido moderado:
 | DELETE | `/comments/{comment_id}` | Eliminar comentario por moderación |
 | DELETE | `/reviews/{review_id}` | Eliminar reseña por moderación |
 
+### Traducción (`/api/v1/translate`)
+| Método | Ruta | Descripción |
+|---|---|---|
+| POST | `/` | Traduce sinopsis al idioma local (con caché en BD) |
+
 ---
 
 ## 🛠️ Instalación y Configuración
@@ -292,11 +299,12 @@ tracker-lists/
 │   │   ├── social.py     # Follows, feed, comentarios, votos
 │   │   ├── reviews.py    # Reseñas y calificaciones
 │   │   ├── additions.py  # Modificaciones comunitarias
-│   │   └── admin.py      # Moderación y administración
+│   │   ├── admin.py      # Moderación y administración
+│   │   └── translate.py  # Traducción de sinopsis con caché
 │   ├── core/             # Configuración, base de datos, seguridad, rate limiting
-│   ├── models/           # Modelos SQLAlchemy (User, ReadingList, UserLibraryItem, etc.)
+│   ├── models/           # Modelos SQLAlchemy (User, ReadingList, TranslationCache, etc.)
 │   ├── schemas/          # Schemas Pydantic para validación de requests/responses
-│   └── services/         # Clientes de APIs externas (TVMaze, OMDb, Last.fm, IGDB, Google Books, Comic Vine)
+│   └── services/         # Clientes externos (TVMaze, OMDb, IGDB, deep-translator, etc.)
 ├── frontend/
 │   ├── src/
 │   │   ├── api/          # Cliente Axios con interceptores de autenticación
