@@ -68,6 +68,27 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
     setManualDescription('');
   };
 
+  const formatReleaseDate = (dateStr?: string) => {
+    if (!dateStr) return '';
+    if (/^\d{4}$/.test(dateStr)) return dateStr;
+    try {
+      const cleanStr = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
+      const parts = cleanStr.split('-');
+      if (parts.length === 3) {
+        const year = parseInt(parts[0]);
+        const month = parseInt(parts[1]) - 1;
+        const day = parseInt(parts[2]);
+        const date = new Date(year, month, day);
+        if (!isNaN(date.getTime())) {
+          return new Intl.DateTimeFormat(language === 'es' ? 'es-ES' : 'en-US', { day: '2-digit', month: 'long', year: 'numeric' }).format(date);
+        }
+      }
+      return dateStr;
+    } catch {
+      return dateStr;
+    }
+  };
+
   const handleLoadSeriesEpisodes = async (seriesId: string) => {
     if (expandedSeriesId === seriesId) {
       setExpandedSeriesId(null);
@@ -232,6 +253,11 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
                       />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <h5 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{media.title}</h5>
+                        {media.release_date && (
+                          <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.1rem' }}>
+                            {formatReleaseDate(media.release_date)}
+                          </span>
+                        )}
                         <span style={{ fontSize: '0.7rem', color: 'var(--accent-primary)', textTransform: 'capitalize', fontWeight: 600 }}>
                           {media.item_type === 'comic' ? (language === 'es' ? 'Cómic' : 'Comic') : media.item_type === 'manga' ? 'Manga' : t('media' + media.item_type.charAt(0).toUpperCase() + media.item_type.slice(1))}
                         </span>
@@ -356,9 +382,16 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
                               
                               return (
                                 <div key={ep.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.25rem' }}>
-                                  <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={ep_name}>
-                                    {ep_num}. {ep_name}
-                                  </span>
+                                  <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={ep_name}>
+                                      {ep_num}. {ep_name}
+                                    </span>
+                                    {ep.air_date && (
+                                      <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>
+                                        {formatReleaseDate(ep.air_date)}
+                                      </span>
+                                    )}
+                                  </div>
                                   <button
                                     type="button"
                                     onClick={() => onSelectItem({

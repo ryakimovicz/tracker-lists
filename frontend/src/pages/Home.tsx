@@ -417,6 +417,95 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries }: { item: an
   );
 };
 
+const ActiveMovieCard = ({ item, onUpdate, language, onOpenMovie }: { item: any, onUpdate: () => void, language: string, onOpenMovie: (item: any) => void }) => {
+  const { user } = useAuth();
+  const [isLoading, setIsLoading] = useState(false);
+  const [isPeek, setIsPeek] = useState(false);
+
+  const shouldBlur = item.is_nsfw && !user?.show_nsfw;
+  const currentlyBlurred = shouldBlur && !isPeek;
+
+  const handleMarkSeen = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsLoading(true);
+    try {
+      await apiClient.put(`/library/${item.id}`, { status: 'completed' });
+      onUpdate();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  const handleCardClick = (e: React.MouseEvent) => {
+    if (currentlyBlurred) {
+      e.stopPropagation();
+      setIsPeek(true);
+      return;
+    }
+    onOpenMovie(item);
+  };
+
+  return (
+    <div 
+      onClick={handleCardClick}
+      style={{ 
+        minWidth: "220px", maxWidth: "220px", background: "var(--bg-secondary)", 
+        border: "1px solid var(--border-color)", borderRadius: "12px", 
+        overflow: "hidden", cursor: "pointer", position: "relative",
+        display: "flex", flexDirection: "column"
+      }}
+      className="activity-card"
+    >
+      <div 
+        onClick={(e) => { e.stopPropagation(); onOpenMovie(item); }}
+        className="card-series-title"
+        style={{ padding: "0.5rem 0.75rem", fontSize: "0.85rem", fontWeight: 600, borderBottom: "1px solid var(--border-color)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between" }}
+      >
+        <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{item.title}</span>
+        <ChevronRight size={14} style={{ flexShrink: 0, marginLeft: "0.25rem", opacity: 0.7 }} />
+      </div>
+
+      <div style={{ width: "100%", height: "125px", background: "var(--bg-tertiary)", position: "relative" }}>
+        {item.image_url ? (
+          <img src={item.image_url} alt={item.title} style={{ width: "100%", height: "100%", objectFit: "cover", filter: currentlyBlurred ? "blur(15px)" : "none" }} />
+        ) : (
+          <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: "2rem", filter: currentlyBlurred ? "blur(15px)" : "none" }}>?</div>
+        )}
+        
+        <div className="tag-movie" style={{ position: "absolute", bottom: "0.25rem", left: "0.5rem", padding: "0.1rem 0.4rem", borderRadius: "4px", fontSize: "0.7rem", fontWeight: 600, opacity: 0.85, backdropFilter: 'blur(4px)' }}>
+          {language === 'es' ? 'Película' : 'Movie'}
+        </div>
+      </div>
+      
+      <div style={{ padding: "0.75rem", display: "flex", flexDirection: "column", gap: "0.25rem", flex: 1 }}>
+        <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text-secondary)", marginTop: "auto", marginBottom: "auto" }}>
+          {item.status === 'completed' ? (language === 'es' ? 'Visto' : 'Watched') : (language === 'es' ? 'En pausa' : 'Paused')}
+        </div>
+      </div>
+      
+      {!currentlyBlurred && (
+        <button 
+          onClick={handleMarkSeen}
+          disabled={isLoading}
+          className="btn-check-seen"
+          style={{
+            position: "absolute", bottom: "0.5rem", right: "0.5rem",
+            width: "32px", height: "32px", borderRadius: "50%",
+            background: "var(--bg-tertiary)", border: "2px solid var(--text-muted)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            cursor: isLoading ? "wait" : "pointer", color: "var(--text-primary)",
+            opacity: isLoading ? 0.5 : 1
+          }}
+        >
+          <Check size={16} />
+        </button>
+      )}
+    </div>
+  );
+};
+
 // --- Main Component ---
 
 export const Home: React.FC = () => {
@@ -481,11 +570,11 @@ export const Home: React.FC = () => {
 
   let filteredItems: any[] = [];
   if (activeTab === "watching") {
-    filteredItems = libraryItems.filter(i => ["watching", "reading", "playing"].includes(i.status));
+    filteredItems = libraryItems.filter(i => ["watching", "reading", "playing"].includes(i.status) && (i.item_type === "series" || i.item_type === "anime" || i.item_type === "movie"));
   } else if (activeTab === "plan_to_watch") {
-    filteredItems = libraryItems.filter(i => ["plan_to_watch", "plan_to_play", "plan_to_read"].includes(i.status));
+    filteredItems = libraryItems.filter(i => ["plan_to_watch", "plan_to_play", "plan_to_read"].includes(i.status) && (i.item_type === "series" || i.item_type === "anime" || i.item_type === "movie"));
   } else if (activeTab === "completed") {
-    filteredItems = libraryItems.filter(i => ["completed", "read"].includes(i.status));
+    filteredItems = libraryItems.filter(i => ["completed", "read"].includes(i.status) && (i.item_type === "series" || i.item_type === "anime" || i.item_type === "movie"));
   }
 
   const getTypeCat = (type: string) => {
@@ -499,7 +588,9 @@ export const Home: React.FC = () => {
       {/* Tabs */}
       <div style={{ display: "flex", gap: "2rem", borderBottom: "1px solid var(--border-color)", paddingBottom: "0.5rem", position: "relative" }}>
         {["watching", "plan_to_watch", "completed"].map((tab) => {
-          const labels: any = { "watching": "Continuar viendo", "plan_to_watch": "No comenzadas", "completed": "Terminadas" };
+          const labels: any = language === 'es'
+            ? { "watching": "Continuar viendo", "plan_to_watch": "No comenzado", "completed": "Terminado" }
+            : { "watching": "Continue watching", "plan_to_watch": "Not started", "completed": "Completed" };
           const isActive = activeTab === tab;
           return (
             <div 
@@ -530,6 +621,17 @@ export const Home: React.FC = () => {
                   language={language}
                   onUpdate={() => fetchDashboard(true)}
                   onOpenSeries={(seriesItem) => setSelectedItem(seriesItem)}
+                />
+              );
+            }
+            if ((activeTab === "watching" || activeTab === "plan_to_watch") && item.item_type === "movie") {
+              return (
+                <ActiveMovieCard
+                  key={item.id}
+                  item={item}
+                  language={language}
+                  onUpdate={() => fetchDashboard(true)}
+                  onOpenMovie={(movieItem) => setSelectedItem(movieItem)}
                 />
               );
             }

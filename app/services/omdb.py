@@ -35,6 +35,48 @@ class OMDbService:
         return None
 
     @classmethod
+    def _fetch_movie_details(cls, item: dict) -> SearchResultItem:
+        import concurrent.futures
+        imdb_id = item.get("imdbID")
+        
+        def get_fanart():
+            return cls.get_fanart_poster(imdb_id)
+            
+        def get_omdb_plot():
+            if not cls.API_KEY or not imdb_id: return ""
+            url = f"http://www.omdbapi.com/?i={imdb_id}&plot=short&apikey={cls.API_KEY}"
+            try:
+                req = urllib.request.Request(url, headers={"User-Agent": "TrackerLists/1.0"})
+                with urllib.request.urlopen(req, timeout=3) as res:
+                    if res.status == 200:
+                        data = json.loads(res.read().decode())
+                        plot = data.get("Plot")
+                        return plot if plot and plot != "N/A" else ""
+            except Exception:
+                pass
+            return ""
+            
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as ex:
+            f1 = ex.submit(get_fanart)
+            f2 = ex.submit(get_omdb_plot)
+            poster = f1.result()
+            plot = f2.result()
+            
+        if not poster:
+            omdb_poster = item.get("Poster")
+            poster = omdb_poster if omdb_poster != "N/A" else None
+            
+        return SearchResultItem(
+            external_id=f"omdb_{imdb_id}",
+            title=item.get("Title"),
+            image_url=poster,
+            description=plot,
+            item_type="movie",
+            release_date=item.get("Year"),
+            imdb_id=imdb_id
+        )
+
+    @classmethod
     def search_movies(cls, query: str) -> List[SearchResultItem]:
         if not query or not cls.API_KEY:
             return []
@@ -44,34 +86,29 @@ class OMDbService:
         
         results = []
         try:
-            with urllib.request.urlopen(url, timeout=5) as response:
+            req = urllib.request.Request(url, headers={"User-Agent": "TrackerLists/1.0"})
+            with urllib.request.urlopen(req, timeout=5) as response:
                 if response.status == 200:
                     data = json.loads(response.read().decode())
-                    
                     if data.get("Response") == "True":
-                        for item in data.get("Search", []):
-                            imdb_id = item.get("imdbID")
-                            
-                            # Try to get HD poster from Fanart.tv, otherwise use OMDb's poster
-                            poster = cls.get_fanart_poster(imdb_id)
-                            if not poster:
-                                omdb_poster = item.get("Poster")
-                                poster = omdb_poster if omdb_poster != "N/A" else None
-                            
-                            release_date = item.get("Year")
-                            
-                            results.append(
-                                SearchResultItem(
-                                    external_id=f"omdb_{imdb_id}",
-                                    title=item.get("Title"),
-                                    image_url=poster,
-                                    description="", # OMDb search endpoint doesn't return plot. Would need detailed lookup.
-                                    item_type="movie",
-                                    release_date=release_date,
-                                    imdb_id=imdb_id
-                                )
-                            )
+                        import concurrent.futures
+                        items = data.get("Search", [])
+                        with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
+                            results = list(executor.map(cls._fetch_movie_details, items))
         except Exception as e:
             print(f"OMDb Search API Error: {e}")
             
         return results
+
+    @classmethod
+    def get_new_movies(cls) -> List[SearchResultItem]:
+        # Fallback to searching movies from the current year
+        current_year = "2024" # hardcoded for simplicity as omdb lacks better endpoints
+        return cls.search_movies(f"movie {current_year}")[:15]
+
+    @classmethod
+    def get_trending_movies(cls) -> List[SearchResultItem]:
+        # Fallback to popular franchises
+        import random
+        queries = ["Avengers", "Batman", "Spider-Man", "Star Wars", "Harry Potter", "Lord of the Rings"]
+        return cls.search_movies(random.choice(queries))[:15]

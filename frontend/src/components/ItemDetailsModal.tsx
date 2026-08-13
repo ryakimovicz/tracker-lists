@@ -69,7 +69,9 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   const [pagesReadVal, setPagesReadVal] = useState<number | ''>(0);
   const [isSavingReview, setIsSavingReview] = useState(false);
   const [descExpanded, setDescExpanded] = useState(false);
-  
+  const [translatedDesc, setTranslatedDesc] = useState<string | null>(null);
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [showOriginalDesc, setShowOriginalDesc] = useState(true);
   const [episodes, setEpisodes] = useState<any[]>([]);
   const [seasons, setSeasons] = useState<any[]>([]);
   const [activeSeason, setActiveSeason] = useState<number | null>(null);
@@ -83,6 +85,26 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   const [showShelfMenu, setShowShelfMenu] = useState(false);
   const [showEpisodeMenu, setShowEpisodeMenu] = useState(false);
   const [openEpisodeMenuId, setOpenEpisodeMenuId] = useState<number | null>(null);
+
+  const handleTranslateDescription = async (textToTranslate: string) => {
+    if (!textToTranslate) return;
+    if (translatedDesc) {
+      setShowOriginalDesc(false);
+      return;
+    }
+    try {
+      setIsTranslating(true);
+      const res = await apiClient.post('/translate/', { text: textToTranslate, target_language: 'es' });
+      if (res.data && res.data.translated_text) {
+        setTranslatedDesc(res.data.translated_text);
+        setShowOriginalDesc(false);
+      }
+    } catch (err) {
+      console.error("Translation error:", err);
+    } finally {
+      setIsTranslating(false);
+    }
+  };
 
   const getDefaultStatus = (type: string) => {
     if (type === 'game') return 'plan_to_play';
@@ -138,6 +160,24 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       }
     } else {
       await ensureTracked('dropped');
+    }
+  };
+
+  const handleToggleStatus = async (statusId: string) => {
+    if (!selectedItem) return;
+    const isCurrentlyActive = selectedItem.status === statusId;
+    const newStatus = isCurrentlyActive ? 'plan_to_watch' : statusId;
+    
+    if (selectedItem.id) {
+      try {
+        await apiClient.put(`/library/${selectedItem.id}`, { status: newStatus });
+        setSelectedItem((prev: any) => prev ? { ...prev, status: newStatus } : null);
+        onUpdate && onUpdate();
+      } catch (e) {
+        console.error(e);
+      }
+    } else {
+      await ensureTracked(newStatus);
     }
   };
 
@@ -1079,11 +1119,14 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         >
                           <button
                             type="button"
-                            onClick={handleMarkDropped}
+                            onClick={() => {
+                                onToggleFavorite && onToggleFavorite(selectedItem.id, isFavorite);
+                                setShowMenu(false);
+                            }}
                             style={{
                               background: 'transparent',
                               border: 'none',
-                              color: '#f59e0b',
+                              color: isFavorite ? 'var(--accent-primary)' : 'var(--text-primary)',
                               textAlign: 'left',
                               padding: '0.4rem 0.6rem',
                               cursor: 'pointer',
@@ -1094,8 +1137,33 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                               gap: '0.4rem'
                             }}
                           >
-                            🚫 {language === 'es' ? 'Marcar como abandonado' : 'Mark as dropped'}
+                            <Heart size={14} fill={isFavorite ? 'var(--accent-primary)' : 'none'} />
+                            {isFavorite
+                              ? (language === 'es' ? 'Quitar Destacado' : 'Remove Featured')
+                              : (language === 'es' ? 'Destacar (Favorito)' : 'Feature (Favorite)')
+                            }
                           </button>
+                          {selectedItem?.item_type !== 'movie' && (
+                            <button
+                              type="button"
+                              onClick={handleMarkDropped}
+                              style={{
+                                background: 'transparent',
+                                border: 'none',
+                                color: '#f59e0b',
+                                textAlign: 'left',
+                                padding: '0.4rem 0.6rem',
+                                cursor: 'pointer',
+                                fontSize: '0.85rem',
+                                borderRadius: '4px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.4rem'
+                              }}
+                            >
+                              🚫 {language === 'es' ? 'Marcar como abandonado' : 'Mark as dropped'}
+                            </button>
+                          )}
                           {selectedItem?.id && (
                             <button
                               type="button"
@@ -1218,7 +1286,12 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                     }
 
                     const notes = parseNotes(selectedItem.custom_notes || '');
-                    const cleanText = stripHtml(notes.description || '');
+                    let cleanText = stripHtml(notes.description || '');
+                    const isTranslatedView = language === 'es' && !showOriginalDesc && translatedDesc;
+                    if (isTranslatedView) {
+                      cleanText = stripHtml(translatedDesc);
+                    }
+                    
                     const shouldTruncate = cleanText.length > 180;
                     const displayedText = shouldTruncate && !descExpanded
                       ? cleanText.slice(0, 180) + '...'
@@ -1252,6 +1325,38 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                 </button>
                               )}
                             </p>
+                            
+                            {language === 'es' && (
+                              <button
+                                onClick={() => {
+                                  if (showOriginalDesc) {
+                                    handleTranslateDescription(notes.description || '');
+                                  } else {
+                                    setShowOriginalDesc(true);
+                                  }
+                                }}
+                                disabled={isTranslating}
+                                style={{
+                                  background: 'transparent',
+                                  border: 'none',
+                                  color: 'var(--text-muted)',
+                                  cursor: isTranslating ? 'wait' : 'pointer',
+                                  fontWeight: 500,
+                                  fontSize: '0.8rem',
+                                  marginTop: '0.35rem',
+                                  padding: 0,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '0.25rem',
+                                  opacity: isTranslating ? 0.7 : 1
+                                }}
+                              >
+                                🌐 {isTranslating 
+                                  ? 'Traduciendo...' 
+                                  : (showOriginalDesc ? 'Ver traducción' : 'Mostrar texto original')
+                                }
+                              </button>
+                            )}
                           </div>
                         )}
                         {(selectedItem.release_date || notes.release_date) && (
@@ -1306,33 +1411,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                     </div>
                   </div>
 
-                  {/* Favorite toggler */}
-                  {isOwnProfile && !isEpisode && (
-                    <div>
-                      <button
-                        onClick={() => onToggleFavorite && onToggleFavorite(selectedItem.id, isFavorite)}
-                        className="btn-secondary"
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '0.5rem',
-                          fontSize: '0.85rem',
-                          padding: '0.4rem 0.8rem',
-                          borderColor: isFavorite ? 'var(--accent-primary)' : 'var(--border-color)',
-                          background: isFavorite ? 'rgba(124, 58, 237, 0.1)' : 'transparent',
-                          color: isFavorite ? 'var(--accent-primary)' : 'var(--text-primary)'
-                        }}
-                      >
-                        <Heart size={16} fill={isFavorite ? 'var(--accent-primary)' : 'none'} />
-                        {isFavorite
-                          ? (language === 'es' ? 'Destacado (Quitar)' : 'Featured (Remove)')
-                          : (language === 'es' ? 'Destacar (Favorito)' : 'Feature (Favorite)')
-                        }
-                      </button>
-                    </div>
-                  )}
-
-
+                  {/* Favorite toggler moved to 3-dots menu */}
 
                   {/* Pages read input for books/comics/mangas */}
                   {!isEpisode && selectedItem && ['book', 'comic', 'manga'].includes(selectedItem.item_type) && (
@@ -1381,36 +1460,97 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                     </div>
                   )}
 
-                  {/* Completion Tick Button (Right aligned below rating / Destacar) */}
+                  {/* Completion / Status Buttons */}
                   {isOwnProfile && !isEpisode && selectedItem?.item_type !== 'series' && selectedItem?.item_type !== 'anime' && (
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginTop: '0.75rem' }}>
-                      <button
-                        type="button"
-                        disabled={!isOwnProfile}
-                        onClick={handleMarkCompleted}
-                        style={{
-                          background: (selectedItem?.status === 'completed' || selectedItem?.status === 'read') ? `var(--color-${selectedItem.item_type || 'movie'})` : 'var(--bg-tertiary)',
-                          border: (selectedItem?.status === 'completed' || selectedItem?.status === 'read') ? 'none' : '1px solid var(--border-color)',
-                          borderRadius: '20px',
-                          padding: '0.45rem 1rem',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '0.5rem',
-                          cursor: isOwnProfile ? 'pointer' : 'default',
-                          color: (selectedItem?.status === 'completed' || selectedItem?.status === 'read') ? `var(--color-text-${selectedItem.item_type || 'movie'})` : 'var(--text-primary)',
-                          fontSize: '0.85rem',
-                          fontWeight: 600,
-                          transition: 'all 0.2s ease'
-                        }}
-                      >
-                        <Check size={16} strokeWidth={3} />
-                        <span>
-                          {(selectedItem?.status === 'completed' || selectedItem?.status === 'read')
-                            ? (['book', 'comic', 'manga'].includes(selectedItem.item_type) ? (language === 'es' ? 'Leído' : 'Read') : selectedItem.item_type === 'game' ? (language === 'es' ? 'Jugado' : 'Played') : (language === 'es' ? 'Visto' : 'Watched'))
-                            : (['book', 'comic', 'manga'].includes(selectedItem.item_type) ? (language === 'es' ? 'Marcar como leído' : 'Mark as read') : selectedItem.item_type === 'game' ? (language === 'es' ? 'Marcar como jugado' : 'Mark as played') : (language === 'es' ? 'Marcar como visto' : 'Mark as seen'))
-                          }
-                        </span>
-                      </button>
+                    <div style={{ marginTop: '0.75rem' }}>
+                      {selectedItem?.item_type === 'movie' ? (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleStatus('completed')}
+                            style={{
+                              background: selectedItem?.status === 'completed' ? 'var(--color-movie)' : 'var(--bg-tertiary)',
+                              border: selectedItem?.status === 'completed' ? 'none' : '1px solid var(--border-color)',
+                              borderRadius: '8px',
+                              padding: '0.5rem',
+                              textAlign: 'center',
+                              cursor: 'pointer',
+                              color: selectedItem?.status === 'completed' ? 'var(--color-text-movie)' : 'var(--text-primary)',
+                              fontSize: '0.85rem',
+                              fontWeight: 600,
+                              transition: 'all 0.2s ease'
+                            }}
+                          >
+                            {language === 'es' ? 'Visto' : 'Watched'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleStatus('watching')}
+                            style={{
+                              background: selectedItem?.status === 'watching' ? '#3b82f6' : 'var(--bg-tertiary)',
+                              border: selectedItem?.status === 'watching' ? 'none' : '1px solid var(--border-color)',
+                              borderRadius: '8px',
+                              padding: '0.5rem',
+                              textAlign: 'center',
+                              cursor: 'pointer',
+                              color: selectedItem?.status === 'watching' ? '#ffffff' : 'var(--text-primary)',
+                              fontSize: '0.85rem',
+                              fontWeight: 600,
+                              transition: 'all 0.2s ease'
+                            }}
+                          >
+                            {language === 'es' ? 'Pausa' : 'Paused'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleStatus('dropped')}
+                            style={{
+                              background: selectedItem?.status === 'dropped' ? '#ef4444' : 'var(--bg-tertiary)',
+                              border: selectedItem?.status === 'dropped' ? 'none' : '1px solid var(--border-color)',
+                              borderRadius: '8px',
+                              padding: '0.5rem',
+                              textAlign: 'center',
+                              cursor: 'pointer',
+                              color: selectedItem?.status === 'dropped' ? '#ffffff' : 'var(--text-primary)',
+                              fontSize: '0.85rem',
+                              fontWeight: 600,
+                              transition: 'all 0.2s ease'
+                            }}
+                          >
+                            {language === 'es' ? 'Abandonado' : 'Dropped'}
+                          </button>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
+                          <button
+                            type="button"
+                            disabled={!isOwnProfile}
+                            onClick={handleMarkCompleted}
+                            style={{
+                              background: (selectedItem?.status === 'completed' || selectedItem?.status === 'read') ? `var(--color-${selectedItem.item_type || 'movie'})` : 'var(--bg-tertiary)',
+                              border: (selectedItem?.status === 'completed' || selectedItem?.status === 'read') ? 'none' : '1px solid var(--border-color)',
+                              borderRadius: '20px',
+                              padding: '0.45rem 1rem',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.5rem',
+                              cursor: isOwnProfile ? 'pointer' : 'default',
+                              color: (selectedItem?.status === 'completed' || selectedItem?.status === 'read') ? `var(--color-text-${selectedItem.item_type || 'movie'})` : 'var(--text-primary)',
+                              fontSize: '0.85rem',
+                              fontWeight: 600,
+                              transition: 'all 0.2s ease'
+                            }}
+                          >
+                            <Check size={16} strokeWidth={3} />
+                            <span>
+                              {(selectedItem?.status === 'completed' || selectedItem?.status === 'read')
+                                ? (['book', 'comic', 'manga'].includes(selectedItem.item_type) ? (language === 'es' ? 'Leído' : 'Read') : selectedItem.item_type === 'game' ? (language === 'es' ? 'Jugado' : 'Played') : (language === 'es' ? 'Visto' : 'Watched'))
+                                : (['book', 'comic', 'manga'].includes(selectedItem.item_type) ? (language === 'es' ? 'Marcar como leído' : 'Mark as read') : selectedItem.item_type === 'game' ? (language === 'es' ? 'Marcar como jugado' : 'Mark as played') : (language === 'es' ? 'Marcar como visto' : 'Mark as seen'))
+                              }
+                            </span>
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

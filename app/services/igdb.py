@@ -118,13 +118,48 @@ class IGDBService:
                     return results
         except Exception as e:
             print(f"IGDB API Error: {e}")
-            return [
-                SearchResultItem(
-                    external_id="error-api",
-                    title="Error al consultar IGDB",
-                    image_url=None,
-                    description=str(e),
-                    item_type="game"
-                )
-            ]
+            return []
         return []
+
+    @classmethod
+    def _execute_query(cls, body: str) -> List[SearchResultItem]:
+        client_id = getattr(settings, "TWITCH_CLIENT_ID", None)
+        token = cls._get_access_token()
+        if not client_id or not token: return []
+        req = urllib.request.Request("https://api.igdb.com/v4/games", data=body.encode("utf-8"), headers={"Client-ID": client_id, "Authorization": f"Bearer {token}", "Accept": "application/json"})
+        try:
+            with urllib.request.urlopen(req, timeout=8) as response:
+                if response.status == 200:
+                    data = json.loads(response.read().decode())
+                    results = []
+                    for item in data:
+                        image_url = None
+                        cover = item.get("cover")
+                        if cover and cover.get("image_id"):
+                            image_url = f"https://images.igdb.com/igdb/image/upload/t_cover_big/{cover['image_id']}.jpg"
+                        release_timestamp = item.get("first_release_date")
+                        release_date = datetime.fromtimestamp(release_timestamp).strftime("%Y-%m-%d") if release_timestamp else None
+                        results.append(SearchResultItem(
+                            external_id=str(item.get("id")),
+                            title=item.get("name") or "Untitled Game",
+                            image_url=image_url,
+                            item_type="game",
+                            release_date=release_date
+                        ))
+                    return results
+        except Exception as e:
+            pass
+        return []
+
+    @classmethod
+    def get_new_games(cls) -> List[SearchResultItem]:
+        now = int(datetime.now().timestamp())
+        body = f'fields id, name, cover.image_id, first_release_date; where first_release_date < {now} & category = 0; sort first_release_date desc; limit 15;'
+        return cls._execute_query(body)
+
+    @classmethod
+    def get_trending_games(cls) -> List[SearchResultItem]:
+        now = int(datetime.now().timestamp())
+        six_months_ago = int((datetime.now() - timedelta(days=180)).timestamp())
+        body = f'fields id, name, cover.image_id, first_release_date; where first_release_date > {six_months_ago} & first_release_date < {now} & total_rating > 80 & total_rating_count > 50 & category = 0; sort total_rating desc; limit 15;'
+        return cls._execute_query(body)

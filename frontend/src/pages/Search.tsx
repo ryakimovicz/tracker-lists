@@ -1,3 +1,4 @@
+import { HorizontalScroll } from '../components/HorizontalScroll';
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from '../context/LanguageContext';
@@ -15,6 +16,7 @@ interface SearchResultItem {
   release_date?: string;
   imdb_id?: string;
   is_nsfw?: boolean;
+  status?: string;
 }
 
 const stripHtml = (html: string) => {
@@ -46,6 +48,7 @@ export const Search: React.FC = () => {
 
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResultItem[]>([]);
+  const [activeExploreTab, setActiveExploreTab] = useState<'agregado' | 'nuevo' | 'descubrir'>('agregado');
   const [activeTab, setActiveTab] = useState<'all' | 'movie' | 'series' | 'anime' | 'book' | 'game' | 'user' | 'guide' | 'comic' | 'manga'>('all');
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
@@ -123,7 +126,7 @@ export const Search: React.FC = () => {
       const fetchExplore = async () => {
         try {
           setLoadingExplore(true);
-          const res = await apiClient.get('/search/explore/recommendations');
+          const res = await apiClient.get('/search/explore/tabs');
           setExploreData(res.data);
         } catch (err) {
           console.error("Failed to load recommendations", err);
@@ -328,55 +331,104 @@ export const Search: React.FC = () => {
       </section>
 
       {query === '' ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '3rem', marginTop: '1rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', marginTop: '1rem' }}>
+          
+          <div style={{ display: "flex", gap: "2rem", borderBottom: "1px solid var(--border-color)", paddingBottom: "0.5rem", position: "relative" }}>
+            {["agregado", "nuevo", "descubrir"].map((tab) => {
+              const labels: any = { "agregado": "Agregado", "nuevo": "Nuevo", "descubrir": "Descubrir" };
+              const isActive = activeExploreTab === tab;
+              return (
+                <div 
+                  key={tab}
+                  onClick={() => setActiveExploreTab(tab as any)}
+                  style={{
+                    fontSize: "1.1rem", fontWeight: isActive ? 600 : 500,
+                    color: isActive ? "var(--text-primary)" : "var(--text-secondary)",
+                    cursor: "pointer", padding: "0.5rem 0", position: "relative"
+                  }}
+                >
+                  {labels[tab]}
+                  {isActive && <div style={{ position: "absolute", bottom: "-0.5rem", left: 0, right: 0, height: "2px", background: "var(--accent-primary)" }} />}
+                </div>
+              );
+            })}
+          </div>
+
           {loadingExplore ? (
-            <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '3rem' }}>Cargando recomendaciones...</div>
+            <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '3rem' }}>Cargando...</div>
           ) : exploreData ? (
-            <>
-              {exploreData.for_you && exploreData.for_you.length > 0 && (
-                <section>
-                  <h3 style={{ marginBottom: '1rem', fontSize: '1.4rem' }}>Para ti</h3>
-                  <div style={{ display: 'flex', gap: '1rem', overflowX: 'auto', paddingBottom: '1rem' }}>
-                    {exploreData.for_you.map((item: any, idx: number) => (
-                      <div key={idx} className="glass-card" style={{ minWidth: '160px', width: '160px', padding: '0.75rem', cursor: 'pointer' }} onClick={() => handleOpenItemDetails(item)}>
-                        <img src={item.image_url || 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=150'} alt={item.title} style={{ width: '100%', height: '220px', objectFit: 'cover', borderRadius: '8px' }} onError={(e) => e.currentTarget.style.display='none'} />
-                        <h4 style={{ margin: '0.5rem 0 0 0', fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</h4>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              )}
-              {exploreData.trending && exploreData.trending.length > 0 && (
-                <section>
-                  <h3 style={{ marginBottom: '1rem', fontSize: '1.4rem' }}>Tendencias Globales</h3>
-                  <div style={{ display: 'flex', gap: '1rem', overflowX: 'auto', paddingBottom: '1rem' }}>
-                    {exploreData.trending.map((item: any, idx: number) => (
-                      <div key={idx} className="glass-card" style={{ minWidth: '160px', width: '160px', padding: '0.75rem', cursor: 'pointer' }} onClick={() => handleOpenItemDetails(item)}>
-                        <img src={item.image_url || 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=150'} alt={item.title} style={{ width: '100%', height: '220px', objectFit: 'cover', borderRadius: '8px' }} onError={(e) => e.currentTarget.style.display='none'} />
-                        <h4 style={{ margin: '0.5rem 0 0 0', fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</h4>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              )}
-              {exploreData.featured_guides && exploreData.featured_guides.length > 0 && (
-                <section>
-                  <h3 style={{ marginBottom: '1rem', fontSize: '1.4rem' }}>Guías Destacadas</h3>
-                  <div style={{ display: 'flex', gap: '1rem', overflowX: 'auto', paddingBottom: '1rem' }}>
-                    {exploreData.featured_guides.map((g: any, idx: number) => (
-                      <div key={idx} className="glass-card" style={{ minWidth: '250px', width: '250px', padding: '1rem', cursor: 'pointer', display: 'flex', flexDirection: 'column' }} onClick={() => navigate(`/guide/` + g.id)}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                          <BookOpen size={16} color="var(--accent-primary)" />
-                          <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Por {g.creator_name}</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+              {(() => {
+                const items = exploreData[activeExploreTab] || [];
+                if (items.length === 0) {
+                  return <div style={{ color: "var(--text-secondary)", padding: "1rem 0" }}>No hay elementos en esta categoría.</div>;
+                }
+
+                // Agrupar por categoría
+                const grouped: Record<string, any[]> = {};
+                items.forEach((item: any) => {
+                  if (!grouped[item.item_type]) grouped[item.item_type] = [];
+                  grouped[item.item_type].push(item);
+                });
+                
+                // Sort each group
+                Object.keys(grouped).forEach(key => {
+                  if (activeExploreTab === 'nuevo' || activeExploreTab === 'descubrir') {
+                    grouped[key].sort((a, b) => {
+                      if (!a.release_date) return 1;
+                      if (!b.release_date) return -1;
+                      return new Date(b.release_date).getTime() - new Date(a.release_date).getTime();
+                    });
+                  }
+                  // Para 'agregado', ya viene ordenado desde el backend por id descendente (mas reciente primero).
+                });
+
+                return Object.entries(grouped).map(([type, groupItems]) => {
+                  const title = type === 'comic' ? (language === 'es' ? 'Cómics' : 'Comics') : 
+                                type === 'manga' ? 'Mangas' : 
+                                type === 'book' ? (language === 'es' ? 'Libros' : 'Books') :
+                                type === 'movie' ? (language === 'es' ? 'Películas' : 'Movies') :
+                                type === 'series' ? 'Series' :
+                                type === 'game' ? (language === 'es' ? 'Juegos' : 'Games') :
+                                type === 'anime' ? 'Anime' : type;
+                  
+                  return (
+                    <HorizontalScroll key={type} title={title}>
+                      {groupItems.map((item: any, idx: number) => (
+                        <div key={idx} className="glass-card" style={{ minWidth: '200px', width: '200px', padding: '1rem', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '0.75rem' }} onClick={() => handleOpenItemDetails(item)}>
+                          <div style={{ position: 'relative', width: '100%', height: '280px', overflow: 'hidden', borderRadius: '8px' }}>
+                            <img src={item.image_url || 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=300'} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => e.currentTarget.style.display='none'} />
+                            
+                            {/* Status Badge */}
+                            {item.status && ['completed', 'watching', 'dropped'].includes(item.status) && (
+                              <div style={{ 
+                                position: 'absolute', top: '0.5rem', right: '0.5rem', 
+                                padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600,
+                                background: item.status === 'completed' ? 'var(--color-movie)' : item.status === 'watching' ? '#3b82f6' : '#ef4444',
+                                color: item.status === 'completed' ? 'var(--color-text-movie)' : '#ffffff',
+                                boxShadow: '0 2px 4px rgba(0,0,0,0.5)'
+                              }}>
+                                {item.status === 'completed' ? (language === 'es' ? 'Visto' : 'Watched') : item.status === 'watching' ? (language === 'es' ? 'En pausa' : 'Paused') : (language === 'es' ? 'Abandonado' : 'Dropped')}
+                              </div>
+                            )}
+
+                            {item.item_type && (
+                              <div style={{ position: 'absolute', bottom: '0.5rem', left: '0.5rem' }}>
+                                <span className={getTagClass(item.item_type)}>{item.item_type}</span>
+                              </div>
+                            )}
+                          </div>
+                          <div>
+                            <h4 style={{ margin: '0 0 0.25rem 0', fontSize: '1rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</h4>
+                            {item.release_date && <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{item.release_date}</span>}
+                          </div>
                         </div>
-                        <h4 style={{ margin: '0 0 0.5rem 0' }}>{g.title}</h4>
-                        <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' }}>{g.description}</p>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              )}
-            </>
+                      ))}
+                    </HorizontalScroll>
+                  );
+                });
+              })()}
+            </div>
           ) : null}
         </div>
       ) : (
@@ -544,15 +596,17 @@ export const Search: React.FC = () => {
                   }}
                 />
                 <div style={{ flex: 1, textAlign: 'left' }}>
-                  <h4 style={{ margin: '0 0 0.25rem 0', fontSize: '1rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.title}>
+                  <h4 style={{ margin: '0 0 0.15rem 0', fontSize: '1rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.title}>
                     {item.title}
                   </h4>
+                  {item.release_date && (
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
+                      {formatReleaseDate(item.release_date)}
+                    </div>
+                  )}
                   <span className={getTagClass(item.item_type)} style={{ marginBottom: '0.5rem', alignSelf: 'flex-start' }}>
                     {item.item_type === 'comic' ? (language === 'es' ? 'Cómic' : 'Comic') : item.item_type === 'manga' ? 'Manga' : t('media' + item.item_type.charAt(0).toUpperCase() + item.item_type.slice(1))}
                   </span>
-                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', margin: 0, height: '3.2rem', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' }}>
-                    {stripHtml(item.description)}
-                  </p>
                 </div>
 
                 {onShelf && (

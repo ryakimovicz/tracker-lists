@@ -161,3 +161,73 @@ class TVMazeService:
         except Exception:
             pass
         return None
+
+
+    @staticmethod
+    def get_new_shows() -> List[SearchResultItem]:
+        import json, urllib.request, datetime
+        today = datetime.datetime.now().strftime("%Y-%m-%d")
+        url = f"https://api.tvmaze.com/schedule/web?date={today}"
+        req = urllib.request.Request(url, headers={"User-Agent": "TrackerLists/1.0"})
+        results = []
+        try:
+            with urllib.request.urlopen(req, timeout=5) as response:
+                if response.status == 200:
+                    data = json.loads(response.read().decode())
+                    seen = set()
+                    for item in data:
+                        show = item.get("_embedded", {}).get("show")
+                        if not show:
+                            continue
+                        if show.get("id") in seen:
+                            continue
+                        seen.add(show.get("id"))
+                        image_data = show.get("image")
+                        image_url = image_data.get("original") or image_data.get("medium") if image_data else None
+                        premiered = show.get("premiered")
+                        release_date = premiered[:4] if premiered else None
+                        results.append(SearchResultItem(
+                            external_id=f"tvm_{show.get('id')}",
+                            title=show.get("name"),
+                            image_url=image_url,
+                            description=show.get("summary", ""),
+                            item_type="series",
+                            release_date=release_date,
+                            popularity=show.get("weight", 0)
+                        ))
+                    return sorted(results, key=lambda x: x.popularity, reverse=True)[:10]
+        except Exception:
+            pass
+        return []
+
+    @staticmethod
+    def get_trending_shows() -> List[SearchResultItem]:
+        # TVMaze doesn't have a direct trending endpoint, we can use shows sorted by weight/rating
+        import json, urllib.request
+        url = "https://api.tvmaze.com/shows"
+        req = urllib.request.Request(url, headers={"User-Agent": "TrackerLists/1.0"})
+        results = []
+        try:
+            with urllib.request.urlopen(req, timeout=5) as response:
+                if response.status == 200:
+                    data = json.loads(response.read().decode())
+                    sorted_shows = sorted(data, key=lambda x: x.get("weight", 0), reverse=True)[:10]
+                    for show in sorted_shows:
+                        image_data = show.get("image")
+                        image_url = image_data.get("original") or image_data.get("medium") if image_data else None
+                        premiered = show.get("premiered")
+                        release_date = premiered[:4] if premiered else None
+                        results.append(SearchResultItem(
+                            external_id=f"tvm_{show.get('id')}",
+                            title=show.get("name"),
+                            image_url=image_url,
+                            description=show.get("summary", ""),
+                            item_type="series",
+                            release_date=release_date,
+                            popularity=show.get("weight", 0)
+                        ))
+                    return results
+        except Exception:
+            pass
+        return []
+

@@ -194,15 +194,16 @@ class ComicVineService:
 
             merged_results.sort(key=lambda x: get_relevance_score(x.title), reverse=True)
             return merged_results
-
         except Exception as e:
             print(f"Comic Vine API Error: {e}")
-            return [
-                SearchResultItem(
-                    external_id="error-api",
-                    title="Error al consultar Comic Vine",
-                    image_url=None,
-                    description=str(e),
-                    item_type="comic"
-                )
-            ]
+            return []
+
+    @staticmethod
+    def get_new_comics() -> List[SearchResultItem]:
+        return ComicVineService.search_comics("Batman")[:15]
+
+    @staticmethod
+    def get_trending_comics() -> List[SearchResultItem]:
+        import random
+        queries = ["Spider-Man", "X-Men", "Avengers", "Superman", "Justice League"]
+        return ComicVineService.search_comics(random.choice(queries))[:15]

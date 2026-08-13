@@ -29,11 +29,11 @@ def validate_media_status(item_type: str, status_val: UserLibraryStatusEnum):
                 detail="Invalid status for game. Must be 'plan_to_play', 'playing', 'completed', or 'dropped'."
             )
     elif t_lower == "movie":
-        allowed = {UserLibraryStatusEnum.PLAN_TO_WATCH, UserLibraryStatusEnum.COMPLETED}
+        allowed = {UserLibraryStatusEnum.PLAN_TO_WATCH, UserLibraryStatusEnum.WATCHING, UserLibraryStatusEnum.COMPLETED}
         if status_val not in allowed:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid status for movie. Must be 'plan_to_watch', 'completed', or 'dropped'."
+                detail="Invalid status for movie. Must be 'plan_to_watch', 'watching', 'completed', or 'dropped'."
             )
     elif t_lower in ("series", "anime"):
         allowed = {UserLibraryStatusEnum.PLAN_TO_WATCH, UserLibraryStatusEnum.WATCHING, UserLibraryStatusEnum.COMPLETED}

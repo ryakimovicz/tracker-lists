@@ -155,3 +155,13 @@ class GoogleBooksService:
                     seen_isbns.add(isbn)
                     
         return merged_results
+
+    @staticmethod
+    def get_new_books() -> List[SearchResultItem]:
+        return GoogleBooksService.search_books("subject:fiction 2024")[:15]
+
+    @staticmethod
+    def get_trending_books() -> List[SearchResultItem]:
+        import random
+        queries = ["Harry Potter", "Lord of the Rings", "Percy Jackson", "A Song of Ice and Fire", "Stephen King", "Brandon Sanderson"]
+        return GoogleBooksService.search_books(random.choice(queries))[:15]

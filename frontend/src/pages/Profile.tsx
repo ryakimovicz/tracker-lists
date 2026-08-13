@@ -424,8 +424,9 @@ export const Profile: React.FC = () => {
       const isSeriesOrRegular = item.item_type !== 'episode' && item.item_type !== 'season' && !item.external_id?.startsWith('tvm-ep-');
       const isNotStartedSeries = (item.item_type === 'series' || item.item_type === 'anime') && !item.last_seen_episode;
       const isPlanToStatus = ['plan_to_watch', 'plan_to_play', 'plan_to_read'].includes(item.status);
+      const isInvalidMovie = (item.item_type || '').toLowerCase() === 'movie' && item.status !== 'completed';
 
-      return matchesMedia && matchesSearch && (isSeriesOrRegular || isLoose) && !isNotStartedSeries && !isPlanToStatus;
+      return matchesMedia && matchesSearch && (isSeriesOrRegular || isLoose) && !isNotStartedSeries && !isPlanToStatus && !isInvalidMovie;
     })
     .sort((a, b) => {
       const dateA = new Date(a.completed_at || a.updated_at || 0).getTime();
@@ -442,6 +443,8 @@ export const Profile: React.FC = () => {
   const visualLibraryItems = libraryItems.filter(item => {
     const isPlanToStatus = ['plan_to_watch', 'plan_to_play', 'plan_to_read'].includes(item.status);
     if (isPlanToStatus) return false;
+
+    if ((item.item_type || '').toLowerCase() === 'movie' && item.status !== 'completed') return false;
 
     const isNotStartedSeries = (item.item_type === 'series' || item.item_type === 'anime') && !item.last_seen_episode;
     if (isNotStartedSeries) return false;

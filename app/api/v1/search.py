@@ -447,3 +447,172 @@ def get_explore_recommendations(
         trending=trending,
         featured_guides=featured_guides
     )
+
+
+class ExploreTabsResponse(BaseModel):
+    agregado: List[SearchResultItem]
+    nuevo: List[SearchResultItem]
+    descubrir: List[SearchResultItem]
+
+@router.get("/explore/tabs", response_model=ExploreTabsResponse)
+@limiter.limit("30/minute")
+def get_explore_tabs(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_optional)
+):
+    agregado = []
+    nuevo = []
+    descubrir = []
+    
+    # 1. Agregado (UserLibraryItem filtered)
+    if current_user:
+        user_items = db.query(UserLibraryItem).filter(
+            UserLibraryItem.user_id == current_user.id
+        ).order_by(UserLibraryItem.id.desc()).all()
+        for item in user_items:
+            if not item.external_id.startswith("tvm-ep-"):
+                agregado.append(SearchResultItem(
+                    external_id=item.external_id,
+                    title=item.title,
+                    image_url=item.image_url,
+                    item_type=item.item_type,
+                    status=item.status
+                ))
+    
+    # 2. Nuevo (APIs + Platform fallback)
+    # We will run this concurrently
+    import concurrent.futures
+    
+    def fetch_new_tv():
+        try: return TVMazeService.get_new_shows()
+        except: return []
+        
+    def fetch_new_manga():
+        try: return AnilistService.get_new_manga()
+        except: return []
+
+    def fetch_new_games():
+        try: return IGDBService.get_new_games()
+        except: return []
+
+    def fetch_new_movies():
+        try: return OMDbService.get_new_movies()
+        except: return []
+
+    def fetch_new_books():
+        try: return GoogleBooksService.get_new_books()
+        except: return []
+
+    def fetch_new_comics():
+        try: return ComicVineService.get_new_comics()
+        except: return []
+        
+    # Tendencias
+    def fetch_trending_tv():
+        try: return TVMazeService.get_trending_shows()
+        except: return []
+        
+    def fetch_trending_manga():
+        try: return AnilistService.get_trending_manga()
+        except: return []
+
+    def fetch_trending_games():
+        try: return IGDBService.get_trending_games()
+        except: return []
+
+    def fetch_trending_movies():
+        try: return OMDbService.get_trending_movies()
+        except: return []
+
+    def fetch_trending_books():
+        try: return GoogleBooksService.get_trending_books()
+        except: return []
+
+    def fetch_trending_comics():
+        try: return ComicVineService.get_trending_comics()
+        except: return []
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=12) as executor:
+        f_ntv = executor.submit(fetch_new_tv)
+        f_nmg = executor.submit(fetch_new_manga)
+        f_ngm = executor.submit(fetch_new_games)
+        f_nmv = executor.submit(fetch_new_movies)
+        f_nbk = executor.submit(fetch_new_books)
+        f_ncm = executor.submit(fetch_new_comics)
+        f_ttv = executor.submit(fetch_trending_tv)
+        f_tmg = executor.submit(fetch_trending_manga)
+        f_tgm = executor.submit(fetch_trending_games)
+        f_tmv = executor.submit(fetch_trending_movies)
+        f_tbk = executor.submit(fetch_trending_books)
+        f_tcm = executor.submit(fetch_trending_comics)
+        
+        nuevo.extend(f_ntv.result())
+        nuevo.extend(f_nmg.result())
+        nuevo.extend(f_ngm.result())
+        nuevo.extend(f_nmv.result())
+        nuevo.extend(f_nbk.result())
+        nuevo.extend(f_ncm.result())
+        
+        descubrir.extend(f_ttv.result())
+        descubrir.extend(f_tmg.result())
+        descubrir.extend(f_tgm.result())
+        descubrir.extend(f_tmv.result())
+        descubrir.extend(f_tbk.result())
+        descubrir.extend(f_tcm.result())
+        
+    # Platform fallback for discovering movies / books etc
+    now = datetime.now(timezone.utc)
+    week_ago = now - timedelta(days=30)
+    trending_logs = db.query(
+        UserActivityLog.external_id, 
+        UserActivityLog.item_type,
+        UserActivityLog.item_title,
+        UserActivityLog.image_url,
+        func.count(UserActivityLog.id).label('count')
+    ).filter(
+        UserActivityLog.activity_type.in_(['shelf_add', 'item_completed', 'item_added']),
+        UserActivityLog.external_id.isnot(None),
+        UserActivityLog.item_type.in_(['movie', 'book', 'game'])
+    ).group_by(
+        UserActivityLog.external_id, 
+        UserActivityLog.item_type,
+        UserActivityLog.item_title,
+        UserActivityLog.image_url
+    ).order_by(func.count(UserActivityLog.id).desc()).limit(15).all()
+
+    for log in trending_logs:
+        descubrir.append(SearchResultItem(
+            external_id=log.external_id,
+            title=log.item_title,
+            image_url=log.image_url,
+            item_type=log.item_type,
+            popularity=float(log.count) * 10
+        ))
+        
+    nuevo_logs = db.query(
+        UserLibraryItem.external_id, 
+        UserLibraryItem.item_type,
+        UserLibraryItem.title,
+        UserLibraryItem.image_url,
+    ).filter(
+        UserLibraryItem.item_type.in_(['movie', 'book', 'game'])
+    ).order_by(UserLibraryItem.id.desc()).limit(15).all()
+    
+    seen_new = set()
+    for log in nuevo_logs:
+        if log.external_id not in seen_new:
+            seen_new.add(log.external_id)
+            nuevo.append(SearchResultItem(
+                external_id=log.external_id,
+                title=log.title,
+                image_url=log.image_url,
+                item_type=log.item_type
+            ))
+
+    return ExploreTabsResponse(
+        agregado=agregado,
+        nuevo=nuevo,
+        descubrir=descubrir
+    )
+
