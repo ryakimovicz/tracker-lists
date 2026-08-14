@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 import json
 from typing import List, Dict, Any, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, BackgroundTasks
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -1280,10 +1280,104 @@ def bulk_section_action(
     db.commit()
     return {"message": f"Section '{action_req.section_name}' items updated successfully with action '{action}'"}
 
+def check_series_completion(user_id: int, ep_external_id: str):
+    # This runs in background to check if the full series is watched
+    from app.core.database import SessionLocal
+    db = SessionLocal()
+    try:
+        if not ep_external_id.startswith("tvm-ep-"):
+            return
+        ep_id = ep_external_id.replace("tvm-ep-", "")
+        import urllib.request, json
+        # 1. Get show id from episode
+        url = f"https://api.tvmaze.com/episodes/{ep_id}?embed=show"
+        req = urllib.request.Request(url, headers={"User-Agent": "TrackerLists/1.0"})
+        show_id = None
+        show_name = None
+        show_image = None
+        with urllib.request.urlopen(req, timeout=5) as response:
+            if response.status == 200:
+                data = json.loads(response.read().decode())
+                show = data.get("_embedded", {}).get("show", {})
+                if show:
+                    show_id = show.get("id")
+                    show_name = show.get("name")
+                    show_image = show.get("image", {}).get("original") if show.get("image") else None
+        
+        if not show_id:
+            return
+            
+        # 2. Get all episodes for the show
+        episodes_url = f"https://api.tvmaze.com/shows/{show_id}/episodes"
+        req2 = urllib.request.Request(episodes_url, headers={"User-Agent": "TrackerLists/1.0"})
+        with urllib.request.urlopen(req2, timeout=5) as response2:
+            if response2.status == 200:
+                episodes = json.loads(response2.read().decode())
+                # Filter out episodes that haven't aired yet
+                import datetime
+                today = datetime.datetime.now().strftime("%Y-%m-%d")
+                aired_episodes = [ep for ep in episodes if ep.get("airdate") and ep.get("airdate") <= today]
+                total_aired = len(aired_episodes)
+                
+                if total_aired == 0:
+                    return
+                
+                # 3. Check user's progress
+                from app.models.consumption import ItemProgress
+                from app.models.library import UserLibraryItem, UserLibraryStatusEnum
+                
+                aired_ep_ids = [f"tvm-ep-{ep['id']}" for ep in aired_episodes]
+                
+                completed_count = db.query(ItemProgress).filter(
+                    ItemProgress.user_id == user_id,
+                    ItemProgress.external_id.in_(aired_ep_ids),
+                    ItemProgress.is_completed == True
+                ).count()
+                
+                if completed_count >= total_aired:
+                    # Mark series as completed
+                    show_ext_id = f"tvm_{show_id}"
+                    existing_series = db.query(UserLibraryItem).filter(
+                        UserLibraryItem.user_id == user_id,
+                        UserLibraryItem.external_id == show_ext_id
+                    ).first()
+                    
+                    if existing_series:
+                        existing_series.status = UserLibraryStatusEnum.COMPLETED
+                        from datetime import timezone
+                        existing_series.completed_at = datetime.datetime.now(timezone.utc)
+                    else:
+                        from datetime import timezone
+                        new_series = UserLibraryItem(
+                            user_id=user_id,
+                            item_type="series",
+                            external_id=show_ext_id,
+                            title=show_name,
+                            image_url=show_image,
+                            status=UserLibraryStatusEnum.COMPLETED,
+                            completed_at=datetime.datetime.now(timezone.utc),
+                            imdb_id=show_ext_id
+                        )
+                        db.add(new_series)
+                    
+                    # Remove loose episodes
+                    db.query(UserLibraryItem).filter(
+                        UserLibraryItem.user_id == user_id,
+                        UserLibraryItem.item_type == "episode",
+                        UserLibraryItem.external_id.in_(aired_ep_ids)
+                    ).delete(synchronize_session=False)
+                    
+                    db.commit()
+    except Exception as e:
+        print(f"Error checking series completion: {e}")
+    finally:
+        db.close()
+
 @router.post("/{list_id}/toggle-series-episode", status_code=status.HTTP_200_OK)
 def toggle_series_episode(
     list_id: int,
     ep_req: ToggleSeriesEpisodeRequest,
+    background_tasks: BackgroundTasks,
     action: Optional[str] = None, # None=toggle, 'mark_again', 'remove'
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -1370,6 +1464,7 @@ def toggle_series_episode(
         
     if just_marked:
         auto_add_to_library(db, current_user.id, item)
+        background_tasks.add_task(check_series_completion, current_user.id, ext_id)
         
         ch = ConsumptionHistory(
             user_id=current_user.id,

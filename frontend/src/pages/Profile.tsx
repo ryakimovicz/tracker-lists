@@ -1021,7 +1021,7 @@ export const Profile: React.FC = () => {
                     <Heart size={16} fill="white" color="white" />
                   </div>
                   <img
-                    src={item.image_url}
+                    src={item.image_url || undefined}
                     alt={item.title}
                     style={{ width: '100%', height: '260px', objectFit: 'cover', borderRadius: '8px' }}
                   />

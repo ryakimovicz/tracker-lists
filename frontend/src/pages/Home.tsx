@@ -24,7 +24,7 @@ export const getTagClass = (type: string) => {
 
 // --- Helper Components ---
 
-const ScrollRow = ({ children, title }: { children: React.ReactNode, title?: string }) => {
+const ScrollRow = ({ children, title, outlineColor }: { children: React.ReactNode, title?: string, outlineColor?: string }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const scroll = (direction: "left" | "right") => {
@@ -35,8 +35,8 @@ const ScrollRow = ({ children, title }: { children: React.ReactNode, title?: str
   };
 
   return (
-    <div style={{ position: "relative", marginBottom: "2rem" }}>
-      {title && <h3 style={{ fontSize: "1.2rem", marginBottom: "1rem", fontWeight: 600, paddingLeft: "45px" }}>{title}</h3>}
+    <div style={{ position: "relative" }}>
+      {title && <div style={{ display: "flex", paddingLeft: "45px", marginBottom: "1rem" }}><h3 style={{ fontSize: "1.2rem", fontWeight: 600, color: "var(--text-primary)", border: `2px solid ${outlineColor || "var(--border-color)"}`, borderRadius: "8px", padding: "0.2rem 0.75rem", background: "var(--bg-secondary)" }}>{title}</h3></div>}
       <button 
         onClick={() => scroll("left")}
         style={{ position: "absolute", left: "0px", top: "50%", transform: "translateY(-50%)", zIndex: 10, background: "var(--bg-tertiary)", border: "1px solid var(--border-color)", borderRadius: "50%", width: "40px", height: "40px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", boxShadow: "0 4px 6px rgba(0,0,0,0.3)" }}
@@ -66,7 +66,9 @@ const CustomCard = ({
   onClick, 
   onTitleClick,
   isNsfw,
-  language
+  language,
+  themeColor,
+  themeTextColor
 }: { 
   title: string; 
   coverUrl?: string; 
@@ -80,6 +82,8 @@ const CustomCard = ({
   onTitleClick?: (e: React.MouseEvent) => void;
   isNsfw?: boolean;
   language?: string;
+  themeColor?: string;
+  themeTextColor?: string;
 }) => {
   const { user } = useAuth();
   const [isPeek, setIsPeek] = useState(false);
@@ -100,9 +104,10 @@ const CustomCard = ({
       onClick={handleClick}
       style={{ 
         minWidth: "180px", maxWidth: "180px", background: "var(--bg-secondary)", 
-        border: "1px solid var(--border-color)", borderRadius: "12px", 
+        border: `1px solid ${themeColor || "var(--border-color)"}`, borderRadius: "12px", 
         overflow: "hidden", cursor: "pointer", position: "relative",
-        display: "flex", flexDirection: "column"
+        display: "flex", flexDirection: "column",
+        boxShadow: themeColor ? `0 0 10px ${themeColor}33` : "none"
       }}
       className="activity-card"
     >
@@ -170,10 +175,12 @@ const CustomCard = ({
           style={{
             position: "absolute", bottom: "0.5rem", right: "0.5rem",
             width: "32px", height: "32px", borderRadius: "50%",
-            background: "var(--bg-tertiary)", border: "2px solid var(--text-muted)",
+            background: "var(--bg-tertiary)", border: `2px solid ${themeColor || "var(--text-muted)"}`,
             display: "flex", alignItems: "center", justifyContent: "center",
-            cursor: "pointer", color: "var(--text-primary)"
-          }}
+            cursor: "pointer", color: themeColor || "var(--text-primary)",
+            "--btn-hover-bg": themeColor,
+            "--btn-hover-text": themeTextColor
+          } as React.CSSProperties}
         >
           <Check size={16} />
         </button>
@@ -182,7 +189,7 @@ const CustomCard = ({
   );
 };
 
-const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries }: { item: any, onUpdate: () => void, language: string, onOpenSeries: (item: any) => void }) => {
+const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, themeTextColor }: { item: any, onUpdate: () => void, language: string, onOpenSeries: (item: any) => void, themeColor?: string, themeTextColor?: string }) => {
   const { user } = useAuth();
   const [nextEp, setNextEp] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -340,7 +347,7 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries }: { item: an
     return item.image_url;
   };
   const coverUrl = getCoverUrl();
-  const categoryLabel = item.item_type === 'anime' ? 'Anime' : 'Serie';
+
   
   let seasonText = '';
   let epName = '';
@@ -357,9 +364,10 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries }: { item: an
         onClick={handleCardClick}
         style={{ 
           minWidth: "220px", maxWidth: "220px", background: "var(--bg-secondary)", 
-          border: "1px solid var(--border-color)", borderRadius: "12px", 
+          border: `1px solid ${themeColor || "var(--border-color)"}`, borderRadius: "12px", 
           overflow: "hidden", cursor: "pointer", position: "relative",
-          display: "flex", flexDirection: "column"
+          display: "flex", flexDirection: "column",
+          boxShadow: themeColor ? `0 0 10px ${themeColor}33` : "none"
         }}
         className="activity-card"
       >
@@ -379,9 +387,7 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries }: { item: an
             <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: "2rem", filter: currentlyBlurred ? "blur(15px)" : "none" }}>?</div>
           )}
           
-          <div className={getTagClass(item.item_type)} style={{ position: "absolute", bottom: "0.25rem", left: "0.5rem", padding: "0.1rem 0.4rem", borderRadius: "4px", fontSize: "0.7rem", fontWeight: 600, opacity: 0.85, backdropFilter: 'blur(4px)' }}>
-            {categoryLabel}
-          </div>
+
         </div>
         
         <div style={{ padding: "0.75rem", display: "flex", flexDirection: "column", gap: "0.25rem", flex: 1 }}>
@@ -403,11 +409,13 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries }: { item: an
             style={{
               position: "absolute", bottom: "0.5rem", right: "0.5rem",
               width: "32px", height: "32px", borderRadius: "50%",
-              background: "var(--bg-tertiary)", border: "2px solid var(--text-muted)",
+              background: "var(--bg-tertiary)", border: `2px solid ${themeColor || "var(--text-muted)"}`,
               display: "flex", alignItems: "center", justifyContent: "center",
-              cursor: isLoading ? "wait" : "pointer", color: "var(--text-primary)",
-              opacity: isLoading ? 0.5 : 1
-            }}
+              cursor: isLoading ? "wait" : "pointer", color: themeColor || "var(--text-primary)",
+              opacity: isLoading ? 0.5 : 1,
+              "--btn-hover-bg": themeColor,
+              "--btn-hover-text": themeTextColor
+            } as React.CSSProperties}
           >
             <Check size={16} />
           </button>
@@ -530,11 +538,13 @@ const ActiveItemCard = ({ item, onUpdate, language, onOpenItem }: { item: any, o
           style={{
             position: "absolute", bottom: "0.5rem", right: "0.5rem",
             width: "32px", height: "32px", borderRadius: "50%",
-            background: "var(--bg-tertiary)", border: "2px solid var(--text-muted)",
+            background: "var(--bg-tertiary)", border: `2px solid ${themeColor || "var(--text-muted)"}`,
             display: "flex", alignItems: "center", justifyContent: "center",
-            cursor: isLoading ? "wait" : "pointer", color: "var(--text-primary)",
-            opacity: isLoading ? 0.5 : 1
-          }}
+            cursor: isLoading ? "wait" : "pointer", color: themeColor || "var(--text-primary)",
+            opacity: isLoading ? 0.5 : 1,
+            "--btn-hover-bg": themeColor,
+            "--btn-hover-text": themeTextColor
+          } as React.CSSProperties}
         >
           <Check size={16} />
         </button>
@@ -548,7 +558,7 @@ const ActiveItemCard = ({ item, onUpdate, language, onOpenItem }: { item: any, o
 export const Home: React.FC = () => {
   const navigate = useNavigate();
   const { language } = useTranslation();
-  const [activeTab, setActiveTab] = useState<"watching" | "plan_to_watch" | "completed" | "dropped">("watching");
+  const [activeTab, setActiveTab] = useState<"watching" | "guides" | "plan_to_watch" | "completed" | "dropped">("watching");
   
   const [libraryItems, setLibraryItems] = useState<any[]>([]);
   const [upNextGuides, setUpNextGuides] = useState<any[]>([]);
@@ -625,11 +635,14 @@ export const Home: React.FC = () => {
     <div style={{ maxWidth: "1200px", margin: "0 auto", display: "flex", flexDirection: "column", gap: "2rem" }}>
       
       {/* Tabs */}
-      <div style={{ display: "flex", gap: "2rem", borderBottom: "1px solid var(--border-color)", paddingBottom: "0.5rem", position: "relative" }}>
-        {["watching", "plan_to_watch", "completed", "dropped"].map((tab) => {
+      <div style={{ 
+        display: "flex", gap: "2rem", borderBottom: "1px solid var(--border-color)", paddingBottom: "0.5rem", 
+        position: "sticky", top: 0, zIndex: 10, background: "var(--bg-primary)", paddingTop: "1rem" 
+      }}>
+        {["watching", "guides", "plan_to_watch", "completed", "dropped"].map((tab) => {
           const labels: any = language === 'es'
-            ? { "watching": "Continuar", "plan_to_watch": "No comenzado", "completed": "Terminado", "dropped": "Abandonado" }
-            : { "watching": "Continue", "plan_to_watch": "Not started", "completed": "Completed", "dropped": "Dropped" };
+            ? { "watching": "Continuar", "guides": "Guías", "plan_to_watch": "No comenzado", "completed": "Terminado", "dropped": "Abandonado" }
+            : { "watching": "Continue", "guides": "Guides", "plan_to_watch": "Not started", "completed": "Completed", "dropped": "Dropped" };
           const isActive = activeTab === tab;
           return (
             <div 
@@ -649,71 +662,14 @@ export const Home: React.FC = () => {
       </div>
 
       {/* Media Row */}
-      {filteredItems.length > 0 ? (
-        <ScrollRow>
-          {filteredItems.map(item => {
-            if ((activeTab === "watching" || activeTab === "plan_to_watch") && (item.item_type === "series" || item.item_type === "anime")) {
-              return (
-                <ActiveSeriesCard 
-                  key={item.id}
-                  item={item}
-                  language={language}
-                  onUpdate={() => fetchDashboard(true)}
-                  onOpenSeries={(seriesItem) => setSelectedItem(seriesItem)}
-                />
-              );
-            }
-            if ((activeTab === "watching" || activeTab === "plan_to_watch") && item.item_type !== "series" && item.item_type !== "anime") {
-              return (
-                <ActiveItemCard
-                  key={item.id}
-                  item={item}
-                  language={language}
-                  onUpdate={() => fetchDashboard(true)}
-                  onOpenItem={(i) => setSelectedItem(i)}
-                />
-              );
-            }
-            return (
-              <CustomCard 
-                key={item.id}
-                title={item.title}
-                coverUrl={item.image_url}
-                coverBottomText={item.item_type}
-                subtitle2={(() => {
-                  if (['completed', 'read', 'endless'].includes(item.status)) {
-                    if (['book', 'comic', 'manga'].includes(item.item_type)) return item.total_pages ? `${item.total_pages} ${language === 'es' ? 'páginas' : 'pages'}` : '';
-                    if (item.item_type === 'movie') return item.total_pages ? `${item.total_pages} min` : '';
-                    if (item.item_type === 'game') return item.pages_read > 0 ? `${Math.floor(item.pages_read / 60)}h ${String(item.pages_read % 60).padStart(2, '0')}m` : '';
-                    return '';
-                  }
-                  if (item.status === 'dropped') {
-                    if (['book', 'comic', 'manga'].includes(item.item_type)) return item.pages_read > 0 ? `${item.pages_read} ${language === 'es' ? 'páginas' : 'pages'}` : '';
-                    if (item.item_type === 'game') return item.pages_read > 0 ? `${Math.floor(item.pages_read / 60)}h ${String(item.pages_read % 60).padStart(2, '0')}m` : '';
-                    return '';
-                  }
-                  return "Progreso...";
-                })()}
-                onCheck={!['completed', 'read'].includes(item.status) ? (e) => handleMarkDone(e, item) : undefined}
-                onClick={() => setSelectedItem(item)}
-                isNsfw={item.is_nsfw}
-                language={language}
-              />
-            );
-          })}
-        </ScrollRow>
-      ) : (
-        <div style={{ color: "var(--text-secondary)", padding: "1rem 0" }}>No hay elementos en esta categoria.</div>
-      )}
-
-        {/* Guides Row */}
-        {activeTab === "watching" && upNextGuides.length > 0 && (
-          <ScrollRow title="Continuar guías">
+      {activeTab === "guides" ? (
+        upNextGuides.length > 0 ? (
+          <ScrollRow>
             {upNextGuides.map(g => {
               let insideTop = g.title;
               let bottomText1 = '';
               let bottomText2 = '';
-              let coverBottom = getTypeCat(g.item_type);
+              
 
               const match = g.title.match(/^(.*?)\s*-\s*S(\d+)E(\d+)(.*)$/i);
               if (match) {
@@ -738,7 +694,9 @@ export const Home: React.FC = () => {
                   title={g.list_title}
                   coverUrl={g.image_url}
                   preSubtitle={insideTop}
-                  coverBottomText={g.item_type}
+                  themeColor="var(--color-guide)"
+                  themeTextColor="var(--color-text-guide)"
+                  coverBottomText={undefined}
                   subtitle1={bottomText1}
                   subtitle2={bottomText2}
                   onCheck={(e) => handleMarkDone(e, g)}
@@ -750,7 +708,73 @@ export const Home: React.FC = () => {
               );
             })}
           </ScrollRow>
-        )}
+        ) : (
+          <div style={{ color: "var(--text-secondary)", padding: "1rem 0" }}>No hay guías seguidas.</div>
+        )
+      ) : (
+        filteredItems.length > 0 ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+            {["movie", "series", "anime", "book", "comic", "manga", "game"].map(category => {
+              let catItems = filteredItems.filter(i => i.item_type === category);
+              if (catItems.length === 0) return null;
+              return (
+                <ScrollRow key={category} title={getTypeCat(category)} outlineColor={`var(--color-${category})`}>
+                  {catItems.map(item => {
+                    if ((activeTab === "watching" || activeTab === "plan_to_watch") && (item.item_type === "series" || item.item_type === "anime")) {
+                      return (
+                        <ActiveSeriesCard 
+                          key={item.id}
+                          item={item}
+                          language={language}
+                          onUpdate={() => fetchDashboard(true)}
+                          onOpenSeries={(seriesItem) => setSelectedItem(seriesItem)}
+                          themeColor={`var(--color-${item.item_type})`}
+                          themeTextColor={`var(--color-text-${item.item_type})`}
+                        />
+                      );
+                    }
+                    
+                    return (
+                      <CustomCard 
+                        key={item.id}
+                        title={item.title}
+                        coverUrl={item.image_url}
+                        themeColor={`var(--color-${item.item_type})`}
+                          themeTextColor={`var(--color-text-${item.item_type})`}
+                        coverBottomText={undefined}
+                        subtitle2={(() => {
+                          if (['completed', 'read', 'endless'].includes(item.status)) {
+                            if (['book', 'comic', 'manga'].includes(item.item_type)) return item.total_pages ? `${item.total_pages} ${language === 'es' ? 'páginas' : 'pages'}` : '';
+                            if (item.item_type === 'movie') return item.total_pages ? `${item.total_pages} min` : '';
+                            if (item.item_type === 'game') return item.pages_read > 0 ? `${Math.floor(item.pages_read / 60)}h ${String(item.pages_read % 60).padStart(2, '0')}m` : '';
+                            return '';
+                          }
+                          if (item.status === 'dropped') {
+                            if (['book', 'comic', 'manga'].includes(item.item_type)) return item.pages_read > 0 ? `${item.pages_read} ${language === 'es' ? 'páginas' : 'pages'}` : '';
+                            if (item.item_type === 'game') return item.pages_read > 0 ? `${Math.floor(item.pages_read / 60)}h ${String(item.pages_read % 60).padStart(2, '0')}m` : '';
+                            return '';
+                          }
+                          if (['watching', 'reading', 'playing', 'endless'].includes(item.status)) {
+                            if (item.item_type === 'game' && item.pages_read > 0) return `${Math.floor(item.pages_read / 60)}h ${String(item.pages_read % 60).padStart(2, '0')}m`;
+                            if (['book', 'comic', 'manga'].includes(item.item_type) && item.pages_read > 0) return `${item.pages_read} ${language === 'es' ? 'páginas' : 'pages'}`;
+                          }
+                          return "";
+                        })()}
+                        onCheck={!['completed', 'read'].includes(item.status) ? (e) => handleMarkDone(e, item) : undefined}
+                        onClick={() => setSelectedItem(item)}
+                        isNsfw={item.is_nsfw}
+                        language={language}
+                      />
+                    );
+                  })}
+                </ScrollRow>
+              );
+            })}
+          </div>
+        ) : (
+          <div style={{ color: "var(--text-secondary)", padding: "1rem 0" }}>No hay elementos en esta categoria.</div>
+        )
+      )}
 
       {/* Activity Feed */}
       <h3 style={{ fontSize: "1.2rem", marginBottom: "0.5rem", fontWeight: 600 }}>Novedades en guias seguidas</h3>
