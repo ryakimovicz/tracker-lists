@@ -42,7 +42,7 @@ La interfaz está estructurada en **seis secciones principales** accesibles desd
 
 ### 🏠 Home (Inicio)
 Centro de control personal del usuario dividido en 4 pestañas:
-- **Continuar**: Series y animes en progreso (muestran el siguiente episodio por ver con botón `✓`), libros/cómics (muestran páginas leídas) y juegos (muestran horas jugadas). También incluye el progreso activo en guías cronológicas.
+- **Continuar**: Series y animes en progreso (muestran el siguiente episodio por ver con botón `✓`), libros/cómics (muestran páginas leídas), y juegos y películas (muestran tiempo activo en horas y minutos). También incluye el progreso activo en guías cronológicas.
 - **No comenzado**: Obras pendientes (Plan to watch/read/play).
 - **Terminado**: Obras completadas. Muestra directamente el total de páginas, duración en minutos o horas jugadas en lugar del estado.
 - **Abandonado**: Obras dejadas a medias, detallando el progreso hasta el momento del abandono.
@@ -67,7 +67,7 @@ Búsqueda y descubrimiento:
 - **Modal de Detalle del Ítem**: Ficha completa del elemento con:
   - Botón `+` en la barra superior para añadir/seguir la obra en la estantería (creando automáticamente una lista privada de seguimiento para series/animes).
   - Sistema intuitivo de 4 botones principales integrados: **En Progreso, Completado, Infinito, Abandonado**, que añaden automáticamente el elemento a la estantería al activarse.
-  - Tracking detallado de progreso: **Páginas leídas vs. Totales** para libros, cómics y mangas, y **Horas jugadas** para videojuegos. Se puede ingresar manualmente o autocompletar al marcar la obra como completada.
+  - Tracking detallado de progreso: **Páginas leídas vs. Totales** para libros, cómics y mangas, y **Tiempo consumido (hh:mm)** para videojuegos y películas. El tiempo se puede ingresar manualmente (al pausar/abandonar) o se autocompleta automáticamente al marcar la obra como completada.
   - Botón interactivo **"🌐 Ver traducción"** debajo de las sinopsis en inglés (cuando la interfaz está en Español), con sistema inteligente de caché en base de datos.
   - Para series y animes: acordeón de temporadas y capítulos con marcado mediante botones circulares `✓` individuales o masivos por temporada.
   - Botón interactivo **"🌐 Ver traducción"** debajo de las sinopsis en inglés (cuando la interfaz está en Español), con sistema inteligente de caché en base de datos.
@@ -78,9 +78,10 @@ Perfil público y gestión de biblioteca:
 - **Estadísticas**: Seguidores, seguidos, fecha de registro e historial de actividad.
 - **Estantería (Shelf)**: Catálogo personal organizado por categoría y estado de consumo, sin desplegables de estado en las tarjetas:
   - Marcado de fecha (sin hora) en que el usuario completó/marcó el elemento.
-  - Ocultamiento inteligente de elementos marcados como `🚫 Abandonado` para mantener la estantería limpia.
+  - **Sistema Unificado de Etiquetas (Badges)**: Distintivos visuales para identificar el estado de cada obra (Jugando, Leyendo, Viendo, Completado, Abandonado, Infinito, etc.).
+  - **Muestra de Elementos en Progreso**: La estantería ahora muestra elementos activos (en pausa, leyendo, jugando) además de los completados.
   - **Tarjetas de Series**: Muestran limpiamente el último capítulo visto (ej: `Último visto: S01E03`).
-  - **Episodios y Temporadas Sueltas**: Si el usuario marca un capítulo o temporada en una guía sin seguir la serie completa, se crea una tarjeta individual en la estantería indicando la serie a la que pertenece y la fecha. Si posteriormente se sigue la serie completa, las tarjetas sueltas se agrupan automáticamente en la tarjeta principal de la serie.
+  - **Episodios y Temporadas Sueltas**: Formateo inteligente que extrae el nombre de la serie, temporada y episodio, y título del capítulo para una lectura más limpia. Las tarjetas sueltas se agrupan si se empieza a seguir la serie completa.
 - **Favoritos**: Obras destacadas visibles en el perfil.
 
 ### 🛡️ Panel de Administración
