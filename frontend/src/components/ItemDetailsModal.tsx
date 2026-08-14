@@ -151,16 +151,25 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   const handleMarkDropped = async () => {
     if (!selectedItem) return;
     setShowMenu(false);
+    
+    const isDropped = selectedItem.status === 'dropped';
+    let targetStatus = 'dropped';
+    if (isDropped) {
+      if (selectedItem.item_type === 'game') targetStatus = 'playing';
+      else if (['book', 'comic', 'manga'].includes(selectedItem.item_type)) targetStatus = 'reading';
+      else targetStatus = 'watching';
+    }
+
     if (selectedItem.id) {
       try {
-        await apiClient.put(`/library/${selectedItem.id}`, { status: 'dropped' });
-        setSelectedItem((prev: any) => prev ? { ...prev, status: 'dropped' } : null);
+        await apiClient.put(`/library/${selectedItem.id}`, { status: targetStatus });
+        setSelectedItem((prev: any) => prev ? { ...prev, status: targetStatus } : null);
         onUpdate && onUpdate();
       } catch (e) {
         console.error(e);
       }
     } else {
-      await ensureTracked('dropped');
+      await ensureTracked(targetStatus);
     }
   };
 
@@ -1154,7 +1163,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                               style={{
                                 background: 'transparent',
                                 border: 'none',
-                                color: '#f59e0b',
+                                color: selectedItem?.status === 'dropped' ? '#3b82f6' : '#f59e0b',
                                 textAlign: 'left',
                                 padding: '0.4rem 0.6rem',
                                 cursor: 'pointer',
@@ -1165,7 +1174,15 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                 gap: '0.4rem'
                               }}
                             >
-                              🚫 {language === 'es' ? 'Marcar como abandonado' : 'Mark as dropped'}
+                              {selectedItem?.status === 'dropped' ? (
+                                selectedItem?.item_type === 'game' 
+                                  ? (language === 'es' ? '▶️ Seguir jugando' : '▶️ Resume playing')
+                                  : ['book', 'comic', 'manga'].includes(selectedItem?.item_type)
+                                  ? (language === 'es' ? '▶️ Seguir leyendo' : '▶️ Resume reading')
+                                  : (language === 'es' ? '▶️ Seguir viendo' : '▶️ Resume watching')
+                              ) : (
+                                `🚫 ${language === 'es' ? 'Marcar como abandonado' : 'Mark as dropped'}`
+                              )}
                             </button>
                           )}
                           {selectedItem?.id && (
