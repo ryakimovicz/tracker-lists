@@ -673,27 +673,35 @@ export const Profile: React.FC = () => {
                   if (type === 'anime') return libraryItems.some(item => item.item_type === 'anime');
                   return libraryItems.some(item => item.item_type === type);
                 });
-                return allowedTypes.map(type => (
-                  <button
-                    key={type}
-                    onClick={() => setMediaFilter(type)}
-                    className={mediaFilter === type ? 'btn-primary' : 'btn-secondary'}
-                    style={{
-                      padding: '0.35rem 0.85rem',
-                      fontSize: '0.85rem',
-                      textTransform: 'capitalize'
-                    }}
-                  >
-                    {type === 'all' ? (language === 'es' ? 'Todo' : 'All') :
-                     type === 'movie' ? (language === 'es' ? 'Películas' : 'Movies') :
-                     type === 'series' ? (language === 'es' ? 'Series' : 'Series') :
-                     type === 'anime' ? 'Anime' :
-                     type === 'book' ? (language === 'es' ? 'Libros' : 'Books') :
-                     type === 'comic' ? (language === 'es' ? 'Cómics' : 'Comics') :
-                     type === 'manga' ? 'Mangas' :
-                     type === 'game' ? (language === 'es' ? 'Juegos' : 'Games') : type}
-                  </button>
-                ));
+                return allowedTypes.map(type => {
+                  const typeColor = type === 'all' ? 'var(--accent-primary)' : `var(--color-${type})`;
+                  const typeTextColor = type === 'all' ? '#ffffff' : `var(--color-text-${type})`;
+                  const isSelected = mediaFilter === type;
+
+                  return (
+                    <button
+                      key={type}
+                      onClick={() => setMediaFilter(type)}
+                      className={`profile-category-tab ${isSelected ? 'selected' : ''}`}
+                      style={{
+                        padding: '0.35rem 0.85rem',
+                        fontSize: '0.85rem',
+                        textTransform: 'capitalize',
+                        '--tab-color': typeColor,
+                        '--tab-text': typeTextColor
+                      } as React.CSSProperties}
+                    >
+                      {type === 'all' ? (language === 'es' ? 'Todo' : 'All') :
+                       type === 'movie' ? (language === 'es' ? 'Películas' : 'Movies') :
+                       type === 'series' ? (language === 'es' ? 'Series' : 'Series') :
+                       type === 'anime' ? 'Anime' :
+                       type === 'book' ? (language === 'es' ? 'Libros' : 'Books') :
+                       type === 'comic' ? (language === 'es' ? 'Cómics' : 'Comics') :
+                       type === 'manga' ? 'Mangas' :
+                       type === 'game' ? (language === 'es' ? 'Juegos' : 'Games') : type}
+                    </button>
+                  );
+                });
               })()}
             </div>
             
@@ -760,14 +768,16 @@ export const Profile: React.FC = () => {
                               style={{ width: '100%', height: '240px', objectFit: 'cover', borderRadius: '8px' }}
                             />
                             
-                            <div className={getTagClass(item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tvm-ep-') ? 'series' : item.item_type)} style={{ position: "absolute", bottom: "0.25rem", left: "0.5rem", padding: "0.1rem 0.4rem", borderRadius: "4px", fontSize: "0.7rem", fontWeight: 600, opacity: 0.85, backdropFilter: 'blur(4px)' }}>
-                              {(item.item_type === 'episode' || item.external_id?.startsWith('tvm-ep-'))
-                                ? (language === 'es' ? 'Serie' : 'Series')
-                                : item.item_type === 'season'
-                                ? (language === 'es' ? 'Temporada' : 'Season')
-                                : item.item_type === 'comic' ? (language === 'es' ? 'Cómic' : 'Comic') : item.item_type === 'manga' ? 'Manga' : t('media' + item.item_type.charAt(0).toUpperCase() + item.item_type.slice(1))
-                              }
-                            </div>
+                            {mediaFilter === 'all' && (
+                              <div className={getTagClass(item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tvm-ep-') ? 'series' : item.item_type)} style={{ position: "absolute", top: "0.5rem", left: "0.5rem", padding: "0.15rem 0.45rem", borderRadius: "4px", fontSize: "0.7rem", fontWeight: 600, opacity: 0.9, backdropFilter: 'blur(4px)', zIndex: 1 }}>
+                                {(item.item_type === 'episode' || item.external_id?.startsWith('tvm-ep-'))
+                                  ? (language === 'es' ? 'Serie' : 'Series')
+                                  : item.item_type === 'season'
+                                  ? (language === 'es' ? 'Temporada' : 'Season')
+                                  : item.item_type === 'comic' ? (language === 'es' ? 'Cómic' : 'Comic') : item.item_type === 'manga' ? 'Manga' : t('media' + item.item_type.charAt(0).toUpperCase() + item.item_type.slice(1))
+                                }
+                              </div>
+                            )}
                             
                             <button
                               onClick={(e) => {
@@ -834,19 +844,11 @@ export const Profile: React.FC = () => {
                               );
                             })()}
 
-                            {/* Followed series last completed episode */}
-                            {(item.item_type === 'series' || item.item_type === 'anime') && item.last_seen_episode && (
-                              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500, display: 'block', marginTop: '0.1rem' }}>
-                                {language === 'es' ? 'Último visto: ' : 'Last seen: '}
-                                {(() => {
-                                  const match = item.last_seen_episode.match(/S\d+E\d+/i);
-                                  return match ? match[0].toUpperCase() : item.last_seen_episode;
-                                })()}
-                              </span>
-                            )}
-
-                            {/* Unified Badges System */}
+                            {/* Unified Badges System (under title) */}
                             {(() => {
+                              const isUnitEpisode = item.item_type === 'episode' || item.external_id?.startsWith('tvm-ep-') || !!(item.title || '').match(/^(.*?)\s*-\s*S(\d+)E(\d+)(.*)$/i);
+                              if (isUnitEpisode) return null;
+
                               const badges = [];
                               
                               // Dropped (All)
@@ -877,27 +879,43 @@ export const Profile: React.FC = () => {
                                 if (item.status === 'reading') badges.push({ text: language === 'es' ? 'Leyendo' : 'Reading', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' });
                                 else if (item.status === 'read' || item.status === 'completed') badges.push({ text: language === 'es' ? 'Leído' : 'Read', color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)' });
                               }
-                              // Loose Episodes
-                              else if (item.item_type === 'episode') {
-                                badges.push({ text: language === 'es' ? 'Episodio' : 'Episode', color: '#6366f1', bg: 'rgba(99, 102, 241, 0.15)' });
-                              }
 
-                              return badges.map((badge, idx) => (
-                                <span key={idx} style={{
-                                  fontSize: '0.72rem',
-                                  background: badge.bg,
-                                  color: badge.color,
-                                  padding: '0.15rem 0.4rem',
-                                  borderRadius: '4px',
-                                  fontWeight: 600,
-                                  display: 'inline-block',
-                                  marginTop: '0.3rem',
-                                  marginRight: '0.3rem'
-                                }}>
-                                  {badge.text}
-                                </span>
-                              ));
+                              if (badges.length === 0) return null;
+
+                              return (
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem', marginTop: '0.25rem' }}>
+                                  {badges.map((badge, idx) => (
+                                    <span key={idx} style={{
+                                      fontSize: '0.72rem',
+                                      background: badge.bg,
+                                      color: badge.color,
+                                      padding: '0.15rem 0.4rem',
+                                      borderRadius: '4px',
+                                      fontWeight: 600,
+                                      display: 'inline-block'
+                                    }}>
+                                      {badge.text}
+                                    </span>
+                                  ))}
+                                </div>
+                              );
                             })()}
+
+                            {/* Followed series last completed episode */}
+                            {(item.item_type === 'series' || item.item_type === 'anime') && item.last_seen_episode && (
+                              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500, display: 'block', marginTop: '0.35rem' }}>
+                                {(() => {
+                                  const match = item.last_seen_episode.match(/S(\d+)E(\d+)/i);
+                                  let formatted = item.last_seen_episode;
+                                  if (match) {
+                                    const s = String(match[1]).padStart(2, '0');
+                                    const e = String(match[2]).padStart(2, '0');
+                                    formatted = language === 'es' ? `T${s} | E${e}` : `S${s} | E${e}`;
+                                  }
+                                  return `${language === 'es' ? 'Último: ' : 'Last: '}${formatted}`;
+                                })()}
+                              </span>
+                            )}
 
                             {/* Game Hours Played */}
                             {item.item_type === 'game' && (item.pages_read || 0) > 0 && (
