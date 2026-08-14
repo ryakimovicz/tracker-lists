@@ -15,7 +15,7 @@
 
 ### Frontend
 - **Framework**: React 19 + TypeScript + Vite
-- **Estilos**: Vanilla CSS con sistema de diseño premium "Galería Cultural" basado en variables CSS (Tonos Pizarra y Acentos Pastel), *Glassmorphism* (tarjetas translúcidas con desenfoque) y tipografía Inter.
+- **Estilos**: Vanilla CSS con sistema de diseño premium "Galería Cultural" basado en variables CSS (Tonos Pizarra y Acentos Vibrantes), *Glassmorphism* (tarjetas translúcidas con desenfoque) y tipografía Inter.
 - **Cliente HTTP**: Axios con interceptores para renovación automática de tokens
 - **Estado Global**: Contextos de React (`AuthContext`, `LanguageContext`, `ThemeContext`)
 - **Localización**: Español e Inglés, con selector dinámico persistente
