@@ -54,11 +54,20 @@ Timeline comunitaria unificada:
 - **Interacciones**: Votos, comentarios y reportes en guías y opiniones.
 
 ### ✏️ Crear (Editor de Guías)
-Constructor de guías cronológicas:
-- **Editor Visual**: Ordenamiento manual de obras de distintos tipos de medios (películas, libros, cómics, juegos, etc.).
-- **Gestión Avanzada**: Cortar, copiar, pegar (*"Pegar Arriba"*, *"Pegar Abajo"*) mediante menú contextual de acción o pulsación larga (`useLongPress`).
-- **Importador de Temporadas**: Importa temporadas completas de series con un clic.
-- **Prioridad de Secciones**: Escala 1–5 para clasificar secciones como "Canon", "Recomendado", "Relleno", etc.
+Constructor interactivo de guías y listas cronológicas con flujo documental estilo procesador de texto:
+- **Estructura Jerárquica Flexible**: Organización multinivel en **Secciones maestras**, **Bloques** con escala de importancia (1 a 5: Extra, Opcional, Recomendado, Importante, Obligatorio) y **Subbloques** anidados.
+- **Sistema Unificado de Arrastrar y Soltar (Drag & Drop)**:
+  - Tirador unificado de 3 líneas horizontales (`≡`) en secciones, bloques, subbloques y obras para reordenamiento fluido por eventos de puntero (*Pointer Events*).
+  - **Desplazamiento con Rueda del Mouse**: Permite hacer scroll continuo con la ruedita del ratón mientras se arrastra cualquier elemento por documentos extensos.
+  - **Arrastre de Secciones con Bloques Asociados**: Al mover una sección, todos sus bloques se mueven junto a ella; durante el arrastre, los bloques se colapsan dinámicamente para ofrecer una vista compacta y reubicación ágil entre secciones.
+  - **Arrastre de Bloques entre Secciones**: Ranuras de inserción animadas (*drop slots*) que indican la posición exacta de caída, con sangría visual al posicionarse como primer bloque de una sección.
+  - **Vista Previa Flotante (Ghost Preview)**: Tarjeta flotante que sigue el cursor mostrando el icono, títulos de series/capítulos formateados (`T01 | E01`), bloques o secciones.
+- **Gestión Avanzada del Portapapeles y Selección Múltiple**:
+  - Selección individual y por lote con casillas de verificación en tarjetas, subbloques, bloques y secciones.
+  - Botones alineados a la izquierda para **Copiar**, **Cortar**, **Eliminar** y zonas inteligentes de pegado (**`PasteZone`**).
+  - Barra flotante inferior de acciones con contador en tiempo real de elementos seleccionados.
+- **Buscador Integrado Multi-Panel**: Búsqueda en tiempo real de obras conectadas a múltiples APIs externas directamente dentro de cada bloque o subbloque.
+- **Autoguardado Automático en Segundo Plano (Auto-Save)**: Guarda los borradores en la base de datos de manera continua (`draft_flow`) con indicador de hora del último guardado y botón de publicación definitiva (`Publicar Cambios`).
 
 ### 🔍 Explorar (Buscador)
 Búsqueda y descubrimiento:
