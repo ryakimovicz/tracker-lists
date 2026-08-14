@@ -452,9 +452,11 @@ def update_library_item(
         lib_item.updated_at = datetime.now(timezone.utc)
     
     pages_val = item_in.pages_read if item_in.pages_read is not None else (lib_item.pages_read or 0)
-    if pages_val > 0 and lib_item.status not in (UserLibraryStatusEnum.READ, UserLibraryStatusEnum.COMPLETED, UserLibraryStatusEnum.ENDLESS, UserLibraryStatusEnum.DROPPED):
+    if pages_val > 0 and lib_item.status not in (UserLibraryStatusEnum.READ, UserLibraryStatusEnum.COMPLETED, UserLibraryStatusEnum.ENDLESS, UserLibraryStatusEnum.DROPPED, UserLibraryStatusEnum.WATCHING, UserLibraryStatusEnum.PLAYING, UserLibraryStatusEnum.READING):
         if lib_item.item_type == "game":
             lib_item.status = UserLibraryStatusEnum.PLAYING
+        elif lib_item.item_type in ("movie", "series", "anime"):
+            lib_item.status = UserLibraryStatusEnum.WATCHING
         else:
             lib_item.status = UserLibraryStatusEnum.READING
         activity = UserActivityLog(

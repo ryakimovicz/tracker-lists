@@ -424,10 +424,8 @@ export const Profile: React.FC = () => {
       const isSeriesOrRegular = item.item_type !== 'episode' && item.item_type !== 'season' && !item.external_id?.startsWith('tvm-ep-');
       const isNotStartedSeries = (item.item_type === 'series' || item.item_type === 'anime') && !item.last_seen_episode;
       const isPlanToStatus = ['plan_to_watch', 'plan_to_play', 'plan_to_read'].includes(item.status);
-      const isInvalidMovie = (item.item_type || '').toLowerCase() === 'movie' && item.status !== 'completed';
-      const isDroppedReading = ['book', 'comic', 'manga', 'game'].includes(item.item_type) && item.status === 'dropped';
 
-      return matchesMedia && matchesSearch && (isSeriesOrRegular || isLoose) && !isNotStartedSeries && !isPlanToStatus && !isInvalidMovie && !isDroppedReading;
+      return matchesMedia && matchesSearch && (isSeriesOrRegular || isLoose) && !isNotStartedSeries && !isPlanToStatus;
     })
     .sort((a, b) => {
       const dateA = new Date(a.completed_at || a.updated_at || 0).getTime();
@@ -444,10 +442,6 @@ export const Profile: React.FC = () => {
   const visualLibraryItems = libraryItems.filter(item => {
     const isPlanToStatus = ['plan_to_watch', 'plan_to_play', 'plan_to_read'].includes(item.status);
     if (isPlanToStatus) return false;
-
-    if ((item.item_type || '').toLowerCase() === 'movie' && item.status !== 'completed') return false;
-    
-    if (['book', 'comic', 'manga', 'game'].includes(item.item_type) && item.status === 'dropped') return false;
 
     const isNotStartedSeries = (item.item_type === 'series' || item.item_type === 'anime') && !item.last_seen_episode;
     if (isNotStartedSeries) return false;
@@ -829,38 +823,60 @@ export const Profile: React.FC = () => {
                               </span>
                             )}
 
-                            {/* Status Badge (Dropped) */}
-                            {item.status === 'dropped' && (
-                              <span style={{
-                                fontSize: '0.72rem',
-                                background: 'rgba(245, 158, 11, 0.15)',
-                                color: '#f59e0b',
-                                padding: '0.15rem 0.4rem',
-                                borderRadius: '4px',
-                                fontWeight: 600,
-                                display: 'inline-block',
-                                marginTop: '0.3rem'
-                              }}>
-                                🚫 {language === 'es' ? 'Abandonado' : 'Dropped'}
-                              </span>
-                            )}
+                            {/* Unified Badges System */}
+                            {(() => {
+                              const badges = [];
+                              
+                              // Dropped (All)
+                              if (item.status === 'dropped') {
+                                badges.push({ text: language === 'es' ? 'Abandonado' : 'Dropped', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.15)' });
+                              }
+                              // Endless (Games)
+                              else if (item.status === 'endless') {
+                                badges.push({ text: language === 'es' ? 'Infinito' : 'Endless', color: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.15)' });
+                              }
+                              // Games
+                              else if (item.item_type === 'game') {
+                                if (item.status === 'playing') badges.push({ text: language === 'es' ? 'Jugando' : 'Playing', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' });
+                                else if (item.status === 'completed') badges.push({ text: language === 'es' ? 'Completado' : 'Completed', color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)' });
+                              }
+                              // Movies
+                              else if (item.item_type === 'movie') {
+                                if (item.status === 'watching') badges.push({ text: language === 'es' ? 'Pausa' : 'Paused', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' });
+                                else if (item.status === 'completed') badges.push({ text: language === 'es' ? 'Visto' : 'Watched', color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)' });
+                              }
+                              // Series / Anime
+                              else if (item.item_type === 'series' || item.item_type === 'anime') {
+                                if (item.status === 'watching') badges.push({ text: language === 'es' ? 'Viendo' : 'Watching', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' });
+                                else if (item.status === 'completed') badges.push({ text: language === 'es' ? 'Terminada' : 'Completed', color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)' });
+                              }
+                              // Reading (Books, Comics, Manga)
+                              else if (['book', 'comic', 'manga'].includes(item.item_type)) {
+                                if (item.status === 'reading') badges.push({ text: language === 'es' ? 'Leyendo' : 'Reading', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' });
+                                else if (item.status === 'read' || item.status === 'completed') badges.push({ text: language === 'es' ? 'Leído' : 'Read', color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)' });
+                              }
+                              // Loose Episodes
+                              else if (item.item_type === 'episode') {
+                                badges.push({ text: language === 'es' ? 'Episodio' : 'Episode', color: '#6366f1', bg: 'rgba(99, 102, 241, 0.15)' });
+                              }
 
-                            {/* Status Badge (Endless) */}
-                            {item.status === 'endless' && (
-                              <span style={{
-                                fontSize: '0.72rem',
-                                background: 'rgba(139, 92, 246, 0.15)',
-                                color: '#8b5cf6',
-                                padding: '0.15rem 0.4rem',
-                                borderRadius: '4px',
-                                fontWeight: 600,
-                                display: 'inline-block',
-                                marginTop: '0.3rem'
-                              }}>
-                                ♾️ {language === 'es' ? 'Infinito' : 'Endless'}
-                              </span>
-                            )}
-                            
+                              return badges.map((badge, idx) => (
+                                <span key={idx} style={{
+                                  fontSize: '0.72rem',
+                                  background: badge.bg,
+                                  color: badge.color,
+                                  padding: '0.15rem 0.4rem',
+                                  borderRadius: '4px',
+                                  fontWeight: 600,
+                                  display: 'inline-block',
+                                  marginTop: '0.3rem',
+                                  marginRight: '0.3rem'
+                                }}>
+                                  {badge.text}
+                                </span>
+                              ));
+                            })()}
+
                             {/* Game Hours Played */}
                             {item.item_type === 'game' && (item.pages_read || 0) > 0 && (
                               <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500, display: 'block', marginTop: '0.2rem' }}>

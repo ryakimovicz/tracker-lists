@@ -743,24 +743,35 @@ export const Home: React.FC = () => {
                           themeTextColor={`var(--color-text-${item.item_type})`}
                         coverBottomText={undefined}
                         subtitle2={(() => {
+                          const formatTime = (mins: number) => {
+                            if (!mins) return '';
+                            const h = Math.floor(mins / 60);
+                            const m = mins % 60;
+                            return h > 0 ? `${h}h ${m > 0 ? `${String(m).padStart(2, '0')}m` : '00m'}` : `${m}m`;
+                          };
+
+                          if (item.status === 'plan_to_watch') {
+                            if (item.item_type === 'movie') return formatTime(item.total_pages);
+                            return '';
+                          }
                           if (['completed', 'read', 'endless'].includes(item.status)) {
                             if (['book', 'comic', 'manga'].includes(item.item_type)) return item.total_pages ? `${item.total_pages} ${language === 'es' ? 'páginas' : 'pages'}` : '';
-                            if (item.item_type === 'movie') return item.total_pages ? `${item.total_pages} min` : '';
-                            if (item.item_type === 'game') return item.pages_read > 0 ? `${Math.floor(item.pages_read / 60)}h ${String(item.pages_read % 60).padStart(2, '0')}m` : '';
+                            if (item.item_type === 'movie') return formatTime(item.total_pages);
+                            if (item.item_type === 'game') return formatTime(item.pages_read);
                             return '';
                           }
                           if (item.status === 'dropped') {
                             if (['book', 'comic', 'manga'].includes(item.item_type)) return item.pages_read > 0 ? `${item.pages_read} ${language === 'es' ? 'páginas' : 'pages'}` : '';
-                            if (item.item_type === 'game') return item.pages_read > 0 ? `${Math.floor(item.pages_read / 60)}h ${String(item.pages_read % 60).padStart(2, '0')}m` : '';
+                            if (['game', 'movie'].includes(item.item_type)) return formatTime(item.pages_read);
                             return '';
                           }
-                          if (['watching', 'reading', 'playing', 'endless'].includes(item.status)) {
-                            if (item.item_type === 'game' && item.pages_read > 0) return `${Math.floor(item.pages_read / 60)}h ${String(item.pages_read % 60).padStart(2, '0')}m`;
-                            if (['book', 'comic', 'manga'].includes(item.item_type) && item.pages_read > 0) return `${item.pages_read} ${language === 'es' ? 'páginas' : 'pages'}`;
+                          if (['watching', 'reading', 'playing'].includes(item.status)) {
+                            if (['game', 'movie'].includes(item.item_type)) return formatTime(item.pages_read);
+                            if (['book', 'comic', 'manga'].includes(item.item_type)) return item.pages_read > 0 ? `${item.pages_read} ${language === 'es' ? 'páginas' : 'pages'}` : '';
                           }
                           return "";
                         })()}
-                        onCheck={!['completed', 'read'].includes(item.status) ? (e) => handleMarkDone(e, item) : undefined}
+                        onCheck={!['completed', 'read', 'endless'].includes(item.status) ? (e) => handleMarkDone(e, item) : undefined}
                         onClick={() => setSelectedItem(item)}
                         isNsfw={item.is_nsfw}
                         language={language}

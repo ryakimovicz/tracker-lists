@@ -1363,16 +1363,28 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                             )}
                           </div>
                         )}
-                        {(selectedItem.release_date || notes.release_date) && (
-                          <div>
-                            <h5 style={{ margin: '0 0 0.25rem 0', color: 'var(--text-secondary)' }}>
-                              {language === 'es' ? 'Fecha de lanzamiento:' : 'Release Date:'}
-                            </h5>
-                            <span style={{ fontSize: '0.88rem', color: 'var(--text-primary)' }}>
-                              {formatReleaseDate(selectedItem.release_date || notes.release_date)}
-                            </span>
-                          </div>
-                        )}
+                        <div style={{ display: 'flex', gap: '2rem' }}>
+                          {(selectedItem.release_date || notes.release_date) && (
+                            <div>
+                              <h5 style={{ margin: '0 0 0.25rem 0', color: 'var(--text-secondary)' }}>
+                                {language === 'es' ? 'Fecha de lanzamiento:' : 'Release Date:'}
+                              </h5>
+                              <span style={{ fontSize: '0.88rem', color: 'var(--text-primary)' }}>
+                                {formatReleaseDate(selectedItem.release_date || notes.release_date)}
+                              </span>
+                            </div>
+                          )}
+                          {selectedItem.item_type === 'movie' && (selectedItem.total_pages || selectedItem.page_count) && (
+                            <div>
+                              <h5 style={{ margin: '0 0 0.25rem 0', color: 'var(--text-secondary)' }}>
+                                {language === 'es' ? 'Duración:' : 'Duration:'}
+                              </h5>
+                              <span style={{ fontSize: '0.88rem', color: 'var(--text-primary)' }}>
+                                {(() => { const m = selectedItem.total_pages || selectedItem.page_count; const h = Math.floor(m / 60); const mins = m % 60; return h > 0 ? `${h}h ${mins > 0 ? `${String(mins).padStart(2, '0')}m` : ''}` : `${mins}m`; })()}
+                              </span>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     );
                   })()}
@@ -1516,11 +1528,13 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                     </div>
                   )}
 
-                  {/* Hours played input for games */}
-                  {!isEpisode && selectedItem && selectedItem.item_type === 'game' && ['completed', 'playing', 'dropped', 'endless'].includes(selectedItem.status) && (
+                  {/* Hours/Minutes played/watched input for games and movies */}
+                  {!isEpisode && selectedItem && ( (selectedItem.item_type === 'game' && ['completed', 'playing', 'dropped', 'endless'].includes(selectedItem.status)) || (selectedItem.item_type === 'movie' && ['watching', 'dropped'].includes(selectedItem.status)) ) && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.5rem' }}>
                       <h5 style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-                        {language === 'es' ? 'Horas jugadas:' : 'Hours played:'}
+                        {selectedItem.item_type === 'movie' 
+                          ? (language === 'es' ? 'Tiempo visto:' : 'Time watched:')
+                          : (language === 'es' ? 'Horas jugadas:' : 'Hours played:')}
                       </h5>
                       <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                         <input
@@ -1548,6 +1562,13 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                     totalMins = (parseInt(hh) || 0) * 60 + (parseInt(mm) || 0);
                                 } else {
                                     totalMins = (parseInt(val) || 0) * 60;
+                                }
+                            }
+                            if (selectedItem.item_type === 'movie') {
+                                const maxMins = selectedItem.total_pages || selectedItem.page_count;
+                                if (maxMins && totalMins >= maxMins) {
+                                    totalMins = maxMins;
+                                    handleToggleStatus('completed');
                                 }
                             }
                             setPagesReadVal(totalMins);
@@ -1660,11 +1681,21 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                             type="button"
                             onClick={() => {
                               const isCurrentlyActive = selectedItem.status === (['book', 'comic', 'manga'].includes(selectedItem.item_type) ? 'read' : 'completed');
-                              if (!isCurrentlyActive && ['book', 'comic', 'manga'].includes(selectedItem.item_type) && totalPagesVal !== '') {
-                                // Auto-fill pages_read to totalPagesVal
-                                setPagesReadVal(totalPagesVal);
-                                if (selectedItem.id) {
-                                  apiClient.put(`/library/${selectedItem.id}`, { pages_read: totalPagesVal }).catch(console.error);
+                              if (!isCurrentlyActive) {
+                                if (['book', 'comic', 'manga'].includes(selectedItem.item_type) && totalPagesVal !== '') {
+                                  // Auto-fill pages_read to totalPagesVal
+                                  setPagesReadVal(totalPagesVal);
+                                  if (selectedItem.id) {
+                                    apiClient.put(`/library/${selectedItem.id}`, { pages_read: totalPagesVal }).catch(console.error);
+                                  }
+                                } else if (selectedItem.item_type === 'movie') {
+                                  const movieTotal = selectedItem.total_pages || selectedItem.page_count;
+                                  if (movieTotal) {
+                                    setPagesReadVal(movieTotal);
+                                    if (selectedItem.id) {
+                                      apiClient.put(`/library/${selectedItem.id}`, { pages_read: movieTotal }).catch(console.error);
+                                    }
+                                  }
                                 }
                               }
                               handleToggleStatus(['book', 'comic', 'manga'].includes(selectedItem.item_type) ? 'read' : 'completed');
@@ -1700,7 +1731,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                               transition: 'all 0.2s ease'
                             }}
                           >
-                            {['book', 'comic', 'manga'].includes(selectedItem.item_type) ? (language === 'es' ? 'Pausa' : 'Paused') : (language === 'es' ? 'Pausa' : 'Paused')}
+                            {['book', 'comic', 'manga'].includes(selectedItem.item_type) ? (language === 'es' ? 'Leyendo' : 'Reading') : (language === 'es' ? 'Pausa' : 'Paused')}
                           </button>
                           <button
                             type="button"
