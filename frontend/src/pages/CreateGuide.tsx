@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from '../context/LanguageContext';
 import { apiClient } from '../api/client';
@@ -19,7 +19,9 @@ import {
   Lock,
   Plus,
   Scissors,
-  ClipboardPaste
+  ClipboardPaste,
+  Copy,
+  Menu
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -67,7 +69,8 @@ const PasteZone = ({
   label, 
   actionTargetType,
   canPaste,
-  handlePaste
+  handlePaste,
+  indent = false
 }: { 
   type: 'section' | 'block' | 'subblock' | 'item', 
   targetId?: string, 
@@ -75,7 +78,8 @@ const PasteZone = ({
   label: string, 
   actionTargetType: 'root' | 'section' | 'block' | 'subblock',
   canPaste: boolean,
-  handlePaste: (targetType: 'root' | 'section' | 'block' | 'subblock', targetId?: string, insertIndex?: number) => void
+  handlePaste: (targetType: 'root' | 'section' | 'block' | 'subblock', targetId?: string, insertIndex?: number) => void,
+  indent?: boolean
 }) => {
   const [isHovered, setIsHovered] = useState(false);
 
@@ -88,7 +92,9 @@ const PasteZone = ({
       onClick={() => handlePaste(actionTargetType, targetId, index)}
       style={{
         height: isHovered ? '32px' : '12px',
-        width: '100%',
+        width: indent ? 'calc(100% - 2.5rem)' : '100%',
+        marginLeft: indent ? '2.5rem' : '0',
+        boxSizing: 'border-box',
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'center',
@@ -96,7 +102,7 @@ const PasteZone = ({
         cursor: 'pointer',
         background: isHovered ? 'rgba(124, 58, 237, 0.1)' : 'transparent',
         borderRadius: '6px',
-        margin: '0.2rem 0',
+        margin: indent ? '0.2rem 0 0.2rem 2.5rem' : '0.2rem 0',
         border: isHovered ? '1px dashed var(--accent-primary)' : '1px solid transparent'
       }}
     >
@@ -446,39 +452,101 @@ export const CreateGuide: React.FC = () => {
     setSelectedElements({ parentId: null, type: null, ids: [] });
   };
 
+  const handleCopyMulti = () => {
+    if (selectedElements.ids.length === 0 || !selectedElements.type) return;
+
+    let itemsToCopy: any[] = [];
+    const selSet = new Set(selectedElements.ids);
+    
+    if (selectedElements.type === 'item') {
+      docFlow.forEach(el => {
+        if (el.id === selectedElements.parentId && el.items) {
+          el.items.forEach(item => {
+            if (selSet.has(item.id)) {
+              itemsToCopy.push({ data: JSON.parse(JSON.stringify(item)), sourceId: item.id });
+            }
+          });
+        } else if (el.subblocks) {
+          el.subblocks.forEach(sub => {
+            if (sub.id === selectedElements.parentId && sub.items) {
+              sub.items.forEach(item => {
+                if (selSet.has(item.id)) {
+                  itemsToCopy.push({ data: JSON.parse(JSON.stringify(item)), sourceId: item.id });
+                }
+              });
+            }
+          });
+        }
+      });
+    } else if (selectedElements.type === 'subblock') {
+      docFlow.forEach(el => {
+        if (el.id === selectedElements.parentId && el.subblocks) {
+          el.subblocks.forEach(sub => {
+            if (selSet.has(sub.id)) {
+              itemsToCopy.push({ data: JSON.parse(JSON.stringify(sub)), sourceId: sub.id });
+            }
+          });
+        }
+      });
+    } else if (selectedElements.type === 'block' || selectedElements.type === 'section') {
+      docFlow.forEach(el => {
+        if (selSet.has(el.id)) {
+          itemsToCopy.push({ data: JSON.parse(JSON.stringify(el)), sourceId: el.id });
+        }
+      });
+    }
+
+    setClipboard({
+      action: 'copy',
+      type: selectedElements.type,
+      items: itemsToCopy
+    });
+    setSelectedElements({ parentId: null, type: null, ids: [] });
+  };
+
   const handleCutMulti = () => {
     if (selectedElements.ids.length === 0 || !selectedElements.type) return;
 
     let itemsToCut: any[] = [];
+    const selSet = new Set(selectedElements.ids);
     
-    // We need to gather the data for each selected element
-    selectedElements.ids.forEach(selId => {
-      if (selectedElements.type === 'item') {
-        docFlow.forEach(el => {
-          if (el.id === selectedElements.parentId && el.items) {
-            const item = el.items.find(i => i.id === selId);
-            if (item) itemsToCut.push({ data: item, sourceId: item.id, sourceParentId: el.id });
-          } else if (el.subblocks) {
-            el.subblocks.forEach(sub => {
-              if (sub.id === selectedElements.parentId && sub.items) {
-                const item = sub.items.find(i => i.id === selId);
-                if (item) itemsToCut.push({ data: item, sourceId: item.id, sourceParentId: el.id, sourceGrandparentId: sub.id });
-              }
-            });
-          }
-        });
-      } else if (selectedElements.type === 'subblock') {
-        docFlow.forEach(el => {
-          if (el.id === selectedElements.parentId && el.subblocks) {
-            const sub = el.subblocks.find(s => s.id === selId);
-            if (sub) itemsToCut.push({ data: sub, sourceId: sub.id, sourceParentId: el.id });
-          }
-        });
-      } else {
-        const el = docFlow.find(e => e.id === selId);
-        if (el) itemsToCut.push({ data: el, sourceId: el.id });
-      }
-    });
+    if (selectedElements.type === 'item') {
+      docFlow.forEach(el => {
+        if (el.id === selectedElements.parentId && el.items) {
+          el.items.forEach(item => {
+            if (selSet.has(item.id)) {
+              itemsToCut.push({ data: item, sourceId: item.id, sourceParentId: el.id });
+            }
+          });
+        } else if (el.subblocks) {
+          el.subblocks.forEach(sub => {
+            if (sub.id === selectedElements.parentId && sub.items) {
+              sub.items.forEach(item => {
+                if (selSet.has(item.id)) {
+                  itemsToCut.push({ data: item, sourceId: item.id, sourceParentId: el.id, sourceGrandparentId: sub.id });
+                }
+              });
+            }
+          });
+        }
+      });
+    } else if (selectedElements.type === 'subblock') {
+      docFlow.forEach(el => {
+        if (el.id === selectedElements.parentId && el.subblocks) {
+          el.subblocks.forEach(sub => {
+            if (selSet.has(sub.id)) {
+              itemsToCut.push({ data: sub, sourceId: sub.id, sourceParentId: el.id });
+            }
+          });
+        }
+      });
+    } else if (selectedElements.type === 'block' || selectedElements.type === 'section') {
+      docFlow.forEach(el => {
+        if (selSet.has(el.id)) {
+          itemsToCut.push({ data: el, sourceId: el.id });
+        }
+      });
+    }
 
     setClipboard({
       action: 'cut',
@@ -486,6 +554,182 @@ export const CreateGuide: React.FC = () => {
       items: itemsToCut
     });
     setSelectedElements({ parentId: null, type: null, ids: [] });
+  };
+
+  const [pointerDrag, setPointerDrag] = useState<{
+    dragType: 'section' | 'block' | 'subblock' | 'item';
+    item: any;
+    sourceParentId: string;
+    sourceGrandparentId?: string;
+    sourceIndex: number;
+    currentX: number;
+    currentY: number;
+  } | null>(null);
+  const [dragOverTarget, setDragOverTarget] = useState<{ parentId: string; grandparentId?: string; index: number; targetSectionId?: string; isAfter?: boolean } | null>(null);
+
+  const pointerDragRef = useRef<typeof pointerDrag>(null);
+  const dragOverTargetRef = useRef<typeof dragOverTarget>(null);
+
+  useEffect(() => {
+    pointerDragRef.current = pointerDrag;
+  }, [pointerDrag]);
+
+  useEffect(() => {
+    dragOverTargetRef.current = dragOverTarget;
+  }, [dragOverTarget]);
+
+  // Pointer-based Drag & Drop with full native mouse wheel support for sections, blocks, subblocks, and items
+  useEffect(() => {
+    if (!pointerDrag) return;
+
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'grabbing';
+
+    const updateTarget = (clientX: number, clientY: number) => {
+      const elements = document.elementsFromPoint(clientX, clientY);
+
+      if (pointerDrag.dragType === 'section') {
+        const secEl = elements.map(el => el.closest('[data-section-element-id]')).find(Boolean) as HTMLElement | undefined;
+        if (secEl) {
+          const secId = secEl.getAttribute('data-section-element-id') || '';
+          const rect = secEl.getBoundingClientRect();
+          const isAfter = clientY > rect.top + rect.height / 2;
+
+          setDragOverTarget(prev => {
+            if (prev && prev.parentId === 'section-root' && prev.targetSectionId === secId && prev.isAfter === isAfter) return prev;
+            return { parentId: 'section-root', targetSectionId: secId, isAfter, index: 0 };
+          });
+        }
+      } else if (pointerDrag.dragType === 'block') {
+        const rootEl = elements.map(el => el.closest('[data-root-element-id]')).find(Boolean) as HTMLElement | undefined;
+        if (rootEl) {
+          const cIdx = parseInt(rootEl.getAttribute('data-root-index') || '0', 10);
+          const rect = rootEl.getBoundingClientRect();
+          const isAfter = clientY > rect.top + rect.height / 2;
+          const targetIdx = isAfter ? cIdx + 1 : cIdx;
+
+          setDragOverTarget(prev => {
+            if (prev && prev.parentId === 'root' && prev.index === targetIdx) return prev;
+            return { parentId: 'root', index: targetIdx };
+          });
+        }
+      } else if (pointerDrag.dragType === 'subblock') {
+        const subEl = elements.map(el => el.closest('[data-subblock-id]')).find(Boolean) as HTMLElement | undefined;
+        if (subEl) {
+          const pId = subEl.getAttribute('data-subblock-parent-id') || '';
+          const cIdx = parseInt(subEl.getAttribute('data-subblock-index') || '0', 10);
+          const rect = subEl.getBoundingClientRect();
+          const isAfter = clientY > rect.top + rect.height / 2;
+          const targetIdx = isAfter ? cIdx + 1 : cIdx;
+
+          setDragOverTarget(prev => {
+            if (prev && prev.parentId === pId && prev.grandparentId === 'subblock-container' && prev.index === targetIdx) return prev;
+            return { parentId: pId, grandparentId: 'subblock-container', index: targetIdx };
+          });
+        }
+      } else {
+        const cardEl = elements.map(el => el.closest('[data-card-item-id]')).find(Boolean) as HTMLElement | undefined;
+        if (cardEl) {
+          const pId = cardEl.getAttribute('data-card-parent-id') || '';
+          const gpId = cardEl.getAttribute('data-card-grandparent-id') || undefined;
+          const cIdx = parseInt(cardEl.getAttribute('data-card-index') || '0', 10);
+          const rect = cardEl.getBoundingClientRect();
+          const isAfter = clientY > rect.top + rect.height / 2;
+          const targetIdx = isAfter ? cIdx + 1 : cIdx;
+
+          setDragOverTarget(prev => {
+            if (prev && prev.parentId === pId && prev.grandparentId === gpId && prev.index === targetIdx) {
+              return prev;
+            }
+            return { parentId: pId, grandparentId: gpId, index: targetIdx };
+          });
+        }
+      }
+    };
+
+    const handlePointerMove = (e: PointerEvent) => {
+      setPointerDrag(prev => prev ? { ...prev, currentX: e.clientX, currentY: e.clientY } : null);
+      updateTarget(e.clientX, e.clientY);
+    };
+
+    const handleWheel = () => {
+      requestAnimationFrame(() => {
+        if (pointerDragRef.current) {
+          updateTarget(pointerDragRef.current.currentX, pointerDragRef.current.currentY);
+        }
+      });
+    };
+
+    const handlePointerUp = () => {
+      const currentDrag = pointerDragRef.current;
+      const target = dragOverTargetRef.current;
+
+      if (currentDrag && target) {
+        if (currentDrag.dragType === 'section' && target.parentId === 'section-root' && target.targetSectionId) {
+          handleReorderSection(currentDrag.item.id, target.targetSectionId, !!target.isAfter);
+        } else if (currentDrag.dragType === 'block' && target.parentId === 'root') {
+          setDocFlow(prev => {
+            let newFlow = [...prev];
+            const [moved] = newFlow.splice(currentDrag.sourceIndex, 1);
+            let targetIdx = target.index;
+            if (currentDrag.sourceIndex < targetIdx) {
+              targetIdx = targetIdx - 1;
+            }
+            newFlow.splice(Math.min(Math.max(0, targetIdx), newFlow.length), 0, moved);
+            return newFlow;
+          });
+        } else if (currentDrag.dragType === 'subblock' && target.grandparentId === 'subblock-container') {
+          setDocFlow(prev => prev.map(el => {
+            if (el.id === currentDrag.sourceParentId && el.subblocks) {
+              let newSubs = [...el.subblocks];
+              const [moved] = newSubs.splice(currentDrag.sourceIndex, 1);
+              let targetIdx = target.index;
+              if (currentDrag.sourceIndex < targetIdx) {
+                targetIdx = targetIdx - 1;
+              }
+              newSubs.splice(Math.min(Math.max(0, targetIdx), newSubs.length), 0, moved);
+              return { ...el, subblocks: newSubs };
+            }
+            return el;
+          }));
+        } else if (currentDrag.dragType === 'item') {
+          const src = {
+            id: currentDrag.item.id,
+            parentId: currentDrag.sourceParentId,
+            grandparentId: currentDrag.sourceGrandparentId
+          };
+          handleReorderItem(src, target.parentId, target.grandparentId, target.index);
+        }
+      }
+
+      setPointerDrag(null);
+      setDragOverTarget(null);
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+    };
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('wheel', handleWheel, { passive: true });
+
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('wheel', handleWheel);
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+    };
+  }, [!!pointerDrag]);
+
+  const handleCopy = (
+    type: 'section' | 'block' | 'subblock' | 'item',
+    data: any
+  ) => {
+    setClipboard({
+      action: 'copy',
+      type,
+      items: [{ data: JSON.parse(JSON.stringify(data)), sourceId: data.id }]
+    });
   };
 
   const handleCut = (
@@ -502,14 +746,119 @@ export const CreateGuide: React.FC = () => {
     });
   };
 
+  const handleReorderSection = (sourceSectionId: string, targetSectionId: string, isAfter: boolean) => {
+    setDocFlow(prev => {
+      let unsectioned: DocElement[] = [];
+      let chunks: Array<{ sectionId: string; elements: DocElement[] }> = [];
+      let currentChunk: { sectionId: string; elements: DocElement[] } | null = null;
+
+      for (const el of prev) {
+        if (el.type === 'section') {
+          if (currentChunk) chunks.push(currentChunk);
+          currentChunk = { sectionId: el.id, elements: [el] };
+        } else {
+          if (currentChunk) {
+            currentChunk.elements.push(el);
+          } else {
+            unsectioned.push(el);
+          }
+        }
+      }
+      if (currentChunk) chunks.push(currentChunk);
+
+      const srcIdx = chunks.findIndex(c => c.sectionId === sourceSectionId);
+      let tgtIdx = chunks.findIndex(c => c.sectionId === targetSectionId);
+
+      if (srcIdx === -1 || tgtIdx === -1) return prev;
+
+      const [movedChunk] = chunks.splice(srcIdx, 1);
+      tgtIdx = chunks.findIndex(c => c.sectionId === targetSectionId);
+      const insertIdx = isAfter ? tgtIdx + 1 : tgtIdx;
+
+      chunks.splice(insertIdx, 0, movedChunk);
+
+      let result: DocElement[] = [...unsectioned];
+      for (const c of chunks) {
+        result.push(...c.elements);
+      }
+      return result;
+    });
+  };
+
+  const handleReorderItem = (
+    source: { id: string | number; parentId: string; grandparentId?: string },
+    targetParentId: string,
+    targetGrandparentId: string | undefined,
+    targetIndex: number
+  ) => {
+    setDocFlow(prev => {
+      let newFlow = JSON.parse(JSON.stringify(prev)) as DocElement[];
+      let finalTargetIndex = targetIndex;
+      
+      // 1. Find and extract source item
+      let movedItem: any = null;
+      if (source.grandparentId) {
+        const block = newFlow.find(b => b.id === source.parentId);
+        if (block && block.subblocks) {
+          const sub = block.subblocks.find(s => s.id === source.grandparentId);
+          if (sub && sub.items) {
+            const idx = sub.items.findIndex(i => i.id === source.id);
+            if (idx !== -1) {
+              [movedItem] = sub.items.splice(idx, 1);
+              if (source.parentId === targetParentId && source.grandparentId === targetGrandparentId && idx < finalTargetIndex) {
+                finalTargetIndex = finalTargetIndex - 1;
+              }
+            }
+          }
+        }
+      } else {
+        const block = newFlow.find(b => b.id === source.parentId);
+        if (block && block.items) {
+          const idx = block.items.findIndex(i => i.id === source.id);
+          if (idx !== -1) {
+            [movedItem] = block.items.splice(idx, 1);
+            if (source.parentId === targetParentId && !targetGrandparentId && idx < finalTargetIndex) {
+              finalTargetIndex = finalTargetIndex - 1;
+            }
+          }
+        }
+      }
+
+      if (!movedItem) return prev;
+
+      // 2. Insert into target
+      if (targetGrandparentId) {
+        const block = newFlow.find(b => b.id === targetParentId);
+        if (block && block.subblocks) {
+          const sub = block.subblocks.find(s => s.id === targetGrandparentId);
+          if (sub) {
+            if (!sub.items) sub.items = [];
+            const safeIdx = Math.min(Math.max(0, finalTargetIndex), sub.items.length);
+            sub.items.splice(safeIdx, 0, movedItem);
+          }
+        }
+      } else {
+        const block = newFlow.find(b => b.id === targetParentId);
+        if (block) {
+          if (!block.items) block.items = [];
+          const safeIdx = Math.min(Math.max(0, finalTargetIndex), block.items.length);
+          block.items.splice(safeIdx, 0, movedItem);
+        }
+      }
+
+      return newFlow;
+    });
+  };
+
   const handlePaste = (targetType: 'root' | 'section' | 'block' | 'subblock', targetId?: string, insertIndex?: number) => {
     if (!clipboard) return;
 
     setDocFlow(prev => {
       let newFlow = JSON.parse(JSON.stringify(prev)) as DocElement[];
 
-      // 1. Remove from source
-      clipboard.items.forEach(clipboardItem => {
+      // 1. Remove from source (only when cutting)
+      if (clipboard.action === 'cut') {
+        clipboard.items.forEach(clipboardItem => {
         if (clipboard.type === 'item') {
           if (clipboardItem.sourceGrandparentId) {
             const block = newFlow.find(el => el.id === clipboardItem.sourceParentId);
@@ -536,10 +885,14 @@ export const CreateGuide: React.FC = () => {
           }
         }
       });
+      }
 
       // 2. Prepare data to paste
       const pasteDatas = clipboard.items.map(clipboardItem => {
         if (clipboard.type === 'item') {
+          if (clipboard.action === 'copy') {
+            return { ...clipboardItem.data, id: Date.now() + Math.floor(Math.random() * 10000) };
+          }
           return { ...clipboardItem.data };
         } else {
           const pData = regenerateIds(clipboardItem.data);
@@ -802,7 +1155,20 @@ export const CreateGuide: React.FC = () => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
           
           {/* Editor Header Tools */}
-          <div className="glass-card" style={{ padding: '1.5rem 2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', position: 'sticky', top: '75px', zIndex: 100 }}>
+          <div className="glass-card" style={{ 
+            padding: '1.5rem 2rem', 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center', 
+            flexWrap: 'wrap', 
+            gap: '1rem', 
+            position: 'sticky', 
+            top: '75px', 
+            zIndex: 100,
+            opacity: pointerDrag ? 0.75 : 1,
+            pointerEvents: pointerDrag ? 'none' : 'auto',
+            transition: 'opacity 0.2s ease'
+          }}>
             <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
               <button onClick={addSection} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem' }}>
                 <FolderPlus size={16} /> {language === 'es' ? '+ Nueva Sección' : '+ New Section'}
@@ -898,6 +1264,7 @@ export const CreateGuide: React.FC = () => {
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
                 {docFlow.map((element, index) => {
+                  const isFirstBlockOfSection = index > 0 && docFlow[index - 1]?.type === 'section';
                   const rootPasteZone = (
                     <PasteZone 
                       type={element.type === 'section' ? 'section' : 'block'} 
@@ -906,6 +1273,7 @@ export const CreateGuide: React.FC = () => {
                       label={language === 'es' ? 'Pegar Aquí' : 'Paste Here'} 
                       canPaste={clipboard?.type === 'section' || clipboard?.type === 'block'} 
                       handlePaste={handlePaste} 
+                      indent={isFirstBlockOfSection && clipboard?.type === 'block'}
                     />
                   );
                   
@@ -914,32 +1282,155 @@ export const CreateGuide: React.FC = () => {
                     return (
                       <React.Fragment key={element.id}>
                         {rootPasteZone}
-                        <div className="document-section-block" style={{ padding: '1.5rem', background: 'rgba(124,58,237,0.03)', borderLeft: '4px solid var(--accent-primary)', position: 'relative', display: 'flex', flexDirection: 'column', gap: '0.75rem', borderRadius: '0 8px 8px 0' }}>
+                        {/* Animated Drop Slot before section (when dragging a section) */}
+                        {pointerDrag?.dragType === 'section' && dragOverTarget?.parentId === 'section-root' && dragOverTarget.targetSectionId === element.id && !dragOverTarget.isAfter && pointerDrag?.item.id !== element.id && (
+                          <div style={{
+                            height: '52px',
+                            borderRadius: '8px',
+                            border: '2px dashed var(--accent-primary)',
+                            background: 'rgba(129, 140, 248, 0.15)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: 'var(--accent-primary)',
+                            fontSize: '0.9rem',
+                            fontWeight: 600,
+                            margin: '0.5rem 0',
+                            transition: 'all 0.15s ease'
+                          }}>
+                            <span>{language === 'es' ? '⬇ Soltar sección aquí' : '⬇ Drop section here'}</span>
+                          </div>
+                        )}
+
+                        {/* Animated Drop Slot before section (when dragging a block) */}
+                        {pointerDrag?.dragType === 'block' && dragOverTarget?.parentId === 'root' && dragOverTarget.index === index && pointerDrag?.item.id !== element.id && (
+                          <div style={{
+                            height: '52px',
+                            borderRadius: '8px',
+                            border: '2px dashed var(--accent-primary)',
+                            background: 'rgba(129, 140, 248, 0.15)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: 'var(--accent-primary)',
+                            fontSize: '0.9rem',
+                            fontWeight: 600,
+                            margin: '0.5rem 0',
+                            marginLeft: isFirstBlockOfSection ? '2.5rem' : '0',
+                            width: isFirstBlockOfSection ? 'calc(100% - 2.5rem)' : '100%',
+                            boxSizing: 'border-box',
+                            transition: 'all 0.15s ease'
+                          }}>
+                            <span>{language === 'es' ? '⬇ Soltar bloque aquí' : '⬇ Drop block here'}</span>
+                          </div>
+                        )}
+
+                        <div 
+                          data-root-element-id={element.id}
+                          data-root-index={index}
+                          data-section-element-id={element.id}
+                          className="document-section-block" 
+                          style={{ 
+                            padding: '1.5rem', 
+                            background: 'rgba(124,58,237,0.03)', 
+                            borderLeft: '4px solid var(--accent-primary)', 
+                            position: 'relative', 
+                            display: 'flex', 
+                            flexDirection: 'column', 
+                            gap: '0.75rem', 
+                            borderRadius: '0 8px 8px 0',
+                            opacity: pointerDrag?.item.id === element.id ? 0.35 : 1,
+                            transition: 'opacity 0.2s ease'
+                          }}
+                        >
                         
-                        {/* Control actions */}
-                        <div style={{ position: 'absolute', top: '1rem', left: '1rem' }}>
-                          <input type="checkbox" disabled={selectedElements.ids.length > 0 && (selectedElements.type !== 'section' || selectedElements.parentId !== null)} checked={selectedElements.type === 'section' && selectedElements.ids.includes(element.id)} onChange={() => toggleSelection('section', element.id)} style={{ transform: 'scale(1.2)', cursor: 'pointer' }} />
-                        </div>
-                        <div style={{ position: 'absolute', top: '1rem', right: '1rem', display: 'flex', gap: '0.35rem' }}>
+                        {/* Top row: Left-aligned control actions */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', width: '100%', flexWrap: 'wrap' }}>
+                          <input 
+                            type="checkbox" 
+                            disabled={selectedElements.ids.length > 0 && (selectedElements.type !== 'section' || selectedElements.parentId !== null)} 
+                            checked={selectedElements.type === 'section' && selectedElements.ids.includes(element.id)} 
+                            onChange={() => toggleSelection('section', element.id)} 
+                            style={{ transform: 'scale(1.15)', cursor: 'pointer', marginRight: '0.25rem' }} 
+                            title={language === 'es' ? 'Seleccionar sección' : 'Select section'}
+                          />
+                          <button 
+                            type="button" 
+                            onClick={() => handleCopy('section', element)} 
+                            className="btn-secondary" 
+                            style={{ padding: '0.2rem 0.35rem', border: 'none', background: 'transparent', color: 'var(--accent-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                            title={language === 'es' ? 'Copiar sección' : 'Copy section'}
+                          >
+                            <Copy size={15} />
+                          </button>
+                          <button 
+                            type="button" 
+                            onClick={() => handleCut('section', element, element.id)} 
+                            className="btn-secondary" 
+                            style={{ padding: '0.2rem 0.35rem', border: 'none', background: 'transparent', color: '#f59e0b', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                            title={language === 'es' ? 'Cortar sección' : 'Cut section'}
+                          >
+                            <Scissors size={15} />
+                          </button>
+                          <button 
+                            type="button" 
+                            onClick={() => removeDocElement(element.id)} 
+                            className="btn-secondary" 
+                            style={{ padding: '0.2rem 0.35rem', border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                            title={language === 'es' ? 'Eliminar sección' : 'Delete section'}
+                          >
+                            <Trash2 size={15} />
+                          </button>
                           {clipboard && (clipboard.type === 'block' || clipboard.type === 'subblock') && (
-                            <button onClick={() => handlePaste('section', element.id)} className="btn-primary" style={{ padding: '0.2rem 0.4rem', marginRight: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
-                              <ClipboardPaste size={14} /> {language === 'es' ? 'Pegar' : 'Paste'}
+                            <button onClick={() => handlePaste('section', element.id)} className="btn-primary" style={{ padding: '0.2rem 0.5rem', marginLeft: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.2rem', fontSize: '0.8rem' }}>
+                              <ClipboardPaste size={13} /> {language === 'es' ? 'Pegar' : 'Paste'}
                             </button>
                           )}
-                          <button onClick={() => handleCut('section', element, element.id)} className="btn-secondary" style={{ padding: '0.2rem 0.4rem', color: '#f59e0b' }}><Scissors size={14} /></button>
-                          <button onClick={() => moveDocElement(index, 'up')} disabled={index === 0} className="btn-secondary" style={{ padding: '0.2rem 0.4rem' }}><ChevronUp size={14} /></button>
-                          <button onClick={() => moveDocElement(index, 'down')} disabled={index === docFlow.length - 1} className="btn-secondary" style={{ padding: '0.2rem 0.4rem' }}><ChevronDown size={14} /></button>
-                          <button onClick={() => removeDocElement(element.id)} className="btn-secondary" style={{ padding: '0.2rem 0.4rem', color: '#ef4444' }}><Trash2 size={14} /></button>
                         </div>
 
-                        {/* Title Input */}
-                        <input
-                          type="text"
-                          value={element.title}
-                          onChange={(e) => updateDocElement(element.id, { title: e.target.value })}
-                          style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--accent-primary)', background: 'transparent', border: 'none', borderBottom: '1px dashed var(--border-color)', outline: 'none', width: '80%', padding: '0.2rem 0' }}
-                          placeholder={language === 'es' ? 'Nueva sección' : 'New section'}
-                        />
+                        {/* Title Row with Drag Handle at Left */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', width: '100%' }}>
+                          <div 
+                            onPointerDown={(e) => {
+                              if (e.button !== 0) return;
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setPointerDrag({
+                                dragType: 'section',
+                                item: element,
+                                sourceParentId: 'root',
+                                sourceIndex: index,
+                                currentX: e.clientX,
+                                currentY: e.clientY
+                              });
+                            }}
+                            style={{ 
+                              cursor: 'grab', 
+                              color: 'var(--text-secondary)', 
+                              opacity: 0.7, 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              justifyContent: 'center',
+                              padding: '0.2rem',
+                              borderRadius: '4px',
+                              flexShrink: 0,
+                              touchAction: 'none',
+                              transition: 'opacity 0.2s ease, color 0.2s ease'
+                            }}
+                            title={language === 'es' ? 'Arrastrar para reordenar sección' : 'Drag to reorder section'}
+                            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.opacity = '1'; (e.currentTarget as HTMLElement).style.color = 'var(--accent-primary)'; }}
+                            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.opacity = '0.7'; (e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)'; }}
+                          >
+                            <Menu size={18} />
+                          </div>
+                          <input
+                            type="text"
+                            value={element.title}
+                            onChange={(e) => updateDocElement(element.id, { title: e.target.value })}
+                            style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--accent-primary)', background: 'transparent', border: 'none', borderBottom: '1px dashed var(--border-color)', outline: 'none', flex: 1, padding: '0.2rem 0' }}
+                            placeholder={language === 'es' ? 'Nueva sección' : 'New section'}
+                          />
+                        </div>
 
                         {/* Description Input */}
                         <textarea
@@ -950,35 +1441,158 @@ export const CreateGuide: React.FC = () => {
                           rows={2}
                         />
                       </div>
+
+                      {/* Animated Drop Slot after section (when dragging a section) */}
+                      {pointerDrag?.dragType === 'section' && dragOverTarget?.parentId === 'section-root' && dragOverTarget.targetSectionId === element.id && dragOverTarget.isAfter && pointerDrag?.item.id !== element.id && (
+                        <div style={{
+                          height: '52px',
+                          borderRadius: '8px',
+                          border: '2px dashed var(--accent-primary)',
+                          background: 'rgba(129, 140, 248, 0.15)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: 'var(--accent-primary)',
+                          fontSize: '0.9rem',
+                          fontWeight: 600,
+                          margin: '0.5rem 0',
+                          transition: 'all 0.15s ease'
+                        }}>
+                          <span>{language === 'es' ? '⬇ Soltar sección aquí' : '⬇ Drop section here'}</span>
+                        </div>
+                      )}
                       </React.Fragment>
                     );
                   }
 
                   // BLOCK ELEMENT RENDER
                   if (element.type === 'block') {
+                    // When dragging a section, hide all blocks to show only a compact list of sections
+                    if (pointerDrag?.dragType === 'section') {
+                      return null;
+                    }
                     return (
                       <React.Fragment key={element.id}>
                         {rootPasteZone}
-                      <div style={{ padding: '2rem', border: '1px solid var(--border-color)', borderRadius: '12px', background: 'var(--bg-primary)', position: 'relative', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                        {/* Animated Drop Slot before block (when dragging a block) */}
+                        {pointerDrag?.dragType === 'block' && dragOverTarget?.parentId === 'root' && dragOverTarget.index === index && pointerDrag?.item.id !== element.id && (
+                          <div style={{
+                            height: '52px',
+                            borderRadius: '8px',
+                            border: '2px dashed var(--accent-primary)',
+                            background: 'rgba(129, 140, 248, 0.15)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: 'var(--accent-primary)',
+                            fontSize: '0.9rem',
+                            fontWeight: 600,
+                            margin: '0.5rem 0',
+                            marginLeft: isFirstBlockOfSection ? '2.5rem' : '0',
+                            width: isFirstBlockOfSection ? 'calc(100% - 2.5rem)' : '100%',
+                            boxSizing: 'border-box',
+                            transition: 'all 0.15s ease'
+                          }}>
+                            <span>{language === 'es' ? '⬇ Soltar bloque aquí' : '⬇ Drop block here'}</span>
+                          </div>
+                        )}
+
+                      <div 
+                        data-root-element-id={element.id}
+                        data-root-index={index}
+                        style={{ 
+                          padding: '2rem', 
+                          border: '1px solid var(--border-color)', 
+                          borderRadius: '12px', 
+                          background: 'var(--bg-primary)', 
+                          position: 'relative', 
+                          display: 'flex', 
+                          flexDirection: 'column', 
+                          gap: '1.25rem',
+                          opacity: pointerDrag?.item.id === element.id ? 0.35 : 1,
+                          transition: 'opacity 0.2s ease'
+                        }}
+                      >
                         
-                        {/* Control actions */}
-                        <div style={{ position: 'absolute', top: '1rem', left: '1rem' }}>
-                          <input type="checkbox" disabled={selectedElements.ids.length > 0 && (selectedElements.type !== 'block' || selectedElements.parentId !== null)} checked={selectedElements.type === 'block' && selectedElements.ids.includes(element.id)} onChange={() => toggleSelection('block', element.id)} style={{ transform: 'scale(1.2)', cursor: 'pointer' }} />
-                        </div>
-                        <div style={{ position: 'absolute', top: '1rem', right: '1rem', display: 'flex', gap: '0.35rem' }}>
+                        {/* Top row: Left-aligned control actions */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', width: '100%', flexWrap: 'wrap' }}>
+                          <input 
+                            type="checkbox" 
+                            disabled={selectedElements.ids.length > 0 && (selectedElements.type !== 'block' || selectedElements.parentId !== null)} 
+                            checked={selectedElements.type === 'block' && selectedElements.ids.includes(element.id)} 
+                            onChange={() => toggleSelection('block', element.id)} 
+                            style={{ transform: 'scale(1.15)', cursor: 'pointer', marginRight: '0.25rem' }} 
+                            title={language === 'es' ? 'Seleccionar bloque' : 'Select block'}
+                          />
+                          <button 
+                            type="button" 
+                            onClick={() => handleCopy('block', element)} 
+                            className="btn-secondary" 
+                            style={{ padding: '0.2rem 0.35rem', border: 'none', background: 'transparent', color: 'var(--accent-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                            title={language === 'es' ? 'Copiar bloque' : 'Copy block'}
+                          >
+                            <Copy size={15} />
+                          </button>
+                          <button 
+                            type="button" 
+                            onClick={() => handleCut('block', element, element.id)} 
+                            className="btn-secondary" 
+                            style={{ padding: '0.2rem 0.35rem', border: 'none', background: 'transparent', color: '#f59e0b', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                            title={language === 'es' ? 'Cortar bloque' : 'Cut block'}
+                          >
+                            <Scissors size={15} />
+                          </button>
+                          <button 
+                            type="button" 
+                            onClick={() => removeDocElement(element.id)} 
+                            className="btn-secondary" 
+                            style={{ padding: '0.2rem 0.35rem', border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                            title={language === 'es' ? 'Eliminar bloque' : 'Delete block'}
+                          >
+                            <Trash2 size={15} />
+                          </button>
                           {clipboard && (clipboard.type === 'subblock' || clipboard.type === 'item') && (
-                            <button onClick={() => handlePaste('block', element.id)} className="btn-primary" style={{ padding: '0.2rem 0.4rem', marginRight: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
-                              <ClipboardPaste size={14} /> {language === 'es' ? 'Pegar' : 'Paste'}
+                            <button onClick={() => handlePaste('block', element.id)} className="btn-primary" style={{ padding: '0.2rem 0.5rem', marginLeft: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.2rem', fontSize: '0.8rem' }}>
+                              <ClipboardPaste size={13} /> {language === 'es' ? 'Pegar' : 'Paste'}
                             </button>
                           )}
-                          <button onClick={() => handleCut('block', element, element.id)} className="btn-secondary" style={{ padding: '0.2rem 0.4rem', color: '#f59e0b' }}><Scissors size={14} /></button>
-                          <button onClick={() => moveDocElement(index, 'up')} disabled={index === 0} className="btn-secondary" style={{ padding: '0.2rem 0.4rem' }}><ChevronUp size={14} /></button>
-                          <button onClick={() => moveDocElement(index, 'down')} disabled={index === docFlow.length - 1} className="btn-secondary" style={{ padding: '0.2rem 0.4rem' }}><ChevronDown size={14} /></button>
-                          <button onClick={() => removeDocElement(element.id)} className="btn-secondary" style={{ padding: '0.2rem 0.4rem', color: '#ef4444' }}><Trash2 size={14} /></button>
                         </div>
 
-                         {/* Top row: Title and importance */}
-                        <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center', flexWrap: 'wrap', width: '85%' }}>
+                         {/* Title Row with Drag Handle at Left */}
+                        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap', width: '100%' }}>
+                          <div 
+                            onPointerDown={(e) => {
+                              if (e.button !== 0) return;
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setPointerDrag({
+                                dragType: 'block',
+                                item: element,
+                                sourceParentId: 'root',
+                                sourceIndex: index,
+                                currentX: e.clientX,
+                                currentY: e.clientY
+                              });
+                            }}
+                            style={{ 
+                              cursor: 'grab', 
+                              color: 'var(--text-secondary)', 
+                              opacity: 0.7, 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              justifyContent: 'center',
+                              padding: '0.2rem',
+                              borderRadius: '4px',
+                              flexShrink: 0,
+                              touchAction: 'none',
+                              transition: 'opacity 0.2s ease, color 0.2s ease'
+                            }}
+                            title={language === 'es' ? 'Arrastrar para reordenar bloque' : 'Drag to reorder block'}
+                            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.opacity = '1'; (e.currentTarget as HTMLElement).style.color = 'var(--accent-primary)'; }}
+                            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.opacity = '0.7'; (e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)'; }}
+                          >
+                            <Menu size={18} />
+                          </div>
                           <input
                             type="text"
                             value={element.title}
@@ -1015,60 +1629,210 @@ export const CreateGuide: React.FC = () => {
                         />
 
                         {/* List of Media items in Block */}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                          {(element.items || []).map((item, itemIndex) => (
-                            <React.Fragment key={item.id}>
-                              <PasteZone 
-                                type="item" 
-                                actionTargetType="block" 
-                                targetId={element.id} 
-                                index={itemIndex} 
-                                label={language === 'es' ? 'Pegar Aquí' : 'Paste Here'} 
-                                canPaste={clipboard?.type === 'item'} 
-                                handlePaste={handlePaste} 
-                              />
-                            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', background: 'var(--bg-secondary)', padding: '0.5rem 1rem', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
-                              <input type="checkbox" disabled={selectedElements.ids.length > 0 && (selectedElements.type !== 'item' || selectedElements.parentId !== element.id)} checked={selectedElements.type === 'item' && selectedElements.ids.includes(item.id)} onChange={() => toggleSelection('item', item.id, element.id)} style={{ transform: 'scale(1.1)', cursor: 'pointer' }} />
-                              {item.image_url && (
-                                <img
-                                  src={item.image_url}
-                                  alt={item.title}
-                                  onClick={() => setZoomedImage(item.image_url)}
-                                  style={{ width: '32px', height: '48px', objectFit: 'cover', borderRadius: '4px', cursor: 'zoom-in' }}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                          {(element.items || []).map((item, itemIndex) => {
+                            const isDropTargetTop = dragOverTarget?.parentId === element.id && !dragOverTarget.grandparentId && dragOverTarget.index === itemIndex;
+                            const isBeingDragged = pointerDrag?.item.id === item.id;
+
+                            return (
+                              <React.Fragment key={item.id}>
+                                <PasteZone 
+                                  type="item" 
+                                  actionTargetType="block" 
+                                  targetId={element.id} 
+                                  index={itemIndex} 
+                                  label={language === 'es' ? 'Pegar Aquí' : 'Paste Here'} 
+                                  canPaste={clipboard?.type === 'item'} 
+                                  handlePaste={handlePaste} 
                                 />
-                              )}
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                {(() => {
-                                  const match = (item.title || '').match(/^(.*?)\s*-\s*S(\d+)E(\d+)(.*)$/i);
-                                  if (match) {
-                                    const series = match[1].trim();
-                                    const s = match[2];
-                                    const e = match[3];
-                                    const epName = match[4].replace(/^\s*-\s*/, '').trim();
-                                    const formattedSE = language === 'es' ? `T${s} | E${e}` : `S${s} | E${e}`;
-                                    return (
-                                      <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                        <span style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{series}</span>
-                                        <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--accent-primary)', marginTop: '0.1rem' }}>{formattedSE}</span>
-                                        {epName && <span style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-secondary)', marginTop: '0.1rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{epName}</span>}
-                                      </div>
-                                    );
-                                  }
-                                  return <h5 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</h5>;
-                                })()}
-                                <span style={{ fontSize: '0.7rem', color: 'var(--accent-primary)', textTransform: 'capitalize' }}>{item.item_type}</span>
+
+                                {/* Animated Drop Slot before this item */}
+                                {isDropTargetTop && !isBeingDragged && (
+                                  <div 
+                                    style={{
+                                      height: '48px',
+                                      borderRadius: '8px',
+                                      border: '2px dashed var(--accent-primary)',
+                                      background: 'rgba(129, 140, 248, 0.15)',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      color: 'var(--accent-primary)',
+                                      fontSize: '0.85rem',
+                                      fontWeight: 600,
+                                      margin: '0.2rem 0',
+                                      transition: 'all 0.15s ease'
+                                    }}
+                                  >
+                                    <span>{language === 'es' ? '⬇ Soltar aquí' : '⬇ Drop here'}</span>
+                                  </div>
+                                )}
+
+                              <div 
+                                data-card-item-id={item.id}
+                                data-card-parent-id={element.id}
+                                data-card-grandparent-id=""
+                                data-card-index={itemIndex}
+                                style={{ 
+                                  display: 'flex', 
+                                  flexDirection: 'column',
+                                  gap: '0.4rem',
+                                  background: isBeingDragged ? 'rgba(30, 41, 59, 0.4)' : 'var(--bg-secondary)', 
+                                  padding: '0.5rem 0.85rem', 
+                                  borderRadius: '8px', 
+                                  border: isBeingDragged ? '1px dashed var(--accent-primary)' : '1px solid var(--border-color)',
+                                  opacity: isBeingDragged ? 0.35 : 1,
+                                  transform: isBeingDragged ? 'scale(0.98)' : 'none',
+                                  transition: 'all 0.15s ease'
+                                }}
+                              >
+                                {/* Top row: Action buttons and checkbox */}
+                                <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', gap: '0.35rem', width: '100%' }}>
+                                  <input 
+                                    type="checkbox" 
+                                    disabled={selectedElements.ids.length > 0 && (selectedElements.type !== 'item' || selectedElements.parentId !== element.id)} 
+                                    checked={selectedElements.type === 'item' && selectedElements.ids.includes(item.id)} 
+                                    onChange={() => toggleSelection('item', item.id, element.id)} 
+                                    style={{ transform: 'scale(1.1)', cursor: 'pointer', marginRight: '0.2rem' }} 
+                                    title={language === 'es' ? 'Seleccionar' : 'Select'}
+                                  />
+                                  <button 
+                                    type="button" 
+                                    onClick={() => handleCopy('item', item)} 
+                                    className="btn-secondary" 
+                                    style={{ padding: '0.2rem 0.35rem', border: 'none', background: 'transparent', color: 'var(--accent-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                                    title={language === 'es' ? 'Copiar' : 'Copy'}
+                                  >
+                                    <Copy size={15} />
+                                  </button>
+                                  <button 
+                                    type="button" 
+                                    onClick={() => handleCut('item', item, item.id, element.id)} 
+                                    className="btn-secondary" 
+                                    style={{ padding: '0.2rem 0.35rem', border: 'none', background: 'transparent', color: '#f59e0b', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                                    title={language === 'es' ? 'Cortar' : 'Cut'}
+                                  >
+                                    <Scissors size={15} />
+                                  </button>
+                                  <button 
+                                    type="button" 
+                                    onClick={() => removeMediaItem(element.id, item.id)} 
+                                    className="btn-secondary" 
+                                    style={{ padding: '0.2rem 0.35rem', border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                                    title={language === 'es' ? 'Eliminar' : 'Delete'}
+                                  >
+                                    <Trash2 size={15} />
+                                  </button>
+                                </div>
+
+                                {/* Main row: Drag handle (left), Thumbnail, and Info */}
+                                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', width: '100%' }}>
+                                  <div 
+                                    onPointerDown={(e) => {
+                                      if (e.button !== 0) return;
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      setPointerDrag({
+                                        item,
+                                        sourceParentId: element.id,
+                                        sourceGrandparentId: undefined,
+                                        sourceIndex: itemIndex,
+                                        currentX: e.clientX,
+                                        currentY: e.clientY
+                                      });
+                                    }}
+                                    style={{ 
+                                      cursor: 'grab', 
+                                      color: 'var(--text-secondary)', 
+                                      opacity: 0.6, 
+                                      display: 'flex', 
+                                      alignItems: 'center', 
+                                      justifyContent: 'center',
+                                      padding: '0.2rem 0.3rem',
+                                      borderRadius: '4px',
+                                      flexShrink: 0,
+                                      touchAction: 'none',
+                                      transition: 'opacity 0.2s ease, color 0.2s ease'
+                                    }}
+                                    title={language === 'es' ? 'Arrastrar para reordenar' : 'Drag to reorder'}
+                                    onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.opacity = '1'; (e.currentTarget as HTMLElement).style.color = 'var(--accent-primary)'; }}
+                                    onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.opacity = '0.6'; (e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)'; }}
+                                  >
+                                    <Menu size={18} />
+                                  </div>
+
+                                  {item.image_url && (
+                                    <img
+                                      src={item.image_url}
+                                      alt={item.title}
+                                      onClick={() => setZoomedImage(item.image_url)}
+                                      style={{ width: '36px', height: '52px', objectFit: 'cover', borderRadius: '4px', cursor: 'zoom-in', flexShrink: 0 }}
+                                    />
+                                  )}
+
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    {(() => {
+                                      const match = (item.title || '').match(/^(.*?)\s*-\s*S(\d+)E(\d+)(.*)$/i);
+                                      if (match) {
+                                        const series = match[1].trim();
+                                        const s = match[2];
+                                        const e = match[3];
+                                        const epName = match[4].replace(/^\s*-\s*/, '').trim();
+                                        const formattedSE = language === 'es' ? `T${s} | E${e}` : `S${s} | E${e}`;
+                                        return (
+                                          <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                            <span style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{series}</span>
+                                            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--accent-primary)', marginTop: '0.1rem' }}>{formattedSE}</span>
+                                            {epName && <span style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-secondary)', marginTop: '0.1rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{epName}</span>}
+                                          </div>
+                                        );
+                                      }
+                                      return <h5 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</h5>;
+                                    })()}
+                                    <span style={{ fontSize: '0.7rem', color: 'var(--accent-primary)', textTransform: 'capitalize', display: 'block', marginTop: '0.15rem' }}>{item.item_type}</span>
+                                  </div>
+                                </div>
                               </div>
-                              <div style={{ display: 'flex', gap: '0.35rem' }}>
-                                <button onClick={() => handleCut('item', item, item.id, element.id)} className="btn-secondary" style={{ padding: '0.2rem 0.4rem', border: 'none', background: 'transparent', color: '#f59e0b' }}>
-                                  <Scissors size={16} />
-                                </button>
-                                <button onClick={() => removeMediaItem(element.id, item.id)} className="btn-secondary" style={{ padding: '0.2rem 0.4rem', border: 'none', background: 'transparent', color: '#ef4444' }}>
-                                  <Trash2 size={16} />
-                                </button>
-                              </div>
+                              </React.Fragment>
+                            );
+                          })}
+
+                          {/* Animated Drop Slot at bottom of block items */}
+                          {dragOverTarget?.parentId === element.id && !dragOverTarget.grandparentId && dragOverTarget.index === (element.items || []).length && (
+                            <div 
+                              onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
+                              onDrop={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                const data = e.dataTransfer.getData('application/json');
+                                if (data) {
+                                  try {
+                                    const src = JSON.parse(data);
+                                    handleReorderItem(src, element.id, undefined, (element.items || []).length);
+                                  } catch(err) {}
+                                }
+                                setDraggedItem(null);
+                                setDragOverTarget(null);
+                              }}
+                              style={{
+                                height: '48px',
+                                borderRadius: '8px',
+                                border: '2px dashed var(--accent-primary)',
+                                background: 'rgba(129, 140, 248, 0.15)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: 'var(--accent-primary)',
+                                fontSize: '0.85rem',
+                                fontWeight: 600,
+                                margin: '0.2rem 0',
+                                transition: 'all 0.15s ease'
+                              }}
+                            >
+                              <span>{language === 'es' ? '⬇ Soltar aquí' : '⬇ Drop here'}</span>
                             </div>
-                            </React.Fragment>
-                          ))}
+                          )}
+
                           <PasteZone 
                             type="item" 
                             actionTargetType="block" 
@@ -1096,22 +1860,89 @@ export const CreateGuide: React.FC = () => {
                               canPaste={clipboard?.type === 'subblock'} 
                               handlePaste={handlePaste} 
                             />
-                          <div style={{ marginLeft: '2rem', padding: '1.25rem', borderLeft: '2px dashed var(--border-color)', display: 'flex', flexDirection: 'column', gap: '1rem', position: 'relative' }}>
-                            <div style={{ position: 'absolute', top: '1.25rem', left: '0.5rem' }}>
-                              <input type="checkbox" disabled={selectedElements.ids.length > 0 && (selectedElements.type !== 'subblock' || selectedElements.parentId !== element.id)} checked={selectedElements.type === 'subblock' && selectedElements.ids.includes(sub.id)} onChange={() => toggleSelection('subblock', sub.id, element.id)} style={{ transform: 'scale(1.1)', cursor: 'pointer' }} />
+                          {/* Drop slot before subblock */}
+                          {dragOverTarget?.parentId === element.id && dragOverTarget.grandparentId === 'subblock-container' && dragOverTarget.index === subIndex && pointerDrag?.item.id !== sub.id && (
+                            <div style={{
+                              height: '44px',
+                              borderRadius: '6px',
+                              border: '2px dashed var(--accent-primary)',
+                              background: 'rgba(129, 140, 248, 0.15)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: 'var(--accent-primary)',
+                              fontSize: '0.85rem',
+                              fontWeight: 600,
+                              margin: '0.3rem 0',
+                              marginLeft: '2rem',
+                              transition: 'all 0.15s ease'
+                            }}>
+                              <span>{language === 'es' ? '⬇ Soltar subbloque aquí' : '⬇ Drop subblock here'}</span>
                             </div>
-                            <div style={{ position: 'absolute', top: '0.5rem', right: '0.5rem', display: 'flex', gap: '0.35rem' }}>
+                          )}
+
+                          <div 
+                            data-subblock-id={sub.id}
+                            data-subblock-parent-id={element.id}
+                            data-subblock-index={subIndex}
+                            style={{ 
+                              marginLeft: '2rem', 
+                              padding: '1.25rem', 
+                              borderLeft: '2px dashed var(--border-color)', 
+                              display: 'flex', 
+                              flexDirection: 'column', 
+                              gap: '1rem', 
+                              position: 'relative',
+                              opacity: pointerDrag?.item.id === sub.id ? 0.35 : 1,
+                              transition: 'opacity 0.2s ease'
+                            }}
+                          >
+                            {/* Subblock Top row: Left-aligned control actions */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', width: '100%', flexWrap: 'wrap' }}>
+                              <input 
+                                type="checkbox" 
+                                disabled={selectedElements.ids.length > 0 && (selectedElements.type !== 'subblock' || selectedElements.parentId !== element.id)} 
+                                checked={selectedElements.type === 'subblock' && selectedElements.ids.includes(sub.id)} 
+                                onChange={() => toggleSelection('subblock', sub.id, element.id)} 
+                                style={{ transform: 'scale(1.1)', cursor: 'pointer', marginRight: '0.25rem' }} 
+                                title={language === 'es' ? 'Seleccionar subbloque' : 'Select subblock'}
+                              />
+                              <button 
+                                type="button" 
+                                onClick={() => handleCopy('subblock', sub)} 
+                                className="btn-secondary" 
+                                style={{ padding: '0.2rem 0.35rem', border: 'none', background: 'transparent', color: 'var(--accent-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                                title={language === 'es' ? 'Copiar subbloque' : 'Copy subblock'}
+                              >
+                                <Copy size={15} />
+                              </button>
+                              <button 
+                                type="button" 
+                                onClick={() => handleCut('subblock', sub, sub.id, element.id)} 
+                                className="btn-secondary" 
+                                style={{ padding: '0.2rem 0.35rem', border: 'none', background: 'transparent', color: '#f59e0b', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                                title={language === 'es' ? 'Cortar subbloque' : 'Cut subblock'}
+                              >
+                                <Scissors size={15} />
+                              </button>
+                              <button 
+                                type="button" 
+                                onClick={() => removeDocElement(element.id, sub.id)} 
+                                className="btn-secondary" 
+                                style={{ padding: '0.2rem 0.35rem', border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                                title={language === 'es' ? 'Eliminar subbloque' : 'Delete subblock'}
+                              >
+                                <Trash2 size={15} />
+                              </button>
                               {clipboard && clipboard.type === 'item' && (
-                                <button onClick={() => handlePaste('subblock', sub.id)} className="btn-primary" style={{ padding: '0.2rem 0.4rem', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
-                                  <ClipboardPaste size={14} /> {language === 'es' ? 'Pegar' : 'Paste'}
+                                <button onClick={() => handlePaste('subblock', sub.id)} className="btn-primary" style={{ padding: '0.2rem 0.5rem', marginLeft: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.2rem', fontSize: '0.8rem' }}>
+                                  <ClipboardPaste size={13} /> {language === 'es' ? 'Pegar' : 'Paste'}
                                 </button>
                               )}
-                              <button onClick={() => handleCut('subblock', sub, sub.id, element.id)} className="btn-secondary" style={{ padding: '0.2rem 0.4rem', color: '#f59e0b', border: 'none', background: 'transparent' }}><Scissors size={14} /></button>
-                              <button onClick={() => removeDocElement(element.id, sub.id)} className="btn-secondary" style={{ padding: '0.2rem 0.4rem', color: '#ef4444', border: 'none', background: 'transparent' }}><Trash2 size={14} /></button>
                             </div>
 
-                            {/* Subblock Top row: Title and importance */}
-                            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap', width: '90%' }}>
+                            {/* Subblock Title and importance */}
+                            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap', width: '100%' }}>
                               <input
                                 type="text"
                                 value={sub.title}
@@ -1147,59 +1978,246 @@ export const CreateGuide: React.FC = () => {
                             />
 
                             {/* Subblock Items list */}
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                              {(sub.items || []).map((item, itemIndex) => (
-                                <React.Fragment key={item.id}>
-                                  <PasteZone 
-                                    type="item" 
-                                    actionTargetType="subblock" 
-                                    targetId={sub.id} 
-                                    index={itemIndex} 
-                                    label={language === 'es' ? 'Pegar Aquí' : 'Paste Here'} 
-                                    canPaste={clipboard?.type === 'item'} 
-                                    handlePaste={handlePaste} 
-                                  />
-                                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', background: 'var(--bg-secondary)', padding: '0.4rem 0.8rem', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
-                                  <input type="checkbox" disabled={selectedElements.ids.length > 0 && (selectedElements.type !== 'item' || selectedElements.parentId !== sub.id)} checked={selectedElements.type === 'item' && selectedElements.ids.includes(item.id)} onChange={() => toggleSelection('item', item.id, sub.id)} style={{ transform: 'scale(1.1)', cursor: 'pointer' }} />
-                                  {item.image_url && (
-                                    <img
-                                      src={item.image_url}
-                                      alt={item.title}
-                                      onClick={() => setZoomedImage(item.image_url)}
-                                      style={{ width: '24px', height: '36px', objectFit: 'cover', borderRadius: '3px', cursor: 'zoom-in' }}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                              {(sub.items || []).map((item, itemIndex) => {
+                                const isDropTargetTop = dragOverTarget?.parentId === element.id && dragOverTarget.grandparentId === sub.id && dragOverTarget.index === itemIndex;
+                                const isBeingDragged = pointerDrag?.item.id === item.id;
+
+                                return (
+                                  <React.Fragment key={item.id}>
+                                    <PasteZone 
+                                      type="item" 
+                                      actionTargetType="subblock" 
+                                      targetId={sub.id} 
+                                      index={itemIndex} 
+                                      label={language === 'es' ? 'Pegar Aquí' : 'Paste Here'} 
+                                      canPaste={clipboard?.type === 'item'} 
+                                      handlePaste={handlePaste} 
                                     />
-                                  )}
-                                  <div style={{ flex: 1, minWidth: 0 }}>
-                                    {(() => {
-                                      const match = (item.title || '').match(/^(.*?)\s*-\s*S(\d+)E(\d+)(.*)$/i);
-                                      if (match) {
-                                        const series = match[1].trim();
-                                        const s = match[2];
-                                        const e = match[3];
-                                        const epName = match[4].replace(/^\s*-\s*/, '').trim();
-                                        const formattedSE = language === 'es' ? `T${s} | E${e}` : `S${s} | E${e}`;
-                                        return (
-                                          <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                            <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{series}</span>
-                                            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--accent-primary)', marginTop: '0.1rem' }}>{formattedSE}</span>
-                                            {epName && <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)', marginTop: '0.1rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{epName}</span>}
-                                          </div>
-                                        );
+
+                                    {/* Animated Drop Slot before this subblock item */}
+                                    {isDropTargetTop && !isBeingDragged && (
+                                      <div 
+                                        onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
+                                        onDrop={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          const data = e.dataTransfer.getData('application/json');
+                                          if (data) {
+                                            try {
+                                              const src = JSON.parse(data);
+                                              handleReorderItem(src, element.id, sub.id, itemIndex);
+                                            } catch(err) {}
+                                          }
+                                          setDraggedItem(null);
+                                          setDragOverTarget(null);
+                                        }}
+                                        style={{
+                                          height: '42px',
+                                          borderRadius: '6px',
+                                          border: '2px dashed var(--accent-primary)',
+                                          background: 'rgba(129, 140, 248, 0.15)',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          color: 'var(--accent-primary)',
+                                          fontSize: '0.8rem',
+                                          fontWeight: 600,
+                                          margin: '0.15rem 0',
+                                          transition: 'all 0.15s ease'
+                                        }}
+                                      >
+                                        <span>{language === 'es' ? '⬇ Soltar aquí' : '⬇ Drop here'}</span>
+                                      </div>
+                                    )}
+
+                                  <div 
+                                    draggable
+                                    onDragStart={(e) => {
+                                      e.dataTransfer.setData('application/json', JSON.stringify({ id: item.id, parentId: element.id, grandparentId: sub.id, index: itemIndex }));
+                                      setDraggedItem({ id: item.id, parentId: element.id, grandparentId: sub.id, index: itemIndex });
+                                    }}
+                                    onDragEnd={() => {
+                                      setDraggedItem(null);
+                                      setDragOverTarget(null);
+                                    }}
+                                    onDragOver={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      e.dataTransfer.dropEffect = 'move';
+                                      const rect = e.currentTarget.getBoundingClientRect();
+                                      const midY = rect.top + rect.height / 2;
+                                      const isAfter = e.clientY > midY;
+                                      const targetIdx = isAfter ? itemIndex + 1 : itemIndex;
+                                      if (
+                                        !dragOverTarget ||
+                                        dragOverTarget.parentId !== element.id ||
+                                        dragOverTarget.grandparentId !== sub.id ||
+                                        dragOverTarget.index !== targetIdx
+                                      ) {
+                                        setDragOverTarget({ parentId: element.id, grandparentId: sub.id, index: targetIdx });
                                       }
-                                      return <h6 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</h6>;
-                                    })()}
+                                    }}
+                                    onDrop={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      const data = e.dataTransfer.getData('application/json');
+                                      if (data) {
+                                        try {
+                                          const src = JSON.parse(data);
+                                          const targetIdx = dragOverTarget ? dragOverTarget.index : itemIndex;
+                                          handleReorderItem(src, element.id, sub.id, targetIdx);
+                                        } catch(err) {}
+                                      }
+                                      setDraggedItem(null);
+                                      setDragOverTarget(null);
+                                    }}
+                                    style={{ 
+                                      display: 'flex', 
+                                      flexDirection: 'column',
+                                      gap: '0.35rem',
+                                      background: isBeingDragged ? 'rgba(30, 41, 59, 0.4)' : 'var(--bg-secondary)', 
+                                      padding: '0.45rem 0.75rem', 
+                                      borderRadius: '6px', 
+                                      border: isBeingDragged ? '1px dashed var(--accent-primary)' : '1px solid var(--border-color)',
+                                      opacity: isBeingDragged ? 0.35 : 1,
+                                      transform: isBeingDragged ? 'scale(0.98)' : 'none',
+                                      transition: 'all 0.15s ease'
+                                    }}
+                                  >
+                                    {/* Top row: Action buttons and checkbox */}
+                                    <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', gap: '0.3rem', width: '100%' }}>
+                                      <input 
+                                        type="checkbox" 
+                                        disabled={selectedElements.ids.length > 0 && (selectedElements.type !== 'item' || selectedElements.parentId !== sub.id)} 
+                                        checked={selectedElements.type === 'item' && selectedElements.ids.includes(item.id)} 
+                                        onChange={() => toggleSelection('item', item.id, sub.id)} 
+                                        style={{ transform: 'scale(1.1)', cursor: 'pointer', marginRight: '0.2rem' }} 
+                                        title={language === 'es' ? 'Seleccionar' : 'Select'}
+                                      />
+                                      <button 
+                                        type="button" 
+                                        onClick={() => handleCopy('item', item)} 
+                                        className="btn-secondary" 
+                                        style={{ padding: '0.15rem 0.3rem', border: 'none', background: 'transparent', color: 'var(--accent-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                                        title={language === 'es' ? 'Copiar' : 'Copy'}
+                                      >
+                                        <Copy size={14} />
+                                      </button>
+                                      <button 
+                                        type="button" 
+                                        onClick={() => handleCut('item', item, item.id, element.id, sub.id)} 
+                                        className="btn-secondary" 
+                                        style={{ padding: '0.15rem 0.3rem', border: 'none', background: 'transparent', color: '#f59e0b', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                                        title={language === 'es' ? 'Cortar' : 'Cut'}
+                                      >
+                                        <Scissors size={14} />
+                                      </button>
+                                      <button 
+                                        type="button" 
+                                        onClick={() => removeMediaItem(element.id, item.id, sub.id)} 
+                                        className="btn-secondary" 
+                                        style={{ padding: '0.15rem 0.3rem', border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                                        title={language === 'es' ? 'Eliminar' : 'Delete'}
+                                      >
+                                        <Trash2 size={14} />
+                                      </button>
+                                    </div>
+
+                                    {/* Main row: Drag handle (left), Thumbnail, and Info */}
+                                    <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', width: '100%' }}>
+                                      <div 
+                                        style={{ 
+                                          cursor: 'grab', 
+                                          color: 'var(--text-secondary)', 
+                                          opacity: 0.6, 
+                                          display: 'flex', 
+                                          alignItems: 'center', 
+                                          justifyContent: 'center',
+                                          padding: '0.15rem 0.25rem',
+                                          borderRadius: '4px',
+                                          flexShrink: 0,
+                                          transition: 'opacity 0.2s ease, color 0.2s ease'
+                                        }}
+                                        title={language === 'es' ? 'Arrastrar para reordenar' : 'Drag to reorder'}
+                                        onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.opacity = '1'; (e.currentTarget as HTMLElement).style.color = 'var(--accent-primary)'; }}
+                                        onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.opacity = '0.6'; (e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)'; }}
+                                      >
+                                        <Menu size={16} />
+                                      </div>
+
+                                      {item.image_url && (
+                                        <img
+                                          src={item.image_url}
+                                          alt={item.title}
+                                          onClick={() => setZoomedImage(item.image_url)}
+                                          style={{ width: '28px', height: '40px', objectFit: 'cover', borderRadius: '3px', cursor: 'zoom-in', flexShrink: 0 }}
+                                        />
+                                      )}
+
+                                      <div style={{ flex: 1, minWidth: 0 }}>
+                                        {(() => {
+                                          const match = (item.title || '').match(/^(.*?)\s*-\s*S(\d+)E(\d+)(.*)$/i);
+                                          if (match) {
+                                            const series = match[1].trim();
+                                            const s = match[2];
+                                            const e = match[3];
+                                            const epName = match[4].replace(/^\s*-\s*/, '').trim();
+                                            const formattedSE = language === 'es' ? `T${s} | E${e}` : `S${s} | E${e}`;
+                                            return (
+                                              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{series}</span>
+                                                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--accent-primary)', marginTop: '0.1rem' }}>{formattedSE}</span>
+                                                {epName && <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)', marginTop: '0.1rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{epName}</span>}
+                                              </div>
+                                            );
+                                          }
+                                          return <h6 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</h6>;
+                                        })()}
+                                        <span style={{ fontSize: '0.7rem', color: 'var(--accent-primary)', textTransform: 'capitalize', display: 'block', marginTop: '0.1rem' }}>{item.item_type}</span>
+                                      </div>
+                                    </div>
                                   </div>
-                                  <div style={{ display: 'flex', gap: '0.35rem' }}>
-                                    <button onClick={() => handleCut('item', item, item.id, element.id, sub.id)} className="btn-secondary" style={{ padding: '0.2rem 0.4rem', border: 'none', background: 'transparent', color: '#f59e0b' }}>
-                                      <Scissors size={14} />
-                                    </button>
-                                    <button onClick={() => removeMediaItem(element.id, item.id, sub.id)} className="btn-secondary" style={{ padding: '0.2rem 0.4rem', border: 'none', background: 'transparent', color: '#ef4444' }}>
-                                      <Trash2 size={14} />
-                                    </button>
-                                  </div>
+                                  </React.Fragment>
+                                );
+                              })}
+
+                              {/* Animated Drop Slot at bottom of subblock items */}
+                              {dragOverTarget?.parentId === element.id && dragOverTarget.grandparentId === sub.id && dragOverTarget.index === (sub.items || []).length && (
+                                <div 
+                                  onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
+                                  onDrop={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    const data = e.dataTransfer.getData('application/json');
+                                    if (data) {
+                                      try {
+                                        const src = JSON.parse(data);
+                                        handleReorderItem(src, element.id, sub.id, (sub.items || []).length);
+                                      } catch(err) {}
+                                    }
+                                    setDraggedItem(null);
+                                    setDragOverTarget(null);
+                                  }}
+                                  style={{
+                                    height: '42px',
+                                    borderRadius: '6px',
+                                    border: '2px dashed var(--accent-primary)',
+                                    background: 'rgba(129, 140, 248, 0.15)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    color: 'var(--accent-primary)',
+                                    fontSize: '0.8rem',
+                                    fontWeight: 600,
+                                    margin: '0.15rem 0',
+                                    transition: 'all 0.15s ease'
+                                  }}
+                                >
+                                  <span>{language === 'es' ? '⬇ Soltar aquí' : '⬇ Drop here'}</span>
                                 </div>
-                                </React.Fragment>
-                              ))}
+                              )}
+
                               <PasteZone 
                                 type="item" 
                                 actionTargetType="subblock" 
@@ -1240,6 +2258,33 @@ export const CreateGuide: React.FC = () => {
 
                     return null;
                   })}
+
+                  {/* Animated Drop Slot at bottom of docFlow when dragging block */}
+                  {pointerDrag?.dragType === 'block' && dragOverTarget?.parentId === 'root' && dragOverTarget.index === docFlow.length && (() => {
+                    const isLastFirstBlock = docFlow.length > 0 && docFlow[docFlow.length - 1]?.type === 'section';
+                    return (
+                      <div style={{
+                        height: '52px',
+                        borderRadius: '8px',
+                        border: '2px dashed var(--accent-primary)',
+                        background: 'rgba(129, 140, 248, 0.15)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: 'var(--accent-primary)',
+                        fontSize: '0.9rem',
+                        fontWeight: 600,
+                        margin: '0.5rem 0',
+                        marginLeft: isLastFirstBlock ? '2.5rem' : '0',
+                        width: isLastFirstBlock ? 'calc(100% - 2.5rem)' : '100%',
+                        boxSizing: 'border-box',
+                        transition: 'all 0.15s ease'
+                      }}>
+                        <span>{language === 'es' ? '⬇ Soltar bloque aquí' : '⬇ Drop block here'}</span>
+                      </div>
+                    );
+                  })()}
+
                   <PasteZone 
                     type="section" 
                     actionTargetType="root" 
@@ -1247,6 +2292,7 @@ export const CreateGuide: React.FC = () => {
                     label={language === 'es' ? 'Pegar Aquí' : 'Paste Here'} 
                     canPaste={clipboard?.type === 'section' || clipboard?.type === 'block'} 
                     handlePaste={handlePaste} 
+                    indent={docFlow.length > 0 && docFlow[docFlow.length - 1]?.type === 'section' && clipboard?.type === 'block'}
                   />
                 </div>
               )}
@@ -1256,35 +2302,56 @@ export const CreateGuide: React.FC = () => {
         </div>
       )}
 
-      {/* Floating Action Bar for Multi-Selection */}
-      {selectedElements.ids.length > 0 && (
+      {/* Floating Action Bar for Multi-Selection or Active Clipboard */}
+      {(selectedElements.ids.length > 0 || (clipboard && clipboard.items.length > 0)) && (
         <div style={{
           position: 'fixed',
           bottom: '2rem',
-          left: '50%',
+          left: 'calc(50% + 125px)',
           transform: 'translateX(-50%)',
-          background: 'var(--bg-secondary)',
-          border: '1px solid var(--border-color)',
+          background: 'var(--bg-primary)',
+          border: '1px solid var(--border-glow, var(--border-color))',
           borderRadius: '24px',
           padding: '0.75rem 1.5rem',
           display: 'flex',
           alignItems: 'center',
-          gap: '1.5rem',
-          boxShadow: '0 10px 25px rgba(0,0,0,0.3)',
+          gap: '1.25rem',
+          boxShadow: '0 16px 40px rgba(0,0,0,0.65)',
           zIndex: 1000
         }}>
-          <span style={{ fontWeight: 600 }}>{selectedElements.ids.length} {language === 'es' ? 'seleccionados' : 'selected'}</span>
-          <div style={{ display: 'flex', gap: '0.75rem' }}>
-            <button onClick={handleCutMulti} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.4rem 1rem' }}>
-              <Scissors size={16} /> {language === 'es' ? 'Cortar' : 'Cut'}
-            </button>
-            <button onClick={handleDeleteMulti} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.4rem 1rem', color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.2)' }}>
-              <Trash2 size={16} /> {language === 'es' ? 'Eliminar' : 'Delete'}
-            </button>
-            <button onClick={() => setSelectedElements({ parentId: null, type: null, ids: [] })} className="btn-secondary" style={{ padding: '0.4rem 1rem' }}>
-              {language === 'es' ? 'Cancelar' : 'Cancel'}
-            </button>
-          </div>
+          {selectedElements.ids.length > 0 ? (
+            <>
+              <span style={{ fontWeight: 600 }}>{selectedElements.ids.length} {language === 'es' ? 'seleccionados' : 'selected'}</span>
+              <div style={{ display: 'flex', gap: '0.6rem' }}>
+                <button onClick={handleCopyMulti} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.4rem 1rem', color: 'var(--accent-primary)', borderColor: 'rgba(129, 140, 248, 0.3)' }}>
+                  <Copy size={16} /> {language === 'es' ? 'Copiar' : 'Copy'}
+                </button>
+                <button onClick={handleCutMulti} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.4rem 1rem', color: '#f59e0b', borderColor: 'rgba(245, 158, 11, 0.3)' }}>
+                  <Scissors size={16} /> {language === 'es' ? 'Cortar' : 'Cut'}
+                </button>
+                <button onClick={handleDeleteMulti} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.4rem 1rem', color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.3)' }}>
+                  <Trash2 size={16} /> {language === 'es' ? 'Eliminar' : 'Delete'}
+                </button>
+                <button onClick={() => setSelectedElements({ parentId: null, type: null, ids: [] })} className="btn-secondary" style={{ padding: '0.4rem 1rem' }}>
+                  {language === 'es' ? 'Cancelar' : 'Cancel'}
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <span style={{ fontWeight: 600 }}>
+                {clipboard?.items.length === 1 
+                  ? (language === 'es' ? '1 seleccionado' : '1 selected')
+                  : `${clipboard?.items.length} ${language === 'es' ? 'seleccionados' : 'selected'}`
+                }
+              </span>
+              <div style={{ display: 'flex', gap: '0.6rem' }}>
+                <button onClick={() => setClipboard(null)} className="btn-secondary" style={{ padding: '0.4rem 1rem' }}>
+                  {language === 'es' ? 'Cancelar' : 'Cancel'}
+                </button>
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -1377,6 +2444,104 @@ export const CreateGuide: React.FC = () => {
         </div>
       )}
 
+      {/* Floating Ghost Preview when dragging with pointer */}
+      {pointerDrag && (
+        <div style={{
+          position: 'fixed',
+          left: pointerDrag.currentX + 16,
+          top: pointerDrag.currentY - 24,
+          pointerEvents: 'none',
+          zIndex: 9999,
+          background: 'var(--bg-primary)',
+          border: '1px solid var(--accent-primary)',
+          boxShadow: '0 14px 32px rgba(0,0,0,0.6)',
+          borderRadius: '8px',
+          padding: '0.5rem 0.85rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.6rem',
+          width: '280px',
+          opacity: 0.95,
+          transform: 'scale(1.02)'
+        }}>
+          {pointerDrag.dragType === 'section' ? (
+            <>
+              <div style={{ color: 'var(--accent-primary)', display: 'flex', alignItems: 'center' }}>
+                <FolderPlus size={20} />
+              </div>
+              <div style={{ overflow: 'hidden', flex: 1 }}>
+                <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {pointerDrag.item.title || (language === 'es' ? 'Sección' : 'Section')}
+                </p>
+                <span style={{ fontSize: '0.7rem', color: 'var(--accent-primary)', textTransform: 'capitalize', display: 'block' }}>
+                  {language === 'es' ? 'Sección (con sus bloques)' : 'Section (with blocks)'}
+                </span>
+              </div>
+            </>
+          ) : pointerDrag.dragType === 'block' ? (
+            <>
+              <div style={{ color: 'var(--accent-primary)', display: 'flex', alignItems: 'center' }}>
+                <LayoutGrid size={20} />
+              </div>
+              <div style={{ overflow: 'hidden', flex: 1 }}>
+                <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {pointerDrag.item.title || (language === 'es' ? 'Bloque' : 'Block')}
+                </p>
+                <span style={{ fontSize: '0.7rem', color: 'var(--accent-primary)', textTransform: 'capitalize', display: 'block' }}>
+                  {language === 'es' ? 'Bloque' : 'Block'} ({(pointerDrag.item.items || []).length} items)
+                </span>
+              </div>
+            </>
+          ) : pointerDrag.dragType === 'subblock' ? (
+            <>
+              <div style={{ color: 'var(--accent-primary)', display: 'flex', alignItems: 'center' }}>
+                <FolderPlus size={18} />
+              </div>
+              <div style={{ overflow: 'hidden', flex: 1 }}>
+                <p style={{ margin: 0, fontSize: '0.85rem', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {pointerDrag.item.title || (language === 'es' ? 'Subbloque' : 'Subblock')}
+                </p>
+                <span style={{ fontSize: '0.7rem', color: 'var(--accent-primary)', textTransform: 'capitalize', display: 'block' }}>
+                  {language === 'es' ? 'Subbloque' : 'Subblock'} ({(pointerDrag.item.items || []).length} items)
+                </span>
+              </div>
+            </>
+          ) : (
+            <>
+              {pointerDrag.item.image_url && (
+                <img src={pointerDrag.item.image_url} alt="" style={{ width: '28px', height: '40px', objectFit: 'cover', borderRadius: '4px', flexShrink: 0 }} />
+              )}
+              <div style={{ overflow: 'hidden', flex: 1 }}>
+                {(() => {
+                  const match = (pointerDrag.item.title || '').match(/^(.*?)\s*-\s*S(\d+)E(\d+)(.*)$/i);
+                  if (match) {
+                    const series = match[1].trim();
+                    const s = match[2];
+                    const e = match[3];
+                    const epName = match[4].replace(/^\s*-\s*/, '').trim();
+                    const formattedSE = language === 'es' ? `T${s} | E${e}` : `S${s} | E${e}`;
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{series}</span>
+                        <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--accent-primary)', marginTop: '0.1rem' }}>{formattedSE}</span>
+                        {epName && <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)', marginTop: '0.1rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{epName}</span>}
+                      </div>
+                    );
+                  }
+                  return (
+                    <p style={{ margin: 0, fontSize: '0.85rem', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {pointerDrag.item.title}
+                    </p>
+                  );
+                })()}
+                <span style={{ fontSize: '0.7rem', color: 'var(--accent-primary)', textTransform: 'capitalize', display: 'block', marginTop: '0.1rem' }}>
+                  {pointerDrag.item.item_type}
+                </span>
+              </div>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 };
