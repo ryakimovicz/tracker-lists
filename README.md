@@ -41,9 +41,11 @@
 La interfaz está estructurada en **seis secciones principales** accesibles desde la barra lateral (Sidebar):
 
 ### 🏠 Home (Inicio)
-Centro de control personal del usuario:
-- **Continuar viendo**: Series y animes en progreso que muestran permanentemente el siguiente episodio por ver (`S01E01`, `S01E02`...), con un botón circular `✓` para marcarlo como visto directamente desde la tarjeta.
-- **Continuar guías**: Progreso activo en las guías cronológicas que el usuario sigue.
+Centro de control personal del usuario dividido en 4 pestañas:
+- **Continuar**: Series y animes en progreso (muestran el siguiente episodio por ver con botón `✓`), libros/cómics (muestran páginas leídas) y juegos (muestran horas jugadas). También incluye el progreso activo en guías cronológicas.
+- **No comenzado**: Obras pendientes (Plan to watch/read/play).
+- **Terminado**: Obras completadas. Muestra directamente el total de páginas, duración en minutos o horas jugadas en lugar del estado.
+- **Abandonado**: Obras dejadas a medias, detallando el progreso hasta el momento del abandono.
 - **Actualizaciones**: Cambios recientes en las guías seguidas.
 
 ### 📱 Social (Feed)
@@ -64,8 +66,8 @@ Búsqueda y descubrimiento:
 - **Buscador Global**: Conecta con TVMaze, OMDb, IGDB, Google Books y Comic Vine con filtros por categoría (Películas, Series, Animes, Libros, Cómics, Mangas, Juegos).
 - **Modal de Detalle del Ítem**: Ficha completa del elemento con:
   - Botón `+` en la barra superior para añadir/seguir la obra en la estantería (creando automáticamente una lista privada de seguimiento para series/animes).
-  - Sistema intuitivo de 3 botones principales integrados: **Leído/Completado, Pausa, Abandonado**, que añaden automáticamente el elemento a la estantería al activarse.
-  - Para libros, cómics y mangas: **Tracking detallado de progreso por página** (Páginas leídas vs. Totales), que se auto-completa al marcar la obra como Leída.
+  - Sistema intuitivo de 4 botones principales integrados: **En Progreso, Completado, Infinito, Abandonado**, que añaden automáticamente el elemento a la estantería al activarse.
+  - Tracking detallado de progreso: **Páginas leídas vs. Totales** para libros, cómics y mangas, y **Horas jugadas** para videojuegos. Se puede ingresar manualmente o autocompletar al marcar la obra como completada.
   - Botón interactivo **"🌐 Ver traducción"** debajo de las sinopsis en inglés (cuando la interfaz está en Español), con sistema inteligente de caché en base de datos.
   - Para series y animes: acordeón de temporadas y capítulos con marcado mediante botones circulares `✓` individuales o masivos por temporada.
   - Botón interactivo **"🌐 Ver traducción"** debajo de las sinopsis en inglés (cuando la interfaz está en Español), con sistema inteligente de caché en base de datos.
