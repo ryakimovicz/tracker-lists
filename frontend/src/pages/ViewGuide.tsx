@@ -433,7 +433,24 @@ export const ViewGuide: React.FC = () => {
                                     />
                                   )}
                                   <div style={{ flex: 1 }}>
-                                    <h5 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 600 }}>{item.title}</h5>
+                                    {(() => {
+                                      const match = (item.title || '').match(/^(.*?)\s*-\s*S(\d+)E(\d+)(.*)$/i);
+                                      if (match) {
+                                        const series = match[1].trim();
+                                        const s = match[2];
+                                        const e = match[3];
+                                        const epName = match[4].replace(/^\s*-\s*/, '').trim();
+                                        const formattedSE = language === 'es' ? `T${s} | E${e}` : `S${s} | E${e}`;
+                                        return (
+                                          <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                            <span style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-primary)' }}>{series}</span>
+                                            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--accent-primary)' }}>{formattedSE}</span>
+                                            {epName && <span style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-secondary)' }}>{epName}</span>}
+                                          </div>
+                                        );
+                                      }
+                                      return <h5 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 600 }}>{item.title}</h5>;
+                                    })()}
                                   </div>
                                   <button
                                     onClick={() => handleOpenItemDetails(item)}
@@ -532,7 +549,24 @@ export const ViewGuide: React.FC = () => {
                                             />
                                           )}
                                           <div style={{ flex: 1 }}>
-                                            <h6 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 600 }}>{item.title}</h6>
+                                            {(() => {
+                                              const match = (item.title || '').match(/^(.*?)\s*-\s*S(\d+)E(\d+)(.*)$/i);
+                                              if (match) {
+                                                const series = match[1].trim();
+                                                const s = match[2];
+                                                const e = match[3];
+                                                const epName = match[4].replace(/^\s*-\s*/, '').trim();
+                                                const formattedSE = language === 'es' ? `T${s} | E${e}` : `S${s} | E${e}`;
+                                                return (
+                                                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                    <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>{series}</span>
+                                                    <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--accent-primary)' }}>{formattedSE}</span>
+                                                    {epName && <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)' }}>{epName}</span>}
+                                                  </div>
+                                                );
+                                              }
+                                              return <h6 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 600 }}>{item.title}</h6>;
+                                            })()}
                                           </div>
                                           <button
                                             onClick={() => handleOpenItemDetails(item)}

@@ -1038,7 +1038,24 @@ export const CreateGuide: React.FC = () => {
                                 />
                               )}
                               <div style={{ flex: 1, minWidth: 0 }}>
-                                <h5 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</h5>
+                                {(() => {
+                                  const match = (item.title || '').match(/^(.*?)\s*-\s*S(\d+)E(\d+)(.*)$/i);
+                                  if (match) {
+                                    const series = match[1].trim();
+                                    const s = match[2];
+                                    const e = match[3];
+                                    const epName = match[4].replace(/^\s*-\s*/, '').trim();
+                                    const formattedSE = language === 'es' ? `T${s} | E${e}` : `S${s} | E${e}`;
+                                    return (
+                                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                        <span style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{series}</span>
+                                        <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--accent-primary)', marginTop: '0.1rem' }}>{formattedSE}</span>
+                                        {epName && <span style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-secondary)', marginTop: '0.1rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{epName}</span>}
+                                      </div>
+                                    );
+                                  }
+                                  return <h5 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</h5>;
+                                })()}
                                 <span style={{ fontSize: '0.7rem', color: 'var(--accent-primary)', textTransform: 'capitalize' }}>{item.item_type}</span>
                               </div>
                               <div style={{ display: 'flex', gap: '0.35rem' }}>
@@ -1153,7 +1170,24 @@ export const CreateGuide: React.FC = () => {
                                     />
                                   )}
                                   <div style={{ flex: 1, minWidth: 0 }}>
-                                    <h6 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</h6>
+                                    {(() => {
+                                      const match = (item.title || '').match(/^(.*?)\s*-\s*S(\d+)E(\d+)(.*)$/i);
+                                      if (match) {
+                                        const series = match[1].trim();
+                                        const s = match[2];
+                                        const e = match[3];
+                                        const epName = match[4].replace(/^\s*-\s*/, '').trim();
+                                        const formattedSE = language === 'es' ? `T${s} | E${e}` : `S${s} | E${e}`;
+                                        return (
+                                          <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                            <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{series}</span>
+                                            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--accent-primary)', marginTop: '0.1rem' }}>{formattedSE}</span>
+                                            {epName && <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)', marginTop: '0.1rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{epName}</span>}
+                                          </div>
+                                        );
+                                      }
+                                      return <h6 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</h6>;
+                                    })()}
                                   </div>
                                   <div style={{ display: 'flex', gap: '0.35rem' }}>
                                     <button onClick={() => handleCut('item', item, item.id, element.id, sub.id)} className="btn-secondary" style={{ padding: '0.2rem 0.4rem', border: 'none', background: 'transparent', color: '#f59e0b' }}>

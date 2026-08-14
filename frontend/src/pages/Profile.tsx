@@ -796,21 +796,43 @@ export const Profile: React.FC = () => {
                             </button>
                           </div>
                           <div style={{ flex: 1, textAlign: 'left', cursor: 'pointer' }} onClick={() => handleOpenItemDetails(item)}>
-                            <h4 style={{ margin: '0 0 0.25rem 0', fontSize: '0.95rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.title}>
-                              {(() => {
-                                const isEpOrSeason = item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tvm-ep-');
-                                if (isEpOrSeason && item.last_seen_episode && item.title.toLowerCase().startsWith(item.last_seen_episode.toLowerCase() + ' - ')) {
-                                  return item.title.slice(item.last_seen_episode.length + 3);
-                                }
-                                return item.title;
-                              })()}
-                            </h4>
-                            {/* Standalone episode/season series title */}
-                            {(item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tvm-ep-')) && item.last_seen_episode && (
-                              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500, display: 'block', marginTop: '0.1rem' }}>
-                                {language === 'es' ? 'Serie: ' : 'Show: '}{item.last_seen_episode}
-                              </span>
-                            )}
+                            {(() => {
+                              const match = (item.title || '').match(/^(.*?)\s*-\s*S(\d+)E(\d+)(.*)$/i);
+                              const isEpOrSeason = item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tvm-ep-');
+                              
+                              if (isEpOrSeason && match) {
+                                const series = match[1].trim();
+                                const s = match[2];
+                                const e = match[3];
+                                const epName = match[4].replace(/^\s*-\s*/, '').trim();
+                                const formattedSE = language === 'es' ? `T${s} | E${e}` : `S${s} | E${e}`;
+                                return (
+                                  <div style={{ display: 'flex', flexDirection: 'column', marginBottom: '0.25rem' }}>
+                                    <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.title}>{series}</h4>
+                                    <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--accent-primary)', marginTop: '0.1rem' }}>{formattedSE}</span>
+                                    {epName && <span style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-secondary)', marginTop: '0.1rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{epName}</span>}
+                                  </div>
+                                );
+                              }
+                              
+                              let displayTitle = item.title;
+                              if (isEpOrSeason && item.last_seen_episode && item.title.toLowerCase().startsWith(item.last_seen_episode.toLowerCase() + ' - ')) {
+                                displayTitle = item.title.slice(item.last_seen_episode.length + 3);
+                              }
+                              
+                              return (
+                                <>
+                                  <h4 style={{ margin: '0 0 0.25rem 0', fontSize: '0.95rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.title}>
+                                    {displayTitle}
+                                  </h4>
+                                  {isEpOrSeason && item.last_seen_episode && (
+                                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500, display: 'block', marginTop: '0.1rem' }}>
+                                      {language === 'es' ? 'Serie: ' : 'Show: '}{item.last_seen_episode}
+                                    </span>
+                                  )}
+                                </>
+                              );
+                            })()}
 
                             {/* Followed series last completed episode */}
                             {(item.item_type === 'series' || item.item_type === 'anime') && item.last_seen_episode && (
