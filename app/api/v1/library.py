@@ -22,11 +22,11 @@ def validate_media_status(item_type: str, status_val: UserLibraryStatusEnum):
         return
         
     if t_lower == "game":
-        allowed = {UserLibraryStatusEnum.PLAN_TO_PLAY, UserLibraryStatusEnum.PLAYING, UserLibraryStatusEnum.COMPLETED}
+        allowed = {UserLibraryStatusEnum.PLAN_TO_PLAY, UserLibraryStatusEnum.PLAYING, UserLibraryStatusEnum.COMPLETED, UserLibraryStatusEnum.ENDLESS}
         if status_val not in allowed:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid status for game. Must be 'plan_to_play', 'playing', 'completed', or 'dropped'."
+                detail="Invalid status for game. Must be 'plan_to_play', 'playing', 'completed', 'endless', or 'dropped'."
             )
     elif t_lower == "movie":
         allowed = {UserLibraryStatusEnum.PLAN_TO_WATCH, UserLibraryStatusEnum.WATCHING, UserLibraryStatusEnum.COMPLETED}
@@ -288,8 +288,11 @@ def add_to_library(
     status_val = item_in.status
 
     pages_val = item_in.pages_read if item_in.pages_read is not None else 0
-    if pages_val > 0 and status_val not in (UserLibraryStatusEnum.READ, UserLibraryStatusEnum.COMPLETED):
-        status_val = UserLibraryStatusEnum.READING
+    if pages_val > 0 and status_val not in (UserLibraryStatusEnum.READ, UserLibraryStatusEnum.COMPLETED, UserLibraryStatusEnum.ENDLESS, UserLibraryStatusEnum.DROPPED):
+        if item_in.item_type == "game":
+            status_val = UserLibraryStatusEnum.PLAYING
+        else:
+            status_val = UserLibraryStatusEnum.READING
 
     completed_at_val = None
     last_title = None
@@ -449,8 +452,11 @@ def update_library_item(
         lib_item.updated_at = datetime.now(timezone.utc)
     
     pages_val = item_in.pages_read if item_in.pages_read is not None else (lib_item.pages_read or 0)
-    if pages_val > 0 and lib_item.status not in (UserLibraryStatusEnum.READ, UserLibraryStatusEnum.COMPLETED):
-        lib_item.status = UserLibraryStatusEnum.READING
+    if pages_val > 0 and lib_item.status not in (UserLibraryStatusEnum.READ, UserLibraryStatusEnum.COMPLETED, UserLibraryStatusEnum.ENDLESS, UserLibraryStatusEnum.DROPPED):
+        if lib_item.item_type == "game":
+            lib_item.status = UserLibraryStatusEnum.PLAYING
+        else:
+            lib_item.status = UserLibraryStatusEnum.READING
         activity = UserActivityLog(
             user_id=current_user.id,
             activity_type="shelf_status",

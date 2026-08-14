@@ -425,7 +425,7 @@ export const Profile: React.FC = () => {
       const isNotStartedSeries = (item.item_type === 'series' || item.item_type === 'anime') && !item.last_seen_episode;
       const isPlanToStatus = ['plan_to_watch', 'plan_to_play', 'plan_to_read'].includes(item.status);
       const isInvalidMovie = (item.item_type || '').toLowerCase() === 'movie' && item.status !== 'completed';
-      const isDroppedReading = ['book', 'comic', 'manga'].includes(item.item_type) && item.status === 'dropped';
+      const isDroppedReading = ['book', 'comic', 'manga', 'game'].includes(item.item_type) && item.status === 'dropped';
 
       return matchesMedia && matchesSearch && (isSeriesOrRegular || isLoose) && !isNotStartedSeries && !isPlanToStatus && !isInvalidMovie && !isDroppedReading;
     })
@@ -447,7 +447,7 @@ export const Profile: React.FC = () => {
 
     if ((item.item_type || '').toLowerCase() === 'movie' && item.status !== 'completed') return false;
     
-    if (['book', 'comic', 'manga'].includes(item.item_type) && item.status === 'dropped') return false;
+    if (['book', 'comic', 'manga', 'game'].includes(item.item_type) && item.status === 'dropped') return false;
 
     const isNotStartedSeries = (item.item_type === 'series' || item.item_type === 'anime') && !item.last_seen_episode;
     if (isNotStartedSeries) return false;
@@ -845,10 +845,33 @@ export const Profile: React.FC = () => {
                               </span>
                             )}
 
+                            {/* Status Badge (Endless) */}
+                            {item.status === 'endless' && (
+                              <span style={{
+                                fontSize: '0.72rem',
+                                background: 'rgba(139, 92, 246, 0.15)',
+                                color: '#8b5cf6',
+                                padding: '0.15rem 0.4rem',
+                                borderRadius: '4px',
+                                fontWeight: 600,
+                                display: 'inline-block',
+                                marginTop: '0.3rem'
+                              }}>
+                                ♾️ {language === 'es' ? 'Infinito' : 'Endless'}
+                              </span>
+                            )}
+                            
+                            {/* Game Hours Played */}
+                            {item.item_type === 'game' && (item.pages_read || 0) > 0 && (
+                              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500, display: 'block', marginTop: '0.2rem' }}>
+                                ⏱️ {Math.floor((item.pages_read || 0) / 60)}h {String((item.pages_read || 0) % 60).padStart(2, '0')}m
+                              </span>
+                            )}
+
                             {/* Formatted Date */}
                             {(item.completed_at || item.updated_at) && (
                               <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontStyle: 'italic', display: 'block', marginTop: '0.3rem' }}>
-                                {formatDate(new Date(item.completed_at || item.updated_at))}
+                                {formatDate(new Date(item.completed_at || item.updated_at || new Date()))}
                               </span>
                             )}
                           </div>

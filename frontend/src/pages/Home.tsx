@@ -488,10 +488,37 @@ const ActiveItemCard = ({ item, onUpdate, language, onOpenItem }: { item: any, o
       </div>
       
       <div style={{ padding: "0.75rem", display: "flex", flexDirection: "column", gap: "0.25rem", flex: 1 }}>
-        <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text-secondary)", marginTop: "auto", marginBottom: "auto", minHeight: "1.2em" }}>
-          {item.status === 'completed' || item.status === 'read' ? (language === 'es' ? (['book', 'comic', 'manga'].includes(item.item_type) ? 'Terminado' : 'Visto') : 'Completed') : 
-           ['plan_to_watch', 'plan_to_read', 'plan_to_play'].includes(item.status) ? (['book', 'comic', 'manga'].includes(item.item_type) ? (item.total_pages ? `${item.total_pages} ${language === 'es' ? 'páginas' : 'pages'}` : '\u00A0') : (item.item_type === 'movie' && item.total_pages ? `${item.total_pages} min` : (language === 'es' ? (item.item_type === 'game' ? 'Por jugar' : 'Por ver') : 'Plan to'))) :
-           (language === 'es' ? (['book', 'comic', 'manga'].includes(item.item_type) ? 'Leyendo' : (item.item_type === 'game' ? 'Jugando' : 'En pausa')) : 'Paused')}
+        <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text-secondary)", marginTop: "auto", marginBottom: "auto", minHeight: "1.2em", display: "flex", flexDirection: "column", gap: "0.15rem" }}>
+          <span>
+          {(() => {
+            if (item.status === 'endless') return language === 'es' ? 'Infinito' : 'Endless';
+            if (item.status === 'completed' || item.status === 'read') {
+                if (['book', 'comic', 'manga'].includes(item.item_type)) return item.total_pages ? `${item.total_pages} ${language === 'es' ? 'páginas' : 'pages'}` : '\u00A0';
+                if (item.item_type === 'movie') return item.total_pages ? `${item.total_pages} min` : '\u00A0';
+                if (item.item_type === 'game') return item.pages_read > 0 ? `${Math.floor(item.pages_read / 60)}h ${String(item.pages_read % 60).padStart(2, '0')}m` : '\u00A0';
+                return language === 'es' ? 'Visto' : 'Watched';
+            }
+            if (['plan_to_watch', 'plan_to_read', 'plan_to_play'].includes(item.status)) {
+                if (['book', 'comic', 'manga'].includes(item.item_type)) return item.total_pages ? `${item.total_pages} ${language === 'es' ? 'páginas' : 'pages'}` : '\u00A0';
+                if (item.item_type === 'movie' && item.total_pages) return `${item.total_pages} min`;
+                return language === 'es' ? (item.item_type === 'game' ? 'Por jugar' : 'Por ver') : 'Plan to';
+            }
+            if (item.item_type === 'game') return language === 'es' ? 'Jugando' : 'Playing';
+            if (['book', 'comic', 'manga'].includes(item.item_type)) return language === 'es' ? 'Leyendo' : 'Reading';
+            return language === 'es' ? 'En pausa' : 'Paused';
+          })()}
+          </span>
+          {(() => {
+              if (item.pages_read > 0 && !['completed', 'read', 'plan_to_watch', 'plan_to_read', 'plan_to_play'].includes(item.status)) {
+                  if (item.item_type === 'game') {
+                      return <span style={{ fontSize: "0.75rem", fontWeight: 500, color: "var(--text-muted)" }}>{Math.floor(item.pages_read / 60)}h {String(item.pages_read % 60).padStart(2, '0')}m</span>;
+                  }
+                  if (['book', 'comic', 'manga'].includes(item.item_type)) {
+                      return <span style={{ fontSize: "0.75rem", fontWeight: 500, color: "var(--text-muted)" }}>{item.pages_read} {language === 'es' ? 'páginas' : 'pages'}</span>;
+                  }
+              }
+              return null;
+          })()}
         </div>
       </div>
       
@@ -521,7 +548,7 @@ const ActiveItemCard = ({ item, onUpdate, language, onOpenItem }: { item: any, o
 export const Home: React.FC = () => {
   const navigate = useNavigate();
   const { language } = useTranslation();
-  const [activeTab, setActiveTab] = useState<"watching" | "plan_to_watch" | "completed">("watching");
+  const [activeTab, setActiveTab] = useState<"watching" | "plan_to_watch" | "completed" | "dropped">("watching");
   
   const [libraryItems, setLibraryItems] = useState<any[]>([]);
   const [upNextGuides, setUpNextGuides] = useState<any[]>([]);
@@ -584,7 +611,9 @@ export const Home: React.FC = () => {
   } else if (activeTab === "plan_to_watch") {
     filteredItems = libraryItems.filter(i => ["plan_to_watch", "plan_to_play", "plan_to_read"].includes(i.status) && i.item_type !== "custom");
   } else if (activeTab === "completed") {
-    filteredItems = libraryItems.filter(i => ["completed", "read"].includes(i.status) && i.item_type !== "custom");
+    filteredItems = libraryItems.filter(i => ["completed", "read", "endless"].includes(i.status) && i.item_type !== "custom");
+  } else if (activeTab === "dropped") {
+    filteredItems = libraryItems.filter(i => i.status === "dropped" && i.item_type !== "custom");
   }
 
   const getTypeCat = (type: string) => {
@@ -597,10 +626,10 @@ export const Home: React.FC = () => {
       
       {/* Tabs */}
       <div style={{ display: "flex", gap: "2rem", borderBottom: "1px solid var(--border-color)", paddingBottom: "0.5rem", position: "relative" }}>
-        {["watching", "plan_to_watch", "completed"].map((tab) => {
+        {["watching", "plan_to_watch", "completed", "dropped"].map((tab) => {
           const labels: any = language === 'es'
-            ? { "watching": "Continuar", "plan_to_watch": "No comenzado", "completed": "Terminado" }
-            : { "watching": "Continue", "plan_to_watch": "Not started", "completed": "Completed" };
+            ? { "watching": "Continuar", "plan_to_watch": "No comenzado", "completed": "Terminado", "dropped": "Abandonado" }
+            : { "watching": "Continue", "plan_to_watch": "Not started", "completed": "Completed", "dropped": "Dropped" };
           const isActive = activeTab === tab;
           return (
             <div 
@@ -651,7 +680,20 @@ export const Home: React.FC = () => {
                 title={item.title}
                 coverUrl={item.image_url}
                 coverBottomText={item.item_type}
-                subtitle2={['completed', 'read'].includes(item.status) ? "Completado" : "Progreso..."}
+                subtitle2={(() => {
+                  if (['completed', 'read', 'endless'].includes(item.status)) {
+                    if (['book', 'comic', 'manga'].includes(item.item_type)) return item.total_pages ? `${item.total_pages} ${language === 'es' ? 'páginas' : 'pages'}` : '';
+                    if (item.item_type === 'movie') return item.total_pages ? `${item.total_pages} min` : '';
+                    if (item.item_type === 'game') return item.pages_read > 0 ? `${Math.floor(item.pages_read / 60)}h ${String(item.pages_read % 60).padStart(2, '0')}m` : '';
+                    return '';
+                  }
+                  if (item.status === 'dropped') {
+                    if (['book', 'comic', 'manga'].includes(item.item_type)) return item.pages_read > 0 ? `${item.pages_read} ${language === 'es' ? 'páginas' : 'pages'}` : '';
+                    if (item.item_type === 'game') return item.pages_read > 0 ? `${Math.floor(item.pages_read / 60)}h ${String(item.pages_read % 60).padStart(2, '0')}m` : '';
+                    return '';
+                  }
+                  return "Progreso...";
+                })()}
                 onCheck={!['completed', 'read'].includes(item.status) ? (e) => handleMarkDone(e, item) : undefined}
                 onClick={() => setSelectedItem(item)}
                 isNsfw={item.is_nsfw}

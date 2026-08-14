@@ -1430,7 +1430,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                           disabled={!isOwnProfile}
                           value={pagesReadVal}
                           min={0}
-                          max={totalPagesVal !== '' ? totalPagesVal : undefined}
+                          max={(totalPagesVal !== '' && totalPagesVal !== 0) ? totalPagesVal : undefined}
                           onFocus={() => {
                             if (pagesReadVal === 0) setPagesReadVal('');
                           }}
@@ -1449,7 +1449,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                           }}
                           onChange={(e) => {
                             let val: number | '' = e.target.value === '' ? '' : parseInt(e.target.value) || 0;
-                            if (val !== '' && totalPagesVal !== '' && val > totalPagesVal) {
+                            if (val !== '' && totalPagesVal !== '' && totalPagesVal !== 0 && val > totalPagesVal) {
                               val = totalPagesVal;
                             }
                             setPagesReadVal(val);
@@ -1516,10 +1516,145 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                     </div>
                   )}
 
+                  {/* Hours played input for games */}
+                  {!isEpisode && selectedItem && selectedItem.item_type === 'game' && ['completed', 'playing', 'dropped', 'endless'].includes(selectedItem.status) && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.5rem' }}>
+                      <h5 style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                        {language === 'es' ? 'Horas jugadas:' : 'Hours played:'}
+                      </h5>
+                      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                        <input
+                          key={pagesReadVal}
+                          type="text"
+                          className="input-field"
+                          disabled={!isOwnProfile}
+                          placeholder="HH:mm"
+                          defaultValue={
+                            pagesReadVal === '' || pagesReadVal === 0
+                              ? ''
+                              : `${Math.floor((pagesReadVal as number) / 60)}:${String((pagesReadVal as number) % 60).padStart(2, '0')}`
+                          }
+                          onFocus={(e) => {
+                             if (e.target.value === '0:00') {
+                                e.target.value = '';
+                             }
+                          }}
+                          onBlur={(e) => {
+                            let totalMins = 0;
+                            const val = e.target.value.trim();
+                            if (val) {
+                                if (val.includes(':')) {
+                                    const [hh, mm] = val.split(':');
+                                    totalMins = (parseInt(hh) || 0) * 60 + (parseInt(mm) || 0);
+                                } else {
+                                    totalMins = (parseInt(val) || 0) * 60;
+                                }
+                            }
+                            setPagesReadVal(totalMins);
+                            handleSavePagesRead(totalMins);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                                (e.target as HTMLInputElement).blur();
+                            }
+                          }}
+                          onChange={(e) => {
+                            // Only allow numbers and colon visually
+                            e.target.value = e.target.value.replace(/[^0-9:]/g, '');
+                          }}
+                          style={{
+                            padding: '0.4rem 0.8rem',
+                            fontSize: '0.85rem',
+                            background: 'var(--bg-secondary)',
+                            border: '1px solid var(--border-color)',
+                            color: 'var(--text-primary)',
+                            borderRadius: '6px',
+                            maxWidth: '120px'
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
                   {/* Completion / Status Buttons */}
                   {isOwnProfile && !isEpisode && selectedItem?.item_type !== 'series' && selectedItem?.item_type !== 'anime' && (
                     <div style={{ marginTop: '0.75rem' }}>
-                      {['movie', 'book', 'comic', 'manga'].includes(selectedItem?.item_type) ? (
+                      {selectedItem?.item_type === 'game' ? (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem' }}>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleStatus('playing')}
+                            style={{
+                              background: selectedItem?.status === 'playing' ? 'var(--color-game)' : 'var(--bg-tertiary)',
+                              border: selectedItem?.status === 'playing' ? 'none' : '1px solid var(--border-color)',
+                              borderRadius: '8px',
+                              padding: '0.5rem',
+                              textAlign: 'center',
+                              cursor: 'pointer',
+                              color: selectedItem?.status === 'playing' ? '#ffffff' : 'var(--text-primary)',
+                              fontSize: '0.75rem',
+                              fontWeight: 600,
+                              transition: 'all 0.2s ease'
+                            }}
+                          >
+                            {language === 'es' ? 'Jugando' : 'Playing'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleStatus('completed')}
+                            style={{
+                              background: selectedItem?.status === 'completed' ? 'var(--color-game)' : 'var(--bg-tertiary)',
+                              border: selectedItem?.status === 'completed' ? 'none' : '1px solid var(--border-color)',
+                              borderRadius: '8px',
+                              padding: '0.5rem',
+                              textAlign: 'center',
+                              cursor: 'pointer',
+                              color: selectedItem?.status === 'completed' ? '#ffffff' : 'var(--text-primary)',
+                              fontSize: '0.75rem',
+                              fontWeight: 600,
+                              transition: 'all 0.2s ease'
+                            }}
+                          >
+                            {language === 'es' ? 'Completado' : 'Completed'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleStatus('endless')}
+                            style={{
+                              background: selectedItem?.status === 'endless' ? '#8b5cf6' : 'var(--bg-tertiary)',
+                              border: selectedItem?.status === 'endless' ? 'none' : '1px solid var(--border-color)',
+                              borderRadius: '8px',
+                              padding: '0.5rem',
+                              textAlign: 'center',
+                              cursor: 'pointer',
+                              color: selectedItem?.status === 'endless' ? '#ffffff' : 'var(--text-primary)',
+                              fontSize: '0.75rem',
+                              fontWeight: 600,
+                              transition: 'all 0.2s ease'
+                            }}
+                          >
+                            {language === 'es' ? 'Infinito' : 'Endless'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleStatus('dropped')}
+                            style={{
+                              background: selectedItem?.status === 'dropped' ? '#ef4444' : 'var(--bg-tertiary)',
+                              border: selectedItem?.status === 'dropped' ? 'none' : '1px solid var(--border-color)',
+                              borderRadius: '8px',
+                              padding: '0.5rem',
+                              textAlign: 'center',
+                              cursor: 'pointer',
+                              color: selectedItem?.status === 'dropped' ? '#ffffff' : 'var(--text-primary)',
+                              fontSize: '0.75rem',
+                              fontWeight: 600,
+                              transition: 'all 0.2s ease'
+                            }}
+                          >
+                            {language === 'es' ? 'Abandonado' : 'Dropped'}
+                          </button>
+                        </div>
+                      ) : ['movie', 'book', 'comic', 'manga'].includes(selectedItem?.item_type) ? (
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
                           <button
                             type="button"
