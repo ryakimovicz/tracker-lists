@@ -13,7 +13,8 @@ import {
   Send,
   Trash2,
   ThumbsUp,
-  Reply
+  Reply,
+  Pencil
 } from 'lucide-react';
 import { ItemDetailsModal } from '../components/ItemDetailsModal';
 
@@ -439,6 +440,15 @@ export const ViewGuide: React.FC = () => {
         <button onClick={() => navigate(-1)} className="btn-secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
           <ArrowLeft size={16} /> {language === 'es' ? 'Volver' : 'Back'}
         </button>
+        {currentUser && guide && currentUser.id === guide.creator_id && (
+          <button
+            onClick={() => navigate(`/create?id=${guide.id}`)}
+            className="btn-primary"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.45rem 1rem', fontSize: '0.9rem', fontWeight: 600 }}
+          >
+            <Pencil size={15} /> {language === 'es' ? 'Editar Guía' : 'Edit Guide'}
+          </button>
+        )}
       </div>
 
       <div className="glass-card" style={{ padding: '2.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem', textAlign: 'left' }}>
@@ -508,44 +518,82 @@ export const ViewGuide: React.FC = () => {
               </div>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={handleToggleSaveGuide}
-            disabled={isTogglingSave}
-            title={isSaved ? (language === 'es' ? 'Dejar de seguir guía' : 'Unfollow guide') : (language === 'es' ? 'Seguir guía' : 'Follow guide')}
-            style={{
-              background: isSaved ? 'rgba(239, 68, 68, 0.15)' : 'var(--bg-secondary)',
-              border: isSaved ? '1px solid rgba(239, 68, 68, 0.4)' : '1px solid var(--border-color)',
-              color: isSaved ? '#ef4444' : 'var(--text-secondary)',
-              borderRadius: '50%',
-              width: '42px',
-              height: '42px',
-              minWidth: '42px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              transition: 'all 0.2s ease',
-              boxShadow: isSaved ? '0 0 14px rgba(239, 68, 68, 0.35)' : 'none',
-              flexShrink: 0
-            }}
-            onMouseEnter={(e) => {
-              if (!isSaved) {
-                (e.currentTarget as HTMLElement).style.color = '#ef4444';
-                (e.currentTarget as HTMLElement).style.borderColor = 'rgba(239, 68, 68, 0.4)';
-                (e.currentTarget as HTMLElement).style.background = 'rgba(239, 68, 68, 0.1)';
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (!isSaved) {
-                (e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)';
-                (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-color)';
-                (e.currentTarget as HTMLElement).style.background = 'var(--bg-secondary)';
-              }
-            }}
-          >
-            <Heart size={22} fill={isSaved ? '#ef4444' : 'none'} />
-          </button>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            {currentUser && guide && currentUser.id === guide.creator_id && (
+              <button
+                type="button"
+                onClick={() => navigate(`/create?id=${guide.id}`)}
+                title={language === 'es' ? 'Editar guía' : 'Edit guide'}
+                style={{
+                  background: 'var(--bg-secondary)',
+                  border: '1px solid var(--border-color)',
+                  color: 'var(--text-secondary)',
+                  borderRadius: '50%',
+                  width: '42px',
+                  height: '42px',
+                  minWidth: '42px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  flexShrink: 0
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLElement).style.color = 'var(--accent-primary)';
+                  (e.currentTarget as HTMLElement).style.borderColor = 'var(--accent-primary)';
+                  (e.currentTarget as HTMLElement).style.background = 'rgba(124, 58, 237, 0.1)';
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)';
+                  (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-color)';
+                  (e.currentTarget as HTMLElement).style.background = 'var(--bg-secondary)';
+                }}
+              >
+                <Pencil size={18} />
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={handleToggleSaveGuide}
+              disabled={isTogglingSave}
+              title={isSaved ? (language === 'es' ? 'Dejar de seguir guía' : 'Unfollow guide') : (language === 'es' ? 'Seguir guía' : 'Follow guide')}
+              style={{
+                background: isSaved ? 'rgba(239, 68, 68, 0.15)' : 'var(--bg-secondary)',
+                border: isSaved ? '1px solid rgba(239, 68, 68, 0.4)' : '1px solid var(--border-color)',
+                color: isSaved ? '#ef4444' : 'var(--text-secondary)',
+                borderRadius: '50%',
+                width: '42px',
+                height: '42px',
+                minWidth: '42px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                boxShadow: isSaved ? '0 0 14px rgba(239, 68, 68, 0.35)' : 'none',
+                flexShrink: 0
+              }}
+              onMouseEnter={(e) => {
+                if (!isSaved) {
+                  (e.currentTarget as HTMLElement).style.color = '#ef4444';
+                  (e.currentTarget as HTMLElement).style.borderColor = 'rgba(239, 68, 68, 0.4)';
+                  (e.currentTarget as HTMLElement).style.background = 'rgba(239, 68, 68, 0.1)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isSaved) {
+                  (e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)';
+                  (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-color)';
+                  (e.currentTarget as HTMLElement).style.background = 'var(--bg-secondary)';
+                }
+              }}
+            >
+              <Heart size={22} fill={isSaved ? '#ef4444' : 'none'} />
+            </button>
+          </div>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', background: 'var(--bg-secondary)', padding: '1.25rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
