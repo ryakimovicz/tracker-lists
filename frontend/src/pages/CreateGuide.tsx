@@ -939,110 +939,195 @@ export const CreateGuide: React.FC = () => {
 
   const handlePasteSection = (targetSectionId?: string, position: 'before' | 'after' = 'after') => {
     if (!clipboard || clipboard.type !== 'section') return;
-    if (!targetSectionId) {
-      handlePaste('root');
-      return;
-    }
-    const idx = docFlow.findIndex(el => el.id === targetSectionId);
-    if (idx === -1) {
-      handlePaste('root');
-      return;
-    }
-    if (position === 'before') {
-      handlePaste('root', undefined, idx);
-    } else {
-      let nextSecIdx = docFlow.length;
-      for (let i = idx + 1; i < docFlow.length; i++) {
-        if (docFlow[i].type === 'section') {
-          nextSecIdx = i;
-          break;
+
+    setDocFlow(prev => {
+      let unsectioned: DocElement[] = [];
+      let chunks: Array<{ sectionId: string; elements: DocElement[] }> = [];
+      let currentChunk: { sectionId: string; elements: DocElement[] } | null = null;
+
+      for (const el of prev) {
+        if (el.type === 'section') {
+          if (currentChunk) chunks.push(currentChunk);
+          currentChunk = { sectionId: el.id, elements: [el] };
+        } else {
+          if (currentChunk) {
+            currentChunk.elements.push(el);
+          } else {
+            unsectioned.push(el);
+          }
         }
       }
-      handlePaste('root', undefined, nextSecIdx);
-    }
+      if (currentChunk) chunks.push(currentChunk);
+
+      let movedChunks: Array<{ sectionId: string; elements: DocElement[] }> = [];
+      const cutIds = new Set(clipboard.items.map((i: any) => i.sourceId));
+
+      if (clipboard.action === 'cut') {
+        const remainingChunks: Array<{ sectionId: string; elements: DocElement[] }> = [];
+        for (const c of chunks) {
+          if (cutIds.has(c.sectionId)) {
+            movedChunks.push(c);
+          } else {
+            remainingChunks.push(c);
+          }
+        }
+        chunks = remainingChunks;
+      } else {
+        clipboard.items.forEach((clipboardItem: any) => {
+          const rawEls = Array.isArray(clipboardItem.data) ? clipboardItem.data : [clipboardItem.data];
+          const newEls = rawEls.map((el: DocElement) => regenerateIds(el));
+          const secEl = newEls.find((el: DocElement) => el.type === 'section') || newEls[0];
+          movedChunks.push({ sectionId: secEl.id, elements: newEls });
+        });
+      }
+
+      if (movedChunks.length === 0) return prev;
+
+      if (targetSectionId) {
+        const tgtIdx = chunks.findIndex(c => c.sectionId === targetSectionId);
+        if (tgtIdx !== -1) {
+          const insertIdx = position === 'after' ? tgtIdx + 1 : tgtIdx;
+          chunks.splice(insertIdx, 0, ...movedChunks);
+        } else {
+          chunks.push(...movedChunks);
+        }
+      } else {
+        chunks.push(...movedChunks);
+      }
+
+      let result: DocElement[] = [...unsectioned];
+      for (const c of chunks) {
+        result.push(...c.elements);
+      }
+      return result;
+    });
+
+    setClipboard(null);
   };
 
   const handlePaste = (targetType: 'root' | 'section' | 'block' | 'subblock', targetId?: string, insertIndex?: number) => {
     if (!clipboard) return;
+
+    if (clipboard.type === 'section') {
+      // Direct section paste with chunks
+      setDocFlow(prev => {
+        let unsectioned: DocElement[] = [];
+        let chunks: Array<{ sectionId: string; elements: DocElement[] }> = [];
+        let currentChunk: { sectionId: string; elements: DocElement[] } | null = null;
+
+        for (const el of prev) {
+          if (el.type === 'section') {
+            if (currentChunk) chunks.push(currentChunk);
+            currentChunk = { sectionId: el.id, elements: [el] };
+          } else {
+            if (currentChunk) {
+              currentChunk.elements.push(el);
+            } else {
+              unsectioned.push(el);
+            }
+          }
+        }
+        if (currentChunk) chunks.push(currentChunk);
+
+        let movedChunks: Array<{ sectionId: string; elements: DocElement[] }> = [];
+        const cutIds = new Set(clipboard.items.map((i: any) => i.sourceId));
+
+        if (clipboard.action === 'cut') {
+          const remainingChunks: Array<{ sectionId: string; elements: DocElement[] }> = [];
+          for (const c of chunks) {
+            if (cutIds.has(c.sectionId)) {
+              movedChunks.push(c);
+            } else {
+              remainingChunks.push(c);
+            }
+          }
+          chunks = remainingChunks;
+        } else {
+          clipboard.items.forEach((clipboardItem: any) => {
+            const rawEls = Array.isArray(clipboardItem.data) ? clipboardItem.data : [clipboardItem.data];
+            const newEls = rawEls.map((el: DocElement) => regenerateIds(el));
+            const secEl = newEls.find((el: DocElement) => el.type === 'section') || newEls[0];
+            movedChunks.push({ sectionId: secEl.id, elements: newEls });
+          });
+        }
+
+        if (movedChunks.length === 0) return prev;
+
+        if (insertIndex !== undefined) {
+          let targetChunkIdx = chunks.length;
+          let currentOffset = unsectioned.length;
+          for (let ci = 0; ci < chunks.length; ci++) {
+            if (currentOffset >= insertIndex) {
+              targetChunkIdx = ci;
+              break;
+            }
+            currentOffset += chunks[ci].elements.length;
+          }
+          chunks.splice(targetChunkIdx, 0, ...movedChunks);
+        } else {
+          chunks.push(...movedChunks);
+        }
+
+        let result: DocElement[] = [...unsectioned];
+        for (const c of chunks) {
+          result.push(...c.elements);
+        }
+        return result;
+      });
+
+      setClipboard(null);
+      return;
+    }
 
     setDocFlow(prev => {
       let newFlow = JSON.parse(JSON.stringify(prev)) as DocElement[];
 
       // 1. Remove from source (only when cutting)
       if (clipboard.action === 'cut') {
-        if (clipboard.type === 'section') {
-          const idsToRemove = new Set<string>();
-          clipboard.items.forEach((item: any) => {
-            if (item.sourceIds && Array.isArray(item.sourceIds)) {
-              item.sourceIds.forEach((id: string) => idsToRemove.add(id));
-            } else if (item.sourceId) {
-              const chunk = getSectionChunkElements(prev, item.sourceId as string);
-              chunk.forEach(c => idsToRemove.add(c.id));
-            }
-          });
-          newFlow = newFlow.filter(el => !idsToRemove.has(el.id));
-        } else {
-          clipboard.items.forEach(clipboardItem => {
-            if (clipboard.type === 'item') {
-              if (clipboardItem.sourceGrandparentId) {
-                const block = newFlow.find(el => el.id === clipboardItem.sourceParentId);
-                if (block && block.subblocks) {
-                  const sub = block.subblocks.find(s => s.id === clipboardItem.sourceGrandparentId);
-                  if (sub && sub.items) {
-                    sub.items = sub.items.filter(item => item.id !== clipboardItem.sourceId);
-                  }
-                }
-              } else {
-                const block = newFlow.find(el => el.id === clipboardItem.sourceParentId);
-                if (block && block.items) {
-                  block.items = block.items.filter(item => item.id !== clipboardItem.sourceId);
+        clipboard.items.forEach(clipboardItem => {
+          if (clipboard.type === 'item') {
+            if (clipboardItem.sourceGrandparentId) {
+              const block = newFlow.find(el => el.id === clipboardItem.sourceParentId);
+              if (block && block.subblocks) {
+                const sub = block.subblocks.find(s => s.id === clipboardItem.sourceGrandparentId);
+                if (sub && sub.items) {
+                  sub.items = sub.items.filter(item => item.id !== clipboardItem.sourceId);
                 }
               }
             } else {
-              if (clipboardItem.sourceParentId) {
-                const block = newFlow.find(el => el.id === clipboardItem.sourceParentId);
-                if (block && block.subblocks) {
-                  block.subblocks = block.subblocks.filter(s => s.id !== clipboardItem.sourceId);
-                }
-              } else {
-                newFlow = newFlow.filter(el => el.id !== clipboardItem.sourceId);
+              const block = newFlow.find(el => el.id === clipboardItem.sourceParentId);
+              if (block && block.items) {
+                block.items = block.items.filter(item => item.id !== clipboardItem.sourceId);
               }
             }
-          });
-        }
+          } else {
+            if (clipboardItem.sourceParentId) {
+              const block = newFlow.find(el => el.id === clipboardItem.sourceParentId);
+              if (block && block.subblocks) {
+                block.subblocks = block.subblocks.filter(s => s.id !== clipboardItem.sourceId);
+              }
+            } else {
+              newFlow = newFlow.filter(el => el.id !== clipboardItem.sourceId);
+            }
+          }
+        });
       }
 
       // 2. Prepare data to paste
-      let pasteDatas: any[] = [];
-      if (clipboard.type === 'section') {
-        clipboard.items.forEach((clipboardItem: any) => {
-          const rawList = Array.isArray(clipboardItem.data) ? clipboardItem.data : [clipboardItem.data];
+      const pasteDatas = clipboard.items.map(clipboardItem => {
+        if (clipboard.type === 'item') {
           if (clipboard.action === 'copy') {
-            rawList.forEach((el: DocElement) => {
-              pasteDatas.push(regenerateIds(el));
-            });
-          } else {
-            rawList.forEach((el: DocElement) => {
-              pasteDatas.push({ ...el });
-            });
+            return { ...clipboardItem.data, id: Date.now() + Math.floor(Math.random() * 10000) };
           }
-        });
-      } else {
-        pasteDatas = clipboard.items.map(clipboardItem => {
-          if (clipboard.type === 'item') {
-            if (clipboard.action === 'copy') {
-              return { ...clipboardItem.data, id: Date.now() + Math.floor(Math.random() * 10000) };
-            }
-            return { ...clipboardItem.data };
-          } else {
-            const pData = regenerateIds(clipboardItem.data);
-            if (targetType === 'section' && clipboard.type === 'subblock') {
-              pData.type = 'block';
-            }
-            return pData;
+          return { ...clipboardItem.data };
+        } else {
+          const pData = regenerateIds(clipboardItem.data);
+          if (targetType === 'section' && clipboard.type === 'subblock') {
+            pData.type = 'block';
           }
-        });
-      }
+          return pData;
+        }
+      });
 
       // Helper to safely insert at index or push
       const insertOrPush = (arr: any[], dataArray: any[], idx?: number) => {
@@ -1054,7 +1139,7 @@ export const CreateGuide: React.FC = () => {
       };
 
       // 3. Insert into target
-      if (targetType === 'root' && (clipboard.type === 'section' || clipboard.type === 'block')) {
+      if (targetType === 'root' && clipboard.type === 'block') {
         insertOrPush(newFlow, pasteDatas, insertIndex);
       } else if (targetType === 'section' && (clipboard.type === 'block' || clipboard.type === 'subblock')) {
         let insertPos = -1;
