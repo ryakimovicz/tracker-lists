@@ -440,15 +440,6 @@ export const ViewGuide: React.FC = () => {
         <button onClick={() => navigate(-1)} className="btn-secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
           <ArrowLeft size={16} /> {language === 'es' ? 'Volver' : 'Back'}
         </button>
-        {currentUser && guide && currentUser.id === guide.creator_id && (
-          <button
-            onClick={() => navigate(`/create?id=${guide.id}`)}
-            className="btn-primary"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.45rem 1rem', fontSize: '0.9rem', fontWeight: 600 }}
-          >
-            <Pencil size={15} /> {language === 'es' ? 'Editar Guía' : 'Edit Guide'}
-          </button>
-        )}
       </div>
 
       <div className="glass-card" style={{ padding: '2.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem', textAlign: 'left' }}>

@@ -1218,17 +1218,30 @@ export const CreateGuide: React.FC = () => {
                 <option value="private">{language === 'es' ? 'Privada' : 'Private'}</option>
               </select>
 
-              {guide && (
-                <button
-                  type="button"
-                  onClick={() => navigate(`/guide/${guide.id}`)}
-                  className="btn-secondary"
-                  style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', height: '38px', padding: '0.5rem 1rem', fontSize: '0.85rem' }}
-                  title={language === 'es' ? 'Ver guía' : 'View guide'}
-                >
-                  <Eye size={16} /> {language === 'es' ? 'Ver Guía' : 'View Guide'}
-                </button>
-              )}
+              {guide && (() => {
+                const isPublished = guide.visibility !== 'draft';
+                return (
+                  <button
+                    type="button"
+                    onClick={() => isPublished && navigate(`/guide/${guide.id}`)}
+                    disabled={!isPublished}
+                    className="btn-secondary"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.45rem',
+                      height: '38px',
+                      padding: '0.5rem 1rem',
+                      fontSize: '0.85rem',
+                      opacity: isPublished ? 1 : 0.45,
+                      cursor: isPublished ? 'pointer' : 'not-allowed'
+                    }}
+                    title={isPublished ? (language === 'es' ? 'Ver guía' : 'View guide') : (language === 'es' ? 'La guía debe estar publicada para poder verla' : 'The guide must be published to view it')}
+                  >
+                    <Eye size={16} /> {language === 'es' ? 'Ver Guía' : 'View Guide'}
+                  </button>
+                );
+              })()}
 
               <button onClick={handlePublishGuide} disabled={isSubmitting} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1.25rem', height: '38px' }}>
                 <Save size={16} /> {isSubmitting ? '...' : language === 'es' ? 'Publicar Cambios' : 'Publish Changes'}
