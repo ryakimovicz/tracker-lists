@@ -23,6 +23,7 @@ interface CommentItem {
   content: string;
   created_at: string;
   creator_username: string;
+  photo_url?: string;
   vote_count: number;
   is_voted_by_me: boolean;
 }
@@ -860,48 +861,61 @@ export const ViewGuide: React.FC = () => {
 
         {/* New Comment Box */}
         {currentUser ? (
-          <form onSubmit={handlePostComment} style={{ marginBottom: '2rem' }}>
-            <textarea
-              value={newCommentText}
-              onChange={(e) => setNewCommentText(e.target.value)}
-              placeholder={language === 'es' ? 'Escribe un comentario público sobre esta guía...' : 'Write a public comment on this guide...'}
-              rows={3}
-              maxLength={1000}
-              style={{
-                width: '100%',
-                padding: '0.85rem',
-                borderRadius: '8px',
-                border: '1px solid var(--border-color)',
-                background: 'var(--bg-secondary)',
-                color: 'var(--text-primary)',
-                resize: 'vertical',
-                fontSize: '0.92rem',
-                fontFamily: 'inherit',
-                outline: 'none',
-                boxSizing: 'border-box'
-              }}
-            />
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.5rem' }}>
-              <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                {newCommentText.length} / 1000
-              </span>
-              <button
-                type="submit"
-                disabled={!newCommentText.trim() || isSubmittingComment}
-                className="btn-primary"
+          <form onSubmit={handlePostComment} style={{ marginBottom: '2rem', display: 'flex', gap: '0.85rem', alignItems: 'flex-start' }}>
+            {currentUser.photo_url ? (
+              <img
+                src={currentUser.photo_url}
+                alt={currentUser.username}
+                style={{ width: '38px', height: '38px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--accent-primary)', flexShrink: 0, marginTop: '0.2rem' }}
+              />
+            ) : (
+              <div style={{ width: '38px', height: '38px', borderRadius: '50%', background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, flexShrink: 0, marginTop: '0.2rem' }}>
+                {(currentUser.username || 'U')[0].toUpperCase()}
+              </div>
+            )}
+            <div style={{ flex: 1 }}>
+              <textarea
+                value={newCommentText}
+                onChange={(e) => setNewCommentText(e.target.value)}
+                placeholder={language === 'es' ? 'Escribe un comentario público sobre esta guía...' : 'Write a public comment on this guide...'}
+                rows={3}
+                maxLength={1000}
                 style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.4rem',
-                  padding: '0.5rem 1.25rem',
-                  fontSize: '0.88rem',
-                  opacity: (!newCommentText.trim() || isSubmittingComment) ? 0.6 : 1,
-                  cursor: (!newCommentText.trim() || isSubmittingComment) ? 'not-allowed' : 'pointer'
+                  width: '100%',
+                  padding: '0.85rem',
+                  borderRadius: '8px',
+                  border: '1px solid var(--border-color)',
+                  background: 'var(--bg-secondary)',
+                  color: 'var(--text-primary)',
+                  resize: 'vertical',
+                  fontSize: '0.92rem',
+                  fontFamily: 'inherit',
+                  outline: 'none',
+                  boxSizing: 'border-box'
                 }}
-              >
-                <Send size={15} />
-                {isSubmittingComment ? (language === 'es' ? 'Publicando...' : 'Posting...') : (language === 'es' ? 'Comentar' : 'Comment')}
-              </button>
+              />
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.5rem' }}>
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                  {newCommentText.length} / 1000
+                </span>
+                <button
+                  type="submit"
+                  disabled={!newCommentText.trim() || isSubmittingComment}
+                  className="btn-primary"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.4rem',
+                    padding: '0.5rem 1.25rem',
+                    fontSize: '0.88rem',
+                    opacity: (!newCommentText.trim() || isSubmittingComment) ? 0.6 : 1,
+                    cursor: (!newCommentText.trim() || isSubmittingComment) ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  <Send size={15} />
+                  {isSubmittingComment ? (language === 'es' ? 'Publicando...' : 'Posting...') : (language === 'es' ? 'Comentar' : 'Comment')}
+                </button>
+              </div>
             </div>
           </form>
         ) : (
@@ -935,21 +949,37 @@ export const ViewGuide: React.FC = () => {
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <div style={{
-                      width: '28px',
-                      height: '28px',
-                      borderRadius: '50%',
-                      background: 'var(--accent-primary)',
-                      color: '#fff',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '0.78rem',
-                      fontWeight: 700
-                    }}>
-                      {(comment.creator_username || 'U')[0].toUpperCase()}
-                    </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                    {comment.photo_url ? (
+                      <img
+                        src={comment.photo_url}
+                        alt={comment.creator_username}
+                        style={{
+                          width: '32px',
+                          height: '32px',
+                          borderRadius: '50%',
+                          objectFit: 'cover',
+                          border: '1px solid var(--border-color)',
+                          flexShrink: 0
+                        }}
+                      />
+                    ) : (
+                      <div style={{
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '50%',
+                        background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))',
+                        color: '#fff',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '0.82rem',
+                        fontWeight: 700,
+                        flexShrink: 0
+                      }}>
+                        {(comment.creator_username || 'U')[0].toUpperCase()}
+                      </div>
+                    )}
                     <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>{comment.creator_username}</span>
                     <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>• {formatCommentDate(comment.created_at)}</span>
                   </div>

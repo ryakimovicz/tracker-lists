@@ -189,6 +189,7 @@ def add_comment(
         content=new_comment.content,
         created_at=new_comment.created_at,
         creator_username=current_user.username,
+        photo_url=current_user.photo_url,
         vote_count=0,
         is_voted_by_me=False
     )
@@ -221,6 +222,7 @@ def get_list_comments(
                 content=c.content,
                 created_at=c.created_at,
                 creator_username=c.user.username,
+                photo_url=c.user.photo_url if c.user else None,
                 vote_count=vote_count,
                 is_voted_by_me=is_voted
             )

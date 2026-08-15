@@ -20,6 +20,7 @@ class CommentResponse(BaseModel):
     content: str
     created_at: datetime
     creator_username: str
+    photo_url: Optional[str] = None
     vote_count: int = 0
     is_voted_by_me: bool = False
 
