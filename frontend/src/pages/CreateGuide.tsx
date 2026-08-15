@@ -891,6 +891,74 @@ export const CreateGuide: React.FC = () => {
     });
   };
 
+  const handlePasteSection = (targetSectionId?: string, position: 'before' | 'after' = 'after') => {
+    if (!clipboard || clipboard.type !== 'section') return;
+
+    setDocFlow(prev => {
+      let unsectioned: DocElement[] = [];
+      let chunks: Array<{ sectionId: string; elements: DocElement[] }> = [];
+      let currentChunk: { sectionId: string; elements: DocElement[] } | null = null;
+
+      for (const el of prev) {
+        if (el.type === 'section') {
+          if (currentChunk) chunks.push(currentChunk);
+          currentChunk = { sectionId: el.id, elements: [el] };
+        } else {
+          if (currentChunk) {
+            currentChunk.elements.push(el);
+          } else {
+            unsectioned.push(el);
+          }
+        }
+      }
+      if (currentChunk) chunks.push(currentChunk);
+
+      let movedChunks: Array<{ sectionId: string; elements: DocElement[] }> = [];
+      const cutIds = new Set(clipboard.items.map(i => i.sourceId));
+
+      if (clipboard.action === 'cut') {
+        const remainingChunks: Array<{ sectionId: string; elements: DocElement[] }> = [];
+        for (const c of chunks) {
+          if (cutIds.has(c.sectionId)) {
+            movedChunks.push(c);
+          } else {
+            remainingChunks.push(c);
+          }
+        }
+        chunks = remainingChunks;
+      } else {
+        clipboard.items.forEach(clipboardItem => {
+          const rawEls = Array.isArray(clipboardItem.data) ? clipboardItem.data : [clipboardItem.data];
+          const newEls = rawEls.map((el: DocElement) => regenerateIds(el));
+          const secEl = newEls.find((el: DocElement) => el.type === 'section') || newEls[0];
+          movedChunks.push({ sectionId: secEl.id, elements: newEls });
+        });
+      }
+
+      if (movedChunks.length === 0) return prev;
+
+      if (targetSectionId) {
+        const tgtIdx = chunks.findIndex(c => c.sectionId === targetSectionId);
+        if (tgtIdx !== -1) {
+          const insertIdx = position === 'after' ? tgtIdx + 1 : tgtIdx;
+          chunks.splice(insertIdx, 0, ...movedChunks);
+        } else {
+          chunks.push(...movedChunks);
+        }
+      } else {
+        chunks.push(...movedChunks);
+      }
+
+      let result: DocElement[] = [...unsectioned];
+      for (const c of chunks) {
+        result.push(...c.elements);
+      }
+      return result;
+    });
+
+    setClipboard(null);
+  };
+
   const handlePaste = (targetType: 'root' | 'section' | 'block' | 'subblock', targetId?: string, insertIndex?: number) => {
     if (!clipboard) return;
 
@@ -1274,7 +1342,6 @@ export const CreateGuide: React.FC = () => {
                     </button>
                   );
                 })()}
-
                 <button onClick={handlePublishGuide} disabled={isSubmitting} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1.25rem', height: '38px' }}>
                   <Save size={16} /> {isSubmitting ? '...' : language === 'es' ? 'Publicar Cambios' : 'Publish Changes'}
                 </button>
@@ -1282,7 +1349,7 @@ export const CreateGuide: React.FC = () => {
             </div>
 
             {/* Bottom Row: Document Builders (+ Nueva Sección, + Nuevo Bloque, Pegar Sección) */}
-            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', borderTop: '1px solid var(--border-color)', paddingTop: '0.85rem' }}>
+            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap', borderTop: '1px solid var(--border-color)', paddingTop: '0.85rem' }}>
               <button onClick={addSection} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', padding: '0.45rem 1rem' }}>
                 <FolderPlus size={16} /> {language === 'es' ? '+ Nueva Sección' : '+ New Section'}
               </button>
@@ -1290,9 +1357,14 @@ export const CreateGuide: React.FC = () => {
                 <LayoutGrid size={16} /> {language === 'es' ? '+ Nuevo Bloque' : '+ New Block'}
               </button>
               {clipboard && clipboard.type === 'section' && (
-                <button onClick={() => handlePaste('root')} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', padding: '0.45rem 1rem' }}>
-                  <ClipboardPaste size={16} /> {language === 'es' ? 'Pegar Sección' : 'Paste Section'}
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <button onClick={() => handlePaste('root')} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', padding: '0.45rem 1rem' }}>
+                    <ClipboardPaste size={16} /> {language === 'es' ? 'Pegar Sección al final' : 'Paste Section at end'}
+                  </button>
+                  <button onClick={() => setClipboard(null)} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', padding: '0.45rem 0.85rem', color: '#ef4444' }}>
+                    {language === 'es' ? 'Cancelar' : 'Cancel'}
+                  </button>
+                </div>
               )}
             </div>
           </div>
@@ -1339,7 +1411,6 @@ export const CreateGuide: React.FC = () => {
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
                 {docFlow.map((element, index) => {
-                  const isFirstBlockOfSection = index > 0 && docFlow[index - 1]?.type === 'section';
                   const rootPasteZone = (
                     <PasteZone 
                       type={element.type === 'section' ? 'section' : 'block'} 
@@ -1348,12 +1419,15 @@ export const CreateGuide: React.FC = () => {
                       label={language === 'es' ? 'Pegar Aquí' : 'Paste Here'} 
                       canPaste={clipboard?.type === 'section' || clipboard?.type === 'block'} 
                       handlePaste={handlePaste} 
-                      indent={isFirstBlockOfSection && clipboard?.type === 'block'}
+                      indent={index > 0 && docFlow[index - 1]?.type === 'section' && clipboard?.type === 'block'}
                     />
                   );
                   
                   // SECTION ELEMENT RENDER
                   if (element.type === 'section') {
+                    const isSectionCut = clipboard && clipboard.action === 'cut' && clipboard.type === 'section' && clipboard.items.some(i => i.sourceId === element.id || i.id === element.id || i.data?.id === element.id);
+                    const isSectionCutActive = clipboard && clipboard.action === 'cut' && clipboard.type === 'section';
+
                     return (
                       <React.Fragment key={element.id}>
                         {rootPasteZone}
@@ -1391,9 +1465,6 @@ export const CreateGuide: React.FC = () => {
                             fontSize: '0.9rem',
                             fontWeight: 600,
                             margin: '0.5rem 0',
-                            marginLeft: isFirstBlockOfSection ? '2.5rem' : '0',
-                            width: isFirstBlockOfSection ? 'calc(100% - 2.5rem)' : '100%',
-                            boxSizing: 'border-box',
                             transition: 'all 0.15s ease'
                           }}>
                             <span>{language === 'es' ? '⬇ Soltar bloque aquí' : '⬇ Drop block here'}</span>
@@ -1407,59 +1478,83 @@ export const CreateGuide: React.FC = () => {
                           className="document-section-block" 
                           style={{ 
                             padding: '1.5rem', 
-                            background: 'rgba(124,58,237,0.03)', 
-                            borderLeft: '4px solid var(--accent-primary)', 
+                            background: isSectionCut ? 'rgba(245, 158, 11, 0.08)' : 'rgba(124,58,237,0.03)', 
+                            borderLeft: isSectionCut ? '4px dashed #f59e0b' : '4px solid var(--accent-primary)', 
+                            border: isSectionCut ? '1px dashed #f59e0b' : undefined,
                             position: 'relative', 
                             display: 'flex', 
                             flexDirection: 'column', 
                             gap: '0.75rem', 
                             borderRadius: '0 8px 8px 0',
-                            opacity: pointerDrag?.item.id === element.id ? 0.35 : 1,
+                            opacity: (pointerDrag?.item.id === element.id || isSectionCut) ? 0.35 : 1,
                             transition: 'opacity 0.2s ease'
                           }}
                         >
                         
                         {/* Top row: Left-aligned control actions */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', width: '100%', flexWrap: 'wrap' }}>
-                          <input 
-                            type="checkbox" 
-                            disabled={selectedElements.ids.length > 0 && (selectedElements.type !== 'section' || selectedElements.parentId !== null)} 
-                            checked={selectedElements.type === 'section' && selectedElements.ids.includes(element.id)} 
-                            onChange={() => toggleSelection('section', element.id)} 
-                            style={{ transform: 'scale(1.15)', cursor: 'pointer', marginRight: '0.25rem' }} 
-                            title={language === 'es' ? 'Seleccionar sección' : 'Select section'}
-                          />
-                          <button 
-                            type="button" 
-                            onClick={() => handleCopy('section', element)} 
-                            className="btn-secondary" 
-                            style={{ padding: '0.2rem 0.35rem', border: 'none', background: 'transparent', color: 'var(--accent-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-                            title={language === 'es' ? 'Copiar sección' : 'Copy section'}
-                          >
-                            <Copy size={15} />
-                          </button>
-                          <button 
-                            type="button" 
-                            onClick={() => handleCut('section', element, element.id)} 
-                            className="btn-secondary" 
-                            style={{ padding: '0.2rem 0.35rem', border: 'none', background: 'transparent', color: '#f59e0b', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-                            title={language === 'es' ? 'Cortar sección' : 'Cut section'}
-                          >
-                            <Scissors size={15} />
-                          </button>
-                          <button 
-                            type="button" 
-                            onClick={() => removeDocElement(element.id)} 
-                            className="btn-secondary" 
-                            style={{ padding: '0.2rem 0.35rem', border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-                            title={language === 'es' ? 'Eliminar sección' : 'Delete section'}
-                          >
-                            <Trash2 size={15} />
-                          </button>
-                          {clipboard && (clipboard.type === 'block' || clipboard.type === 'subblock') && (
-                            <button onClick={() => handlePaste('section', element.id)} className="btn-primary" style={{ padding: '0.2rem 0.5rem', marginLeft: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.2rem', fontSize: '0.8rem' }}>
-                              <ClipboardPaste size={13} /> {language === 'es' ? 'Pegar' : 'Paste'}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', flexWrap: 'wrap', gap: '0.5rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                            <input 
+                              type="checkbox" 
+                              disabled={selectedElements.ids.length > 0 && (selectedElements.type !== 'section' || selectedElements.parentId !== null)} 
+                              checked={selectedElements.type === 'section' && selectedElements.ids.includes(element.id)} 
+                              onChange={() => toggleSelection('section', element.id)} 
+                              style={{ transform: 'scale(1.15)', cursor: 'pointer', marginRight: '0.25rem' }} 
+                              title={language === 'es' ? 'Seleccionar sección' : 'Select section'}
+                            />
+                            <button 
+                              type="button" 
+                              onClick={() => handleCopy('section', element)} 
+                              className="btn-secondary" 
+                              style={{ padding: '0.2rem 0.35rem', border: 'none', background: 'transparent', color: 'var(--accent-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                              title={language === 'es' ? 'Copiar sección' : 'Copy section'}
+                            >
+                              <Copy size={15} />
                             </button>
+                            <button 
+                              type="button" 
+                              onClick={() => handleCut('section', element, element.id)} 
+                              className="btn-secondary" 
+                              style={{ padding: '0.2rem 0.35rem', border: 'none', background: 'transparent', color: '#f59e0b', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                              title={language === 'es' ? 'Cortar sección' : 'Cut section'}
+                            >
+                              <Scissors size={15} />
+                            </button>
+                            <button 
+                              type="button" 
+                              onClick={() => removeDocElement(element.id)} 
+                              className="btn-secondary" 
+                              style={{ padding: '0.2rem 0.35rem', border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                              title={language === 'es' ? 'Eliminar sección' : 'Delete section'}
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                            {clipboard && (clipboard.type === 'block' || clipboard.type === 'subblock') && (
+                              <button onClick={() => handlePaste('section', element.id)} className="btn-primary" style={{ padding: '0.2rem 0.5rem', marginLeft: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.2rem', fontSize: '0.8rem' }}>
+                                <ClipboardPaste size={13} /> {language === 'es' ? 'Pegar' : 'Paste'}
+                              </button>
+                            )}
+                          </div>
+                          
+                          {isSectionCutActive && !isSectionCut && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                              <button 
+                                type="button" 
+                                onClick={() => handlePaste('root', undefined, index)} 
+                                className="btn-primary" 
+                                style={{ padding: '0.25rem 0.6rem', display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.78rem' }}
+                              >
+                                <ClipboardPaste size={13} /> {language === 'es' ? 'Pegar antes' : 'Paste before'}
+                              </button>
+                              <button 
+                                type="button" 
+                                onClick={() => handlePaste('root', undefined, index + 1)} 
+                                className="btn-primary" 
+                                style={{ padding: '0.25rem 0.6rem', display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.78rem' }}
+                              >
+                                <ClipboardPaste size={13} /> {language === 'es' ? 'Pegar después' : 'Paste after'}
+                              </button>
+                            </div>
                           )}
                         </div>
 
@@ -1542,8 +1637,9 @@ export const CreateGuide: React.FC = () => {
 
                   // BLOCK ELEMENT RENDER
                   if (element.type === 'block') {
-                    // When dragging a section, hide all blocks to show only a compact list of sections
-                    if (pointerDrag?.dragType === 'section') {
+                    // When dragging a section, or cutting a section, hide all blocks to show only a compact list of sections
+                    const isSectionCutting = clipboard && clipboard.action === 'cut' && clipboard.type === 'section';
+                    if (pointerDrag?.dragType === 'section' || isSectionCutting) {
                       return null;
                     }
                     return (
