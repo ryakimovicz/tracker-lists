@@ -2,6 +2,14 @@ from datetime import datetime
 from typing import List, Optional
 from pydantic import BaseModel, Field
 
+class ListRatingCreate(BaseModel):
+    rating: Optional[int] = Field(None, ge=1, le=5)
+
+class ListRatingResponse(BaseModel):
+    user_rating: Optional[int] = None
+    average_rating: Optional[float] = None
+    total_ratings: int = 0
+
 class CommentCreate(BaseModel):
     content: str = Field(..., min_length=1, max_length=1000)
 

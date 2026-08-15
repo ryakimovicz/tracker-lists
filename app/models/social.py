@@ -9,6 +9,7 @@ class ListVote(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     list_id = Column(Integer, ForeignKey("reading_lists.id", ondelete="CASCADE"), nullable=False)
+    rating = Column(Integer, default=5, nullable=True)
 
     __table_args__ = (
         UniqueConstraint("user_id", "list_id", name="uq_user_list_vote"),

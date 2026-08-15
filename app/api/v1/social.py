@@ -15,14 +15,94 @@ from app.schemas.social import (
     CommentCreate,
     CommentResponse,
     ReportCreate,
-    ActivityFeedItemResponse
+    ActivityFeedItemResponse,
+    ListRatingCreate,
+    ListRatingResponse
 )
 from app.schemas.list import ReadingListResponse
 from app.schemas.user import UserResponse
 
 router = APIRouter()
 
-# --- 1. List Votes & Reports ---
+# --- 1. List Ratings, Votes & Reports ---
+
+@router.post("/lists/{list_id}/rating", response_model=ListRatingResponse)
+def rate_list(
+    list_id: int,
+    rating_in: ListRatingCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    reading_list = db.query(ReadingList).filter(ReadingList.id == list_id).first()
+    if not reading_list:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="List not found")
+        
+    vote = db.query(ListVote).filter(
+        ListVote.user_id == current_user.id,
+        ListVote.list_id == list_id
+    ).first()
+
+    if rating_in.rating is None or rating_in.rating <= 0:
+        if vote:
+            db.delete(vote)
+            db.commit()
+    else:
+        if vote:
+            vote.rating = rating_in.rating
+        else:
+            vote = ListVote(user_id=current_user.id, list_id=list_id, rating=rating_in.rating)
+            db.add(vote)
+        
+        activity = UserActivityLog(
+            user_id=current_user.id,
+            activity_type="guide_rated",
+            item_title=reading_list.title,
+            item_type="guide",
+            list_id=reading_list.id,
+            details=str(rating_in.rating)
+        )
+        db.add(activity)
+        db.commit()
+
+    all_votes = db.query(ListVote).filter(ListVote.list_id == list_id, ListVote.rating != None).all()
+    total = len(all_votes)
+    avg = sum(v.rating for v in all_votes) / total if total > 0 else None
+    
+    current_user_vote = db.query(ListVote).filter(
+        ListVote.user_id == current_user.id,
+        ListVote.list_id == list_id
+    ).first()
+
+    return ListRatingResponse(
+        user_rating=current_user_vote.rating if current_user_vote else None,
+        average_rating=round(avg, 1) if avg is not None else None,
+        total_ratings=total
+    )
+
+@router.get("/lists/{list_id}/rating", response_model=ListRatingResponse)
+def get_list_rating(
+    list_id: int,
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db)
+):
+    all_votes = db.query(ListVote).filter(ListVote.list_id == list_id, ListVote.rating != None).all()
+    total = len(all_votes)
+    avg = sum(v.rating for v in all_votes) / total if total > 0 else None
+    
+    user_rating = None
+    if current_user:
+        vote = db.query(ListVote).filter(
+            ListVote.user_id == current_user.id,
+            ListVote.list_id == list_id
+        ).first()
+        if vote:
+            user_rating = vote.rating
+
+    return ListRatingResponse(
+        user_rating=user_rating,
+        average_rating=round(avg, 1) if avg is not None else None,
+        total_ratings=total
+    )
 
 @router.post("/lists/{list_id}/vote", status_code=status.HTTP_200_OK)
 def toggle_list_vote(
@@ -44,7 +124,7 @@ def toggle_list_vote(
         db.commit()
         return {"voted": False}
     else:
-        new_vote = ListVote(user_id=current_user.id, list_id=list_id)
+        new_vote = ListVote(user_id=current_user.id, list_id=list_id, rating=5)
         db.add(new_vote)
         db.commit()
         return {"voted": True}

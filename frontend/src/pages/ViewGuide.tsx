@@ -7,9 +7,25 @@ import {
   ChevronRight,
   ArrowLeft,
   Check,
-  Heart
+  Heart,
+  Star,
+  MessageSquare,
+  Send,
+  Trash2,
+  ThumbsUp
 } from 'lucide-react';
 import { ItemDetailsModal } from '../components/ItemDetailsModal';
+
+interface CommentItem {
+  id: number;
+  user_id: number;
+  list_id: number;
+  content: string;
+  created_at: string;
+  creator_username: string;
+  vote_count: number;
+  is_voted_by_me: boolean;
+}
 
 export const ViewGuide: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -24,6 +40,18 @@ export const ViewGuide: React.FC = () => {
   const [errorMsg, setErrorMsg] = useState('');
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
   const [collapsedNodes, setCollapsedNodes] = useState<Record<string, boolean>>({});
+
+  // Ratings state
+  const [userRating, setUserRating] = useState<number | null>(null);
+  const [averageRating, setAverageRating] = useState<number | null>(null);
+  const [totalRatings, setTotalRatings] = useState<number>(0);
+  const [isSavingRating, setIsSavingRating] = useState(false);
+
+  // Comments state
+  const [comments, setComments] = useState<CommentItem[]>([]);
+  const [newCommentText, setNewCommentText] = useState('');
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false);
+  const [isLoadingComments, setIsLoadingComments] = useState(false);
 
   // Standalone details modal states
   const [selectedItem, setSelectedItem] = useState<any | null>(null);
@@ -60,12 +88,111 @@ export const ViewGuide: React.FC = () => {
     }
   };
 
+  const handleSaveRating = async (ratingVal: number | null) => {
+    if (!guide || isSavingRating) return;
+    setIsSavingRating(true);
+    try {
+      const res = await apiClient.post(`/social/lists/${guide.id}/rating`, { rating: ratingVal });
+      setUserRating(res.data.user_rating);
+      setAverageRating(res.data.average_rating);
+      setTotalRatings(res.data.total_ratings);
+    } catch (err) {
+      console.error("Failed to save rating", err);
+    } finally {
+      setIsSavingRating(false);
+    }
+  };
+
+  const fetchComments = async () => {
+    if (!id) return;
+    try {
+      setIsLoadingComments(true);
+      const res = await apiClient.get(`/social/lists/${id}/comments`);
+      setComments(res.data);
+    } catch (err) {
+      console.error("Failed to fetch comments", err);
+    } finally {
+      setIsLoadingComments(false);
+    }
+  };
+
+  const handlePostComment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!guide || !newCommentText.trim() || isSubmittingComment) return;
+    setIsSubmittingComment(true);
+    try {
+      const res = await apiClient.post(`/social/lists/${guide.id}/comments`, { content: newCommentText.trim() });
+      setComments(prev => [res.data, ...prev]);
+      setNewCommentText('');
+    } catch (err) {
+      console.error("Failed to post comment", err);
+    } finally {
+      setIsSubmittingComment(false);
+    }
+  };
+
+  const handleDeleteComment = async (commentId: number) => {
+    if (!guide) return;
+    try {
+      await apiClient.delete(`/social/lists/${guide.id}/comments/${commentId}`);
+      setComments(prev => prev.filter(c => c.id !== commentId));
+    } catch (err) {
+      console.error("Failed to delete comment", err);
+    }
+  };
+
+  const handleVoteComment = async (commentId: number) => {
+    if (!guide) return;
+    try {
+      const res = await apiClient.post(`/social/lists/${guide.id}/comments/${commentId}/vote`);
+      setComments(prev => prev.map(c => {
+        if (c.id === commentId) {
+          return {
+            ...c,
+            is_voted_by_me: res.data.voted,
+            vote_count: res.data.voted ? c.vote_count + 1 : Math.max(0, c.vote_count - 1)
+          };
+        }
+        return c;
+      }));
+    } catch (err) {
+      console.error("Failed to vote comment", err);
+    }
+  };
+
+  const formatCommentDate = (dateStr: string) => {
+    try {
+      const date = new Date(dateStr);
+      const now = new Date();
+      const diffMs = now.getTime() - date.getTime();
+      const diffMinutes = Math.floor(diffMs / (1000 * 60));
+      const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+      if (diffMinutes < 1) return language === 'es' ? 'hace un momento' : 'just now';
+      if (diffMinutes < 60) return language === 'es' ? `hace ${diffMinutes} min` : `${diffMinutes}m ago`;
+      if (diffHours < 24) return language === 'es' ? `hace ${diffHours} h` : `${diffHours}h ago`;
+      if (diffDays < 7) return language === 'es' ? `hace ${diffDays} d` : `${diffDays}d ago`;
+
+      return date.toLocaleDateString(language === 'es' ? 'es-ES' : 'en-US', {
+        day: 'numeric',
+        month: 'short',
+        year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
+      });
+    } catch {
+      return dateStr;
+    }
+  };
+
   const fetchListDetails = () => {
     if (!id) return;
     apiClient.get(`/lists/${id}`)
       .then(response => {
         setGuide(response.data);
         setIsSaved(!!response.data.is_saved_by_me);
+        setUserRating(response.data.user_rating ?? null);
+        setAverageRating(response.data.average_rating ?? null);
+        setTotalRatings(response.data.total_ratings ?? 0);
         const cachedCollapse = localStorage.getItem(`guide_collapsed_${id}`);
         if (cachedCollapse) {
           try {
@@ -85,11 +212,12 @@ export const ViewGuide: React.FC = () => {
       });
   };
 
-  // Fetch guide details and profile information on mount
+  // Fetch guide details, profile and comments on mount
   useEffect(() => {
     setLoading(true);
     setErrorMsg('');
     fetchListDetails();
+    fetchComments();
 
     // Fetch user profile
     apiClient.get('/users/me')
@@ -305,7 +433,7 @@ export const ViewGuide: React.FC = () => {
           </button>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', background: 'var(--bg-secondary)', padding: '1.25rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem', background: 'var(--bg-secondary)', padding: '1.25rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
           <div>
             <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{language === 'es' ? 'Progreso Completado:' : 'Completed Progress:'}</span>
             <h4 style={{ margin: '0.25rem 0 0 0', fontSize: '1.35rem', fontWeight: 700 }}>
@@ -317,6 +445,69 @@ export const ViewGuide: React.FC = () => {
             <h4 style={{ margin: '0.25rem 0 0 0', fontSize: '1.35rem', fontWeight: 700, textTransform: 'capitalize' }}>
               {guide.creator_username}
             </h4>
+          </div>
+          <div>
+            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+              {language === 'es' ? 'Valoración Promedio:' : 'Average Rating:'}
+            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.25rem' }}>
+              <Star size={18} fill={averageRating ? "#f59e0b" : "none"} color={averageRating ? "#f59e0b" : "var(--text-muted)"} />
+              <h4 style={{ margin: 0, fontSize: '1.35rem', fontWeight: 700 }}>
+                {averageRating !== null ? averageRating.toFixed(1) : '-'}
+              </h4>
+              <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                ({totalRatings} {totalRatings === 1 ? (language === 'es' ? 'voto' : 'vote') : (language === 'es' ? 'votos' : 'votes')})
+              </span>
+            </div>
+            
+            {/* Interactive Stars for Current User */}
+            <div style={{ marginTop: '0.5rem' }}>
+              <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.2rem' }}>
+                {language === 'es' ? 'Tu Valoración:' : 'Your Rating:'}
+              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button
+                    key={star}
+                    disabled={!currentUser || isSavingRating}
+                    onClick={() => handleSaveRating(star)}
+                    title={`${star} ${star === 1 ? 'estrella' : 'estrellas'}`}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      cursor: currentUser ? 'pointer' : 'default',
+                      padding: 0,
+                      display: 'flex',
+                      alignItems: 'center'
+                    }}
+                  >
+                    <Star
+                      size={18}
+                      fill={star <= (userRating || 0) ? '#f59e0b' : 'none'}
+                      color={star <= (userRating || 0) ? '#f59e0b' : 'var(--text-muted)'}
+                    />
+                  </button>
+                ))}
+                {userRating && userRating > 0 && (
+                  <button
+                    onClick={() => handleSaveRating(null)}
+                    disabled={isSavingRating}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: '#ef4444',
+                      fontSize: '0.75rem',
+                      cursor: 'pointer',
+                      marginLeft: '0.5rem',
+                      padding: 0,
+                      textDecoration: 'underline'
+                    }}
+                  >
+                    {language === 'es' ? 'Quitar' : 'Clear'}
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
         </div>
 
@@ -656,6 +847,163 @@ export const ViewGuide: React.FC = () => {
             });
           })()}
         </div>
+      </div>
+
+      {/* Public Comments Section */}
+      <div className="glass-card" style={{ marginTop: '2rem', padding: '2.5rem', textAlign: 'left' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1.5rem' }}>
+          <MessageSquare size={22} color="var(--accent-primary)" />
+          <h3 style={{ margin: 0, fontSize: '1.35rem', fontWeight: 700 }}>
+            {language === 'es' ? 'Comentarios' : 'Comments'} ({comments.length})
+          </h3>
+        </div>
+
+        {/* New Comment Box */}
+        {currentUser ? (
+          <form onSubmit={handlePostComment} style={{ marginBottom: '2rem' }}>
+            <textarea
+              value={newCommentText}
+              onChange={(e) => setNewCommentText(e.target.value)}
+              placeholder={language === 'es' ? 'Escribe un comentario público sobre esta guía...' : 'Write a public comment on this guide...'}
+              rows={3}
+              maxLength={1000}
+              style={{
+                width: '100%',
+                padding: '0.85rem',
+                borderRadius: '8px',
+                border: '1px solid var(--border-color)',
+                background: 'var(--bg-secondary)',
+                color: 'var(--text-primary)',
+                resize: 'vertical',
+                fontSize: '0.92rem',
+                fontFamily: 'inherit',
+                outline: 'none',
+                boxSizing: 'border-box'
+              }}
+            />
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.5rem' }}>
+              <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                {newCommentText.length} / 1000
+              </span>
+              <button
+                type="submit"
+                disabled={!newCommentText.trim() || isSubmittingComment}
+                className="btn-primary"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                  padding: '0.5rem 1.25rem',
+                  fontSize: '0.88rem',
+                  opacity: (!newCommentText.trim() || isSubmittingComment) ? 0.6 : 1,
+                  cursor: (!newCommentText.trim() || isSubmittingComment) ? 'not-allowed' : 'pointer'
+                }}
+              >
+                <Send size={15} />
+                {isSubmittingComment ? (language === 'es' ? 'Publicando...' : 'Posting...') : (language === 'es' ? 'Comentar' : 'Comment')}
+              </button>
+            </div>
+          </form>
+        ) : (
+          <div style={{ padding: '1rem', background: 'var(--bg-secondary)', borderRadius: '8px', marginBottom: '1.5rem', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+            {language === 'es' ? 'Inicia sesión para dejar un comentario.' : 'Log in to leave a comment.'}
+          </div>
+        )}
+
+        {/* Comments List */}
+        {isLoadingComments ? (
+          <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+            {language === 'es' ? 'Cargando comentarios...' : 'Loading comments...'}
+          </div>
+        ) : comments.length === 0 ? (
+          <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.92rem', fontStyle: 'italic' }}>
+            {language === 'es' ? 'Aún no hay comentarios en esta guía. ¡Sé el primero en opinar!' : 'No comments on this guide yet. Be the first to comment!'}
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {comments.map((comment) => (
+              <div
+                key={comment.id}
+                style={{
+                  padding: '1.15rem',
+                  background: 'var(--bg-secondary)',
+                  borderRadius: '8px',
+                  border: '1px solid var(--border-color)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.6rem'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <div style={{
+                      width: '28px',
+                      height: '28px',
+                      borderRadius: '50%',
+                      background: 'var(--accent-primary)',
+                      color: '#fff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '0.78rem',
+                      fontWeight: 700
+                    }}>
+                      {(comment.creator_username || 'U')[0].toUpperCase()}
+                    </div>
+                    <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>{comment.creator_username}</span>
+                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>• {formatCommentDate(comment.created_at)}</span>
+                  </div>
+
+                  {currentUser && (currentUser.id === comment.user_id || currentUser.is_admin) && (
+                    <button
+                      onClick={() => handleDeleteComment(comment.id)}
+                      title={language === 'es' ? 'Eliminar comentario' : 'Delete comment'}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: 'var(--text-muted)',
+                        cursor: 'pointer',
+                        padding: '0.2rem',
+                        display: 'flex',
+                        alignItems: 'center'
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.color = '#ef4444')}
+                      onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
+                </div>
+
+                <p style={{ margin: 0, fontSize: '0.92rem', color: 'var(--text-primary)', whiteSpace: 'pre-wrap', lineHeight: '1.45' }}>
+                  {comment.content}
+                </p>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>
+                  <button
+                    onClick={() => handleVoteComment(comment.id)}
+                    style={{
+                      background: comment.is_voted_by_me ? 'rgba(59, 130, 246, 0.15)' : 'transparent',
+                      border: comment.is_voted_by_me ? '1px solid rgba(59, 130, 246, 0.3)' : '1px solid var(--border-color)',
+                      color: comment.is_voted_by_me ? '#3b82f6' : 'var(--text-secondary)',
+                      borderRadius: '4px',
+                      padding: '0.2rem 0.5rem',
+                      fontSize: '0.78rem',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.35rem',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    <ThumbsUp size={12} fill={comment.is_voted_by_me ? '#3b82f6' : 'none'} />
+                    <span>{comment.vote_count}</span>
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {selectedItem && (

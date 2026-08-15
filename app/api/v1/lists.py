@@ -263,8 +263,19 @@ def get_list_details(
         sd = reading_list.section_descriptions or {}
         list_title = sd.get("draft_title") or list_title
         list_desc = sd.get("draft_description") or list_desc
-            
 
+    # Ratings metrics
+    all_votes = db.query(ListVote).filter(ListVote.list_id == list_id, ListVote.rating != None).all()
+    total_ratings = len(all_votes)
+    avg_rating = sum(v.rating for v in all_votes) / total_ratings if total_ratings > 0 else None
+    user_rating = None
+    if current_user:
+        user_vote = db.query(ListVote).filter(
+            ListVote.user_id == current_user.id,
+            ListVote.list_id == list_id
+        ).first()
+        if user_vote:
+            user_rating = user_vote.rating
 
     return ReadingListDetailsResponse(
         id=reading_list.id,
@@ -280,6 +291,9 @@ def get_list_details(
         total_count=merged_total,
         progress_percentage=round(progress_percentage, 2),
         skipped_percentage=round(skipped_percentage, 2),
+        user_rating=user_rating,
+        average_rating=round(avg_rating, 1) if avg_rating is not None else None,
+        total_ratings=total_ratings,
         section_descriptions=reading_list.section_descriptions,
         section_importances=reading_list.section_importances,
         items=merged_items

@@ -74,6 +74,9 @@ class ReadingListDetailsResponse(ReadingListResponse):
     total_count: int = 0
     progress_percentage: float = 0.0
     skipped_percentage: float = 0.0
+    user_rating: Optional[int] = None
+    average_rating: Optional[float] = None
+    total_ratings: int = 0
     items: List[ListItemProgressResponse] = []
 
 import enum
