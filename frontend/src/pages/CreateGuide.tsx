@@ -14,8 +14,6 @@ import {
   BookOpen,
   LayoutGrid,
   Save,
-  ChevronDown,
-  ChevronUp,
   Lock,
   Plus,
   Scissors,
@@ -48,11 +46,12 @@ interface DocElement {
 }
 
 interface ClipboardState {
-  action: 'cut';
+  action: 'cut' | 'copy';
   type: 'section' | 'block' | 'subblock' | 'item';
   items: Array<{
     data: any;
     sourceId: string | number;
+    sourceIds?: (string | number)[];
     sourceParentId?: string;
     sourceGrandparentId?: string;
   }>;
@@ -1348,18 +1347,7 @@ export const CreateGuide: React.FC = () => {
     }));
   };
 
-  // Reorder docFlow elements
-  const moveDocElement = (index: number, direction: 'up' | 'down') => {
-    if (direction === 'up' && index === 0) return;
-    if (direction === 'down' && index === docFlow.length - 1) return;
 
-    const newFlow = [...docFlow];
-    const targetIndex = direction === 'up' ? index - 1 : index + 1;
-    const temp = newFlow[index];
-    newFlow[index] = newFlow[targetIndex];
-    newFlow[targetIndex] = temp;
-    setDocFlow(newFlow);
-  };
 
   return (
     <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '2rem 0', display: 'flex', flexDirection: 'column', gap: '2rem', textAlign: 'left' }}>
@@ -1596,7 +1584,7 @@ export const CreateGuide: React.FC = () => {
                   
                   // SECTION ELEMENT RENDER
                   if (element.type === 'section') {
-                    const isSectionCut = clipboard && clipboard.action === 'cut' && clipboard.type === 'section' && clipboard.items.some(i => i.sourceId === element.id || i.id === element.id || i.data?.id === element.id);
+                    const isSectionCut = clipboard && clipboard.action === 'cut' && clipboard.type === 'section' && clipboard.items.some((i: any) => i.sourceId === element.id || i.id === element.id || i.data?.id === element.id || (i.sourceIds && i.sourceIds.includes(element.id)));
                     const isSectionCutActive = clipboard && clipboard.action === 'cut' && clipboard.type === 'section';
 
                     return (
@@ -1808,6 +1796,7 @@ export const CreateGuide: React.FC = () => {
 
                   // BLOCK ELEMENT RENDER
                   if (element.type === 'block') {
+                    const isFirstBlockOfSection = index > 0 && docFlow[index - 1]?.type === 'section';
                     // When dragging a section, or cutting a section, hide all blocks to show only a compact list of sections
                     const isSectionCutting = clipboard && clipboard.action === 'cut' && clipboard.type === 'section';
                     if (pointerDrag?.dragType === 'section' || isSectionCutting) {
@@ -2125,6 +2114,7 @@ export const CreateGuide: React.FC = () => {
                                       e.preventDefault();
                                       e.stopPropagation();
                                       setPointerDrag({
+                                        dragType: 'item',
                                         item,
                                         sourceParentId: element.id,
                                         sourceGrandparentId: undefined,
@@ -2185,47 +2175,33 @@ export const CreateGuide: React.FC = () => {
                                   </div>
                                 </div>
                               </div>
-                                );
-                              })()}
-                              </React.Fragment>
                             );
-                          })}
+                          })()}
+                            </React.Fragment>
+                          );
+                        })}
 
-                          {/* Animated Drop Slot at bottom of block items */}
-                          {dragOverTarget?.parentId === element.id && !dragOverTarget.grandparentId && dragOverTarget.index === (element.items || []).length && (
-                            <div 
-                              onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
-                              onDrop={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                const data = e.dataTransfer.getData('application/json');
-                                if (data) {
-                                  try {
-                                    const src = JSON.parse(data);
-                                    handleReorderItem(src, element.id, undefined, (element.items || []).length);
-                                  } catch(err) {}
-                                }
-                                setDraggedItem(null);
-                                setDragOverTarget(null);
-                              }}
-                              style={{
-                                height: '48px',
-                                borderRadius: '8px',
-                                border: '2px dashed var(--accent-primary)',
-                                background: 'rgba(129, 140, 248, 0.15)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                color: 'var(--accent-primary)',
-                                fontSize: '0.85rem',
-                                fontWeight: 600,
-                                margin: '0.2rem 0',
-                                transition: 'all 0.15s ease'
-                              }}
-                            >
-                              <span>{language === 'es' ? '⬇ Soltar aquí' : '⬇ Drop here'}</span>
-                            </div>
-                          )}
+                        {/* Animated Drop Slot at bottom of block items */}
+                        {pointerDrag?.dragType === 'item' && dragOverTarget?.parentId === element.id && !dragOverTarget.grandparentId && dragOverTarget.index === (element.items || []).length && (
+                          <div 
+                            style={{
+                              height: '48px',
+                              borderRadius: '8px',
+                              border: '2px dashed var(--accent-primary)',
+                              background: 'rgba(129, 140, 248, 0.15)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: 'var(--accent-primary)',
+                              fontSize: '0.85rem',
+                              fontWeight: 600,
+                              margin: '0.25rem 0',
+                              transition: 'all 0.15s ease'
+                            }}
+                          >
+                            <span>{language === 'es' ? '⬇ Soltar aquí' : '⬇ Drop here'}</span>
+                          </div>
+                        )}
 
                           <PasteZone 
                             type="item" 
@@ -2389,7 +2365,7 @@ export const CreateGuide: React.FC = () => {
                             {/* Subblock Items list */}
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                               {(sub.items || []).map((item, itemIndex) => {
-                                const isDropTargetTop = dragOverTarget?.parentId === element.id && dragOverTarget.grandparentId === sub.id && dragOverTarget.index === itemIndex;
+                                const isDropTargetTop = pointerDrag?.dragType === 'item' && dragOverTarget?.parentId === element.id && dragOverTarget.grandparentId === sub.id && dragOverTarget.index === itemIndex && pointerDrag?.item.id !== item.id;
                                 const isBeingDragged = pointerDrag?.item.id === item.id;
 
                                 return (
@@ -2405,22 +2381,8 @@ export const CreateGuide: React.FC = () => {
                                     />
 
                                     {/* Animated Drop Slot before this subblock item */}
-                                    {isDropTargetTop && !isBeingDragged && (
+                                    {isDropTargetTop && (
                                       <div 
-                                        onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
-                                        onDrop={(e) => {
-                                          e.preventDefault();
-                                          e.stopPropagation();
-                                          const data = e.dataTransfer.getData('application/json');
-                                          if (data) {
-                                            try {
-                                              const src = JSON.parse(data);
-                                              handleReorderItem(src, element.id, sub.id, itemIndex);
-                                            } catch(err) {}
-                                          }
-                                          setDraggedItem(null);
-                                          setDragOverTarget(null);
-                                        }}
                                         style={{
                                           height: '42px',
                                           borderRadius: '6px',
@@ -2445,46 +2407,10 @@ export const CreateGuide: React.FC = () => {
 
                                       return (
                                         <div 
-                                          draggable
-                                          onDragStart={(e) => {
-                                            e.dataTransfer.setData('application/json', JSON.stringify({ id: item.id, parentId: element.id, grandparentId: sub.id, index: itemIndex }));
-                                            setDraggedItem({ id: item.id, parentId: element.id, grandparentId: sub.id, index: itemIndex });
-                                          }}
-                                          onDragEnd={() => {
-                                            setDraggedItem(null);
-                                            setDragOverTarget(null);
-                                          }}
-                                          onDragOver={(e) => {
-                                            e.preventDefault();
-                                            e.stopPropagation();
-                                            e.dataTransfer.dropEffect = 'move';
-                                            const rect = e.currentTarget.getBoundingClientRect();
-                                            const midY = rect.top + rect.height / 2;
-                                            const isAfter = e.clientY > midY;
-                                            const targetIdx = isAfter ? itemIndex + 1 : itemIndex;
-                                            if (
-                                              !dragOverTarget ||
-                                              dragOverTarget.parentId !== element.id ||
-                                              dragOverTarget.grandparentId !== sub.id ||
-                                              dragOverTarget.index !== targetIdx
-                                            ) {
-                                              setDragOverTarget({ parentId: element.id, grandparentId: sub.id, index: targetIdx });
-                                            }
-                                          }}
-                                          onDrop={(e) => {
-                                            e.preventDefault();
-                                            e.stopPropagation();
-                                            const data = e.dataTransfer.getData('application/json');
-                                            if (data) {
-                                              try {
-                                                const src = JSON.parse(data);
-                                                const targetIdx = dragOverTarget ? dragOverTarget.index : itemIndex;
-                                                handleReorderItem(src, element.id, sub.id, targetIdx);
-                                              } catch(err) {}
-                                            }
-                                            setDraggedItem(null);
-                                            setDragOverTarget(null);
-                                          }}
+                                          data-card-item-id={item.id}
+                                          data-card-parent-id={element.id}
+                                          data-card-grandparent-id={sub.id}
+                                          data-card-index={itemIndex}
                                           style={{ 
                                             display: 'flex', 
                                             flexDirection: 'column',
@@ -2573,6 +2499,20 @@ export const CreateGuide: React.FC = () => {
                                     {/* Main row: Drag handle (left), Thumbnail, and Info */}
                                     <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', width: '100%' }}>
                                       <div 
+                                        onPointerDown={(e) => {
+                                          if (e.button !== 0) return;
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          setPointerDrag({
+                                            dragType: 'item',
+                                            item,
+                                            sourceParentId: element.id,
+                                            sourceGrandparentId: sub.id,
+                                            sourceIndex: itemIndex,
+                                            currentX: e.clientX,
+                                            currentY: e.clientY
+                                          });
+                                        }}
                                         style={{ 
                                           cursor: 'grab', 
                                           color: 'var(--text-secondary)', 
@@ -2583,6 +2523,7 @@ export const CreateGuide: React.FC = () => {
                                           padding: '0.15rem 0.25rem',
                                           borderRadius: '4px',
                                           flexShrink: 0,
+                                          touchAction: 'none',
                                           transition: 'opacity 0.2s ease, color 0.2s ease'
                                         }}
                                         title={language === 'es' ? 'Arrastrar para reordenar' : 'Drag to reorder'}
@@ -2631,22 +2572,8 @@ export const CreateGuide: React.FC = () => {
                               })}
 
                               {/* Animated Drop Slot at bottom of subblock items */}
-                              {dragOverTarget?.parentId === element.id && dragOverTarget.grandparentId === sub.id && dragOverTarget.index === (sub.items || []).length && (
+                              {pointerDrag?.dragType === 'item' && dragOverTarget?.parentId === element.id && dragOverTarget.grandparentId === sub.id && dragOverTarget.index === (sub.items || []).length && (
                                 <div 
-                                  onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
-                                  onDrop={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    const data = e.dataTransfer.getData('application/json');
-                                    if (data) {
-                                      try {
-                                        const src = JSON.parse(data);
-                                        handleReorderItem(src, element.id, sub.id, (sub.items || []).length);
-                                      } catch(err) {}
-                                    }
-                                    setDraggedItem(null);
-                                    setDragOverTarget(null);
-                                  }}
                                   style={{
                                     height: '42px',
                                     borderRadius: '6px',
