@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from '../context/LanguageContext';
 import { apiClient } from '../api/client';
 import { SearchPanel } from '../components/SearchPanel';
@@ -21,7 +21,8 @@ import {
   Scissors,
   ClipboardPaste,
   Copy,
-  Menu
+  Menu,
+  Eye
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -148,6 +149,7 @@ export const CreateGuide: React.FC = () => {
     }
     return detail || err.message || 'An error occurred';
   };
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const editId = searchParams.get('edit') || searchParams.get('id');
 
@@ -1192,8 +1194,8 @@ export const CreateGuide: React.FC = () => {
               ) : null}
             </div>
 
-            {/* Target visibility selector & Publish action */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            {/* Target visibility selector, View Guide & Publish action */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
               <select
                 className="input-field"
                 value={guide?.section_descriptions?.intended_visibility || 'public'}
@@ -1215,6 +1217,18 @@ export const CreateGuide: React.FC = () => {
                 <option value="public">{language === 'es' ? 'Pública' : 'Public'}</option>
                 <option value="private">{language === 'es' ? 'Privada' : 'Private'}</option>
               </select>
+
+              {guide && (
+                <button
+                  type="button"
+                  onClick={() => navigate(`/guide/${guide.id}`)}
+                  className="btn-secondary"
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', height: '38px', padding: '0.5rem 1rem', fontSize: '0.85rem' }}
+                  title={language === 'es' ? 'Ver guía' : 'View guide'}
+                >
+                  <Eye size={16} /> {language === 'es' ? 'Ver Guía' : 'View Guide'}
+                </button>
+              )}
 
               <button onClick={handlePublishGuide} disabled={isSubmitting} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1.25rem', height: '38px' }}>
                 <Save size={16} /> {isSubmitting ? '...' : language === 'es' ? 'Publicar Cambios' : 'Publish Changes'}
