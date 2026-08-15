@@ -348,22 +348,80 @@ def toggle_follow_user(
 @router.get("/users/{user_id}/followers", response_model=List[UserResponse])
 def get_user_followers(
     user_id: int,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    if user_id != current_user.id and not getattr(current_user, 'is_admin', False):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only view your own followers and following list."
+        )
     followers = db.query(User).join(Follow, Follow.follower_id == User.id).filter(
         Follow.followed_id == user_id
     ).all()
-    return followers
+    my_following_ids = set(
+        r[0] for r in db.query(Follow.followed_id).filter(Follow.follower_id == current_user.id).all()
+    )
+    res = []
+    for u in followers:
+        f_count = db.query(Follow).filter(Follow.followed_id == u.id).count()
+        fg_count = db.query(Follow).filter(Follow.follower_id == u.id).count()
+        u_dict = {
+            "id": u.id,
+            "username": u.username,
+            "email": u.email,
+            "created_at": u.created_at,
+            "photo_url": u.photo_url,
+            "is_admin": u.is_admin,
+            "show_nsfw": u.show_nsfw,
+            "is_pro": u.is_pro,
+            "profile_color": u.profile_color,
+            "lastfm_username": u.lastfm_username,
+            "followers_count": f_count,
+            "following_count": fg_count,
+            "is_following": u.id in my_following_ids
+        }
+        res.append(UserResponse(**u_dict))
+    return res
 
 @router.get("/users/{user_id}/following", response_model=List[UserResponse])
 def get_user_following(
     user_id: int,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    if user_id != current_user.id and not getattr(current_user, 'is_admin', False):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only view your own followers and following list."
+        )
     following = db.query(User).join(Follow, Follow.followed_id == User.id).filter(
         Follow.follower_id == user_id
     ).all()
-    return following
+    my_following_ids = set(
+        r[0] for r in db.query(Follow.followed_id).filter(Follow.follower_id == current_user.id).all()
+    )
+    res = []
+    for u in following:
+        f_count = db.query(Follow).filter(Follow.followed_id == u.id).count()
+        fg_count = db.query(Follow).filter(Follow.follower_id == u.id).count()
+        u_dict = {
+            "id": u.id,
+            "username": u.username,
+            "email": u.email,
+            "created_at": u.created_at,
+            "photo_url": u.photo_url,
+            "is_admin": u.is_admin,
+            "show_nsfw": u.show_nsfw,
+            "is_pro": u.is_pro,
+            "profile_color": u.profile_color,
+            "lastfm_username": u.lastfm_username,
+            "followers_count": f_count,
+            "following_count": fg_count,
+            "is_following": u.id in my_following_ids
+        }
+        res.append(UserResponse(**u_dict))
+    return res
 
 # --- 4. Feeds ---
 

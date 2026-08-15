@@ -16,7 +16,11 @@ import {
   Eye,
   Edit,
   Settings,
-  Star
+  Star,
+  UserPlus,
+  UserCheck,
+  Users,
+  X
 } from 'lucide-react';
 
 interface LibraryItem {
@@ -51,6 +55,9 @@ interface UserProfile {
   is_pro?: boolean;
   profile_color?: string;
   lastfm_username?: string;
+  followers_count?: number;
+  following_count?: number;
+  is_following?: boolean;
 }
 
 export const getTagClass = (type: string) => {
@@ -131,6 +138,82 @@ export const Profile: React.FC = () => {
   ];
   const [isConnectingLastFm, setIsConnectingLastFm] = useState(false);
   const [lastFmTokenInput, setLastFmTokenInput] = useState('');
+
+  // Followers & Following floating modal states
+  const [showFollowModal, setShowFollowModal] = useState(false);
+  const [followModalTab, setFollowModalTab] = useState<'followers' | 'following'>('followers');
+  const [followersList, setFollowersList] = useState<UserProfile[]>([]);
+  const [followingList, setFollowingList] = useState<UserProfile[]>([]);
+  const [followListLoading, setFollowListLoading] = useState(false);
+
+  const handleOpenFollowModal = async (initialTab: 'followers' | 'following') => {
+    setFollowModalTab(initialTab);
+    setShowFollowModal(true);
+    setFollowListLoading(true);
+    try {
+      const myId = currentUser?.id || profile?.id;
+      const [followersRes, followingRes] = await Promise.all([
+        apiClient.get(`/social/users/${myId}/followers`),
+        apiClient.get(`/social/users/${myId}/following`)
+      ]);
+      setFollowersList(followersRes.data);
+      setFollowingList(followingRes.data);
+    } catch (err) {
+      console.error('Failed to load followers/following', err);
+    } finally {
+      setFollowListLoading(false);
+    }
+  };
+
+  const handleToggleFollowUserInModal = async (targetUser: UserProfile) => {
+    try {
+      const res = await apiClient.post(`/social/users/${targetUser.id}/follow`);
+      const isNowFollowing = res.data.following;
+
+      // Update in followers list
+      setFollowersList(prev => prev.map(u => u.id === targetUser.id ? { ...u, is_following: isNowFollowing } : u));
+
+      // Update in following list
+      if (!isNowFollowing) {
+        setFollowingList(prev => prev.filter(u => u.id !== targetUser.id));
+      } else {
+        setFollowingList(prev => {
+          if (prev.some(u => u.id === targetUser.id)) {
+            return prev.map(u => u.id === targetUser.id ? { ...u, is_following: true } : u);
+          }
+          return [...prev, { ...targetUser, is_following: true }];
+        });
+      }
+
+      // Update profile following count
+      setProfile(prev => prev ? {
+        ...prev,
+        following_count: Math.max(0, (prev.following_count || 0) + (isNowFollowing ? 1 : -1))
+      } : null);
+    } catch (err: any) {
+      console.error('Failed to toggle follow in modal', err);
+    }
+  };
+
+  const handleToggleFollowProfileUser = async () => {
+    if (!profile) return;
+    try {
+      const res = await apiClient.post(`/social/users/${profile.id}/follow`);
+      const isNowFollowing = res.data.following;
+      setProfile(prev => prev ? {
+        ...prev,
+        is_following: isNowFollowing,
+        followers_count: Math.max(0, (prev.followers_count || 0) + (isNowFollowing ? 1 : -1))
+      } : null);
+      setSuccessMsg(isNowFollowing 
+        ? (language === 'es' ? 'Comenzaste a seguir a este usuario.' : 'Started following this user.')
+        : (language === 'es' ? 'Dejaste de seguir a este usuario.' : 'Unfollowed this user.')
+      );
+      setTimeout(() => setSuccessMsg(''), 3000);
+    } catch (err: any) {
+      setErrorMsg(err.response?.data?.detail || 'Error updating follow status');
+    }
+  };
 
   const formatDate = (date: Date) => {
     return date.toLocaleDateString(language === 'es' ? 'es-ES' : 'en-US', {
@@ -482,7 +565,7 @@ export const Profile: React.FC = () => {
             style={{ width: 100, height: 100, borderRadius: '50%', border: '3px solid var(--accent-primary)', boxShadow: 'var(--shadow-md)' }}
           />
           <div style={{ flex: 1, minWidth: 250, textAlign: 'left' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.4rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.4rem', flexWrap: 'wrap' }}>
               <h1 style={{ margin: 0, fontSize: '2rem', fontWeight: 800 }}>{profile.username}</h1>
               {profile.is_pro && (
                   <span 
@@ -498,13 +581,98 @@ export const Profile: React.FC = () => {
                   ADMIN
                 </span>
               )}
+
+              {/* Follow / Unfollow button on other users' profiles */}
+              {!isOwnProfile && currentUser && (
+                <button
+                  type="button"
+                  onClick={handleToggleFollowProfileUser}
+                  className={profile.is_following ? "btn-secondary" : "btn-primary"}
+                  style={{
+                    padding: '0.35rem 0.85rem',
+                    fontSize: '0.85rem',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.4rem',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                    transition: 'all 0.2s ease',
+                    marginLeft: 'auto',
+                    ...(profile.is_following ? { borderColor: 'var(--accent-primary)', color: 'var(--accent-primary)' } : {})
+                  }}
+                >
+                  {profile.is_following ? (
+                    <>
+                      <UserCheck size={16} />
+                      {language === 'es' ? 'Siguiendo' : 'Following'}
+                    </>
+                  ) : (
+                    <>
+                      <UserPlus size={16} />
+                      {language === 'es' ? 'Seguir' : 'Follow'}
+                    </>
+                  )}
+                </button>
+              )}
             </div>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', margin: '0 0 0.8rem 0', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
               <Calendar size={16} /> {language === 'es' ? 'Miembro desde' : 'Joined'} {formatDate(new Date(profile.created_at))}
             </p>
-            <div style={{ display: 'flex', gap: '1.5rem', fontSize: '0.9rem' }}>
-              <span><strong>0</strong> {language === 'es' ? 'Seguidores' : 'Followers'}</span>
-              <span><strong>0</strong> {language === 'es' ? 'Seguidos' : 'Following'}</span>
+            <div style={{ display: 'flex', gap: '1.5rem', fontSize: '0.9rem', flexWrap: 'wrap', alignItems: 'center' }}>
+              {isOwnProfile ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenFollowModal('followers')}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      padding: '0.2rem 0.4rem',
+                      borderRadius: '4px',
+                      color: 'inherit',
+                      cursor: 'pointer',
+                      fontSize: 'inherit',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.35rem',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.color = 'var(--accent-primary)'; e.currentTarget.style.background = 'rgba(129, 140, 248, 0.1)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.color = 'inherit'; e.currentTarget.style.background = 'none'; }}
+                    title={language === 'es' ? 'Ver seguidores' : 'View followers'}
+                  >
+                    <strong style={{ color: 'var(--text-primary)' }}>{profile.followers_count ?? 0}</strong> {language === 'es' ? 'Seguidores' : 'Followers'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenFollowModal('following')}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      padding: '0.2rem 0.4rem',
+                      borderRadius: '4px',
+                      color: 'inherit',
+                      cursor: 'pointer',
+                      fontSize: 'inherit',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.35rem',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.color = 'var(--accent-primary)'; e.currentTarget.style.background = 'rgba(129, 140, 248, 0.1)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.color = 'inherit'; e.currentTarget.style.background = 'none'; }}
+                    title={language === 'es' ? 'Ver seguidos' : 'View following'}
+                  >
+                    <strong style={{ color: 'var(--text-primary)' }}>{profile.following_count ?? 0}</strong> {language === 'es' ? 'Seguidos' : 'Following'}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <span><strong>{profile.followers_count ?? 0}</strong> {language === 'es' ? 'Seguidores' : 'Followers'}</span>
+                  <span><strong>{profile.following_count ?? 0}</strong> {language === 'es' ? 'Seguidos' : 'Following'}</span>
+                </>
+              )}
               <span><strong>{visualLibraryItems.length}</strong> {language === 'es' ? 'En Estantería' : 'On Shelf'}</span>
             </div>
             
@@ -1351,6 +1519,225 @@ export const Profile: React.FC = () => {
               <button className="btn-primary" style={{ flex: 1 }} onClick={() => handleUpdateColor(selectedColor)}>
                 {language === 'es' ? 'Guardar' : 'Save'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Followers / Following Floating Modal */}
+      {showFollowModal && (
+        <div 
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.75)',
+            backdropFilter: 'blur(5px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 4000,
+            padding: '1rem'
+          }} 
+          onClick={() => setShowFollowModal(false)}
+        >
+          <div 
+            className="glass-card" 
+            style={{ 
+              width: '100%', 
+              maxWidth: '560px', 
+              maxHeight: '80vh', 
+              display: 'flex', 
+              flexDirection: 'column', 
+              borderRadius: '16px',
+              overflow: 'hidden',
+              boxShadow: '0 20px 40px rgba(0, 0, 0, 0.4)',
+              background: 'var(--bg-secondary)',
+              border: '1px solid var(--border-color)'
+            }} 
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'space-between', 
+              padding: '1.25rem 1.5rem', 
+              borderBottom: '1px solid var(--border-color)',
+              background: 'var(--bg-primary)'
+            }}>
+              <div style={{ display: 'flex', gap: '0.75rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setFollowModalTab('followers')}
+                  style={{
+                    padding: '0.45rem 0.9rem',
+                    borderRadius: '8px',
+                    border: 'none',
+                    fontWeight: 700,
+                    fontSize: '0.95rem',
+                    cursor: 'pointer',
+                    background: followModalTab === 'followers' ? 'var(--accent-primary)' : 'transparent',
+                    color: followModalTab === 'followers' ? '#fff' : 'var(--text-secondary)',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  {language === 'es' ? 'Seguidores' : 'Followers'} ({followersList.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFollowModalTab('following')}
+                  style={{
+                    padding: '0.45rem 0.9rem',
+                    borderRadius: '8px',
+                    border: 'none',
+                    fontWeight: 700,
+                    fontSize: '0.95rem',
+                    cursor: 'pointer',
+                    background: followModalTab === 'following' ? 'var(--accent-primary)' : 'transparent',
+                    color: followModalTab === 'following' ? '#fff' : 'var(--text-secondary)',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  {language === 'es' ? 'Siguiendo' : 'Following'} ({followingList.length})
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowFollowModal(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--text-secondary)',
+                  cursor: 'pointer',
+                  padding: '0.3rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: '6px',
+                  transition: 'color 0.2s ease'
+                }}
+                onMouseEnter={e => e.currentTarget.style.color = 'var(--text-primary)'}
+                onMouseLeave={e => e.currentTarget.style.color = 'var(--text-secondary)'}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div style={{ padding: '1.25rem 1.5rem', overflowY: 'auto', flex: 1, minHeight: '260px' }}>
+              {followListLoading ? (
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '200px', color: 'var(--text-secondary)' }}>
+                  {language === 'es' ? 'Cargando lista...' : 'Loading list...'}
+                </div>
+              ) : (
+                (() => {
+                  const currentList = followModalTab === 'followers' ? followersList : followingList;
+
+                  if (currentList.length === 0) {
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '200px', gap: '0.75rem', color: 'var(--text-secondary)' }}>
+                        <Users size={36} style={{ opacity: 0.4 }} />
+                        <span style={{ fontSize: '0.95rem', fontWeight: 500 }}>
+                          {followModalTab === 'followers' 
+                            ? (language === 'es' ? 'No tienes seguidores todavía.' : 'No followers yet.')
+                            : (language === 'es' ? 'No estás siguiendo a ningún usuario todavía.' : 'Not following anyone yet.')}
+                        </span>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: '0.85rem' }}>
+                      {currentList.map(u => {
+                        const isSelf = u.id === currentUser?.id;
+
+                        return (
+                          <div
+                            key={u.id}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              gap: '0.75rem',
+                              padding: '0.65rem 0.85rem',
+                              background: 'var(--bg-primary)',
+                              borderRadius: '10px',
+                              border: '1px solid var(--border-color)',
+                              transition: 'border-color 0.2s ease'
+                            }}
+                          >
+                            <div 
+                              onClick={() => {
+                                setShowFollowModal(false);
+                                navigate(`/profile?user_id=${u.id}`);
+                              }}
+                              style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', cursor: 'pointer', flex: 1, minWidth: 0 }}
+                              title={language === 'es' ? `Ver perfil de ${u.username}` : `View ${u.username}'s profile`}
+                            >
+                              <img
+                                src={u.photo_url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=100'}
+                                alt={u.username}
+                                style={{ width: '38px', height: '38px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '2px solid var(--accent-primary)' }}
+                              />
+                              <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                                  <span style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {u.username}
+                                  </span>
+                                  {u.is_pro && (
+                                    <span style={{ fontSize: '0.65rem', background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b', padding: '0.1rem 0.3rem', borderRadius: '3px', fontWeight: 700 }}>
+                                      PRO
+                                    </span>
+                                  )}
+                                </div>
+                                <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                                  {u.followers_count ?? 0} {language === 'es' ? 'seguidores' : 'followers'}
+                                </span>
+                              </div>
+                            </div>
+
+                            {!isSelf && (
+                              <button
+                                type="button"
+                                onClick={() => handleToggleFollowUserInModal(u)}
+                                className={u.is_following ? "btn-secondary" : "btn-primary"}
+                                style={{
+                                  padding: '0.3rem 0.65rem',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 600,
+                                  borderRadius: '6px',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '0.3rem',
+                                  flexShrink: 0,
+                                  ...(u.is_following ? { borderColor: 'var(--accent-primary)', color: 'var(--accent-primary)' } : {})
+                                }}
+                              >
+                                {u.is_following ? (
+                                  <>
+                                    <UserCheck size={13} />
+                                    {language === 'es' ? 'Siguiendo' : 'Following'}
+                                  </>
+                                ) : (
+                                  <>
+                                    <UserPlus size={13} />
+                                    {language === 'es' ? 'Seguir' : 'Follow'}
+                                  </>
+                                )}
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()
+              )}
             </div>
           </div>
         </div>

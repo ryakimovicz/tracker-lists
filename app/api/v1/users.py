@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Query, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, get_current_user_optional
 from app.models.user import User
 from app.models.list import ReadingList, VisibilityEnum
 from app.models.list_item import ListItem
@@ -12,6 +12,7 @@ from app.models.saved_list import SavedList
 from app.models.item_progress import ItemProgress
 from app.models.library import UserLibraryItem
 from app.models.addition import ListAddition, UserAdoptedAddition
+from app.models.social import Follow
 from app.core.security import verify_password, get_password_hash
 from app.services.lastfm import LastFMService
 from app.models.activity import UserActivityLog
@@ -43,6 +44,9 @@ def get_user_dashboard(
     ).filter(
         SavedList.user_id == current_user.id
     ).all()
+
+    followers_count = db.query(Follow).filter(Follow.followed_id == current_user.id).count()
+    following_count = db.query(Follow).filter(Follow.follower_id == current_user.id).count()
     
     return UserDashboardResponse(
         id=current_user.id,
@@ -55,6 +59,9 @@ def get_user_dashboard(
         is_pro=current_user.is_pro,
         profile_color=current_user.profile_color,
         lastfm_username=current_user.lastfm_username,
+        followers_count=followers_count,
+        following_count=following_count,
+        is_following=False,
         created_lists=created_lists,
         saved_lists=saved_lists
     )
@@ -405,6 +412,7 @@ def get_guides_updates(
 @router.get("/profile/{user_id}", response_model=UserDashboardResponse)
 def get_any_user_profile(
     user_id: int,
+    current_user: Optional[User] = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
     user = db.query(User).filter(User.id == user_id).first()
@@ -429,6 +437,15 @@ def get_any_user_profile(
         SavedList.user_id == user.id,
         ReadingList.visibility == VisibilityEnum.PUBLIC
     ).all()
+
+    followers_count = db.query(Follow).filter(Follow.followed_id == user.id).count()
+    following_count = db.query(Follow).filter(Follow.follower_id == user.id).count()
+    is_following = False
+    if current_user:
+        is_following = db.query(Follow).filter(
+            Follow.follower_id == current_user.id,
+            Follow.followed_id == user.id
+        ).first() is not None
     
     return UserDashboardResponse(
         id=user.id,
@@ -441,6 +458,9 @@ def get_any_user_profile(
         is_pro=user.is_pro,
         profile_color=user.profile_color,
         lastfm_username=user.lastfm_username,
+        followers_count=followers_count,
+        following_count=following_count,
+        is_following=is_following,
         created_lists=created_lists,
         saved_lists=saved_lists
     )

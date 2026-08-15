@@ -17,6 +17,9 @@ class UserResponse(UserBase):
     is_pro: bool = False
     profile_color: str | None = None
     lastfm_username: str | None = None
+    followers_count: int = 0
+    following_count: int = 0
+    is_following: bool = False
 
     class Config:
         from_attributes = True
@@ -42,6 +45,9 @@ class UserDashboardResponse(BaseModel):
     is_pro: bool = False
     profile_color: str | None = None
     lastfm_username: str | None = None
+    followers_count: int = 0
+    following_count: int = 0
+    is_following: bool = False
     created_lists: List[ReadingListResponse] = []
     saved_lists: List[ReadingListResponse] = []
 
