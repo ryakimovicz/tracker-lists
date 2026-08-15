@@ -443,13 +443,70 @@ export const ViewGuide: React.FC = () => {
 
       <div className="glass-card" style={{ padding: '2.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem', textAlign: 'left' }}>
         <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem' }}>
-          <div style={{ flex: 1 }}>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
             <h1 style={{ margin: 0, fontSize: '2rem', fontWeight: 800 }}>{guide.title}</h1>
             {guide.description && (
-              <p style={{ color: 'var(--text-secondary)', fontSize: '1.05rem', margin: '0.5rem 0 0 0', fontStyle: 'italic', lineHeight: '1.4' }}>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '1.05rem', margin: 0, fontStyle: 'italic', lineHeight: '1.4' }}>
                 {guide.description}
               </p>
             )}
+            
+            {/* Creator Author Pill */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginTop: '0.35rem' }}>
+              <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                {language === 'es' ? 'Creada por' : 'Created by'}
+              </span>
+              <div
+                onClick={() => guide.creator_id && navigate(`/profile?user_id=${guide.creator_id}`)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.45rem',
+                  padding: '0.2rem 0.65rem 0.2rem 0.3rem',
+                  background: 'var(--bg-secondary)',
+                  borderRadius: '20px',
+                  border: '1px solid var(--border-color)',
+                  cursor: guide.creator_id ? 'pointer' : 'default',
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseEnter={(e) => { if (guide.creator_id) { e.currentTarget.style.borderColor = 'var(--accent-primary)'; e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; } }}
+                onMouseLeave={(e) => { if (guide.creator_id) { e.currentTarget.style.borderColor = 'var(--border-color)'; e.currentTarget.style.background = 'var(--bg-secondary)'; } }}
+                title={language === 'es' ? 'Ver perfil del creador' : 'View creator profile'}
+              >
+                {guide.creator_photo_url ? (
+                  <img
+                    src={guide.creator_photo_url}
+                    alt={guide.creator_username}
+                    style={{
+                      width: '22px',
+                      height: '22px',
+                      borderRadius: '50%',
+                      objectFit: 'cover',
+                      flexShrink: 0
+                    }}
+                  />
+                ) : (
+                  <div style={{
+                    width: '22px',
+                    height: '22px',
+                    borderRadius: '50%',
+                    background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))',
+                    color: '#fff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '0.72rem',
+                    fontWeight: 700,
+                    flexShrink: 0
+                  }}>
+                    {(guide.creator_username || 'U')[0].toUpperCase()}
+                  </div>
+                )}
+                <span style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                  {guide.creator_username}
+                </span>
+              </div>
+            </div>
           </div>
           <button
             type="button"
@@ -491,63 +548,12 @@ export const ViewGuide: React.FC = () => {
           </button>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem', background: 'var(--bg-secondary)', padding: '1.25rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', background: 'var(--bg-secondary)', padding: '1.25rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
           <div>
             <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{language === 'es' ? 'Progreso Completado:' : 'Completed Progress:'}</span>
             <h4 style={{ margin: '0.25rem 0 0 0', fontSize: '1.35rem', fontWeight: 700 }}>
               {guide.completed_count} / {guide.total_count} ({guide.progress_percentage}%)
             </h4>
-          </div>
-          <div>
-            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{language === 'es' ? 'Creador:' : 'Creator:'}</span>
-            <div
-              onClick={() => guide.creator_id && navigate(`/profile?user_id=${guide.creator_id}`)}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.6rem',
-                marginTop: '0.35rem',
-                cursor: guide.creator_id ? 'pointer' : 'default',
-                transition: 'transform 0.2s ease'
-              }}
-              onMouseEnter={(e) => { if (guide.creator_id) e.currentTarget.style.transform = 'translateY(-1px)'; }}
-              onMouseLeave={(e) => { if (guide.creator_id) e.currentTarget.style.transform = 'none'; }}
-              title={language === 'es' ? 'Ver perfil del creador' : 'View creator profile'}
-            >
-              {guide.creator_photo_url ? (
-                <img
-                  src={guide.creator_photo_url}
-                  alt={guide.creator_username}
-                  style={{
-                    width: '32px',
-                    height: '32px',
-                    borderRadius: '50%',
-                    objectFit: 'cover',
-                    border: '2px solid var(--accent-primary)',
-                    flexShrink: 0
-                  }}
-                />
-              ) : (
-                <div style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '50%',
-                  background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))',
-                  color: '#fff',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '0.82rem',
-                  fontWeight: 700,
-                  flexShrink: 0
-                }}>
-                  {(guide.creator_username || 'U')[0].toUpperCase()}
-                </div>
-              )}
-              <h4 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, textTransform: 'capitalize', color: 'var(--text-primary)' }}>
-                {guide.creator_username}
-              </h4>
-            </div>
           </div>
           <div>
             <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
