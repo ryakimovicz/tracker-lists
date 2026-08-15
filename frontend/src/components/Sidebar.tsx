@@ -37,7 +37,15 @@ export const Sidebar: React.FC = () => {
   };
 
   const NavItem = ({ to, icon: Icon, label }: { to: string, icon: any, label: string }) => {
-    const isActive = location.pathname === to || (to !== '/' && location.pathname.startsWith(to));
+    const searchParams = new URLSearchParams(location.search);
+    const userIdParam = searchParams.get('user_id');
+    const isOtherUserProfile = location.pathname === '/profile' && !!userIdParam && String(userIdParam) !== String(user?.id);
+
+    let isActive = location.pathname === to || (to !== '/' && location.pathname.startsWith(to));
+    if (to === '/profile' && isOtherUserProfile) {
+      isActive = false;
+    }
+
     return (
       <Link
         to={to}

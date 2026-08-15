@@ -224,8 +224,9 @@ export const Profile: React.FC = () => {
   };
 
   useEffect(() => {
+    setShowFollowModal(false);
     fetchProfileAndLibrary();
-  }, []);
+  }, [userIdParam]);
 
   const fetchProfileAndLibrary = async () => {
     setLoading(true);
