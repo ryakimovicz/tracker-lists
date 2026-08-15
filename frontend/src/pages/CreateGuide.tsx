@@ -1158,11 +1158,9 @@ export const CreateGuide: React.FC = () => {
           
           {/* Editor Header Tools */}
           <div className="glass-card" style={{ 
-            padding: '1.5rem 2rem', 
+            padding: '1.25rem 2rem', 
             display: 'flex', 
-            justifyContent: 'space-between', 
-            alignItems: 'center', 
-            flexWrap: 'wrap', 
+            flexDirection: 'column',
             gap: '1rem', 
             position: 'sticky', 
             top: '75px', 
@@ -1171,81 +1169,85 @@ export const CreateGuide: React.FC = () => {
             pointerEvents: pointerDrag ? 'none' : 'auto',
             transition: 'opacity 0.2s ease'
           }}>
-            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-              <button onClick={addSection} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem' }}>
+            {/* Top Row: Auto-save status & Main Actions (Visibility, View Guide, Publish Changes) */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+              {/* Auto-save status indicator */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                {isAutoSaving ? (
+                  <span>{language === 'es' ? 'Guardando borrador...' : 'Saving draft...'}</span>
+                ) : lastSavedTime ? (
+                  <span>{language === 'es' ? `Borrador guardado: ${lastSavedTime}` : `Draft auto-saved: ${lastSavedTime}`}</span>
+                ) : null}
+              </div>
+
+              {/* Target visibility selector, View Guide & Publish action */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                <select
+                  className="input-field"
+                  value={guide?.section_descriptions?.intended_visibility || 'public'}
+                  onChange={(e) => {
+                    const newInt = e.target.value;
+                    setGuide((prev: any) => {
+                      if (!prev) return null;
+                      return {
+                        ...prev,
+                        section_descriptions: {
+                          ...prev.section_descriptions,
+                          intended_visibility: newInt
+                        }
+                      };
+                    });
+                  }}
+                  style={{ width: '110px', fontSize: '0.82rem', padding: '0.25rem 0.5rem', height: '38px', margin: 0 }}
+                >
+                  <option value="public">{language === 'es' ? 'Pública' : 'Public'}</option>
+                  <option value="private">{language === 'es' ? 'Privada' : 'Private'}</option>
+                </select>
+
+                {guide && (() => {
+                  const isPublished = guide.visibility !== 'draft';
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => isPublished && navigate(`/guide/${guide.id}`)}
+                      disabled={!isPublished}
+                      className="btn-secondary"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.45rem',
+                        height: '38px',
+                        padding: '0.5rem 1rem',
+                        fontSize: '0.85rem',
+                        opacity: isPublished ? 1 : 0.45,
+                        cursor: isPublished ? 'pointer' : 'not-allowed'
+                      }}
+                      title={isPublished ? (language === 'es' ? 'Ver guía' : 'View guide') : (language === 'es' ? 'La guía debe estar publicada para poder verla' : 'The guide must be published to view it')}
+                    >
+                      <Eye size={16} /> {language === 'es' ? 'Ver Guía' : 'View Guide'}
+                    </button>
+                  );
+                })()}
+
+                <button onClick={handlePublishGuide} disabled={isSubmitting} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1.25rem', height: '38px' }}>
+                  <Save size={16} /> {isSubmitting ? '...' : language === 'es' ? 'Publicar Cambios' : 'Publish Changes'}
+                </button>
+              </div>
+            </div>
+
+            {/* Bottom Row: Document Builders (+ Nueva Sección, + Nuevo Bloque, Pegar Sección) */}
+            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', borderTop: '1px solid var(--border-color)', paddingTop: '0.85rem' }}>
+              <button onClick={addSection} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', padding: '0.45rem 1rem' }}>
                 <FolderPlus size={16} /> {language === 'es' ? '+ Nueva Sección' : '+ New Section'}
               </button>
-              <button onClick={addBlock} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem' }}>
+              <button onClick={addBlock} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', padding: '0.45rem 1rem' }}>
                 <LayoutGrid size={16} /> {language === 'es' ? '+ Nuevo Bloque' : '+ New Block'}
               </button>
               {clipboard && clipboard.type === 'section' && (
-                <button onClick={() => handlePaste('root')} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem' }}>
+                <button onClick={() => handlePaste('root')} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', padding: '0.45rem 1rem' }}>
                   <ClipboardPaste size={16} /> {language === 'es' ? 'Pegar Sección' : 'Paste Section'}
                 </button>
               )}
-            </div>
-            
-            {/* Auto-save status indicator */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
-              {isAutoSaving ? (
-                <span>{language === 'es' ? 'Guardando borrador...' : 'Saving draft...'}</span>
-              ) : lastSavedTime ? (
-                <span>{language === 'es' ? `Borrador guardado: ${lastSavedTime}` : `Draft auto-saved: ${lastSavedTime}`}</span>
-              ) : null}
-            </div>
-
-            {/* Target visibility selector, View Guide & Publish action */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-              <select
-                className="input-field"
-                value={guide?.section_descriptions?.intended_visibility || 'public'}
-                onChange={(e) => {
-                  const newInt = e.target.value;
-                  setGuide((prev: any) => {
-                    if (!prev) return null;
-                    return {
-                      ...prev,
-                      section_descriptions: {
-                        ...prev.section_descriptions,
-                        intended_visibility: newInt
-                      }
-                    };
-                  });
-                }}
-                style={{ width: '110px', fontSize: '0.82rem', padding: '0.25rem 0.5rem', height: '38px', margin: 0 }}
-              >
-                <option value="public">{language === 'es' ? 'Pública' : 'Public'}</option>
-                <option value="private">{language === 'es' ? 'Privada' : 'Private'}</option>
-              </select>
-
-              {guide && (() => {
-                const isPublished = guide.visibility !== 'draft';
-                return (
-                  <button
-                    type="button"
-                    onClick={() => isPublished && navigate(`/guide/${guide.id}`)}
-                    disabled={!isPublished}
-                    className="btn-secondary"
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.45rem',
-                      height: '38px',
-                      padding: '0.5rem 1rem',
-                      fontSize: '0.85rem',
-                      opacity: isPublished ? 1 : 0.45,
-                      cursor: isPublished ? 'pointer' : 'not-allowed'
-                    }}
-                    title={isPublished ? (language === 'es' ? 'Ver guía' : 'View guide') : (language === 'es' ? 'La guía debe estar publicada para poder verla' : 'The guide must be published to view it')}
-                  >
-                    <Eye size={16} /> {language === 'es' ? 'Ver Guía' : 'View Guide'}
-                  </button>
-                );
-              })()}
-
-              <button onClick={handlePublishGuide} disabled={isSubmitting} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1.25rem', height: '38px' }}>
-                <Save size={16} /> {isSubmitting ? '...' : language === 'es' ? 'Publicar Cambios' : 'Publish Changes'}
-              </button>
             </div>
           </div>
 
