@@ -6,7 +6,8 @@ import {
   ChevronDown,
   ChevronRight,
   ArrowLeft,
-  Check
+  Check,
+  Heart
 } from 'lucide-react';
 import { ItemDetailsModal } from '../components/ItemDetailsModal';
 
@@ -17,6 +18,8 @@ export const ViewGuide: React.FC = () => {
   const { language } = useTranslation();
 
   const [guide, setGuide] = useState<any | null>(null);
+  const [isSaved, setIsSaved] = useState(false);
+  const [isTogglingSave, setIsTogglingSave] = useState(false);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
@@ -38,11 +41,31 @@ export const ViewGuide: React.FC = () => {
     }
   };
 
+  const handleToggleSaveGuide = async () => {
+    if (!guide || isTogglingSave) return;
+    setIsTogglingSave(true);
+    const nextState = !isSaved;
+    setIsSaved(nextState);
+    try {
+      if (isSaved) {
+        await apiClient.delete(`/lists/${guide.id}/save`);
+      } else {
+        await apiClient.post(`/lists/${guide.id}/save`);
+      }
+    } catch (err) {
+      setIsSaved(!nextState);
+      console.error("Failed to toggle guide follow/save", err);
+    } finally {
+      setIsTogglingSave(false);
+    }
+  };
+
   const fetchListDetails = () => {
     if (!id) return;
     apiClient.get(`/lists/${id}`)
       .then(response => {
         setGuide(response.data);
+        setIsSaved(!!response.data.is_saved_by_me);
         const cachedCollapse = localStorage.getItem(`guide_collapsed_${id}`);
         if (cachedCollapse) {
           try {
@@ -233,13 +256,53 @@ export const ViewGuide: React.FC = () => {
       </div>
 
       <div className="glass-card" style={{ padding: '2.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem', textAlign: 'left' }}>
-        <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '1.25rem' }}>
-          <h1 style={{ margin: 0, fontSize: '2rem', fontWeight: 800 }}>{guide.title}</h1>
-          {guide.description && (
-            <p style={{ color: 'var(--text-secondary)', fontSize: '1.05rem', margin: '0.5rem 0 0 0', fontStyle: 'italic', lineHeight: '1.4' }}>
-              {guide.description}
-            </p>
-          )}
+        <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem' }}>
+          <div style={{ flex: 1 }}>
+            <h1 style={{ margin: 0, fontSize: '2rem', fontWeight: 800 }}>{guide.title}</h1>
+            {guide.description && (
+              <p style={{ color: 'var(--text-secondary)', fontSize: '1.05rem', margin: '0.5rem 0 0 0', fontStyle: 'italic', lineHeight: '1.4' }}>
+                {guide.description}
+              </p>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={handleToggleSaveGuide}
+            disabled={isTogglingSave}
+            title={isSaved ? (language === 'es' ? 'Dejar de seguir guía' : 'Unfollow guide') : (language === 'es' ? 'Seguir guía' : 'Follow guide')}
+            style={{
+              background: isSaved ? 'rgba(239, 68, 68, 0.15)' : 'var(--bg-secondary)',
+              border: isSaved ? '1px solid rgba(239, 68, 68, 0.4)' : '1px solid var(--border-color)',
+              color: isSaved ? '#ef4444' : 'var(--text-secondary)',
+              borderRadius: '50%',
+              width: '42px',
+              height: '42px',
+              minWidth: '42px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+              boxShadow: isSaved ? '0 0 14px rgba(239, 68, 68, 0.35)' : 'none',
+              flexShrink: 0
+            }}
+            onMouseEnter={(e) => {
+              if (!isSaved) {
+                (e.currentTarget as HTMLElement).style.color = '#ef4444';
+                (e.currentTarget as HTMLElement).style.borderColor = 'rgba(239, 68, 68, 0.4)';
+                (e.currentTarget as HTMLElement).style.background = 'rgba(239, 68, 68, 0.1)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!isSaved) {
+                (e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)';
+                (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-color)';
+                (e.currentTarget as HTMLElement).style.background = 'var(--bg-secondary)';
+              }
+            }}
+          >
+            <Heart size={22} fill={isSaved ? '#ef4444' : 'none'} />
+          </button>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', background: 'var(--bg-secondary)', padding: '1.25rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
