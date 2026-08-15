@@ -34,6 +34,7 @@ class Comment(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     list_id = Column(Integer, ForeignKey("reading_lists.id", ondelete="CASCADE"), nullable=False)
+    parent_id = Column(Integer, ForeignKey("comments.id", ondelete="CASCADE"), nullable=True)
     content = Column(Text, nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
@@ -41,6 +42,7 @@ class Comment(Base):
     user = relationship("User", backref="comments")
     reading_list = relationship("ReadingList", back_populates="comments")
     votes = relationship("CommentVote", backref="comment", cascade="all, delete-orphan")
+    replies = relationship("Comment", cascade="all, delete-orphan")
 
 class CommentVote(Base):
     __tablename__ = "comment_votes"

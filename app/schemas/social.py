@@ -12,11 +12,13 @@ class ListRatingResponse(BaseModel):
 
 class CommentCreate(BaseModel):
     content: str = Field(..., min_length=1, max_length=1000)
+    parent_id: Optional[int] = None
 
 class CommentResponse(BaseModel):
     id: int
     user_id: int
     list_id: int
+    parent_id: Optional[int] = None
     content: str
     created_at: datetime
     creator_username: str

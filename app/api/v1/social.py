@@ -162,9 +162,15 @@ def add_comment(
     if not reading_list:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="List not found")
         
+    if comment_in.parent_id:
+        parent_comment = db.query(Comment).filter(Comment.id == comment_in.parent_id, Comment.list_id == list_id).first()
+        if not parent_comment:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Parent comment not found")
+
     new_comment = Comment(
         user_id=current_user.id,
         list_id=list_id,
+        parent_id=comment_in.parent_id,
         content=comment_in.content
     )
     db.add(new_comment)
@@ -186,6 +192,7 @@ def add_comment(
         id=new_comment.id,
         user_id=new_comment.user_id,
         list_id=new_comment.list_id,
+        parent_id=new_comment.parent_id,
         content=new_comment.content,
         created_at=new_comment.created_at,
         creator_username=current_user.username,
@@ -198,11 +205,11 @@ def add_comment(
 def get_list_comments(
     list_id: int,
     skip: int = 0,
-    limit: int = 20,
+    limit: int = 200,
     current_user: Optional[User] = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
-    comments = db.query(Comment).filter(Comment.list_id == list_id).order_by(Comment.created_at.desc()).offset(skip).limit(limit).all()
+    comments = db.query(Comment).filter(Comment.list_id == list_id).order_by(Comment.created_at.asc()).offset(skip).limit(limit).all()
     results = []
     
     for c in comments:
@@ -219,9 +226,10 @@ def get_list_comments(
                 id=c.id,
                 user_id=c.user_id,
                 list_id=c.list_id,
+                parent_id=c.parent_id,
                 content=c.content,
                 created_at=c.created_at,
-                creator_username=c.user.username,
+                creator_username=c.user.username if c.user else "Unknown",
                 photo_url=c.user.photo_url if c.user else None,
                 vote_count=vote_count,
                 is_voted_by_me=is_voted
