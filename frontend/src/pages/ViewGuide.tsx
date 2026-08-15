@@ -1228,30 +1228,35 @@ export const ViewGuide: React.FC = () => {
                           boxSizing: 'border-box'
                         }}
                       />
-                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.4rem' }}>
-                        <button
-                          type="button"
-                          onClick={() => { setReplyTarget(null); setReplyText(''); }}
-                          className="btn-secondary"
-                          style={{ padding: '0.35rem 0.8rem', fontSize: '0.8rem' }}
-                        >
-                          {language === 'es' ? 'Cancelar' : 'Cancel'}
-                        </button>
-                        <button
-                          type="submit"
-                          disabled={!replyText.trim() || isSubmittingComment}
-                          className="btn-primary"
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '0.35rem',
-                            padding: '0.35rem 0.9rem',
-                            fontSize: '0.8rem'
-                          }}
-                        >
-                          <Send size={13} />
-                          {isSubmittingComment ? (language === 'es' ? 'Enviando...' : 'Sending...') : (language === 'es' ? 'Responder' : 'Reply')}
-                        </button>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.4rem' }}>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                          {replyText.length} / 1000
+                        </span>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <button
+                            type="button"
+                            onClick={() => { setReplyTarget(null); setReplyText(''); }}
+                            className="btn-secondary"
+                            style={{ padding: '0.35rem 0.8rem', fontSize: '0.8rem' }}
+                          >
+                            {language === 'es' ? 'Cancelar' : 'Cancel'}
+                          </button>
+                          <button
+                            type="submit"
+                            disabled={!replyText.trim() || isSubmittingComment}
+                            className="btn-primary"
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.35rem',
+                              padding: '0.35rem 0.9rem',
+                              fontSize: '0.8rem'
+                            }}
+                          >
+                            <Send size={13} />
+                            {isSubmittingComment ? (language === 'es' ? 'Enviando...' : 'Sending...') : (language === 'es' ? 'Responder' : 'Reply')}
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </form>
