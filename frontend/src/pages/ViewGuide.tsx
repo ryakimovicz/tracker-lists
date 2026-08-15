@@ -500,9 +500,54 @@ export const ViewGuide: React.FC = () => {
           </div>
           <div>
             <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{language === 'es' ? 'Creador:' : 'Creator:'}</span>
-            <h4 style={{ margin: '0.25rem 0 0 0', fontSize: '1.35rem', fontWeight: 700, textTransform: 'capitalize' }}>
-              {guide.creator_username}
-            </h4>
+            <div
+              onClick={() => guide.creator_id && navigate(`/profile?user_id=${guide.creator_id}`)}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.6rem',
+                marginTop: '0.35rem',
+                cursor: guide.creator_id ? 'pointer' : 'default',
+                transition: 'transform 0.2s ease'
+              }}
+              onMouseEnter={(e) => { if (guide.creator_id) e.currentTarget.style.transform = 'translateY(-1px)'; }}
+              onMouseLeave={(e) => { if (guide.creator_id) e.currentTarget.style.transform = 'none'; }}
+              title={language === 'es' ? 'Ver perfil del creador' : 'View creator profile'}
+            >
+              {guide.creator_photo_url ? (
+                <img
+                  src={guide.creator_photo_url}
+                  alt={guide.creator_username}
+                  style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '50%',
+                    objectFit: 'cover',
+                    border: '2px solid var(--accent-primary)',
+                    flexShrink: 0
+                  }}
+                />
+              ) : (
+                <div style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '50%',
+                  background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))',
+                  color: '#fff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '0.82rem',
+                  fontWeight: 700,
+                  flexShrink: 0
+                }}>
+                  {(guide.creator_username || 'U')[0].toUpperCase()}
+                </div>
+              )}
+              <h4 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, textTransform: 'capitalize', color: 'var(--text-primary)' }}>
+                {guide.creator_username}
+              </h4>
+            </div>
           </div>
           <div>
             <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>

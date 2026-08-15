@@ -68,6 +68,7 @@ class ReadingListResponse(ReadingListBase):
 
 class ReadingListDetailsResponse(ReadingListResponse):
     creator_username: str
+    creator_photo_url: Optional[str] = None
     is_saved_by_me: bool = False
     completed_count: int = 0
     skipped_count: int = 0

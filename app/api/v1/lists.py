@@ -286,6 +286,7 @@ def get_list_details(
         visibility=reading_list.visibility,
         created_at=reading_list.created_at,
         creator_username=creator_username,
+        creator_photo_url=creator.photo_url if creator else None,
         is_saved_by_me=is_saved_by_me,
         completed_count=completed_count,
         skipped_count=skipped_count,
