@@ -48,7 +48,7 @@ export const Search: React.FC = () => {
 
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResultItem[]>([]);
-  const [activeExploreTab, setActiveExploreTab] = useState<'agregado' | 'nuevo' | 'descubrir'>('agregado');
+  const [activeExploreTab, setActiveExploreTab] = useState<'nuevo' | 'descubrir'>('nuevo');
   const [activeTab, setActiveTab] = useState<'all' | 'movie' | 'series' | 'anime' | 'book' | 'game' | 'user' | 'guide' | 'comic' | 'manga'>('all');
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
@@ -334,8 +334,8 @@ export const Search: React.FC = () => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', marginTop: '1rem' }}>
           
           <div style={{ display: "flex", gap: "2rem", borderBottom: "1px solid var(--border-color)", paddingBottom: "0.5rem", position: "relative" }}>
-            {["agregado", "nuevo", "descubrir"].map((tab) => {
-              const labels: any = { "agregado": "Agregado", "nuevo": "Nuevo", "descubrir": "Descubrir" };
+            {["nuevo", "descubrir"].map((tab) => {
+              const labels: any = { "nuevo": language === 'es' ? "Nuevo" : "New", "descubrir": language === 'es' ? "Descubrir" : "Discover" };
               const isActive = activeExploreTab === tab;
               return (
                 <div 
