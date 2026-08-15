@@ -12,6 +12,7 @@ from app.models.list_item import ListItem, ItemTypeEnum
 from app.models.saved_list import SavedList
 from app.models.item_progress import ItemProgress
 from app.models.addition import ListAddition, UserAdoptedAddition
+from app.models.social import ListVote
 from app.services.tvmaze import TVMazeService
 from app.models.library import UserLibraryItem, UserLibraryStatusEnum
 from app.models.activity import UserActivityLog
