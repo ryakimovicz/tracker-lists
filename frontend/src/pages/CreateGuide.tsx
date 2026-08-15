@@ -329,13 +329,52 @@ export const CreateGuide: React.FC = () => {
           type: 'subblock',
           title: '',
           description: '',
-          importance_rank: 3,
+          importance_rank: el.importance_rank ?? 3,
           items: []
         };
         return {
           ...el,
           subblocks: [...(el.subblocks || []), newSub]
         };
+      }
+      return el;
+    }));
+  };
+
+  const updateItemImportance = (blockId: string, itemId: number, rank: number | null, subblockId?: string) => {
+    setDocFlow(prev => prev.map(el => {
+      if (subblockId) {
+        if (el.id === blockId && el.type === 'block') {
+          return {
+            ...el,
+            subblocks: (el.subblocks || []).map(sub => {
+              if (sub.id === subblockId) {
+                return {
+                  ...sub,
+                  items: (sub.items || []).map(item => {
+                    if (item.id === itemId) {
+                      return { ...item, importance_rank: rank };
+                    }
+                    return item;
+                  })
+                };
+              }
+              return sub;
+            })
+          };
+        }
+      } else {
+        if (el.id === blockId && el.type === 'block') {
+          return {
+            ...el,
+            items: (el.items || []).map(item => {
+              if (item.id === itemId) {
+                return { ...item, importance_rank: rank };
+              }
+              return item;
+            })
+          };
+        }
       }
       return el;
     }));
@@ -989,6 +1028,13 @@ export const CreateGuide: React.FC = () => {
     setErrorMsg('');
     setSuccessMsg('');
     try {
+      const targetBlock = docFlow.find(b => b.id === searchTarget.elementId);
+      let targetImportance = targetBlock?.importance_rank ?? 3;
+      if (searchTarget.subblockId && targetBlock && targetBlock.subblocks) {
+        const targetSub = targetBlock.subblocks.find(s => s.id === searchTarget.subblockId);
+        targetImportance = targetSub?.importance_rank ?? targetImportance;
+      }
+
       // Create ListItem in backend database
       const response = await apiClient.post(`/lists/${guide.id}/items`, {
         item_type: media.item_type,
@@ -997,11 +1043,11 @@ export const CreateGuide: React.FC = () => {
         image_url: media.image_url,
         custom_notes: media.description,
         section: null,
-        importance_rank: null,
+        importance_rank: targetImportance,
         order_index: 0
       });
 
-      const newItem = response.data;
+      const newItem = { ...response.data, importance_rank: targetImportance };
 
       // Insert item into the correct block/subblock in docFlow state
       setDocFlow(prev => prev.map(el => {
@@ -1715,43 +1761,71 @@ export const CreateGuide: React.FC = () => {
                                   transition: 'all 0.15s ease'
                                 }}
                               >
-                                {/* Top row: Action buttons and checkbox */}
-                                <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', gap: '0.35rem', width: '100%' }}>
-                                  <input 
-                                    type="checkbox" 
-                                    disabled={selectedElements.ids.length > 0 && (selectedElements.type !== 'item' || selectedElements.parentId !== element.id)} 
-                                    checked={selectedElements.type === 'item' && selectedElements.ids.includes(item.id)} 
-                                    onChange={() => toggleSelection('item', item.id, element.id)} 
-                                    style={{ transform: 'scale(1.1)', cursor: 'pointer', marginRight: '0.2rem' }} 
-                                    title={language === 'es' ? 'Seleccionar' : 'Select'}
-                                  />
-                                  <button 
-                                    type="button" 
-                                    onClick={() => handleCopy('item', item)} 
-                                    className="btn-secondary" 
-                                    style={{ padding: '0.2rem 0.35rem', border: 'none', background: 'transparent', color: 'var(--accent-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-                                    title={language === 'es' ? 'Copiar' : 'Copy'}
-                                  >
-                                    <Copy size={15} />
-                                  </button>
-                                  <button 
-                                    type="button" 
-                                    onClick={() => handleCut('item', item, item.id, element.id)} 
-                                    className="btn-secondary" 
-                                    style={{ padding: '0.2rem 0.35rem', border: 'none', background: 'transparent', color: '#f59e0b', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-                                    title={language === 'es' ? 'Cortar' : 'Cut'}
-                                  >
-                                    <Scissors size={15} />
-                                  </button>
-                                  <button 
-                                    type="button" 
-                                    onClick={() => removeMediaItem(element.id, item.id)} 
-                                    className="btn-secondary" 
-                                    style={{ padding: '0.2rem 0.35rem', border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-                                    title={language === 'es' ? 'Eliminar' : 'Delete'}
-                                  >
-                                    <Trash2 size={15} />
-                                  </button>
+                                {/* Top row: Action buttons, checkbox, and item importance selector */}
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                    <input 
+                                      type="checkbox" 
+                                      disabled={selectedElements.ids.length > 0 && (selectedElements.type !== 'item' || selectedElements.parentId !== element.id)} 
+                                      checked={selectedElements.type === 'item' && selectedElements.ids.includes(item.id)} 
+                                      onChange={() => toggleSelection('item', item.id, element.id)} 
+                                      style={{ transform: 'scale(1.1)', cursor: 'pointer', marginRight: '0.2rem' }} 
+                                      title={language === 'es' ? 'Seleccionar' : 'Select'}
+                                    />
+                                    <button 
+                                      type="button" 
+                                      onClick={() => handleCopy('item', item)} 
+                                      className="btn-secondary" 
+                                      style={{ padding: '0.2rem 0.35rem', border: 'none', background: 'transparent', color: 'var(--accent-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                                      title={language === 'es' ? 'Copiar' : 'Copy'}
+                                    >
+                                      <Copy size={15} />
+                                    </button>
+                                    <button 
+                                      type="button" 
+                                      onClick={() => handleCut('item', item, item.id, element.id)} 
+                                      className="btn-secondary" 
+                                      style={{ padding: '0.2rem 0.35rem', border: 'none', background: 'transparent', color: '#f59e0b', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                                      title={language === 'es' ? 'Cortar' : 'Cut'}
+                                    >
+                                      <Scissors size={15} />
+                                    </button>
+                                    <button 
+                                      type="button" 
+                                      onClick={() => removeMediaItem(element.id, item.id)} 
+                                      className="btn-secondary" 
+                                      style={{ padding: '0.2rem 0.35rem', border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                                      title={language === 'es' ? 'Eliminar' : 'Delete'}
+                                    >
+                                      <Trash2 size={15} />
+                                    </button>
+                                  </div>
+
+                                  {/* Importance rank selector */}
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                    <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                                      {language === 'es' ? 'Importancia:' : 'Importance:'}
+                                    </span>
+                                    <select
+                                      value={item.importance_rank ?? element.importance_rank ?? 3}
+                                      onChange={(e) => updateItemImportance(element.id, item.id, e.target.value ? parseInt(e.target.value) : null)}
+                                      style={{
+                                        padding: '0.12rem 0.35rem',
+                                        fontSize: '0.72rem',
+                                        background: 'var(--bg-primary)',
+                                        border: '1px solid var(--border-color)',
+                                        color: (item.importance_rank && item.importance_rank !== (element.importance_rank ?? 3)) ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                                        fontWeight: (item.importance_rank && item.importance_rank !== (element.importance_rank ?? 3)) ? 700 : 400,
+                                        borderRadius: '4px'
+                                      }}
+                                    >
+                                      <option value="1">1 - {language === 'es' ? 'Extra' : 'Extra'}</option>
+                                      <option value="2">2 - {language === 'es' ? 'Opcional' : 'Optional'}</option>
+                                      <option value="3">3 - {language === 'es' ? 'Recomendado' : 'Recommended'}</option>
+                                      <option value="4">4 - {language === 'es' ? 'Importante' : 'Important'}</option>
+                                      <option value="5">5 - {language === 'es' ? 'Obligatorio' : 'Mandatory'}</option>
+                                    </select>
+                                  </div>
                                 </div>
 
                                 {/* Main row: Drag handle (left), Thumbnail, and Info */}
@@ -2114,43 +2188,71 @@ export const CreateGuide: React.FC = () => {
                                       transition: 'all 0.15s ease'
                                     }}
                                   >
-                                    {/* Top row: Action buttons and checkbox */}
-                                    <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', gap: '0.3rem', width: '100%' }}>
-                                      <input 
-                                        type="checkbox" 
-                                        disabled={selectedElements.ids.length > 0 && (selectedElements.type !== 'item' || selectedElements.parentId !== sub.id)} 
-                                        checked={selectedElements.type === 'item' && selectedElements.ids.includes(item.id)} 
-                                        onChange={() => toggleSelection('item', item.id, sub.id)} 
-                                        style={{ transform: 'scale(1.1)', cursor: 'pointer', marginRight: '0.2rem' }} 
-                                        title={language === 'es' ? 'Seleccionar' : 'Select'}
-                                      />
-                                      <button 
-                                        type="button" 
-                                        onClick={() => handleCopy('item', item)} 
-                                        className="btn-secondary" 
-                                        style={{ padding: '0.15rem 0.3rem', border: 'none', background: 'transparent', color: 'var(--accent-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-                                        title={language === 'es' ? 'Copiar' : 'Copy'}
-                                      >
-                                        <Copy size={14} />
-                                      </button>
-                                      <button 
-                                        type="button" 
-                                        onClick={() => handleCut('item', item, item.id, element.id, sub.id)} 
-                                        className="btn-secondary" 
-                                        style={{ padding: '0.15rem 0.3rem', border: 'none', background: 'transparent', color: '#f59e0b', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-                                        title={language === 'es' ? 'Cortar' : 'Cut'}
-                                      >
-                                        <Scissors size={14} />
-                                      </button>
-                                      <button 
-                                        type="button" 
-                                        onClick={() => removeMediaItem(element.id, item.id, sub.id)} 
-                                        className="btn-secondary" 
-                                        style={{ padding: '0.15rem 0.3rem', border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-                                        title={language === 'es' ? 'Eliminar' : 'Delete'}
-                                      >
-                                        <Trash2 size={14} />
-                                      </button>
+                                    {/* Top row: Action buttons, checkbox, and item importance selector */}
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', gap: '0.4rem', flexWrap: 'wrap' }}>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                                        <input 
+                                          type="checkbox" 
+                                          disabled={selectedElements.ids.length > 0 && (selectedElements.type !== 'item' || selectedElements.parentId !== sub.id)} 
+                                          checked={selectedElements.type === 'item' && selectedElements.ids.includes(item.id)} 
+                                          onChange={() => toggleSelection('item', item.id, sub.id)} 
+                                          style={{ transform: 'scale(1.1)', cursor: 'pointer', marginRight: '0.2rem' }} 
+                                          title={language === 'es' ? 'Seleccionar' : 'Select'}
+                                        />
+                                        <button 
+                                          type="button" 
+                                          onClick={() => handleCopy('item', item)} 
+                                          className="btn-secondary" 
+                                          style={{ padding: '0.15rem 0.3rem', border: 'none', background: 'transparent', color: 'var(--accent-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                                          title={language === 'es' ? 'Copiar' : 'Copy'}
+                                        >
+                                          <Copy size={14} />
+                                        </button>
+                                        <button 
+                                          type="button" 
+                                          onClick={() => handleCut('item', item, item.id, element.id, sub.id)} 
+                                          className="btn-secondary" 
+                                          style={{ padding: '0.15rem 0.3rem', border: 'none', background: 'transparent', color: '#f59e0b', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                                          title={language === 'es' ? 'Cortar' : 'Cut'}
+                                        >
+                                          <Scissors size={14} />
+                                        </button>
+                                        <button 
+                                          type="button" 
+                                          onClick={() => removeMediaItem(element.id, item.id, sub.id)} 
+                                          className="btn-secondary" 
+                                          style={{ padding: '0.15rem 0.3rem', border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                                          title={language === 'es' ? 'Eliminar' : 'Delete'}
+                                        >
+                                          <Trash2 size={14} />
+                                        </button>
+                                      </div>
+
+                                      {/* Importance rank selector */}
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                                        <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
+                                          {language === 'es' ? 'Importancia:' : 'Importance:'}
+                                        </span>
+                                        <select
+                                          value={item.importance_rank ?? sub.importance_rank ?? element.importance_rank ?? 3}
+                                          onChange={(e) => updateItemImportance(element.id, item.id, e.target.value ? parseInt(e.target.value) : null, sub.id)}
+                                          style={{
+                                            padding: '0.1rem 0.3rem',
+                                            fontSize: '0.7rem',
+                                            background: 'var(--bg-primary)',
+                                            border: '1px solid var(--border-color)',
+                                            color: (item.importance_rank && item.importance_rank !== (sub.importance_rank ?? element.importance_rank ?? 3)) ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                                            fontWeight: (item.importance_rank && item.importance_rank !== (sub.importance_rank ?? element.importance_rank ?? 3)) ? 700 : 400,
+                                            borderRadius: '4px'
+                                          }}
+                                        >
+                                          <option value="1">1 - {language === 'es' ? 'Extra' : 'Extra'}</option>
+                                          <option value="2">2 - {language === 'es' ? 'Opcional' : 'Optional'}</option>
+                                          <option value="3">3 - {language === 'es' ? 'Recomendado' : 'Recommended'}</option>
+                                          <option value="4">4 - {language === 'es' ? 'Importante' : 'Important'}</option>
+                                          <option value="5">5 - {language === 'es' ? 'Obligatorio' : 'Mandatory'}</option>
+                                        </select>
+                                      </div>
                                     </div>
 
                                     {/* Main row: Drag handle (left), Thumbnail, and Info */}

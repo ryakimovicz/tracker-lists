@@ -803,6 +803,12 @@ export const ViewGuide: React.FC = () => {
                       <>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', paddingLeft: '1.5rem' }}>
                           {blockItems.map((item: any) => {
+                            const flowItem = (el.items || []).find((i: any) => i.id === item.id);
+                            const blockImportance = el.importance_rank ?? 3;
+                            const itemImportance = item.importance_rank ?? flowItem?.importance_rank ?? blockImportance;
+                            const showItemPriority = itemImportance !== blockImportance;
+                            const itemPriorityLabel = showItemPriority ? getPriorityLabel(itemImportance, language) : null;
+
                             return (
                               <div key={item.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.6rem', background: 'var(--bg-secondary)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
                                 <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
@@ -845,13 +851,21 @@ export const ViewGuide: React.FC = () => {
                                         const formattedSE = language === 'es' ? `T${s} | E${e}` : `S${s} | E${e}`;
                                         return (
                                           <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                            <span style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-primary)' }}>{series}</span>
+                                            <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.4rem', flexWrap: 'wrap' }}>
+                                              <span style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-primary)' }}>{series}</span>
+                                              {itemPriorityLabel && <span style={{ fontSize: '0.72rem', color: 'var(--accent-primary)', fontWeight: 600 }}>({itemPriorityLabel})</span>}
+                                            </div>
                                             <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--accent-primary)' }}>{formattedSE}</span>
                                             {epName && <span style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-secondary)' }}>{epName}</span>}
                                           </div>
                                         );
                                       }
-                                      return <h5 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 600 }}>{item.title}</h5>;
+                                      return (
+                                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.4rem', flexWrap: 'wrap' }}>
+                                          <h5 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 600 }}>{item.title}</h5>
+                                          {itemPriorityLabel && <span style={{ fontSize: '0.72rem', color: 'var(--accent-primary)', fontWeight: 600 }}>({itemPriorityLabel})</span>}
+                                        </div>
+                                      );
                                     })()}
                                   </div>
                                   <button
@@ -874,7 +888,9 @@ export const ViewGuide: React.FC = () => {
                           const isSubblockCompleted = allSubblockIds.length > 0 && allSubblockIds.every((id: number) => itemsList.find((i: any) => i.id === id)?.is_completed);
                           const isSubCollapsed = collapsedNodes[sub.id] || false;
                           
-                          const subPriorityLabel = getPriorityLabel(sub.importance_rank, language);
+                          const blockImportance = el.importance_rank ?? 3;
+                          const showSubPriority = sub.importance_rank && sub.importance_rank !== blockImportance;
+                          const subPriorityLabel = showSubPriority ? getPriorityLabel(sub.importance_rank, language) : null;
 
                           return (
                             <div id={sub.id} key={sub.id} style={{ marginLeft: '1.5rem', paddingLeft: '0.75rem', borderLeft: '2px dashed var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.5rem', transition: 'background-color 2.5s ease-out', borderRadius: '8px' }}>
@@ -919,6 +935,12 @@ export const ViewGuide: React.FC = () => {
                               {!isSubCollapsed && (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', paddingLeft: '1.25rem' }}>
                                   {subItems.map((item: any) => {
+                                    const flowItem = (sub.items || []).find((i: any) => i.id === item.id);
+                                    const subImportance = sub.importance_rank ?? blockImportance;
+                                    const itemImportance = item.importance_rank ?? flowItem?.importance_rank ?? subImportance;
+                                    const showItemPriority = itemImportance !== subImportance;
+                                    const itemPriorityLabel = showItemPriority ? getPriorityLabel(itemImportance, language) : null;
+
                                     return (
                                       <div key={item.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.4rem 0.8rem', background: 'var(--bg-secondary)', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
                                         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
@@ -961,13 +983,21 @@ export const ViewGuide: React.FC = () => {
                                                 const formattedSE = language === 'es' ? `T${s} | E${e}` : `S${s} | E${e}`;
                                                 return (
                                                   <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                                    <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>{series}</span>
+                                                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.35rem', flexWrap: 'wrap' }}>
+                                                      <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>{series}</span>
+                                                      {itemPriorityLabel && <span style={{ fontSize: '0.7rem', color: 'var(--accent-primary)', fontWeight: 600 }}>({itemPriorityLabel})</span>}
+                                                    </div>
                                                     <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--accent-primary)' }}>{formattedSE}</span>
                                                     {epName && <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)' }}>{epName}</span>}
                                                   </div>
                                                 );
                                               }
-                                              return <h6 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 600 }}>{item.title}</h6>;
+                                              return (
+                                                <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.35rem', flexWrap: 'wrap' }}>
+                                                  <h6 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 600 }}>{item.title}</h6>
+                                                  {itemPriorityLabel && <span style={{ fontSize: '0.7rem', color: 'var(--accent-primary)', fontWeight: 600 }}>({itemPriorityLabel})</span>}
+                                                </div>
+                                              );
                                             })()}
                                           </div>
                                           <button
