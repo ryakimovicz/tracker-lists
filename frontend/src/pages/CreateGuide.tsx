@@ -1472,7 +1472,7 @@ export const CreateGuide: React.FC = () => {
               </button>
               {clipboard && clipboard.type === 'section' && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                  <button onClick={() => handlePaste('root')} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', padding: '0.45rem 1rem' }}>
+                  <button onClick={() => handlePasteSection()} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', padding: '0.45rem 1rem' }}>
                     <ClipboardPaste size={16} /> {language === 'es' ? 'Pegar Sección al final' : 'Paste Section at end'}
                   </button>
                   <button onClick={() => setClipboard(null)} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', padding: '0.45rem 0.85rem', color: '#ef4444' }}>
@@ -1532,7 +1532,13 @@ export const CreateGuide: React.FC = () => {
                       index={index} 
                       label={language === 'es' ? 'Pegar Aquí' : 'Paste Here'} 
                       canPaste={clipboard?.type === 'section' || clipboard?.type === 'block'} 
-                      handlePaste={handlePaste} 
+                      handlePaste={(tType, tId, idx) => {
+                        if (clipboard?.type === 'section' && element.type === 'section') {
+                          handlePasteSection(element.id, 'before');
+                        } else {
+                          handlePaste(tType, tId, idx);
+                        }
+                      }} 
                       indent={index > 0 && docFlow[index - 1]?.type === 'section' && clipboard?.type === 'block'}
                     />
                   );
@@ -1654,7 +1660,7 @@ export const CreateGuide: React.FC = () => {
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                               <button 
                                 type="button" 
-                                onClick={() => handlePaste('root', undefined, index)} 
+                                onClick={() => handlePasteSection(element.id, 'before')} 
                                 className="btn-primary" 
                                 style={{ padding: '0.25rem 0.6rem', display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.78rem' }}
                               >
@@ -1662,7 +1668,7 @@ export const CreateGuide: React.FC = () => {
                               </button>
                               <button 
                                 type="button" 
-                                onClick={() => handlePaste('root', undefined, index + 1)} 
+                                onClick={() => handlePasteSection(element.id, 'after')} 
                                 className="btn-primary" 
                                 style={{ padding: '0.25rem 0.6rem', display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.78rem' }}
                               >
@@ -2632,7 +2638,13 @@ export const CreateGuide: React.FC = () => {
                     index={docFlow.length} 
                     label={language === 'es' ? 'Pegar Aquí' : 'Paste Here'} 
                     canPaste={clipboard?.type === 'section' || clipboard?.type === 'block'} 
-                    handlePaste={handlePaste} 
+                    handlePaste={(tType, tId, idx) => {
+                      if (clipboard?.type === 'section') {
+                        handlePasteSection();
+                      } else {
+                        handlePaste(tType, tId, idx);
+                      }
+                    }} 
                     indent={docFlow.length > 0 && docFlow[docFlow.length - 1]?.type === 'section' && clipboard?.type === 'block'}
                   />
                 </div>
