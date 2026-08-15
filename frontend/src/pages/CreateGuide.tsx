@@ -1138,9 +1138,18 @@ export const CreateGuide: React.FC = () => {
         }
       };
 
-      // 3. Insert into target
+      // 3. Insert into target with index offset compensation for cut operations
       if (targetType === 'root' && clipboard.type === 'block') {
-        insertOrPush(newFlow, pasteDatas, insertIndex);
+        let finalInsertIndex = insertIndex;
+        if (insertIndex !== undefined && clipboard.action === 'cut') {
+          const cutRootIds = new Set(clipboard.items.filter((i: any) => !i.sourceParentId).map((i: any) => i.sourceId));
+          let removedCount = 0;
+          for (let i = 0; i < Math.min(insertIndex, prev.length); i++) {
+            if (cutRootIds.has(prev[i].id)) removedCount++;
+          }
+          finalInsertIndex = Math.max(0, insertIndex - removedCount);
+        }
+        insertOrPush(newFlow, pasteDatas, finalInsertIndex);
       } else if (targetType === 'section' && (clipboard.type === 'block' || clipboard.type === 'subblock')) {
         let insertPos = -1;
         if (insertIndex !== undefined) {
@@ -1172,13 +1181,37 @@ export const CreateGuide: React.FC = () => {
         const block = newFlow.find(el => el.id === targetId);
         if (block) {
           if (!block.subblocks) block.subblocks = [];
-          insertOrPush(block.subblocks, pasteDatas, insertIndex);
+          let finalInsertIndex = insertIndex;
+          if (insertIndex !== undefined && clipboard.action === 'cut') {
+            const prevBlock = prev.find(el => el.id === targetId);
+            if (prevBlock && prevBlock.subblocks) {
+              const cutIds = new Set(clipboard.items.filter((i: any) => i.sourceParentId === targetId).map((i: any) => i.sourceId));
+              let removedCount = 0;
+              for (let i = 0; i < Math.min(insertIndex, prevBlock.subblocks.length); i++) {
+                if (cutIds.has(prevBlock.subblocks[i].id)) removedCount++;
+              }
+              finalInsertIndex = Math.max(0, insertIndex - removedCount);
+            }
+          }
+          insertOrPush(block.subblocks, pasteDatas, finalInsertIndex);
         }
       } else if (targetType === 'block' && clipboard.type === 'item') {
         const block = newFlow.find(el => el.id === targetId);
         if (block) {
           if (!block.items) block.items = [];
-          insertOrPush(block.items, pasteDatas, insertIndex);
+          let finalInsertIndex = insertIndex;
+          if (insertIndex !== undefined && clipboard.action === 'cut') {
+            const prevBlock = prev.find(el => el.id === targetId);
+            if (prevBlock && prevBlock.items) {
+              const cutIds = new Set(clipboard.items.filter((i: any) => i.sourceParentId === targetId && !i.sourceGrandparentId).map((i: any) => i.sourceId));
+              let removedCount = 0;
+              for (let i = 0; i < Math.min(insertIndex, prevBlock.items.length); i++) {
+                if (cutIds.has(prevBlock.items[i].id)) removedCount++;
+              }
+              finalInsertIndex = Math.max(0, insertIndex - removedCount);
+            }
+          }
+          insertOrPush(block.items, pasteDatas, finalInsertIndex);
         }
       } else if (targetType === 'subblock' && clipboard.type === 'item') {
         for (const block of newFlow) {
@@ -1186,7 +1219,25 @@ export const CreateGuide: React.FC = () => {
             const sub = block.subblocks.find(s => s.id === targetId);
             if (sub) {
               if (!sub.items) sub.items = [];
-              insertOrPush(sub.items, pasteDatas, insertIndex);
+              let finalInsertIndex = insertIndex;
+              if (insertIndex !== undefined && clipboard.action === 'cut') {
+                let prevSub: any = null;
+                for (const pb of prev) {
+                  if (pb.subblocks) {
+                    const found = pb.subblocks.find(s => s.id === targetId);
+                    if (found) { prevSub = found; break; }
+                  }
+                }
+                if (prevSub && prevSub.items) {
+                  const cutIds = new Set(clipboard.items.filter((i: any) => i.sourceGrandparentId === targetId).map((i: any) => i.sourceId));
+                  let removedCount = 0;
+                  for (let i = 0; i < Math.min(insertIndex, prevSub.items.length); i++) {
+                    if (cutIds.has(prevSub.items[i].id)) removedCount++;
+                  }
+                  finalInsertIndex = Math.max(0, insertIndex - removedCount);
+                }
+              }
+              insertOrPush(sub.items, pasteDatas, finalInsertIndex);
               break;
             }
           }
