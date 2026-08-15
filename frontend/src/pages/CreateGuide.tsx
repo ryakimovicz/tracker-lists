@@ -1788,66 +1788,79 @@ export const CreateGuide: React.FC = () => {
                           </div>
                         )}
 
-                      <div 
-                        data-root-element-id={element.id}
-                        data-root-index={index}
-                        style={{ 
-                          padding: '2rem', 
-                          border: '1px solid var(--border-color)', 
-                          borderRadius: '12px', 
-                          background: 'var(--bg-primary)', 
-                          position: 'relative', 
-                          display: 'flex', 
-                          flexDirection: 'column', 
-                          gap: '1.25rem',
-                          opacity: pointerDrag?.item.id === element.id ? 0.35 : 1,
-                          transition: 'opacity 0.2s ease'
-                        }}
-                      >
-                        
-                        {/* Top row: Left-aligned control actions */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', width: '100%', flexWrap: 'wrap' }}>
-                          <input 
-                            type="checkbox" 
-                            disabled={selectedElements.ids.length > 0 && (selectedElements.type !== 'block' || selectedElements.parentId !== null)} 
-                            checked={selectedElements.type === 'block' && selectedElements.ids.includes(element.id)} 
-                            onChange={() => toggleSelection('block', element.id)} 
-                            style={{ transform: 'scale(1.15)', cursor: 'pointer', marginRight: '0.25rem' }} 
-                            title={language === 'es' ? 'Seleccionar bloque' : 'Select block'}
-                          />
-                          <button 
-                            type="button" 
-                            onClick={() => handleCopy('block', element)} 
-                            className="btn-secondary" 
-                            style={{ padding: '0.2rem 0.35rem', border: 'none', background: 'transparent', color: 'var(--accent-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-                            title={language === 'es' ? 'Copiar bloque' : 'Copy block'}
+                      {(() => {
+                        const isBlockCut = clipboard && clipboard.action === 'cut' && clipboard.type === 'block' && clipboard.items.some((i: any) => i.sourceId === element.id || i.id === element.id || i.data?.id === element.id);
+
+                        return (
+                          <div 
+                            data-root-element-id={element.id}
+                            data-root-index={index}
+                            style={{ 
+                              padding: '2rem', 
+                              border: isBlockCut ? '1px dashed #f59e0b' : '1px solid var(--border-color)', 
+                              borderLeft: isBlockCut ? '4px dashed #f59e0b' : '1px solid var(--border-color)',
+                              borderRadius: '12px', 
+                              background: isBlockCut ? 'rgba(245, 158, 11, 0.05)' : 'var(--bg-primary)', 
+                              position: 'relative', 
+                              display: 'flex', 
+                              flexDirection: 'column', 
+                              gap: '1.25rem',
+                              opacity: (pointerDrag?.item.id === element.id || isBlockCut) ? 0.35 : 1,
+                              transition: 'opacity 0.2s ease, background 0.2s ease, border 0.2s ease'
+                            }}
                           >
-                            <Copy size={15} />
-                          </button>
-                          <button 
-                            type="button" 
-                            onClick={() => handleCut('block', element, element.id)} 
-                            className="btn-secondary" 
-                            style={{ padding: '0.2rem 0.35rem', border: 'none', background: 'transparent', color: '#f59e0b', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-                            title={language === 'es' ? 'Cortar bloque' : 'Cut block'}
-                          >
-                            <Scissors size={15} />
-                          </button>
-                          <button 
-                            type="button" 
-                            onClick={() => removeDocElement(element.id)} 
-                            className="btn-secondary" 
-                            style={{ padding: '0.2rem 0.35rem', border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-                            title={language === 'es' ? 'Eliminar bloque' : 'Delete block'}
-                          >
-                            <Trash2 size={15} />
-                          </button>
-                          {clipboard && (clipboard.type === 'subblock' || clipboard.type === 'item') && (
-                            <button onClick={() => handlePaste('block', element.id)} className="btn-primary" style={{ padding: '0.2rem 0.5rem', marginLeft: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.2rem', fontSize: '0.8rem' }}>
-                              <ClipboardPaste size={13} /> {language === 'es' ? 'Pegar' : 'Paste'}
-                            </button>
-                          )}
-                        </div>
+                            
+                            {/* Top row: Left-aligned control actions */}
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', flexWrap: 'wrap', gap: '0.4rem' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                                <input 
+                                  type="checkbox" 
+                                  disabled={selectedElements.ids.length > 0 && (selectedElements.type !== 'block' || selectedElements.parentId !== null)} 
+                                  checked={selectedElements.type === 'block' && selectedElements.ids.includes(element.id)} 
+                                  onChange={() => toggleSelection('block', element.id)} 
+                                  style={{ transform: 'scale(1.15)', cursor: 'pointer', marginRight: '0.25rem' }} 
+                                  title={language === 'es' ? 'Seleccionar bloque' : 'Select block'}
+                                />
+                                <button 
+                                  type="button" 
+                                  onClick={() => handleCopy('block', element)} 
+                                  className="btn-secondary" 
+                                  style={{ padding: '0.2rem 0.35rem', border: 'none', background: 'transparent', color: 'var(--accent-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                                  title={language === 'es' ? 'Copiar bloque' : 'Copy block'}
+                                >
+                                  <Copy size={15} />
+                                </button>
+                                <button 
+                                  type="button" 
+                                  onClick={() => handleCut('block', element, element.id)} 
+                                  className="btn-secondary" 
+                                  style={{ padding: '0.2rem 0.35rem', border: 'none', background: 'transparent', color: '#f59e0b', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                                  title={language === 'es' ? 'Cortar bloque' : 'Cut block'}
+                                >
+                                  <Scissors size={15} />
+                                </button>
+                                <button 
+                                  type="button" 
+                                  onClick={() => removeDocElement(element.id)} 
+                                  className="btn-secondary" 
+                                  style={{ padding: '0.2rem 0.35rem', border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                                  title={language === 'es' ? 'Eliminar bloque' : 'Delete block'}
+                                >
+                                  <Trash2 size={15} />
+                                </button>
+                                {clipboard && (clipboard.type === 'subblock' || clipboard.type === 'item') && (
+                                  <button onClick={() => handlePaste('block', element.id)} className="btn-primary" style={{ padding: '0.2rem 0.5rem', marginLeft: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.2rem', fontSize: '0.8rem' }}>
+                                    <ClipboardPaste size={13} /> {language === 'es' ? 'Pegar' : 'Paste'}
+                                  </button>
+                                )}
+                              </div>
+
+                              {isBlockCut && (
+                                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#f59e0b', background: 'rgba(245, 158, 11, 0.15)', padding: '0.15rem 0.5rem', borderRadius: '4px' }}>
+                                  {language === 'es' ? '✂ Bloque cortado' : '✂ Block cut'}
+                                </span>
+                              )}
+                            </div>
 
                          {/* Title Row with Drag Handle at Left */}
                         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap', width: '100%' }}>
@@ -1959,63 +1972,72 @@ export const CreateGuide: React.FC = () => {
                                   </div>
                                 )}
 
-                              <div 
-                                data-card-item-id={item.id}
-                                data-card-parent-id={element.id}
-                                data-card-grandparent-id=""
-                                data-card-index={itemIndex}
-                                style={{ 
-                                  display: 'flex', 
-                                  flexDirection: 'column',
-                                  gap: '0.4rem',
-                                  background: isBeingDragged ? 'rgba(30, 41, 59, 0.4)' : 'var(--bg-secondary)', 
-                                  padding: '0.5rem 0.85rem', 
-                                  borderRadius: '8px', 
-                                  border: isBeingDragged ? '1px dashed var(--accent-primary)' : '1px solid var(--border-color)',
-                                  opacity: isBeingDragged ? 0.35 : 1,
-                                  transform: isBeingDragged ? 'scale(0.98)' : 'none',
-                                  transition: 'all 0.15s ease'
-                                }}
-                              >
-                                {/* Top row: Action buttons, checkbox, and item importance selector */}
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', gap: '0.5rem', flexWrap: 'wrap' }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                                    <input 
-                                      type="checkbox" 
-                                      disabled={selectedElements.ids.length > 0 && (selectedElements.type !== 'item' || selectedElements.parentId !== element.id)} 
-                                      checked={selectedElements.type === 'item' && selectedElements.ids.includes(item.id)} 
-                                      onChange={() => toggleSelection('item', item.id, element.id)} 
-                                      style={{ transform: 'scale(1.1)', cursor: 'pointer', marginRight: '0.2rem' }} 
-                                      title={language === 'es' ? 'Seleccionar' : 'Select'}
-                                    />
-                                    <button 
-                                      type="button" 
-                                      onClick={() => handleCopy('item', item)} 
-                                      className="btn-secondary" 
-                                      style={{ padding: '0.2rem 0.35rem', border: 'none', background: 'transparent', color: 'var(--accent-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-                                      title={language === 'es' ? 'Copiar' : 'Copy'}
-                                    >
-                                      <Copy size={15} />
-                                    </button>
-                                    <button 
-                                      type="button" 
-                                      onClick={() => handleCut('item', item, item.id, element.id)} 
-                                      className="btn-secondary" 
-                                      style={{ padding: '0.2rem 0.35rem', border: 'none', background: 'transparent', color: '#f59e0b', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-                                      title={language === 'es' ? 'Cortar' : 'Cut'}
-                                    >
-                                      <Scissors size={15} />
-                                    </button>
-                                    <button 
-                                      type="button" 
-                                      onClick={() => removeMediaItem(element.id, item.id)} 
-                                      className="btn-secondary" 
-                                      style={{ padding: '0.2rem 0.35rem', border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-                                      title={language === 'es' ? 'Eliminar' : 'Delete'}
-                                    >
-                                      <Trash2 size={15} />
-                                    </button>
-                                  </div>
+                              {(() => {
+                                const isItemCut = clipboard && clipboard.action === 'cut' && clipboard.type === 'item' && clipboard.items.some((i: any) => i.sourceId === item.id || i.id === item.id || i.data?.id === item.id);
+
+                                return (
+                                  <div 
+                                    data-card-item-id={item.id}
+                                    data-card-parent-id={element.id}
+                                    data-card-grandparent-id=""
+                                    data-card-index={itemIndex}
+                                    style={{ 
+                                      display: 'flex', 
+                                      flexDirection: 'column',
+                                      gap: '0.4rem',
+                                      background: isItemCut ? 'rgba(245, 158, 11, 0.08)' : (isBeingDragged ? 'rgba(30, 41, 59, 0.4)' : 'var(--bg-secondary)'), 
+                                      padding: '0.5rem 0.85rem', 
+                                      borderRadius: '8px', 
+                                      border: isItemCut ? '1px dashed #f59e0b' : (isBeingDragged ? '1px dashed var(--accent-primary)' : '1px solid var(--border-color)'),
+                                      opacity: (isBeingDragged || isItemCut) ? 0.35 : 1,
+                                      transform: isBeingDragged ? 'scale(0.98)' : 'none',
+                                      transition: 'all 0.15s ease'
+                                    }}
+                                  >
+                                    {/* Top row: Action buttons, checkbox, and item importance selector */}
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                        <input 
+                                          type="checkbox" 
+                                          disabled={selectedElements.ids.length > 0 && (selectedElements.type !== 'item' || selectedElements.parentId !== element.id)} 
+                                          checked={selectedElements.type === 'item' && selectedElements.ids.includes(item.id)} 
+                                          onChange={() => toggleSelection('item', item.id, element.id)} 
+                                          style={{ transform: 'scale(1.1)', cursor: 'pointer', marginRight: '0.2rem' }} 
+                                          title={language === 'es' ? 'Seleccionar' : 'Select'}
+                                        />
+                                        <button 
+                                          type="button" 
+                                          onClick={() => handleCopy('item', item)} 
+                                          className="btn-secondary" 
+                                          style={{ padding: '0.2rem 0.35rem', border: 'none', background: 'transparent', color: 'var(--accent-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                                          title={language === 'es' ? 'Copiar' : 'Copy'}
+                                        >
+                                          <Copy size={15} />
+                                        </button>
+                                        <button 
+                                          type="button" 
+                                          onClick={() => handleCut('item', item, item.id, element.id)} 
+                                          className="btn-secondary" 
+                                          style={{ padding: '0.2rem 0.35rem', border: 'none', background: 'transparent', color: '#f59e0b', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                                          title={language === 'es' ? 'Cortar' : 'Cut'}
+                                        >
+                                          <Scissors size={15} />
+                                        </button>
+                                        <button 
+                                          type="button" 
+                                          onClick={() => removeMediaItem(element.id, item.id)} 
+                                          className="btn-secondary" 
+                                          style={{ padding: '0.2rem 0.35rem', border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                                          title={language === 'es' ? 'Eliminar' : 'Delete'}
+                                        >
+                                          <Trash2 size={15} />
+                                        </button>
+                                        {isItemCut && (
+                                          <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#f59e0b', background: 'rgba(245, 158, 11, 0.15)', padding: '0.1rem 0.4rem', borderRadius: '4px' }}>
+                                            {language === 'es' ? '✂ Cortado' : '✂ Cut'}
+                                          </span>
+                                        )}
+                                      </div>
 
                                   {/* Importance rank selector */}
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
@@ -2112,6 +2134,8 @@ export const CreateGuide: React.FC = () => {
                                   </div>
                                 </div>
                               </div>
+                                );
+                              })()}
                               </React.Fragment>
                             );
                           })}
@@ -2200,65 +2224,80 @@ export const CreateGuide: React.FC = () => {
                             </div>
                           )}
 
-                          <div 
-                            data-subblock-id={sub.id}
-                            data-subblock-parent-id={element.id}
-                            data-subblock-index={subIndex}
-                            style={{ 
-                              marginLeft: '2rem', 
-                              padding: '1.25rem', 
-                              borderLeft: '2px dashed var(--border-color)', 
-                              display: 'flex', 
-                              flexDirection: 'column', 
-                              gap: '1rem', 
-                              position: 'relative',
-                              opacity: pointerDrag?.item.id === sub.id ? 0.35 : 1,
-                              transition: 'opacity 0.2s ease'
-                            }}
-                          >
-                            {/* Subblock Top row: Left-aligned control actions */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', width: '100%', flexWrap: 'wrap' }}>
-                              <input 
-                                type="checkbox" 
-                                disabled={selectedElements.ids.length > 0 && (selectedElements.type !== 'subblock' || selectedElements.parentId !== element.id)} 
-                                checked={selectedElements.type === 'subblock' && selectedElements.ids.includes(sub.id)} 
-                                onChange={() => toggleSelection('subblock', sub.id, element.id)} 
-                                style={{ transform: 'scale(1.1)', cursor: 'pointer', marginRight: '0.25rem' }} 
-                                title={language === 'es' ? 'Seleccionar subbloque' : 'Select subblock'}
-                              />
-                              <button 
-                                type="button" 
-                                onClick={() => handleCopy('subblock', sub)} 
-                                className="btn-secondary" 
-                                style={{ padding: '0.2rem 0.35rem', border: 'none', background: 'transparent', color: 'var(--accent-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-                                title={language === 'es' ? 'Copiar subbloque' : 'Copy subblock'}
+                          {(() => {
+                            const isSubblockCut = clipboard && clipboard.action === 'cut' && clipboard.type === 'subblock' && clipboard.items.some((i: any) => i.sourceId === sub.id || i.id === sub.id || i.data?.id === sub.id);
+
+                            return (
+                              <div 
+                                data-subblock-id={sub.id}
+                                data-subblock-parent-id={element.id}
+                                data-subblock-index={subIndex}
+                                style={{ 
+                                  marginLeft: '2rem', 
+                                  padding: '1.25rem', 
+                                  border: isSubblockCut ? '1px dashed #f59e0b' : undefined,
+                                  borderLeft: isSubblockCut ? '3px dashed #f59e0b' : '2px dashed var(--border-color)', 
+                                  borderRadius: isSubblockCut ? '8px' : undefined,
+                                  background: isSubblockCut ? 'rgba(245, 158, 11, 0.05)' : 'transparent',
+                                  display: 'flex', 
+                                  flexDirection: 'column', 
+                                  gap: '1rem', 
+                                  position: 'relative',
+                                  opacity: (pointerDrag?.item.id === sub.id || isSubblockCut) ? 0.35 : 1,
+                                  transition: 'opacity 0.2s ease, background 0.2s ease, border 0.2s ease'
+                                }}
                               >
-                                <Copy size={15} />
-                              </button>
-                              <button 
-                                type="button" 
-                                onClick={() => handleCut('subblock', sub, sub.id, element.id)} 
-                                className="btn-secondary" 
-                                style={{ padding: '0.2rem 0.35rem', border: 'none', background: 'transparent', color: '#f59e0b', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-                                title={language === 'es' ? 'Cortar subbloque' : 'Cut subblock'}
-                              >
-                                <Scissors size={15} />
-                              </button>
-                              <button 
-                                type="button" 
-                                onClick={() => removeDocElement(element.id, sub.id)} 
-                                className="btn-secondary" 
-                                style={{ padding: '0.2rem 0.35rem', border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-                                title={language === 'es' ? 'Eliminar subbloque' : 'Delete subblock'}
-                              >
-                                <Trash2 size={15} />
-                              </button>
-                              {clipboard && clipboard.type === 'item' && (
-                                <button onClick={() => handlePaste('subblock', sub.id)} className="btn-primary" style={{ padding: '0.2rem 0.5rem', marginLeft: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.2rem', fontSize: '0.8rem' }}>
-                                  <ClipboardPaste size={13} /> {language === 'es' ? 'Pegar' : 'Paste'}
-                                </button>
-                              )}
-                            </div>
+                                {/* Subblock Top row: Left-aligned control actions */}
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', flexWrap: 'wrap', gap: '0.4rem' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                                    <input 
+                                      type="checkbox" 
+                                      disabled={selectedElements.ids.length > 0 && (selectedElements.type !== 'subblock' || selectedElements.parentId !== element.id)} 
+                                      checked={selectedElements.type === 'subblock' && selectedElements.ids.includes(sub.id)} 
+                                      onChange={() => toggleSelection('subblock', sub.id, element.id)} 
+                                      style={{ transform: 'scale(1.1)', cursor: 'pointer', marginRight: '0.25rem' }} 
+                                      title={language === 'es' ? 'Seleccionar subbloque' : 'Select subblock'}
+                                    />
+                                    <button 
+                                      type="button" 
+                                      onClick={() => handleCopy('subblock', sub)} 
+                                      className="btn-secondary" 
+                                      style={{ padding: '0.2rem 0.35rem', border: 'none', background: 'transparent', color: 'var(--accent-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                                      title={language === 'es' ? 'Copiar subbloque' : 'Copy subblock'}
+                                    >
+                                      <Copy size={15} />
+                                    </button>
+                                    <button 
+                                      type="button" 
+                                      onClick={() => handleCut('subblock', sub, sub.id, element.id)} 
+                                      className="btn-secondary" 
+                                      style={{ padding: '0.2rem 0.35rem', border: 'none', background: 'transparent', color: '#f59e0b', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                                      title={language === 'es' ? 'Cortar subbloque' : 'Cut subblock'}
+                                    >
+                                      <Scissors size={15} />
+                                    </button>
+                                    <button 
+                                      type="button" 
+                                      onClick={() => removeDocElement(element.id, sub.id)} 
+                                      className="btn-secondary" 
+                                      style={{ padding: '0.2rem 0.35rem', border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                                      title={language === 'es' ? 'Eliminar subbloque' : 'Delete subblock'}
+                                    >
+                                      <Trash2 size={15} />
+                                    </button>
+                                    {clipboard && clipboard.type === 'item' && (
+                                      <button onClick={() => handlePaste('subblock', sub.id)} className="btn-primary" style={{ padding: '0.2rem 0.5rem', marginLeft: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.2rem', fontSize: '0.8rem' }}>
+                                        <ClipboardPaste size={13} /> {language === 'es' ? 'Pegar' : 'Paste'}
+                                      </button>
+                                    )}
+                                  </div>
+
+                                  {isSubblockCut && (
+                                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#f59e0b', background: 'rgba(245, 158, 11, 0.15)', padding: '0.15rem 0.5rem', borderRadius: '4px' }}>
+                                      {language === 'es' ? '✂ Subbloque cortado' : '✂ Subblock cut'}
+                                    </span>
+                                  )}
+                                </div>
 
                             {/* Subblock Title and importance */}
                             <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap', width: '100%' }}>
@@ -2350,99 +2389,108 @@ export const CreateGuide: React.FC = () => {
                                       </div>
                                     )}
 
-                                  <div 
-                                    draggable
-                                    onDragStart={(e) => {
-                                      e.dataTransfer.setData('application/json', JSON.stringify({ id: item.id, parentId: element.id, grandparentId: sub.id, index: itemIndex }));
-                                      setDraggedItem({ id: item.id, parentId: element.id, grandparentId: sub.id, index: itemIndex });
-                                    }}
-                                    onDragEnd={() => {
-                                      setDraggedItem(null);
-                                      setDragOverTarget(null);
-                                    }}
-                                    onDragOver={(e) => {
-                                      e.preventDefault();
-                                      e.stopPropagation();
-                                      e.dataTransfer.dropEffect = 'move';
-                                      const rect = e.currentTarget.getBoundingClientRect();
-                                      const midY = rect.top + rect.height / 2;
-                                      const isAfter = e.clientY > midY;
-                                      const targetIdx = isAfter ? itemIndex + 1 : itemIndex;
-                                      if (
-                                        !dragOverTarget ||
-                                        dragOverTarget.parentId !== element.id ||
-                                        dragOverTarget.grandparentId !== sub.id ||
-                                        dragOverTarget.index !== targetIdx
-                                      ) {
-                                        setDragOverTarget({ parentId: element.id, grandparentId: sub.id, index: targetIdx });
-                                      }
-                                    }}
-                                    onDrop={(e) => {
-                                      e.preventDefault();
-                                      e.stopPropagation();
-                                      const data = e.dataTransfer.getData('application/json');
-                                      if (data) {
-                                        try {
-                                          const src = JSON.parse(data);
-                                          const targetIdx = dragOverTarget ? dragOverTarget.index : itemIndex;
-                                          handleReorderItem(src, element.id, sub.id, targetIdx);
-                                        } catch(err) {}
-                                      }
-                                      setDraggedItem(null);
-                                      setDragOverTarget(null);
-                                    }}
-                                    style={{ 
-                                      display: 'flex', 
-                                      flexDirection: 'column',
-                                      gap: '0.35rem',
-                                      background: isBeingDragged ? 'rgba(30, 41, 59, 0.4)' : 'var(--bg-secondary)', 
-                                      padding: '0.45rem 0.75rem', 
-                                      borderRadius: '6px', 
-                                      border: isBeingDragged ? '1px dashed var(--accent-primary)' : '1px solid var(--border-color)',
-                                      opacity: isBeingDragged ? 0.35 : 1,
-                                      transform: isBeingDragged ? 'scale(0.98)' : 'none',
-                                      transition: 'all 0.15s ease'
-                                    }}
-                                  >
-                                    {/* Top row: Action buttons, checkbox, and item importance selector */}
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', gap: '0.4rem', flexWrap: 'wrap' }}>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                                        <input 
-                                          type="checkbox" 
-                                          disabled={selectedElements.ids.length > 0 && (selectedElements.type !== 'item' || selectedElements.parentId !== sub.id)} 
-                                          checked={selectedElements.type === 'item' && selectedElements.ids.includes(item.id)} 
-                                          onChange={() => toggleSelection('item', item.id, sub.id)} 
-                                          style={{ transform: 'scale(1.1)', cursor: 'pointer', marginRight: '0.2rem' }} 
-                                          title={language === 'es' ? 'Seleccionar' : 'Select'}
-                                        />
-                                        <button 
-                                          type="button" 
-                                          onClick={() => handleCopy('item', item)} 
-                                          className="btn-secondary" 
-                                          style={{ padding: '0.15rem 0.3rem', border: 'none', background: 'transparent', color: 'var(--accent-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-                                          title={language === 'es' ? 'Copiar' : 'Copy'}
+                                    {(() => {
+                                      const isItemCut = clipboard && clipboard.action === 'cut' && clipboard.type === 'item' && clipboard.items.some((i: any) => i.sourceId === item.id || i.id === item.id || i.data?.id === item.id);
+
+                                      return (
+                                        <div 
+                                          draggable
+                                          onDragStart={(e) => {
+                                            e.dataTransfer.setData('application/json', JSON.stringify({ id: item.id, parentId: element.id, grandparentId: sub.id, index: itemIndex }));
+                                            setDraggedItem({ id: item.id, parentId: element.id, grandparentId: sub.id, index: itemIndex });
+                                          }}
+                                          onDragEnd={() => {
+                                            setDraggedItem(null);
+                                            setDragOverTarget(null);
+                                          }}
+                                          onDragOver={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            e.dataTransfer.dropEffect = 'move';
+                                            const rect = e.currentTarget.getBoundingClientRect();
+                                            const midY = rect.top + rect.height / 2;
+                                            const isAfter = e.clientY > midY;
+                                            const targetIdx = isAfter ? itemIndex + 1 : itemIndex;
+                                            if (
+                                              !dragOverTarget ||
+                                              dragOverTarget.parentId !== element.id ||
+                                              dragOverTarget.grandparentId !== sub.id ||
+                                              dragOverTarget.index !== targetIdx
+                                            ) {
+                                              setDragOverTarget({ parentId: element.id, grandparentId: sub.id, index: targetIdx });
+                                            }
+                                          }}
+                                          onDrop={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            const data = e.dataTransfer.getData('application/json');
+                                            if (data) {
+                                              try {
+                                                const src = JSON.parse(data);
+                                                const targetIdx = dragOverTarget ? dragOverTarget.index : itemIndex;
+                                                handleReorderItem(src, element.id, sub.id, targetIdx);
+                                              } catch(err) {}
+                                            }
+                                            setDraggedItem(null);
+                                            setDragOverTarget(null);
+                                          }}
+                                          style={{ 
+                                            display: 'flex', 
+                                            flexDirection: 'column',
+                                            gap: '0.35rem',
+                                            background: isItemCut ? 'rgba(245, 158, 11, 0.08)' : (isBeingDragged ? 'rgba(30, 41, 59, 0.4)' : 'var(--bg-secondary)'), 
+                                            padding: '0.45rem 0.75rem', 
+                                            borderRadius: '6px', 
+                                            border: isItemCut ? '1px dashed #f59e0b' : (isBeingDragged ? '1px dashed var(--accent-primary)' : '1px solid var(--border-color)'),
+                                            opacity: (isBeingDragged || isItemCut) ? 0.35 : 1,
+                                            transform: isBeingDragged ? 'scale(0.98)' : 'none',
+                                            transition: 'all 0.15s ease'
+                                          }}
                                         >
-                                          <Copy size={14} />
-                                        </button>
-                                        <button 
-                                          type="button" 
-                                          onClick={() => handleCut('item', item, item.id, element.id, sub.id)} 
-                                          className="btn-secondary" 
-                                          style={{ padding: '0.15rem 0.3rem', border: 'none', background: 'transparent', color: '#f59e0b', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-                                          title={language === 'es' ? 'Cortar' : 'Cut'}
-                                        >
-                                          <Scissors size={14} />
-                                        </button>
-                                        <button 
-                                          type="button" 
-                                          onClick={() => removeMediaItem(element.id, item.id, sub.id)} 
-                                          className="btn-secondary" 
-                                          style={{ padding: '0.15rem 0.3rem', border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-                                          title={language === 'es' ? 'Eliminar' : 'Delete'}
-                                        >
-                                          <Trash2 size={14} />
-                                        </button>
-                                      </div>
+                                          {/* Top row: Action buttons, checkbox, and item importance selector */}
+                                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', gap: '0.4rem', flexWrap: 'wrap' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                                              <input 
+                                                type="checkbox" 
+                                                disabled={selectedElements.ids.length > 0 && (selectedElements.type !== 'item' || selectedElements.parentId !== sub.id)} 
+                                                checked={selectedElements.type === 'item' && selectedElements.ids.includes(item.id)} 
+                                                onChange={() => toggleSelection('item', item.id, sub.id)} 
+                                                style={{ transform: 'scale(1.1)', cursor: 'pointer', marginRight: '0.2rem' }} 
+                                                title={language === 'es' ? 'Seleccionar' : 'Select'}
+                                              />
+                                              <button 
+                                                type="button" 
+                                                onClick={() => handleCopy('item', item)} 
+                                                className="btn-secondary" 
+                                                style={{ padding: '0.15rem 0.3rem', border: 'none', background: 'transparent', color: 'var(--accent-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                                                title={language === 'es' ? 'Copiar' : 'Copy'}
+                                              >
+                                                <Copy size={14} />
+                                              </button>
+                                              <button 
+                                                type="button" 
+                                                onClick={() => handleCut('item', item, item.id, element.id, sub.id)} 
+                                                className="btn-secondary" 
+                                                style={{ padding: '0.15rem 0.3rem', border: 'none', background: 'transparent', color: '#f59e0b', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                                                title={language === 'es' ? 'Cortar' : 'Cut'}
+                                              >
+                                                <Scissors size={14} />
+                                              </button>
+                                              <button 
+                                                type="button" 
+                                                onClick={() => removeMediaItem(element.id, item.id, sub.id)} 
+                                                className="btn-secondary" 
+                                                style={{ padding: '0.15rem 0.3rem', border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                                                title={language === 'es' ? 'Eliminar' : 'Delete'}
+                                              >
+                                                <Trash2 size={14} />
+                                              </button>
+                                              {isItemCut && (
+                                                <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#f59e0b', background: 'rgba(245, 158, 11, 0.15)', padding: '0.1rem 0.4rem', borderRadius: '4px' }}>
+                                                  {language === 'es' ? '✂ Cortado' : '✂ Cut'}
+                                                </span>
+                                              )}
+                                            </div>
 
                                       {/* Importance rank selector */}
                                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
@@ -2525,7 +2573,9 @@ export const CreateGuide: React.FC = () => {
                                       </div>
                                     </div>
                                   </div>
-                                  </React.Fragment>
+                                );
+                              })()}
+                              </React.Fragment>
                                 );
                               })}
 
@@ -2581,7 +2631,9 @@ export const CreateGuide: React.FC = () => {
                             </div>
 
                           </div>
-                          </React.Fragment>
+                        );
+                      })()}
+                      </React.Fragment>
                         ))}
                         <PasteZone 
                           type="subblock" 
@@ -2599,7 +2651,9 @@ export const CreateGuide: React.FC = () => {
                         </button>
 
                         </div>
-                        </React.Fragment>
+                      );
+                    })()}
+                    </React.Fragment>
                       );
                     }
 
