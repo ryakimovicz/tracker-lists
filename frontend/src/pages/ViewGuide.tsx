@@ -58,7 +58,11 @@ export const ViewGuide: React.FC = () => {
   // Comments state
   const [comments, setComments] = useState<CommentItem[]>([]);
   const [newCommentText, setNewCommentText] = useState('');
-  const [replyingToId, setReplyingToId] = useState<number | null>(null);
+  const [replyTarget, setReplyTarget] = useState<{
+    rootCommentId: number;
+    replyToUser: string;
+    targetCommentId: number;
+  } | null>(null);
   const [replyText, setReplyText] = useState('');
   const [collapsedReplies, setCollapsedReplies] = useState<Record<number, boolean>>({});
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
@@ -152,20 +156,36 @@ export const ViewGuide: React.FC = () => {
     }
   };
 
-  const handlePostReply = async (e: React.FormEvent, parentId: number) => {
+  const handleOpenReply = (rootCommentId: number, targetCommentId: number, targetUsername: string) => {
+    if (replyTarget && replyTarget.targetCommentId === targetCommentId) {
+      setReplyTarget(null);
+      setReplyText('');
+    } else {
+      setReplyTarget({
+        rootCommentId,
+        replyToUser: targetUsername,
+        targetCommentId
+      });
+      setReplyText(`@${targetUsername} `);
+      // Auto un-collapse so thread is visible
+      setCollapsedReplies(prev => ({ ...prev, [rootCommentId]: false }));
+    }
+  };
+
+  const handlePostReply = async (e: React.FormEvent, rootParentId: number) => {
     e.preventDefault();
     if (!guide || !replyText.trim() || isSubmittingComment) return;
     setIsSubmittingComment(true);
     try {
       const res = await apiClient.post(`/social/lists/${guide.id}/comments`, {
         content: replyText.trim(),
-        parent_id: parentId
+        parent_id: rootParentId
       });
       setComments(prev => [...prev, res.data]);
       setReplyText('');
-      setReplyingToId(null);
+      setReplyTarget(null);
       // Auto un-collapse parent so the new reply is visible immediately
-      setCollapsedReplies(prev => ({ ...prev, [parentId]: false }));
+      setCollapsedReplies(prev => ({ ...prev, [rootParentId]: false }));
     } catch (err) {
       console.error("Failed to post reply", err);
     } finally {
@@ -180,6 +200,35 @@ export const ViewGuide: React.FC = () => {
     }));
   };
 
+  const renderCommentContent = (content: string) => {
+    const parts = content.split(/(@[a-zA-Z0-9_\-.]+)/g);
+    return (
+      <span>
+        {parts.map((part, idx) => {
+          if (part.startsWith('@') && part.length > 1) {
+            return (
+              <span
+                key={idx}
+                style={{
+                  color: 'var(--accent-primary)',
+                  fontWeight: 600,
+                  background: 'rgba(99, 102, 241, 0.12)',
+                  padding: '0.1rem 0.35rem',
+                  borderRadius: '4px',
+                  marginRight: '0.2rem',
+                  display: 'inline-block'
+                }}
+              >
+                {part}
+              </span>
+            );
+          }
+          return part;
+        })}
+      </span>
+    );
+  };
+
   const buildCommentTree = (items: CommentItem[]): CommentTreeNode[] => {
     const map = new Map<number, CommentTreeNode>();
     const roots: CommentTreeNode[] = [];
@@ -188,10 +237,24 @@ export const ViewGuide: React.FC = () => {
       map.set(item.id, { ...item, replies: [] });
     });
 
+    const findRootId = (parentId: number): number => {
+      let curr = map.get(parentId);
+      while (curr && curr.parent_id && map.has(curr.parent_id)) {
+        curr = map.get(curr.parent_id);
+      }
+      return curr ? curr.id : parentId;
+    };
+
     items.forEach(item => {
       const node = map.get(item.id)!;
       if (item.parent_id && map.has(item.parent_id)) {
-        map.get(item.parent_id)!.replies.push(node);
+        const rootId = findRootId(item.parent_id);
+        const rootNode = map.get(rootId);
+        if (rootNode && rootNode.id !== node.id) {
+          rootNode.replies.push(node);
+        } else {
+          roots.push(node);
+        }
       } else {
         roots.push(node);
       }
@@ -1114,18 +1177,99 @@ export const ViewGuide: React.FC = () => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
             {(() => {
               const rootNodes = buildCommentTree(comments);
-              
-              const renderNode = (node: CommentTreeNode, depth = 0) => {
-                const isReplying = replyingToId === node.id;
+
+              const renderReplyForm = (rootCommentId: number, targetCommentId: number, placeholderUser: string) => {
+                if (replyTarget?.targetCommentId !== targetCommentId) return null;
+                return (
+                  <form
+                    onSubmit={(e) => handlePostReply(e, rootCommentId)}
+                    style={{
+                      marginLeft: targetCommentId === rootCommentId ? '1.5rem' : '0.5rem',
+                      padding: '1rem',
+                      background: 'var(--bg-secondary)',
+                      borderRadius: '8px',
+                      border: '1px solid var(--accent-primary)',
+                      display: 'flex',
+                      gap: '0.75rem',
+                      alignItems: 'flex-start',
+                      marginTop: '0.4rem'
+                    }}
+                  >
+                    {currentUser?.photo_url ? (
+                      <img
+                        src={currentUser.photo_url}
+                        alt=""
+                        style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover' }}
+                      />
+                    ) : (
+                      <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'var(--accent-primary)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 700 }}>
+                        {(currentUser?.username || 'U')[0].toUpperCase()}
+                      </div>
+                    )}
+                    <div style={{ flex: 1 }}>
+                      <textarea
+                        autoFocus
+                        value={replyText}
+                        onChange={(e) => setReplyText(e.target.value)}
+                        placeholder={language === 'es' ? `Respondiendo a @${placeholderUser}...` : `Replying to @${placeholderUser}...`}
+                        rows={2}
+                        maxLength={1000}
+                        style={{
+                          width: '100%',
+                          padding: '0.65rem',
+                          borderRadius: '6px',
+                          border: '1px solid var(--border-color)',
+                          background: 'var(--bg-primary)',
+                          color: 'var(--text-primary)',
+                          resize: 'vertical',
+                          fontSize: '0.88rem',
+                          fontFamily: 'inherit',
+                          outline: 'none',
+                          boxSizing: 'border-box'
+                        }}
+                      />
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.4rem' }}>
+                        <button
+                          type="button"
+                          onClick={() => { setReplyTarget(null); setReplyText(''); }}
+                          className="btn-secondary"
+                          style={{ padding: '0.35rem 0.8rem', fontSize: '0.8rem' }}
+                        >
+                          {language === 'es' ? 'Cancelar' : 'Cancel'}
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={!replyText.trim() || isSubmittingComment}
+                          className="btn-primary"
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.35rem',
+                            padding: '0.35rem 0.9rem',
+                            fontSize: '0.8rem'
+                          }}
+                        >
+                          <Send size={13} />
+                          {isSubmittingComment ? (language === 'es' ? 'Enviando...' : 'Sending...') : (language === 'es' ? 'Responder' : 'Reply')}
+                        </button>
+                      </div>
+                    </div>
+                  </form>
+                );
+              };
+
+              return rootNodes.map((node) => {
+                const isReplyingRoot = replyTarget?.targetCommentId === node.id;
                 const isCollapsed = !!collapsedReplies[node.id];
                 const hasReplies = node.replies && node.replies.length > 0;
 
                 return (
                   <div key={node.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                    {/* Root Comment Card (Depth 0) */}
                     <div
                       style={{
-                        padding: depth === 0 ? '1.15rem' : '0.95rem',
-                        background: depth === 0 ? 'var(--bg-secondary)' : 'rgba(255,255,255,0.02)',
+                        padding: '1.15rem',
+                        background: 'var(--bg-secondary)',
                         borderRadius: '8px',
                         border: '1px solid var(--border-color)',
                         display: 'flex',
@@ -1141,8 +1285,8 @@ export const ViewGuide: React.FC = () => {
                               src={node.photo_url}
                               alt={node.creator_username}
                               style={{
-                                width: depth === 0 ? '32px' : '26px',
-                                height: depth === 0 ? '32px' : '26px',
+                                width: '32px',
+                                height: '32px',
                                 borderRadius: '50%',
                                 objectFit: 'cover',
                                 border: '1px solid var(--border-color)',
@@ -1151,22 +1295,22 @@ export const ViewGuide: React.FC = () => {
                             />
                           ) : (
                             <div style={{
-                              width: depth === 0 ? '32px' : '26px',
-                              height: depth === 0 ? '32px' : '26px',
+                              width: '32px',
+                              height: '32px',
                               borderRadius: '50%',
                               background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))',
                               color: '#fff',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              fontSize: depth === 0 ? '0.82rem' : '0.72rem',
+                              fontSize: '0.82rem',
                               fontWeight: 700,
                               flexShrink: 0
                             }}>
                               {(node.creator_username || 'U')[0].toUpperCase()}
                             </div>
                           )}
-                          <span style={{ fontWeight: 600, fontSize: depth === 0 ? '0.9rem' : '0.85rem' }}>{node.creator_username}</span>
+                          <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>{node.creator_username}</span>
                           <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>• {formatCommentDate(node.created_at)}</span>
                         </div>
 
@@ -1193,7 +1337,7 @@ export const ViewGuide: React.FC = () => {
 
                       {/* Comment text */}
                       <p style={{ margin: 0, fontSize: '0.92rem', color: 'var(--text-primary)', whiteSpace: 'pre-wrap', lineHeight: '1.45' }}>
-                        {node.content}
+                        {renderCommentContent(node.content)}
                       </p>
 
                       {/* Actions */}
@@ -1220,19 +1364,11 @@ export const ViewGuide: React.FC = () => {
 
                         {currentUser && (
                           <button
-                            onClick={() => {
-                              if (isReplying) {
-                                setReplyingToId(null);
-                                setReplyText('');
-                              } else {
-                                setReplyingToId(node.id);
-                                setReplyText('');
-                              }
-                            }}
+                            onClick={() => handleOpenReply(node.id, node.id, node.creator_username)}
                             style={{
                               background: 'transparent',
                               border: 'none',
-                              color: isReplying ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                              color: isReplyingRoot ? 'var(--accent-primary)' : 'var(--text-secondary)',
                               fontSize: '0.78rem',
                               fontWeight: 600,
                               cursor: 'pointer',
@@ -1243,7 +1379,7 @@ export const ViewGuide: React.FC = () => {
                             }}
                           >
                             <Reply size={13} />
-                            <span>{isReplying ? (language === 'es' ? 'Cancelar respuesta' : 'Cancel reply') : (language === 'es' ? 'Responder' : 'Reply')}</span>
+                            <span>{isReplyingRoot ? (language === 'es' ? 'Cancelar respuesta' : 'Cancel reply') : (language === 'es' ? 'Responder' : 'Reply')}</span>
                           </button>
                         )}
 
@@ -1275,104 +1411,155 @@ export const ViewGuide: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Inline Reply Form */}
-                    {isReplying && (
-                      <form
-                        onSubmit={(e) => handlePostReply(e, node.id)}
-                        style={{
-                          marginLeft: '1.5rem',
-                          padding: '1rem',
-                          background: 'var(--bg-secondary)',
-                          borderRadius: '8px',
-                          border: '1px solid var(--accent-primary)',
-                          display: 'flex',
-                          gap: '0.75rem',
-                          alignItems: 'flex-start'
-                        }}
-                      >
-                        {currentUser?.photo_url ? (
-                          <img
-                            src={currentUser.photo_url}
-                            alt=""
-                            style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover' }}
-                          />
-                        ) : (
-                          <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'var(--accent-primary)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 700 }}>
-                            {(currentUser?.username || 'U')[0].toUpperCase()}
-                          </div>
-                        )}
-                        <div style={{ flex: 1 }}>
-                          <textarea
-                            autoFocus
-                            value={replyText}
-                            onChange={(e) => setReplyText(e.target.value)}
-                            placeholder={language === 'es' ? `Respondiendo a @${node.creator_username}...` : `Replying to @${node.creator_username}...`}
-                            rows={2}
-                            maxLength={1000}
-                            style={{
-                              width: '100%',
-                              padding: '0.65rem',
-                              borderRadius: '6px',
-                              border: '1px solid var(--border-color)',
-                              background: 'var(--bg-primary)',
-                              color: 'var(--text-primary)',
-                              resize: 'vertical',
-                              fontSize: '0.88rem',
-                              fontFamily: 'inherit',
-                              outline: 'none',
-                              boxSizing: 'border-box'
-                            }}
-                          />
-                          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.4rem' }}>
-                            <button
-                              type="button"
-                              onClick={() => { setReplyingToId(null); setReplyText(''); }}
-                              className="btn-secondary"
-                              style={{ padding: '0.35rem 0.8rem', fontSize: '0.8rem' }}
-                            >
-                              {language === 'es' ? 'Cancelar' : 'Cancel'}
-                            </button>
-                            <button
-                              type="submit"
-                              disabled={!replyText.trim() || isSubmittingComment}
-                              className="btn-primary"
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '0.35rem',
-                                padding: '0.35rem 0.9rem',
-                                fontSize: '0.8rem'
-                              }}
-                            >
-                              <Send size={13} />
-                              {isSubmittingComment ? (language === 'es' ? 'Enviando...' : 'Sending...') : (language === 'es' ? 'Responder' : 'Reply')}
-                            </button>
-                          </div>
-                        </div>
-                      </form>
-                    )}
+                    {/* Inline Reply Form under Root comment */}
+                    {renderReplyForm(node.id, node.id, node.creator_username)}
 
-                    {/* Recursive Child Replies */}
+                    {/* Single-Level Replies Container */}
                     {hasReplies && !isCollapsed && (
                       <div
                         style={{
                           display: 'flex',
                           flexDirection: 'column',
-                          gap: '0.75rem',
-                          marginLeft: '1.25rem',
+                          gap: '0.6rem',
+                          marginLeft: '1.5rem',
                           paddingLeft: '1rem',
                           borderLeft: '2px solid var(--border-color)',
                           marginTop: '0.25rem'
                         }}
                       >
-                        {node.replies.map((childReply) => renderNode(childReply, depth + 1))}
+                        {node.replies.map((reply) => {
+                          const isReplyingChild = replyTarget?.targetCommentId === reply.id;
+                          return (
+                            <div key={reply.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                              <div
+                                style={{
+                                  padding: '0.95rem',
+                                  background: 'rgba(255,255,255,0.02)',
+                                  borderRadius: '8px',
+                                  border: '1px solid var(--border-color)',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  gap: '0.5rem'
+                                }}
+                              >
+                                {/* Reply Header */}
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    {reply.photo_url ? (
+                                      <img
+                                        src={reply.photo_url}
+                                        alt={reply.creator_username}
+                                        style={{
+                                          width: '26px',
+                                          height: '26px',
+                                          borderRadius: '50%',
+                                          objectFit: 'cover',
+                                          border: '1px solid var(--border-color)',
+                                          flexShrink: 0
+                                        }}
+                                      />
+                                    ) : (
+                                      <div style={{
+                                        width: '26px',
+                                        height: '26px',
+                                        borderRadius: '50%',
+                                        background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))',
+                                        color: '#fff',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        fontSize: '0.72rem',
+                                        fontWeight: 700,
+                                        flexShrink: 0
+                                      }}>
+                                        {(reply.creator_username || 'U')[0].toUpperCase()}
+                                      </div>
+                                    )}
+                                    <span style={{ fontWeight: 600, fontSize: '0.85rem' }}>{reply.creator_username}</span>
+                                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>• {formatCommentDate(reply.created_at)}</span>
+                                  </div>
+
+                                  {currentUser && (currentUser.id === reply.user_id || currentUser.is_admin) && (
+                                    <button
+                                      onClick={() => handleDeleteComment(reply.id)}
+                                      title={language === 'es' ? 'Eliminar respuesta' : 'Delete reply'}
+                                      style={{
+                                        background: 'transparent',
+                                        border: 'none',
+                                        color: 'var(--text-muted)',
+                                        cursor: 'pointer',
+                                        padding: '0.2rem',
+                                        display: 'flex',
+                                        alignItems: 'center'
+                                      }}
+                                      onMouseEnter={(e) => (e.currentTarget.style.color = '#ef4444')}
+                                      onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
+                                    >
+                                      <Trash2 size={13} />
+                                    </button>
+                                  )}
+                                </div>
+
+                                {/* Reply Text */}
+                                <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-primary)', whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>
+                                  {renderCommentContent(reply.content)}
+                                </p>
+
+                                {/* Reply Actions */}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '0.2rem', flexWrap: 'wrap' }}>
+                                  <button
+                                    onClick={() => handleVoteComment(reply.id)}
+                                    style={{
+                                      background: reply.is_voted_by_me ? 'rgba(59, 130, 246, 0.15)' : 'transparent',
+                                      border: reply.is_voted_by_me ? '1px solid rgba(59, 130, 246, 0.3)' : '1px solid var(--border-color)',
+                                      color: reply.is_voted_by_me ? '#3b82f6' : 'var(--text-secondary)',
+                                      borderRadius: '4px',
+                                      padding: '0.15rem 0.45rem',
+                                      fontSize: '0.75rem',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '0.3rem',
+                                      cursor: 'pointer',
+                                      transition: 'all 0.2s ease'
+                                    }}
+                                  >
+                                    <ThumbsUp size={11} fill={reply.is_voted_by_me ? '#3b82f6' : 'none'} />
+                                    <span>{reply.vote_count}</span>
+                                  </button>
+
+                                  {currentUser && (
+                                    <button
+                                      onClick={() => handleOpenReply(node.id, reply.id, reply.creator_username)}
+                                      style={{
+                                        background: 'transparent',
+                                        border: 'none',
+                                        color: isReplyingChild ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                                        fontSize: '0.75rem',
+                                        fontWeight: 600,
+                                        cursor: 'pointer',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '0.25rem',
+                                        padding: '0.15rem 0.35rem'
+                                      }}
+                                    >
+                                      <Reply size={12} />
+                                      <span>{isReplyingChild ? (language === 'es' ? 'Cancelar' : 'Cancel') : (language === 'es' ? 'Responder' : 'Reply')}</span>
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Inline Reply Form under Child Reply */}
+                              {renderReplyForm(node.id, reply.id, reply.creator_username)}
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
                 );
-              };
-
-              return rootNodes.map((rootNode) => renderNode(rootNode, 0));
+              });
             })()}
           </div>
         )}

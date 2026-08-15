@@ -162,15 +162,24 @@ def add_comment(
     if not reading_list:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="List not found")
         
+    effective_parent_id = None
     if comment_in.parent_id:
         parent_comment = db.query(Comment).filter(Comment.id == comment_in.parent_id, Comment.list_id == list_id).first()
         if not parent_comment:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Parent comment not found")
+        # Ensure only 1 level of nesting: always attach reply to the top-level root comment
+        curr = parent_comment
+        while curr.parent_id is not None:
+            root = db.query(Comment).filter(Comment.id == curr.parent_id).first()
+            if not root:
+                break
+            curr = root
+        effective_parent_id = curr.id
 
     new_comment = Comment(
         user_id=current_user.id,
         list_id=list_id,
-        parent_id=comment_in.parent_id,
+        parent_id=effective_parent_id,
         content=comment_in.content
     )
     db.add(new_comment)
@@ -248,8 +257,8 @@ def delete_comment(
     if not comment:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found")
         
-    # Only list creator or comment creator can delete comments
-    if comment.user_id != current_user.id and comment.reading_list.creator_id != current_user.id:
+    # Only list creator, comment creator or admin can delete comments
+    if comment.user_id != current_user.id and comment.reading_list.creator_id != current_user.id and not getattr(current_user, 'is_admin', False):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You are not authorized to delete this comment"
