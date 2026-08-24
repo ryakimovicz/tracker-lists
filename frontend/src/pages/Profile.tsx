@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from '../context/LanguageContext';
 import { apiClient } from '../api/client';
 import { ItemDetailsModal } from '../components/ItemDetailsModal';
+import { MediaPoster } from '../components/MediaPoster';
 
 import {
   BookOpen,
@@ -929,12 +930,16 @@ export const Profile: React.FC = () => {
                     }}>
                       {displayedItems.map(item => (
                         <div key={item.id} className="glass-card" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                          <div style={{ position: 'relative', cursor: 'pointer' }} onClick={() => handleOpenItemDetails(item)}>
-
-                            <img
-                              src={item.image_url || 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=150'}
-                              alt={item.title}
-                              style={{ width: '100%', height: '240px', objectFit: 'cover', borderRadius: '8px' }}
+                          <div style={{ position: 'relative', cursor: 'pointer', width: '100%', height: '240px', borderRadius: '8px', overflow: 'hidden' }} onClick={() => handleOpenItemDetails(item)}>
+                            <MediaPoster
+                              src={item.image_url}
+                              title={item.title}
+                              itemType={item.item_type}
+                              height="100%"
+                              width="100%"
+                              borderRadius="8px"
+                              isNsfw={item.is_nsfw}
+                              showNsfw={currentUser?.show_nsfw}
                             />
                             
                             {mediaFilter === 'all' && (
@@ -1276,11 +1281,16 @@ export const Profile: React.FC = () => {
                   className="glass-card"
                   style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}
                 >
-                  <img
-                    src={album.image || 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=150'}
-                    alt={album.name}
-                    style={{ width: '100%', aspectRatio: '1/1', objectFit: 'cover', borderRadius: '8px' }}
-                  />
+                  <div style={{ width: '100%', aspectRatio: '1/1', borderRadius: '8px', overflow: 'hidden' }}>
+                    <MediaPoster
+                      src={album.image}
+                      title={album.name}
+                      itemType="music"
+                      height="100%"
+                      width="100%"
+                      borderRadius="8px"
+                    />
+                  </div>
                   <div style={{ flex: 1 }}>
                     <a href={album.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
                       <h4 style={{ margin: '0 0 0.25rem 0', color: 'var(--text-primary)' }}>{album.name}</h4>

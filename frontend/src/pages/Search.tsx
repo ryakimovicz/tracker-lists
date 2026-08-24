@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from '../context/LanguageContext';
 import { apiClient } from '../api/client';
 import { ItemDetailsModal } from '../components/ItemDetailsModal';
+import { MediaPoster } from '../components/MediaPoster';
 
 import { Search as SearchIcon, AlertCircle, CheckCircle, Plus, X, Heart, Star, Users, BookOpen } from 'lucide-react';
 
@@ -383,41 +384,16 @@ export const Search: React.FC = () => {
                       {groupItems.map((item: any, idx: number) => (
                         <div key={idx} className="glass-card" style={{ minWidth: '200px', width: '200px', padding: '1rem', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '0.75rem' }} onClick={() => handleOpenItemDetails(item)}>
                           <div style={{ position: 'relative', width: '100%', height: '280px', overflow: 'hidden', borderRadius: '8px' }}>
-                            <img src={item.image_url || 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=300'} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => e.currentTarget.style.display='none'} />
-                            
-                            {/* Overlay Title on Cinema Placeholder */}
-                            {item.image_url && item.image_url.includes('489599849927-2ee91cede3ba') && (
-                              <div style={{
-                                position: 'absolute',
-                                top: 0,
-                                left: 0,
-                                width: '100%',
-                                height: '52%',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                padding: '1rem 0.75rem',
-                                textAlign: 'center',
-                                background: 'linear-gradient(to bottom, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.4) 80%, transparent 100%)',
-                                boxSizing: 'border-box',
-                                pointerEvents: 'none'
-                              }}>
-                                <span style={{
-                                  color: '#ffffff',
-                                  fontSize: '0.95rem',
-                                  fontWeight: 700,
-                                  lineHeight: '1.25',
-                                  textShadow: '0 2px 8px rgba(0,0,0,0.9)',
-                                  letterSpacing: '0.02em',
-                                  display: '-webkit-box',
-                                  WebkitLineClamp: 3,
-                                  WebkitBoxOrient: 'vertical',
-                                  overflow: 'hidden'
-                                }}>
-                                  {item.title}
-                                </span>
-                              </div>
-                            )}
+                            <MediaPoster
+                              src={item.image_url}
+                              title={item.title}
+                              itemType={item.item_type}
+                              height="100%"
+                              width="100%"
+                              borderRadius="8px"
+                              isNsfw={item.is_nsfw}
+                              showNsfw={currentUser?.show_nsfw}
+                            />
 
                             {/* Status Badge */}
                             {item.status && ['completed', 'watching', 'dropped', 'read', 'reading'].includes(item.status) && (
@@ -612,18 +588,18 @@ export const Search: React.FC = () => {
             return (
               <div key={`${item.external_id}-${item.item_type}`} className="glass-card" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', cursor: 'pointer', position: 'relative' }} onClick={() => handleOpenItemDetails(item)}>
 
-                <img
-                  src={item.image_url || 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=150'}
-                  alt={item.title}
-                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                  style={{ 
-                    width: '100%', 
-                    height: '260px', 
-                    objectFit: 'cover', 
-                    borderRadius: '8px',
-                    filter: item.is_nsfw && !currentUser?.show_nsfw ? 'blur(15px)' : 'none'
-                  }}
-                />
+                <div style={{ width: '100%', height: '260px', borderRadius: '8px', overflow: 'hidden' }}>
+                  <MediaPoster
+                    src={item.image_url}
+                    title={item.title}
+                    itemType={item.item_type}
+                    height="100%"
+                    width="100%"
+                    borderRadius="8px"
+                    isNsfw={item.is_nsfw}
+                    showNsfw={currentUser?.show_nsfw}
+                  />
+                </div>
                 <div style={{ flex: 1, textAlign: 'left' }}>
                   <h4 style={{ margin: '0 0 0.15rem 0', fontSize: '1rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.title}>
                     {item.title}

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Star, Check } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { MediaPoster } from './MediaPoster';
 
 interface MediaCardProps {
   id: string | number;
@@ -24,22 +25,21 @@ export const MediaCard: React.FC<MediaCardProps> = ({
   subtitle,
   progressText,
   onClick,
-  style,
+  style = {},
   actionLabel,
   onAction,
-  isLoading,
-  isNsfw
+  isLoading = false,
+  isNsfw = false,
 }) => {
   const { user } = useAuth();
-  const [isPeek, setIsPeek] = React.useState(false);
-  
+  const [blurOverride, setBlurOverride] = React.useState(false);
   const shouldBlur = isNsfw && !user?.show_nsfw;
-  const currentlyBlurred = shouldBlur && !isPeek;
+  const currentlyBlurred = shouldBlur && !blurOverride;
 
   const handleCardClick = (e: React.MouseEvent) => {
     if (currentlyBlurred) {
       e.stopPropagation();
-      setIsPeek(true);
+      setBlurOverride(true);
       return;
     }
     if (onClick) onClick();
@@ -50,11 +50,11 @@ export const MediaCard: React.FC<MediaCardProps> = ({
       className="glass-card"
       onClick={handleCardClick}
       style={{
-        padding: '0.75rem',
+        padding: '1rem',
         display: 'flex',
         flexDirection: 'column',
         gap: '0.75rem',
-        cursor: (onClick || currentlyBlurred) ? 'pointer' : 'default',
+        cursor: onClick ? 'pointer' : 'default',
         minWidth: '160px',
         width: '160px',
         transition: 'transform 0.2s',
@@ -67,18 +67,16 @@ export const MediaCard: React.FC<MediaCardProps> = ({
         if (onClick) e.currentTarget.style.transform = 'none';
       }}
     >
-      <div style={{ position: 'relative' }}>
-        <img
-          src={imageUrl || 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=150'}
-          alt={title}
-          style={{ 
-            width: '100%', 
-            height: '220px', 
-            objectFit: 'cover', 
-            borderRadius: '8px',
-            filter: currentlyBlurred ? 'blur(15px)' : 'none',
-            transition: 'filter 0.3s'
-          }}
+      <div style={{ position: 'relative', width: '100%', height: '220px', borderRadius: '8px', overflow: 'hidden' }}>
+        <MediaPoster
+          src={imageUrl}
+          title={title}
+          itemType={typeLabel}
+          height="100%"
+          width="100%"
+          borderRadius="8px"
+          isNsfw={isNsfw}
+          showNsfw={user?.show_nsfw || blurOverride}
         />
         {currentlyBlurred && (
           <div style={{
