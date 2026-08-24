@@ -2,21 +2,22 @@
 
 :root {
   /* Premium Dark Theme Color Tokens (Gallery Style) */
-  --bg-primary: #0f172a; /* slate-900 background */
-  --bg-secondary: rgba(30, 41, 59, 0.6); /* slate-800 translucent */
-  --bg-tertiary: rgba(51, 65, 85, 0.5); /* slate-700 translucent */
+  /* Premium Dark Theme Color Tokens (Letterboxd/Cinema Deep Charcoal Style) */
+  --bg-primary: #090d16; /* Deep Cinema Charcoal */
+  --bg-secondary: rgba(18, 24, 38, 0.65); /* Translucent charcoal card */
+  --bg-tertiary: rgba(30, 41, 59, 0.55); /* Elevated slate surface */
   
-  --text-primary: #f8fafc; /* slate-50 */
-  --text-secondary: #94a3b8; /* slate-400 */
-  --text-muted: #64748b; /* slate-500 */
+  --text-primary: #f8fafc; /* Crisp light */
+  --text-secondary: #94a3b8; /* Slate muted */
+  --text-muted: #64748b;
   
-  --accent-primary: #6366f1; /* Deep Galactic Indigo */
-  --accent-secondary: #4f46e5; /* Royal Indigo */
-  --accent-hover: #4f46e5;
+  --accent-primary: #f59e0b; /* Solar Amber */
+  --accent-secondary: #d97706; /* Deep Amber */
+  --accent-hover: #d97706;
   
-  --border-color: rgba(99, 102, 241, 0.16); /* Sophisticated indigo glow */
-  --border-glow: rgba(99, 102, 241, 0.32);
-  --card-shadow: 0 10px 40px -10px rgba(0,0,0,0.5);
+  --border-color: rgba(245, 158, 11, 0.18); /* Warm amber glow */
+  --border-glow: rgba(245, 158, 11, 0.35);
+  --card-shadow: 0 10px 40px -10px rgba(0,0,0,0.6);
 
   /* Priority Color Levels (1 to 5) */
   --priority-1: #64748b;
@@ -25,18 +26,18 @@
   --priority-4: #f59e0b;
   --priority-5: #ef4444;
 
-    /* Category Colors (Light Theme defaults) */
+  /* Category Colors (Dark Theme defaults) */
   --color-movie: #4ADE80;
   --color-text-movie: #0F172A;
-  --color-series: #FACC15;
+  --color-series: #38BDF8; /* Sky Cyan for series to give amber full brand priority */
   --color-text-series: #0F172A;
   --color-anime: #FB923C;
   --color-text-anime: #0F172A;
-  --color-book: #B45309;
-  --color-text-book: #FFFFFF;
+  --color-book: #E2E8F0;
+  --color-text-book: #0F172A;
   --color-comic: #F87171;
   --color-text-comic: #0F172A;
-  --color-manga: #60A5FA;
+  --color-manga: #818CF8;
   --color-text-manga: #0F172A;
   --color-game: #C084FC;
   --color-text-game: #0F172A;
@@ -44,66 +45,62 @@
   --color-text-guide: #FFFFFF;
   --color-user: #F472B6;
   --color-text-user: #0F172A;
-
-
-
-
 
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
 [data-theme="light"] {
-  /* Premium Light Theme Color Tokens (Gallery Style) */
-  --bg-primary: #f8fafc; /* slate-50 */
-  --bg-secondary: rgba(255, 255, 255, 0.7); /* white translucent */
-  --bg-tertiary: rgba(241, 245, 249, 0.5); /* slate-100 translucent */
+  /* Premium Light Theme Color Tokens (Warm Sand & Amber Style) */
+  --bg-primary: #fafaf9; /* Stone-50 warm paper background */
+  --bg-secondary: rgba(255, 255, 255, 0.85); /* Translucent white card */
+  --bg-tertiary: rgba(245, 245, 244, 0.7); /* Stone-100 surface */
   
-  --text-primary: #0f172a; /* slate-900 */
-  --text-secondary: #475569; /* slate-600 */
-  --text-muted: #94a3b8; /* slate-400 */
+  --text-primary: #1c1917; /* Stone-900 */
+  --text-secondary: #57534e; /* Stone-600 */
+  --text-muted: #a8a29e; /* Stone-400 */
   
-  --accent-primary: #4f46e5; /* Royal Indigo */
-  --accent-secondary: #4338ca;
-  --accent-hover: #4338ca;
+  --accent-primary: #d97706; /* Rich Amber */
+  --accent-secondary: #b45309; /* Deep Ochre */
+  --accent-hover: #b45309;
   
-  --border-color: rgba(79, 70, 229, 0.15);
-  --border-glow: rgba(79, 70, 229, 0.2);
-  --card-shadow: 0 10px 40px -10px rgba(15,23,42,0.08);
+  --border-color: rgba(217, 119, 6, 0.16);
+  --border-glow: rgba(217, 119, 6, 0.25);
+  --card-shadow: 0 10px 40px -10px rgba(28, 25, 23, 0.08);
 
-    /* Category Colors (Light Theme) */
-  --color-movie: #4ADE80;
-  --color-text-movie: #0F172A;
-  --color-series: #FACC15;
-  --color-text-series: #0F172A;
-  --color-anime: #FB923C;
-  --color-text-anime: #0F172A;
-  --color-book: #B45309;
+  /* Category Colors (Light Theme) */
+  --color-movie: #16A34A;
+  --color-text-movie: #FFFFFF;
+  --color-series: #0284C7;
+  --color-text-series: #FFFFFF;
+  --color-anime: #EA580C;
+  --color-text-anime: #FFFFFF;
+  --color-book: #475569;
   --color-text-book: #FFFFFF;
-  --color-comic: #F87171;
-  --color-text-comic: #0F172A;
-  --color-manga: #60A5FA;
-  --color-text-manga: #0F172A;
-  --color-game: #C084FC;
-  --color-text-game: #0F172A;
-  --color-guide: #475569;
+  --color-comic: #DC2626;
+  --color-text-comic: #FFFFFF;
+  --color-manga: #6366F1;
+  --color-text-manga: #FFFFFF;
+  --color-game: #9333EA;
+  --color-text-game: #FFFFFF;
+  --color-guide: #57534E;
   --color-text-guide: #FFFFFF;
-  --color-user: #F472B6;
-  --color-text-user: #0F172A;
+  --color-user: #DB2777;
+  --color-text-user: #FFFFFF;
 }
 
 [data-theme="dark"] {
-    /* Category Colors (Dark Theme) */
+  /* Category Colors (Dark Theme) */
   --color-movie: #4ADE80;
   --color-text-movie: #0F172A;
-  --color-series: #FACC15;
+  --color-series: #38BDF8;
   --color-text-series: #0F172A;
   --color-anime: #FB923C;
   --color-text-anime: #0F172A;
-  --color-book: #B45309;
-  --color-text-book: #FFFFFF;
+  --color-book: #E2E8F0;
+  --color-text-book: #0F172A;
   --color-comic: #F87171;
   --color-text-comic: #0F172A;
-  --color-manga: #60A5FA;
+  --color-manga: #818CF8;
   --color-text-manga: #0F172A;
   --color-game: #C084FC;
   --color-text-game: #0F172A;
@@ -197,20 +194,21 @@ h1, h2, h3, h4, h5, h6 {
   justify-content: center;
   gap: 0.5rem;
   background: var(--accent-primary);
-  color: #ffffff;
+  color: #0f172a;
   border: none;
   border-radius: 12px;
   padding: 0.75rem 1.5rem;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
-  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);
+  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.35);
   transition: background-color 0.2s, transform 0.2s, box-shadow 0.2s;
 }
 
 .btn-primary:hover {
   background: var(--accent-hover);
+  color: #ffffff;
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.45);
+  box-shadow: 0 6px 20px rgba(245, 158, 11, 0.45);
 }
 
 .activity-card {
@@ -219,7 +217,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .activity-card:hover {
   transform: translateX(4px);
-  box-shadow: 0 4px 20px rgba(99, 102, 241, 0.15);
+  box-shadow: 0 4px 20px rgba(245, 158, 11, 0.15);
 }
 
 .btn-secondary {
