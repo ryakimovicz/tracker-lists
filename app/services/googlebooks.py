@@ -160,16 +160,25 @@ class GoogleBooksService:
                     
         return merged_results
 
+    _new_books_cache = {}
+
     @staticmethod
     def get_new_books() -> List[SearchResultItem]:
         from datetime import datetime
-        import json, urllib.request, urllib.parse
+        import json, urllib.request, urllib.parse, time
+        import concurrent.futures
         from app.core.config import settings
+
+        cache_key = "googlebooks_new_books_v1"
+        now_ts = time.time()
+        if cache_key in GoogleBooksService._new_books_cache:
+            ts, data = GoogleBooksService._new_books_cache[cache_key]
+            if now_ts - ts < 1800: # 30 min cache
+                return data
 
         today_str = datetime.now().strftime("%Y-%m-%d")
         current_year = datetime.now().year
         
-        # General queries across all genres to catch the latest releases of the current year
         search_terms = [
             f"{current_year}",
             f"novel {current_year}",
@@ -177,11 +186,7 @@ class GoogleBooksService:
             f"bestseller {current_year}"
         ]
         
-        all_books: List[SearchResultItem] = []
-        seen_ids = set()
-        seen_titles = set()
-
-        for term in search_terms:
+        def fetch_term(term):
             try:
                 encoded = urllib.parse.quote(term)
                 url = f"https://www.googleapis.com/books/v1/volumes?q={encoded}&orderBy=newest&maxResults=40"
@@ -191,65 +196,77 @@ class GoogleBooksService:
                 req = urllib.request.Request(url, headers={"User-Agent": "TrackerLists/1.0"})
                 with urllib.request.urlopen(req, timeout=5) as response:
                     if response.status == 200:
-                        data = json.loads(response.read().decode())
-                        for item in data.get("items", []):
-                            g_id = item.get("id")
-                            if not g_id or g_id in seen_ids:
-                                continue
-
-                            v_info = item.get("volumeInfo", {})
-                            title = v_info.get("title") or "Untitled Book"
-                            norm_title = "".join(e for e in title.lower() if e.isalnum())
-                            if norm_title in seen_titles:
-                                continue
-
-                            # Must have a real cover image
-                            img_links = v_info.get("imageLinks", {})
-                            img_url = img_links.get("thumbnail") or img_links.get("smallThumbnail")
-                            if not img_url:
-                                continue
-                            if img_url.startswith("http://"):
-                                img_url = img_url.replace("http://", "https://")
-
-                            pub_date = v_info.get("publishedDate") or ""
-                            # Filter out future dates that haven't been released yet and older years
-                            if not pub_date or pub_date > today_str:
-                                continue
-                            if not (pub_date.startswith(str(current_year)) or pub_date.startswith(str(current_year - 1))):
-                                continue
-
-                            # Filter out technical manuals, test prep, magazines, electrical code, business blueprints, and reference pamphlets
-                            lower_title = title.lower()
-                            technical_keywords = [
-                                "code book", "manual", "handbook", "exam prep", "study guide", 
-                                "test prep", "magazine", "journal", "periodical", "bulletin",
-                                "directory", "catalogue", "electrical code", "regulations", "audiobook",
-                                "business blueprint", "coloring book", "visas 2026", "hustle culture",
-                                "revista"
-                            ]
-                            if any(k in lower_title for k in technical_keywords):
-                                continue
-
-                            # Format release date as YYYY-MM for books
-                            formatted_date = pub_date[:7] if len(pub_date) >= 7 else pub_date
-
-                            authors = v_info.get("authors", [])
-                            author_str = f"Author: {authors[0]}." if authors else ""
-                            desc = v_info.get("description") or (author_str + f" Published: {formatted_date}.")
-
-                            seen_ids.add(g_id)
-                            seen_titles.add(norm_title)
-                            all_books.append(SearchResultItem(
-                                external_id=f"googlebook-{g_id}",
-                                title=title,
-                                image_url=img_url,
-                                description=desc,
-                                item_type="book",
-                                release_date=formatted_date,
-                                page_count=v_info.get("pageCount")
-                            ))
+                        d = json.loads(response.read().decode())
+                        return d.get("items", [])
             except Exception:
                 pass
+            return []
+
+        all_raw_items = []
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+            for items in executor.map(fetch_term, search_terms):
+                all_raw_items.extend(items)
+
+        all_books: List[SearchResultItem] = []
+        seen_ids = set()
+        seen_titles = set()
+
+        for item in all_raw_items:
+            g_id = item.get("id")
+            if not g_id or g_id in seen_ids:
+                continue
+
+            v_info = item.get("volumeInfo", {})
+            title = v_info.get("title") or "Untitled Book"
+            norm_title = "".join(e for e in title.lower() if e.isalnum())
+            if norm_title in seen_titles:
+                continue
+
+            # Must have a real cover image
+            img_links = v_info.get("imageLinks", {})
+            img_url = img_links.get("thumbnail") or img_links.get("smallThumbnail")
+            if not img_url:
+                continue
+            if img_url.startswith("http://"):
+                img_url = img_url.replace("http://", "https://")
+
+            pub_date = v_info.get("publishedDate") or ""
+            # Filter out future dates that haven't been released yet and older years
+            if not pub_date or pub_date > today_str:
+                continue
+            if not (pub_date.startswith(str(current_year)) or pub_date.startswith(str(current_year - 1))):
+                continue
+
+            # Filter out technical manuals, test prep, magazines, electrical code, business blueprints, and reference pamphlets
+            lower_title = title.lower()
+            technical_keywords = [
+                "code book", "manual", "handbook", "exam prep", "study guide", 
+                "test prep", "magazine", "journal", "periodical", "bulletin",
+                "directory", "catalogue", "electrical code", "regulations", "audiobook",
+                "business blueprint", "coloring book", "visas 2026", "hustle culture",
+                "revista"
+            ]
+            if any(k in lower_title for k in technical_keywords):
+                continue
+
+            # Format release date as YYYY-MM for books
+            formatted_date = pub_date[:7] if len(pub_date) >= 7 else pub_date
+
+            authors = v_info.get("authors", [])
+            author_str = f"Author: {authors[0]}." if authors else ""
+            desc = v_info.get("description") or (author_str + f" Published: {formatted_date}.")
+
+            seen_ids.add(g_id)
+            seen_titles.add(norm_title)
+            all_books.append(SearchResultItem(
+                external_id=f"googlebook-{g_id}",
+                title=title,
+                image_url=img_url,
+                description=desc,
+                item_type="book",
+                release_date=formatted_date,
+                page_count=v_info.get("pageCount")
+            ))
 
         # Sort strictly by release date descending
         all_books.sort(
@@ -257,7 +274,9 @@ class GoogleBooksService:
             reverse=True
         )
 
-        return all_books[:40]
+        final_res = all_books[:40]
+        GoogleBooksService._new_books_cache[cache_key] = (now_ts, final_res)
+        return final_res
 
     @staticmethod
     def get_trending_books() -> List[SearchResultItem]:

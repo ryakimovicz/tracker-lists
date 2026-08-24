@@ -163,26 +163,42 @@ class TVMazeService:
         return None
 
 
+    _schedule_cache = {}
+
     @staticmethod
     def get_new_shows() -> List[SearchResultItem]:
-        import json, urllib.request, datetime
+        import json, urllib.request, datetime, time
+        import concurrent.futures
+        
+        cache_key = "tvmaze_new_shows_v1"
+        now_ts = time.time()
+        if cache_key in TVMazeService._schedule_cache:
+            ts, data = TVMazeService._schedule_cache[cache_key]
+            if now_ts - ts < 1800: # 30 min cache
+                return data
+
         today = datetime.date.today()
-        # Fetch schedule for the last 5 days
         dates = [(today - datetime.timedelta(days=i)).strftime("%Y-%m-%d") for i in range(5)]
         
-        all_episodes = []
+        urls = []
         for d in dates:
-            u1 = f"https://api.tvmaze.com/schedule/web?date={d}"
-            u2 = f"https://api.tvmaze.com/schedule?date={d}&country=US"
-            for u in [u1, u2]:
-                try:
-                    req = urllib.request.Request(u, headers={"User-Agent": "TrackerLists/1.0"})
-                    with urllib.request.urlopen(req, timeout=4) as response:
-                        if response.status == 200:
-                            items = json.loads(response.read().decode())
-                            all_episodes.extend(items)
-                except Exception:
-                    pass
+            urls.append(f"https://api.tvmaze.com/schedule/web?date={d}")
+            urls.append(f"https://api.tvmaze.com/schedule?date={d}&country=US")
+
+        def fetch_url(u):
+            try:
+                req = urllib.request.Request(u, headers={"User-Agent": "TrackerLists/1.0"})
+                with urllib.request.urlopen(req, timeout=4) as response:
+                    if response.status == 200:
+                        return json.loads(response.read().decode())
+            except Exception:
+                pass
+            return []
+
+        all_episodes = []
+        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+            for items in executor.map(fetch_url, urls):
+                all_episodes.extend(items)
 
         shows_map = {}
         for ep in all_episodes:
@@ -246,26 +262,43 @@ class TVMazeService:
                 popularity=show.get("weight", 0)
             ))
 
+        TVMazeService._schedule_cache[cache_key] = (now_ts, results)
         return results
 
     @staticmethod
     def get_new_anime() -> List[SearchResultItem]:
-        import json, urllib.request, datetime
+        import json, urllib.request, datetime, time
+        import concurrent.futures
+
+        cache_key = "tvmaze_new_anime_v1"
+        now_ts = time.time()
+        if cache_key in TVMazeService._schedule_cache:
+            ts, data = TVMazeService._schedule_cache[cache_key]
+            if now_ts - ts < 1800: # 30 min cache
+                return data
+
         today = datetime.date.today()
-        # Fetch schedule for the last 5 days including Japan & Web releases
         dates = [(today - datetime.timedelta(days=i)).strftime("%Y-%m-%d") for i in range(5)]
         
-        all_episodes = []
+        urls = []
         for d in dates:
-            for u in [f"https://api.tvmaze.com/schedule/web?date={d}", f"https://api.tvmaze.com/schedule?date={d}&country=JP"]:
-                try:
-                    req = urllib.request.Request(u, headers={"User-Agent": "TrackerLists/1.0"})
-                    with urllib.request.urlopen(req, timeout=4) as response:
-                        if response.status == 200:
-                            items = json.loads(response.read().decode())
-                            all_episodes.extend(items)
-                except Exception:
-                    pass
+            urls.append(f"https://api.tvmaze.com/schedule/web?date={d}")
+            urls.append(f"https://api.tvmaze.com/schedule?date={d}&country=JP")
+
+        def fetch_url(u):
+            try:
+                req = urllib.request.Request(u, headers={"User-Agent": "TrackerLists/1.0"})
+                with urllib.request.urlopen(req, timeout=4) as response:
+                    if response.status == 200:
+                        return json.loads(response.read().decode())
+            except Exception:
+                pass
+            return []
+
+        all_episodes = []
+        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+            for items in executor.map(fetch_url, urls):
+                all_episodes.extend(items)
 
         anime_map = {}
         for ep in all_episodes:
@@ -328,6 +361,7 @@ class TVMazeService:
                 popularity=show.get("weight", 0)
             ))
 
+        TVMazeService._schedule_cache[cache_key] = (now_ts, results)
         return results
 
     @staticmethod
