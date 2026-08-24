@@ -34,7 +34,6 @@ class Settings(BaseSettings):
     
     # External APIs
     COMIC_VINE_API_KEY: str = ""
-    TMDB_API_KEY: str = ""
     GOOGLE_BOOKS_API_KEY: str = ""
     TWITCH_CLIENT_ID: str = ""
     TWITCH_CLIENT_SECRET: str = ""

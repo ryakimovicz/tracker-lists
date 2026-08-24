@@ -31,7 +31,8 @@
 | [Last.fm](https://www.last.fm/api) | Música, álbumes destacados y scrobbling en tiempo real |
 | [IGDB](https://api-docs.igdb.com/) | Videojuegos (autenticado via Twitch OAuth2) |
 | [Google Books](https://developers.google.com/books/docs/v1/using) + [Open Library](https://openlibrary.org/developers/api) | Libros (con tracking de páginas) |
-| [Comic Vine](https://comicvine.gamespot.com/api/) | Cómics y mangas (con tracking de páginas) |
+| [Comic Vine](https://comicvine.gamespot.com/api/) | Cómics occidentales (con tracking de volúmenes y grapas) |
+| [AniList](https://graphql.anilist.co) | Mangas, novelas ligeras y one-shots (GraphQL) |
 | [Google Translate](https://translate.google.com/) | Traducción dinámica de sinopsis (vía `deep-translator`) |
 
 ---

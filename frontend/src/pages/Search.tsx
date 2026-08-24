@@ -48,7 +48,6 @@ export const Search: React.FC = () => {
 
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResultItem[]>([]);
-  const [activeExploreTab, setActiveExploreTab] = useState<'nuevo' | 'descubrir'>('nuevo');
   const [activeTab, setActiveTab] = useState<'all' | 'movie' | 'series' | 'anime' | 'book' | 'game' | 'user' | 'guide' | 'comic' | 'manga'>('all');
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
@@ -72,28 +71,6 @@ export const Search: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<any | null>(null);
   const [followingUsers, setFollowingUsers] = useState<any[]>([]);
   const [savedGuides, setSavedGuides] = useState<any[]>([]);
-
-  const getCachedTMDB = (key: string) => {
-    try {
-      const item = localStorage.getItem(`tmdb_cache_${key}`);
-      if (item) {
-        const parsed = JSON.parse(item);
-        if (Date.now() - parsed.timestamp < 6 * 60 * 60 * 1000) {
-          return parsed.data;
-        }
-      }
-    } catch(e){}
-    return null;
-  };
-
-  const setCachedTMDB = (key: string, data: any) => {
-    try {
-      localStorage.setItem(`tmdb_cache_${key}`, JSON.stringify({
-        data,
-        timestamp: Date.now()
-      }));
-    } catch(e){}
-  };
 
   const loadShelfItems = async () => {
     try {
@@ -334,34 +311,26 @@ export const Search: React.FC = () => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', marginTop: '1rem' }}>
           
           <div style={{ display: "flex", gap: "2rem", borderBottom: "1px solid var(--border-color)", paddingBottom: "0.5rem", position: "relative" }}>
-            {["nuevo", "descubrir"].map((tab) => {
-              const labels: any = { "nuevo": language === 'es' ? "Nuevo" : "New", "descubrir": language === 'es' ? "Descubrir" : "Discover" };
-              const isActive = activeExploreTab === tab;
-              return (
-                <div 
-                  key={tab}
-                  onClick={() => setActiveExploreTab(tab as any)}
-                  style={{
-                    fontSize: "1.1rem", fontWeight: isActive ? 600 : 500,
-                    color: isActive ? "var(--text-primary)" : "var(--text-secondary)",
-                    cursor: "pointer", padding: "0.5rem 0", position: "relative"
-                  }}
-                >
-                  {labels[tab]}
-                  {isActive && <div style={{ position: "absolute", bottom: "-0.5rem", left: 0, right: 0, height: "2px", background: "var(--accent-primary)" }} />}
-                </div>
-              );
-            })}
+            <div 
+              style={{
+                fontSize: "1.1rem", fontWeight: 600,
+                color: "var(--text-primary)",
+                padding: "0.5rem 0", position: "relative"
+              }}
+            >
+              {t('exploreNew')}
+              <div style={{ position: "absolute", bottom: "-0.5rem", left: 0, right: 0, height: "2px", background: "var(--accent-primary)" }} />
+            </div>
           </div>
 
           {loadingExplore ? (
-            <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '3rem' }}>Cargando...</div>
+            <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '3rem' }}>{language === 'es' ? 'Cargando...' : 'Loading...'}</div>
           ) : exploreData ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
               {(() => {
-                const items = exploreData[activeExploreTab] || [];
+                const items = exploreData.nuevo || [];
                 if (items.length === 0) {
-                  return <div style={{ color: "var(--text-secondary)", padding: "1rem 0" }}>No hay elementos en esta categoría.</div>;
+                  return <div style={{ color: "var(--text-secondary)", padding: "1rem 0" }}>{language === 'es' ? 'No hay elementos disponibles.' : 'No items available.'}</div>;
                 }
 
                 // Agrupar por categoría
@@ -373,24 +342,27 @@ export const Search: React.FC = () => {
                 
                 // Sort each group
                 Object.keys(grouped).forEach(key => {
-                  if (activeExploreTab === 'nuevo' || activeExploreTab === 'descubrir') {
-                    grouped[key].sort((a, b) => {
-                      if (!a.release_date) return 1;
-                      if (!b.release_date) return -1;
-                      return new Date(b.release_date).getTime() - new Date(a.release_date).getTime();
-                    });
-                  }
-                  // Para 'agregado', ya viene ordenado desde el backend por id descendente (mas reciente primero).
+                  grouped[key].sort((a, b) => {
+                    if (!a.release_date) return 1;
+                    if (!b.release_date) return -1;
+                    return new Date(b.release_date).getTime() - new Date(a.release_date).getTime();
+                  });
                 });
 
-                return Object.entries(grouped).map(([type, groupItems]) => {
-                  const title = type === 'comic' ? (language === 'es' ? 'Cómics' : 'Comics') : 
-                                type === 'manga' ? 'Mangas' : 
-                                type === 'book' ? (language === 'es' ? 'Libros' : 'Books') :
-                                type === 'movie' ? (language === 'es' ? 'Películas' : 'Movies') :
+                // Enforce exact order requested: Película, Serie, Anime, Libro, Comic, Manga, Juegos
+                const categoryOrder = ['movie', 'series', 'anime', 'book', 'comic', 'manga', 'game'];
+
+                return categoryOrder.map(type => {
+                  const groupItems = grouped[type];
+                  if (!groupItems || groupItems.length === 0) return null;
+
+                  const title = type === 'movie' ? (language === 'es' ? 'Películas' : 'Movies') :
                                 type === 'series' ? 'Series' :
-                                type === 'game' ? (language === 'es' ? 'Juegos' : 'Games') :
-                                type === 'anime' ? 'Anime' : type;
+                                type === 'anime' ? 'Anime' :
+                                type === 'book' ? (language === 'es' ? 'Libros' : 'Books') :
+                                type === 'comic' ? (language === 'es' ? 'Cómics' : 'Comics') : 
+                                type === 'manga' ? 'Mangas' : 
+                                type === 'game' ? (language === 'es' ? 'Juegos' : 'Games') : type;
                   
                   return (
                     <HorizontalScroll key={type} title={title}>
@@ -399,6 +371,40 @@ export const Search: React.FC = () => {
                           <div style={{ position: 'relative', width: '100%', height: '280px', overflow: 'hidden', borderRadius: '8px' }}>
                             <img src={item.image_url || 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=300'} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => e.currentTarget.style.display='none'} />
                             
+                            {/* Overlay Title on Cinema Placeholder */}
+                            {item.image_url && item.image_url.includes('489599849927-2ee91cede3ba') && (
+                              <div style={{
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                width: '100%',
+                                height: '52%',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                padding: '1rem 0.75rem',
+                                textAlign: 'center',
+                                background: 'linear-gradient(to bottom, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.4) 80%, transparent 100%)',
+                                boxSizing: 'border-box',
+                                pointerEvents: 'none'
+                              }}>
+                                <span style={{
+                                  color: '#ffffff',
+                                  fontSize: '0.95rem',
+                                  fontWeight: 700,
+                                  lineHeight: '1.25',
+                                  textShadow: '0 2px 8px rgba(0,0,0,0.9)',
+                                  letterSpacing: '0.02em',
+                                  display: '-webkit-box',
+                                  WebkitLineClamp: 3,
+                                  WebkitBoxOrient: 'vertical',
+                                  overflow: 'hidden'
+                                }}>
+                                  {item.title}
+                                </span>
+                              </div>
+                            )}
+
                             {/* Status Badge */}
                             {item.status && ['completed', 'watching', 'dropped', 'read', 'reading'].includes(item.status) && (
                               <div style={{ 
@@ -420,7 +426,16 @@ export const Search: React.FC = () => {
                           </div>
                           <div>
                             <h4 style={{ margin: '0 0 0.25rem 0', fontSize: '1rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</h4>
-                            {item.release_date && <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{item.release_date}</span>}
+                            {(item.item_type === 'series' || item.item_type === 'anime') && item.latest_episode != null ? (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+                                <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--accent-primary)' }}>
+                                  {language === 'es' ? 'T' : 'S'}{String(item.latest_season || 1).padStart(2, '0')} | E{String(item.latest_episode).padStart(2, '0')}
+                                </span>
+                                {item.release_date && <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{item.release_date}</span>}
+                              </div>
+                            ) : (
+                              item.release_date && <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{item.release_date}</span>
+                            )}
                           </div>
                         </div>
                       ))}

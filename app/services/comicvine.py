@@ -202,10 +202,52 @@ class ComicVineService:
 
     @staticmethod
     def get_new_comics() -> List[SearchResultItem]:
-        return ComicVineService.search_comics("Batman")[:15]
+        api_key = settings.COMIC_VINE_API_KEY
+        if not api_key:
+            return []
+        
+        # Fetch latest published comic issues from Comic Vine with full dates
+        try:
+            url = f"https://comicvine.gamespot.com/api/issues/?api_key={api_key}&format=json&sort=cover_date:desc&limit=15"
+            req = urllib.request.Request(url, headers={"User-Agent": "Pathd/1.0 (contact@pathd.app)"})
+            with urllib.request.urlopen(req, timeout=6) as response:
+                if response.status == 200:
+                    data = json.loads(response.read().decode())
+                    results = []
+                    for item in data.get("results", []):
+                        image_obj = item.get("image", {})
+                        image_url = image_obj.get("super_url") or image_obj.get("medium_url") or image_obj.get("small_url")
+                        
+                        vol_name = item.get("volume", {}).get("name")
+                        issue_num = item.get("issue_number")
+                        title = item.get("name")
+                        if not title:
+                            title = f"{vol_name} #{issue_num}" if (vol_name and issue_num) else (vol_name or "Untitled Comic")
+                        elif vol_name and issue_num and vol_name not in title:
+                            title = f"{vol_name} #{issue_num}: {title}"
+                            
+                        pub_date = item.get("store_date") or item.get("cover_date") or (item.get("date_added")[:10] if item.get("date_added") else None)
+                        
+                        results.append(SearchResultItem(
+                            external_id=f"cv_issue_{item.get('id')}",
+                            title=title,
+                            image_url=image_url,
+                            description=item.get("deck") or item.get("description") or "",
+                            item_type="comic",
+                            release_date=pub_date
+                        ))
+                    if results:
+                        return results
+        except Exception as e:
+            print(f"Comic Vine New Comics error: {e}")
+
+        # Fallback to volumes query
+        from datetime import datetime
+        current_year = datetime.now().year
+        return ComicVineService.search_comics(f"Batman {current_year}")[:15]
 
     @staticmethod
     def get_trending_comics() -> List[SearchResultItem]:
         import random
-        queries = ["Spider-Man", "X-Men", "Avengers", "Superman", "Justice League"]
+        queries = ["Spider-Man", "X-Men", "Batman", "Superman", "Wolverine", "Avengers"]
         return ComicVineService.search_comics(random.choice(queries))[:15]

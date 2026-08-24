@@ -375,7 +375,7 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
                               const seasonStr = selectedSeason < 10 ? '0' + selectedSeason : selectedSeason;
                               const fullTitle = `${media.title} - S${seasonStr}E${ep_num < 10 ? '0' + ep_num : ep_num} - ${ep_name}`;
                               const still = ep.still_path;
-                              const image_url = still ? (still.startsWith('http') ? still : `https://image.tmdb.org/t/p/w185${still}`) : media.image_url;
+                              const image_url = still ? still : media.image_url;
                               
                               const ext_id = `tvm-ep-${ep.id}`;
                               const isEpAdded = addedIds.includes(ext_id);

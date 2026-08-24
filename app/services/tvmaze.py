@@ -166,39 +166,169 @@ class TVMazeService:
     @staticmethod
     def get_new_shows() -> List[SearchResultItem]:
         import json, urllib.request, datetime
-        today = datetime.datetime.now().strftime("%Y-%m-%d")
-        url = f"https://api.tvmaze.com/schedule/web?date={today}"
-        req = urllib.request.Request(url, headers={"User-Agent": "TrackerLists/1.0"})
+        today = datetime.date.today()
+        # Fetch schedule for the last 5 days
+        dates = [(today - datetime.timedelta(days=i)).strftime("%Y-%m-%d") for i in range(5)]
+        
+        all_episodes = []
+        for d in dates:
+            u1 = f"https://api.tvmaze.com/schedule/web?date={d}"
+            u2 = f"https://api.tvmaze.com/schedule?date={d}&country=US"
+            for u in [u1, u2]:
+                try:
+                    req = urllib.request.Request(u, headers={"User-Agent": "TrackerLists/1.0"})
+                    with urllib.request.urlopen(req, timeout=4) as response:
+                        if response.status == 200:
+                            items = json.loads(response.read().decode())
+                            all_episodes.extend(items)
+                except Exception:
+                    pass
+
+        shows_map = {}
+        for ep in all_episodes:
+            show = ep.get("_embedded", {}).get("show")
+            if not show or not show.get("id"):
+                continue
+
+            # Exclude anime from general series list
+            genres = show.get("genres", [])
+            lang = show.get("language")
+            show_type = show.get("type")
+            is_anime = ("Anime" in genres) or (lang == "Japanese" and show_type == "Animation")
+            if is_anime:
+                continue
+
+            show_id = show.get("id")
+            airdate = ep.get("airdate")
+            season = ep.get("season")
+            number = ep.get("number")
+            if not airdate:
+                continue
+
+            ep_info = {
+                "airdate": airdate,
+                "season": season,
+                "number": number
+            }
+
+            if show_id not in shows_map:
+                shows_map[show_id] = {
+                    "show": show,
+                    "latest_ep": ep_info
+                }
+            else:
+                cur = shows_map[show_id]["latest_ep"]
+                if (airdate, season or 0, number or 0) > (cur["airdate"], cur["season"] or 0, cur["number"] or 0):
+                    shows_map[show_id]["latest_ep"] = ep_info
+
+        sorted_shows = sorted(
+            shows_map.values(),
+            key=lambda x: (x["latest_ep"]["airdate"], x["show"].get("weight", 0)),
+            reverse=True
+        )[:60]
+
         results = []
-        try:
-            with urllib.request.urlopen(req, timeout=5) as response:
-                if response.status == 200:
-                    data = json.loads(response.read().decode())
-                    seen = set()
-                    for item in data:
-                        show = item.get("_embedded", {}).get("show")
-                        if not show:
-                            continue
-                        if show.get("id") in seen:
-                            continue
-                        seen.add(show.get("id"))
-                        image_data = show.get("image")
-                        image_url = image_data.get("original") or image_data.get("medium") if image_data else None
-                        premiered = show.get("premiered")
-                        release_date = premiered[:4] if premiered else None
-                        results.append(SearchResultItem(
-                            external_id=f"tvm_{show.get('id')}",
-                            title=show.get("name"),
-                            image_url=image_url,
-                            description=show.get("summary", ""),
-                            item_type="series",
-                            release_date=release_date,
-                            popularity=show.get("weight", 0)
-                        ))
-                    return sorted(results, key=lambda x: x.popularity, reverse=True)[:10]
-        except Exception:
-            pass
-        return []
+        for item in sorted_shows:
+            show = item["show"]
+            lep = item["latest_ep"]
+            image_data = show.get("image")
+            image_url = image_data.get("original") or image_data.get("medium") if image_data else None
+
+            results.append(SearchResultItem(
+                external_id=f"tvm_{show.get('id')}",
+                title=show.get("name"),
+                image_url=image_url,
+                description=show.get("summary", ""),
+                item_type="series",
+                release_date=lep["airdate"],
+                latest_season=lep.get("season"),
+                latest_episode=lep.get("number"),
+                popularity=show.get("weight", 0)
+            ))
+
+        return results
+
+    @staticmethod
+    def get_new_anime() -> List[SearchResultItem]:
+        import json, urllib.request, datetime
+        today = datetime.date.today()
+        # Fetch schedule for the last 5 days including Japan & Web releases
+        dates = [(today - datetime.timedelta(days=i)).strftime("%Y-%m-%d") for i in range(5)]
+        
+        all_episodes = []
+        for d in dates:
+            for u in [f"https://api.tvmaze.com/schedule/web?date={d}", f"https://api.tvmaze.com/schedule?date={d}&country=JP"]:
+                try:
+                    req = urllib.request.Request(u, headers={"User-Agent": "TrackerLists/1.0"})
+                    with urllib.request.urlopen(req, timeout=4) as response:
+                        if response.status == 200:
+                            items = json.loads(response.read().decode())
+                            all_episodes.extend(items)
+                except Exception:
+                    pass
+
+        anime_map = {}
+        for ep in all_episodes:
+            show = ep.get("_embedded", {}).get("show")
+            if not show or not show.get("id"):
+                continue
+
+            genres = show.get("genres", [])
+            lang = show.get("language")
+            show_type = show.get("type")
+            is_anime = ("Anime" in genres) or (lang == "Japanese" and show_type == "Animation")
+            if not is_anime:
+                continue
+
+            show_id = show.get("id")
+            airdate = ep.get("airdate")
+            season = ep.get("season")
+            number = ep.get("number")
+            if not airdate:
+                continue
+
+            ep_info = {
+                "airdate": airdate,
+                "season": season,
+                "number": number
+            }
+
+            if show_id not in anime_map:
+                anime_map[show_id] = {
+                    "show": show,
+                    "latest_ep": ep_info
+                }
+            else:
+                cur = anime_map[show_id]["latest_ep"]
+                if (airdate, season or 0, number or 0) > (cur["airdate"], cur["season"] or 0, cur["number"] or 0):
+                    anime_map[show_id]["latest_ep"] = ep_info
+
+        sorted_anime = sorted(
+            anime_map.values(),
+            key=lambda x: (x["latest_ep"]["airdate"], x["show"].get("weight", 0)),
+            reverse=True
+        )[:60]
+
+        results = []
+        for item in sorted_anime:
+            show = item["show"]
+            lep = item["latest_ep"]
+            image_data = show.get("image")
+            image_url = image_data.get("original") or image_data.get("medium") if image_data else None
+
+            results.append(SearchResultItem(
+                external_id=f"tvm_{show.get('id')}",
+                title=show.get("name"),
+                image_url=image_url,
+                description=show.get("summary", ""),
+                item_type="anime",
+                release_date=lep["airdate"],
+                latest_season=lep.get("season"),
+                latest_episode=lep.get("number"),
+                popularity=show.get("weight", 0)
+            ))
+
+        return results
 
     @staticmethod
     def get_trending_shows() -> List[SearchResultItem]:
@@ -211,19 +341,18 @@ class TVMazeService:
             with urllib.request.urlopen(req, timeout=5) as response:
                 if response.status == 200:
                     data = json.loads(response.read().decode())
-                    sorted_shows = sorted(data, key=lambda x: x.get("weight", 0), reverse=True)[:10]
+                    sorted_shows = sorted(data, key=lambda x: x.get("weight", 0), reverse=True)[:15]
                     for show in sorted_shows:
                         image_data = show.get("image")
                         image_url = image_data.get("original") or image_data.get("medium") if image_data else None
                         premiered = show.get("premiered")
-                        release_date = premiered[:4] if premiered else None
                         results.append(SearchResultItem(
                             external_id=f"tvm_{show.get('id')}",
                             title=show.get("name"),
                             image_url=image_url,
                             description=show.get("summary", ""),
                             item_type="series",
-                            release_date=release_date,
+                            release_date=premiered,
                             popularity=show.get("weight", 0)
                         ))
                     return results

@@ -7,7 +7,7 @@ from app.services.base import SearchResultItem
 
 class GoogleBooksService:
     @staticmethod
-    def fetch_google_books(query: str) -> List[Tuple[SearchResultItem, List[str]]]:
+    def fetch_google_books(query: str, order_by: str = None) -> List[Tuple[SearchResultItem, List[str]]]:
         if not query:
             return []
         try:
@@ -19,6 +19,8 @@ class GoogleBooksService:
                 search_term = query
             encoded_query = urllib.parse.quote(search_term)
             url = f"https://www.googleapis.com/books/v1/volumes?q={encoded_query}&maxResults=15"
+            if order_by:
+                url += f"&orderBy={order_by}"
             if settings.GOOGLE_BOOKS_API_KEY:
                 url += f"&key={settings.GOOGLE_BOOKS_API_KEY}"
             req = urllib.request.Request(
@@ -126,12 +128,12 @@ class GoogleBooksService:
         return []
 
     @staticmethod
-    def search_books(query: str) -> List[SearchResultItem]:
+    def search_books(query: str, order_by: str = None) -> List[SearchResultItem]:
         if not query:
             return []
             
         with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-            future_google = executor.submit(GoogleBooksService.fetch_google_books, query)
+            future_google = executor.submit(GoogleBooksService.fetch_google_books, query, order_by)
             future_ol = executor.submit(GoogleBooksService.fetch_open_library, query)
             google_results = future_google.result()
             ol_results = future_ol.result()
@@ -160,10 +162,18 @@ class GoogleBooksService:
 
     @staticmethod
     def get_new_books() -> List[SearchResultItem]:
-        return GoogleBooksService.search_books("subject:fiction 2024")[:15]
+        from datetime import datetime
+        current_year = datetime.now().year
+        today_str = datetime.now().strftime("%Y-%m-%d")
+        # Fetch newest published books with cover image
+        results = GoogleBooksService.search_books(f"fiction {current_year}", order_by="newest")
+        with_covers = [b for b in results if b.image_url]
+        # Filter out future dates that haven't released yet
+        filtered = [b for b in with_covers if b.release_date and b.release_date <= today_str]
+        return (filtered or with_covers or results)[:15]
 
     @staticmethod
     def get_trending_books() -> List[SearchResultItem]:
         import random
-        queries = ["Harry Potter", "Lord of the Rings", "Percy Jackson", "A Song of Ice and Fire", "Stephen King", "Brandon Sanderson"]
+        queries = ["Bestseller", "Fantasy", "Sci-Fi", "Mystery", "Thriller", "Stephen King", "Brandon Sanderson"]
         return GoogleBooksService.search_books(random.choice(queries))[:15]

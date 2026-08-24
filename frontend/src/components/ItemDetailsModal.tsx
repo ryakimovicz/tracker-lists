@@ -387,16 +387,19 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
             filteredSeasons = cached.seasons;
           } else {
             const seriesRes = await apiClient.get(`/search/series/${item.external_id}`);
-            seriesData = seriesRes.data;
-            filteredSeasons = (seriesData.seasons || []).filter((s: any) => s.season_number > 0);
+            seriesData = seriesRes.data || {};
+            filteredSeasons = (seriesData?.seasons || []).filter((s: any) => s.season_number > 0);
+            if (filteredSeasons.length === 0 && (item.item_type === 'series' || item.item_type === 'anime')) {
+              filteredSeasons = [{ id: 1, season_number: 1, episode_count: item.latest_episode || 12 }];
+            }
             setCachedSeries(cacheKey, { ...seriesData, seasons: filteredSeasons });
           }
           
-          if (!item.description || !item.release_date || !item.image_url) {
+          if (seriesData && (!item.description || !item.release_date || !item.image_url)) {
             setSelectedItem((prev: any) => prev ? {
               ...prev,
-              description: prev.description || seriesData.overview,
-              release_date: prev.release_date || seriesData.first_air_date,
+              description: prev.description || seriesData.overview || '',
+              release_date: prev.release_date || seriesData.first_air_date || '',
               image_url: prev.image_url || seriesData.image_url || null
             } : null);
           }
@@ -538,26 +541,40 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
           }
         }
       } else {
-        setIsLoadingMetadata(true);
-        apiClient.get('/search/', { params: { q: item.title, type: item.item_type === 'anime' ? 'series' : item.item_type } })
-          .then(searchRes => {
-            const match = searchRes.data.find((x: any) => x.external_id === item.external_id);
-            if (match) {
-              const cachedVal = { description: match.description || '', release_date: match.release_date || null };
-              setCachedSeries(descCacheKey, cachedVal);
-              setSelectedItem((prev: any) => {
-                if (!prev) return null;
-                return {
-                  ...prev,
-                  custom_notes: JSON.stringify(cachedVal)
-                };
-              });
-            }
-          })
-          .catch(e => console.error(e))
-          .finally(() => {
-            setIsLoadingMetadata(false);
+        // If item already has a description (e.g. from theatrical cartelera or explore search), use it directly
+        if (item.description) {
+          const cachedVal = { description: item.description, release_date: item.release_date || null };
+          setCachedSeries(descCacheKey, cachedVal);
+          setSelectedItem((prev: any) => {
+            if (!prev) return null;
+            return {
+              ...prev,
+              custom_notes: JSON.stringify(cachedVal)
+            };
           });
+          setIsLoadingMetadata(false);
+        } else {
+          setIsLoadingMetadata(true);
+          apiClient.get('/search/', { params: { q: item.title, type: item.item_type === 'anime' ? 'series' : item.item_type } })
+            .then(searchRes => {
+              const match = searchRes.data.find((x: any) => x.external_id === item.external_id) || searchRes.data[0];
+              if (match) {
+                const cachedVal = { description: match.description || '', release_date: match.release_date || null };
+                setCachedSeries(descCacheKey, cachedVal);
+                setSelectedItem((prev: any) => {
+                  if (!prev) return null;
+                  return {
+                    ...prev,
+                    custom_notes: JSON.stringify(cachedVal)
+                  };
+                });
+              }
+            })
+            .catch(e => console.error(e))
+            .finally(() => {
+              setIsLoadingMetadata(false);
+            });
+        }
       }
     };
 
@@ -1256,6 +1273,23 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                           transition: 'filter 0.3s'
                         }}
                       />
+                      {selectedItem.image_url && selectedItem.image_url.includes('489599849927-2ee91cede3ba') && !shouldBlurCover && (
+                        <div style={{
+                          position: 'absolute', top: 0, left: 0, width: '100%', height: '52%',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          padding: '0.5rem', textAlign: 'center', pointerEvents: 'none',
+                          background: 'linear-gradient(to bottom, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.4) 80%, transparent 100%)',
+                          boxSizing: 'border-box', borderRadius: '8px 8px 0 0'
+                        }}>
+                          <span style={{
+                            color: '#ffffff', fontSize: '0.8rem', fontWeight: 700, lineHeight: '1.2',
+                            textShadow: '0 2px 6px rgba(0,0,0,0.9)', letterSpacing: '0.02em',
+                            display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden'
+                          }}>
+                            {selectedItem.title}
+                          </span>
+                        </div>
+                      )}
                       {shouldBlurCover && (
                         <div style={{
                           position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
@@ -1315,7 +1349,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                     
                     const shouldTruncate = cleanText.length > 180;
                     const displayedText = shouldTruncate && !descExpanded
-                      ? cleanText.slice(0, 180) + '...'
+                      ? cleanText.slice(0, 180).replace(/\.\.\.$/, '') + '...'
                       : cleanText;
 
                     return (

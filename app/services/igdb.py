@@ -153,13 +153,15 @@ class IGDBService:
 
     @classmethod
     def get_new_games(cls) -> List[SearchResultItem]:
-        now = int(datetime.now().timestamp())
-        body = f'fields id, name, cover.image_id, first_release_date; where first_release_date < {now} & category = 0; sort first_release_date desc; limit 15;'
+        import time
+        now = int(time.time())
+        body = f'fields id, name, cover.image_id, first_release_date, summary; where first_release_date < {now} & cover != null; sort first_release_date desc; limit 15;'
         return cls._execute_query(body)
 
     @classmethod
     def get_trending_games(cls) -> List[SearchResultItem]:
-        now = int(datetime.now().timestamp())
-        six_months_ago = int((datetime.now() - timedelta(days=180)).timestamp())
-        body = f'fields id, name, cover.image_id, first_release_date; where first_release_date > {six_months_ago} & first_release_date < {now} & total_rating > 80 & total_rating_count > 50 & category = 0; sort total_rating desc; limit 15;'
+        import time
+        now = int(time.time())
+        six_months_ago = now - (180 * 86400)
+        body = f'fields id, name, cover.image_id, first_release_date, summary, total_rating; where first_release_date > {six_months_ago} & first_release_date < {now} & cover != null & total_rating != null; sort total_rating desc; limit 15;'
         return cls._execute_query(body)
