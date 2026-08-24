@@ -50,14 +50,14 @@
 }
 
 [data-theme="light"] {
-  /* Premium Light Theme Color Tokens (Warm Sand & Amber Style) */
-  --bg-primary: #fafaf9; /* Stone-50 warm paper background */
-  --bg-secondary: rgba(255, 255, 255, 0.85); /* Translucent white card */
-  --bg-tertiary: rgba(245, 245, 244, 0.7); /* Stone-100 surface */
+  /* Premium Light Theme Color Tokens (Gallery Slate-Ice & Amber Style) */
+  --bg-primary: #f1f5f9; /* Slate-100 Soft Slate Ice - harmonizes with dark slate/charcoal */
+  --bg-secondary: rgba(255, 255, 255, 0.88); /* Translucent crisp white card */
+  --bg-tertiary: rgba(226, 232, 240, 0.6); /* Slate-200 subtle surface */
   
-  --text-primary: #1c1917; /* Stone-900 */
-  --text-secondary: #57534e; /* Stone-600 */
-  --text-muted: #a8a29e; /* Stone-400 */
+  --text-primary: #0f172a; /* Slate-900 */
+  --text-secondary: #475569; /* Slate-600 */
+  --text-muted: #94a3b8; /* Slate-400 */
   
   --accent-primary: #d97706; /* Rich Amber */
   --accent-secondary: #b45309; /* Deep Ochre */
@@ -65,12 +65,12 @@
   
   --border-color: rgba(217, 119, 6, 0.16);
   --border-glow: rgba(217, 119, 6, 0.25);
-  --card-shadow: 0 10px 40px -10px rgba(28, 25, 23, 0.08);
+  --card-shadow: 0 10px 40px -10px rgba(15, 23, 42, 0.08);
 
   /* Category Colors (Light Theme) */
   --color-movie: #16A34A;
   --color-text-movie: #FFFFFF;
-  --color-series: #EAB308;
+  --color-series: #FACC15; /* Pure Vibrant Yellow */
   --color-text-series: #0F172A;
   --color-anime: #EA580C;
   --color-text-anime: #FFFFFF;
@@ -82,7 +82,7 @@
   --color-text-manga: #FFFFFF;
   --color-game: #9333EA;
   --color-text-game: #FFFFFF;
-  --color-guide: #57534E;
+  --color-guide: #475569;
   --color-text-guide: #FFFFFF;
   --color-user: #DB2777;
   --color-text-user: #FFFFFF;
