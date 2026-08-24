@@ -218,9 +218,24 @@ class GoogleBooksService:
                             if not (pub_date.startswith(str(current_year)) or pub_date.startswith(str(current_year - 1))):
                                 continue
 
+                            # Filter out technical manuals, test prep, magazines, electrical code, business blueprints, and reference pamphlets
+                            lower_title = title.lower()
+                            technical_keywords = [
+                                "code book", "manual", "handbook", "exam prep", "study guide", 
+                                "test prep", "magazine", "journal", "periodical", "bulletin",
+                                "directory", "catalogue", "electrical code", "regulations", "audiobook",
+                                "business blueprint", "coloring book", "visas 2026", "hustle culture",
+                                "revista"
+                            ]
+                            if any(k in lower_title for k in technical_keywords):
+                                continue
+
+                            # Format release date as YYYY-MM for books
+                            formatted_date = pub_date[:7] if len(pub_date) >= 7 else pub_date
+
                             authors = v_info.get("authors", [])
                             author_str = f"Author: {authors[0]}." if authors else ""
-                            desc = v_info.get("description") or (author_str + f" Published: {pub_date}.")
+                            desc = v_info.get("description") or (author_str + f" Published: {formatted_date}.")
 
                             seen_ids.add(g_id)
                             seen_titles.add(norm_title)
@@ -230,7 +245,7 @@ class GoogleBooksService:
                                 image_url=img_url,
                                 description=desc,
                                 item_type="book",
-                                release_date=pub_date,
+                                release_date=formatted_date,
                                 page_count=v_info.get("pageCount")
                             ))
             except Exception:
@@ -238,7 +253,7 @@ class GoogleBooksService:
 
         # Sort strictly by release date descending
         all_books.sort(
-            key=lambda b: (b.release_date or "", len(b.release_date or "")),
+            key=lambda b: b.release_date or "",
             reverse=True
         )
 
