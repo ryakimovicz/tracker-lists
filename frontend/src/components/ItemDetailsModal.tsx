@@ -698,10 +698,10 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   };
 
   
-  const ensureTrackedPromiseRef = React.useRef<Promise<number | null> | null>(null);
+  const ensureTrackedPromiseRef = React.useRef<Promise<any | null> | null>(null);
 
   const ensureTracked = async (status: string) => {
-    if (selectedItem.tracking_list_id) return selectedItem.tracking_list_id;
+    if (selectedItem.tracking_list_id && selectedItem.id) return selectedItem;
     if (ensureTrackedPromiseRef.current) {
       return await ensureTrackedPromiseRef.current;
     }
@@ -726,7 +726,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
           ...newItem
         }));
         onUpdate && onUpdate(newItem);
-        return newItem.tracking_list_id;
+        return newItem;
       } catch (e) {
         console.error("Failed to add to library", e);
         return null;
@@ -767,9 +767,16 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
     if (isAllDone && selectedItem.status !== 'completed') {
       try {
-        await apiClient.put(`/library/${selectedItem.id}`, { status: 'completed' });
-        setSelectedItem((prev: any) => ({ ...prev, status: 'completed' }));
-        onUpdate && onUpdate();
+        let targetId = selectedItem.id;
+        if (!targetId) {
+          const newId = await ensureTracked('watching');
+          targetId = selectedItem.id;
+        }
+        if (targetId) {
+          await apiClient.put(`/library/${targetId}`, { status: 'completed' });
+          setSelectedItem((prev: any) => ({ ...prev, status: 'completed', id: targetId }));
+          onUpdate && onUpdate();
+        }
       } catch (e) {
         console.error("Failed to auto-complete", e);
       }
@@ -809,7 +816,9 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
       if (!effectiveListId) {
         try {
-          effectiveListId = await ensureTracked('watching');
+          const tracked = await ensureTracked('watching');
+          if (!tracked) return;
+          effectiveListId = tracked.tracking_list_id || tracked;
         } catch (err) {
           console.error("Failed to track series automatically", err);
           return;
@@ -1976,9 +1985,9 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                   e.stopPropagation();
                                   let effectiveListId = selectedItem.tracking_list_id;
                                   if (!effectiveListId) {
-                                    const newId = await ensureTracked('watching');
-                                    if (!newId) return;
-                                    effectiveListId = newId;
+                                    const tracked = await ensureTracked('watching');
+                                    if (!tracked) return;
+                                    effectiveListId = tracked.tracking_list_id || tracked;
                                   }
                                   
                                   const checkedVal = !isSeasonDone;
