@@ -4,10 +4,11 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 interface HorizontalScrollProps {
   children: React.ReactNode;
   title?: string;
+  outlineColor?: string;
   className?: string;
 }
 
-export const HorizontalScroll: React.FC<HorizontalScrollProps> = ({ children, title, className = "" }) => {
+export const HorizontalScroll: React.FC<HorizontalScrollProps> = ({ children, title, outlineColor, className = "" }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const scroll = (direction: "left" | "right") => {
@@ -19,7 +20,21 @@ export const HorizontalScroll: React.FC<HorizontalScrollProps> = ({ children, ti
 
   return (
     <div className={`horizontal-scroll-container ${className}`} style={{ position: "relative", marginBottom: "2rem", width: "100%", maxWidth: "100%", overflow: "hidden" }}>
-      {title && <h3 style={{ fontSize: "1.2rem", marginBottom: "1rem", fontWeight: 600, paddingLeft: "45px" }}>{title}</h3>}
+      {title && (
+        <div style={{ display: "flex", paddingLeft: "45px", marginBottom: "1rem" }}>
+          <h3 style={{ 
+            fontSize: "1.2rem", 
+            fontWeight: 600, 
+            color: "var(--text-primary)", 
+            border: `2px solid ${outlineColor || "var(--border-color)"}`, 
+            borderRadius: "8px", 
+            padding: "0.2rem 0.75rem", 
+            background: "var(--bg-secondary)" 
+          }}>
+            {title}
+          </h3>
+        </div>
+      )}
       
       <button 
         onClick={() => scroll("left")}

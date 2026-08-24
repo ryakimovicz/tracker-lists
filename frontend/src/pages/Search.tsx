@@ -56,7 +56,7 @@ const ExploreSection = React.memo<ExploreSectionProps>(({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
       {categories.map(({ type, title, items }) => (
-        <HorizontalScroll key={type} title={title}>
+        <HorizontalScroll key={type} title={title} outlineColor={`var(--color-${type})`}>
           {items.map((item: any, idx: number) => (
             <div key={idx} className="glass-card" style={{ minWidth: '200px', width: '200px', padding: '1rem', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '0.75rem' }} onClick={() => onOpenItem(item)}>
               <div style={{ position: 'relative', width: '100%', height: '280px', overflow: 'hidden', borderRadius: '8px' }}>
