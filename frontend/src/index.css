@@ -10,12 +10,12 @@
   --text-secondary: #94a3b8; /* slate-400 */
   --text-muted: #64748b; /* slate-500 */
   
-  --accent-primary: #818cf8; /* Soft Indigo */
-  --accent-secondary: #6366f1; /* Indigo */
-  --accent-gradient: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
+  --accent-primary: #8b5cf6; /* Vibrant Electric Violet */
+  --accent-secondary: #7c3aed; /* Deep Violet */
+  --accent-hover: #7c3aed;
   
-  --border-color: rgba(129, 140, 248, 0.15); /* Soft border glow */
-  --border-glow: rgba(129, 140, 248, 0.3);
+  --border-color: rgba(139, 92, 246, 0.18); /* Crisp violet glow */
+  --border-glow: rgba(139, 92, 246, 0.35);
   --card-shadow: 0 10px 40px -10px rgba(0,0,0,0.5);
 
   /* Priority Color Levels (1 to 5) */
@@ -62,11 +62,12 @@
   --text-secondary: #475569; /* slate-600 */
   --text-muted: #94a3b8; /* slate-400 */
   
-  --accent-primary: #4f46e5; /* Indigo */
-  --accent-secondary: #6366f1; /* Indigo */
+  --accent-primary: #7c3aed; /* Deep Violet */
+  --accent-secondary: #6d28d9;
+  --accent-hover: #6d28d9;
   
-  --border-color: rgba(79, 70, 229, 0.15);
-  --border-glow: rgba(79, 70, 229, 0.2);
+  --border-color: rgba(124, 58, 237, 0.15);
+  --border-glow: rgba(124, 58, 237, 0.2);
   --card-shadow: 0 10px 40px -10px rgba(15,23,42,0.08);
 
     /* Category Colors (Light Theme) */
@@ -112,11 +113,11 @@
   --color-text-user: #0F172A;
 }
 
+/* Global Reset & Base */
 * {
-  box-sizing: border-box;
   margin: 0;
   padding: 0;
-  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+  box-sizing: border-box;
 }
 
 body {
@@ -125,10 +126,12 @@ body {
   color: var(--text-primary);
   min-height: 100vh;
   overflow-x: hidden;
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Premium Layout Wrappers */
+/* Layout Elements */
 .app-container {
   display: flex;
   min-height: 100vh;
@@ -136,7 +139,6 @@ body {
 
 .sidebar {
   width: 250px;
-  flex-shrink: 0;
   background: var(--bg-secondary);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
@@ -165,9 +167,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .gradient-text {
-  background: var(--accent-gradient);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: var(--accent-primary);
 }
 
 /* Card glassmorphism styling */
@@ -196,20 +196,21 @@ h1, h2, h3, h4, h5, h6 {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  background: var(--accent-gradient);
+  background: var(--accent-primary);
   color: #ffffff;
   border: none;
   border-radius: 12px;
   padding: 0.75rem 1.5rem;
   font-weight: 500;
   cursor: pointer;
-  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.35);
-  transition: transform 0.2s, opacity 0.2s;
+  box-shadow: 0 4px 14px rgba(139, 92, 246, 0.35);
+  transition: background-color 0.2s, transform 0.2s, box-shadow 0.2s;
 }
 
 .btn-primary:hover {
+  background: var(--accent-hover);
   transform: translateY(-2px);
-  opacity: 0.9;
+  box-shadow: 0 6px 20px rgba(139, 92, 246, 0.45);
 }
 
 .activity-card {
