@@ -153,11 +153,14 @@ class AnilistService:
 
     @staticmethod
     def get_new_manga() -> List[SearchResultItem]:
+        import json, urllib.request, datetime
         url = "https://graphql.anilist.co"
-        graphql_query = '''
-        query {
-          Page(page: 1, perPage: 15) {
-            media(type: MANGA, sort: [START_DATE_DESC], startDate_greater: 20260101, startDate_lesser: 20260821, isAdult: false) {
+        today_int = int(datetime.date.today().strftime("%Y%m%d"))
+        
+        graphql_query = """
+        query ($end: FuzzyDateInt) {
+          Page(page: 1, perPage: 40) {
+            media(type: MANGA, sort: [START_DATE_DESC], startDate_greater: 20260101, startDate_lesser: $end, isAdult: false) {
               id
               title { romaji english }
               description
@@ -168,9 +171,11 @@ class AnilistService:
             }
           }
         }
-        '''
-        import json, urllib.request
-        payload = json.dumps({"query": graphql_query}).encode("utf-8")
+        """
+        payload = json.dumps({
+            "query": graphql_query,
+            "variables": {"end": today_int}
+        }).encode("utf-8")
         req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json", "Accept": "application/json", "User-Agent": "Pathd/1.0"})
         try:
             with urllib.request.urlopen(req, timeout=5) as response:
