@@ -153,3 +153,6 @@ Thumbs.db
 # IDEs
 .vscode/
 .idea/
+
+# Scratch and test files
+scratch/
