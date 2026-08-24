@@ -594,9 +594,54 @@ export const Home: React.FC = () => {
     try {
       if (!silent) setLoading(true);
       const libRes = await apiClient.get('/library/');
-      if (libRes.data) {
-        setLibraryItems(libRes.data);
+      let currentLib = libRes.data || [];
+
+      // Auto-revert series/anime from 'completed' to 'watching' if a new episode has aired
+      const todayStr = new Date().toISOString().split('T')[0];
+      const completedSeries = currentLib.filter((i: any) => i.status === 'completed' && (i.item_type === 'series' || i.item_type === 'anime') && i.tracking_list_id);
+
+      for (const item of completedSeries) {
+        const cacheKeyAll = `${item.external_id}_all_episodes`;
+        let allEps = getCachedSeries(cacheKeyAll);
+        if (!allEps) {
+          try {
+            const epRes = await apiClient.get(`/search/series/${item.external_id}/episodes`);
+            allEps = epRes.data;
+            setCachedSeries(cacheKeyAll, allEps);
+          } catch (e) {
+            allEps = null;
+          }
+        }
+
+        if (allEps && Array.isArray(allEps)) {
+          let trackedEps: any[] = [];
+          try {
+            const listRes = await apiClient.get(`/lists/${item.tracking_list_id}`);
+            trackedEps = listRes.data.items || [];
+          } catch (e) {
+            trackedEps = [];
+          }
+
+          // Check if there is an uncompleted episode whose air date is today or earlier
+          const hasNewAiredEpisode = allEps.some(ep => {
+            const airDate = ep.airdate || ep.air_date;
+            const isAired = airDate && airDate <= todayStr;
+            const isWatched = trackedEps.some((t: any) => (t.external_id === `tvm-ep-${ep.id}` || t.id === ep.id) && t.is_completed);
+            return isAired && !isWatched;
+          });
+
+          if (hasNewAiredEpisode) {
+            try {
+              await apiClient.put(`/library/${item.id}`, { status: 'watching' });
+              item.status = 'watching';
+            } catch (e) {
+              console.error("Failed to auto-resume series", e);
+            }
+          }
+        }
       }
+
+      setLibraryItems(currentLib);
 
       const upNextRes = await apiClient.get('/users/me/up-next');
       if (upNextRes.data && upNextRes.data.guides) {
