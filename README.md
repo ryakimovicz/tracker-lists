@@ -26,14 +26,14 @@
 
 | Servicio | Uso |
 |---|---|
-| [TVMaze](https://www.tvmaze.com/api) | Series, animes y detalle de episodios/temporadas |
 | [OMDb](https://www.omdbapi.com/) + [Fanart.tv](https://fanart.tv/) | Películas (con duración y sinopsis completas) y pósters en HD |
-| [Last.fm](https://www.last.fm/api) | Música, álbumes destacados y scrobbling en tiempo real |
-| [IGDB](https://api-docs.igdb.com/) | Videojuegos (autenticado via Twitch OAuth2) |
+| [TVMaze](https://www.tvmaze.com/api) | Series, animes y detalle de episodios/temporadas |
 | [Google Books](https://developers.google.com/books/docs/v1/using) + [Open Library](https://openlibrary.org/developers/api) | Libros (con tracking de páginas) |
 | [Comic Vine](https://comicvine.gamespot.com/api/) | Cómics occidentales (con tracking de volúmenes y grapas) |
 | [AniList](https://graphql.anilist.co) | Mangas, novelas ligeras y one-shots (GraphQL) |
-| [Google Translate](https://translate.google.com/) | Traducción dinámica de sinopsis (vía `deep-translator`) |
+| [IGDB](https://api-docs.igdb.com/) | Videojuegos (autenticado via Twitch OAuth2) |
+| [Last.fm](https://www.last.fm/api) | Música, álbumes destacados y scrobbling en tiempo real |
+| [deep-translator](https://github.com/nidhaloff/deep-translator) (Google) | Traducción dinámica y gratuita de sinopsis con caché en base de datos |
 
 ---
 
