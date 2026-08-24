@@ -208,23 +208,38 @@ class ComicVineService:
         
         # Fetch latest published comic issues from Comic Vine with full dates
         try:
-            url = f"https://comicvine.gamespot.com/api/issues/?api_key={api_key}&format=json&sort=cover_date:desc&limit=15"
+            url = f"https://comicvine.gamespot.com/api/issues/?api_key={api_key}&format=json&sort=cover_date:desc&limit=50"
             req = urllib.request.Request(url, headers={"User-Agent": "Pathd/1.0 (contact@pathd.app)"})
             with urllib.request.urlopen(req, timeout=6) as response:
                 if response.status == 200:
                     data = json.loads(response.read().decode())
                     results = []
+                    
+                    # Keywords to identify manga magazines/anthologies in Comic Vine
+                    manga_keywords = [
+                        "shonen jump", "v jump", "shueisha", "kodansha", "manga", "kirara",
+                        "yuri hime", "champion red", "action pizazz", "office you", "dengeki",
+                        "young jump", "weekly shonen", "monthly shonen", "tankobon", "jump giga"
+                    ]
+
                     for item in data.get("results", []):
+                        vol_name = (item.get("volume", {}).get("name") or "").strip()
+                        issue_num = item.get("issue_number")
+                        raw_title = item.get("name") or ""
+                        
+                        full_name_check = f"{vol_name} {raw_title}".lower()
+                        if any(k in full_name_check for k in manga_keywords):
+                            continue
+
                         image_obj = item.get("image", {})
                         image_url = image_obj.get("super_url") or image_obj.get("medium_url") or image_obj.get("small_url")
                         
-                        vol_name = item.get("volume", {}).get("name")
-                        issue_num = item.get("issue_number")
-                        title = item.get("name")
-                        if not title:
+                        if not raw_title:
                             title = f"{vol_name} #{issue_num}" if (vol_name and issue_num) else (vol_name or "Untitled Comic")
-                        elif vol_name and issue_num and vol_name not in title:
-                            title = f"{vol_name} #{issue_num}: {title}"
+                        elif vol_name and issue_num and vol_name not in raw_title:
+                            title = f"{vol_name} #{issue_num}: {raw_title}"
+                        else:
+                            title = raw_title
                             
                         pub_date = item.get("store_date") or item.get("cover_date") or (item.get("date_added")[:10] if item.get("date_added") else None)
                         
@@ -237,7 +252,7 @@ class ComicVineService:
                             release_date=pub_date
                         ))
                     if results:
-                        return results
+                        return results[:25]
         except Exception as e:
             print(f"Comic Vine New Comics error: {e}")
 
