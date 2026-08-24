@@ -155,7 +155,7 @@ class IGDBService:
     def get_new_games(cls) -> List[SearchResultItem]:
         import time
         now = int(time.time())
-        body = f'fields id, name, cover.image_id, first_release_date, summary; where first_release_date < {now} & cover != null; sort first_release_date desc; limit 15;'
+        body = f'fields id, name, cover.image_id, first_release_date, summary; where first_release_date < {now} & cover != null; sort first_release_date desc; limit 40;'
         return cls._execute_query(body)
 
     @classmethod
