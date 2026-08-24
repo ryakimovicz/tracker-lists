@@ -765,17 +765,19 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       }
     }
 
-    if (isAllDone && selectedItem.status !== 'completed') {
+    if (isAllDone) {
       try {
         let targetId = selectedItem.id;
         if (!targetId) {
-          const newId = await ensureTracked('watching');
-          targetId = selectedItem.id;
+          const libRes = await apiClient.get('/library/');
+          const match = (libRes.data || []).find((x: any) => x.external_id === selectedItem.external_id || (effectiveListId && x.tracking_list_id === effectiveListId));
+          if (match) {
+            targetId = match.id;
+          }
         }
         if (targetId) {
           await apiClient.put(`/library/${targetId}`, { status: 'completed' });
           setSelectedItem((prev: any) => ({ ...prev, status: 'completed', id: targetId }));
-          onUpdate && onUpdate();
         }
       } catch (e) {
         console.error("Failed to auto-complete", e);
