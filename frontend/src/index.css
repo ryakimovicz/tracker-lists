@@ -29,15 +29,15 @@
   /* Category Colors (Dark Theme defaults) */
   --color-movie: #4ADE80;
   --color-text-movie: #0F172A;
-  --color-series: #38BDF8; /* Sky Cyan for series to give amber full brand priority */
+  --color-series: #FACC15;
   --color-text-series: #0F172A;
   --color-anime: #FB923C;
   --color-text-anime: #0F172A;
-  --color-book: #E2E8F0;
-  --color-text-book: #0F172A;
+  --color-book: #B45309;
+  --color-text-book: #FFFFFF;
   --color-comic: #F87171;
   --color-text-comic: #0F172A;
-  --color-manga: #818CF8;
+  --color-manga: #60A5FA;
   --color-text-manga: #0F172A;
   --color-game: #C084FC;
   --color-text-game: #0F172A;
@@ -70,15 +70,15 @@
   /* Category Colors (Light Theme) */
   --color-movie: #16A34A;
   --color-text-movie: #FFFFFF;
-  --color-series: #0284C7;
+  --color-series: #CA8A04;
   --color-text-series: #FFFFFF;
   --color-anime: #EA580C;
   --color-text-anime: #FFFFFF;
-  --color-book: #475569;
+  --color-book: #B45309;
   --color-text-book: #FFFFFF;
   --color-comic: #DC2626;
   --color-text-comic: #FFFFFF;
-  --color-manga: #6366F1;
+  --color-manga: #2563EB;
   --color-text-manga: #FFFFFF;
   --color-game: #9333EA;
   --color-text-game: #FFFFFF;
@@ -92,15 +92,15 @@
   /* Category Colors (Dark Theme) */
   --color-movie: #4ADE80;
   --color-text-movie: #0F172A;
-  --color-series: #38BDF8;
+  --color-series: #FACC15;
   --color-text-series: #0F172A;
   --color-anime: #FB923C;
   --color-text-anime: #0F172A;
-  --color-book: #E2E8F0;
-  --color-text-book: #0F172A;
+  --color-book: #B45309;
+  --color-text-book: #FFFFFF;
   --color-comic: #F87171;
   --color-text-comic: #0F172A;
-  --color-manga: #818CF8;
+  --color-manga: #60A5FA;
   --color-text-manga: #0F172A;
   --color-game: #C084FC;
   --color-text-game: #0F172A;
