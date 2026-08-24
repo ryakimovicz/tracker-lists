@@ -182,7 +182,7 @@ h1, h2, h3, h4, h5, h6 {
   display: inline-block;
   color: var(--text-primary);
   transition: transform 0.2s ease, color 0.2s ease, text-shadow 0.2s ease;
-  animation: pathTrail 2.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  animation: pathTrail 6.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
 
 .brand-letter:nth-child(1) { animation-delay: 0.0s; }
@@ -197,12 +197,12 @@ h1, h2, h3, h4, h5, h6 {
     text-shadow: none;
     transform: translateY(0);
   }
-  20% {
+  6% {
     color: var(--accent-primary);
     text-shadow: 0 0 14px rgba(245, 158, 11, 0.65);
     transform: translateY(-2.5px);
   }
-  40% {
+  12% {
     color: var(--text-primary);
     text-shadow: none;
     transform: translateY(0);
@@ -210,7 +210,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .brand-logo-text:hover .brand-letter {
-  animation-duration: 1.2s;
+  animation-duration: 3.5s;
 }
 
 /* Card glassmorphism styling */
