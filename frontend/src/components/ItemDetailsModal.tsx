@@ -716,7 +716,29 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     const totalEpisodes = seasons.reduce((acc: number, s: any) => acc + (s.episode_count || 0), 0);
     const completedEpisodes = currentEpisodes.filter((ep: any) => ep.is_completed).length;
     
-    if (totalEpisodes > 0 && completedEpisodes >= totalEpisodes && selectedItem.status !== 'completed') {
+    // Check if all episodes are completed
+    let isAllDone = totalEpisodes > 0 && completedEpisodes >= totalEpisodes;
+
+    // If not all episodes are completed, check if the user is "Up to Date" (all currently released episodes watched)
+    if (!isAllDone) {
+      const cacheKeyAll = `${selectedItem.external_id}_all_episodes`;
+      const allEps = getCachedSeries(cacheKeyAll);
+      if (allEps && Array.isArray(allEps)) {
+        const todayStr = new Date().toISOString().split('T')[0];
+        // Find the first uncompleted episode
+        const uncompletedEps = allEps.filter(ep => !currentEpisodes.some(tracked => (tracked.external_id === `tvm-ep-${ep.id}` || tracked.id === ep.id) && tracked.is_completed));
+        if (uncompletedEps.length > 0) {
+          const nextEpToWatch = uncompletedEps[0];
+          // If the next uncompleted episode's air date is in the future, the user is caught up!
+          const airDate = nextEpToWatch.airdate || nextEpToWatch.air_date;
+          if (airDate && airDate > todayStr) {
+            isAllDone = true;
+          }
+        }
+      }
+    }
+
+    if (isAllDone && selectedItem.status !== 'completed') {
       try {
         await apiClient.put(`/library/${selectedItem.id}`, { status: 'completed' });
         setSelectedItem((prev: any) => ({ ...prev, status: 'completed' }));
@@ -787,6 +809,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
         setSelectedItem((prev: any) => prev ? { ...prev, completed_at: res.data.completed_at, is_completed: res.data.is_completed } : null);
       }
       
+      await checkCompletionStatus(effectiveListId, updatedList);
       onUpdate();
     } catch (err) {
       console.error("Failed to toggle episode", err);

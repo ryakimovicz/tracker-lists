@@ -301,13 +301,37 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
       const updatedList = listRes.data.items || [];
       const cacheKey = `series_${item.external_id}`;
       const cached = getCachedSeries(cacheKey);
+      
+      let isAllDone = false;
       if (cached && cached.seasons) {
         const totalEps = cached.seasons.reduce((acc: number, s: any) => acc + (s.episode_count || 0), 0);
         const completed = updatedList.filter((ep: any) => ep.is_completed).length;
         if (totalEps > 0 && completed >= totalEps) {
-          await apiClient.put(`/library/${item.id}`, { status: 'completed' });
+          isAllDone = true;
         }
       }
+
+      // Check if next episode air date is in future
+      if (!isAllDone) {
+        const cacheKeyAll = `${item.external_id}_all_episodes`;
+        const allEps = getCachedSeries(cacheKeyAll);
+        if (allEps && Array.isArray(allEps)) {
+          const todayStr = new Date().toISOString().split('T')[0];
+          const uncompletedEps = allEps.filter(ep => !updatedList.some((tracked: any) => (tracked.external_id === `tvm-ep-${ep.id}` || tracked.id === ep.id) && tracked.is_completed));
+          if (uncompletedEps.length > 0) {
+            const nextEpToWatch = uncompletedEps[0];
+            const airDate = nextEpToWatch.airdate || nextEpToWatch.air_date;
+            if (airDate && airDate > todayStr) {
+              isAllDone = true;
+            }
+          }
+        }
+      }
+
+      if (isAllDone) {
+        await apiClient.put(`/library/${item.id}`, { status: 'completed' });
+      }
+
       onUpdate();
       await fetchNextEpisode();
     } catch (err) {
