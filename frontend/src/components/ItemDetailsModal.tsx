@@ -349,9 +349,16 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       setIsLoadingSeasonEpisodes(false);
     }
   };
+  const lastInitialKeyRef = React.useRef<string>('');
 
   useEffect(() => {
     if (!initialItem) return;
+    const currentKey = `${initialItem.external_id || initialItem.id}_${initialItem.item_type}`;
+    if (lastInitialKeyRef.current === currentKey) {
+      // Avoid resetting all episode progress states when only parent shelf list refreshed
+      return;
+    }
+    lastInitialKeyRef.current = currentKey;
     
     const initModal = async (item: any) => {
       setSelectedItem(item);
@@ -373,14 +380,14 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
               setEpisodes(itemsList);
             } catch (err) {
               console.error("Failed to fetch tracking list", err);
-              // Continue loading series data even if list fails
             }
           }
-          
-          let filteredSeasons = [];
-          const cacheKey = `tvmaze_series_${item.external_id}`;
+
+          const seriesId = item.external_id;
+          const cacheKey = `${seriesId}_metadata`;
           const cached = getCachedSeries(cacheKey);
-          let seriesData = null;
+          let seriesData: any = null;
+          let filteredSeasons: any[] = [];
           
           if (cached && cached.seasons && cached.image_url !== undefined) {
             seriesData = cached;
@@ -478,61 +485,91 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       } else if (item.item_type === 'episode' || isActualEpisode) {
         if (item.imdb_id && item.imdb_id.startsWith('tvm_')) {
           setIsLoadingMetadata(true);
-          apiClient.get(`/search/series/${item.imdb_id}/episodes`)
-            .then(res => {
-              const allEps = res.data || [];
-              const epIdNumStr = item.external_id.replace('tvm-ep-', '');
-              const matchedEp = allEps.find((e: any) => e.id.toString() === epIdNumStr);
-              if (matchedEp) {
-                setSelectedItem((prev: any) => prev ? {
-                  ...prev,
-                  custom_notes: JSON.stringify({ description: matchedEp.overview || '', release_date: matchedEp.air_date || null }),
-                  season_number: matchedEp.season_number,
-                  episode_number: matchedEp.episode_number,
-                  parent_series: prev.parent_series || { external_id: item.imdb_id, title: item.last_seen_episode || 'Serie', item_type: 'series' }
-                } : null);
-              } else if (!item.parent_series) {
-                setSelectedItem((prev: any) => prev ? {
-                  ...prev,
-                  parent_series: { external_id: item.imdb_id, title: item.last_seen_episode || 'Serie', item_type: 'series' }
-                } : null);
-              }
+          const showId = item.imdb_id.replace('tvm_', '');
+          apiClient.get(`/search/series/tvm_${showId}`)
+            .then(showRes => {
+              const showData = showRes.data;
+              const seriesName = showData?.title || showData?.name || 'Series';
+              const epNum = item.latest_episode || item.episode_number || item.number;
+              const seasonNum = item.latest_season || item.season_number || item.season || 1;
+              const epTitle = `${seriesName} - S${String(seasonNum).padStart(2, '0')}E${String(epNum).padStart(2, '0')}`;
+              
+              setSelectedItem((prev: any) => prev ? {
+                ...prev,
+                title: epTitle,
+                parent_series: {
+                  external_id: `tvm_${showId}`,
+                  title: seriesName,
+                  item_type: 'series'
+                }
+              } : null);
+
+              // Also fetch overview for this episode
+              apiClient.get(`/search/series/tvm_${showId}/episodes`)
+                .then(allEpsRes => {
+                  const eps = allEpsRes.data || [];
+                  const thisEp = eps.find((e: any) => e.id === item.id || `tvm-ep-${e.id}` === item.external_id || (e.season === seasonNum && e.number === epNum));
+                  if (thisEp) {
+                    const descVal = { description: thisEp.summary || thisEp.overview || '', release_date: thisEp.airdate || null };
+                    setCachedSeries(descCacheKey, descVal);
+                    setSelectedItem((prev: any) => prev ? {
+                      ...prev,
+                      image_url: prev.image_url || thisEp.image?.original || thisEp.image?.medium || null,
+                      custom_notes: JSON.stringify(descVal)
+                    } : null);
+                  }
+                })
+                .catch(console.error)
+                .finally(() => setIsLoadingMetadata(false));
             })
-            .catch(e => console.error(e))
-            .finally(() => setIsLoadingMetadata(false));
+            .catch(e => { console.error(e); setIsLoadingMetadata(false); });
         } else {
-          // If we don't have imdb_id, try to infer the series name from the title
-          const match = item.title?.match(/^(.*?)\s*-\s*S(\d+)E(\d+)/i);
+          const match = item.external_id.match(/tmdb-tv-(\d+)-s(\d+)-e(\d+)/);
           if (match) {
-            const seriesName = match[1].trim();
             setIsLoadingMetadata(true);
-            apiClient.get('/search/', { params: { q: seriesName, type: 'series' } })
-              .then(searchRes => {
-                const possibleSeries = searchRes.data[0];
-                if (possibleSeries) {
-                  const actualSeriesId = possibleSeries.external_id;
+            const actualSeriesId = `tmdb-tv-${match[1]}`;
+            apiClient.get(`/search/series/${actualSeriesId}`)
+              .then(seriesRes => {
+                const seriesData = seriesRes.data;
+                const seriesName = seriesData?.name || seriesData?.title || 'Series';
+                const epTitle = `${seriesName} - S${match[2].padStart(2, '0')}E${match[3].padStart(2, '0')}`;
+                
+                setSelectedItem((prev: any) => prev ? {
+                  ...prev,
+                  title: epTitle,
+                  parent_series: {
+                    external_id: actualSeriesId,
+                    title: seriesName,
+                    item_type: 'series'
+                  }
+                } : null);
+                
+                if (seriesData?.seasons) {
+                  const seasonObj = seriesData.seasons.find((s: any) => s.season_number === parseInt(match[2]));
+                  const epCount = seasonObj?.episode_count || 10;
+                  const seasonEps = Array.from({ length: epCount }, (_, i) => ({
+                    id: `${actualSeriesId}-s${match[2]}-e${i + 1}`,
+                    season_number: parseInt(match[2]),
+                    episode_number: i + 1,
+                    title: `Episodio ${i + 1}`
+                  }));
+                  setSeasonEpisodes(prev => ({ ...prev, [parseInt(match[2])]: seasonEps }));
+                  
                   apiClient.get(`/search/series/${actualSeriesId}/episodes`)
-                    .then(res => {
-                      const allEps = res.data || [];
-                      const epIdNumStr = item.external_id ? item.external_id.replace('tvm-ep-', '') : null;
+                    .then(allEpsRes => {
+                      const allEps = allEpsRes.data || [];
                       const matchedEp = allEps.find((e: any) => 
-                        (epIdNumStr && e.id.toString() === epIdNumStr) ||
                         (e.season_number === parseInt(match[2]) && e.episode_number === parseInt(match[3]))
                       );
                       if (matchedEp) {
                         setSelectedItem((prev: any) => prev ? {
                           ...prev,
                           custom_notes: JSON.stringify({ description: matchedEp.overview || '', release_date: matchedEp.air_date || null }),
-                          season_number: matchedEp.season_number,
-                          episode_number: matchedEp.episode_number,
-                          parent_series: prev.parent_series || { external_id: actualSeriesId, title: seriesName, item_type: 'series' }
                         } : null);
                       }
                     })
                     .catch(e => console.error(e))
                     .finally(() => setIsLoadingMetadata(false));
-                } else {
-                  setIsLoadingMetadata(false);
                 }
               })
               .catch(e => { console.error(e); setIsLoadingMetadata(false); });
@@ -541,7 +578,6 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
           }
         }
       } else {
-        // If item already has a description (e.g. from theatrical cartelera or explore search), use it directly
         if (item.description) {
           const cachedVal = { description: item.description, release_date: item.release_date || null };
           setCachedSeries(descCacheKey, cachedVal);
@@ -579,7 +615,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     };
 
     initModal(initialItem);
-  }, [initialItem, profileId]);
+  }, [initialItem?.external_id, initialItem?.id, profileId]);
 
   const handleSaveRating = async (ratingVal: number) => {
     if (!selectedItem) return;
