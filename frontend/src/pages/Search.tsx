@@ -47,6 +47,7 @@ export const Search: React.FC = () => {
   };
 
   const [query, setQuery] = useState('');
+  const [submittedQuery, setSubmittedQuery] = useState('');
   const [results, setResults] = useState<SearchResultItem[]>([]);
   const [activeTab, setActiveTab] = useState<'all' | 'movie' | 'series' | 'anime' | 'book' | 'game' | 'user' | 'guide' | 'comic' | 'manga'>('all');
   const [errorMsg, setErrorMsg] = useState('');
@@ -99,7 +100,7 @@ export const Search: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (query === '') {
+    if (submittedQuery === '') {
       const fetchExplore = async () => {
         try {
           setLoadingExplore(true);
@@ -113,17 +114,23 @@ export const Search: React.FC = () => {
       };
       fetchExplore();
     }
-  }, [query]);
+  }, [submittedQuery]);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!query.trim()) return;
+    const cleanQuery = query.trim();
+    if (!cleanQuery) {
+      setSubmittedQuery('');
+      setResults([]);
+      return;
+    }
 
+    setSubmittedQuery(cleanQuery);
     setIsSearching(true);
     setErrorMsg('');
     try {
       const response = await apiClient.get('/search/all', {
-        params: { q: query }
+        params: { q: cleanQuery }
       });
       setResults(response.data);
     } catch (err: any) {
@@ -295,7 +302,14 @@ export const Search: React.FC = () => {
               className="input-field"
               placeholder={t('searchPlaceholder')}
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value;
+                setQuery(val);
+                if (val.trim() === '') {
+                  setSubmittedQuery('');
+                  setResults([]);
+                }
+              }}
               style={{ paddingLeft: '2.5rem' }}
             />
             <SearchIcon size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)' }} />
@@ -307,7 +321,7 @@ export const Search: React.FC = () => {
         </form>
       </section>
 
-      {query === '' ? (
+      {submittedQuery === '' ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', marginTop: '1rem' }}>
           
           <div style={{ display: "flex", gap: "2rem", borderBottom: "1px solid var(--border-color)", paddingBottom: "0.5rem", position: "relative" }}>
@@ -641,7 +655,7 @@ export const Search: React.FC = () => {
         </div>
       )}
 
-      {results.length === 0 && !isSearching && query && (
+      {results.length === 0 && !isSearching && submittedQuery && (
         <div className="glass-card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
           {t('searchNoResults')}
         </div>
