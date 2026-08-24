@@ -79,6 +79,14 @@ class TVMazeService:
                 if response.status == 200:
                     data = json.loads(response.read().decode())
                     seasons = []
+                    # Fetch episodes first to know the real episode count per season
+                    all_eps = TVMazeService.get_all_episodes(series_id)
+                    eps_per_season = {}
+                    for ep in all_eps:
+                        s_num = ep.get("season_number")
+                        if s_num is not None:
+                            eps_per_season[s_num] = eps_per_season.get(s_num, 0) + 1
+
                     try:
                         with urllib.request.urlopen(f"https://api.tvmaze.com/shows/{real_id}/seasons", timeout=5) as s_response:
                             if s_response.status == 200:
@@ -86,13 +94,25 @@ class TVMazeService:
                                 for s in seasons_data:
                                     num = s.get("number")
                                     if num is not None and num > 0:
-                                        seasons.append({
-                                            "id": s.get("id"),
-                                            "season_number": num,
-                                            "episode_count": s.get("episodeOrder") or 999
-                                        })
+                                        real_count = eps_per_season.get(num, 0)
+                                        order_count = s.get("episodeOrder")
+                                        # Only include seasons that have episodes or a defined episode order
+                                        if real_count > 0 or order_count is not None:
+                                            seasons.append({
+                                                "id": s.get("id"),
+                                                "season_number": num,
+                                                "episode_count": real_count if real_count > 0 else (order_count or 1)
+                                            })
                     except Exception:
                         pass
+                    
+                    if not seasons and eps_per_season:
+                        for num, count in sorted(eps_per_season.items()):
+                            seasons.append({
+                                "id": num,
+                                "season_number": num,
+                                "episode_count": count
+                            })
                     
                     return {
                         "id": series_id,

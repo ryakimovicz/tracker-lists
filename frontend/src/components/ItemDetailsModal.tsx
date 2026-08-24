@@ -434,6 +434,22 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
               grouped[ep.season_number].push(ep);
             });
             setSeasonEpisodes(prev => ({ ...prev, ...grouped }));
+
+            // Clean seasons list to only include seasons with actual episodes or valid counts
+            setSeasons(prevSeasons => {
+              if (!prevSeasons || prevSeasons.length === 0) return prevSeasons;
+              const validSeasons = prevSeasons.filter(s => {
+                const countInEps = (grouped[s.season_number] || []).length;
+                return countInEps > 0 || (s.episode_count && s.episode_count < 900);
+              }).map(s => {
+                const countInEps = (grouped[s.season_number] || []).length;
+                return {
+                  ...s,
+                  episode_count: countInEps > 0 ? countInEps : s.episode_count
+                };
+              });
+              return validSeasons.length > 0 ? validSeasons : prevSeasons;
+            });
           };
 
           if (cachedAll && Array.isArray(cachedAll)) {
