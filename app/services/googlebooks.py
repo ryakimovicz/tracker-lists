@@ -163,14 +163,86 @@ class GoogleBooksService:
     @staticmethod
     def get_new_books() -> List[SearchResultItem]:
         from datetime import datetime
-        current_year = datetime.now().year
+        import json, urllib.request, urllib.parse
+        from app.core.config import settings
+
         today_str = datetime.now().strftime("%Y-%m-%d")
-        # Fetch newest published books with cover image
-        results = GoogleBooksService.search_books(f"fiction {current_year}", order_by="newest")
-        with_covers = [b for b in results if b.image_url]
-        # Filter out future dates that haven't released yet
-        filtered = [b for b in with_covers if b.release_date and b.release_date <= today_str]
-        return (filtered or with_covers or results)[:15]
+        current_year = datetime.now().year
+        
+        # General queries across all genres to catch the latest releases of the current year
+        search_terms = [
+            f"{current_year}",
+            f"novel {current_year}",
+            f"books {current_year}",
+            f"bestseller {current_year}"
+        ]
+        
+        all_books: List[SearchResultItem] = []
+        seen_ids = set()
+        seen_titles = set()
+
+        for term in search_terms:
+            try:
+                encoded = urllib.parse.quote(term)
+                url = f"https://www.googleapis.com/books/v1/volumes?q={encoded}&orderBy=newest&maxResults=40"
+                if settings.GOOGLE_BOOKS_API_KEY:
+                    url += f"&key={settings.GOOGLE_BOOKS_API_KEY}"
+                
+                req = urllib.request.Request(url, headers={"User-Agent": "TrackerLists/1.0"})
+                with urllib.request.urlopen(req, timeout=5) as response:
+                    if response.status == 200:
+                        data = json.loads(response.read().decode())
+                        for item in data.get("items", []):
+                            g_id = item.get("id")
+                            if not g_id or g_id in seen_ids:
+                                continue
+
+                            v_info = item.get("volumeInfo", {})
+                            title = v_info.get("title") or "Untitled Book"
+                            norm_title = "".join(e for e in title.lower() if e.isalnum())
+                            if norm_title in seen_titles:
+                                continue
+
+                            # Must have a real cover image
+                            img_links = v_info.get("imageLinks", {})
+                            img_url = img_links.get("thumbnail") or img_links.get("smallThumbnail")
+                            if not img_url:
+                                continue
+                            if img_url.startswith("http://"):
+                                img_url = img_url.replace("http://", "https://")
+
+                            pub_date = v_info.get("publishedDate") or ""
+                            # Filter out future dates that haven't been released yet and older years
+                            if not pub_date or pub_date > today_str:
+                                continue
+                            if not (pub_date.startswith(str(current_year)) or pub_date.startswith(str(current_year - 1))):
+                                continue
+
+                            authors = v_info.get("authors", [])
+                            author_str = f"Author: {authors[0]}." if authors else ""
+                            desc = v_info.get("description") or (author_str + f" Published: {pub_date}.")
+
+                            seen_ids.add(g_id)
+                            seen_titles.add(norm_title)
+                            all_books.append(SearchResultItem(
+                                external_id=f"googlebook-{g_id}",
+                                title=title,
+                                image_url=img_url,
+                                description=desc,
+                                item_type="book",
+                                release_date=pub_date,
+                                page_count=v_info.get("pageCount")
+                            ))
+            except Exception:
+                pass
+
+        # Sort strictly by release date descending
+        all_books.sort(
+            key=lambda b: (b.release_date or "", len(b.release_date or "")),
+            reverse=True
+        )
+
+        return all_books[:40]
 
     @staticmethod
     def get_trending_books() -> List[SearchResultItem]:
