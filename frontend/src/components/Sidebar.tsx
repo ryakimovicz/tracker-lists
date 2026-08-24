@@ -72,14 +72,12 @@ export const Sidebar: React.FC = () => {
     <div className="sidebar">
       {/* Title */}
       <div style={{ padding: '0.5rem 0 2rem 0' }}>
-        <Link to="/" style={{
-          textDecoration: 'none',
-          fontSize: '2rem',
-          fontWeight: 700,
-          color: 'var(--text-primary)',
-          letterSpacing: '-1px'
-        }}>
-          Pathd
+        <Link to="/" className="brand-logo-text" title="Pathd">
+          <span className="brand-letter">P</span>
+          <span className="brand-letter">a</span>
+          <span className="brand-letter">t</span>
+          <span className="brand-letter">h</span>
+          <span className="brand-letter">d</span>
         </Link>
       </div>
 
