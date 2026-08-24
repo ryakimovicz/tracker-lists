@@ -242,12 +242,13 @@ def add_to_library(
         UserLibraryItem.external_id == item_in.external_id
     ).first()
     
-    if existing:
-        if existing.tracking_list_id is not None or item_in.item_type not in ("series", "anime"):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="This item is already in your library"
-            )
+    if existing and existing.tracking_list_id is not None:
+        # If already tracked, gracefully return existing or update its status
+        if item_in.status:
+            existing.status = item_in.status
+            db.commit()
+            db.refresh(existing)
+        return existing
         
     tracking_list_id = existing.tracking_list_id if existing else None
     

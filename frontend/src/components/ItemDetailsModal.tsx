@@ -682,33 +682,44 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   };
 
   
+  const ensureTrackedPromiseRef = React.useRef<Promise<number | null> | null>(null);
+
   const ensureTracked = async (status: string) => {
     if (selectedItem.tracking_list_id) return selectedItem.tracking_list_id;
-    
-    try {
-      const res = await apiClient.post('/library/', {
-        external_id: selectedItem.external_id,
-        title: selectedItem.title,
-        image_url: selectedItem.image_url,
-        description: selectedItem.description,
-        item_type: selectedItem.item_type,
-        release_date: selectedItem.release_date,
-        total_pages: totalPagesVal !== '' ? totalPagesVal : (selectedItem.total_pages || selectedItem.page_count || null),
-        pages_read: (status === 'read' && totalPagesVal !== '') ? totalPagesVal : (pagesReadVal !== '' ? pagesReadVal : 0),
-        status: status
-      });
-      
-      const newItem = res.data;
-      setSelectedItem((prev: any) => ({
-        ...prev,
-        ...newItem
-      }));
-      onUpdate && onUpdate(newItem);
-      return newItem.tracking_list_id;
-    } catch (e) {
-      console.error("Failed to add to library", e);
-      return null;
+    if (ensureTrackedPromiseRef.current) {
+      return await ensureTrackedPromiseRef.current;
     }
+    
+    ensureTrackedPromiseRef.current = (async () => {
+      try {
+        const res = await apiClient.post('/library/', {
+          external_id: selectedItem.external_id,
+          title: selectedItem.title,
+          image_url: selectedItem.image_url,
+          description: selectedItem.description,
+          item_type: selectedItem.item_type,
+          release_date: selectedItem.release_date,
+          total_pages: totalPagesVal !== '' ? totalPagesVal : (selectedItem.total_pages || selectedItem.page_count || null),
+          pages_read: (status === 'read' && totalPagesVal !== '') ? totalPagesVal : (pagesReadVal !== '' ? pagesReadVal : 0),
+          status: status
+        });
+        
+        const newItem = res.data;
+        setSelectedItem((prev: any) => ({
+          ...prev,
+          ...newItem
+        }));
+        onUpdate && onUpdate(newItem);
+        return newItem.tracking_list_id;
+      } catch (e) {
+        console.error("Failed to add to library", e);
+        return null;
+      } finally {
+        ensureTrackedPromiseRef.current = null;
+      }
+    })();
+
+    return await ensureTrackedPromiseRef.current;
   };
 
   const checkCompletionStatus = async (effectiveListId: number, currentEpisodes: any[]) => {
