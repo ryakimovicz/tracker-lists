@@ -29,7 +29,7 @@
   /* Category Colors (Dark Theme defaults) */
   --color-movie: #4ADE80;
   --color-text-movie: #0F172A;
-  --color-series: #FACC15;
+  --color-series: #FDE047; /* Radiant Lemon Yellow - distinct from amber brand accent */
   --color-text-series: #0F172A;
   --color-anime: #FB923C;
   --color-text-anime: #0F172A;
@@ -70,8 +70,8 @@
   /* Category Colors (Light Theme) */
   --color-movie: #16A34A;
   --color-text-movie: #FFFFFF;
-  --color-series: #CA8A04;
-  --color-text-series: #FFFFFF;
+  --color-series: #EAB308;
+  --color-text-series: #0F172A;
   --color-anime: #EA580C;
   --color-text-anime: #FFFFFF;
   --color-book: #B45309;
@@ -92,7 +92,7 @@
   /* Category Colors (Dark Theme) */
   --color-movie: #4ADE80;
   --color-text-movie: #0F172A;
-  --color-series: #FACC15;
+  --color-series: #FDE047;
   --color-text-series: #0F172A;
   --color-anime: #FB923C;
   --color-text-anime: #0F172A;
