@@ -1966,9 +1966,24 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                   }
                                   
                                   const checkedVal = !isSeasonDone;
-                                  const cacheKey = `${selectedItem.external_id}_s${s.season_number}`;
-                                  const seriesEps = getCachedSeries(cacheKey);
+                                  let seriesEps = seasonEpisodes[s.season_number];
+                                  if (!seriesEps || seriesEps.length === 0) {
+                                    const cacheKeyAll = `${selectedItem.external_id}_all_episodes`;
+                                    const cachedAll = getCachedSeries(cacheKeyAll);
+                                    if (cachedAll && Array.isArray(cachedAll)) {
+                                      seriesEps = cachedAll.filter((ep: any) => ep.season_number === s.season_number);
+                                    }
+                                  }
                                   
+                                  // Update global progress optimistically
+                                  if (seriesEps && seriesEps.length > 0) {
+                                    const newProg: Record<string, boolean> = {};
+                                    seriesEps.forEach((ep: any) => {
+                                      newProg[`tvm-ep-${ep.id}`] = checkedVal;
+                                    });
+                                    setGlobalProgress(prev => ({ ...prev, ...newProg }));
+                                  }
+
                                   try {
                                     await apiClient.post(`/lists/${effectiveListId}/bulk-toggle-season`, {
                                       season_number: s.season_number,
@@ -1979,6 +1994,14 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                     const listRes = await apiClient.get(`/lists/${effectiveListId}`);
                                     const updatedList = listRes.data.items || [];
                                     setEpisodes(updatedList);
+                                    
+                                    // Also sync global progress in case backend populated new episodes
+                                    const extIds = updatedList.map((x: any) => x.external_id).filter(Boolean);
+                                    if (extIds.length > 0) {
+                                      const progRes = await apiClient.post('/users/me/progress/bulk-check', { external_ids: extIds });
+                                      setGlobalProgress(prev => ({ ...prev, ...progRes.data }));
+                                    }
+
                                     await checkCompletionStatus(effectiveListId, updatedList);
                                     onUpdate && onUpdate();
                                   } catch (err) {
