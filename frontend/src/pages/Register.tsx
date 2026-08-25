@@ -4,9 +4,10 @@ import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../context/LanguageContext';
 import { apiClient } from '../api/client';
 import { User, Mail, Lock, AlertCircle, CheckCircle } from 'lucide-react';
+import { GoogleLogin, type CredentialResponse } from '@react-oauth/google';
 
 export const Register: React.FC = () => {
-  const { isAuthenticated } = useAuth();
+  const { login, isAuthenticated } = useAuth();
   const { t } = useTranslation();
   const navigate = useNavigate();
 
@@ -22,6 +23,29 @@ export const Register: React.FC = () => {
   const [errorMsg, setErrorMsg] = useState('');
   const [isSuccess, setIsSuccess] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleGoogleSuccess = async (credentialResponse: CredentialResponse) => {
+    if (!credentialResponse.credential) {
+      setErrorMsg(t('errRegistrationFailed'));
+      return;
+    }
+    setIsSubmitting(true);
+    setErrorMsg('');
+    try {
+      const response = await apiClient.post('/auth/google', {
+        id_token: credentialResponse.credential
+      });
+      const { access_token } = response.data;
+      await login(access_token);
+      navigate('/profile');
+    } catch (err: any) {
+      console.error('Google register error:', err);
+      setErrorMsg(err.response?.data?.detail || t('errRegistrationFailed'));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -136,6 +160,24 @@ export const Register: React.FC = () => {
             {isSubmitting ? t('authRegistering') : t('authRegisterButton')}
           </button>
 
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', margin: '0.5rem 0', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+            <div style={{ flex: 1, height: '1px', background: 'var(--border-color)' }}></div>
+            <span>{t('authOr')}</span>
+            <div style={{ flex: 1, height: '1px', background: 'var(--border-color)' }}></div>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
+            <GoogleLogin
+              onSuccess={handleGoogleSuccess}
+              onError={() => setErrorMsg(t('errRegistrationFailed'))}
+              theme="filled_black"
+              shape="pill"
+              text="signup_with"
+              size="large"
+              width="100%"
+            />
+          </div>
+
           <p style={{ textAlign: 'center', fontSize: '0.9rem', marginTop: '1rem', color: 'var(--text-secondary)' }}>
             {t('authHaveAccount')}{' '}
             <Link to="/login" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}>
@@ -148,3 +190,4 @@ export const Register: React.FC = () => {
   );
 };
 export default Register;
+

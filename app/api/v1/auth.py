@@ -186,13 +186,17 @@ def google_auth(
         try:
             from google.oauth2 import id_token
             from google.auth.transport import requests
+            import re
             
-            # Specify the CLIENT_ID of the app that accesses the backend
-            id_info = id_token.verify_oauth2_token(payload.id_token, requests.Request(), clock_skew_in_seconds=10)
+            # Specify the CLIENT_ID of the app if configured, otherwise verify against Google certs
+            audience = settings.GOOGLE_CLIENT_ID if settings.GOOGLE_CLIENT_ID else None
+            id_info = id_token.verify_oauth2_token(payload.id_token, requests.Request(), audience=audience, clock_skew_in_seconds=10)
             
             email = id_info.get("email")
-            # Generate username from email name part or name field
-            username = id_info.get("name", email.split("@")[0]).replace(" ", "").lower()
+            # Generate clean username from email name part or name field
+            raw_name = id_info.get("name") or email.split("@")[0]
+            clean_name = re.sub(r'[^a-zA-Z0-9_]', '', raw_name.replace(" ", "_")).lower()
+            username = clean_name[:30] if clean_name else f"user_{secrets.token_hex(4)}"
         except ImportError:
             raise HTTPException(
                 status_code=status.HTTP_501_NOT_IMPLEMENTED,

@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../context/LanguageContext';
 import { apiClient } from '../api/client';
 import { Mail, Lock, AlertCircle, LogIn } from 'lucide-react';
+import { GoogleLogin, type CredentialResponse } from '@react-oauth/google';
 
 export const Login: React.FC = () => {
   const { login, isAuthenticated } = useAuth();
@@ -50,23 +51,28 @@ export const Login: React.FC = () => {
     }
   };
 
-  const handleMockGoogleLogin = async () => {
+  const handleGoogleSuccess = async (credentialResponse: CredentialResponse) => {
+    if (!credentialResponse.credential) {
+      setErrorMsg(t('errLoginFailed'));
+      return;
+    }
     setIsSubmitting(true);
     setErrorMsg('');
     try {
-      // Mock Google OAuth login bypass on the backend
       const response = await apiClient.post('/auth/google', {
-        id_token: 'mock-google-email-username'
+        id_token: credentialResponse.credential
       });
       const { access_token } = response.data;
       await login(access_token);
       navigate('/profile');
     } catch (err: any) {
-      setErrorMsg(t('errLoginFailed'));
+      console.error('Google login error:', err);
+      setErrorMsg(err.response?.data?.detail || t('errLoginFailed'));
     } finally {
       setIsSubmitting(false);
     }
   };
+
 
   return (
     <div className="glass-card" style={{ maxWidth: 450, margin: '4rem auto', padding: '2.5rem' }}>
@@ -127,9 +133,17 @@ export const Login: React.FC = () => {
           <div style={{ flex: 1, height: '1px', background: 'var(--border-color)' }}></div>
         </div>
 
-        <button type="button" onClick={handleMockGoogleLogin} className="btn-secondary" style={{ width: '100%' }}>
-          {t('authGoogleLogin')}
-        </button>
+        <div style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
+          <GoogleLogin
+            onSuccess={handleGoogleSuccess}
+            onError={() => setErrorMsg(t('errLoginFailed'))}
+            theme="filled_black"
+            shape="pill"
+            text="signin_with"
+            size="large"
+            width="100%"
+          />
+        </div>
 
         <p style={{ textAlign: 'center', fontSize: '0.9rem', marginTop: '1rem', color: 'var(--text-secondary)' }}>
           {t('authNoAccount')}{' '}
@@ -142,3 +156,4 @@ export const Login: React.FC = () => {
   );
 };
 export default Login;
+

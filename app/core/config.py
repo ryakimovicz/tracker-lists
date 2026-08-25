@@ -44,6 +44,7 @@ class Settings(BaseSettings):
     FANART_API_KEY: str = ""
     LASTFM_API_KEY: str = ""
     LASTFM_SHARED_SECRET: str = ""
+    GOOGLE_CLIENT_ID: str = ""
     
     # SMTP Email Settings
     SMTP_TLS: bool = True
