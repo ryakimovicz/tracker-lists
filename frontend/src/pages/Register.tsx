@@ -285,9 +285,10 @@ export const Register: React.FC = () => {
               shape="pill"
               text="signup_with"
               size="large"
-              width="100%"
+              width="360"
             />
           </div>
+
 
           <p style={{ textAlign: 'center', fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.75rem', lineHeight: 1.4 }}>
             {language === 'es' ? 'Al registrarte, aceptas nuestros ' : 'By creating an account, you agree to our '}

@@ -209,8 +209,9 @@ export const Login: React.FC = () => {
             shape="pill"
             text="signin_with"
             size="large"
-            width="100%"
+            width="360"
           />
+
         </div>
 
         <p style={{ textAlign: 'center', fontSize: '0.9rem', marginTop: '1rem', color: 'var(--text-secondary)' }}>
