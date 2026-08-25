@@ -25,6 +25,8 @@ import { GoogleOAuthProvider } from '@react-oauth/google';
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '831175761004-j5as0nr5ls0pmerajp7ldn725h2dpb00.apps.googleusercontent.com';
 
+import { CookieBanner } from './components/CookieBanner';
+
 function AppRoutes() {
   const { isAuthenticated } = useAuth();
 
@@ -105,10 +107,12 @@ function AppRoutes() {
             />
           </Routes>
         </main>
+        <CookieBanner />
       </div>
     </Router>
   );
 }
+
 
 
 function App() {
