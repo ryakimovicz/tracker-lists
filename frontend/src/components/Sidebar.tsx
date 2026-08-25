@@ -148,8 +148,9 @@ export const Sidebar: React.FC = () => {
                   fontWeight: 600
                 }}
               >
-                <Star size={16} fill="#fff" /> {t('navUpgradePro') || (language === 'es' ? 'Pasar a Pro' : 'Upgrade Pro')}
+                <Star size={16} fill="#fff" /> {t('navUpgradePro') || (language === 'es' ? 'Hacerse Premium' : 'Get Premium')}
               </button>
+
             )}
 
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.5rem 1rem' }}>
