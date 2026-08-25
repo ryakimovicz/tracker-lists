@@ -15,6 +15,9 @@ import { Profile } from './pages/Profile';
 import { Social } from './pages/Social';
 import { CreateGuide } from './pages/CreateGuide';
 import { ViewGuide } from './pages/ViewGuide';
+import { SettingsPage } from './pages/Settings';
+import { PrivacyPolicy } from './pages/PrivacyPolicy';
+import { TermsOfService } from './pages/TermsOfService';
 
 import { LanguageProvider } from './context/LanguageContext';
 import { ThemeProvider } from './context/ThemeContext';
@@ -38,8 +41,18 @@ function AppRoutes() {
             <Route path="/register" element={<Register />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/privacy" element={<PrivacyPolicy />} />
+            <Route path="/terms" element={<TermsOfService />} />
             
             {/* Authenticated Routes */}
+            <Route
+              path="/settings"
+              element={
+                <RouteGuard>
+                  <SettingsPage />
+                </RouteGuard>
+              }
+            />
             <Route
               path="/profile"
               element={
@@ -96,6 +109,7 @@ function AppRoutes() {
     </Router>
   );
 }
+
 
 function App() {
   return (

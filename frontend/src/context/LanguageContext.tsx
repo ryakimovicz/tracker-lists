@@ -22,6 +22,8 @@ const translations: Translations = {
   navCreate: { en: 'Create', es: 'Crear' },
   navExplore: { en: 'Explore', es: 'Explorar' },
   navProfile: { en: 'Profile', es: 'Perfil' },
+  navSettings: { en: 'Settings', es: 'Ajustes' },
+
 
   // Landing Page
   heroTitleLine1: { en: 'Guides for everything you love', es: 'Guías de todo lo que amas' },

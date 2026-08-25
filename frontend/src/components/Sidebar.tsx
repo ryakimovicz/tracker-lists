@@ -96,19 +96,26 @@ export const Sidebar: React.FC = () => {
       {/* Bottom Area */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: 'auto', paddingTop: '2rem', borderTop: '1px solid var(--border-color)' }}>
         
-        {/* Settings pseudo-link */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '1rem',
-          padding: '0.75rem 1rem',
-          color: 'var(--text-secondary)',
-          fontWeight: 500,
-          cursor: 'pointer'
-        }}>
+        {/* Settings link */}
+        <Link
+          to={isAuthenticated ? "/settings" : "/login"}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '1rem',
+            padding: '0.75rem 1rem',
+            color: location.pathname === '/settings' ? 'var(--accent-primary)' : 'var(--text-secondary)',
+            background: location.pathname === '/settings' ? 'var(--border-glow)' : 'transparent',
+            borderRadius: '8px',
+            textDecoration: 'none',
+            fontWeight: location.pathname === '/settings' ? 600 : 500,
+            transition: 'all 0.2s',
+          }}
+        >
           <Settings size={20} />
-          <span style={{ fontSize: '1.05rem' }}>Ajustes</span>
-        </div>
+          <span style={{ fontSize: '1.05rem' }}>{t('navSettings') || (language === 'es' ? 'Ajustes' : 'Settings')}</span>
+        </Link>
+
 
         {/* Toggles */}
         <div style={{ display: 'flex', gap: '0.5rem', padding: '0 1rem' }}>

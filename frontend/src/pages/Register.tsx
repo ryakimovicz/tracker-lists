@@ -9,8 +9,9 @@ import { GoogleUsernameModal } from '../components/GoogleUsernameModal';
 
 export const Register: React.FC = () => {
   const { login, isAuthenticated } = useAuth();
-  const { t } = useTranslation();
+  const { language, t } = useTranslation();
   const navigate = useNavigate();
+
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -221,6 +222,17 @@ export const Register: React.FC = () => {
             />
           </div>
 
+          <p style={{ textAlign: 'center', fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.75rem', lineHeight: 1.4 }}>
+            {language === 'es' ? 'Al registrarte, aceptas nuestros ' : 'By creating an account, you agree to our '}
+            <Link to="/terms" style={{ color: 'var(--accent-primary)', textDecoration: 'none' }}>
+              {language === 'es' ? 'Términos' : 'Terms'}
+            </Link>
+            {language === 'es' ? ' y ' : ' and '}
+            <Link to="/privacy" style={{ color: 'var(--accent-primary)', textDecoration: 'none' }}>
+              {language === 'es' ? 'Privacidad' : 'Privacy'}
+            </Link>.
+          </p>
+
           <p style={{ textAlign: 'center', fontSize: '0.9rem', marginTop: '1rem', color: 'var(--text-secondary)' }}>
             {t('authHaveAccount')}{' '}
             <Link to="/login" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}>
@@ -229,6 +241,7 @@ export const Register: React.FC = () => {
           </p>
         </form>
       )}
+
 
       <GoogleUsernameModal
         isOpen={showGoogleModal}

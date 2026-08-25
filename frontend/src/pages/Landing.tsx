@@ -73,6 +73,34 @@ export const Landing: React.FC = () => {
           </p>
         </div>
       </section>
+
+      {/* Footer */}
+      <footer style={{
+        marginTop: '2rem',
+        paddingTop: '2rem',
+        borderTop: '1px solid var(--border-color)',
+        display: 'flex',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        gap: '1rem',
+        fontSize: '0.85rem',
+        color: 'var(--text-muted)'
+      }}>
+        <div>
+          © {new Date().getFullYear()} Pathd (pathd.net). All rights reserved.
+        </div>
+        <div style={{ display: 'flex', gap: '1.5rem' }}>
+          <Link to="/terms" style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>
+            Terms & APIs
+          </Link>
+          <Link to="/privacy" style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>
+            Privacy Policy
+          </Link>
+        </div>
+      </footer>
     </div>
   );
 };
+export default Landing;
+

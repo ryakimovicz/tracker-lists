@@ -202,8 +202,20 @@ export const GoogleUsernameModal: React.FC<GoogleUsernameModalProps> = ({
               </>
             )}
           </button>
+
+          <p style={{ textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-muted)', margin: '0.5rem 0 0', lineHeight: 1.4 }}>
+            {language === 'es' ? 'Al registrarte, aceptas nuestros ' : 'By registering, you agree to our '}
+            <a href="/terms" target="_blank" rel="noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none' }}>
+              {language === 'es' ? 'Términos' : 'Terms'}
+            </a>
+            {language === 'es' ? ' y ' : ' and '}
+            <a href="/privacy" target="_blank" rel="noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none' }}>
+              {language === 'es' ? 'Privacidad' : 'Privacy'}
+            </a>.
+          </p>
         </form>
       </div>
     </div>
   );
 };
+

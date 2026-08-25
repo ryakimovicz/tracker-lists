@@ -345,9 +345,48 @@ def delete_account(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    from app.models.library import UserLibraryItem
+    from app.models.consumption import ConsumptionHistory
+    from app.models.activity import UserActivityLog
+    from app.models.social import Follow, Comment, CommentVote, ListVote, ListReport, CommentReport
+    from app.models.review import MediaReview, MediaReviewVote, MediaReviewReport
+    from app.models.addition import ListAddition, UserAdoptedAddition, AdditionVote, AdditionComment
+    from app.models.saved_list import SavedList
+    from app.models.item_progress import ItemProgress
+
+    user_id = current_user.id
+
+    # 1. Delete comments and review votes/reports
+    db.query(CommentVote).filter(CommentVote.user_id == user_id).delete()
+    db.query(CommentReport).filter(CommentReport.user_id == user_id).delete()
+    db.query(Comment).filter(Comment.user_id == user_id).delete()
+
+    db.query(ListVote).filter(ListVote.user_id == user_id).delete()
+    db.query(ListReport).filter(ListReport.user_id == user_id).delete()
+
+    db.query(MediaReviewVote).filter(MediaReviewVote.user_id == user_id).delete()
+    db.query(MediaReviewReport).filter(MediaReviewReport.user_id == user_id).delete()
+    db.query(MediaReview).filter(MediaReview.user_id == user_id).delete()
+
+    # 2. Additions and votes
+    db.query(AdditionVote).filter(AdditionVote.user_id == user_id).delete()
+    db.query(AdditionComment).filter(AdditionComment.user_id == user_id).delete()
+    db.query(UserAdoptedAddition).filter(UserAdoptedAddition.user_id == user_id).delete()
+    db.query(ListAddition).filter(ListAddition.user_id == user_id).delete()
+
+    # 3. Follows, activities, progress, library and consumptions
+    db.query(Follow).filter((Follow.follower_id == user_id) | (Follow.followed_id == user_id)).delete()
+    db.query(UserActivityLog).filter(UserActivityLog.user_id == user_id).delete()
+    db.query(ItemProgress).filter(ItemProgress.user_id == user_id).delete()
+    db.query(UserLibraryItem).filter(UserLibraryItem.user_id == user_id).delete()
+    db.query(ConsumptionHistory).filter(ConsumptionHistory.user_id == user_id).delete()
+    db.query(SavedList).filter(SavedList.user_id == user_id).delete()
+
+    # 4. Delete user (which cascades to owned reading lists)
     db.delete(current_user)
     db.commit()
     return None
+
 
 @router.get("/me/activity")
 def get_my_activity(
