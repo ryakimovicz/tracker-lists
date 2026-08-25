@@ -39,6 +39,7 @@ interface LibraryItem {
   last_seen_episode?: string;
   pages_read?: number;
   tracking_list_id?: number;
+  is_nsfw?: boolean;
 }
 
 

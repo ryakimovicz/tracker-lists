@@ -449,7 +449,7 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
   );
 };
 
-const ActiveItemCard = ({ item, onUpdate, language, onOpenItem }: { item: any, onUpdate: () => void, language: string, onOpenItem: (item: any) => void }) => {
+const ActiveItemCard = ({ item, onUpdate, language, onOpenItem, themeColor, themeTextColor }: { item: any, onUpdate: () => void, language: string, onOpenItem: (item: any) => void, themeColor?: string, themeTextColor?: string }) => {
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [isPeek, setIsPeek] = useState(false);

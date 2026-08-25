@@ -21,27 +21,18 @@ export const HorizontalScroll: React.FC<HorizontalScrollProps> = ({ children, ti
   return (
     <div className={`horizontal-scroll-container ${className}`} style={{ position: "relative", marginBottom: "2rem", width: "100%", maxWidth: "100%", overflow: "hidden" }}>
       {title && (
-        <div style={{ paddingLeft: "60px", paddingRight: "60px", marginBottom: "1.25rem" }}>
-          <div style={{ display: "inline-flex", alignItems: "baseline", gap: "0.5rem", paddingBottom: "0.4rem" }}>
-            <h3 style={{ 
-              fontSize: "1.25rem", 
-              fontWeight: 700, 
-              color: "var(--text-primary)",
-              letterSpacing: "-0.01em",
-              margin: 0
-            }}>
-              {title}
-            </h3>
-          </div>
-          <div style={{ 
-            width: "100%", 
-            height: "2px", 
-            background: outlineColor 
-              ? `linear-gradient(90deg, ${outlineColor} 0%, ${outlineColor}88 35%, transparent 100%)` 
-              : "linear-gradient(90deg, var(--border-color) 0%, transparent 100%)",
-            borderRadius: "2px",
-            marginTop: "0.25rem"
-          }} />
+        <div style={{ display: "flex", paddingLeft: "45px", marginBottom: "1rem" }}>
+          <h3 style={{ 
+            fontSize: "1.2rem", 
+            fontWeight: 600, 
+            color: "var(--text-primary)", 
+            border: `2px solid ${outlineColor || "var(--border-color)"}`, 
+            borderRadius: "8px", 
+            padding: "0.2rem 0.75rem", 
+            background: "var(--bg-secondary)" 
+          }}>
+            {title}
+          </h3>
         </div>
       )}
       
