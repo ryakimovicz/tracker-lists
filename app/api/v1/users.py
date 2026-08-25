@@ -322,6 +322,22 @@ def update_username(
     return current_user
 
 
+def trim_downgraded_user_favorites(db: Session, user_id: int):
+    from app.models.library import UserLibraryItem
+    categories = ['movie', 'series', 'anime', 'book', 'comic', 'manga', 'game']
+    for cat in categories:
+        favs = db.query(UserLibraryItem).filter(
+            UserLibraryItem.user_id == user_id,
+            UserLibraryItem.item_type == cat,
+            UserLibraryItem.is_favorite == True
+        ).order_by(UserLibraryItem.updated_at.desc(), UserLibraryItem.id.asc()).all()
+        
+        # Keep only the 1st one, untag any extra 9
+        if len(favs) > 1:
+            for extra in favs[1:]:
+                extra.is_favorite = False
+    db.commit()
+
 class UserSettingsUpdate(BaseModel):
     show_nsfw: bool | None = None
     is_pro: bool | None = None
@@ -336,11 +352,15 @@ def update_user_settings(
         current_user.show_nsfw = req.show_nsfw
     
     if req.is_pro is not None:
+        was_pro = current_user.is_pro
         current_user.is_pro = req.is_pro
+        if was_pro and not req.is_pro:
+            trim_downgraded_user_favorites(db, current_user.id)
         
     db.commit()
     db.refresh(current_user)
     return current_user
+
 
 @router.put("/me/password")
 def change_password(

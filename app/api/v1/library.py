@@ -431,6 +431,29 @@ def update_library_item(
         db.add(activity)
         
     if item_in.is_favorite is not None:
+        if item_in.is_favorite and not lib_item.is_favorite:
+            # Check limits per category: 1 for free, 10 for pro
+            max_limit = 10 if getattr(current_user, 'is_pro', False) else 1
+            existing_count = db.query(UserLibraryItem).filter(
+                UserLibraryItem.user_id == current_user.id,
+                UserLibraryItem.item_type == lib_item.item_type,
+                UserLibraryItem.is_favorite == True,
+                UserLibraryItem.id != lib_item.id
+            ).count()
+            
+            if existing_count >= max_limit:
+                category_name = str(lib_item.item_type).capitalize()
+                if not getattr(current_user, 'is_pro', False):
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Free users can feature 1 {category_name} on their profile. Upgrade to Pathd Pro to feature up to 10!"
+                    )
+                else:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Pro limit reached: Maximum 10 featured items allowed for {category_name}."
+                    )
+                    
         lib_item.is_favorite = item_in.is_favorite
         lib_item.updated_at = datetime.now(timezone.utc)
         
@@ -445,6 +468,7 @@ def update_library_item(
             details="starred" if item_in.is_favorite else "unstarred"
         )
         db.add(activity)
+
 
     if item_in.pages_read is not None:
         lib_item.pages_read = item_in.pages_read

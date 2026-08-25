@@ -361,9 +361,31 @@ export const Profile: React.FC = () => {
     }
   };
   const handleToggleFavorite = async (itemId: number, currentFav: boolean) => {
-    if (!currentFav && !profile?.is_pro && favorites.length >= 4) {
-      setErrorMsg(language === 'es' ? 'Límite de destacados alcanzado. Hazte Pro para tener destacados ilimitados.' : 'Favorites limit reached. Become Pro for unlimited favorites.');
-      return;
+    const targetItem = libraryItems.find(li => li.id === itemId);
+    if (!targetItem) return;
+
+    if (!currentFav) {
+      const isPro = Boolean(profile?.is_pro || currentUser?.is_pro);
+      const sameCategoryFavs = favorites.filter(f => f.item_type === targetItem.item_type);
+      const maxAllowed = isPro ? 10 : 1;
+
+      if (sameCategoryFavs.length >= maxAllowed) {
+        if (!isPro) {
+          setErrorMsg(
+            language === 'es'
+              ? `Los usuarios gratuitos pueden destacar 1 elemento por categoría. ¡Hazte Pro para destacar hasta 10!`
+              : `Free users can feature 1 item per category. Upgrade to Pathd Pro to feature up to 10!`
+          );
+        } else {
+          setErrorMsg(
+            language === 'es'
+              ? `Has alcanzado el límite máximo de 10 destacados para esta categoría.`
+              : `Pro limit reached: Maximum 10 featured items allowed for this category.`
+          );
+        }
+        setTimeout(() => setErrorMsg(''), 5000);
+        return;
+      }
     }
     
     try {
@@ -371,10 +393,8 @@ export const Profile: React.FC = () => {
       setLibraryItems(prev => prev.map(item => item.id === itemId ? { ...item, is_favorite: !currentFav } : item));
       
       setFavorites(prev => {
-        const item = libraryItems.find(li => li.id === itemId);
-        if (!item) return prev;
         if (!currentFav) {
-          return [...prev, { ...item, is_favorite: true }];
+          return [...prev, { ...targetItem, is_favorite: true }];
         } else {
           return prev.filter(li => li.id !== itemId);
         }
@@ -384,10 +404,12 @@ export const Profile: React.FC = () => {
       const targetActivityUrl = userIdParam ? `/users/${userIdParam}/activity` : '/users/me/activity';
       const actRes = await apiClient.get(targetActivityUrl);
       setActivities(actRes.data);
-    } catch(err) {
-      console.error(err);
+    } catch(err: any) {
+      setErrorMsg(err.response?.data?.detail || (language === 'es' ? 'Error al actualizar destacado' : 'Failed to update favorite'));
+      setTimeout(() => setErrorMsg(''), 5000);
     }
   };
+
 
   const handleOpenItemDetails = (item: any) => {
     setSelectedItem(item);
@@ -1234,13 +1256,35 @@ export const Profile: React.FC = () => {
 
       {activeTab === 'favorites' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', textAlign: 'left' }}>
-          <h3>{language === 'es' ? 'Mis Obras Destacadas' : 'My Featured Favorites'}</h3>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
+            <div>
+              <h3 style={{ margin: 0 }}>{language === 'es' ? 'Mis Obras Destacadas' : 'My Featured Favorites'}</h3>
+              <p style={{ margin: '0.25rem 0 0', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                {profile?.is_pro
+                  ? (language === 'es' ? '⭐ Plan Pro: Puedes destacar hasta 10 elementos por categoría.' : '⭐ Pro Plan: You can feature up to 10 items per category.')
+                  : (language === 'es' ? 'Plan Gratuito: 1 elemento destacado por categoría (Máx. 7). Pasa a Pro para destacar hasta 10.' : 'Free Plan: 1 featured item per category (Max. 7). Upgrade to Pro to feature up to 10.')
+                }
+              </p>
+            </div>
+            <span style={{
+              fontSize: '0.8rem',
+              fontWeight: 600,
+              padding: '0.35rem 0.75rem',
+              borderRadius: '20px',
+              background: profile?.is_pro ? 'rgba(124, 58, 237, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+              color: profile?.is_pro ? 'var(--accent-primary)' : 'var(--text-secondary)',
+              border: '1px solid var(--border-color)'
+            }}>
+              {favorites.length} / {profile?.is_pro ? '70' : '7'} {language === 'es' ? 'destacados' : 'featured'}
+            </span>
+          </div>
+
           {favorites.length === 0 ? (
             <div className="glass-card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
               {language === 'es' ? 'Marca obras en tu estantería como favoritas (con el ícono de corazón) para destacarlas aquí.' : 'Mark items on your shelf as favorites (with the heart icon) to highlight them here.'}
             </div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '2rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1.5rem' }}>
               {favorites.map(item => (
                 <div
                   key={item.id}
@@ -1248,16 +1292,22 @@ export const Profile: React.FC = () => {
                   onClick={() => handleOpenItemDetails(item)}
                   style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', position: 'relative', cursor: 'pointer' }}
                 >
-                  <div style={{ position: 'absolute', top: '1.5rem', right: '1.5rem', background: 'rgba(124,58,237,0.9)', padding: '0.3rem', borderRadius: '50%', display: 'flex' }}>
+                  <div style={{ position: 'absolute', top: '1.5rem', right: '1.5rem', background: 'rgba(124,58,237,0.9)', padding: '0.3rem', borderRadius: '50%', display: 'flex', zIndex: 2 }}>
                     <Heart size={16} fill="white" color="white" />
                   </div>
-                  <img
-                    src={item.image_url || undefined}
-                    alt={item.title}
-                    style={{ width: '100%', height: '260px', objectFit: 'cover', borderRadius: '8px' }}
+                  <MediaPoster
+                    src={item.image_url}
+                    title={item.title}
+                    itemType={item.item_type}
+                    height="240px"
+                    width="100%"
+                    borderRadius="8px"
+                    isNsfw={item.is_nsfw}
                   />
-                  <h4>{item.title}</h4>
-                  <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                  <h4 style={{ margin: '0.25rem 0 0', fontSize: '0.95rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.title}>
+                    {item.title}
+                  </h4>
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
                     {t('media' + item.item_type.charAt(0).toUpperCase() + item.item_type.slice(1))}
                   </span>
                 </div>
@@ -1266,6 +1316,7 @@ export const Profile: React.FC = () => {
           )}
         </div>
       )}
+
 
       {activeTab === 'music' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', textAlign: 'left' }}>
