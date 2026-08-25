@@ -5,6 +5,7 @@ import { useTranslation } from '../context/LanguageContext';
 import { apiClient } from '../api/client';
 import { Mail, Lock, AlertCircle, LogIn } from 'lucide-react';
 import { GoogleLogin, type CredentialResponse } from '@react-oauth/google';
+import { GoogleUsernameModal } from '../components/GoogleUsernameModal';
 
 export const Login: React.FC = () => {
   const { login, isAuthenticated } = useAuth();
@@ -21,6 +22,13 @@ export const Login: React.FC = () => {
   const [password, setPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Google modal state
+  const [showGoogleModal, setShowGoogleModal] = useState(false);
+  const [googleEmail, setGoogleEmail] = useState('');
+  const [googleSuggestedUser, setGoogleSuggestedUser] = useState('');
+  const [pendingGoogleToken, setPendingGoogleToken] = useState('');
+  const [googleModalError, setGoogleModalError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,6 +70,16 @@ export const Login: React.FC = () => {
       const response = await apiClient.post('/auth/google', {
         id_token: credentialResponse.credential
       });
+
+      if (response.data.needs_username) {
+        // Needs username prompt
+        setPendingGoogleToken(credentialResponse.credential);
+        setGoogleEmail(response.data.email || '');
+        setGoogleSuggestedUser(response.data.suggested_username || '');
+        setShowGoogleModal(true);
+        return;
+      }
+
       const { access_token } = response.data;
       await login(access_token);
       navigate('/profile');
@@ -72,6 +90,31 @@ export const Login: React.FC = () => {
       setIsSubmitting(false);
     }
   };
+
+  const handleGoogleUsernameConfirm = async (chosenUsername: string) => {
+    setIsSubmitting(true);
+    setGoogleModalError('');
+    try {
+      const response = await apiClient.post('/auth/google', {
+        id_token: pendingGoogleToken,
+        username: chosenUsername
+      });
+      const { access_token } = response.data;
+      setShowGoogleModal(false);
+      await login(access_token);
+      navigate('/profile');
+    } catch (err: any) {
+      const detail = err.response?.data?.detail;
+      if (detail === 'Username already registered') {
+        setGoogleModalError(t('errUsernameTaken'));
+      } else {
+        setGoogleModalError(detail || t('errRegistrationFailed'));
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
 
 
   return (
@@ -152,8 +195,22 @@ export const Login: React.FC = () => {
           </Link>
         </p>
       </form>
+
+      <GoogleUsernameModal
+        isOpen={showGoogleModal}
+        email={googleEmail}
+        initialUsername={googleSuggestedUser}
+        isLoading={isSubmitting}
+        errorMessage={googleModalError}
+        onConfirm={handleGoogleUsernameConfirm}
+        onClose={() => {
+          setShowGoogleModal(false);
+          setPendingGoogleToken('');
+        }}
+      />
     </div>
   );
 };
 export default Login;
+
 

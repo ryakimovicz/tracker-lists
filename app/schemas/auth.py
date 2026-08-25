@@ -17,3 +17,12 @@ class ResetPasswordRequest(BaseModel):
 
 class GoogleLoginRequest(BaseModel):
     id_token: str
+    username: Optional[str] = None
+
+class GoogleAuthResponse(BaseModel):
+    access_token: Optional[str] = None
+    token_type: Optional[str] = "bearer"
+    needs_username: bool = False
+    suggested_username: Optional[str] = None
+    email: Optional[str] = None
+

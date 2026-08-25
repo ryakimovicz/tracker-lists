@@ -12,9 +12,10 @@ from app.core.database import get_db
 from app.core.security import create_access_token, verify_password, get_password_hash
 from app.models.user import User
 from app.schemas.user import UserCreate, UserResponse, Token
-from app.schemas.auth import ForgotPasswordRequest, ResetPasswordRequest, GoogleLoginRequest
+from app.schemas.auth import ForgotPasswordRequest, ResetPasswordRequest, GoogleLoginRequest, GoogleAuthResponse
 
 router = APIRouter()
+
 
 def send_reset_email(to_email: str, username: str, token: str):
     # Print local fallback simulation for developer logs
@@ -162,14 +163,14 @@ def logout(
     return {"message": "Logged out successfully"}
 
 # --- Google OAuth2 Scaffold ---
-@router.post("/google", response_model=Token)
+@router.post("/google", response_model=GoogleAuthResponse)
 def google_auth(
     response: Response,
     payload: GoogleLoginRequest,
     db: Session = Depends(get_db)
 ):
     email = None
-    username = None
+    suggested_username = None
     
     # Try mock token first for easy integration and local developer verification
     if payload.id_token.startswith("mock-google-"):
@@ -177,10 +178,10 @@ def google_auth(
         # format: mock-google-<email>-<username>
         if len(parts) >= 4:
             email = parts[2]
-            username = parts[3]
+            suggested_username = parts[3]
         else:
             email = "googleuser@example.com"
-            username = "googleuser"
+            suggested_username = "googleuser"
     else:
         # Standard Google validation using google-auth library
         try:
@@ -193,10 +194,10 @@ def google_auth(
             id_info = id_token.verify_oauth2_token(payload.id_token, requests.Request(), audience=audience, clock_skew_in_seconds=10)
             
             email = id_info.get("email")
-            # Generate clean username from email name part or name field
+            # Generate clean suggested username from email name part or name field
             raw_name = id_info.get("name") or email.split("@")[0]
             clean_name = re.sub(r'[^a-zA-Z0-9_]', '', raw_name.replace(" ", "_")).lower()
-            username = clean_name[:30] if clean_name else f"user_{secrets.token_hex(4)}"
+            suggested_username = clean_name[:30] if clean_name else f"user_{secrets.token_hex(4)}"
         except ImportError:
             raise HTTPException(
                 status_code=status.HTTP_501_NOT_IMPLEMENTED,
@@ -218,18 +219,48 @@ def google_auth(
     user = db.query(User).filter(User.email == email).first()
     
     if not user:
-        # Check if username is already taken, generate alternative if it is
-        base_username = username
-        counter = 1
-        while db.query(User).filter(User.username == username).first():
-            username = f"{base_username}{counter}"
-            counter += 1
+        # If no custom username provided yet, ask frontend to prompt the user
+        if not payload.username or not payload.username.strip():
+            # Check availability of suggested username, generate alternative if taken
+            base_suggested = suggested_username
+            counter = 1
+            while db.query(User).filter(User.username == suggested_username).first():
+                suggested_username = f"{base_suggested}{counter}"
+                counter += 1
+                
+            return {
+                "needs_username": True,
+                "suggested_username": suggested_username,
+                "email": email,
+                "access_token": None,
+                "token_type": None
+            }
+        
+        # User provided their chosen username: validate format and uniqueness
+        chosen_username = payload.username.strip()
+        import re
+        if len(chosen_username) < 3 or len(chosen_username) > 30:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Username must be between 3 and 30 characters"
+            )
+        if not re.match(r'^[a-zA-Z0-9_]+$', chosen_username):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Username can only contain letters, numbers and underscores"
+            )
             
-        # Create new OAuth user
-        # Generate a random password since they login with Google
+        existing_username = db.query(User).filter(User.username == chosen_username).first()
+        if existing_username:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Username already registered"
+            )
+            
+        # Create new user definitely
         random_pwd = secrets.token_urlsafe(24)
         user = User(
-            username=username,
+            username=chosen_username,
             email=email,
             hashed_password=get_password_hash(random_pwd)
         )
@@ -248,7 +279,14 @@ def google_auth(
     access_token = create_access_token(
         subject=user.id, expires_delta=access_token_expires
     )
-    return {"access_token": access_token, "token_type": "bearer"}
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "needs_username": False,
+        "suggested_username": user.username,
+        "email": user.email
+    }
+
 
 # --- Password Reset Flow ---
 @router.post("/forgot-password")
