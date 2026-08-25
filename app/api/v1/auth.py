@@ -60,19 +60,28 @@ def set_refresh_cookie(response: Response, refresh_token: str):
         max_age=14 * 24 * 60 * 60  # 14 days
     )
 
+from sqlalchemy import func
+
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 def register(user_in: UserCreate, db: Session = Depends(get_db)):
-    # Check if username or email already exists
+    # Check if username or email already exists (case-insensitive)
     user_db = db.query(User).filter(
-        (User.email == user_in.email) | (User.username == user_in.username)
+        (func.lower(User.email) == user_in.email.strip().lower()) |
+        (func.lower(User.username) == user_in.username.strip().lower())
     ).first()
     if user_db:
+        if user_db.email.lower() == user_in.email.strip().lower():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email already registered"
+            )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Username or email already registered"
+            detail="Username already registered"
         )
     
     hashed_password = get_password_hash(user_in.password)
+
     new_user = User(
         username=user_in.username,
         email=user_in.email,
@@ -224,7 +233,7 @@ def google_auth(
             # Check availability of suggested username, generate alternative if taken
             base_suggested = suggested_username
             counter = 1
-            while db.query(User).filter(User.username == suggested_username).first():
+            while db.query(User).filter(func.lower(User.username) == suggested_username.lower()).first():
                 suggested_username = f"{base_suggested}{counter}"
                 counter += 1
                 
@@ -250,12 +259,13 @@ def google_auth(
                 detail="Username can only contain letters, numbers and underscores"
             )
             
-        existing_username = db.query(User).filter(User.username == chosen_username).first()
+        existing_username = db.query(User).filter(func.lower(User.username) == chosen_username.lower()).first()
         if existing_username:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Username already registered"
             )
+
             
         # Create new user definitely
         random_pwd = secrets.token_urlsafe(24)

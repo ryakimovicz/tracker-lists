@@ -287,20 +287,40 @@ def update_username(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    # Check if username is already taken
-    existing = db.query(User).filter(User.username == req.username).first()
+    from sqlalchemy import func
+    import re
+    
+    clean_username = req.username.strip()
+    if len(clean_username) < 3 or len(clean_username) > 30:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Username must be between 3 and 30 characters"
+        )
+    if not re.match(r'^[a-zA-Z0-9_]+$', clean_username):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Username can only contain letters, numbers and underscores"
+        )
+
+    # Check if username is already taken (case-insensitive)
+    existing = db.query(User).filter(func.lower(User.username) == clean_username.lower()).first()
     if existing:
         if existing.id == current_user.id:
+            # Case update for same user (e.g. from myuser to MyUser)
+            current_user.username = clean_username
+            db.commit()
+            db.refresh(current_user)
             return current_user
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Username already taken"
         )
         
-    current_user.username = req.username
+    current_user.username = clean_username
     db.commit()
     db.refresh(current_user)
     return current_user
+
 
 class UserSettingsUpdate(BaseModel):
     show_nsfw: bool | None = None
