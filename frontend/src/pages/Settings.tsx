@@ -22,9 +22,10 @@ import {
 
 export const SettingsPage: React.FC = () => {
   const { user, refreshProfile, logout } = useAuth();
-  const { language } = useTranslation();
+  const { language, t } = useTranslation();
   const navigate = useNavigate();
   const isEs = language === 'es';
+
 
 
   // Username form state
@@ -302,7 +303,7 @@ export const SettingsPage: React.FC = () => {
                     justifyContent: 'center',
                     padding: '0.25rem',
                   }}
-                  title={showCurrentPass ? 'Hide password' : 'Show password'}
+                  title={showCurrentPass ? t('authHidePassword') : t('authShowPassword')}
                 >
                   {showCurrentPass ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
@@ -339,7 +340,7 @@ export const SettingsPage: React.FC = () => {
                       justifyContent: 'center',
                       padding: '0.25rem',
                     }}
-                    title={showNewPass ? 'Hide password' : 'Show password'}
+                    title={showNewPass ? t('authHidePassword') : t('authShowPassword')}
                   >
                     {showNewPass ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
@@ -375,13 +376,14 @@ export const SettingsPage: React.FC = () => {
                       justifyContent: 'center',
                       padding: '0.25rem',
                     }}
-                    title={showConfirmPass ? 'Hide password' : 'Show password'}
+                    title={showConfirmPass ? t('authHidePassword') : t('authShowPassword')}
                   >
                     {showConfirmPass ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 </div>
               </div>
             </div>
+
 
             <button
               type="submit"

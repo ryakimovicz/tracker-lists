@@ -182,10 +182,11 @@ export const Login: React.FC = () => {
                 justifyContent: 'center',
                 padding: '0.25rem',
               }}
-              title={showPassword ? 'Hide password' : 'Show password'}
+              title={showPassword ? t('authHidePassword') : t('authShowPassword')}
             >
               {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
             </button>
+
           </div>
 
         </div>

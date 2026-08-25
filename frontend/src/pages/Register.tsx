@@ -220,7 +220,7 @@ export const Register: React.FC = () => {
                   justifyContent: 'center',
                   padding: '0.25rem',
                 }}
-                title={showPassword ? 'Hide password' : 'Show password'}
+                title={showPassword ? t('authHidePassword') : t('authShowPassword')}
               >
                 {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
@@ -228,7 +228,7 @@ export const Register: React.FC = () => {
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-            <label style={{ fontSize: '0.9rem', fontWeight: 500 }}>{t('authConfirmPassword') || (language === 'es' ? 'Confirmar Contraseña' : 'Confirm Password')}</label>
+            <label style={{ fontSize: '0.9rem', fontWeight: 500 }}>{t('authConfirmPassword')}</label>
             <div style={{ position: 'relative' }}>
               <input
                 type={showConfirmPassword ? 'text' : 'password'}
@@ -257,12 +257,13 @@ export const Register: React.FC = () => {
                   justifyContent: 'center',
                   padding: '0.25rem',
                 }}
-                title={showConfirmPassword ? 'Hide password' : 'Show password'}
+                title={showConfirmPassword ? t('authHidePassword') : t('authShowPassword')}
               >
                 {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
           </div>
+
 
 
 
