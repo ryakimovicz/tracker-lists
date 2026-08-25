@@ -17,9 +17,11 @@ import {
   Trash2,
   X,
   EyeOff,
-  Sparkles
+  Sparkles,
+  Star
 } from 'lucide-react';
 import { AvatarSelectorModal } from '../components/AvatarSelectorModal';
+import { ProModal } from '../components/ProModal';
 
 export const SettingsPage: React.FC = () => {
   const { user, refreshProfile, logout } = useAuth();
@@ -27,8 +29,10 @@ export const SettingsPage: React.FC = () => {
   const navigate = useNavigate();
   const isEs = language === 'es';
 
-  // Avatar modal state
+  // Modal states
   const [showAvatarModal, setShowAvatarModal] = useState(false);
+  const [showProModal, setShowProModal] = useState(false);
+
 
   // Username form state
   const [username, setUsername] = useState(user?.username || '');
@@ -229,22 +233,44 @@ export const SettingsPage: React.FC = () => {
               </div>
             </div>
 
-            <button
-              onClick={() => setShowAvatarModal(true)}
-              className="btn-primary"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                padding: '0.65rem 1.25rem',
-                fontSize: '0.9rem',
-              }}
-            >
-              <Sparkles size={16} />
-              {isEs ? 'Cambiar Avatar' : 'Change Avatar'}
-            </button>
+            {user?.is_pro ? (
+              <button
+                onClick={() => setShowAvatarModal(true)}
+                className="btn-primary"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  padding: '0.65rem 1.25rem',
+                  fontSize: '0.9rem',
+                }}
+              >
+                <Sparkles size={16} />
+                {isEs ? 'Cambiar Avatar' : 'Change Avatar'}
+              </button>
+            ) : (
+              <button
+                onClick={() => setShowProModal(true)}
+                className="btn-primary"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  padding: '0.65rem 1.25rem',
+                  fontSize: '0.9rem',
+                  background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                  border: 'none',
+                  color: '#fff',
+                  boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)',
+                }}
+              >
+                <Star size={16} fill="#fff" />
+                {isEs ? 'Desbloquear con Premium' : 'Unlock with Premium'}
+              </button>
+            )}
           </div>
         </div>
+
 
         {/* Section 2: Username */}
         <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px' }}>
@@ -695,9 +721,15 @@ export const SettingsPage: React.FC = () => {
           await refreshProfile();
         }}
       />
+
+      {/* Pro / Premium Modal */}
+      {showProModal && (
+        <ProModal onClose={() => setShowProModal(false)} />
+      )}
     </div>
   );
 };
 export default SettingsPage;
+
 
 

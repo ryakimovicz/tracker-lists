@@ -5,8 +5,10 @@ import { apiClient } from '../api/client';
 import { ItemDetailsModal } from '../components/ItemDetailsModal';
 import { MediaPoster } from '../components/MediaPoster';
 import { AvatarSelectorModal } from '../components/AvatarSelectorModal';
+import { ProModal } from '../components/ProModal';
 
 import {
+
   BookOpen,
   Calendar,
   Grid,
@@ -88,7 +90,9 @@ export const Profile: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
 
   const [showAvatarModal, setShowAvatarModal] = useState(false);
+  const [showProModal, setShowProModal] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+
 
   const [libraryItems, setLibraryItems] = useState<LibraryItem[]>([]);
   const [activeTab, setActiveTab] = useState<'shelf' | 'guides' | 'favorites' | 'music'>('shelf');
@@ -605,14 +609,32 @@ export const Profile: React.FC = () => {
                   cursor: isOwnProfile ? 'pointer' : 'default',
                 }}
                 onClick={() => {
-                  if (isOwnProfile) setShowAvatarModal(true);
+                  if (isOwnProfile) {
+                    if (profile.is_pro) {
+                      setShowAvatarModal(true);
+                    } else {
+                      setShowProModal(true);
+                    }
+                  }
                 }}
-                title={isOwnProfile ? (language === 'es' ? 'Cambiar avatar de personaje' : 'Change character avatar') : undefined}
+                title={
+                  isOwnProfile
+                    ? profile.is_pro
+                      ? (language === 'es' ? 'Cambiar avatar de personaje' : 'Change character avatar')
+                      : (language === 'es' ? 'Desbloquear avatar de personaje con Premium' : 'Unlock character avatar with Premium')
+                    : undefined
+                }
               />
             ) : (
               <div
                 onClick={() => {
-                  if (isOwnProfile) setShowAvatarModal(true);
+                  if (isOwnProfile) {
+                    if (profile.is_pro) {
+                      setShowAvatarModal(true);
+                    } else {
+                      setShowProModal(true);
+                    }
+                  }
                 }}
                 style={{
                   width: 100,
@@ -629,13 +651,20 @@ export const Profile: React.FC = () => {
                   fontWeight: 800,
                   cursor: isOwnProfile ? 'pointer' : 'default',
                 }}
-                title={isOwnProfile ? (language === 'es' ? 'Elegir avatar de personaje' : 'Choose character avatar') : undefined}
+                title={
+                  isOwnProfile
+                    ? profile.is_pro
+                      ? (language === 'es' ? 'Elegir avatar de personaje' : 'Choose character avatar')
+                      : (language === 'es' ? 'Desbloquear avatar de personaje con Premium' : 'Unlock character avatar with Premium')
+                    : undefined
+                }
               >
                 {profile.username?.charAt(0).toUpperCase() || 'U'}
               </div>
             )}
 
-            {isOwnProfile && (
+            {/* Sparkles button ONLY visible for Premium users */}
+            {isOwnProfile && profile.is_pro && (
               <button
                 onClick={() => setShowAvatarModal(true)}
                 style={{
@@ -660,6 +689,7 @@ export const Profile: React.FC = () => {
               </button>
             )}
           </div>
+
 
           <div style={{ flex: 1, minWidth: 250, textAlign: 'left' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.4rem', flexWrap: 'wrap' }}>
@@ -1893,9 +1923,15 @@ export const Profile: React.FC = () => {
           setCurrentUser(prev => prev ? { ...prev, photo_url: newUrl || '' } : null);
         }}
       />
+
+      {/* Pro / Premium Modal */}
+      {showProModal && (
+        <ProModal onClose={() => setShowProModal(false)} />
+      )}
     </div>
   );
 };
 export default Profile;
+
 
 
