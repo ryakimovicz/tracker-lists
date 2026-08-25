@@ -336,7 +336,42 @@ def trim_downgraded_user_favorites(db: Session, user_id: int):
         if len(favs) > 1:
             for extra in favs[1:]:
                 extra.is_favorite = False
+                
+    # Reset custom avatar to default if user was downgraded
+    user = db.query(User).filter(User.id == user_id).first()
+    if user:
+        user.photo_url = None
+        
     db.commit()
+
+class AvatarUpdateRequest(BaseModel):
+    photo_url: str | None = None
+
+@router.get("/characters/search")
+def search_characters(
+    query: str = Query(..., min_length=2, description="Search term for character name"),
+    current_user: User = Depends(get_current_user)
+):
+    from app.services.characters import CharacterService
+    results = CharacterService.search_all(query)
+    return results
+
+@router.put("/me/avatar", response_model=UserResponse)
+def update_avatar(
+    req: AvatarUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if not getattr(current_user, 'is_pro', False):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Custom character avatars are an exclusive Pathd Pro feature. Upgrade to Pro to customize your avatar!"
+        )
+        
+    current_user.photo_url = req.photo_url
+    db.commit()
+    db.refresh(current_user)
+    return current_user
 
 class UserSettingsUpdate(BaseModel):
     show_nsfw: bool | None = None
@@ -360,6 +395,7 @@ def update_user_settings(
     db.commit()
     db.refresh(current_user)
     return current_user
+
 
 
 @router.put("/me/password")

@@ -16,9 +16,10 @@ import {
   ExternalLink,
   Trash2,
   X,
-  EyeOff
+  EyeOff,
+  Sparkles
 } from 'lucide-react';
-
+import { AvatarSelectorModal } from '../components/AvatarSelectorModal';
 
 export const SettingsPage: React.FC = () => {
   const { user, refreshProfile, logout } = useAuth();
@@ -26,12 +27,14 @@ export const SettingsPage: React.FC = () => {
   const navigate = useNavigate();
   const isEs = language === 'es';
 
-
+  // Avatar modal state
+  const [showAvatarModal, setShowAvatarModal] = useState(false);
 
   // Username form state
   const [username, setUsername] = useState(user?.username || '');
   const [usernameMsg, setUsernameMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isUpdatingUsername, setIsUpdatingUsername] = useState(false);
+
 
   // Password form state
   const [currentPassword, setCurrentPassword] = useState('');
@@ -165,7 +168,84 @@ export const SettingsPage: React.FC = () => {
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-        {/* Section 1: Username */}
+        {/* Section 1: Avatar */}
+        <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1.25rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+              <div
+                style={{
+                  width: '76px',
+                  height: '76px',
+                  borderRadius: '50%',
+                  overflow: 'hidden',
+                  background: 'var(--bg-secondary)',
+                  border: '2px solid var(--border-color)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 8px 16px rgba(0,0,0,0.3)',
+                }}
+              >
+                {user?.photo_url ? (
+                  <img
+                    src={user.photo_url}
+                    alt={user.username}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      background: 'linear-gradient(135deg, var(--accent-primary), #4f46e5)',
+                      color: 'white',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '1.75rem',
+                      fontWeight: 700,
+                    }}
+                  >
+                    {user?.username?.charAt(0).toUpperCase() || 'U'}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <h2 style={{ fontSize: '1.2rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
+                  <Sparkles size={20} color="var(--accent-primary)" />
+                  {isEs ? 'Avatar de Personaje' : 'Character Avatar'}
+                </h2>
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: '0.35rem 0 0' }}>
+                  {user?.is_pro
+                    ? isEs
+                      ? '⭐ Como usuario Pro, puedes buscar tu personaje favorito y usarlo de avatar.'
+                      : '⭐ As a Pro user, you can search and choose any favorite character as your avatar.'
+                    : isEs
+                    ? 'Función exclusiva de Pathd Pro. Los usuarios gratuitos usan el avatar por defecto.'
+                    : 'Exclusive to Pathd Pro. Free users have default initial avatars.'}
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setShowAvatarModal(true)}
+              className="btn-primary"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                padding: '0.65rem 1.25rem',
+                fontSize: '0.9rem',
+              }}
+            >
+              <Sparkles size={16} />
+              {isEs ? 'Cambiar Avatar' : 'Change Avatar'}
+            </button>
+          </div>
+        </div>
+
+        {/* Section 2: Username */}
         <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px' }}>
           <h2 style={{ fontSize: '1.2rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: 0 }}>
             <User size={20} color="var(--accent-primary)" />
@@ -218,6 +298,7 @@ export const SettingsPage: React.FC = () => {
         </div>
 
         {/* Section 2: Preferences & NSFW */}
+
         <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px' }}>
           <h2 style={{ fontSize: '1.2rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: 0 }}>
             <Eye size={20} color="var(--accent-primary)" />
@@ -602,7 +683,20 @@ export const SettingsPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Avatar Selector Modal */}
+      <AvatarSelectorModal
+        isOpen={showAvatarModal}
+        onClose={() => setShowAvatarModal(false)}
+        currentPhotoUrl={user?.photo_url}
+        isPro={user?.is_pro}
+        onAvatarUpdated={async () => {
+          await refreshProfile();
+        }}
+      />
     </div>
   );
 };
 export default SettingsPage;
+
+

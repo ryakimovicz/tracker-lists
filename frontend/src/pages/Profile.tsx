@@ -4,6 +4,7 @@ import { useTranslation } from '../context/LanguageContext';
 import { apiClient } from '../api/client';
 import { ItemDetailsModal } from '../components/ItemDetailsModal';
 import { MediaPoster } from '../components/MediaPoster';
+import { AvatarSelectorModal } from '../components/AvatarSelectorModal';
 
 import {
   BookOpen,
@@ -21,8 +22,10 @@ import {
   UserPlus,
   UserCheck,
   Users,
-  X
+  X,
+  Sparkles
 } from 'lucide-react';
+
 
 interface LibraryItem {
   id: number;
@@ -84,7 +87,9 @@ export const Profile: React.FC = () => {
   const userIdParam = searchParams.get('user_id');
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
 
+  const [showAvatarModal, setShowAvatarModal] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+
   const [libraryItems, setLibraryItems] = useState<LibraryItem[]>([]);
   const [activeTab, setActiveTab] = useState<'shelf' | 'guides' | 'favorites' | 'music'>('shelf');
   const [mediaFilter, setMediaFilter] = useState<'all' | 'movie' | 'series' | 'anime' | 'book' | 'comic' | 'manga' | 'game'>('all');
@@ -584,11 +589,77 @@ export const Profile: React.FC = () => {
       {/* Profile Header Card */}
       {profile && (
         <div className="glass-card" style={{ display: 'flex', gap: '2rem', alignItems: 'center', flexWrap: 'wrap', padding: '2.5rem' }}>
-          <img
-            src={profile.photo_url}
-            alt={profile.username}
-            style={{ width: 100, height: 100, borderRadius: '50%', border: '3px solid var(--accent-primary)', boxShadow: 'var(--shadow-md)' }}
-          />
+          <div style={{ position: 'relative' }}>
+            {profile.photo_url ? (
+              <img
+                src={profile.photo_url}
+                alt={profile.username}
+                style={{
+                  width: 100,
+                  height: 100,
+                  borderRadius: '50%',
+                  objectFit: 'cover',
+                  border: '3px solid var(--accent-primary)',
+                  boxShadow: 'var(--shadow-md)',
+                  cursor: isOwnProfile ? 'pointer' : 'default',
+                }}
+                onClick={() => {
+                  if (isOwnProfile) setShowAvatarModal(true);
+                }}
+                title={isOwnProfile ? (language === 'es' ? 'Cambiar avatar de personaje' : 'Change character avatar') : undefined}
+              />
+            ) : (
+              <div
+                onClick={() => {
+                  if (isOwnProfile) setShowAvatarModal(true);
+                }}
+                style={{
+                  width: 100,
+                  height: 100,
+                  borderRadius: '50%',
+                  border: '3px solid var(--accent-primary)',
+                  boxShadow: 'var(--shadow-md)',
+                  background: 'linear-gradient(135deg, var(--accent-primary), #4f46e5)',
+                  color: 'white',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '2.2rem',
+                  fontWeight: 800,
+                  cursor: isOwnProfile ? 'pointer' : 'default',
+                }}
+                title={isOwnProfile ? (language === 'es' ? 'Elegir avatar de personaje' : 'Choose character avatar') : undefined}
+              >
+                {profile.username?.charAt(0).toUpperCase() || 'U'}
+              </div>
+            )}
+
+            {isOwnProfile && (
+              <button
+                onClick={() => setShowAvatarModal(true)}
+                style={{
+                  position: 'absolute',
+                  bottom: '2px',
+                  right: '2px',
+                  background: 'var(--accent-primary)',
+                  color: 'white',
+                  border: '2px solid var(--surface-color)',
+                  borderRadius: '50%',
+                  width: '28px',
+                  height: '28px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 6px rgba(0,0,0,0.4)',
+                }}
+                title={language === 'es' ? 'Elegir avatar de personaje (Pro)' : 'Choose character avatar (Pro)'}
+              >
+                <Sparkles size={14} />
+              </button>
+            )}
+          </div>
+
           <div style={{ flex: 1, minWidth: 250, textAlign: 'left' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.4rem', flexWrap: 'wrap' }}>
               <h1 style={{ margin: 0, fontSize: '2rem', fontWeight: 800 }}>{profile.username}</h1>
@@ -1807,7 +1878,20 @@ export const Profile: React.FC = () => {
         </div>
       )}
 
+      {/* Avatar Selector Modal */}
+      <AvatarSelectorModal
+        isOpen={showAvatarModal}
+        onClose={() => setShowAvatarModal(false)}
+        currentPhotoUrl={profile?.photo_url}
+        isPro={profile?.is_pro || currentUser?.is_pro}
+        onAvatarUpdated={(newUrl) => {
+          setProfile(prev => prev ? { ...prev, photo_url: newUrl || '' } : null);
+          setCurrentUser(prev => prev ? { ...prev, photo_url: newUrl || '' } : null);
+        }}
+      />
     </div>
   );
 };
 export default Profile;
+
+
