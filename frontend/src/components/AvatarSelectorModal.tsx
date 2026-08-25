@@ -334,7 +334,7 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
                 <span
                   style={{
                     marginTop: '0.45rem',
-                    fontSize: '0.78rem',
+                    fontSize: '0.8rem',
                     fontWeight: 600,
                     textAlign: 'center',
                     color: 'var(--text-primary)',
@@ -348,10 +348,10 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
                   {ch.name}
                 </span>
 
-                {ch.origin && (
+                {ch.origin && ch.origin.toLowerCase() !== ch.name.toLowerCase() && (
                   <span
                     style={{
-                      fontSize: '0.68rem',
+                      fontSize: '0.7rem',
                       color: 'var(--text-muted)',
                       textAlign: 'center',
                       overflow: 'hidden',
@@ -364,10 +364,36 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
                     {ch.origin}
                   </span>
                 )}
+
+                <span
+                  style={{
+                    marginTop: '0.2rem',
+                    fontSize: '0.65rem',
+                    padding: '0.1rem 0.35rem',
+                    borderRadius: '4px',
+                    background:
+                      ch.category === 'anime'
+                        ? 'rgba(139, 92, 246, 0.15)'
+                        : ch.category === 'comic'
+                        ? 'rgba(59, 130, 246, 0.15)'
+                        : 'rgba(16, 185, 129, 0.15)',
+                    color:
+                      ch.category === 'anime'
+                        ? '#a78bfa'
+                        : ch.category === 'comic'
+                        ? '#60a5fa'
+                        : '#34d399',
+                    fontWeight: 600,
+                    textTransform: 'capitalize',
+                  }}
+                >
+                  {ch.category === 'anime' ? 'Anime' : ch.category === 'comic' ? 'Cómic' : 'Juego'}
+                </span>
               </div>
             );
           })}
         </div>
+
 
         {/* Footer Actions */}
         <div

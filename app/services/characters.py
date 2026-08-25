@@ -1,17 +1,19 @@
 import json
 import urllib.request
 import urllib.parse
+import re
 import concurrent.futures
 from typing import List, Dict, Any
 from app.core.config import settings
 from app.services.igdb import IGDBService
 
 class CharacterSearchResult:
-    def __init__(self, name: str, image_url: str, category: str, origin: str = ""):
+    def __init__(self, name: str, image_url: str, category: str, origin: str = "", score: int = 0):
         self.name = name
         self.image_url = image_url
         self.category = category # 'anime', 'comic', 'game', 'movie'
         self.origin = origin
+        self.score = score
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -29,12 +31,13 @@ class CharacterService:
         url = "https://graphql.anilist.co"
         graphql_query = """
         query ($search: String) {
-          Page(page: 1, perPage: 10) {
+          Page(page: 1, perPage: 12) {
             characters(search: $search, sort: FAVOURITES_DESC) {
               id
               name {
                 full
                 native
+                alternative
               }
               image {
                 large
@@ -104,7 +107,8 @@ class CharacterService:
             return []
         
         encoded_query = urllib.parse.quote(query)
-        url = f"https://comicvine.gamespot.com/api/characters/?api_key={settings.COMIC_VINE_API_KEY}&format=json&filter=name:{encoded_query}&limit=10&field_list=id,name,real_name,image,publisher"
+        # Use the global search endpoint dedicated to characters for best matching
+        url = f"https://comicvine.gamespot.com/api/search/?api_key={settings.COMIC_VINE_API_KEY}&format=json&resources=character&query={encoded_query}&limit=12&field_list=id,name,real_name,image,publisher"
         
         req = urllib.request.Request(
             url,
@@ -118,13 +122,19 @@ class CharacterService:
                     data = json.loads(response.read().decode())
                     for ch in data.get("results", []):
                         name = ch.get("name") or "Unknown Character"
+                        real_name = ch.get("real_name")
+                        
+                        display_name = name
+                        if real_name and real_name.lower() != name.lower() and len(real_name) < 30:
+                            display_name = f"{name} ({real_name})"
+                            
                         img_obj = ch.get("image", {}) or {}
                         img_url = img_obj.get("medium_url") or img_obj.get("super_url") or img_obj.get("small_url")
                         publisher = (ch.get("publisher") or {}).get("name") or "Comic"
                         
                         if img_url and "default" not in img_url.lower():
                             results.append(CharacterSearchResult(
-                                name=name,
+                                name=display_name,
                                 image_url=img_url,
                                 category="comic",
                                 origin=publisher
@@ -143,7 +153,7 @@ class CharacterService:
             return []
         
         safe_query = query.replace('"', '\\"')
-        body = f'search "{safe_query}"; fields id, name, mug_shot.image_id, games.name; limit 10;'
+        body = f'search "{safe_query}"; fields id, name, mug_shot.image_id, games.name; limit 12;'
         
         req = urllib.request.Request(
             "https://api.igdb.com/v4/characters",
@@ -182,10 +192,43 @@ class CharacterService:
         return results
 
     @classmethod
+    def _calculate_relevance(cls, item: CharacterSearchResult, clean_query: str) -> int:
+        score = 0
+        name_lower = item.name.lower()
+        origin_lower = (item.origin or "").lower()
+        
+        # 1. Exact match on character name
+        if name_lower == clean_query:
+            score += 1000
+            
+        # 2. Words in name matching query
+        words = re.findall(r'\b[\w\'-]+\b', name_lower)
+        if clean_query in words:
+            score += 600
+        elif any(w.startswith(clean_query) for w in words):
+            score += 400
+        elif clean_query in name_lower:
+            score += 250
+
+        # 3. Origin / Franchise match
+        origin_words = re.findall(r'\b[\w\'-]+\b', origin_lower)
+        if clean_query in origin_words:
+            score += 100
+        elif clean_query in origin_lower:
+            score += 50
+            
+        # Bonus for having character category
+        if item.category == 'comic':
+            score += 20
+            
+        return score
+
+    @classmethod
     def search_all(cls, query: str) -> List[Dict[str, Any]]:
         if not query or len(query.strip()) < 2:
             return []
 
+        clean_query = query.strip().lower()
         all_results = []
         with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
             future_anilist = executor.submit(cls._search_anilist, query)
@@ -199,12 +242,24 @@ class CharacterService:
                 except Exception:
                     pass
 
+        # Compute relevance scores
+        for item in all_results:
+            item.score = cls._calculate_relevance(item, clean_query)
+
+        # Filter out items with score 0 if we have at least 3 relevant results
+        scored_items = [item for item in all_results if item.score > 0]
+        if len(scored_items) < 4:
+            scored_items = all_results
+
+        # Sort by relevance score descending
+        scored_items.sort(key=lambda x: x.score, reverse=True)
+
         # Deduplicate by image_url and return as dicts
         seen_images = set()
         deduped = []
-        for r in all_results:
+        for r in scored_items:
             if r.image_url and r.image_url not in seen_images:
                 seen_images.add(r.image_url)
                 deduped.append(r.to_dict())
 
-        return deduped
+        return deduped[:30]
