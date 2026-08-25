@@ -98,9 +98,10 @@ def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
 ):
-    # Authenticate by username or email
+    # Authenticate by username or email (case-insensitive)
+    clean_identifier = form_data.username.strip().lower()
     user = db.query(User).filter(
-        (User.username == form_data.username) | (User.email == form_data.username)
+        (func.lower(User.username) == clean_identifier) | (func.lower(User.email) == clean_identifier)
     ).first()
     
     if not user or not verify_password(form_data.password, user.hashed_password):
@@ -109,6 +110,7 @@ def login(
             detail="Incorrect username/email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
     
     # Generate Refresh Token
     rf_token = secrets.token_urlsafe(64)
