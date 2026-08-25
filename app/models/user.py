@@ -20,6 +20,7 @@ class User(Base):
     show_nsfw = Column(Boolean, default=False, nullable=False)
     is_pro = Column(Boolean, default=False, nullable=False)
     profile_color = Column(String(20), nullable=True)
+    custom_photo_url = Column(String(500), nullable=True)
 
     # Relationships
     lists = relationship("ReadingList", back_populates="creator", cascade="all, delete-orphan")
@@ -28,6 +29,13 @@ class User(Base):
 
     @property
     def photo_url(self) -> str:
+        if self.custom_photo_url:
+            return self.custom_photo_url
         import hashlib
         email_hash = hashlib.md5(self.email.strip().lower().encode("utf-8")).hexdigest()
         return f"https://www.gravatar.com/avatar/{email_hash}?d=identicon"
+
+    @photo_url.setter
+    def photo_url(self, value: str | None):
+        self.custom_photo_url = value
+

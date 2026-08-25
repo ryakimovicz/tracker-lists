@@ -86,12 +86,13 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
       setErrorMsg(
         err.response?.data?.detail ||
           (isEs
-            ? 'Error al actualizar avatar. Función exclusiva de Pathd Premium.'
-            : 'Failed to update avatar. Exclusive Pathd Premium feature.')
+            ? 'Error al actualizar avatar.'
+            : 'Failed to update avatar.')
       );
     } finally {
       setIsSaving(false);
     }
+
   };
 
   const handleResetToDefault = async () => {

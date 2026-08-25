@@ -8,9 +8,15 @@ from app.core.database import engine, Base
 from app.core.limiter import limiter
 from app.api.v1 import api_router
 
-# Create tables automatically for development.
-# In production, migrations with Alembic are preferred.
+from sqlalchemy import text
 Base.metadata.create_all(bind=engine)
+with engine.connect() as conn:
+    try:
+        conn.execute(text("ALTER TABLE users ADD COLUMN custom_photo_url VARCHAR(500);"))
+        conn.commit()
+    except Exception:
+        pass
+
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
