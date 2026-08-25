@@ -15,6 +15,8 @@ class AnilistService:
           Page(page: 1, perPage: 20) {
             media(search: $search, type: MANGA, sort: POPULARITY_DESC) {
               id
+              isAdult
+              genres
               title {
                 romaji
                 english
@@ -74,6 +76,7 @@ class AnilistService:
                         desc = item.get("description") or ""
                         import re
                         desc = re.sub('<[^<]+?>', '', desc)
+                        is_adult = bool(item.get("isAdult") or "Hentai" in item.get("genres", []))
                         results.append(
                             SearchResultItem(
                                 external_id=str(item.get("id")),
@@ -82,10 +85,12 @@ class AnilistService:
                                 description=desc,
                                 item_type="manga",
                                 release_date=release_date,
-                                popularity=float(item.get("averageScore") or 0)
+                                popularity=float(item.get("averageScore") or 0),
+                                is_nsfw=is_adult
                             )
                         )
                     return results
+
         except Exception as e:
             print(f"AniList API Search Error: {e}")
             return [

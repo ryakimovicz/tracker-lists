@@ -59,7 +59,7 @@ class IGDBService:
 
         # IGDB Apicalypse query
         safe_query = query.replace('"', '\\"')
-        body = f'search "{safe_query}"; fields id, name, cover.image_id, first_release_date, summary, total_rating; limit 15;'
+        body = f'search "{safe_query}"; fields id, name, cover.image_id, first_release_date, summary, total_rating, themes, age_ratings.rating; limit 15;'
         
         req = urllib.request.Request(
             "https://api.igdb.com/v4/games",
@@ -104,6 +104,10 @@ class IGDBService:
                         if item.get("summary"):
                             desc += f" {item['summary'][:150]}..."
 
+                        themes = item.get("themes") or []
+                        age_ratings = [ar.get("rating") for ar in item.get("age_ratings", []) if isinstance(ar, dict)]
+                        is_mature_game = 42 in themes or 5 in age_ratings or 12 in age_ratings
+
                         results.append(
                             SearchResultItem(
                                 external_id=str(item.get("id")),
@@ -112,10 +116,12 @@ class IGDBService:
                                 description=desc,
                                 item_type="game",
                                 release_date=release_date,
-                                popularity=pop_val
+                                popularity=pop_val,
+                                is_nsfw=is_mature_game
                             )
                         )
                     return results
+
         except Exception as e:
             print(f"IGDB API Error: {e}")
             return []

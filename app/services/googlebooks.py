@@ -54,8 +54,10 @@ class GoogleBooksService:
                             img_url = img_url.replace("http://", "https://")
                             
                         ext_id = f"googlebook-{item.get('id')}"
-                        
                         item_type = "book"
+                        is_mature = (v_info.get("maturityRating") == "MATURE")
+
+
 
                         search_item = SearchResultItem(
                             external_id=ext_id,
@@ -64,10 +66,12 @@ class GoogleBooksService:
                             description=desc,
                             item_type=item_type,
                             release_date=pub_date,
-                            page_count=v_info.get("pageCount")
+                            page_count=v_info.get("pageCount"),
+                            is_nsfw=is_mature
                         )
                         results.append((search_item, isbns))
                     return results
+
         except Exception as e:
             print(f"Google Books API Error: {e}")
         return []
