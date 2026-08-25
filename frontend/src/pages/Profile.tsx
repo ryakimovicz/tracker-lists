@@ -328,7 +328,7 @@ export const Profile: React.FC = () => {
     try {
       await apiClient.put('/users/me', { is_pro: false });
       setProfile(prev => prev ? { ...prev, is_pro: false } : null);
-      setSuccessMsg(language === 'es' ? 'Plan Pro removido.' : 'Pro plan removed.');
+      setSuccessMsg(language === 'es' ? 'Plan Premium removido.' : 'Premium plan removed.');
       setTimeout(() => setSuccessMsg(''), 3000);
     } catch (err) {
       setErrorMsg('Error updating status');
@@ -378,20 +378,21 @@ export const Profile: React.FC = () => {
         if (!isPro) {
           setErrorMsg(
             language === 'es'
-              ? `Los usuarios gratuitos pueden destacar 1 elemento por categoría. ¡Hazte Pro para destacar hasta 10!`
-              : `Free users can feature 1 item per category. Upgrade to Pathd Pro to feature up to 10!`
+              ? `Los usuarios gratuitos pueden destacar 1 elemento por categoría. ¡Hazte Premium para destacar hasta 10!`
+              : `Free users can feature 1 item per category. Upgrade to Pathd Premium to feature up to 10!`
           );
         } else {
           setErrorMsg(
             language === 'es'
               ? `Has alcanzado el límite máximo de 10 destacados para esta categoría.`
-              : `Pro limit reached: Maximum 10 featured items allowed for this category.`
+              : `Premium limit reached: Maximum 10 featured items allowed for this category.`
           );
         }
         setTimeout(() => setErrorMsg(''), 5000);
         return;
       }
     }
+
     
     try {
       await apiClient.put(`/library/${itemId}`, { is_favorite: !currentFav });
@@ -653,7 +654,7 @@ export const Profile: React.FC = () => {
                   cursor: 'pointer',
                   boxShadow: '0 2px 6px rgba(0,0,0,0.4)',
                 }}
-                title={language === 'es' ? 'Elegir avatar de personaje (Pro)' : 'Choose character avatar (Pro)'}
+                title={language === 'es' ? 'Elegir avatar de personaje (Premium)' : 'Choose character avatar (Premium)'}
               >
                 <Sparkles size={14} />
               </button>
@@ -667,11 +668,12 @@ export const Profile: React.FC = () => {
                   <span 
                     onClick={isOwnProfile ? handleRemovePro : undefined}
                     style={{ fontSize: '0.75rem', background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.2rem', cursor: isOwnProfile ? 'pointer' : 'default' }} 
-                    title={isOwnProfile ? (language === 'es' ? 'Quitar plan Pro' : 'Remove Pro plan') : 'Pathd Pro'}
+                    title={isOwnProfile ? (language === 'es' ? 'Quitar plan Premium' : 'Remove Premium plan') : 'Pathd Premium'}
                   >
-                    <Star size={12} fill="#f59e0b" /> PRO
+                    <Star size={12} fill="#f59e0b" /> PREMIUM
                   </span>
                 )}
+
               {profile.is_admin && (
                 <span style={{ fontSize: '0.75rem', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: 600 }}>
                   ADMIN
@@ -1332,10 +1334,11 @@ export const Profile: React.FC = () => {
               <h3 style={{ margin: 0 }}>{language === 'es' ? 'Mis Obras Destacadas' : 'My Featured Favorites'}</h3>
               <p style={{ margin: '0.25rem 0 0', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                 {profile?.is_pro
-                  ? (language === 'es' ? '⭐ Plan Pro: Puedes destacar hasta 10 elementos por categoría.' : '⭐ Pro Plan: You can feature up to 10 items per category.')
-                  : (language === 'es' ? 'Plan Gratuito: 1 elemento destacado por categoría. Pasa a Pro para destacar hasta 10.' : 'Free Plan: 1 featured item per category. Upgrade to Pro to feature up to 10.')
+                  ? (language === 'es' ? '⭐ Plan Premium: Puedes destacar hasta 10 elementos por categoría.' : '⭐ Premium Plan: You can feature up to 10 items per category.')
+                  : (language === 'es' ? 'Plan Gratuito: 1 elemento destacado por categoría. Pasa a Premium para destacar hasta 10.' : 'Free Plan: 1 featured item per category. Upgrade to Premium to feature up to 10.')
                 }
               </p>
+
 
             </div>
             <span style={{
@@ -1825,8 +1828,9 @@ export const Profile: React.FC = () => {
                                   </span>
                                   {u.is_pro && (
                                     <span style={{ fontSize: '0.65rem', background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b', padding: '0.1rem 0.3rem', borderRadius: '3px', fontWeight: 700 }}>
-                                      PRO
+                                      PREMIUM
                                     </span>
+
                                   )}
                                 </div>
                                 <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>

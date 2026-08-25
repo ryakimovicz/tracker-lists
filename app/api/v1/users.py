@@ -365,8 +365,9 @@ def update_avatar(
     if not getattr(current_user, 'is_pro', False):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Custom character avatars are an exclusive Pathd Pro feature. Upgrade to Pro to customize your avatar!"
+            detail="Custom character avatars are an exclusive Pathd Premium feature. Upgrade to Premium to customize your avatar!"
         )
+
         
     current_user.photo_url = req.photo_url
     db.commit()

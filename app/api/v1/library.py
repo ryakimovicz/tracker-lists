@@ -446,13 +446,14 @@ def update_library_item(
                 if not getattr(current_user, 'is_pro', False):
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"Free users can feature 1 {category_name} on their profile. Upgrade to Pathd Pro to feature up to 10!"
+                        detail=f"Free users can feature 1 {category_name} on their profile. Upgrade to Pathd Premium to feature up to 10!"
                     )
                 else:
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"Pro limit reached: Maximum 10 featured items allowed for {category_name}."
+                        detail=f"Premium limit reached: Maximum 10 featured items allowed for {category_name}."
                     )
+
                     
         lib_item.is_favorite = item_in.is_favorite
         lib_item.updated_at = datetime.now(timezone.utc)

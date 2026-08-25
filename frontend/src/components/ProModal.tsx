@@ -101,8 +101,9 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent'
           }}>
-            Pathd Pro
+            Pathd Premium
           </h2>
+
           <p style={{ color: 'var(--text-secondary)', fontSize: '1rem', margin: '0.5rem 0 0 0' }}>
             {isEs ? 'Desbloquea el verdadero poder de Pathd.' : 'Unlock the true power of Pathd.'}
           </p>
@@ -202,12 +203,12 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
               onClick={() => handleTogglePro(true)}
               disabled={loading}
             >
-              {loading ? '...' : (isEs ? 'Activar Pathd Pro (Demo)' : 'Activate Pathd Pro (Demo)')}
+              {loading ? '...' : (isEs ? 'Activar Pathd Premium (Demo)' : 'Activate Pathd Premium (Demo)')}
             </button>
           ) : (
             <div style={{ textAlign: 'center' }}>
               <p style={{ color: '#10b981', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
-                <Check size={18} /> {isEs ? '¡Ya eres usuario Pro!' : 'You are a Pro user!'}
+                <Check size={18} /> {isEs ? '¡Ya eres usuario Premium!' : 'You are a Premium user!'}
               </p>
               <button 
                 className="btn-secondary" 
@@ -217,6 +218,7 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
               >
                 {loading ? '...' : (isEs ? 'Revertir a Gratuito (Dev)' : 'Revert to Free (Dev)')}
               </button>
+
             </div>
           )}
         </div>

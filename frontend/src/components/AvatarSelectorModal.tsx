@@ -86,8 +86,8 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
       setErrorMsg(
         err.response?.data?.detail ||
           (isEs
-            ? 'Error al actualizar avatar. Función exclusiva de Pathd Pro.'
-            : 'Failed to update avatar. Exclusive Pathd Pro feature.')
+            ? 'Error al actualizar avatar. Función exclusiva de Pathd Premium.'
+            : 'Failed to update avatar. Exclusive Pathd Premium feature.')
       );
     } finally {
       setIsSaving(false);
@@ -165,14 +165,15 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
               <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                 {isPro
                   ? isEs
-                    ? '⭐ Exclusivo de Pathd Pro'
-                    : '⭐ Exclusive to Pathd Pro'
+                    ? '⭐ Exclusivo de Pathd Premium'
+                    : '⭐ Exclusive to Pathd Premium'
                   : isEs
-                  ? '🔒 Requiere suscripción Pathd Pro'
-                  : '🔒 Requires Pathd Pro subscription'}
+                  ? '🔒 Requiere suscripción Pathd Premium'
+                  : '🔒 Requires Pathd Premium subscription'}
               </span>
             </div>
           </div>
+
           <button
             onClick={onClose}
             style={{
