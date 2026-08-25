@@ -21,7 +21,9 @@ export const Register: React.FC = () => {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const [errorMsg, setErrorMsg] = useState('');
   const [isSuccess, setIsSuccess] = useState(false);
@@ -90,11 +92,9 @@ export const Register: React.FC = () => {
     }
   };
 
-
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!username || !email || !password) return;
+    if (!username || !email || !password || !confirmPassword) return;
 
     if (username.length < 3) {
       setErrorMsg(t('errUsernameLength'));
@@ -104,9 +104,14 @@ export const Register: React.FC = () => {
       setErrorMsg(t('errPasswordLength'));
       return;
     }
+    if (password !== confirmPassword) {
+      setErrorMsg(t('errPasswordsNotMatch'));
+      return;
+    }
 
     setIsSubmitting(true);
     setErrorMsg('');
+
 
     try {
       await apiClient.post('/auth/register', {
@@ -221,6 +226,44 @@ export const Register: React.FC = () => {
               </button>
             </div>
           </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+            <label style={{ fontSize: '0.9rem', fontWeight: 500 }}>{t('authConfirmPassword') || (language === 'es' ? 'Confirmar Contraseña' : 'Confirm Password')}</label>
+            <div style={{ position: 'relative' }}>
+              <input
+                type={showConfirmPassword ? 'text' : 'password'}
+                required
+                className="input-field"
+                placeholder={language === 'es' ? 'repite tu contraseña' : 'confirm your password'}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                style={{ paddingLeft: '2.5rem', paddingRight: '2.5rem' }}
+              />
+              <Lock size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)' }} />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                style={{
+                  position: 'absolute',
+                  right: '0.75rem',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '0.25rem',
+                }}
+                title={showConfirmPassword ? 'Hide password' : 'Show password'}
+              >
+                {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+          </div>
+
 
 
           <button type="submit" disabled={isSubmitting} className="btn-primary" style={{ width: '100%', marginTop: '0.5rem' }}>
