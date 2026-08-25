@@ -1262,9 +1262,10 @@ export const Profile: React.FC = () => {
               <p style={{ margin: '0.25rem 0 0', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                 {profile?.is_pro
                   ? (language === 'es' ? '⭐ Plan Pro: Puedes destacar hasta 10 elementos por categoría.' : '⭐ Pro Plan: You can feature up to 10 items per category.')
-                  : (language === 'es' ? 'Plan Gratuito: 1 elemento destacado por categoría (Máx. 7). Pasa a Pro para destacar hasta 10.' : 'Free Plan: 1 featured item per category (Max. 7). Upgrade to Pro to feature up to 10.')
+                  : (language === 'es' ? 'Plan Gratuito: 1 elemento destacado por categoría. Pasa a Pro para destacar hasta 10.' : 'Free Plan: 1 featured item per category. Upgrade to Pro to feature up to 10.')
                 }
               </p>
+
             </div>
             <span style={{
               fontSize: '0.8rem',
