@@ -23,6 +23,8 @@ const translations: Translations = {
   navExplore: { en: 'Explore', es: 'Explorar' },
   navProfile: { en: 'Profile', es: 'Perfil' },
   navSettings: { en: 'Settings', es: 'Ajustes' },
+  navUpgradePro: { en: 'Upgrade Pro', es: 'Pasar a Pro' },
+
 
 
   // Landing Page

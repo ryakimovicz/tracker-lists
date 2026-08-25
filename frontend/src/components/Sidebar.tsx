@@ -140,22 +140,47 @@ export const Sidebar: React.FC = () => {
                   border: 'none',
                   color: '#fff',
                   width: '100%',
-                  margin: '0.5rem 0'
+                  margin: '0.5rem 0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.4rem',
+                  fontWeight: 600
                 }}
               >
-                <Star size={16} fill="#fff" /> Upgrade Pro
+                <Star size={16} fill="#fff" /> {t('navUpgradePro') || (language === 'es' ? 'Pasar a Pro' : 'Upgrade Pro')}
               </button>
             )}
 
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.5rem 1rem' }}>
-               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                 {user && <img src={user.photo_url} alt="" style={{ width: 32, height: 32, borderRadius: '50%' }} />}
-                 <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>{user?.username}</span>
+               <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                 {user?.photo_url ? (
+                   <img src={user.photo_url} alt="" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover' }} />
+                 ) : (
+                   <div style={{
+                     width: 32,
+                     height: 32,
+                     borderRadius: '50%',
+                     background: 'linear-gradient(135deg, var(--accent-primary), #4f46e5)',
+                     color: 'white',
+                     display: 'flex',
+                     alignItems: 'center',
+                     justifyContent: 'center',
+                     fontSize: '0.85rem',
+                     fontWeight: 700
+                   }}>
+                     {user?.username?.charAt(0).toUpperCase() || 'U'}
+                   </div>
+                 )}
+                 <span style={{ fontWeight: 600, fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '110px' }}>
+                   {user?.username}
+                 </span>
                </div>
-               <button onClick={handleLogout} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
+               <button onClick={handleLogout} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }} title={language === 'es' ? 'Cerrar sesión' : 'Log out'}>
                  <LogOut size={18} />
                </button>
             </div>
+
           </>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0 1rem' }}>

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
+import ReactDOM from 'react-dom';
 import { useTranslation } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
-import { Star, Check, X, Palette, Lock, Crown } from 'lucide-react';
+import { Star, Check, X, Palette, Lock, Crown, Sparkles } from 'lucide-react';
 import { apiClient } from '../api/client';
 
 interface ProModalProps {
@@ -28,28 +29,82 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
     }
   };
 
-  return (
-    <div style={{
-      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-      background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 5000,
-      padding: '1rem'
-    }} onClick={onClose}>
-      <div className="glass-card" style={{ width: '100%', maxWidth: '500px', padding: '2.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem', position: 'relative' }} onClick={e => e.stopPropagation()}>
-        
+  const isEs = language === 'es';
+
+  const modalContent = (
+    <div 
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: 'rgba(0,0,0,0.85)',
+        backdropFilter: 'blur(8px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 99999,
+        padding: '1rem'
+      }} 
+      onClick={onClose}
+    >
+      <div 
+        className="glass-card" 
+        style={{
+          width: '100%',
+          maxWidth: '520px',
+          maxHeight: '90vh',
+          overflowY: 'auto',
+          padding: '2.5rem',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '1.5rem',
+          position: 'relative',
+          borderRadius: '20px',
+          boxShadow: '0 25px 50px rgba(0,0,0,0.6)'
+        }} 
+        onClick={e => e.stopPropagation()}
+      >
         <button 
           onClick={onClose}
-          style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}
+          style={{
+            position: 'absolute',
+            top: '1.25rem',
+            right: '1.25rem',
+            background: 'transparent',
+            border: 'none',
+            color: 'var(--text-secondary)',
+            cursor: 'pointer',
+            padding: '0.25rem'
+          }}
+          title={isEs ? 'Cerrar' : 'Close'}
         >
-          <X size={24} />
+          <X size={22} />
         </button>
 
-        <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
-          <Crown size={48} color="#f59e0b" style={{ marginBottom: '1rem' }} />
-          <h2 style={{ margin: 0, fontSize: '2rem', fontWeight: 800, background: 'linear-gradient(135deg, #f59e0b, #fbbf24)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+        <div style={{ textAlign: 'center', marginBottom: '0.5rem' }}>
+          <div style={{
+            display: 'inline-flex',
+            padding: '1rem',
+            borderRadius: '50%',
+            background: 'rgba(245, 158, 11, 0.15)',
+            marginBottom: '0.75rem'
+          }}>
+            <Crown size={40} color="#f59e0b" />
+          </div>
+          <h2 style={{
+            margin: 0,
+            fontSize: '2rem',
+            fontWeight: 800,
+            background: 'linear-gradient(135deg, #f59e0b, #fbbf24)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent'
+          }}>
             Pathd Pro
           </h2>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '1.05rem', margin: '0.5rem 0 0 0' }}>
-            {language === 'es' ? 'Desbloquea el verdadero poder de Pathd.' : 'Unlock the true power of Pathd.'}
+          <p style={{ color: 'var(--text-secondary)', fontSize: '1rem', margin: '0.5rem 0 0 0' }}>
+            {isEs ? 'Desbloquea el verdadero poder de Pathd.' : 'Unlock the true power of Pathd.'}
           </p>
         </div>
 
@@ -59,60 +114,108 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
           </div>
         )}
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          {/* Benefit 1: Avatars */}
           <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
-            <Palette color="#f59e0b" size={20} style={{ marginTop: '0.1rem' }} />
+            <div style={{ background: 'rgba(245, 158, 11, 0.15)', padding: '0.5rem', borderRadius: '8px', color: '#f59e0b', flexShrink: 0 }}>
+              <Sparkles size={20} />
+            </div>
             <div>
-              <h4 style={{ margin: '0 0 0.25rem 0' }}>{language === 'es' ? 'Personalización Extrema' : 'Extreme Customization'}</h4>
-              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                {language === 'es' ? 'Elige tu propio color principal (Accent Color) que se reflejará en todo tu perfil y guías para todos los visitantes.' : 'Choose your own accent color that will reflect across your profile and guides for all visitors.'}
+              <h4 style={{ margin: '0 0 0.25rem 0', fontSize: '1rem' }}>
+                {isEs ? 'Avatares de Personajes' : 'Character Avatars'}
+              </h4>
+              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                {isEs
+                  ? 'Busca y usa a tus personajes favoritos de Anime, Cómics y Videojuegos como tu foto de perfil oficial.'
+                  : 'Search and set your favorite characters from Anime, Comics, and Games as your official avatar.'}
               </p>
             </div>
           </div>
-          
+
+          {/* Benefit 2: 10 Favorites per category */}
           <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
-            <Star color="#f59e0b" size={20} style={{ marginTop: '0.1rem' }} />
+            <div style={{ background: 'rgba(245, 158, 11, 0.15)', padding: '0.5rem', borderRadius: '8px', color: '#f59e0b', flexShrink: 0 }}>
+              <Star size={20} />
+            </div>
             <div>
-              <h4 style={{ margin: '0 0 0.25rem 0' }}>{language === 'es' ? 'Destacados Ilimitados' : 'Unlimited Favorites'}</h4>
-              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                {language === 'es' ? 'Rompe el límite de 4 destacados en tu perfil. Muestra todas tus obras favoritas sin restricciones.' : 'Break the 4-favorites limit on your profile. Show off all your favorite works without restrictions.'}
+              <h4 style={{ margin: '0 0 0.25rem 0', fontSize: '1rem' }}>
+                {isEs ? 'Hasta 10 Destacados por Categoría' : 'Up to 10 Favorites per Category'}
+              </h4>
+              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                {isEs
+                  ? 'Arma tu Top 10 en Películas, Series, Anime, Libros, Cómics, Manga y Juegos (hasta 70 obras en total).'
+                  : 'Build your ultimate Top 10 in Movies, Shows, Anime, Books, Comics, Manga, and Games (up to 70 total).'}
               </p>
             </div>
           </div>
-          
+
+          {/* Benefit 3: Custom Accent Color */}
           <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
-            <Lock color="#f59e0b" size={20} style={{ marginTop: '0.1rem' }} />
+            <div style={{ background: 'rgba(245, 158, 11, 0.15)', padding: '0.5rem', borderRadius: '8px', color: '#f59e0b', flexShrink: 0 }}>
+              <Palette size={20} />
+            </div>
             <div>
-              <h4 style={{ margin: '0 0 0.25rem 0' }}>{language === 'es' ? 'Guías Privadas' : 'Private Guides'}</h4>
-              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                {language === 'es' ? 'Crea guías secretas solo para ti o guías "No Listadas" para compartir solo con quien tú quieras.' : 'Create secret guides just for you, or "Unlisted" guides to share only with whoever you want.'}
+              <h4 style={{ margin: '0 0 0.25rem 0', fontSize: '1rem' }}>
+                {isEs ? 'Personalización de Color de Perfil' : 'Custom Profile Accent Color'}
+              </h4>
+              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                {isEs
+                  ? 'Elige tu propio color distintivo que se aplicará en todo tu perfil y guías públicas.'
+                  : 'Choose a distinctive accent color that reflects across your profile and public guides.'}
+              </p>
+            </div>
+          </div>
+
+          {/* Benefit 4: Private Guides */}
+          <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
+            <div style={{ background: 'rgba(245, 158, 11, 0.15)', padding: '0.5rem', borderRadius: '8px', color: '#f59e0b', flexShrink: 0 }}>
+              <Lock size={20} />
+            </div>
+            <div>
+              <h4 style={{ margin: '0 0 0.25rem 0', fontSize: '1rem' }}>
+                {isEs ? 'Guías Privadas y No Listadas' : 'Private & Unlisted Guides'}
+              </h4>
+              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                {isEs
+                  ? 'Crea listas secretas solo para ti o enlaces no listados para compartir con quien elijas.'
+                  : 'Create secret lists for yourself, or unlisted links to share with selected friends.'}
               </p>
             </div>
           </div>
         </div>
 
-        <div style={{ marginTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+        <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
           {!user?.is_pro ? (
             <button 
               className="btn-primary" 
-              style={{ width: '100%', padding: '1rem', fontSize: '1.1rem', fontWeight: 600, background: 'linear-gradient(135deg, #f59e0b, #d97706)', border: 'none', color: '#fff' }}
+              style={{
+                width: '100%',
+                padding: '0.9rem',
+                fontSize: '1.05rem',
+                fontWeight: 700,
+                background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                border: 'none',
+                color: '#fff',
+                borderRadius: '10px',
+                boxShadow: '0 4px 15px rgba(245, 158, 11, 0.4)'
+              }}
               onClick={() => handleTogglePro(true)}
               disabled={loading}
             >
-              {loading ? '...' : (language === 'es' ? 'Suscribirse (Demo)' : 'Subscribe (Demo)')}
+              {loading ? '...' : (isEs ? 'Activar Pathd Pro (Demo)' : 'Activate Pathd Pro (Demo)')}
             </button>
           ) : (
             <div style={{ textAlign: 'center' }}>
-              <p style={{ color: '#10b981', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
-                <Check size={18} /> {language === 'es' ? '¡Ya eres usuario Pro!' : 'You are a Pro user!'}
+              <p style={{ color: '#10b981', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                <Check size={18} /> {isEs ? '¡Ya eres usuario Pro!' : 'You are a Pro user!'}
               </p>
               <button 
                 className="btn-secondary" 
-                style={{ width: '100%', padding: '0.75rem', fontSize: '0.9rem' }}
+                style={{ width: '100%', padding: '0.65rem', fontSize: '0.85rem' }}
                 onClick={() => handleTogglePro(false)}
                 disabled={loading}
               >
-                {loading ? '...' : (language === 'es' ? 'Revertir a Gratuito (Dev)' : 'Revert to Free (Dev)')}
+                {loading ? '...' : (isEs ? 'Revertir a Gratuito (Dev)' : 'Revert to Free (Dev)')}
               </button>
             </div>
           )}
@@ -120,4 +223,7 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
       </div>
     </div>
   );
+
+  return ReactDOM.createPortal(modalContent, document.body);
 };
+export default ProModal;
