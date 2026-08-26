@@ -12,7 +12,9 @@ interface UserProfile {
   show_nsfw: boolean;
   is_pro?: boolean;
   profile_color?: string;
+  lastfm_username?: string;
 }
+
 
 
 

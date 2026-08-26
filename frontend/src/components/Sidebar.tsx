@@ -4,7 +4,8 @@ import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
 import type { Theme } from '../context/ThemeContext';
-import { LogOut, Settings, Shield, Globe, Sun, Moon, Monitor, Home, Users, PlusCircle, Compass, User, Star } from 'lucide-react';
+import { LogOut, Shield, Globe, Sun, Moon, Monitor, Home, Users, PlusCircle, Compass, User, Star } from 'lucide-react';
+
 import { ProModal } from './ProModal';
 
 export const Sidebar: React.FC = () => {
@@ -94,31 +95,11 @@ export const Sidebar: React.FC = () => {
       </div>
 
       {/* Bottom Area */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: 'auto', paddingTop: '2rem', borderTop: '1px solid var(--border-color)' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: 'auto', paddingTop: '1.5rem', borderTop: '1px solid var(--border-color)' }}>
         
-        {/* Settings link */}
-        <Link
-          to={isAuthenticated ? "/settings" : "/login"}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '1rem',
-            padding: '0.75rem 1rem',
-            color: location.pathname === '/settings' ? 'var(--accent-primary)' : 'var(--text-secondary)',
-            background: location.pathname === '/settings' ? 'var(--border-glow)' : 'transparent',
-            borderRadius: '8px',
-            textDecoration: 'none',
-            fontWeight: location.pathname === '/settings' ? 600 : 500,
-            transition: 'all 0.2s',
-          }}
-        >
-          <Settings size={20} />
-          <span style={{ fontSize: '1.05rem' }}>{t('navSettings') || (language === 'es' ? 'Ajustes' : 'Settings')}</span>
-        </Link>
-
-
         {/* Toggles */}
-        <div style={{ display: 'flex', gap: '0.5rem', padding: '0 1rem' }}>
+        <div style={{ display: 'flex', gap: '0.5rem', padding: '0 0.5rem' }}>
+
           <button onClick={toggleLanguage} className="btn-secondary" style={{ padding: '0.4rem 0.6rem', flex: 1 }}>
             <Globe size={16} /> {language.toUpperCase()}
           </button>

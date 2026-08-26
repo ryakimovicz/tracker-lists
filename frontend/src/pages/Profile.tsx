@@ -665,96 +665,36 @@ export const Profile: React.FC = () => {
             </>
           )}
 
-          {/* Header Action Buttons (Change Background & Change Banner) */}
+          {/* Header Settings Button */}
           {isOwnProfile && (
-            <div
+            <button
+              onClick={() => navigate('/settings')}
+              className="btn-secondary"
               style={{
                 position: 'absolute',
-                top: '1rem',
-                right: '1rem',
-                display: 'flex',
-                gap: '0.5rem',
+                top: '1.25rem',
+                right: '1.25rem',
+                padding: '0.55rem',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: '50%',
+                background: 'rgba(0, 0, 0, 0.65)',
+                backdropFilter: 'blur(8px)',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                color: 'white',
+                cursor: 'pointer',
                 zIndex: 3,
+                boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                transition: 'all 0.2s ease',
               }}
+              title={language === 'es' ? 'Ajustes de Perfil y Cuenta' : 'Profile & Account Settings'}
             >
-              <button
-                onClick={() => {
-                  if (profile.is_pro || currentUser?.is_pro) {
-                    setShowBackgroundModal(true);
-                  } else {
-                    setShowProModal(true);
-                  }
-                }}
-                className="btn-secondary"
-                style={{
-                  padding: '0.35rem 0.75rem',
-                  fontSize: '0.78rem',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.4rem',
-                  borderRadius: '8px',
-                  background: 'rgba(0, 0, 0, 0.65)',
-                  backdropFilter: 'blur(8px)',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
-                  color: 'white',
-                  cursor: 'pointer',
-                }}
-                title={
-                  profile.is_pro || currentUser?.is_pro
-                    ? (language === 'es' ? 'Cambiar fondo de pantalla del perfil' : 'Change profile background wallpaper')
-                    : (language === 'es' ? 'Desbloquear fondo de perfil con Premium' : 'Unlock profile background with Premium')
-                }
-              >
-                <Monitor size={14} color="#10b981" />
-                <span>
-                  {profile.background_url 
-                    ? (language === 'es' ? 'Cambiar Fondo' : 'Change Background') 
-                    : (language === 'es' ? 'Añadir Fondo' : 'Add Background')}
-                </span>
-              </button>
-
-              <button
-                onClick={() => {
-                  if (profile.is_pro || currentUser?.is_pro) {
-                    setShowBannerModal(true);
-                  } else {
-                    setShowProModal(true);
-                  }
-                }}
-                className="btn-secondary"
-                style={{
-                  padding: '0.35rem 0.75rem',
-                  fontSize: '0.78rem',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.4rem',
-                  borderRadius: '8px',
-                  background: 'rgba(0, 0, 0, 0.65)',
-                  backdropFilter: 'blur(8px)',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
-                  color: 'white',
-                  cursor: 'pointer',
-                }}
-                title={
-                  profile.is_pro || currentUser?.is_pro
-                    ? (language === 'es' ? 'Cambiar portada de perfil' : 'Change profile banner')
-                    : (language === 'es' ? 'Desbloquear portada de perfil con Premium' : 'Unlock profile banner with Premium')
-                }
-              >
-                <ImageIcon size={14} color="#f59e0b" />
-                <span>
-                  {profile.banner_url 
-                    ? (language === 'es' ? 'Cambiar Portada' : 'Change Banner') 
-                    : (language === 'es' ? 'Añadir Portada' : 'Add Banner')}
-                </span>
-              </button>
-            </div>
+              <Settings size={20} />
+            </button>
           )}
 
-
           <div style={{ position: 'relative', zIndex: 2 }}>
-
-
             {profile.photo_url ? (
               <img
                 src={profile.photo_url}
@@ -766,26 +706,10 @@ export const Profile: React.FC = () => {
                   objectFit: 'cover',
                   border: '3px solid var(--accent-primary)',
                   boxShadow: 'var(--shadow-md)',
-                  cursor: isOwnProfile ? 'pointer' : 'default',
                 }}
-                onClick={() => {
-                  if (isOwnProfile) {
-                    setShowAvatarModal(true);
-                  }
-                }}
-                title={
-                  isOwnProfile
-                    ? (language === 'es' ? 'Cambiar foto de perfil' : 'Change profile picture')
-                    : undefined
-                }
               />
             ) : (
               <div
-                onClick={() => {
-                  if (isOwnProfile) {
-                    setShowAvatarModal(true);
-                  }
-                }}
                 style={{
                   width: 100,
                   height: 100,
@@ -799,66 +723,64 @@ export const Profile: React.FC = () => {
                   justifyContent: 'center',
                   fontSize: '2.2rem',
                   fontWeight: 800,
-                  cursor: isOwnProfile ? 'pointer' : 'default',
                 }}
-                title={
-                  isOwnProfile
-                    ? (language === 'es' ? 'Elegir avatar de personaje' : 'Choose character avatar')
-                    : undefined
-                }
               >
                 {profile.username?.charAt(0).toUpperCase() || 'U'}
               </div>
             )}
-
-            {/* Edit avatar button visible for all profile owners */}
-            {isOwnProfile && (
-              <button
-                onClick={() => setShowAvatarModal(true)}
-                style={{
-                  position: 'absolute',
-                  bottom: '2px',
-                  right: '2px',
-                  background: 'var(--accent-primary)',
-                  color: 'white',
-                  border: '2px solid var(--surface-color)',
-                  borderRadius: '50%',
-                  width: '28px',
-                  height: '28px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  boxShadow: '0 2px 6px rgba(0,0,0,0.4)',
-                }}
-                title={language === 'es' ? 'Elegir avatar de personaje' : 'Choose character avatar'}
-              >
-                <Pencil size={14} />
-              </button>
-
-            )}
-
           </div>
 
-
           <div style={{ position: 'relative', zIndex: 2, flex: 1, minWidth: 250, textAlign: 'left' }}>
-
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.4rem', flexWrap: 'wrap' }}>
               <h1 style={{ margin: 0, fontSize: '2rem', fontWeight: 800 }}>{profile.username}</h1>
               {profile.is_pro && (
-                  <span 
-                    onClick={isOwnProfile ? handleRemovePro : undefined}
-                    style={{ fontSize: '0.75rem', background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.2rem', cursor: isOwnProfile ? 'pointer' : 'default' }} 
-                    title={isOwnProfile ? (language === 'es' ? 'Quitar plan Premium' : 'Remove Premium plan') : 'Pathd Premium'}
-                  >
-                    <Star size={12} fill="#f59e0b" /> PREMIUM
-                  </span>
-                )}
-
+                <span 
+                  onClick={isOwnProfile ? handleRemovePro : undefined}
+                  style={{ 
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.3rem',
+                    background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                    color: 'white',
+                    padding: '0.2rem 0.6rem',
+                    borderRadius: '12px',
+                    fontSize: '0.8rem',
+                    fontWeight: 700,
+                    cursor: isOwnProfile ? 'pointer' : 'default',
+                    boxShadow: '0 2px 8px rgba(245, 158, 11, 0.4)'
+                  }}
+                  title={isOwnProfile ? (language === 'es' ? 'Haz clic para remover Plan Premium' : 'Click to remove Premium plan') : undefined}
+                >
+                  <Star size={12} fill="white" />
+                  PRO
+                </span>
+              )}
               {profile.is_admin && (
                 <span style={{ fontSize: '0.75rem', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: 600 }}>
                   ADMIN
                 </span>
+              )}
+              {isOwnProfile && !profile.is_pro && (
+                <button
+                  onClick={() => setShowProModal(true)}
+                  className="btn-primary"
+                  style={{
+                    padding: '0.25rem 0.75rem',
+                    fontSize: '0.8rem',
+                    background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                    border: 'none',
+                    color: '#fff',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.4rem',
+                    fontWeight: 600,
+                    borderRadius: '8px',
+                    boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)'
+                  }}
+                >
+                  <Star size={14} fill="#fff" />
+                  {language === 'es' ? 'Obtener Premium' : 'Get Premium'}
+                </button>
               )}
 
               {/* Follow / Unfollow button on other users' profiles */}
@@ -866,19 +788,15 @@ export const Profile: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleToggleFollowProfileUser}
-                  className={profile.is_following ? "btn-secondary" : "btn-primary"}
+                  className={profile.is_following ? 'btn-secondary' : 'btn-primary'}
                   style={{
-                    padding: '0.35rem 0.85rem',
+                    padding: '0.35rem 0.9rem',
                     fontSize: '0.85rem',
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '0.4rem',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    fontWeight: 600,
-                    transition: 'all 0.2s ease',
-                    marginLeft: 'auto',
-                    ...(profile.is_following ? { borderColor: 'var(--accent-primary)', color: 'var(--accent-primary)' } : {})
+                    borderRadius: '8px',
+                    marginLeft: 'auto'
                   }}
                 >
                   {profile.is_following ? (
@@ -894,6 +812,7 @@ export const Profile: React.FC = () => {
                   )}
                 </button>
               )}
+
             </div>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', margin: '0 0 0.8rem 0', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
               <Calendar size={16} /> {language === 'es' ? 'Miembro desde' : 'Joined'} {formatDate(new Date(profile.created_at))}
@@ -954,24 +873,6 @@ export const Profile: React.FC = () => {
               )}
               <span><strong>{visualLibraryItems.length}</strong> {language === 'es' ? 'En Estantería' : 'On Shelf'}</span>
             </div>
-            
-            {/* Last.fm Integration UI */}
-            {isOwnProfile && (
-              <div style={{ marginTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                {!profile.lastfm_username ? (
-                  <button onClick={handleLastFmLogin} className="btn-secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}>
-                    🎵 {language === 'es' ? 'Conectar Last.fm' : 'Connect Last.fm'}
-                  </button>
-                ) : (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                    <span>🎵 {language === 'es' ? 'Conectado como' : 'Connected as'} <strong>{profile.lastfm_username}</strong></span>
-                    <button onClick={handleLastFmDisconnect} className="btn-secondary" style={{ padding: '0.2rem 0.6rem', fontSize: '0.75rem', borderColor: '#ef4444', color: '#ef4444' }}>
-                      {language === 'es' ? 'Desconectar' : 'Disconnect'}
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
             
             {/* Now Playing Widget */}
             {nowPlaying && (

@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
 import { apiClient } from '../api/client';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+
 import { 
   Settings as SettingsIcon, 
   User, 
@@ -25,8 +26,10 @@ import {
   Pencil,
   Image as ImageIcon,
   Monitor,
-  Palette
+  Palette,
+  Music
 } from 'lucide-react';
+
 
 import { PROFILE_THEME_COLORS, getProfileTheme } from '../utils/profileThemes';
 
@@ -42,7 +45,10 @@ export const SettingsPage: React.FC = () => {
   const { language, setLanguage, t } = useTranslation();
   const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const tokenProcessed = useRef(false);
   const isEs = language === 'es';
+
 
   // Modal states
   const [showAvatarModal, setShowAvatarModal] = useState(false);
@@ -78,11 +84,68 @@ export const SettingsPage: React.FC = () => {
     }
   };
 
-  // Username form state
+  // Last.fm state
+  const [lastfmMsg, setLastfmMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [isDisconnectingLastFm, setIsDisconnectingLastFm] = useState(false);
 
+  useEffect(() => {
+    const token = searchParams.get('token');
+    if (token && !tokenProcessed.current) {
+      tokenProcessed.current = true;
+      connectLastFm(token);
+    }
+  }, [searchParams]);
+
+  const connectLastFm = async (token: string) => {
+    try {
+      await apiClient.post(`/users/me/lastfm/connect?token=${token}`);
+      await refreshProfile();
+      setLastfmMsg({
+        type: 'success',
+        text: isEs ? 'Cuenta de Last.fm conectada exitosamente.' : 'Last.fm account connected successfully.',
+      });
+      navigate('/settings', { replace: true });
+      setTimeout(() => setLastfmMsg(null), 4000);
+    } catch (err: any) {
+      setLastfmMsg({
+        type: 'error',
+        text: err.response?.data?.detail || (isEs ? 'Error al conectar con Last.fm.' : 'Error connecting to Last.fm.'),
+      });
+    }
+  };
+
+  const handleLastFmLogin = () => {
+    const currentOrigin = window.location.origin;
+    window.location.href = `http://www.last.fm/api/auth/?api_key=de5acce61bdd8b3e4bd181ebce8a69e8&cb=${encodeURIComponent(`${currentOrigin}/settings`)}`;
+  };
+
+  const handleLastFmDisconnect = async () => {
+    if (!window.confirm(isEs ? '¿Desconectar cuenta de Last.fm?' : 'Disconnect Last.fm account?')) return;
+    setIsDisconnectingLastFm(true);
+    setLastfmMsg(null);
+    try {
+      await apiClient.delete('/users/me/lastfm/disconnect');
+      await refreshProfile();
+      setLastfmMsg({
+        type: 'success',
+        text: isEs ? 'Cuenta de Last.fm desconectada.' : 'Last.fm account disconnected.',
+      });
+      setTimeout(() => setLastfmMsg(null), 3000);
+    } catch (err: any) {
+      setLastfmMsg({
+        type: 'error',
+        text: isEs ? 'Error al desconectar de Last.fm.' : 'Error disconnecting from Last.fm.',
+      });
+    } finally {
+      setIsDisconnectingLastFm(false);
+    }
+  };
+
+  // Username form state
   const [username, setUsername] = useState(user?.username || '');
   const [usernameMsg, setUsernameMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isUpdatingUsername, setIsUpdatingUsername] = useState(false);
+
 
 
   // Password form state
@@ -539,12 +602,86 @@ export const SettingsPage: React.FC = () => {
               className={showNsfw ? 'btn-primary' : 'btn-secondary'}
               style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}
             >
-              {showNsfw ? (isEs ? 'Habilitado' : 'Enabled') : isEs ? 'Deshabilitado' : 'Disabled'}
+              {showNsfw ? (isEs ? 'Activado' : 'Enabled') : isEs ? 'Desactivado' : 'Disabled'}
             </button>
           </div>
         </div>
 
+        {/* Section 2b: Last.fm Integration */}
+        <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px' }}>
+          <h2 style={{ fontSize: '1.2rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: 0 }}>
+            <Music size={20} color="#ef4444" />
+            {isEs ? 'Integración con Last.fm' : 'Last.fm Integration'}
+          </h2>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1.25rem' }}>
+            {isEs
+              ? 'Conecta tu cuenta de Last.fm para mostrar automáticamente la música que estás escuchando en tu perfil.'
+              : 'Connect your Last.fm account to automatically display what music you are listening to on your profile.'}
+          </p>
+
+          {lastfmMsg && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                padding: '0.75rem 1rem',
+                borderRadius: '8px',
+                marginBottom: '1rem',
+                fontSize: '0.85rem',
+                background: lastfmMsg.type === 'success' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                color: lastfmMsg.type === 'success' ? '#10b981' : '#ef4444',
+                border: `1px solid ${lastfmMsg.type === 'success' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`,
+              }}
+            >
+              {lastfmMsg.type === 'success' ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
+              <span>{lastfmMsg.text}</span>
+            </div>
+          )}
+
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
+            {user?.lastfm_username ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                <div style={{ fontSize: '0.95rem', color: 'var(--text-primary)' }}>
+                  {isEs ? 'Conectado como' : 'Connected as'} <strong style={{ color: '#ef4444' }}>{user.lastfm_username}</strong>
+                </div>
+                <button
+                  onClick={handleLastFmDisconnect}
+                  disabled={isDisconnectingLastFm}
+                  className="btn-secondary"
+                  style={{
+                    padding: '0.45rem 1rem',
+                    fontSize: '0.85rem',
+                    borderColor: '#ef4444',
+                    color: '#ef4444',
+                  }}
+                >
+                  {isDisconnectingLastFm ? (isEs ? 'Desconectando...' : 'Disconnecting...') : isEs ? 'Desconectar' : 'Disconnect'}
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={handleLastFmLogin}
+                className="btn-secondary"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  padding: '0.65rem 1.25rem',
+                  fontSize: '0.9rem',
+                  borderColor: 'rgba(239, 68, 68, 0.4)',
+                  color: '#ef4444',
+                }}
+              >
+                <Music size={16} />
+                {isEs ? 'Conectar con Last.fm' : 'Connect with Last.fm'}
+              </button>
+            )}
+          </div>
+        </div>
+
         {/* Section 3: Appearance / Theme */}
+
         <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px' }}>
           <h2 style={{ fontSize: '1.2rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: 0 }}>
             <Sun size={20} color="var(--accent-primary)" />
