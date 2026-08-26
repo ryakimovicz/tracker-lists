@@ -761,30 +761,9 @@ export const Profile: React.FC = () => {
                   ADMIN
                 </span>
               )}
-              {isOwnProfile && !profile.is_pro && (
-                <button
-                  onClick={() => setShowProModal(true)}
-                  className="btn-primary"
-                  style={{
-                    padding: '0.25rem 0.75rem',
-                    fontSize: '0.8rem',
-                    background: 'linear-gradient(135deg, #f59e0b, #d97706)',
-                    border: 'none',
-                    color: '#fff',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.4rem',
-                    fontWeight: 600,
-                    borderRadius: '8px',
-                    boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)'
-                  }}
-                >
-                  <Star size={14} fill="#fff" />
-                  {language === 'es' ? 'Obtener Premium' : 'Get Premium'}
-                </button>
-              )}
 
               {/* Follow / Unfollow button on other users' profiles */}
+
               {!isOwnProfile && currentUser && (
                 <button
                   type="button"
