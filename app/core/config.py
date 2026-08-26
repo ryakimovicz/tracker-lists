@@ -52,6 +52,11 @@ class Settings(BaseSettings):
     SMTP_HOST: str = ""
     SMTP_USER: str = ""
     SMTP_PASSWORD: str = ""
-    EMAILS_FROM_EMAIL: str = "noreply@pathd.app"
+    # Dodo Payments Settings
+    DODO_PAYMENTS_API_KEY: str = ""
+    DODO_PAYMENTS_PRODUCT_ID: str = ""
+    DODO_PAYMENTS_WEBHOOK_KEY: str = ""
+    DODO_PAYMENTS_ENVIRONMENT: str = "test_mode"
 
 settings = Settings()
+

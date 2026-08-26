@@ -9,6 +9,7 @@ from app.api.v1.reviews import router as reviews_router
 from app.api.v1.additions import router as additions_router
 from app.api.v1.admin import router as admin_router
 from app.api.v1.translate import router as translate_router
+from app.api.v1.payments import router as payments_router
 
 api_router = APIRouter()
 
@@ -22,3 +23,5 @@ api_router.include_router(reviews_router, prefix="/reviews", tags=["reviews"])
 api_router.include_router(additions_router, prefix="/additions", tags=["additions"])
 api_router.include_router(admin_router, prefix="/admin", tags=["admin"])
 api_router.include_router(translate_router, prefix="/translate", tags=["translate"])
+api_router.include_router(payments_router, prefix="/payments", tags=["payments"])
+

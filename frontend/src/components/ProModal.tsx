@@ -15,7 +15,26 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
   const { user, refreshProfile } = useAuth();
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
-  
+
+  const handleSubscribe = async () => {
+
+    setLoading(true);
+    setErrorMsg('');
+    try {
+      const res = await apiClient.post('/payments/create-checkout');
+      if (res.data?.checkout_url) {
+        window.location.href = res.data.checkout_url;
+      } else {
+        throw new Error('No checkout URL received');
+      }
+    } catch (err: any) {
+      console.error('Checkout error:', err);
+      const msg = err.response?.data?.detail || (language === 'es' ? 'Error al iniciar la pasarela de pago.' : 'Error initiating checkout.');
+      setErrorMsg(msg);
+      setLoading(false);
+    }
+  };
+
   const handleTogglePro = async (isPro: boolean) => {
     setLoading(true);
     setErrorMsg('');
@@ -31,6 +50,7 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
   };
 
   const isEs = language === 'es';
+
 
   const modalContent = (
     <div 
@@ -200,12 +220,18 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
                 border: 'none',
                 color: '#fff',
                 borderRadius: '10px',
-                boxShadow: '0 4px 15px rgba(245, 158, 11, 0.4)'
+                boxShadow: '0 4px 15px rgba(245, 158, 11, 0.4)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.5rem',
+                cursor: loading ? 'not-allowed' : 'pointer',
               }}
-              onClick={() => handleTogglePro(true)}
+              onClick={handleSubscribe}
               disabled={loading}
             >
-              {loading ? '...' : (isEs ? 'Activar Pathd Premium (Demo)' : 'Activate Pathd Premium (Demo)')}
+              <Crown size={20} />
+              {loading ? (isEs ? 'Preparando pago...' : 'Preparing checkout...') : (isEs ? 'Suscribirse a Premium ($2.99/mes)' : 'Subscribe to Premium ($2.99/mo)')}
             </button>
           ) : (
             <div style={{ textAlign: 'center' }}>
@@ -220,10 +246,10 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
               >
                 {loading ? '...' : (isEs ? 'Revertir a Gratuito (Dev)' : 'Revert to Free (Dev)')}
               </button>
-
             </div>
           )}
         </div>
+
       </div>
     </div>
   );
