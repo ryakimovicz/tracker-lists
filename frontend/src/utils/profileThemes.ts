@@ -188,7 +188,16 @@ export function getProfileTheme(colorId?: string | null, isLight: boolean = fals
       '--accent-primary': mode.accent,
       '--accent-secondary': mode.hover,
       '--accent-hover': mode.hover,
+      '--border-color': mode.border,
       '--border-glow': mode.glow,
     } as React.CSSProperties,
+    modalStyles: {
+      background: isLight 
+        ? `linear-gradient(180deg, ${mode.border} 0%, rgba(255, 255, 255, 0.96) 60%)` 
+        : `linear-gradient(180deg, ${mode.border} 0%, rgba(9, 13, 22, 0.98) 55%)`,
+      border: `1px solid ${mode.border}`,
+      boxShadow: `0 25px 50px rgba(0,0,0,0.6), 0 0 30px ${mode.glow}`,
+    }
   };
 }
+

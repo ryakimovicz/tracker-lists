@@ -1744,7 +1744,9 @@ export const Profile: React.FC = () => {
           isOwnProfile={isOwnProfile} 
           userIdParam={userIdParam} 
           profileId={profile?.id} 
+          profileColor={profile?.profile_color}
           onClose={() => setSelectedItem(null)} 
+
           onUpdate={() => {
             apiClient.get(userIdParam ? `/library/?user_id=${userIdParam}` : '/library/').then(res => {
               setLibraryItems(res.data);

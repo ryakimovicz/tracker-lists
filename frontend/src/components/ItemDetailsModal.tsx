@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from '../context/LanguageContext';
+import { useTheme } from '../context/ThemeContext';
+import { getProfileTheme } from '../utils/profileThemes';
 import { apiClient } from '../api/client';
 import { Star, Heart, X, Flag, CheckCircle, Check, Plus, MoreVertical, Trash2, ArrowLeft } from 'lucide-react';
 import { getCachedSeries, setCachedSeries } from '../utils/seriesCache';
 import { useAuth } from '../context/AuthContext';
+
 
 
 
@@ -12,6 +15,7 @@ interface ItemDetailsModalProps {
   isOwnProfile: boolean;
   userIdParam?: string | null;
   profileId?: number;
+  profileColor?: string | null;
   onClose: () => void;
   onUpdate: (updatedItem?: any) => void; // Triggered when item details/status changes
   onOpenItem?: (item: any) => void;
@@ -49,6 +53,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   isOwnProfile,
   userIdParam,
   profileId,
+  profileColor,
   onClose,
   onUpdate,
   onOpenItem,
@@ -57,7 +62,13 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   onStatusChange
 }) => {
   const { t, language } = useTranslation();
+  const { theme } = useTheme();
   const { user } = useAuth();
+  const isLight = theme === 'light';
+  const effectiveColor = profileColor || user?.profile_color;
+  const isProActive = Boolean(user?.is_pro || (profileId && profileId === user?.id && user?.is_pro));
+  const profileTheme = getProfileTheme(effectiveColor, isLight);
+
   
   const [selectedItem, setSelectedItem] = useState<any>(initialItem);
   const [isCoverPeek, setIsCoverPeek] = useState(false);
@@ -883,7 +894,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              zIndex: 2000
+              zIndex: 2000,
+              ...(isProActive && effectiveColor ? profileTheme.cssVariables : {})
             }}
           >
             <div
@@ -897,9 +909,11 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                 flexDirection: 'column',
                 gap: '1.5rem',
                 overflowY: 'auto',
-                textAlign: 'left'
+                textAlign: 'left',
+                ...(isProActive && effectiveColor ? profileTheme.modalStyles : {})
               }}
             >
+
               {isEpisode && (
                 <button
                     onClick={async () => {
