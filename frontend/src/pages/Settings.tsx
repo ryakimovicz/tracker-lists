@@ -268,12 +268,20 @@ export const SettingsPage: React.FC = () => {
                   overflow: 'hidden',
                   background: user?.banner_url
                     ? `url(${user.banner_url}) center/cover no-repeat`
-                    : 'linear-gradient(135deg, rgba(124, 58, 237, 0.3), rgba(245, 158, 11, 0.3))',
+                    : 'var(--surface-color)',
                   border: '1px solid var(--border-color)',
                   boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
                   flexShrink: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                 }}
-              />
+              >
+                {!user?.banner_url && (
+                  <ImageIcon size={20} color="var(--text-muted)" opacity={0.6} />
+                )}
+              </div>
+
 
               <div>
                 <h2 style={{ fontSize: '1.2rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>

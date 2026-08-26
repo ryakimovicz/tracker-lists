@@ -227,25 +227,37 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
             overflow: 'hidden',
             background: selectedUrl
               ? `url(${selectedUrl}) center/cover no-repeat`
-              : 'linear-gradient(135deg, rgba(124, 58, 237, 0.25), rgba(245, 158, 11, 0.25))',
+              : 'var(--surface-color)',
             border: '1px solid var(--border-color)',
-            boxShadow: 'inset 0 0 30px rgba(0,0,0,0.5)',
             display: 'flex',
             alignItems: 'flex-end',
             padding: '0.75rem 1rem',
           }}
         >
+          {selectedUrl && (
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 70%)',
+              }}
+            />
+          )}
           <div
             style={{
-              position: 'absolute',
-              inset: 0,
-              background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 70%)',
+              position: 'relative',
+              zIndex: 1,
+              color: selectedUrl ? 'white' : 'var(--text-muted)',
+              fontSize: '0.8rem',
+              fontWeight: 600,
             }}
-          />
-          <div style={{ position: 'relative', zIndex: 1, color: 'white', fontSize: '0.8rem', fontWeight: 600 }}>
-            {selectedUrl ? (isEs ? '✨ Vista previa de la portada' : '✨ Banner live preview') : (isEs ? 'Portada por defecto (Gradiente)' : 'Default header banner (Gradient)')}
+          >
+            {selectedUrl
+              ? (isEs ? 'Vista previa de la portada seleccionada' : 'Selected banner preview')
+              : (isEs ? 'Sin portada (Fondo liso estándar)' : 'No banner (Standard solid background)')}
           </div>
         </div>
+
 
         {/* Search Input */}
         <div style={{ position: 'relative' }}>
