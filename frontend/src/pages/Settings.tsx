@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../context/LanguageContext';
+import { useTheme } from '../context/ThemeContext';
 import { apiClient } from '../api/client';
 import { useNavigate, Link } from 'react-router-dom';
 import { 
@@ -18,16 +19,22 @@ import {
   X,
   EyeOff,
   Sparkles,
-  Star
+  Star,
+  Globe,
+  Sun,
+  Moon,
+  Monitor
 } from 'lucide-react';
 import { AvatarSelectorModal } from '../components/AvatarSelectorModal';
 import { ProModal } from '../components/ProModal';
 
 export const SettingsPage: React.FC = () => {
   const { user, refreshProfile, logout } = useAuth();
-  const { language, t } = useTranslation();
+  const { language, setLanguage, t } = useTranslation();
+  const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
   const isEs = language === 'es';
+
 
   // Modal states
   const [showAvatarModal, setShowAvatarModal] = useState(false);
@@ -299,12 +306,107 @@ export const SettingsPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Section 3: Username */}
+        {/* Section 3: Appearance / Theme */}
+        <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px' }}>
+          <h2 style={{ fontSize: '1.2rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: 0 }}>
+            <Sun size={20} color="var(--accent-primary)" />
+            {isEs ? 'Tema y Apariencia' : 'Theme & Appearance'}
+          </h2>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1.25rem' }}>
+            {isEs
+              ? 'Personaliza el esquema visual de la interfaz según tu preferencia.'
+              : 'Customize the visual scheme of the interface to your preference.'}
+          </p>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem' }}>
+            {[
+              { id: 'dark', label: isEs ? 'Oscuro' : 'Dark', icon: Moon },
+              { id: 'light', label: isEs ? 'Claro' : 'Light', icon: Sun },
+              { id: 'system', label: isEs ? 'Sistema' : 'System', icon: Monitor },
+            ].map((item) => {
+              const Icon = item.icon;
+              const isSelected = theme === item.id;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setTheme(item.id as any)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.6rem',
+                    padding: '0.85rem 1rem',
+                    borderRadius: '12px',
+                    border: isSelected ? '2px solid var(--accent-primary)' : '1px solid var(--border-color)',
+                    background: isSelected ? 'var(--border-glow)' : 'var(--bg-secondary)',
+                    color: isSelected ? 'var(--accent-primary)' : 'var(--text-primary)',
+                    fontWeight: isSelected ? 600 : 500,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                  }}
+                >
+                  <Icon size={18} />
+                  <span>{item.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Section 4: Language */}
+        <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px' }}>
+          <h2 style={{ fontSize: '1.2rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: 0 }}>
+            <Globe size={20} color="var(--accent-primary)" />
+            {isEs ? 'Idioma' : 'Language'}
+          </h2>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1.25rem' }}>
+            {isEs
+              ? 'Selecciona el idioma principal para los textos de la plataforma.'
+              : 'Select the primary language for the platform interface.'}
+          </p>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem' }}>
+            {[
+              { id: 'es', label: 'Español', flag: '🇪🇸' },
+              { id: 'en', label: 'English', flag: '🇬🇧' },
+            ].map((item) => {
+              const isSelected = language === item.id;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setLanguage(item.id as any)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.6rem',
+                    padding: '0.85rem 1rem',
+                    borderRadius: '12px',
+                    border: isSelected ? '2px solid var(--accent-primary)' : '1px solid var(--border-color)',
+                    background: isSelected ? 'var(--border-glow)' : 'var(--bg-secondary)',
+                    color: isSelected ? 'var(--accent-primary)' : 'var(--text-primary)',
+                    fontWeight: isSelected ? 600 : 500,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                  }}
+                >
+                  <span style={{ fontSize: '1.1rem' }}>{item.flag}</span>
+                  <span>{item.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Section 5: Username */}
         <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px' }}>
           <h2 style={{ fontSize: '1.2rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: 0 }}>
             <User size={20} color="var(--accent-primary)" />
             {isEs ? 'Nombre de Usuario' : 'Username'}
           </h2>
+
           <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1.25rem' }}>
             {isEs
               ? 'Este es tu identificador público en tus guías, comentarios y perfil.'
