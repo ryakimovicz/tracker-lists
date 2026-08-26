@@ -58,8 +58,9 @@ def get_user_dashboard(
         background_url=current_user.background_url,
         is_admin=current_user.is_admin,
         show_nsfw=current_user.show_nsfw,
-        is_pro=current_user.is_pro,
+        is_pro=bool(current_user.is_pro or current_user.is_admin),
         profile_color=current_user.profile_color,
+
         lastfm_username=current_user.lastfm_username,
         followers_count=followers_count,
         following_count=following_count,
@@ -382,7 +383,7 @@ def update_banner(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    if not current_user.is_pro:
+    if not (current_user.is_pro or current_user.is_admin):
         raise HTTPException(status_code=403, detail="Setting a custom profile banner is a Pro feature")
     current_user.banner_url = req.banner_url
     db.commit()
@@ -399,11 +400,13 @@ def update_background(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    if not current_user.is_pro:
+    if not (current_user.is_pro or current_user.is_admin):
         raise HTTPException(status_code=403, detail="Setting a custom profile background is a Pro feature")
     current_user.background_url = req.background_url
     db.commit()
     db.refresh(current_user)
+    return current_user
+
 class ColorUpdateRequest(BaseModel):
     profile_color: str | None = None
 
@@ -413,12 +416,13 @@ def update_profile_color(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    if not current_user.is_pro:
+    if not (current_user.is_pro or current_user.is_admin):
         raise HTTPException(status_code=403, detail="Setting a custom profile color is a Pro feature")
     current_user.profile_color = req.profile_color
     db.commit()
     db.refresh(current_user)
     return current_user
+
 
 
 class UserSettingsUpdate(BaseModel):
@@ -621,8 +625,9 @@ def get_any_user_profile(
         background_url=user.background_url,
         is_admin=user.is_admin,
         show_nsfw=user.show_nsfw,
-        is_pro=user.is_pro,
+        is_pro=bool(user.is_pro or user.is_admin),
         profile_color=user.profile_color,
+
         lastfm_username=user.lastfm_username,
         followers_count=followers_count,
         following_count=following_count,

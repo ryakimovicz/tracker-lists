@@ -36,8 +36,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const refreshProfile = async () => {
     try {
       const resp = await apiClient.get('/users/me');
-      setUser(resp.data);
-      window.dispatchEvent(new CustomEvent('profile-updated', { detail: resp.data }));
+      const userData = {
+        ...resp.data,
+        is_pro: Boolean(resp.data.is_pro || resp.data.is_admin)
+      };
+      setUser(userData);
+      window.dispatchEvent(new CustomEvent('profile-updated', { detail: userData }));
     } catch (err) {
       setUser(null);
       localStorage.removeItem('access_token');
@@ -45,6 +49,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsLoading(false);
     }
   };
+
 
 
   const login = async (token: string) => {

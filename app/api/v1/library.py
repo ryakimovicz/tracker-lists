@@ -432,8 +432,9 @@ def update_library_item(
         
     if item_in.is_favorite is not None:
         if item_in.is_favorite and not lib_item.is_favorite:
-            # Check limits per category: 1 for free, 10 for pro
-            max_limit = 10 if getattr(current_user, 'is_pro', False) else 1
+            # Check limits per category: 1 for free, 10 for pro/admin
+            is_pro_user = bool(getattr(current_user, 'is_pro', False) or getattr(current_user, 'is_admin', False))
+            max_limit = 10 if is_pro_user else 1
             existing_count = db.query(UserLibraryItem).filter(
                 UserLibraryItem.user_id == current_user.id,
                 UserLibraryItem.item_type == lib_item.item_type,
@@ -443,7 +444,7 @@ def update_library_item(
             
             if existing_count >= max_limit:
                 category_name = str(lib_item.item_type).capitalize()
-                if not getattr(current_user, 'is_pro', False):
+                if not is_pro_user:
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
                         detail=f"Free users can feature 1 {category_name} on their profile. Upgrade to Pathd Premium to feature up to 10!"
@@ -453,6 +454,7 @@ def update_library_item(
                         status_code=status.HTTP_400_BAD_REQUEST,
                         detail=f"Premium limit reached: Maximum 10 featured items allowed for {category_name}."
                     )
+
 
                     
         lib_item.is_favorite = item_in.is_favorite
