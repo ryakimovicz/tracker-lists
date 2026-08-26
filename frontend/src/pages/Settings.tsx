@@ -352,6 +352,9 @@ export const SettingsPage: React.FC = () => {
               position: 'relative',
               borderRadius: '16px',
               overflow: 'hidden',
+              isolation: 'isolate',
+              transform: 'translateZ(0)',
+              WebkitMaskImage: '-webkit-radial-gradient(white, black)',
               border: `1px solid ${activeProfileTheme.border}`,
               backgroundColor: 'var(--bg-primary)',
               padding: '1.75rem 1.5rem 3.5rem 1.5rem',
@@ -369,12 +372,8 @@ export const SettingsPage: React.FC = () => {
                 <div
                   style={{
                     position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    width: '100%',
-                    height: '100%',
+                    inset: 0,
+                    borderRadius: 'inherit',
                     backgroundImage: `url(${user.background_url})`,
                     backgroundPosition: 'center',
                     backgroundSize: 'cover',
@@ -385,12 +384,8 @@ export const SettingsPage: React.FC = () => {
                 <div
                   style={{
                     position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    width: '100%',
-                    height: '100%',
+                    inset: 0,
+                    borderRadius: 'inherit',
                     background: 'linear-gradient(180deg, rgba(9, 13, 22, 0.45) 0%, rgba(9, 13, 22, 0.75) 45%, rgba(9, 13, 22, 0.96) 100%)',
                     backdropFilter: 'blur(3px)',
                     zIndex: 0,
@@ -399,15 +394,17 @@ export const SettingsPage: React.FC = () => {
               </>
             )}
 
-
             {/* Banner & Header Preview Card */}
             <div
               className="glass-card"
               style={{
                 position: 'relative',
                 zIndex: 1,
-                borderRadius: '16px',
+                borderRadius: '14px',
                 overflow: 'hidden',
+                isolation: 'isolate',
+                transform: 'translateZ(0)',
+                WebkitMaskImage: '-webkit-radial-gradient(white, black)',
                 padding: '1.75rem',
                 border: user?.banner_url ? '1px solid rgba(255, 255, 255, 0.15)' : '1px solid var(--border-color)',
                 boxShadow: '0 12px 30px rgba(0, 0, 0, 0.45)',
@@ -425,6 +422,7 @@ export const SettingsPage: React.FC = () => {
                     style={{
                       position: 'absolute',
                       inset: 0,
+                      borderRadius: 'inherit',
                       backgroundImage: `url(${user.banner_url})`,
                       backgroundPosition: 'center',
                       backgroundSize: 'cover',
@@ -435,12 +433,14 @@ export const SettingsPage: React.FC = () => {
                     style={{
                       position: 'absolute',
                       inset: 0,
+                      borderRadius: 'inherit',
                       background: 'linear-gradient(180deg, rgba(15, 15, 20, 0.4) 0%, rgba(15, 15, 20, 0.88) 100%)',
                       zIndex: 1,
                     }}
                   />
                 </>
               )}
+
 
               {/* Banner Edit Trigger Button on top-right of banner */}
               <div style={{ position: 'absolute', top: '0.85rem', right: '0.85rem', zIndex: 3 }}>
