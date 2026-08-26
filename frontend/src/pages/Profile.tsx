@@ -2,7 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
 import { getProfileTheme } from '../utils/profileThemes';
+
 import { apiClient } from '../api/client';
 import { ItemDetailsModal } from '../components/ItemDetailsModal';
 import { MediaPoster } from '../components/MediaPoster';
@@ -94,6 +96,7 @@ export const getTagClass = (type: string) => {
 export const Profile: React.FC = () => {
   const { t, language } = useTranslation();
   const { theme } = useTheme();
+  const { refreshProfile } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const userIdParam = searchParams.get('user_id');
@@ -140,8 +143,9 @@ export const Profile: React.FC = () => {
       apiClient.post('/payments/verify-success', {
         subscription_id: subscriptionId,
         status: status || 'active'
-      }).then(() => {
-        fetchProfileAndLibrary();
+      }).then(async () => {
+        await refreshProfile();
+        await fetchProfileAndLibrary();
         setSuccessMsg(language === 'es' ? '⭐ ¡Bienvenido a Pathd Premium! Tu suscripción se activó con éxito.' : '⭐ Welcome to Pathd Premium! Your subscription was successfully activated.');
         setTimeout(() => setSuccessMsg(''), 6000);
       }).catch(err => {
@@ -149,6 +153,7 @@ export const Profile: React.FC = () => {
       });
     }
   }, [searchParams, language]);
+
 
 
   // Viewer state for full list details
