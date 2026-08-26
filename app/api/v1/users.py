@@ -54,6 +54,7 @@ def get_user_dashboard(
         email=current_user.email,
         created_at=current_user.created_at,
         photo_url=current_user.photo_url,
+        banner_url=current_user.banner_url,
         is_admin=current_user.is_admin,
         show_nsfw=current_user.show_nsfw,
         is_pro=current_user.is_pro,
@@ -65,6 +66,7 @@ def get_user_dashboard(
         created_lists=created_lists,
         saved_lists=saved_lists
     )
+
 
 @router.post("/me/lastfm/connect")
 def connect_lastfm(
@@ -361,6 +363,33 @@ def update_avatar(
     return current_user
 
 
+class BannerUpdateRequest(BaseModel):
+    banner_url: str | None = None
+
+@router.get("/banners/search")
+def search_banners(
+    query: str = Query("", description="Search term for banner wallpaper"),
+    current_user: User = Depends(get_current_user)
+):
+    from app.services.banners import BannerService
+    results = BannerService.search_all(query)
+    return results
+
+@router.put("/me/banner", response_model=UserResponse)
+def update_banner(
+    req: BannerUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if not current_user.is_pro:
+        raise HTTPException(status_code=403, detail="Setting a custom profile banner is a Pro feature")
+    current_user.banner_url = req.banner_url
+    db.commit()
+    db.refresh(current_user)
+    return current_user
+
+
+
 class UserSettingsUpdate(BaseModel):
     show_nsfw: bool | None = None
     is_pro: bool | None = None
@@ -556,6 +585,7 @@ def get_any_user_profile(
         email=user.email,
         created_at=user.created_at,
         photo_url=user.photo_url,
+        banner_url=user.banner_url,
         is_admin=user.is_admin,
         show_nsfw=user.show_nsfw,
         is_pro=user.is_pro,
@@ -567,6 +597,7 @@ def get_any_user_profile(
         created_lists=created_lists,
         saved_lists=saved_lists
     )
+
 
 @router.get("/{user_id}/activity")
 def get_user_activity(

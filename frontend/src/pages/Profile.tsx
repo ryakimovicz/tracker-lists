@@ -5,6 +5,7 @@ import { apiClient } from '../api/client';
 import { ItemDetailsModal } from '../components/ItemDetailsModal';
 import { MediaPoster } from '../components/MediaPoster';
 import { AvatarSelectorModal } from '../components/AvatarSelectorModal';
+import { BannerSelectorModal } from '../components/BannerSelectorModal';
 import { ProModal } from '../components/ProModal';
 
 import {
@@ -25,7 +26,8 @@ import {
   UserCheck,
   Users,
   X,
-  Pencil
+  Pencil,
+  Image as ImageIcon
 } from 'lucide-react';
 
 
@@ -55,6 +57,7 @@ interface UserProfile {
   username: string;
   email: string;
   photo_url: string;
+  banner_url?: string;
   is_admin: boolean;
   show_nsfw: boolean;
   created_at: string;
@@ -91,7 +94,9 @@ export const Profile: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
 
   const [showAvatarModal, setShowAvatarModal] = useState(false);
+  const [showBannerModal, setShowBannerModal] = useState(false);
   const [showProModal, setShowProModal] = useState(false);
+
   const [profile, setProfile] = useState<UserProfile | null>(null);
 
 
@@ -604,8 +609,69 @@ export const Profile: React.FC = () => {
       
       {/* Profile Header Card */}
       {profile && (
-        <div className="glass-card" style={{ display: 'flex', gap: '2rem', alignItems: 'center', flexWrap: 'wrap', padding: '2.5rem' }}>
-          <div style={{ position: 'relative' }}>
+        <div 
+          className="glass-card" 
+          style={{ 
+            position: 'relative',
+            display: 'flex', 
+            gap: '2rem', 
+            alignItems: 'center', 
+            flexWrap: 'wrap', 
+            padding: '2.5rem',
+            borderRadius: '20px',
+            overflow: 'hidden',
+            background: profile.banner_url 
+              ? `linear-gradient(180deg, rgba(15, 15, 20, 0.45) 0%, rgba(15, 15, 20, 0.88) 60%, rgba(15, 15, 20, 0.98) 100%), url(${profile.banner_url}) center/cover no-repeat` 
+              : undefined,
+            border: profile.banner_url ? '1px solid rgba(255, 255, 255, 0.12)' : undefined,
+            boxShadow: profile.banner_url ? '0 12px 30px rgba(0, 0, 0, 0.4)' : undefined,
+          }}
+        >
+          {/* Change Banner Button (for profile owner) */}
+          {isOwnProfile && (
+            <button
+              onClick={() => {
+                if (profile.is_pro || currentUser?.is_pro) {
+                  setShowBannerModal(true);
+                } else {
+                  setShowProModal(true);
+                }
+              }}
+              className="btn-secondary"
+              style={{
+                position: 'absolute',
+                top: '1rem',
+                right: '1rem',
+                padding: '0.35rem 0.75rem',
+                fontSize: '0.78rem',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                borderRadius: '8px',
+                background: 'rgba(0, 0, 0, 0.65)',
+                backdropFilter: 'blur(8px)',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                color: 'white',
+                cursor: 'pointer',
+                zIndex: 2,
+              }}
+              title={
+                profile.is_pro || currentUser?.is_pro
+                  ? (language === 'es' ? 'Cambiar portada de perfil' : 'Change profile banner')
+                  : (language === 'es' ? 'Desbloquear portada de perfil con Premium' : 'Unlock profile banner with Premium')
+              }
+            >
+              <ImageIcon size={14} color="#f59e0b" />
+              <span>
+                {profile.banner_url 
+                  ? (language === 'es' ? 'Cambiar Portada' : 'Change Banner') 
+                  : (language === 'es' ? 'Añadir Portada' : 'Add Banner')}
+              </span>
+            </button>
+          )}
+
+          <div style={{ position: 'relative', zIndex: 1 }}>
+
             {profile.photo_url ? (
               <img
                 src={profile.photo_url}
@@ -1926,10 +1992,22 @@ export const Profile: React.FC = () => {
         }}
       />
 
+      {/* Banner Selector Modal (Premium) */}
+      <BannerSelectorModal
+        isOpen={showBannerModal}
+        onClose={() => setShowBannerModal(false)}
+        currentBannerUrl={profile?.banner_url}
+        onBannerUpdated={(newUrl) => {
+          setProfile(prev => prev ? { ...prev, banner_url: newUrl || '' } : null);
+          setCurrentUser(prev => prev ? { ...prev, banner_url: newUrl || '' } : null);
+        }}
+      />
+
       {/* Pro / Premium Modal */}
       {showProModal && (
         <ProModal onClose={() => setShowProModal(false)} />
       )}
+
     </div>
   );
 };

@@ -23,11 +23,12 @@ import {
   Sun,
   Moon,
   Monitor,
-  Pencil
+  Pencil,
+  Image as ImageIcon
 } from 'lucide-react';
 
-
 import { AvatarSelectorModal } from '../components/AvatarSelectorModal';
+import { BannerSelectorModal } from '../components/BannerSelectorModal';
 import { ProModal } from '../components/ProModal';
 
 export const SettingsPage: React.FC = () => {
@@ -37,10 +38,11 @@ export const SettingsPage: React.FC = () => {
   const navigate = useNavigate();
   const isEs = language === 'es';
 
-
   // Modal states
   const [showAvatarModal, setShowAvatarModal] = useState(false);
+  const [showBannerModal, setShowBannerModal] = useState(false);
   const [showProModal, setShowProModal] = useState(false);
+
 
 
   // Username form state
@@ -253,6 +255,96 @@ export const SettingsPage: React.FC = () => {
             </button>
           </div>
         </div>
+
+        {/* Section 1.5: Profile Banner (Premium) */}
+        <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+              <div
+                style={{
+                  width: '90px',
+                  height: '52px',
+                  borderRadius: '10px',
+                  overflow: 'hidden',
+                  background: user?.banner_url
+                    ? `url(${user.banner_url}) center/cover no-repeat`
+                    : 'linear-gradient(135deg, rgba(124, 58, 237, 0.3), rgba(245, 158, 11, 0.3))',
+                  border: '1px solid var(--border-color)',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                  flexShrink: 0,
+                }}
+              />
+
+              <div>
+                <h2 style={{ fontSize: '1.2rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
+                  <ImageIcon size={20} color="#f59e0b" />
+                  {isEs ? 'Portada de Perfil' : 'Profile Banner'}
+                  <span
+                    style={{
+                      fontSize: '0.7rem',
+                      background: 'rgba(245, 158, 11, 0.15)',
+                      color: '#f59e0b',
+                      padding: '0.15rem 0.45rem',
+                      borderRadius: '4px',
+                      fontWeight: 700,
+                    }}
+                  >
+                    PREMIUM
+                  </span>
+                </h2>
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: '0.35rem 0 0' }}>
+                  {user?.is_pro
+                    ? isEs
+                      ? 'Personaliza el encabezado panorámico de tu perfil con fondos en alta definición.'
+                      : 'Customize your profile header with high-definition panoramic wallpapers.'
+                    : isEs
+                    ? 'Desbloquea fondos panorámicos en 1080p y 4K con Pathd Premium.'
+                    : 'Unlock panoramic 1080p and 4K profile banners with Pathd Premium.'}
+                </p>
+              </div>
+            </div>
+
+            {user?.is_pro ? (
+              <button
+                onClick={() => setShowBannerModal(true)}
+                className="btn-primary"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  padding: '0.65rem 1.25rem',
+                  fontSize: '0.9rem',
+                  background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                  border: 'none',
+                  color: '#fff',
+                }}
+              >
+                <ImageIcon size={16} />
+                {isEs ? 'Cambiar Portada' : 'Change Banner'}
+              </button>
+            ) : (
+              <button
+                onClick={() => setShowProModal(true)}
+                className="btn-primary"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  padding: '0.65rem 1.25rem',
+                  fontSize: '0.9rem',
+                  background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                  border: 'none',
+                  color: '#fff',
+                  boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)',
+                }}
+              >
+                <Star size={16} fill="#fff" />
+                {isEs ? 'Desbloquear con Premium' : 'Unlock with Premium'}
+              </button>
+            )}
+          </div>
+        </div>
+
 
 
 
@@ -801,10 +893,21 @@ export const SettingsPage: React.FC = () => {
         }}
       />
 
+      {/* Banner Selector Modal (Premium) */}
+      <BannerSelectorModal
+        isOpen={showBannerModal}
+        onClose={() => setShowBannerModal(false)}
+        currentBannerUrl={user?.banner_url}
+        onBannerUpdated={async () => {
+          await refreshProfile();
+        }}
+      />
+
       {/* Pro / Premium Modal */}
       {showProModal && (
         <ProModal onClose={() => setShowProModal(false)} />
       )}
+
     </div>
   );
 };

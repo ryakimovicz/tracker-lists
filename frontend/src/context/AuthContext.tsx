@@ -6,11 +6,13 @@ interface UserProfile {
   username: string;
   email: string;
   photo_url: string;
+  banner_url?: string;
   is_admin: boolean;
   show_nsfw: boolean;
   is_pro?: boolean;
   profile_color?: string;
 }
+
 
 interface AuthContextType {
   user: UserProfile | null;

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import ReactDOM from 'react-dom';
 import { useTranslation } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
-import { Star, Check, X, Palette, Lock, Crown } from 'lucide-react';
+import { Star, Check, X, Palette, Lock, Crown, Image as ImageIcon } from 'lucide-react';
 import { apiClient } from '../api/client';
 
 
@@ -117,8 +117,24 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
         )}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          {/* Benefit 1: 10 Favorites per category */}
+          {/* Benefit 0: Profile Banners */}
+          <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
+            <div style={{ background: 'rgba(245, 158, 11, 0.15)', padding: '0.5rem', borderRadius: '8px', color: '#f59e0b', flexShrink: 0 }}>
+              <ImageIcon size={20} />
+            </div>
+            <div>
+              <h4 style={{ margin: '0 0 0.25rem 0', fontSize: '1rem' }}>
+                {isEs ? 'Portadas y Banners de Perfil' : 'Profile Banners & Wallpapers'}
+              </h4>
+              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                {isEs
+                  ? 'Personaliza el encabezado de tu perfil con fondos panorámicos en 1080p y 4K de Videojuegos, Anime, Películas y Series.'
+                  : 'Customize your profile header with 1080p and 4K panoramic wallpapers from Games, Anime, Movies, and Shows.'}
+              </p>
+            </div>
+          </div>
 
+          {/* Benefit 1: 10 Favorites per category */}
           <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
             <div style={{ background: 'rgba(245, 158, 11, 0.15)', padding: '0.5rem', borderRadius: '8px', color: '#f59e0b', flexShrink: 0 }}>
               <Star size={20} />
