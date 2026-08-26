@@ -349,12 +349,13 @@ class AvatarUpdateRequest(BaseModel):
 
 @router.get("/characters/search")
 def search_characters(
-    query: str = Query(..., min_length=2, description="Search term for character name"),
+    query: str = Query("", description="Search term for character name"),
     current_user: User = Depends(get_current_user)
 ):
     from app.services.characters import CharacterService
     results = CharacterService.search_all(query)
     return results
+
 
 @router.put("/me/avatar", response_model=UserResponse)
 def update_avatar(

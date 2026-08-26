@@ -157,43 +157,62 @@ class CharacterService:
         if not token:
             return []
         
-        safe_query = query.replace('"', '\\"')
-        body = f'search "{safe_query}"; fields id, name, mug_shot.image_id, games.name; limit 12;'
-        
-        req = urllib.request.Request(
-            "https://api.igdb.com/v4/characters",
-            data=body.encode("utf-8"),
-            headers={
-                "Client-ID": settings.TWITCH_CLIENT_ID,
-                "Authorization": f"Bearer {token}",
-                "Accept": "application/json"
-            }
-        )
-
         results = []
-        try:
-            with urllib.request.urlopen(req, timeout=6) as response:
-                if response.status == 200:
-                    data = json.loads(response.read().decode())
-                    for ch in data:
-                        name = ch.get("name") or "Unknown Character"
-                        mug_shot = ch.get("mug_shot")
-                        img_url = None
-                        if mug_shot and mug_shot.get("image_id"):
-                            img_url = f"https://images.igdb.com/igdb/image/upload/t_cover_big/{mug_shot['image_id']}.jpg"
-                        
-                        games = ch.get("games") or []
-                        origin = games[0].get("name") if games and isinstance(games[0], dict) else "Video Game"
-                        
-                        if img_url:
-                            results.append(CharacterSearchResult(
-                                name=name,
-                                image_url=img_url,
-                                category="game",
-                                origin=origin
-                            ))
-        except Exception as e:
-            print(f"IGDB Character Search Error: {e}")
+        seen_ids = set()
+
+        # Try full query first, and if multi-word, also query first token to catch partial progressive typing
+        terms_to_try = [query]
+        tokens = query.split()
+        if len(tokens) > 1 and len(tokens[0]) >= 3:
+            terms_to_try.append(tokens[0])
+
+        for term in terms_to_try:
+            safe_query = term.replace('"', '\\"')
+            body = f'search "{safe_query}"; fields id, name, mug_shot.image_id, games.name; limit 12;'
+            
+            req = urllib.request.Request(
+                "https://api.igdb.com/v4/characters",
+                data=body.encode("utf-8"),
+                headers={
+                    "Client-ID": settings.TWITCH_CLIENT_ID,
+                    "Authorization": f"Bearer {token}",
+                    "Accept": "application/json"
+                }
+            )
+
+            try:
+                with urllib.request.urlopen(req, timeout=5) as response:
+                    if response.status == 200:
+                        data = json.loads(response.read().decode())
+                        for ch in data:
+                            ch_id = ch.get("id")
+                            if ch_id in seen_ids:
+                                continue
+                            seen_ids.add(ch_id)
+
+                            name = ch.get("name") or "Unknown Character"
+                            mug_shot = ch.get("mug_shot")
+                            img_url = None
+                            if mug_shot and mug_shot.get("image_id"):
+                                img_url = f"https://images.igdb.com/igdb/image/upload/t_cover_big/{mug_shot['image_id']}.jpg"
+                            
+                            games = ch.get("games") or []
+                            origin = games[0].get("name") if games and isinstance(games[0], dict) else "Video Game"
+                            
+                            if img_url:
+                                results.append(CharacterSearchResult(
+                                    name=name,
+                                    image_url=img_url,
+                                    category="game",
+                                    origin=origin
+                                ))
+            except Exception as e:
+                print(f"IGDB Character Search Error: {e}")
+                
+            # If we found direct matches with the full term, no need to fallback to first token
+            if len(results) >= 4:
+                break
+
         return results
 
     @staticmethod
@@ -290,20 +309,23 @@ class CharacterService:
         # 1. Exact string match
         if name_lower == clean_query or name_lower == raw_query:
             return 3000
+
+        # Exact prefix match (e.g. "gordon freema" -> "gordon freeman")
+        if name_lower.startswith(clean_query) or name_lower.startswith(raw_query):
+            return 2500
             
-        # Extract individual words
         clean_tokens = [w for w in re.findall(r'\b[\w\'-]+\b', clean_query) if len(w) > 1]
         name_tokens = re.findall(r'\b[\w\'-]+\b', name_lower)
         origin_tokens = re.findall(r'\b[\w\'-]+\b', origin_lower)
 
-        # 2. Multi-word query full coverage bonus
-        # If user searched "gordon freeman", check if BOTH words are in name
+        # 2. Multi-word query matching
         if len(clean_tokens) > 1:
+            # Check if all query tokens match (full or prefix start) in the character's name
             all_in_name = all(any(nt.startswith(ct) for nt in name_tokens) for ct in clean_tokens)
             if all_in_name:
-                score += 2000
-                if name_lower.startswith(clean_query):
-                    score += 500
+                score += 2200
+                if name_lower.startswith(clean_tokens[0]):
+                    score += 300
                 return score
                 
             all_in_origin = all(any(ot.startswith(ct) for ot in origin_tokens) for ct in clean_tokens)
@@ -314,7 +336,7 @@ class CharacterService:
             # Partial match on multi-word query:
             matched_name_tokens = sum(1 for ct in clean_tokens if any(nt.startswith(ct) for nt in name_tokens))
             if matched_name_tokens > 0:
-                score += (matched_name_tokens / len(clean_tokens)) * 300
+                score += int((matched_name_tokens / len(clean_tokens)) * 400)
         else:
             # Single word query
             token = clean_tokens[0] if clean_tokens else clean_query
@@ -333,9 +355,60 @@ class CharacterService:
         return int(score)
 
     @classmethod
+    def get_popular_suggestions(cls) -> List[Dict[str, Any]]:
+        """Returns a rich, curated & popular set of characters across all categories when opening modal."""
+        popular_searches = [
+            ("Goku", "anime"),
+            ("Monkey D. Luffy", "anime"),
+            ("Naruto Uzumaki", "anime"),
+            ("Spider-Man", "comic"),
+            ("Batman", "comic"),
+            ("Deadpool", "comic"),
+            ("Gordon Freeman", "game"),
+            ("Kratos", "game"),
+            ("Geralt of Rivia", "game"),
+            ("Walter White", "series"),
+            ("Patrick Jane", "series"),
+            ("Thomas Shelby", "series"),
+        ]
+        
+        all_results = []
+        with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
+            future_map = {}
+            for name, cat in popular_searches:
+                if cat == "anime":
+                    f = executor.submit(cls._search_anilist, name)
+                elif cat == "comic":
+                    f = executor.submit(cls._search_comicvine, name)
+                elif cat == "game":
+                    f = executor.submit(cls._search_igdb, name)
+                else:
+                    f = executor.submit(cls._search_tvmaze, name, name)
+                future_map[f] = (name, cat)
+
+            for future in concurrent.futures.as_completed(future_map):
+                try:
+                    res = future.result()
+                    if res:
+                        # Grab top 1 or 2 matching items
+                        all_results.extend(res[:2])
+                except Exception:
+                    pass
+
+        # Deduplicate
+        seen_images = set()
+        deduped = []
+        for r in all_results:
+            if r.image_url and r.image_url not in seen_images:
+                seen_images.add(r.image_url)
+                deduped.append(r.to_dict())
+
+        return deduped[:32]
+
+    @classmethod
     def search_all(cls, query: str) -> List[Dict[str, Any]]:
         if not query or len(query.strip()) < 2:
-            return []
+            return cls.get_popular_suggestions()
 
         raw_query = query.strip().lower()
         clean_query = cls._clean_query_terms(query).lower()
@@ -361,22 +434,13 @@ class CharacterService:
         for item in all_results:
             item.score = cls._calculate_relevance(item, clean_query, raw_query)
 
-        # If we have high scoring matches (score >= 1500), filter out weak partial matches
-        high_scorers = [item for item in all_results if item.score >= 1500]
-        if high_scorers:
-            scored_items = high_scorers
-        else:
-            scored_items = [item for item in all_results if item.score > 0]
-            if len(scored_items) < 4:
-                scored_items = all_results
-
         # Sort by relevance score descending
-        scored_items.sort(key=lambda x: x.score, reverse=True)
+        all_results.sort(key=lambda x: x.score, reverse=True)
 
         # Deduplicate by image_url and return as dicts
         seen_images = set()
         deduped = []
-        for r in scored_items:
+        for r in all_results:
             if r.image_url and r.image_url not in seen_images:
                 seen_images.add(r.image_url)
                 deduped.append(r.to_dict())

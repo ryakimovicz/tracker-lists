@@ -41,16 +41,12 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
       setSelectedUrl(currentPhotoUrl || null);
       setErrorMsg('');
       if (!query.trim()) {
-        fetchCharacters('Goku');
+        fetchCharacters('');
       }
     }
   }, [isOpen]);
 
   const fetchCharacters = async (searchTerm: string) => {
-    if (!searchTerm || searchTerm.trim().length < 2) {
-      setResults([]);
-      return;
-    }
     setIsLoading(true);
     setErrorMsg('');
     try {
@@ -70,10 +66,13 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
     const timer = setTimeout(() => {
       if (query.trim().length >= 2) {
         fetchCharacters(query);
+      } else if (query.trim().length === 0) {
+        fetchCharacters('');
       }
     }, 400);
     return () => clearTimeout(timer);
   }, [query]);
+
 
   const handleSaveAvatar = async () => {
     setIsSaving(true);
