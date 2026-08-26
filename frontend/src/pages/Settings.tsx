@@ -420,8 +420,12 @@ export const SettingsPage: React.FC = () => {
                       borderRadius: '4px',
                       fontWeight: 700,
                       alignSelf: 'flex-start',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.25rem',
                     }}
                   >
+                    <Star size={10} fill="#f59e0b" />
                     PREMIUM
                   </span>
                 </div>
@@ -492,8 +496,12 @@ export const SettingsPage: React.FC = () => {
                       borderRadius: '4px',
                       fontWeight: 700,
                       alignSelf: 'flex-start',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.25rem',
                     }}
                   >
+                    <Star size={10} fill="#f59e0b" />
                     PREMIUM
                   </span>
                 </div>
@@ -516,11 +524,16 @@ export const SettingsPage: React.FC = () => {
                     padding: '0.1rem 0.35rem',
                     borderRadius: '4px',
                     fontWeight: 700,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.25rem',
                   }}
                 >
+                  <Star size={10} fill="#f59e0b" />
                   PREMIUM
                 </span>
               </h3>
+
               <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: '0.25rem 0 0' }}>
                 {isEs
                   ? 'Elige el color de acento y resplandor para tu perfil.'

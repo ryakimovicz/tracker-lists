@@ -752,9 +752,10 @@ export const Profile: React.FC = () => {
                   title={isOwnProfile ? (language === 'es' ? 'Haz clic para remover Plan Premium' : 'Click to remove Premium plan') : undefined}
                 >
                   <Star size={12} fill="white" />
-                  PRO
+                  PREMIUM
                 </span>
               )}
+
               {profile.is_admin && (
                 <span style={{ fontSize: '0.75rem', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: 600 }}>
                   ADMIN
