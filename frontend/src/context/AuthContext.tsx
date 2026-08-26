@@ -31,6 +31,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const resp = await apiClient.get('/users/me');
       setUser(resp.data);
+      window.dispatchEvent(new CustomEvent('profile-updated', { detail: resp.data }));
     } catch (err) {
       setUser(null);
       localStorage.removeItem('access_token');
@@ -38,6 +39,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsLoading(false);
     }
   };
+
 
   const login = async (token: string) => {
     localStorage.setItem('access_token', token);

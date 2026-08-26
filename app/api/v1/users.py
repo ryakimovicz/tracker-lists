@@ -612,10 +612,14 @@ def mock_pro_status(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    was_pro = current_user.is_pro
     current_user.is_pro = req.is_pro
+    if was_pro and not req.is_pro:
+        trim_downgraded_user_favorites(db, current_user.id)
     db.commit()
     db.refresh(current_user)
     return {"message": f"User is now {'Pro' if req.is_pro else 'Free'}", "is_pro": req.is_pro}
+
 
 class ColorUpdateRequest(BaseModel):
     color: str | None

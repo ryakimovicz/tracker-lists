@@ -237,7 +237,17 @@ export const Profile: React.FC = () => {
   useEffect(() => {
     setShowFollowModal(false);
     fetchProfileAndLibrary();
+
+    const handleProfileUpdate = () => {
+      fetchProfileAndLibrary();
+    };
+
+    window.addEventListener('profile-updated', handleProfileUpdate);
+    return () => {
+      window.removeEventListener('profile-updated', handleProfileUpdate);
+    };
   }, [userIdParam]);
+
 
   const fetchProfileAndLibrary = async () => {
     setLoading(true);
