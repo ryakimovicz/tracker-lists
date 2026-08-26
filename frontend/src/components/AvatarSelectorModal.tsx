@@ -368,61 +368,38 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
                 )}
 
                 {(() => {
-                  const getCategoryBadge = () => {
+                  const getCategoryLabel = () => {
                     switch (ch.category) {
-                      case 'series':
-                        return {
-                          label: isEs ? 'Serie' : 'Series',
-                          bg: 'rgba(236, 72, 153, 0.15)',
-                          color: '#f472b6',
-                        };
-                      case 'movie':
-                        return {
-                          label: isEs ? 'Película' : 'Movie',
-                          bg: 'rgba(245, 158, 11, 0.15)',
-                          color: '#fbbf24',
-                        };
-                      case 'anime':
-                        return {
-                          label: 'Anime',
-                          bg: 'rgba(139, 92, 246, 0.15)',
-                          color: '#a78bfa',
-                        };
-                      case 'comic':
-                        return {
-                          label: isEs ? 'Cómic' : 'Comic',
-                          bg: 'rgba(59, 130, 246, 0.15)',
-                          color: '#60a5fa',
-                        };
-                      case 'game':
-                      default:
-                        return {
-                          label: isEs ? 'Juego' : 'Game',
-                          bg: 'rgba(16, 185, 129, 0.15)',
-                          color: '#34d399',
-                        };
+                      case 'series': return isEs ? 'Serie' : 'Series';
+                      case 'movie': return isEs ? 'Película' : 'Movie';
+                      case 'anime': return 'Anime';
+                      case 'comic': return isEs ? 'Cómic' : 'Comic';
+                      case 'manga': return 'Manga';
+                      case 'book': return isEs ? 'Libro' : 'Book';
+                      case 'game': return isEs ? 'Juego' : 'Game';
+                      default: return isEs ? 'Serie' : 'Series';
                     }
                   };
-                  const badge = getCategoryBadge();
                   return (
                     <span
+                      className={`tag-badge tag-${ch.category || 'series'}`}
                       style={{
-                        marginTop: '0.2rem',
-                        fontSize: '0.65rem',
-                        padding: '0.1rem 0.4rem',
-                        borderRadius: '4px',
-                        background: badge.bg,
-                        color: badge.color,
-                        fontWeight: 600,
+                        marginTop: '0.25rem',
+                        fontSize: '0.62rem',
+                        padding: '0.1rem 0.45rem',
+                        fontWeight: 700,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.04em',
                       }}
                     >
-                      {badge.label}
+                      {getCategoryLabel()}
                     </span>
                   );
                 })()}
               </div>
             );
           })}
+
         </div>
 
 
