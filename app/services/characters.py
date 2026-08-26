@@ -281,32 +281,56 @@ class CharacterService:
 
         return results
 
-
     @classmethod
     def _calculate_relevance(cls, item: CharacterSearchResult, clean_query: str, raw_query: str) -> int:
         score = 0
         name_lower = item.name.lower()
         origin_lower = (item.origin or "").lower()
         
-        # 1. Exact match on character name
+        # 1. Exact string match
         if name_lower == clean_query or name_lower == raw_query:
-            score += 1000
+            return 3000
             
-        # 2. Words in name matching query
-        words = re.findall(r'\b[\w\'-]+\b', name_lower)
-        if clean_query in words or raw_query in words:
-            score += 600
-        elif any(w.startswith(clean_query) for w in words):
-            score += 400
-        elif clean_query in name_lower:
-            score += 250
+        # Extract individual words
+        clean_tokens = [w for w in re.findall(r'\b[\w\'-]+\b', clean_query) if len(w) > 1]
+        name_tokens = re.findall(r'\b[\w\'-]+\b', name_lower)
+        origin_tokens = re.findall(r'\b[\w\'-]+\b', origin_lower)
 
-        # 3. Origin / Franchise / Series match
-        origin_words = re.findall(r'\b[\w\'-]+\b', origin_lower)
-        if clean_query in origin_words or raw_query in origin_words or clean_query in origin_lower or raw_query in origin_lower:
-            score += 500
-            
-        return score
+        # 2. Multi-word query full coverage bonus
+        # If user searched "gordon freeman", check if BOTH words are in name
+        if len(clean_tokens) > 1:
+            all_in_name = all(any(nt.startswith(ct) for nt in name_tokens) for ct in clean_tokens)
+            if all_in_name:
+                score += 2000
+                if name_lower.startswith(clean_query):
+                    score += 500
+                return score
+                
+            all_in_origin = all(any(ot.startswith(ct) for ot in origin_tokens) for ct in clean_tokens)
+            if all_in_origin:
+                score += 1200
+                return score
+
+            # Partial match on multi-word query:
+            matched_name_tokens = sum(1 for ct in clean_tokens if any(nt.startswith(ct) for nt in name_tokens))
+            if matched_name_tokens > 0:
+                score += (matched_name_tokens / len(clean_tokens)) * 300
+        else:
+            # Single word query
+            token = clean_tokens[0] if clean_tokens else clean_query
+            if token in name_tokens:
+                score += 800
+            elif any(nt.startswith(token) for nt in name_tokens):
+                score += 500
+            elif token in name_lower:
+                score += 300
+                
+            if token in origin_tokens:
+                score += 400
+            elif token in origin_lower:
+                score += 200
+
+        return int(score)
 
     @classmethod
     def search_all(cls, query: str) -> List[Dict[str, Any]]:
@@ -326,7 +350,6 @@ class CharacterService:
             future_igdb = executor.submit(cls._search_igdb, search_term)
             future_tvmaze = executor.submit(cls._search_tvmaze, search_term, raw_query)
 
-
             for future in (future_anilist, future_comicvine, future_igdb, future_tvmaze):
                 try:
                     res = future.result()
@@ -338,10 +361,14 @@ class CharacterService:
         for item in all_results:
             item.score = cls._calculate_relevance(item, clean_query, raw_query)
 
-        # Filter out items with score 0 if we have at least 3 relevant results
-        scored_items = [item for item in all_results if item.score > 0]
-        if len(scored_items) < 4:
-            scored_items = all_results
+        # If we have high scoring matches (score >= 1500), filter out weak partial matches
+        high_scorers = [item for item in all_results if item.score >= 1500]
+        if high_scorers:
+            scored_items = high_scorers
+        else:
+            scored_items = [item for item in all_results if item.score > 0]
+            if len(scored_items) < 4:
+                scored_items = all_results
 
         # Sort by relevance score descending
         scored_items.sort(key=lambda x: x.score, reverse=True)
