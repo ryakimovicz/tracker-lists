@@ -174,8 +174,13 @@ async def dodo_webhook(
         "subscription.expired",
         "subscription.failed",
         "subscription.paused",
-        "entitlement_grant.revoked"
+        "entitlement_grant.revoked",
+        "refund.succeeded",
+        "dispute.lost",
+        "dispute.accepted",
+        "payment.cancelled"
     ]
+
 
     if event_type in pro_active_events:
         user.is_pro = True
