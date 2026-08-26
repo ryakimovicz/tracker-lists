@@ -11,7 +11,7 @@ class CharacterSearchResult:
     def __init__(self, name: str, image_url: str, category: str, origin: str = "", score: int = 0):
         self.name = name
         self.image_url = image_url
-        self.category = category # 'anime', 'comic', 'game', 'movie'
+        self.category = category # 'anime', 'comic', 'game', 'series', 'movie'
         self.origin = origin
         self.score = score
 
@@ -24,6 +24,12 @@ class CharacterSearchResult:
         }
 
 class CharacterService:
+    @staticmethod
+    def _clean_query_terms(query: str) -> str:
+        # Strip common leading Spanish and English articles
+        cleaned = re.sub(r'^(el|la|los|las|the|un|una)\s+', '', query.strip(), flags=re.IGNORECASE).strip()
+        return cleaned if len(cleaned) >= 2 else query.strip()
+
     @staticmethod
     def _search_anilist(query: str) -> List[CharacterSearchResult]:
         if not query:
@@ -107,7 +113,6 @@ class CharacterService:
             return []
         
         encoded_query = urllib.parse.quote(query)
-        # Use the global search endpoint dedicated to characters for best matching
         url = f"https://comicvine.gamespot.com/api/search/?api_key={settings.COMIC_VINE_API_KEY}&format=json&resources=character&query={encoded_query}&limit=12&field_list=id,name,real_name,image,publisher"
         
         req = urllib.request.Request(
@@ -191,35 +196,115 @@ class CharacterService:
             print(f"IGDB Character Search Error: {e}")
         return results
 
+    @staticmethod
+    def _search_tvmaze(query: str, raw_query: str = "") -> List[CharacterSearchResult]:
+        if not query and not raw_query:
+            return []
+        
+        results = []
+        seen_char_keys = set()
+        
+        search_terms = list(dict.fromkeys([q for q in [raw_query, query] if q and len(q.strip()) >= 2]))
+        
+        for term in search_terms:
+            encoded_query = urllib.parse.quote(term)
+            
+            # 1. Search TV shows to get main cast characters
+            shows_url = f"https://api.tvmaze.com/search/shows?q={encoded_query}"
+            try:
+                req_shows = urllib.request.Request(shows_url, headers={"User-Agent": "Pathd/1.0"})
+                with urllib.request.urlopen(req_shows, timeout=5) as response:
+                    if response.status == 200:
+                        shows_data = json.loads(response.read().decode())
+                        for s_item in shows_data[:2]:
+                            show = s_item.get("show", {}) or {}
+                            show_id = show.get("id")
+                            show_name = show.get("name") or "Series"
+                            
+                            if show_id:
+                                cast_url = f"https://api.tvmaze.com/shows/{show_id}/cast"
+                                req_cast = urllib.request.Request(cast_url, headers={"User-Agent": "Pathd/1.0"})
+                                try:
+                                    with urllib.request.urlopen(req_cast, timeout=5) as c_resp:
+                                        if c_resp.status == 200:
+                                            cast_data = json.loads(c_resp.read().decode())
+                                            for member in cast_data[:8]:
+                                                char_obj = member.get("character", {}) or {}
+                                                char_name = char_obj.get("name")
+                                                person_obj = member.get("person", {}) or {}
+                                                actor_name = person_obj.get("name")
+                                                
+                                                img_obj = char_obj.get("image") or person_obj.get("image") or {}
+                                                img_url = img_obj.get("medium") or img_obj.get("original")
+                                                
+                                                display_name = char_name or actor_name or "Character"
+                                                if char_name and actor_name and char_name != actor_name:
+                                                    display_name = f"{char_name} ({actor_name})"
+                                                    
+                                                if img_url and display_name not in seen_char_keys:
+                                                    seen_char_keys.add(display_name)
+                                                    results.append(CharacterSearchResult(
+                                                        name=display_name,
+                                                        image_url=img_url,
+                                                        category="series",
+                                                        origin=show_name
+                                                    ))
+                                except Exception:
+                                    pass
+            except Exception as e:
+                print(f"TVMaze Show Cast Search Error: {e}")
+
+            # 2. Search people/actors in TVMaze
+            people_url = f"https://api.tvmaze.com/search/people?q={encoded_query}"
+            try:
+                req_people = urllib.request.Request(people_url, headers={"User-Agent": "Pathd/1.0"})
+                with urllib.request.urlopen(req_people, timeout=5) as p_resp:
+                    if p_resp.status == 200:
+                        people_data = json.loads(p_resp.read().decode())
+                        for p_item in people_data[:5]:
+                            person = p_item.get("person", {}) or {}
+                            name = person.get("name") or "Actor"
+                            img_obj = person.get("image") or {}
+                            img_url = img_obj.get("medium") or img_obj.get("original")
+                            country = (person.get("country") or {}).get("name") or "TV & Cinema"
+                            
+                            if img_url and name not in seen_char_keys:
+                                seen_char_keys.add(name)
+                                results.append(CharacterSearchResult(
+                                    name=name,
+                                    image_url=img_url,
+                                    category="series",
+                                    origin=country
+                                ))
+            except Exception as e:
+                print(f"TVMaze People Search Error: {e}")
+
+        return results
+
+
     @classmethod
-    def _calculate_relevance(cls, item: CharacterSearchResult, clean_query: str) -> int:
+    def _calculate_relevance(cls, item: CharacterSearchResult, clean_query: str, raw_query: str) -> int:
         score = 0
         name_lower = item.name.lower()
         origin_lower = (item.origin or "").lower()
         
         # 1. Exact match on character name
-        if name_lower == clean_query:
+        if name_lower == clean_query or name_lower == raw_query:
             score += 1000
             
         # 2. Words in name matching query
         words = re.findall(r'\b[\w\'-]+\b', name_lower)
-        if clean_query in words:
+        if clean_query in words or raw_query in words:
             score += 600
         elif any(w.startswith(clean_query) for w in words):
             score += 400
         elif clean_query in name_lower:
             score += 250
 
-        # 3. Origin / Franchise match
+        # 3. Origin / Franchise / Series match
         origin_words = re.findall(r'\b[\w\'-]+\b', origin_lower)
-        if clean_query in origin_words:
-            score += 100
-        elif clean_query in origin_lower:
-            score += 50
-            
-        # Bonus for having character category
-        if item.category == 'comic':
-            score += 20
+        if clean_query in origin_words or raw_query in origin_words or clean_query in origin_lower or raw_query in origin_lower:
+            score += 500
             
         return score
 
@@ -228,14 +313,21 @@ class CharacterService:
         if not query or len(query.strip()) < 2:
             return []
 
-        clean_query = query.strip().lower()
-        all_results = []
-        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
-            future_anilist = executor.submit(cls._search_anilist, query)
-            future_comicvine = executor.submit(cls._search_comicvine, query)
-            future_igdb = executor.submit(cls._search_igdb, query)
+        raw_query = query.strip().lower()
+        clean_query = cls._clean_query_terms(query).lower()
 
-            for future in (future_anilist, future_comicvine, future_igdb):
+        # Query term to send to providers
+        search_term = clean_query if len(clean_query) >= 2 else raw_query
+
+        all_results = []
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+            future_anilist = executor.submit(cls._search_anilist, search_term)
+            future_comicvine = executor.submit(cls._search_comicvine, search_term)
+            future_igdb = executor.submit(cls._search_igdb, search_term)
+            future_tvmaze = executor.submit(cls._search_tvmaze, search_term, raw_query)
+
+
+            for future in (future_anilist, future_comicvine, future_igdb, future_tvmaze):
                 try:
                     res = future.result()
                     all_results.extend(res)
@@ -244,7 +336,7 @@ class CharacterService:
 
         # Compute relevance scores
         for item in all_results:
-            item.score = cls._calculate_relevance(item, clean_query)
+            item.score = cls._calculate_relevance(item, clean_query, raw_query)
 
         # Filter out items with score 0 if we have at least 3 relevant results
         scored_items = [item for item in all_results if item.score > 0]
@@ -262,4 +354,4 @@ class CharacterService:
                 seen_images.add(r.image_url)
                 deduped.append(r.to_dict())
 
-        return deduped[:30]
+        return deduped[:36]

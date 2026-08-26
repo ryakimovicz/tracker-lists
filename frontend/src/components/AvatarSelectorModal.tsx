@@ -196,9 +196,10 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
             className="input-field"
             placeholder={
               isEs
-                ? 'Buscar personaje (Goku, Spider-Man, Kratos, Luffy, Geralt...)'
-                : 'Search character (Goku, Spider-Man, Kratos, Luffy, Geralt...)'
+                ? 'Buscar personaje o serie (El Mentalista, Patrick Jane, Batman, Goku, Walter White...)'
+                : 'Search character or show (The Mentalist, Patrick Jane, Batman, Goku, Walter White...)'
             }
+
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             style={{ paddingLeft: '2.5rem', width: '100%' }}
