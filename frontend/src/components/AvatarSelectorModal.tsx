@@ -30,11 +30,13 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
   const isEs = language === 'es';
 
   const [query, setQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<'all' | 'movie' | 'series' | 'anime' | 'comic' | 'manga' | 'book' | 'game'>('all');
   const [results, setResults] = useState<Character[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedUrl, setSelectedUrl] = useState<string | null>(currentPhotoUrl || null);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+
 
   // Race condition prevention
   const activeRequestIdRef = useRef<number>(0);
@@ -259,6 +261,56 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
           )}
         </div>
 
+        {/* Category Filters */}
+        <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          {(['all', 'movie', 'series', 'anime', 'comic', 'manga', 'book', 'game'] as const).map(cat => {
+            const isSelected = selectedCategory === cat;
+            const catColor = cat === 'all' ? 'var(--accent-primary)' : `var(--color-${cat})`;
+            const catTextColor = cat === 'all' ? '#ffffff' : `var(--color-text-${cat})`;
+
+            const getLabel = () => {
+              switch (cat) {
+                case 'all': return isEs ? 'Todo' : 'All';
+                case 'movie': return isEs ? 'Películas' : 'Movies';
+                case 'series': return isEs ? 'Series' : 'Series';
+                case 'anime': return 'Anime';
+                case 'comic': return isEs ? 'Cómics' : 'Comics';
+                case 'manga': return 'Manga';
+                case 'book': return isEs ? 'Libros' : 'Books';
+                case 'game': return isEs ? 'Juegos' : 'Games';
+                default: return cat;
+              }
+            };
+
+            return (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => setSelectedCategory(cat)}
+                style={{
+                  padding: '0.3rem 0.65rem',
+                  fontSize: '0.78rem',
+                  fontWeight: 600,
+                  borderRadius: '20px',
+                  cursor: 'pointer',
+                  border: isSelected ? `1.5px solid ${catColor}` : '1px solid var(--border-color)',
+                  background: isSelected ? catColor : 'var(--bg-secondary)',
+                  color: isSelected ? (cat === 'all' ? '#ffffff' : catTextColor) : 'var(--text-secondary)',
+                  transition: 'all 0.15s ease',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.3rem',
+                }}
+              >
+                {!isSelected && cat !== 'all' && (
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: catColor }} />
+                )}
+                {getLabel()}
+              </button>
+            );
+          })}
+        </div>
+
         {errorMsg && (
           <div
             style={{
@@ -287,48 +339,58 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
             padding: '0.5rem 0.25rem',
           }}
         >
-          {results.length === 0 && !isLoading && (
-            <div
-              style={{
-                gridColumn: '1 / -1',
-                textAlign: 'center',
-                padding: '3rem 1rem',
-                color: 'var(--text-muted)',
-                fontSize: '0.9rem',
-              }}
-            >
-              {query.trim().length >= 2
-                ? isEs
-                  ? 'No se encontraron resultados con ese nombre.'
-                  : 'No results found with that name.'
-                : isEs
-                ? 'Escribe para buscar personajes y portadas de Películas, Series, Videojuegos, Anime, Libros y Cómics.'
-                : 'Type to search characters and covers across Movies, Shows, Games, Anime, Books, and Comics.'}
-            </div>
-          )}
+          {(() => {
+            const filteredResults = results.filter(ch => selectedCategory === 'all' || ch.category === selectedCategory);
 
-          {results.map((ch, idx) => {
-            const isSelected = selectedUrl === ch.image_url;
-            return (
-              <div
-                key={`${ch.name}-${idx}`}
-                onClick={() => setSelectedUrl(ch.image_url)}
-                style={{
-                  position: 'relative',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  cursor: 'pointer',
-                  padding: '0.5rem',
-                  borderRadius: '12px',
-                  background: isSelected ? 'rgba(124, 58, 237, 0.2)' : 'rgba(255, 255, 255, 0.03)',
-                  border: isSelected
-                    ? '2px solid var(--accent-primary)'
-                    : '1px solid var(--border-color)',
-                  transition: 'all 0.2s ease',
-                  transform: isSelected ? 'scale(1.04)' : 'scale(1)',
-                }}
-              >
+            if (filteredResults.length === 0 && !isLoading) {
+              return (
+                <div
+                  style={{
+                    gridColumn: '1 / -1',
+                    textAlign: 'center',
+                    padding: '3rem 1rem',
+                    color: 'var(--text-muted)',
+                    fontSize: '0.9rem',
+                  }}
+                >
+                  {results.length > 0
+                    ? isEs
+                      ? 'No hay resultados en esta categoría.'
+                      : 'No results found in this category.'
+                    : query.trim().length >= 2
+                    ? isEs
+                      ? 'No se encontraron resultados con ese nombre.'
+                      : 'No results found with that name.'
+                    : isEs
+                    ? 'Escribe para buscar personajes y portadas de Películas, Series, Videojuegos, Anime, Libros y Cómics.'
+                    : 'Type to search characters and covers across Movies, Shows, Games, Anime, Books, and Comics.'}
+                </div>
+              );
+            }
+
+            return filteredResults.map((ch, idx) => {
+              const isSelected = selectedUrl === ch.image_url;
+              return (
+                <div
+                  key={`${ch.name}-${idx}`}
+                  onClick={() => setSelectedUrl(ch.image_url)}
+                  style={{
+                    position: 'relative',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    cursor: 'pointer',
+                    padding: '0.5rem',
+                    borderRadius: '12px',
+                    background: isSelected ? 'rgba(124, 58, 237, 0.2)' : 'rgba(255, 255, 255, 0.03)',
+                    border: isSelected
+                      ? '2px solid var(--accent-primary)'
+                      : '1px solid var(--border-color)',
+                    transition: 'all 0.2s ease',
+                    transform: isSelected ? 'scale(1.04)' : 'scale(1)',
+                  }}
+                >
+
                 <div
                   style={{
                     width: '74px',
@@ -427,9 +489,10 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
                 })()}
               </div>
             );
-          })}
-
+          });
+        })()}
         </div>
+
 
 
 

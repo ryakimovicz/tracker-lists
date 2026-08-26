@@ -28,13 +28,14 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
   const { user, refreshProfile } = useAuth();
   const isEs = language === 'es';
 
-
   const [query, setQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<'all' | 'game' | 'anime' | 'movie' | 'series'>('all');
   const [results, setResults] = useState<BannerItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedUrl, setSelectedUrl] = useState<string | null>(currentBannerUrl || null);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+
 
   // Race condition prevention
   const activeRequestIdRef = useRef<number>(0);
@@ -344,6 +345,53 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
           )}
         </div>
 
+        {/* Category Filters */}
+        <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          {(['all', 'game', 'anime', 'movie', 'series'] as const).map(cat => {
+            const isSelected = selectedCategory === cat;
+            const catColor = cat === 'all' ? '#f59e0b' : `var(--color-${cat})`;
+            const catTextColor = cat === 'all' ? '#ffffff' : `var(--color-text-${cat})`;
+
+            const getLabel = () => {
+              switch (cat) {
+                case 'all': return isEs ? 'Todo' : 'All';
+                case 'game': return isEs ? 'Juegos' : 'Games';
+                case 'anime': return 'Anime';
+                case 'movie': return isEs ? 'Películas' : 'Movies';
+                case 'series': return isEs ? 'Series' : 'Series';
+                default: return cat;
+              }
+            };
+
+            return (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => setSelectedCategory(cat)}
+                style={{
+                  padding: '0.3rem 0.65rem',
+                  fontSize: '0.78rem',
+                  fontWeight: 600,
+                  borderRadius: '20px',
+                  cursor: 'pointer',
+                  border: isSelected ? `1.5px solid ${catColor}` : '1px solid var(--border-color)',
+                  background: isSelected ? catColor : 'var(--bg-secondary)',
+                  color: isSelected ? (cat === 'all' ? '#ffffff' : catTextColor) : 'var(--text-secondary)',
+                  transition: 'all 0.15s ease',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.3rem',
+                }}
+              >
+                {!isSelected && cat !== 'all' && (
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: catColor }} />
+                )}
+                {getLabel()}
+              </button>
+            );
+          })}
+        </div>
+
         {errorMsg && (
           <div
             style={{
@@ -372,48 +420,58 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
             padding: '0.5rem 0.25rem',
           }}
         >
-          {results.length === 0 && !isLoading && (
-            <div
-              style={{
-                gridColumn: '1 / -1',
-                textAlign: 'center',
-                padding: '3rem 1rem',
-                color: 'var(--text-muted)',
-                fontSize: '0.9rem',
-              }}
-            >
-              {query.trim().length >= 2
-                ? isEs
-                  ? 'No se encontraron portadas con ese nombre.'
-                  : 'No banners found with that name.'
-                : isEs
-                ? 'Escribe para buscar fondos y portadas de Videojuegos, Anime, Películas y Series.'
-                : 'Type to search panoramic banners from Games, Anime, Movies, and Shows.'}
-            </div>
-          )}
+          {(() => {
+            const filteredResults = results.filter(b => selectedCategory === 'all' || b.category === selectedCategory);
 
-          {results.map((b, idx) => {
-            const isSelected = selectedUrl === b.image_url;
-            return (
-              <div
-                key={`${b.title}-${idx}`}
-                onClick={() => setSelectedUrl(b.image_url)}
-                style={{
-                  position: 'relative',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  cursor: 'pointer',
-                  borderRadius: '12px',
-                  overflow: 'hidden',
-                  background: 'rgba(255, 255, 255, 0.03)',
-                  border: isSelected
-                    ? '2px solid #f59e0b'
-                    : '1px solid var(--border-color)',
-                  transition: 'all 0.2s ease',
-                  transform: isSelected ? 'scale(1.02)' : 'scale(1)',
-                  boxShadow: isSelected ? '0 0 15px rgba(245, 158, 11, 0.4)' : 'none',
-                }}
-              >
+            if (filteredResults.length === 0 && !isLoading) {
+              return (
+                <div
+                  style={{
+                    gridColumn: '1 / -1',
+                    textAlign: 'center',
+                    padding: '3rem 1rem',
+                    color: 'var(--text-muted)',
+                    fontSize: '0.9rem',
+                  }}
+                >
+                  {results.length > 0
+                    ? isEs
+                      ? 'No hay portadas en esta categoría.'
+                      : 'No banners found in this category.'
+                    : query.trim().length >= 2
+                    ? isEs
+                      ? 'No se encontraron portadas con ese nombre.'
+                      : 'No banners found with that name.'
+                    : isEs
+                    ? 'Escribe para buscar fondos y portadas de Videojuegos, Anime, Películas y Series.'
+                    : 'Type to search panoramic banners from Games, Anime, Movies, and Shows.'}
+                </div>
+              );
+            }
+
+            return filteredResults.map((b, idx) => {
+              const isSelected = selectedUrl === b.image_url;
+              return (
+                <div
+                  key={`${b.title}-${idx}`}
+                  onClick={() => setSelectedUrl(b.image_url)}
+                  style={{
+                    position: 'relative',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    cursor: 'pointer',
+                    borderRadius: '12px',
+                    overflow: 'hidden',
+                    background: 'rgba(255, 255, 255, 0.03)',
+                    border: isSelected
+                      ? '2px solid #f59e0b'
+                      : '1px solid var(--border-color)',
+                    transition: 'all 0.2s ease',
+                    transform: isSelected ? 'scale(1.02)' : 'scale(1)',
+                    boxShadow: isSelected ? '0 0 15px rgba(245, 158, 11, 0.4)' : 'none',
+                  }}
+                >
+
                 <div
                   style={{
                     width: '100%',
@@ -491,8 +549,10 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
                 </div>
               </div>
             );
-          })}
+          });
+        })()}
         </div>
+
 
         {/* Footer Actions */}
         <div
