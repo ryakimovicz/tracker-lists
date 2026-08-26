@@ -59,7 +59,29 @@ export const PrivacyPolicy: React.FC = () => {
 
         <section style={{ marginBottom: '2rem' }}>
           <h2 style={{ fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)' }}>
-            <Lock size={20} /> {isEs ? '3. Tus Derechos y Eliminación de Datos (GDPR / CCPA)' : '3. Your Rights & Data Deletion (GDPR / CCPA)'}
+            <Lock size={20} /> {isEs ? '3. Procesamiento de Pagos y Suscripciones' : '3. Payment Processing & Subscriptions'}
+          </h2>
+          <p style={{ color: 'var(--text-secondary)' }}>
+            {isEs
+              ? 'Los pagos y suscripciones de Pathd Premium son gestionados de forma segura por nuestro Merchant of Record, Dodo Payments (dodopayments.com). Pathd nunca almacena, procesa ni tiene acceso a tus números completos de tarjeta de crédito o información bancaria confidencial. Las suscripciones se renuevan automáticamente cada mes y pueden cancelarse en cualquier momento desde tu panel de usuario.'
+              : 'Payments and subscriptions for Pathd Premium are securely handled by our Merchant of Record, Dodo Payments (dodopayments.com). Pathd never stores, processes, or has access to your full credit card numbers or sensitive banking details. Subscriptions renew automatically on a monthly basis and can be cancelled at any time from your account settings.'}
+          </p>
+        </section>
+
+        <section style={{ marginBottom: '2rem' }}>
+          <h2 style={{ fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)' }}>
+            <Database size={20} /> {isEs ? '4. APIs y Servicios de Terceros' : '4. Third-Party APIs & Services'}
+          </h2>
+          <p style={{ color: 'var(--text-secondary)' }}>
+            {isEs
+              ? 'Para enriquecer tus listas con carátulas, sinopsis y datos de entretenimiento, Pathd utiliza APIs de metadatos de terceros (como IGDB/Twitch, OMDb/TMDB, Google Books, Comic Vine, Fanart.tv y Last.fm). Estos servicios no reciben tus datos personales identificables, únicamente consultas anónimas de búsqueda de contenido multimedia.'
+              : 'To enrich your lists with posters, synopses, and entertainment metadata, Pathd integrates with third-party data APIs (such as IGDB/Twitch, OMDb/TMDB, Google Books, Comic Vine, Fanart.tv, and Last.fm). These services do not receive your personal identifiable information, only anonymized media search queries.'}
+          </p>
+        </section>
+
+        <section style={{ marginBottom: '2rem' }}>
+          <h2 style={{ fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)' }}>
+            <Lock size={20} /> {isEs ? '5. Tus Derechos y Eliminación de Datos (GDPR / CCPA)' : '5. Your Rights & Data Deletion (GDPR / CCPA)'}
           </h2>
           <p style={{ color: 'var(--text-secondary)' }}>
             {isEs
@@ -70,12 +92,12 @@ export const PrivacyPolicy: React.FC = () => {
 
         <section>
           <h2 style={{ fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)' }}>
-            <Mail size={20} /> {isEs ? '4. Contacto de Privacidad' : '4. Privacy Contact'}
+            <Mail size={20} /> {isEs ? '6. Contacto de Privacidad y Soporte' : '6. Privacy & Support Contact'}
           </h2>
           <p style={{ color: 'var(--text-secondary)' }}>
             {isEs
-              ? 'Si tienes dudas sobre esta Política de Privacidad o tus datos, contáctanos en '
-              : 'If you have any questions about this Privacy Policy or your data, please contact us at '}
+              ? 'Si tienes dudas sobre esta Política de Privacidad, pagos o tus datos, contáctanos en '
+              : 'If you have any questions about this Privacy Policy, billing, or your data, please contact us at '}
             <a href="mailto:support@pathd.net" style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>support@pathd.net</a>.
           </p>
         </section>
@@ -83,4 +105,5 @@ export const PrivacyPolicy: React.FC = () => {
     </div>
   );
 };
+
 export default PrivacyPolicy;
