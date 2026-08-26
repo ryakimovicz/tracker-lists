@@ -23,8 +23,10 @@ import {
   Globe,
   Sun,
   Moon,
-  Monitor
+  Monitor,
+  Languages
 } from 'lucide-react';
+
 import { AvatarSelectorModal } from '../components/AvatarSelectorModal';
 import { ProModal } from '../components/ProModal';
 
@@ -368,8 +370,8 @@ export const SettingsPage: React.FC = () => {
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem' }}>
             {[
-              { id: 'es', label: 'Español', flag: '🇪🇸' },
-              { id: 'en', label: 'English', flag: '🇬🇧' },
+              { id: 'es', label: 'Español' },
+              { id: 'en', label: 'English' },
             ].map((item) => {
               const isSelected = language === item.id;
               return (
@@ -392,13 +394,14 @@ export const SettingsPage: React.FC = () => {
                     transition: 'all 0.2s ease',
                   }}
                 >
-                  <span style={{ fontSize: '1.1rem' }}>{item.flag}</span>
+                  <Languages size={18} />
                   <span>{item.label}</span>
                 </button>
               );
             })}
           </div>
         </div>
+
 
         {/* Section 5: Username */}
         <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px' }}>
