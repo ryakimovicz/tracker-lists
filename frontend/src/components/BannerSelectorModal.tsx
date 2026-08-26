@@ -97,7 +97,15 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
     return () => clearTimeout(timer);
   }, [query, isOpen]);
 
+  // Reset category filter if it has no results in new search
+  useEffect(() => {
+    if (selectedCategory !== 'all' && !results.some(r => r.category === selectedCategory)) {
+      setSelectedCategory('all');
+    }
+  }, [results, selectedCategory]);
+
   const handleSaveBanner = async () => {
+
     setIsSaving(true);
     setErrorMsg('');
     try {
@@ -345,52 +353,59 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
           )}
         </div>
 
-        {/* Category Filters */}
-        <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', alignItems: 'center' }}>
-          {(['all', 'game', 'anime', 'movie', 'series'] as const).map(cat => {
-            const isSelected = selectedCategory === cat;
-            const catColor = cat === 'all' ? '#f59e0b' : `var(--color-${cat})`;
-            const catTextColor = cat === 'all' ? '#ffffff' : `var(--color-text-${cat})`;
+        {/* Category Filters (Only show categories with results) */}
+        {(() => {
+          const allCategories = ['all', 'game', 'anime', 'movie', 'series'] as const;
+          const availableCategories = allCategories.filter(cat => cat === 'all' || results.some(r => r.category === cat));
 
-            const getLabel = () => {
-              switch (cat) {
-                case 'all': return isEs ? 'Todo' : 'All';
-                case 'game': return isEs ? 'Juegos' : 'Games';
-                case 'anime': return 'Anime';
-                case 'movie': return isEs ? 'Películas' : 'Movies';
-                case 'series': return isEs ? 'Series' : 'Series';
-                default: return cat;
-              }
-            };
+          if (results.length === 0 || availableCategories.length <= 1) {
+            return null;
+          }
 
-            return (
-              <button
-                key={cat}
-                type="button"
-                onClick={() => setSelectedCategory(cat)}
-                style={{
-                  padding: '0.3rem 0.65rem',
-                  fontSize: '0.78rem',
-                  fontWeight: 600,
-                  borderRadius: '20px',
-                  cursor: 'pointer',
-                  border: isSelected ? `1.5px solid ${catColor}` : '1px solid var(--border-color)',
-                  background: isSelected ? catColor : 'var(--bg-secondary)',
-                  color: isSelected ? (cat === 'all' ? '#ffffff' : catTextColor) : 'var(--text-secondary)',
-                  transition: 'all 0.15s ease',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.3rem',
-                }}
-              >
-                {!isSelected && cat !== 'all' && (
-                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: catColor }} />
-                )}
-                {getLabel()}
-              </button>
-            );
-          })}
-        </div>
+          return (
+            <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap', alignItems: 'center' }}>
+              {availableCategories.map(cat => {
+                const isSelected = selectedCategory === cat;
+                const catColor = cat === 'all' ? '#f59e0b' : `var(--color-${cat})`;
+                const catTextColor = cat === 'all' ? '#ffffff' : `var(--color-text-${cat})`;
+
+                const getLabel = () => {
+                  switch (cat) {
+                    case 'all': return isEs ? 'Todo' : 'All';
+                    case 'game': return isEs ? 'Juegos' : 'Games';
+                    case 'anime': return 'Anime';
+                    case 'movie': return isEs ? 'Películas' : 'Movies';
+                    case 'series': return isEs ? 'Series' : 'Series';
+                    default: return cat;
+                  }
+                };
+
+                return (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setSelectedCategory(cat)}
+                    style={{
+                      padding: '0.3rem 0.75rem',
+                      fontSize: '0.8rem',
+                      fontWeight: 600,
+                      borderRadius: '20px',
+                      cursor: 'pointer',
+                      border: `1.5px solid ${catColor}`,
+                      background: isSelected ? catColor : 'rgba(255, 255, 255, 0.03)',
+                      color: isSelected ? (cat === 'all' ? '#ffffff' : catTextColor) : 'var(--text-primary)',
+                      boxShadow: isSelected ? `0 0 10px ${catColor}40` : 'none',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    {getLabel()}
+                  </button>
+                );
+              })}
+            </div>
+          );
+        })()}
+
 
         {errorMsg && (
           <div
