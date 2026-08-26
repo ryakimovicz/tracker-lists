@@ -29,7 +29,8 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
   const isEs = language === 'es';
 
   const [query, setQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<'all' | 'game' | 'anime' | 'movie' | 'series'>('all');
+  const [selectedCategory, setSelectedCategory] = useState<'all' | 'movie' | 'series' | 'anime' | 'book' | 'comic' | 'manga' | 'game'>('all');
+
   const [results, setResults] = useState<BannerItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedUrl, setSelectedUrl] = useState<string | null>(currentBannerUrl || null);
@@ -356,7 +357,7 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
 
         {/* Category Filters (Only show categories with results) */}
         {(() => {
-          const allCategories = ['all', 'game', 'anime', 'movie', 'series'] as const;
+          const allCategories = ['all', 'movie', 'series', 'anime', 'book', 'comic', 'manga', 'game'] as const;
           const availableCategories = allCategories.filter(cat => cat === 'all' || results.some(r => r.category === cat));
 
           if (results.length === 0 || availableCategories.length <= 1) {
@@ -373,13 +374,17 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
                 const getLabel = () => {
                   switch (cat) {
                     case 'all': return isEs ? 'Todo' : 'All';
-                    case 'game': return isEs ? 'Juegos' : 'Games';
-                    case 'anime': return 'Anime';
                     case 'movie': return isEs ? 'Películas' : 'Movies';
                     case 'series': return isEs ? 'Series' : 'Series';
+                    case 'anime': return 'Anime';
+                    case 'book': return isEs ? 'Libros' : 'Books';
+                    case 'comic': return isEs ? 'Cómics' : 'Comics';
+                    case 'manga': return 'Manga';
+                    case 'game': return isEs ? 'Juegos' : 'Games';
                     default: return cat;
                   }
                 };
+
 
                 return (
                   <button

@@ -108,6 +108,7 @@ class BannerService:
         query ($search: String) {
           Page(page: 1, perPage: 8) {
             media(search: $search, sort: POPULARITY_DESC) {
+              type
               title { english romaji }
               bannerImage
             }
@@ -126,19 +127,22 @@ class BannerService:
                     data = json.loads(resp.read().decode())
                     for m in data.get("data", {}).get("Page", {}).get("media", []):
                         b_url = m.get("bannerImage")
-                        t = m.get("title", {}).get("english") or m.get("title", {}).get("romaji") or "Anime"
+                        m_type = (m.get("type") or "ANIME").lower()
+                        cat = "manga" if m_type == "manga" else "anime"
+                        t = m.get("title", {}).get("english") or m.get("title", {}).get("romaji") or ("Manga" if cat == "manga" else "Anime")
                         if b_url and b_url not in seen_images:
                             seen_images.add(b_url)
                             results.append(BannerSearchResult(
                                 title=t,
                                 image_url=b_url,
-                                category="anime",
+                                category=cat,
                                 origin=t
                             ))
         except Exception as e:
             print(f"AniList Banner Search Error: {e}")
             
         return results
+
 
     @classmethod
     def _search_fanart_movies(cls, query: str) -> List[BannerSearchResult]:

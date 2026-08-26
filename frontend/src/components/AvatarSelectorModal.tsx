@@ -271,7 +271,7 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
 
         {/* Category Filters (Only show categories with results) */}
         {(() => {
-          const allCategories = ['all', 'movie', 'series', 'anime', 'comic', 'manga', 'book', 'game'] as const;
+          const allCategories = ['all', 'movie', 'series', 'anime', 'book', 'comic', 'manga', 'game'] as const;
           const availableCategories = allCategories.filter(cat => cat === 'all' || results.some(r => r.category === cat));
 
           if (results.length === 0 || availableCategories.length <= 1) {
@@ -291,13 +291,14 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
                     case 'movie': return isEs ? 'Películas' : 'Movies';
                     case 'series': return isEs ? 'Series' : 'Series';
                     case 'anime': return 'Anime';
+                    case 'book': return isEs ? 'Libros' : 'Books';
                     case 'comic': return isEs ? 'Cómics' : 'Comics';
                     case 'manga': return 'Manga';
-                    case 'book': return isEs ? 'Libros' : 'Books';
                     case 'game': return isEs ? 'Juegos' : 'Games';
                     default: return cat;
                   }
                 };
+
 
                 return (
                   <button
