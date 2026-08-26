@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { apiClient } from '../api/client';
-import { Search, Sparkles, X, Check, Loader2, User as UserIcon } from 'lucide-react';
+import { Search, X, Check, Loader2, User as UserIcon } from 'lucide-react';
 
 interface Character {
   name: string;
@@ -23,13 +23,11 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
   isOpen,
   onClose,
   currentPhotoUrl,
-  isPro = false,
   onAvatarUpdated,
 }) => {
   const { language } = useTranslation();
   const { refreshProfile } = useAuth();
   const isEs = language === 'es';
-
 
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Character[]>([]);
@@ -38,43 +36,72 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  // Initial popular character suggestions when opening
-  useEffect(() => {
-    if (isOpen) {
-      setSelectedUrl(currentPhotoUrl || null);
-      setErrorMsg('');
-      if (!query.trim()) {
-        fetchCharacters('');
-      }
-    }
-  }, [isOpen]);
+  // Race condition prevention
+  const activeRequestIdRef = useRef<number>(0);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const fetchCharacters = async (searchTerm: string) => {
+    const currentRequestId = ++activeRequestIdRef.current;
+
+    // Abort previous in-flight request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     setIsLoading(true);
     setErrorMsg('');
     try {
       const res = await apiClient.get('/users/characters/search', {
         params: { query: searchTerm.trim() },
+        signal: controller.signal,
       });
-      setResults(res.data || []);
-    } catch (err) {
-      console.error('Character search error:', err);
-    } finally {
-      setIsLoading(false);
+
+      // Only update state if this is still the latest active request
+      if (currentRequestId === activeRequestIdRef.current) {
+        setResults(res.data || []);
+        setIsLoading(false);
+      }
+    } catch (err: any) {
+      if (err.name === 'CanceledError' || err.name === 'AbortError' || err.code === 'ERR_CANCELED') {
+        return;
+      }
+      if (currentRequestId === activeRequestIdRef.current) {
+        console.error('Character search error:', err);
+        setIsLoading(false);
+      }
     }
   };
 
-  // Debounce search
+  // Initial popular character suggestions when opening
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (query.trim().length >= 2) {
-        fetchCharacters(query);
-      } else if (query.trim().length === 0) {
-        fetchCharacters('');
+    if (isOpen) {
+      setSelectedUrl(currentPhotoUrl || null);
+      setErrorMsg('');
+      setQuery('');
+      fetchCharacters('');
+    } else {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
       }
-    }, 400);
+    }
+  }, [isOpen]);
+
+  // Debounced search
+  useEffect(() => {
+    if (!isOpen) return;
+
+    // Skip if query is empty because isOpen effect handles initial empty fetch
+    if (!query.trim()) return;
+
+    const timer = setTimeout(() => {
+      fetchCharacters(query);
+    }, 300);
+
     return () => clearTimeout(timer);
-  }, [query]);
+  }, [query, isOpen]);
+
 
 
   const handleSaveAvatar = async () => {
