@@ -232,12 +232,13 @@ export const SettingsPage: React.FC = () => {
                 <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: '0.35rem 0 0' }}>
                   {user?.is_pro
                     ? isEs
-                      ? '⭐ Como usuario Premium, puedes buscar tu personaje favorito y usarlo de avatar.'
-                      : '⭐ As a Premium user, you can search and choose any favorite character as your avatar.'
+                      ? 'Como usuario Premium, puedes buscar tu personaje favorito y usarlo de avatar.'
+                      : 'As a Premium user, you can search and choose any favorite character as your avatar.'
                     : isEs
                     ? 'Función exclusiva de Pathd Premium. Los usuarios gratuitos usan el avatar por defecto.'
                     : 'Exclusive to Pathd Premium. Free users have default initial avatars.'}
                 </p>
+
 
               </div>
             </div>

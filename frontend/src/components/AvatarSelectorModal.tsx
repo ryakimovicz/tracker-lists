@@ -170,11 +170,12 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
               <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                 {isPro
                   ? isEs
-                    ? '⭐ Exclusivo de Pathd Premium'
-                    : '⭐ Exclusive to Pathd Premium'
+                    ? 'Exclusivo de Pathd Premium'
+                    : 'Exclusive to Pathd Premium'
                   : isEs
                   ? '🔒 Requiere suscripción Pathd Premium'
                   : '🔒 Requires Pathd Premium subscription'}
+
               </span>
             </div>
           </div>

@@ -1374,9 +1374,10 @@ export const Profile: React.FC = () => {
               <h3 style={{ margin: 0 }}>{language === 'es' ? 'Mis Obras Destacadas' : 'My Featured Favorites'}</h3>
               <p style={{ margin: '0.25rem 0 0', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                 {profile?.is_pro
-                  ? (language === 'es' ? '⭐ Plan Premium: Puedes destacar hasta 10 elementos por categoría.' : '⭐ Premium Plan: You can feature up to 10 items per category.')
+                  ? (language === 'es' ? 'Plan Premium: Puedes destacar hasta 10 elementos por categoría.' : 'Premium Plan: You can feature up to 10 items per category.')
                   : (language === 'es' ? 'Plan Gratuito: 1 elemento destacado por categoría. Pasa a Premium para destacar hasta 10.' : 'Free Plan: 1 featured item per category. Upgrade to Premium to feature up to 10.')
                 }
+
               </p>
 
 
