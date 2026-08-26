@@ -55,15 +55,25 @@ export const SettingsPage: React.FC = () => {
   const [showBannerModal, setShowBannerModal] = useState(false);
   const [showBackgroundModal, setShowBackgroundModal] = useState(false);
   const [showProModal, setShowProModal] = useState(false);
+  const [selectedProfileColor, setSelectedProfileColor] = useState(user?.profile_color || 'amber');
   const [colorMsg, setColorMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-
   const [isUpdatingColor, setIsUpdatingColor] = useState(false);
+
+
+  useEffect(() => {
+    if (user?.profile_color) {
+      setSelectedProfileColor(user.profile_color);
+    }
+  }, [user?.profile_color]);
+
+  const activeProfileTheme = getProfileTheme(selectedProfileColor, theme === 'light');
 
   const handleSelectProfileColor = async (colorId: string) => {
     if (!user?.is_pro) {
       setShowProModal(true);
       return;
     }
+    setSelectedProfileColor(colorId);
     setIsUpdatingColor(true);
     setColorMsg(null);
     try {
@@ -83,6 +93,7 @@ export const SettingsPage: React.FC = () => {
       setIsUpdatingColor(false);
     }
   };
+
 
   // Last.fm state
   const [lastfmMsg, setLastfmMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -341,30 +352,53 @@ export const SettingsPage: React.FC = () => {
               position: 'relative',
               borderRadius: '16px',
               overflow: 'hidden',
-              border: '1px solid var(--border-color)',
-              background: user?.background_url
-                ? `url(${user.background_url}) center/cover no-repeat`
-                : 'var(--bg-primary)',
+              border: `1px solid ${activeProfileTheme.border}`,
+              backgroundColor: 'var(--bg-primary)',
               padding: '1.75rem 1.5rem 3.5rem 1.5rem',
               boxShadow: 'inset 0 0 50px rgba(0,0,0,0.5)',
               minHeight: '360px',
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'flex-start',
+              ...activeProfileTheme.cssVariables,
             }}
           >
-            {/* Ambient Background Dark Tint Overlay if background wallpaper exists */}
+            {/* Ambient Background Wallpaper Layer and Dark Overlay (Seamless Coverage) */}
             {user?.background_url && (
-              <div
-                style={{
-                  position: 'absolute',
-                  inset: 0,
-                  background: 'radial-gradient(circle at center, rgba(9, 13, 22, 0.4) 0%, rgba(9, 13, 22, 0.85) 100%)',
-                  backdropFilter: 'blur(2px)',
-                  zIndex: 0,
-                }}
-              />
+              <>
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    width: '100%',
+                    height: '100%',
+                    backgroundImage: `url(${user.background_url})`,
+                    backgroundPosition: 'center',
+                    backgroundSize: 'cover',
+                    backgroundRepeat: 'no-repeat',
+                    zIndex: 0,
+                  }}
+                />
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    width: '100%',
+                    height: '100%',
+                    background: 'linear-gradient(180deg, rgba(9, 13, 22, 0.45) 0%, rgba(9, 13, 22, 0.75) 45%, rgba(9, 13, 22, 0.96) 100%)',
+                    backdropFilter: 'blur(3px)',
+                    zIndex: 0,
+                  }}
+                />
+              </>
             )}
+
 
             {/* Banner & Header Preview Card */}
             <div
@@ -459,13 +493,14 @@ export const SettingsPage: React.FC = () => {
                       height: '76px',
                       borderRadius: '50%',
                       overflow: 'hidden',
-                      border: '3px solid var(--accent-primary)',
-                      boxShadow: '0 6px 16px rgba(0,0,0,0.4)',
+                      border: `3px solid ${activeProfileTheme.accent}`,
+                      boxShadow: `0 6px 16px ${activeProfileTheme.glow}`,
                       background: 'var(--bg-secondary)',
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
+                      transition: 'all 0.2s ease',
                     }}
                     title={isEs ? 'Haz clic para cambiar avatar' : 'Click to change avatar'}
                   >
@@ -480,7 +515,7 @@ export const SettingsPage: React.FC = () => {
                         style={{
                           width: '100%',
                           height: '100%',
-                          background: 'linear-gradient(135deg, var(--accent-primary), #4f46e5)',
+                          background: `linear-gradient(135deg, ${activeProfileTheme.accent}, #4f46e5)`,
                           color: 'white',
                           display: 'flex',
                           alignItems: 'center',
@@ -502,7 +537,7 @@ export const SettingsPage: React.FC = () => {
                       position: 'absolute',
                       bottom: '0',
                       right: '0',
-                      background: 'var(--accent-primary)',
+                      background: activeProfileTheme.accent,
                       color: 'white',
                       border: '2px solid var(--surface-color)',
                       borderRadius: '50%',
@@ -513,12 +548,14 @@ export const SettingsPage: React.FC = () => {
                       justifyContent: 'center',
                       cursor: 'pointer',
                       boxShadow: '0 2px 6px rgba(0,0,0,0.4)',
+                      transition: 'all 0.2s ease',
                     }}
                     title={isEs ? 'Cambiar Avatar' : 'Change Avatar'}
                   >
                     <Pencil size={13} />
                   </button>
                 </div>
+
 
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
@@ -623,7 +660,8 @@ export const SettingsPage: React.FC = () => {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '0.85rem' }}>
             {PROFILE_THEME_COLORS.map((col) => {
               const activeColor = theme === 'light' ? col.light.accent : col.dark.accent;
-              const isSelected = (user?.profile_color || 'amber') === col.id || user?.profile_color === col.dark.accent || user?.profile_color === col.light.accent;
+              const isSelected = selectedProfileColor === col.id || selectedProfileColor === col.dark.accent || selectedProfileColor === col.light.accent;
+
 
               return (
                 <button
