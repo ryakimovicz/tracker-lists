@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from '../context/LanguageContext';
+import { useTheme } from '../context/ThemeContext';
+import { getProfileTheme } from '../utils/profileThemes';
 import { apiClient } from '../api/client';
 import { ItemDetailsModal } from '../components/ItemDetailsModal';
 import { MediaPoster } from '../components/MediaPoster';
@@ -91,10 +93,13 @@ export const getTagClass = (type: string) => {
 
 export const Profile: React.FC = () => {
   const { t, language } = useTranslation();
+  const { theme } = useTheme();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const userIdParam = searchParams.get('user_id');
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+
+  const isLight = theme === 'light';
 
   const [showAvatarModal, setShowAvatarModal] = useState(false);
   const [showBannerModal, setShowBannerModal] = useState(false);
@@ -572,6 +577,8 @@ export const Profile: React.FC = () => {
     return <div style={{ textAlign: 'center', padding: '3rem' }}>Cargando información...</div>;
   }
 
+  const profileTheme = getProfileTheme(profile?.profile_color, isLight);
+
   return (
     <div 
       style={{ 
@@ -583,9 +590,10 @@ export const Profile: React.FC = () => {
         maxWidth: '1000px', 
         margin: '0 auto', 
         padding: '2rem 0',
-        ...(profile?.is_pro && profile?.profile_color ? { '--accent-primary': profile.profile_color } as React.CSSProperties : {})
+        ...(profile?.is_pro && profile?.profile_color ? profileTheme.cssVariables : {})
       }}
     >
+
       {/* Immersive Ambient Background Wallpaper (Fixed Background Layer) */}
       {profile?.background_url && (
         <div

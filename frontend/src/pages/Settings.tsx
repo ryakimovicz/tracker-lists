@@ -22,10 +22,14 @@ import {
   Globe,
   Sun,
   Moon,
-  Monitor,
   Pencil,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Monitor,
+  Palette
 } from 'lucide-react';
+
+import { PROFILE_THEME_COLORS, getProfileTheme } from '../utils/profileThemes';
+
 
 import { AvatarSelectorModal } from '../components/AvatarSelectorModal';
 import { BannerSelectorModal } from '../components/BannerSelectorModal';
@@ -45,11 +49,37 @@ export const SettingsPage: React.FC = () => {
   const [showBannerModal, setShowBannerModal] = useState(false);
   const [showBackgroundModal, setShowBackgroundModal] = useState(false);
   const [showProModal, setShowProModal] = useState(false);
+  const [colorMsg, setColorMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  const [isUpdatingColor, setIsUpdatingColor] = useState(false);
 
-
+  const handleSelectProfileColor = async (colorId: string) => {
+    if (!user?.is_pro) {
+      setShowProModal(true);
+      return;
+    }
+    setIsUpdatingColor(true);
+    setColorMsg(null);
+    try {
+      await apiClient.put('/users/me/color', { profile_color: colorId });
+      await refreshProfile();
+      setColorMsg({
+        type: 'success',
+        text: isEs ? 'Color de perfil y modales actualizado con éxito.' : 'Profile and modal theme color updated.',
+      });
+      setTimeout(() => setColorMsg(null), 3000);
+    } catch (err: any) {
+      setColorMsg({
+        type: 'error',
+        text: err.response?.data?.detail || (isEs ? 'Error al actualizar color.' : 'Error updating color.'),
+      });
+    } finally {
+      setIsUpdatingColor(false);
+    }
+  };
 
   // Username form state
+
   const [username, setUsername] = useState(user?.username || '');
   const [usernameMsg, setUsernameMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isUpdatingUsername, setIsUpdatingUsername] = useState(false);
@@ -357,81 +387,34 @@ export const SettingsPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Section 1c: Profile Background Wallpaper (Premium) */}
+        {/* Section 1d: Profile Accent & Modal Color (Premium) */}
         <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1.5rem', flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
-              {/* Wallpaper Preview thumbnail */}
-              <div
-                style={{
-                  width: '90px',
-                  height: '52px',
-                  borderRadius: '10px',
-                  overflow: 'hidden',
-                  background: user?.background_url
-                    ? `url(${user.background_url}) center/cover no-repeat`
-                    : 'var(--surface-color)',
-                  border: '1px solid var(--border-color)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
-                }}
-              >
-                {!user?.background_url && (
-                  <Monitor size={20} color="var(--text-muted)" opacity={0.6} />
-                )}
-              </div>
-
-              <div>
-                <h2 style={{ fontSize: '1.2rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
-                  <Monitor size={20} color="#10b981" />
-                  {isEs ? 'Fondo de Pantalla del Perfil' : 'Profile Background Wallpaper'}
-                  <span
-                    style={{
-                      fontSize: '0.7rem',
-                      background: 'rgba(245, 158, 11, 0.15)',
-                      color: '#f59e0b',
-                      padding: '0.15rem 0.45rem',
-                      borderRadius: '4px',
-                      fontWeight: 700,
-                    }}
-                  >
-                    PREMIUM
-                  </span>
-                </h2>
-                <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: '0.35rem 0 0' }}>
-                  {user?.is_pro
-                    ? isEs
-                      ? 'Fondo ambiental inmersivo en 1080p y 4K para toda tu página de perfil.'
-                      : 'Immersive 1080p and 4K wallpaper covering your entire profile page.'
-                    : isEs
-                    ? 'Desbloquea fondos ambientales en 1080p y 4K con Pathd Premium.'
-                    : 'Unlock full-page 1080p and 4K wallpapers with Pathd Premium.'}
-                </p>
-              </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <div>
+              <h2 style={{ fontSize: '1.2rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
+                <Palette size={20} color="var(--accent-primary)" />
+                {isEs ? 'Color de Acento y Modales del Perfil' : 'Profile Accent & Modal Color Theme'}
+                <span
+                  style={{
+                    fontSize: '0.7rem',
+                    background: 'rgba(245, 158, 11, 0.15)',
+                    color: '#f59e0b',
+                    padding: '0.15rem 0.45rem',
+                    borderRadius: '4px',
+                    fontWeight: 700,
+                  }}
+                >
+                  PREMIUM
+                </span>
+              </h2>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: '0.35rem 0 0' }}>
+                {isEs
+                  ? 'Personaliza el color de acento, bordes luminosos y botones de tu perfil y sus ventanas modales (calibrado para tema claro y oscuro).'
+                  : 'Customize the accent color, glowing borders, and buttons of your profile and modal windows (calibrated for both dark and light themes).'}
+              </p>
             </div>
 
-            {user?.is_pro ? (
-              <button
-                onClick={() => setShowBackgroundModal(true)}
-                className="btn-primary"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  padding: '0.65rem 1.25rem',
-                  fontSize: '0.9rem',
-                  background: 'linear-gradient(135deg, #10b981, #059669)',
-                  border: 'none',
-                  color: '#fff',
-                }}
-              >
-                <Monitor size={16} />
-                {isEs ? 'Cambiar Fondo' : 'Change Background'}
-              </button>
-            ) : (
+            {!user?.is_pro && (
               <button
                 onClick={() => setShowProModal(true)}
                 className="btn-primary"
@@ -439,20 +422,95 @@ export const SettingsPage: React.FC = () => {
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.5rem',
-                  padding: '0.65rem 1.25rem',
-                  fontSize: '0.9rem',
+                  padding: '0.5rem 1rem',
+                  fontSize: '0.85rem',
                   background: 'linear-gradient(135deg, #f59e0b, #d97706)',
                   border: 'none',
                   color: '#fff',
-                  boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)',
                 }}
               >
-                <Star size={16} fill="#fff" />
+                <Star size={14} fill="#fff" />
                 {isEs ? 'Desbloquear con Premium' : 'Unlock with Premium'}
               </button>
             )}
           </div>
+
+          {colorMsg && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                padding: '0.75rem 1rem',
+                borderRadius: '8px',
+                marginBottom: '1.25rem',
+                fontSize: '0.85rem',
+                background: colorMsg.type === 'success' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                color: colorMsg.type === 'success' ? '#10b981' : '#ef4444',
+                border: `1px solid ${colorMsg.type === 'success' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`,
+              }}
+            >
+              {colorMsg.type === 'success' ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
+              <span>{colorMsg.text}</span>
+            </div>
+          )}
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '0.85rem' }}>
+            {PROFILE_THEME_COLORS.map((col) => {
+              const activeColor = theme === 'light' ? col.light.accent : col.dark.accent;
+              const isSelected = (user?.profile_color || 'amber') === col.id || user?.profile_color === col.dark.accent || user?.profile_color === col.light.accent;
+
+              return (
+                <button
+                  key={col.id}
+                  type="button"
+                  onClick={() => handleSelectProfileColor(col.id)}
+                  disabled={isUpdatingColor}
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '0.6rem',
+                    padding: '0.9rem 0.75rem',
+                    borderRadius: '12px',
+                    border: isSelected ? `2px solid ${activeColor}` : '1px solid var(--border-color)',
+                    background: isSelected ? (theme === 'light' ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.06)') : 'var(--bg-secondary)',
+                    cursor: user?.is_pro ? 'pointer' : 'default',
+                    transition: 'all 0.2s ease',
+                    boxShadow: isSelected ? `0 0 14px ${activeColor}40` : 'none',
+                    transform: isSelected ? 'scale(1.03)' : 'scale(1)',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '50%',
+                      background: activeColor,
+                      boxShadow: `0 2px 8px ${activeColor}60`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    {isSelected && <CheckCircle size={16} color="#ffffff" />}
+                  </div>
+                  <span
+                    style={{
+                      fontSize: '0.8rem',
+                      fontWeight: isSelected ? 700 : 500,
+                      color: isSelected ? activeColor : 'var(--text-primary)',
+                      textAlign: 'center',
+                    }}
+                  >
+                    {isEs ? col.name.es : col.name.en}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
+
 
 
 

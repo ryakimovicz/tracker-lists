@@ -404,11 +404,25 @@ def update_background(
     current_user.background_url = req.background_url
     db.commit()
     db.refresh(current_user)
+class ColorUpdateRequest(BaseModel):
+    profile_color: str | None = None
+
+@router.put("/me/color", response_model=UserResponse)
+def update_profile_color(
+    req: ColorUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if not current_user.is_pro:
+        raise HTTPException(status_code=403, detail="Setting a custom profile color is a Pro feature")
+    current_user.profile_color = req.profile_color
+    db.commit()
+    db.refresh(current_user)
     return current_user
 
 
-
 class UserSettingsUpdate(BaseModel):
+
     show_nsfw: bool | None = None
     is_pro: bool | None = None
 
