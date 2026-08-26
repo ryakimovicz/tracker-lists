@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from '../context/LanguageContext';
+import { useAuth } from '../context/AuthContext';
 import { apiClient } from '../api/client';
 import { Search, Sparkles, X, Check, Loader2, User as UserIcon } from 'lucide-react';
 
@@ -26,7 +27,9 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
   onAvatarUpdated,
 }) => {
   const { language } = useTranslation();
+  const { refreshProfile } = useAuth();
   const isEs = language === 'es';
+
 
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Character[]>([]);
@@ -79,6 +82,7 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
     setErrorMsg('');
     try {
       await apiClient.put('/users/me/avatar', { photo_url: selectedUrl });
+      await refreshProfile();
       onAvatarUpdated(selectedUrl);
       onClose();
     } catch (err: any) {
@@ -91,7 +95,6 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
     } finally {
       setIsSaving(false);
     }
-
   };
 
   const handleResetToDefault = async () => {
@@ -99,6 +102,7 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
     setErrorMsg('');
     try {
       await apiClient.put('/users/me/avatar', { photo_url: null });
+      await refreshProfile();
       onAvatarUpdated(null);
       onClose();
     } catch (err: any) {
@@ -107,6 +111,7 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
       setIsSaving(false);
     }
   };
+
 
   if (!isOpen) return null;
 
