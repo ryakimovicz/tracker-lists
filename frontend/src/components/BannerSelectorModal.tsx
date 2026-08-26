@@ -430,12 +430,13 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
             overflowY: 'auto',
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+            gridAutoRows: 'max-content',
             alignContent: 'start',
-            alignItems: 'start',
             gap: '1rem',
             padding: '0.5rem 0.25rem',
           }}
         >
+
           {(() => {
             const filteredResults = results.filter(b => selectedCategory === 'all' || b.category === selectedCategory);
 
