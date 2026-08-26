@@ -383,7 +383,7 @@ export const SettingsPage: React.FC = () => {
                 textAlign: 'left',
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = '#f59e0b';
+                e.currentTarget.style.borderColor = '#8b5cf6';
                 e.currentTarget.style.transform = 'translateY(-2px)';
               }}
               onMouseLeave={(e) => {
@@ -397,11 +397,11 @@ export const SettingsPage: React.FC = () => {
                     width: '36px',
                     height: '36px',
                     borderRadius: '50%',
-                    background: 'rgba(245, 158, 11, 0.15)',
+                    background: 'rgba(139, 92, 246, 0.15)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    color: '#f59e0b',
+                    color: '#8b5cf6',
                     flexShrink: 0,
                   }}
                 >
@@ -428,6 +428,7 @@ export const SettingsPage: React.FC = () => {
               </div>
               <Pencil size={15} color="var(--text-muted)" />
             </button>
+
 
             {/* 3. Imagen de Fondo (Premium) */}
             <button
