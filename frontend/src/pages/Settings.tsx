@@ -18,14 +18,14 @@ import {
   Trash2,
   X,
   EyeOff,
-  Sparkles,
   Star,
   Globe,
   Sun,
   Moon,
   Monitor,
-  Languages
+  Pencil
 } from 'lucide-react';
+
 
 import { AvatarSelectorModal } from '../components/AvatarSelectorModal';
 import { ProModal } from '../components/ProModal';
@@ -226,7 +226,7 @@ export const SettingsPage: React.FC = () => {
 
               <div>
                 <h2 style={{ fontSize: '1.2rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
-                  <Sparkles size={20} color="var(--accent-primary)" />
+                  <User size={20} color="var(--accent-primary)" />
                   {isEs ? 'Avatar de Personaje' : 'Character Avatar'}
                 </h2>
                 <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: '0.35rem 0 0' }}>
@@ -248,11 +248,12 @@ export const SettingsPage: React.FC = () => {
                 fontSize: '0.9rem',
               }}
             >
-              <Sparkles size={16} />
+              <Pencil size={16} />
               {isEs ? 'Cambiar Avatar' : 'Change Avatar'}
             </button>
           </div>
         </div>
+
 
 
         {/* Section 2: Preferences & NSFW */}

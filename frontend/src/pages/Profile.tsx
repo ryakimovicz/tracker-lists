@@ -25,8 +25,9 @@ import {
   UserCheck,
   Users,
   X,
-  Sparkles
+  Pencil
 } from 'lucide-react';
+
 
 
 interface LibraryItem {
@@ -683,8 +684,9 @@ export const Profile: React.FC = () => {
                 }}
                 title={language === 'es' ? 'Elegir avatar de personaje' : 'Choose character avatar'}
               >
-                <Sparkles size={14} />
+                <Pencil size={14} />
               </button>
+
             )}
 
           </div>

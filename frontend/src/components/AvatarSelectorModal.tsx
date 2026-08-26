@@ -161,8 +161,9 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
                 color: 'var(--accent-primary)',
               }}
             >
-              <Sparkles size={20} />
+              <UserIcon size={20} />
             </div>
+
             <div>
               <h2 style={{ margin: 0, fontSize: '1.3rem', fontWeight: 700 }}>
                 {isEs ? 'Avatar de Personaje' : 'Character Avatar'}
