@@ -322,9 +322,9 @@ export const SettingsPage: React.FC = () => {
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem' }}>
             {[
-              { id: 'dark', label: isEs ? 'Oscuro' : 'Dark', icon: Moon },
               { id: 'light', label: isEs ? 'Claro' : 'Light', icon: Sun },
               { id: 'system', label: isEs ? 'Sistema' : 'System', icon: Monitor },
+              { id: 'dark', label: isEs ? 'Oscuro' : 'Dark', icon: Moon },
             ].map((item) => {
               const Icon = item.icon;
               const isSelected = theme === item.id;
@@ -383,7 +383,6 @@ export const SettingsPage: React.FC = () => {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: '0.6rem',
                     padding: '0.85rem 1rem',
                     borderRadius: '12px',
                     border: isSelected ? '2px solid var(--accent-primary)' : '1px solid var(--border-color)',
@@ -394,13 +393,13 @@ export const SettingsPage: React.FC = () => {
                     transition: 'all 0.2s ease',
                   }}
                 >
-                  <Languages size={18} />
                   <span>{item.label}</span>
                 </button>
               );
             })}
           </div>
         </div>
+
 
 
         {/* Section 5: Username */}
