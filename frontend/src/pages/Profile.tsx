@@ -575,6 +575,8 @@ export const Profile: React.FC = () => {
   return (
     <div 
       style={{ 
+        position: 'relative',
+        zIndex: 1,
         display: 'flex', 
         flexDirection: 'column', 
         gap: '2.5rem', 
@@ -584,7 +586,7 @@ export const Profile: React.FC = () => {
         ...(profile?.is_pro && profile?.profile_color ? { '--accent-primary': profile.profile_color } as React.CSSProperties : {})
       }}
     >
-      {/* Immersive Ambient Background Wallpaper (Fixed Layer) */}
+      {/* Immersive Ambient Background Wallpaper (Fixed Background Layer) */}
       {profile?.background_url && (
         <div
           style={{
@@ -595,7 +597,7 @@ export const Profile: React.FC = () => {
             backgroundSize: 'cover',
             backgroundRepeat: 'no-repeat',
             backgroundAttachment: 'fixed',
-            zIndex: 0,
+            zIndex: -1,
             pointerEvents: 'none',
           }}
         >
@@ -604,12 +606,13 @@ export const Profile: React.FC = () => {
             style={{
               position: 'absolute',
               inset: 0,
-              background: 'radial-gradient(circle at center, rgba(9, 13, 22, 0.7) 0%, rgba(9, 13, 22, 0.88) 75%, rgba(9, 13, 22, 0.97) 100%)',
+              background: 'radial-gradient(circle at center, rgba(9, 13, 22, 0.65) 0%, rgba(9, 13, 22, 0.88) 75%, rgba(9, 13, 22, 0.97) 100%)',
               backdropFilter: 'blur(3px)',
             }}
           />
         </div>
       )}
+
 
       {/* Profile Header Card */}
       {profile && (

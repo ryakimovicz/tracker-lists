@@ -146,7 +146,9 @@ body {
   display: flex;
   flex-direction: column;
   padding: 1.5rem;
+  z-index: 100;
 }
+
 
 .main-content {
   flex: 1;
