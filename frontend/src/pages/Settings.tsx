@@ -291,328 +291,239 @@ export const SettingsPage: React.FC = () => {
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-        {/* Section 1: Visual Profile Customizer & Live Preview */}
-        <div className="glass-card" style={{ padding: '2rem', borderRadius: '20px', overflow: 'hidden' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '0.75rem' }}>
-            <div>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
-                <User size={22} color="var(--accent-primary)" />
-                {isEs ? 'Apariencia y Vista Previa del Perfil' : 'Profile Appearance & Live Preview'}
-              </h2>
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: '0.35rem 0 0' }}>
-                {isEs
-                  ? 'Gestiona tu avatar, portada y fondo ambiental directamente sobre esta vista previa en tiempo real.'
-                  : 'Manage your avatar, banner, and ambient wallpaper directly on this real-time preview.'}
-              </p>
-            </div>
-            
-            {/* Action button for ambient background wallpaper */}
-            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-              <button
-                type="button"
-                onClick={() => {
-                  if (user?.is_pro) {
-                    setShowBackgroundModal(true);
-                  } else {
-                    setShowProModal(true);
-                  }
-                }}
-                className="btn-secondary"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.45rem',
-                  padding: '0.5rem 0.9rem',
-                  fontSize: '0.85rem',
-                  borderRadius: '10px',
-                  border: user?.background_url ? '1px solid #10b981' : '1px solid var(--border-color)',
-                  color: user?.background_url ? '#10b981' : 'var(--text-primary)',
-                  cursor: 'pointer',
-                }}
-                title={isEs ? 'Fondo de pantalla ambiental del perfil' : 'Profile ambient wallpaper'}
-              >
-                <Monitor size={15} color={user?.background_url ? '#10b981' : 'var(--text-muted)'} />
-                <span>
-                  {user?.background_url 
-                    ? (isEs ? 'Cambiar Fondo' : 'Change Background') 
-                    : (isEs ? 'Añadir Fondo' : 'Add Background')}
-                </span>
-                {!user?.is_pro && (
-                  <span style={{ fontSize: '0.65rem', background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b', padding: '0.1rem 0.35rem', borderRadius: '4px', fontWeight: 700 }}>
-                    PRO
-                  </span>
-                )}
-              </button>
-            </div>
+        {/* Section 1: Customize Profile */}
+        <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px' }}>
+
+          <div style={{ marginBottom: '1.5rem' }}>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
+              <User size={20} color="var(--accent-primary)" />
+              {isEs ? 'Personalizar Perfil' : 'Customize Profile'}
+            </h2>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: '0.35rem 0 0' }}>
+              {isEs
+                ? 'Modifica las imágenes y el color temático de tu perfil.'
+                : 'Customize your profile images and theme color.'}
+            </p>
           </div>
 
-          {/* Live Profile Stage Preview */}
-          <div
-            style={{
-              position: 'relative',
-              borderRadius: '16px',
-              overflow: 'hidden',
-              isolation: 'isolate',
-              transform: 'translateZ(0)',
-              WebkitMaskImage: '-webkit-radial-gradient(white, black)',
-              border: `1px solid ${activeProfileTheme.border}`,
-              backgroundColor: 'var(--bg-primary)',
-              padding: '1.75rem 1.5rem 3.5rem 1.5rem',
-              boxShadow: 'inset 0 0 50px rgba(0,0,0,0.5)',
-              minHeight: '360px',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'flex-start',
-              ...activeProfileTheme.cssVariables,
-            }}
-          >
-            {/* Ambient Background Wallpaper Layer and Dark Overlay (Seamless Coverage) */}
-            {user?.background_url && (
-              <>
-                <div
-                  style={{
-                    position: 'absolute',
-                    inset: 0,
-                    borderRadius: 'inherit',
-                    backgroundImage: `url(${user.background_url})`,
-                    backgroundPosition: 'center',
-                    backgroundSize: 'cover',
-                    backgroundRepeat: 'no-repeat',
-                    zIndex: 0,
-                  }}
-                />
-                <div
-                  style={{
-                    position: 'absolute',
-                    inset: 0,
-                    borderRadius: 'inherit',
-                    background: 'linear-gradient(180deg, rgba(9, 13, 22, 0.45) 0%, rgba(9, 13, 22, 0.75) 45%, rgba(9, 13, 22, 0.96) 100%)',
-                    backdropFilter: 'blur(3px)',
-                    zIndex: 0,
-                  }}
-                />
-              </>
-            )}
-
-            {/* Banner & Header Preview Card */}
-            <div
+          {/* 3 Action Buttons: Avatar, Banner, Background */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
+            {/* 1. Imagen de Perfil (Free) */}
+            <button
+              type="button"
+              onClick={() => setShowAvatarModal(true)}
               className="glass-card"
               style={{
-                position: 'relative',
-                zIndex: 1,
-                borderRadius: '14px',
-                overflow: 'hidden',
-                isolation: 'isolate',
-                transform: 'translateZ(0)',
-                WebkitMaskImage: '-webkit-radial-gradient(white, black)',
-                padding: '1.75rem',
-                border: user?.banner_url ? '1px solid rgba(255, 255, 255, 0.15)' : '1px solid var(--border-color)',
-                boxShadow: '0 12px 30px rgba(0, 0, 0, 0.45)',
+                padding: '1.15rem 1rem',
+                borderRadius: '12px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                flexWrap: 'wrap',
-                gap: '1.25rem',
+                gap: '0.75rem',
+                cursor: 'pointer',
+                border: '1px solid var(--border-color)',
+                background: 'var(--bg-secondary)',
+                transition: 'all 0.2s ease',
+                textAlign: 'left',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = 'var(--accent-primary)';
+                e.currentTarget.style.transform = 'translateY(-2px)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = 'var(--border-color)';
+                e.currentTarget.style.transform = 'translateY(0)';
               }}
             >
-              {/* Banner background layer */}
-              {user?.banner_url && (
-                <>
-                  <div
-                    style={{
-                      position: 'absolute',
-                      inset: 0,
-                      borderRadius: 'inherit',
-                      backgroundImage: `url(${user.banner_url})`,
-                      backgroundPosition: 'center',
-                      backgroundSize: 'cover',
-                      zIndex: 0,
-                    }}
-                  />
-                  <div
-                    style={{
-                      position: 'absolute',
-                      inset: 0,
-                      borderRadius: 'inherit',
-                      background: 'linear-gradient(180deg, rgba(15, 15, 20, 0.4) 0%, rgba(15, 15, 20, 0.88) 100%)',
-                      zIndex: 1,
-                    }}
-                  />
-                </>
-              )}
-
-
-              {/* Banner Edit Trigger Button on top-right of banner */}
-              <div style={{ position: 'absolute', top: '0.85rem', right: '0.85rem', zIndex: 3 }}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (user?.is_pro) {
-                      setShowBannerModal(true);
-                    } else {
-                      setShowProModal(true);
-                    }
-                  }}
-                  className="btn-secondary"
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div
                   style={{
-                    padding: '0.35rem 0.75rem',
-                    fontSize: '0.78rem',
-                    display: 'inline-flex',
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '50%',
+                    background: 'var(--border-glow)',
+                    display: 'flex',
                     alignItems: 'center',
-                    gap: '0.4rem',
-                    borderRadius: '8px',
-                    background: 'rgba(0, 0, 0, 0.65)',
-                    backdropFilter: 'blur(8px)',
-                    border: '1px solid rgba(255, 255, 255, 0.2)',
-                    color: 'white',
-                    cursor: 'pointer',
+                    justifyContent: 'center',
+                    color: 'var(--accent-primary)',
+                    flexShrink: 0,
                   }}
                 >
-                  <ImageIcon size={13} color="#f59e0b" />
-                  <span>
-                    {user?.banner_url 
-                      ? (isEs ? 'Cambiar Portada' : 'Change Banner') 
-                      : (isEs ? 'Añadir Portada' : 'Add Banner')}
+                  <User size={18} />
+                </div>
+                <span style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-primary)' }}>
+                  {isEs ? 'Imagen de perfil' : 'Profile Picture'}
+                </span>
+              </div>
+              <Pencil size={15} color="var(--text-muted)" />
+            </button>
+
+            {/* 2. Imagen de Portada (Premium) */}
+            <button
+              type="button"
+              onClick={() => {
+                if (user?.is_pro) {
+                  setShowBannerModal(true);
+                } else {
+                  setShowProModal(true);
+                }
+              }}
+              className="glass-card"
+              style={{
+                padding: '1.15rem 1rem',
+                borderRadius: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '0.75rem',
+                cursor: 'pointer',
+                border: '1px solid var(--border-color)',
+                background: 'var(--bg-secondary)',
+                transition: 'all 0.2s ease',
+                textAlign: 'left',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = '#f59e0b';
+                e.currentTarget.style.transform = 'translateY(-2px)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = 'var(--border-color)';
+                e.currentTarget.style.transform = 'translateY(0)';
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div
+                  style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '50%',
+                    background: 'rgba(245, 158, 11, 0.15)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#f59e0b',
+                    flexShrink: 0,
+                  }}
+                >
+                  <ImageIcon size={18} />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                  <span style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-primary)' }}>
+                    {isEs ? 'Imagen de portada' : 'Banner Image'}
                   </span>
-                  {!user?.is_pro && (
-                    <span style={{ fontSize: '0.65rem', background: 'rgba(245, 158, 11, 0.2)', color: '#f59e0b', padding: '0.1rem 0.35rem', borderRadius: '4px', fontWeight: 700 }}>
-                      PRO
-                    </span>
-                  )}
-                </button>
-              </div>
-
-              {/* User Avatar + Info */}
-              <div style={{ position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
-                {/* Avatar with click and hover button */}
-                <div style={{ position: 'relative' }}>
-                  <div
-                    onClick={() => setShowAvatarModal(true)}
+                  <span
                     style={{
-                      width: '76px',
-                      height: '76px',
-                      borderRadius: '50%',
-                      overflow: 'hidden',
-                      border: `3px solid ${activeProfileTheme.accent}`,
-                      boxShadow: `0 6px 16px ${activeProfileTheme.glow}`,
-                      background: 'var(--bg-secondary)',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      transition: 'all 0.2s ease',
+                      fontSize: '0.65rem',
+                      background: 'rgba(245, 158, 11, 0.15)',
+                      color: '#f59e0b',
+                      padding: '0.1rem 0.35rem',
+                      borderRadius: '4px',
+                      fontWeight: 700,
+                      alignSelf: 'flex-start',
                     }}
-                    title={isEs ? 'Haz clic para cambiar avatar' : 'Click to change avatar'}
                   >
-                    {user?.photo_url ? (
-                      <img
-                        src={user.photo_url}
-                        alt={user.username}
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                      />
-                    ) : (
-                      <div
-                        style={{
-                          width: '100%',
-                          height: '100%',
-                          background: `linear-gradient(135deg, ${activeProfileTheme.accent}, #4f46e5)`,
-                          color: 'white',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: '1.8rem',
-                          fontWeight: 800,
-                        }}
-                      >
-                        {user?.username?.charAt(0).toUpperCase() || 'U'}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Pencil badge to edit avatar */}
-                  <button
-                    type="button"
-                    onClick={() => setShowAvatarModal(true)}
-                    style={{
-                      position: 'absolute',
-                      bottom: '0',
-                      right: '0',
-                      background: activeProfileTheme.accent,
-                      color: 'white',
-                      border: '2px solid var(--surface-color)',
-                      borderRadius: '50%',
-                      width: '26px',
-                      height: '26px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      cursor: 'pointer',
-                      boxShadow: '0 2px 6px rgba(0,0,0,0.4)',
-                      transition: 'all 0.2s ease',
-                    }}
-                    title={isEs ? 'Cambiar Avatar' : 'Change Avatar'}
-                  >
-                    <Pencil size={13} />
-                  </button>
-                </div>
-
-
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-                      {user?.username}
-                    </span>
-                    {user?.is_pro && (
-                      <span
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '0.25rem',
-                          background: 'linear-gradient(135deg, #f59e0b, #d97706)',
-                          color: 'white',
-                          padding: '0.15rem 0.5rem',
-                          borderRadius: '10px',
-                          fontSize: '0.75rem',
-                          fontWeight: 700,
-                        }}
-                      >
-                        <Star size={11} fill="white" />
-                        PRO
-                      </span>
-                    )}
-                  </div>
+                    PREMIUM
+                  </span>
                 </div>
               </div>
-            </div>
+              <Pencil size={15} color="var(--text-muted)" />
+            </button>
+
+            {/* 3. Imagen de Fondo (Premium) */}
+            <button
+              type="button"
+              onClick={() => {
+                if (user?.is_pro) {
+                  setShowBackgroundModal(true);
+                } else {
+                  setShowProModal(true);
+                }
+              }}
+              className="glass-card"
+              style={{
+                padding: '1.15rem 1rem',
+                borderRadius: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '0.75rem',
+                cursor: 'pointer',
+                border: '1px solid var(--border-color)',
+                background: 'var(--bg-secondary)',
+                transition: 'all 0.2s ease',
+                textAlign: 'left',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = '#10b981';
+                e.currentTarget.style.transform = 'translateY(-2px)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = 'var(--border-color)';
+                e.currentTarget.style.transform = 'translateY(0)';
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div
+                  style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '50%',
+                    background: 'rgba(16, 185, 129, 0.15)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#10b981',
+                    flexShrink: 0,
+                  }}
+                >
+                  <Monitor size={18} />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                  <span style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-primary)' }}>
+                    {isEs ? 'Imagen de fondo' : 'Background Image'}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: '0.65rem',
+                      background: 'rgba(245, 158, 11, 0.15)',
+                      color: '#f59e0b',
+                      padding: '0.1rem 0.35rem',
+                      borderRadius: '4px',
+                      fontWeight: 700,
+                      alignSelf: 'flex-start',
+                    }}
+                  >
+                    PREMIUM
+                  </span>
+                </div>
+              </div>
+              <Pencil size={15} color="var(--text-muted)" />
+            </button>
           </div>
-        </div>
 
-
-
-        {/* Section 1d: Profile Accent & Modal Color (Premium) */}
-        <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+          {/* Color de Perfil Subheader */}
+          <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
             <div>
-              <h2 style={{ fontSize: '1.2rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
-                <Palette size={20} color="var(--accent-primary)" />
-                {isEs ? 'Color de Acento y Modales del Perfil' : 'Profile Accent & Modal Color Theme'}
+              <h3 style={{ fontSize: '1.05rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.45rem', margin: 0 }}>
+                <Palette size={18} color="var(--accent-primary)" />
+                {isEs ? 'Color de perfil' : 'Profile Color'}
                 <span
                   style={{
-                    fontSize: '0.7rem',
+                    fontSize: '0.65rem',
                     background: 'rgba(245, 158, 11, 0.15)',
                     color: '#f59e0b',
-                    padding: '0.15rem 0.45rem',
+                    padding: '0.1rem 0.35rem',
                     borderRadius: '4px',
                     fontWeight: 700,
                   }}
                 >
                   PREMIUM
                 </span>
-              </h2>
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: '0.35rem 0 0' }}>
+              </h3>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: '0.25rem 0 0' }}>
                 {isEs
-                  ? 'Personaliza el color de acento, bordes luminosos y botones de tu perfil y sus ventanas modales (calibrado para tema claro y oscuro).'
-                  : 'Customize the accent color, glowing borders, and buttons of your profile and modal windows (calibrated for both dark and light themes).'}
+                  ? 'Elige el color de acento y resplandor para tu perfil.'
+                  : 'Choose the accent and glow color for your profile.'}
               </p>
             </div>
 
@@ -623,15 +534,15 @@ export const SettingsPage: React.FC = () => {
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '0.5rem',
-                  padding: '0.5rem 1rem',
-                  fontSize: '0.85rem',
+                  gap: '0.4rem',
+                  padding: '0.4rem 0.85rem',
+                  fontSize: '0.8rem',
                   background: 'linear-gradient(135deg, #f59e0b, #d97706)',
                   border: 'none',
                   color: '#fff',
                 }}
               >
-                <Star size={14} fill="#fff" />
+                <Star size={13} fill="#fff" />
                 {isEs ? 'Desbloquear con Premium' : 'Unlock with Premium'}
               </button>
             )}
@@ -661,7 +572,6 @@ export const SettingsPage: React.FC = () => {
             {PROFILE_THEME_COLORS.map((col) => {
               const activeColor = theme === 'light' ? col.light.accent : col.dark.accent;
               const isSelected = selectedProfileColor === col.id || selectedProfileColor === col.dark.accent || selectedProfileColor === col.light.accent;
-
 
               return (
                 <button
@@ -714,44 +624,11 @@ export const SettingsPage: React.FC = () => {
           </div>
         </div>
 
-
-
-
-
-
-        {/* Section 2: Preferences & NSFW */}
-        <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px' }}>
-          <h2 style={{ fontSize: '1.2rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: 0 }}>
-            <Eye size={20} color="var(--accent-primary)" />
-            {isEs ? 'Preferencias de Contenido' : 'Content Preferences'}
-          </h2>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '1rem' }}>
-            <div>
-              <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>
-                {isEs ? 'Mostrar contenido para adultos (NSFW / +18)' : 'Show mature content (NSFW / 18+)'}
-              </div>
-              <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                {isEs
-                  ? 'Desenfoca o muestra portadas de contenido explícito o gore.'
-                  : 'Blurs or unblurs explicit or gore cover art.'}
-              </div>
-            </div>
-            <button
-              onClick={handleToggleNsfw}
-              disabled={isUpdatingNsfw}
-              className={showNsfw ? 'btn-primary' : 'btn-secondary'}
-              style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}
-            >
-              {showNsfw ? (isEs ? 'Activado' : 'Enabled') : isEs ? 'Desactivado' : 'Disabled'}
-            </button>
-          </div>
-        </div>
-
-        {/* Section 2b: Last.fm Integration */}
+        {/* Section 2: Last.fm (Mostrar música escuchada) */}
         <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px' }}>
           <h2 style={{ fontSize: '1.2rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: 0 }}>
             <Music size={20} color="#ef4444" />
-            {isEs ? 'Integración con Last.fm' : 'Last.fm Integration'}
+            {isEs ? 'Mostrar música escuchada' : 'Show Currently Playing Music'}
           </h2>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1.25rem' }}>
             {isEs
@@ -820,12 +697,39 @@ export const SettingsPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Section 3: Appearance / Theme */}
+        {/* Section 3: Preferences & NSFW */}
+        <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px' }}>
+          <h2 style={{ fontSize: '1.2rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: 0 }}>
+            <Eye size={20} color="var(--accent-primary)" />
+            {isEs ? 'Preferencias de Contenido' : 'Content Preferences'}
+          </h2>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '1rem' }}>
+            <div>
+              <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>
+                {isEs ? 'Mostrar contenido para adultos (NSFW / +18)' : 'Show mature content (NSFW / 18+)'}
+              </div>
+              <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                {isEs
+                  ? 'Desenfoca o muestra portadas de contenido explícito o gore.'
+                  : 'Blurs or unblurs explicit or gore cover art.'}
+              </div>
+            </div>
+            <button
+              onClick={handleToggleNsfw}
+              disabled={isUpdatingNsfw}
+              className={showNsfw ? 'btn-primary' : 'btn-secondary'}
+              style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}
+            >
+              {showNsfw ? (isEs ? 'Activado' : 'Enabled') : isEs ? 'Desactivado' : 'Disabled'}
+            </button>
+          </div>
+        </div>
 
+        {/* Section 4: Theme */}
         <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px' }}>
           <h2 style={{ fontSize: '1.2rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: 0 }}>
             <Sun size={20} color="var(--accent-primary)" />
-            {isEs ? 'Tema y Apariencia' : 'Theme & Appearance'}
+            {isEs ? 'Tema' : 'Theme'}
           </h2>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1.25rem' }}>
             {isEs
