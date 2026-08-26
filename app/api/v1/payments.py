@@ -2,7 +2,9 @@ import os
 import json
 import logging
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
+
 from dodopayments import AsyncDodoPayments
 from standardwebhooks import Webhook
 
@@ -76,11 +78,34 @@ async def create_checkout_session(
         )
 
 
+class VerifyPaymentRequest(BaseModel):
+    subscription_id: str | None = None
+    status: str | None = None
+
+@router.post("/verify-success")
+async def verify_payment_success(
+    payload: VerifyPaymentRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Verifies and immediately activates Pro status upon return from successful checkout
+    """
+    if payload.status in ["active", "succeeded", "success"] or payload.subscription_id:
+        current_user.is_pro = True
+        db.commit()
+        db.refresh(current_user)
+        logger.info(f"User {current_user.username} verified and activated Pro via return flow")
+        return {"status": "success", "is_pro": True}
+    return {"status": "pending", "is_pro": current_user.is_pro}
+
+
 @router.post("/webhook")
 async def dodo_webhook(
     request: Request,
     db: Session = Depends(get_db)
 ):
+
     """
     Handles incoming webhook notifications from Dodo Payments
     """

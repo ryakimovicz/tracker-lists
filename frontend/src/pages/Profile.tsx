@@ -130,6 +130,27 @@ export const Profile: React.FC = () => {
     }
   }, [libraryItems, searchParams]);
 
+  // Handle return from Dodo Payments checkout flow
+  useEffect(() => {
+    const payment = searchParams.get('payment');
+    const subscriptionId = searchParams.get('subscription_id');
+    const status = searchParams.get('status');
+
+    if (payment === 'success') {
+      apiClient.post('/payments/verify-success', {
+        subscription_id: subscriptionId,
+        status: status || 'active'
+      }).then(() => {
+        fetchProfileAndLibrary();
+        setSuccessMsg(language === 'es' ? '⭐ ¡Bienvenido a Pathd Premium! Tu suscripción se activó con éxito.' : '⭐ Welcome to Pathd Premium! Your subscription was successfully activated.');
+        setTimeout(() => setSuccessMsg(''), 6000);
+      }).catch(err => {
+        console.error('Error verifying payment:', err);
+      });
+    }
+  }, [searchParams, language]);
+
+
   // Viewer state for full list details
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
   const [activities, setActivities] = useState<any[]>([]);
