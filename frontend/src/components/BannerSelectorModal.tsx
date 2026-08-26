@@ -25,8 +25,9 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
   onBannerUpdated,
 }) => {
   const { language } = useTranslation();
-  const { refreshProfile } = useAuth();
+  const { user, refreshProfile } = useAuth();
   const isEs = language === 'es';
+
 
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<BannerItem[]>([]);
@@ -217,46 +218,89 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
           </button>
         </div>
 
-        {/* Live Preview of Selected Banner */}
+        {/* Live Preview of Selected Banner (Matches Profile Header 1:1) */}
         <div
           style={{
             position: 'relative',
             width: '100%',
-            height: '110px',
-            borderRadius: '12px',
+            height: '175px',
+            borderRadius: '16px',
             overflow: 'hidden',
             background: selectedUrl
-              ? `url(${selectedUrl}) center/cover no-repeat`
+              ? `linear-gradient(180deg, rgba(15, 15, 20, 0.4) 0%, rgba(15, 15, 20, 0.85) 60%, rgba(15, 15, 20, 0.98) 100%), url(${selectedUrl}) center/cover no-repeat`
               : 'var(--surface-color)',
-            border: '1px solid var(--border-color)',
+            border: selectedUrl ? '1px solid rgba(255, 255, 255, 0.12)' : '1px solid var(--border-color)',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
             display: 'flex',
-            alignItems: 'flex-end',
-            padding: '0.75rem 1rem',
+            alignItems: 'center',
+            padding: '1.5rem 1.75rem',
+            gap: '1.25rem',
           }}
         >
-          {selectedUrl && (
-            <div
-              style={{
-                position: 'absolute',
-                inset: 0,
-                background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 70%)',
-              }}
-            />
-          )}
-          <div
-            style={{
-              position: 'relative',
-              zIndex: 1,
-              color: selectedUrl ? 'white' : 'var(--text-muted)',
-              fontSize: '0.8rem',
-              fontWeight: 600,
-            }}
-          >
-            {selectedUrl
-              ? (isEs ? 'Vista previa de la portada seleccionada' : 'Selected banner preview')
-              : (isEs ? 'Sin portada (Fondo liso estándar)' : 'No banner (Standard solid background)')}
+          {/* Avatar simulation */}
+          <div style={{ position: 'relative', zIndex: 2, flexShrink: 0 }}>
+            {user?.photo_url ? (
+              <img
+                src={user.photo_url}
+                alt={user.username}
+                style={{
+                  width: 68,
+                  height: 68,
+                  borderRadius: '50%',
+                  objectFit: 'cover',
+                  border: '2.5px solid var(--accent-primary)',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+                }}
+              />
+            ) : (
+              <div
+                style={{
+                  width: 68,
+                  height: 68,
+                  borderRadius: '50%',
+                  border: '2.5px solid var(--accent-primary)',
+                  background: 'linear-gradient(135deg, var(--accent-primary), #4f46e5)',
+                  color: 'white',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '1.5rem',
+                  fontWeight: 800,
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+                }}
+              >
+                {user?.username?.charAt(0).toUpperCase() || 'U'}
+              </div>
+            )}
+          </div>
+
+          {/* User info simulation */}
+          <div style={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                {user?.username || 'Username'}
+              </span>
+              <span
+                style={{
+                  fontSize: '0.65rem',
+                  background: 'rgba(245, 158, 11, 0.15)',
+                  color: '#f59e0b',
+                  padding: '0.1rem 0.35rem',
+                  borderRadius: '3px',
+                  fontWeight: 700,
+                }}
+              >
+                PREMIUM
+              </span>
+            </div>
+            <span style={{ fontSize: '0.75rem', color: selectedUrl ? 'rgba(255,255,255,0.7)' : 'var(--text-muted)' }}>
+              {selectedUrl
+                ? (isEs ? '✨ Vista previa exacta de cómo se verá en tu perfil' : '✨ Exact live preview of your profile header')
+                : (isEs ? 'Sin portada (Fondo liso estándar del perfil)' : 'No banner (Standard solid profile background)')}
+            </span>
           </div>
         </div>
+
 
 
         {/* Search Input */}
