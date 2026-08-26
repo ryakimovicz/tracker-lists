@@ -163,7 +163,7 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
         style={{
           width: '100%',
           maxWidth: '720px',
-          maxHeight: '90vh',
+          height: 'min(760px, 92vh)',
           display: 'flex',
           flexDirection: 'column',
           borderRadius: '20px',
@@ -175,6 +175,7 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
           overflow: 'hidden',
         }}
       >
+
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -427,10 +428,10 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
           style={{
             flex: 1,
             overflowY: 'auto',
-            minHeight: '260px',
-            maxHeight: '340px',
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+            alignContent: 'start',
+            alignItems: 'start',
             gap: '1rem',
             padding: '0.5rem 0.25rem',
           }}
@@ -515,21 +516,24 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
                       <Check size={26} color="white" strokeWidth={3} />
                     </div>
                   )}
-                  <span
-                    className={`tag-badge tag-${b.category || 'game'}`}
-                    style={{
-                      position: 'absolute',
-                      top: '6px',
-                      right: '6px',
-                      fontSize: '0.6rem',
-                      padding: '0.1rem 0.4rem',
-                      fontWeight: 700,
-                      textTransform: 'uppercase',
-                    }}
-                  >
-                    {b.category === 'game' ? (isEs ? 'Juego' : 'Game') : b.category === 'anime' ? 'Anime' : b.category === 'movie' ? (isEs ? 'Película' : 'Movie') : (isEs ? 'Serie' : 'Series')}
-                  </span>
+                  {selectedCategory === 'all' && (
+                    <span
+                      className={`tag-badge tag-${b.category || 'game'}`}
+                      style={{
+                        position: 'absolute',
+                        top: '6px',
+                        right: '6px',
+                        fontSize: '0.6rem',
+                        padding: '0.1rem 0.4rem',
+                        fontWeight: 700,
+                        textTransform: 'uppercase',
+                      }}
+                    >
+                      {b.category === 'game' ? (isEs ? 'Juego' : 'Game') : b.category === 'anime' ? 'Anime' : b.category === 'movie' ? (isEs ? 'Película' : 'Movie') : (isEs ? 'Serie' : 'Series')}
+                    </span>
+                  )}
                 </div>
+
 
                 <div style={{ padding: '0.5rem 0.6rem', textAlign: 'left' }}>
                   <span

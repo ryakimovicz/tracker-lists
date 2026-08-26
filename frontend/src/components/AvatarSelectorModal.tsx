@@ -175,7 +175,7 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
         style={{
           width: '100%',
           maxWidth: '640px',
-          maxHeight: '90vh',
+          height: 'min(640px, 90vh)',
           display: 'flex',
           flexDirection: 'column',
           padding: '1.75rem',
@@ -185,6 +185,7 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
           overflow: 'hidden',
         }}
       >
+
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
@@ -345,10 +346,10 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
           style={{
             flex: 1,
             overflowY: 'auto',
-            minHeight: '280px',
-            maxHeight: '360px',
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))',
+            alignContent: 'start',
+            alignItems: 'start',
             gap: '1rem',
             padding: '0.5rem 0.25rem',
           }}
@@ -472,7 +473,7 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
                   </span>
                 )}
 
-                {(() => {
+                {selectedCategory === 'all' && (() => {
                   const getCategoryLabel = () => {
                     switch (ch.category) {
                       case 'series': return isEs ? 'Serie' : 'Series';
@@ -506,6 +507,7 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
           });
         })()}
         </div>
+
 
 
 
