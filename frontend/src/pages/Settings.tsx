@@ -280,175 +280,279 @@ export const SettingsPage: React.FC = () => {
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-        {/* Section 1: Avatar */}
-        <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1.25rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+        {/* Section 1: Visual Profile Customizer & Live Preview */}
+        <div className="glass-card" style={{ padding: '2rem', borderRadius: '20px', overflow: 'hidden' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <div>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
+                <User size={22} color="var(--accent-primary)" />
+                {isEs ? 'Apariencia y Vista Previa del Perfil' : 'Profile Appearance & Live Preview'}
+              </h2>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: '0.35rem 0 0' }}>
+                {isEs
+                  ? 'Gestiona tu avatar, portada y fondo ambiental directamente sobre esta vista previa en tiempo real.'
+                  : 'Manage your avatar, banner, and ambient wallpaper directly on this real-time preview.'}
+              </p>
+            </div>
+            
+            {/* Action button for ambient background wallpaper */}
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  if (user?.is_pro) {
+                    setShowBackgroundModal(true);
+                  } else {
+                    setShowProModal(true);
+                  }
+                }}
+                className="btn-secondary"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.45rem',
+                  padding: '0.5rem 0.9rem',
+                  fontSize: '0.85rem',
+                  borderRadius: '10px',
+                  border: user?.background_url ? '1px solid #10b981' : '1px solid var(--border-color)',
+                  color: user?.background_url ? '#10b981' : 'var(--text-primary)',
+                  cursor: 'pointer',
+                }}
+                title={isEs ? 'Fondo de pantalla ambiental del perfil' : 'Profile ambient wallpaper'}
+              >
+                <Monitor size={15} color={user?.background_url ? '#10b981' : 'var(--text-muted)'} />
+                <span>
+                  {user?.background_url 
+                    ? (isEs ? 'Cambiar Fondo' : 'Change Background') 
+                    : (isEs ? 'Añadir Fondo' : 'Add Background')}
+                </span>
+                {!user?.is_pro && (
+                  <span style={{ fontSize: '0.65rem', background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b', padding: '0.1rem 0.35rem', borderRadius: '4px', fontWeight: 700 }}>
+                    PRO
+                  </span>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Live Profile Stage Preview */}
+          <div
+            style={{
+              position: 'relative',
+              borderRadius: '16px',
+              overflow: 'hidden',
+              border: '1px solid var(--border-color)',
+              background: user?.background_url
+                ? `url(${user.background_url}) center/cover no-repeat`
+                : 'var(--bg-primary)',
+              padding: '1.25rem',
+              boxShadow: 'inset 0 0 40px rgba(0,0,0,0.5)',
+              minHeight: '220px',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'flex-end',
+            }}
+          >
+            {/* Ambient Background Dark Tint Overlay if background wallpaper exists */}
+            {user?.background_url && (
               <div
                 style={{
-                  width: '76px',
-                  height: '76px',
-                  borderRadius: '50%',
-                  overflow: 'hidden',
-                  background: 'var(--bg-secondary)',
-                  border: '2px solid var(--border-color)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: '0 8px 16px rgba(0,0,0,0.3)',
+                  position: 'absolute',
+                  inset: 0,
+                  background: 'radial-gradient(circle at center, rgba(9, 13, 22, 0.45) 0%, rgba(9, 13, 22, 0.85) 100%)',
+                  backdropFilter: 'blur(2px)',
+                  zIndex: 0,
                 }}
-              >
-                {user?.photo_url ? (
-                  <img
-                    src={user.photo_url}
-                    alt={user.username}
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                  />
-                ) : (
+              />
+            )}
+
+            {/* Banner & Header Preview Card */}
+            <div
+              className="glass-card"
+              style={{
+                position: 'relative',
+                zIndex: 1,
+                borderRadius: '14px',
+                overflow: 'hidden',
+                padding: '1.5rem',
+                border: user?.banner_url ? '1px solid rgba(255, 255, 255, 0.15)' : '1px solid var(--border-color)',
+                boxShadow: '0 10px 25px rgba(0, 0, 0, 0.4)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '1.25rem',
+              }}
+            >
+              {/* Banner background layer */}
+              {user?.banner_url && (
+                <>
                   <div
                     style={{
-                      width: '100%',
-                      height: '100%',
-                      background: 'linear-gradient(135deg, var(--accent-primary), #4f46e5)',
-                      color: 'white',
+                      position: 'absolute',
+                      inset: 0,
+                      backgroundImage: `url(${user.banner_url})`,
+                      backgroundPosition: 'center',
+                      backgroundSize: 'cover',
+                      zIndex: 0,
+                    }}
+                  />
+                  <div
+                    style={{
+                      position: 'absolute',
+                      inset: 0,
+                      background: 'linear-gradient(180deg, rgba(15, 15, 20, 0.4) 0%, rgba(15, 15, 20, 0.88) 100%)',
+                      zIndex: 1,
+                    }}
+                  />
+                </>
+              )}
+
+              {/* Banner Edit Trigger Button on top-right of banner */}
+              <div style={{ position: 'absolute', top: '0.85rem', right: '0.85rem', zIndex: 3 }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (user?.is_pro) {
+                      setShowBannerModal(true);
+                    } else {
+                      setShowProModal(true);
+                    }
+                  }}
+                  className="btn-secondary"
+                  style={{
+                    padding: '0.35rem 0.75rem',
+                    fontSize: '0.78rem',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.4rem',
+                    borderRadius: '8px',
+                    background: 'rgba(0, 0, 0, 0.65)',
+                    backdropFilter: 'blur(8px)',
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    color: 'white',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <ImageIcon size={13} color="#f59e0b" />
+                  <span>
+                    {user?.banner_url 
+                      ? (isEs ? 'Cambiar Portada' : 'Change Banner') 
+                      : (isEs ? 'Añadir Portada' : 'Add Banner')}
+                  </span>
+                  {!user?.is_pro && (
+                    <span style={{ fontSize: '0.65rem', background: 'rgba(245, 158, 11, 0.2)', color: '#f59e0b', padding: '0.1rem 0.35rem', borderRadius: '4px', fontWeight: 700 }}>
+                      PRO
+                    </span>
+                  )}
+                </button>
+              </div>
+
+              {/* User Avatar + Info */}
+              <div style={{ position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+                {/* Avatar with click and hover button */}
+                <div style={{ position: 'relative' }}>
+                  <div
+                    onClick={() => setShowAvatarModal(true)}
+                    style={{
+                      width: '76px',
+                      height: '76px',
+                      borderRadius: '50%',
+                      overflow: 'hidden',
+                      border: '3px solid var(--accent-primary)',
+                      boxShadow: '0 6px 16px rgba(0,0,0,0.4)',
+                      background: 'var(--bg-secondary)',
+                      cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      fontSize: '1.75rem',
-                      fontWeight: 700,
                     }}
+                    title={isEs ? 'Haz clic para cambiar avatar' : 'Click to change avatar'}
                   >
-                    {user?.username?.charAt(0).toUpperCase() || 'U'}
+                    {user?.photo_url ? (
+                      <img
+                        src={user.photo_url}
+                        alt={user.username}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
+                    ) : (
+                      <div
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          background: 'linear-gradient(135deg, var(--accent-primary), #4f46e5)',
+                          color: 'white',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '1.8rem',
+                          fontWeight: 800,
+                        }}
+                      >
+                        {user?.username?.charAt(0).toUpperCase() || 'U'}
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
 
-              <div>
-                <h2 style={{ fontSize: '1.2rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
-                  <User size={20} color="var(--accent-primary)" />
-                  {isEs ? 'Avatar de Personaje' : 'Character Avatar'}
-                </h2>
-                <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: '0.35rem 0 0' }}>
-                  {isEs
-                    ? 'Personaliza tu imagen de perfil eligiendo tu personaje favorito de anime, videojuegos, series o cómics.'
-                    : 'Customize your profile picture by choosing your favorite character from anime, games, shows, or comics.'}
-                </p>
-              </div>
-            </div>
-
-            <button
-              onClick={() => setShowAvatarModal(true)}
-              className="btn-primary"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                padding: '0.65rem 1.25rem',
-                fontSize: '0.9rem',
-              }}
-            >
-              <Pencil size={16} />
-              {isEs ? 'Cambiar Avatar' : 'Change Avatar'}
-            </button>
-          </div>
-        </div>
-
-        {/* Section 1.5: Profile Banner (Premium) */}
-        <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1.5rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-              <div
-                style={{
-                  width: '90px',
-                  height: '52px',
-                  borderRadius: '10px',
-                  overflow: 'hidden',
-                  background: user?.banner_url
-                    ? `url(${user.banner_url}) center/cover no-repeat`
-                    : 'var(--surface-color)',
-                  border: '1px solid var(--border-color)',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-                  flexShrink: 0,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                {!user?.banner_url && (
-                  <ImageIcon size={20} color="var(--text-muted)" opacity={0.6} />
-                )}
-              </div>
-
-
-              <div>
-                <h2 style={{ fontSize: '1.2rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
-                  <ImageIcon size={20} color="#f59e0b" />
-                  {isEs ? 'Portada de Perfil' : 'Profile Banner'}
-                  <span
+                  {/* Pencil badge to edit avatar */}
+                  <button
+                    type="button"
+                    onClick={() => setShowAvatarModal(true)}
                     style={{
-                      fontSize: '0.7rem',
-                      background: 'rgba(245, 158, 11, 0.15)',
-                      color: '#f59e0b',
-                      padding: '0.15rem 0.45rem',
-                      borderRadius: '4px',
-                      fontWeight: 700,
+                      position: 'absolute',
+                      bottom: '0',
+                      right: '0',
+                      background: 'var(--accent-primary)',
+                      color: 'white',
+                      border: '2px solid var(--surface-color)',
+                      borderRadius: '50%',
+                      width: '26px',
+                      height: '26px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.4)',
                     }}
+                    title={isEs ? 'Cambiar Avatar' : 'Change Avatar'}
                   >
-                    PREMIUM
+                    <Pencil size={13} />
+                  </button>
+                </div>
+
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                      {user?.username}
+                    </span>
+                    {user?.is_pro && (
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.25rem',
+                          background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                          color: 'white',
+                          padding: '0.15rem 0.5rem',
+                          borderRadius: '10px',
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                        }}
+                      >
+                        <Star size={11} fill="white" />
+                        PRO
+                      </span>
+                    )}
+                  </div>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                    {isEs ? 'Haz clic en el avatar, portada o fondo para personalizarlos' : 'Click on avatar, banner, or background to customize'}
                   </span>
-                </h2>
-                <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: '0.35rem 0 0' }}>
-                  {user?.is_pro
-                    ? isEs
-                      ? 'Personaliza el encabezado panorámico de tu perfil con fondos en alta definición.'
-                      : 'Customize your profile header with high-definition panoramic wallpapers.'
-                    : isEs
-                    ? 'Desbloquea fondos panorámicos en 1080p y 4K con Pathd Premium.'
-                    : 'Unlock panoramic 1080p and 4K profile banners with Pathd Premium.'}
-                </p>
+                </div>
               </div>
             </div>
-
-            {user?.is_pro ? (
-              <button
-                onClick={() => setShowBannerModal(true)}
-                className="btn-primary"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  padding: '0.65rem 1.25rem',
-                  fontSize: '0.9rem',
-                  background: 'linear-gradient(135deg, #f59e0b, #d97706)',
-                  border: 'none',
-                  color: '#fff',
-                }}
-              >
-                <ImageIcon size={16} />
-                {isEs ? 'Cambiar Portada' : 'Change Banner'}
-              </button>
-            ) : (
-              <button
-                onClick={() => setShowProModal(true)}
-                className="btn-primary"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  padding: '0.65rem 1.25rem',
-                  fontSize: '0.9rem',
-                  background: 'linear-gradient(135deg, #f59e0b, #d97706)',
-                  border: 'none',
-                  color: '#fff',
-                  boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)',
-                }}
-              >
-                <Star size={16} fill="#fff" />
-                {isEs ? 'Desbloquear con Premium' : 'Unlock with Premium'}
-              </button>
-            )}
           </div>
         </div>
+
 
         {/* Section 1d: Profile Accent & Modal Color (Premium) */}
         <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px' }}>
