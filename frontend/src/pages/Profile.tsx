@@ -782,7 +782,8 @@ export const Profile: React.FC = () => {
           </div>
 
 
-          <div style={{ flex: 1, minWidth: 250, textAlign: 'left' }}>
+          <div style={{ position: 'relative', zIndex: 2, flex: 1, minWidth: 250, textAlign: 'left' }}>
+
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.4rem', flexWrap: 'wrap' }}>
               <h1 style={{ margin: 0, fontSize: '2rem', fontWeight: 800 }}>{profile.username}</h1>
               {profile.is_pro && (
