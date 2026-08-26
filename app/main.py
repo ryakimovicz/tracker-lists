@@ -16,6 +16,17 @@ with engine.connect() as conn:
         conn.commit()
     except Exception:
         pass
+    try:
+        conn.execute(text("ALTER TABLE users ADD COLUMN custom_banner_url VARCHAR(500);"))
+        conn.commit()
+    except Exception:
+        pass
+    try:
+        conn.execute(text("ALTER TABLE users ADD COLUMN custom_background_url VARCHAR(500);"))
+        conn.commit()
+    except Exception:
+        pass
+
 
 
 app = FastAPI(

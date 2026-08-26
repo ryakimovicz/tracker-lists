@@ -6,10 +6,10 @@ import { ItemDetailsModal } from '../components/ItemDetailsModal';
 import { MediaPoster } from '../components/MediaPoster';
 import { AvatarSelectorModal } from '../components/AvatarSelectorModal';
 import { BannerSelectorModal } from '../components/BannerSelectorModal';
+import { BackgroundSelectorModal } from '../components/BackgroundSelectorModal';
 import { ProModal } from '../components/ProModal';
 
 import {
-
   BookOpen,
   Calendar,
   Grid,
@@ -27,8 +27,10 @@ import {
   Users,
   X,
   Pencil,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Monitor
 } from 'lucide-react';
+
 
 
 
@@ -58,6 +60,7 @@ interface UserProfile {
   email: string;
   photo_url: string;
   banner_url?: string;
+  background_url?: string;
   is_admin: boolean;
   show_nsfw: boolean;
   created_at: string;
@@ -95,6 +98,7 @@ export const Profile: React.FC = () => {
 
   const [showAvatarModal, setShowAvatarModal] = useState(false);
   const [showBannerModal, setShowBannerModal] = useState(false);
+  const [showBackgroundModal, setShowBackgroundModal] = useState(false);
   const [showProModal, setShowProModal] = useState(false);
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -580,7 +584,33 @@ export const Profile: React.FC = () => {
         ...(profile?.is_pro && profile?.profile_color ? { '--accent-primary': profile.profile_color } as React.CSSProperties : {})
       }}
     >
-      
+      {/* Immersive Ambient Background Wallpaper (Fixed Layer) */}
+      {profile?.background_url && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundImage: `url(${profile.background_url})`,
+            backgroundPosition: 'center',
+            backgroundSize: 'cover',
+            backgroundRepeat: 'no-repeat',
+            backgroundAttachment: 'fixed',
+            zIndex: 0,
+            pointerEvents: 'none',
+          }}
+        >
+          {/* Subtle blur and dark atmospheric vignette */}
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              background: 'radial-gradient(circle at center, rgba(9, 13, 22, 0.7) 0%, rgba(9, 13, 22, 0.88) 75%, rgba(9, 13, 22, 0.97) 100%)',
+              backdropFilter: 'blur(3px)',
+            }}
+          />
+        </div>
+      )}
+
       {/* Profile Header Card */}
       {profile && (
         <div 
@@ -624,48 +654,92 @@ export const Profile: React.FC = () => {
             </>
           )}
 
-          {/* Change Banner Button (for profile owner) */}
+          {/* Header Action Buttons (Change Background & Change Banner) */}
           {isOwnProfile && (
-            <button
-              onClick={() => {
-                if (profile.is_pro || currentUser?.is_pro) {
-                  setShowBannerModal(true);
-                } else {
-                  setShowProModal(true);
-                }
-              }}
-              className="btn-secondary"
+            <div
               style={{
                 position: 'absolute',
                 top: '1rem',
                 right: '1rem',
-                padding: '0.35rem 0.75rem',
-                fontSize: '0.78rem',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.4rem',
-                borderRadius: '8px',
-                background: 'rgba(0, 0, 0, 0.65)',
-                backdropFilter: 'blur(8px)',
-                border: '1px solid rgba(255, 255, 255, 0.2)',
-                color: 'white',
-                cursor: 'pointer',
+                display: 'flex',
+                gap: '0.5rem',
                 zIndex: 3,
               }}
-              title={
-                profile.is_pro || currentUser?.is_pro
-                  ? (language === 'es' ? 'Cambiar portada de perfil' : 'Change profile banner')
-                  : (language === 'es' ? 'Desbloquear portada de perfil con Premium' : 'Unlock profile banner with Premium')
-              }
             >
-              <ImageIcon size={14} color="#f59e0b" />
-              <span>
-                {profile.banner_url 
-                  ? (language === 'es' ? 'Cambiar Portada' : 'Change Banner') 
-                  : (language === 'es' ? 'Añadir Portada' : 'Add Banner')}
-              </span>
-            </button>
+              <button
+                onClick={() => {
+                  if (profile.is_pro || currentUser?.is_pro) {
+                    setShowBackgroundModal(true);
+                  } else {
+                    setShowProModal(true);
+                  }
+                }}
+                className="btn-secondary"
+                style={{
+                  padding: '0.35rem 0.75rem',
+                  fontSize: '0.78rem',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                  borderRadius: '8px',
+                  background: 'rgba(0, 0, 0, 0.65)',
+                  backdropFilter: 'blur(8px)',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  color: 'white',
+                  cursor: 'pointer',
+                }}
+                title={
+                  profile.is_pro || currentUser?.is_pro
+                    ? (language === 'es' ? 'Cambiar fondo de pantalla del perfil' : 'Change profile background wallpaper')
+                    : (language === 'es' ? 'Desbloquear fondo de perfil con Premium' : 'Unlock profile background with Premium')
+                }
+              >
+                <Monitor size={14} color="#10b981" />
+                <span>
+                  {profile.background_url 
+                    ? (language === 'es' ? 'Cambiar Fondo' : 'Change Background') 
+                    : (language === 'es' ? 'Añadir Fondo' : 'Add Background')}
+                </span>
+              </button>
+
+              <button
+                onClick={() => {
+                  if (profile.is_pro || currentUser?.is_pro) {
+                    setShowBannerModal(true);
+                  } else {
+                    setShowProModal(true);
+                  }
+                }}
+                className="btn-secondary"
+                style={{
+                  padding: '0.35rem 0.75rem',
+                  fontSize: '0.78rem',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                  borderRadius: '8px',
+                  background: 'rgba(0, 0, 0, 0.65)',
+                  backdropFilter: 'blur(8px)',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  color: 'white',
+                  cursor: 'pointer',
+                }}
+                title={
+                  profile.is_pro || currentUser?.is_pro
+                    ? (language === 'es' ? 'Cambiar portada de perfil' : 'Change profile banner')
+                    : (language === 'es' ? 'Desbloquear portada de perfil con Premium' : 'Unlock profile banner with Premium')
+                }
+              >
+                <ImageIcon size={14} color="#f59e0b" />
+                <span>
+                  {profile.banner_url 
+                    ? (language === 'es' ? 'Cambiar Portada' : 'Change Banner') 
+                    : (language === 'es' ? 'Añadir Portada' : 'Add Banner')}
+                </span>
+              </button>
+            </div>
           )}
+
 
           <div style={{ position: 'relative', zIndex: 2 }}>
 
@@ -1945,10 +2019,22 @@ export const Profile: React.FC = () => {
         }}
       />
 
+      {/* Background Wallpaper Selector Modal (Premium) */}
+      <BackgroundSelectorModal
+        isOpen={showBackgroundModal}
+        onClose={() => setShowBackgroundModal(false)}
+        currentBackgroundUrl={profile?.background_url}
+        onBackgroundUpdated={(newUrl) => {
+          setProfile(prev => prev ? { ...prev, background_url: newUrl || '' } : null);
+          setCurrentUser(prev => prev ? { ...prev, background_url: newUrl || '' } : null);
+        }}
+      />
+
       {/* Pro / Premium Modal */}
       {showProModal && (
         <ProModal onClose={() => setShowProModal(false)} />
       )}
+
 
     </div>
   );

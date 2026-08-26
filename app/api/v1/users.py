@@ -55,6 +55,7 @@ def get_user_dashboard(
         created_at=current_user.created_at,
         photo_url=current_user.photo_url,
         banner_url=current_user.banner_url,
+        background_url=current_user.background_url,
         is_admin=current_user.is_admin,
         show_nsfw=current_user.show_nsfw,
         is_pro=current_user.is_pro,
@@ -389,6 +390,23 @@ def update_banner(
     return current_user
 
 
+class BackgroundUpdateRequest(BaseModel):
+    background_url: str | None = None
+
+@router.put("/me/background", response_model=UserResponse)
+def update_background(
+    req: BackgroundUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if not current_user.is_pro:
+        raise HTTPException(status_code=403, detail="Setting a custom profile background is a Pro feature")
+    current_user.background_url = req.background_url
+    db.commit()
+    db.refresh(current_user)
+    return current_user
+
+
 
 class UserSettingsUpdate(BaseModel):
     show_nsfw: bool | None = None
@@ -586,6 +604,7 @@ def get_any_user_profile(
         created_at=user.created_at,
         photo_url=user.photo_url,
         banner_url=user.banner_url,
+        background_url=user.background_url,
         is_admin=user.is_admin,
         show_nsfw=user.show_nsfw,
         is_pro=user.is_pro,

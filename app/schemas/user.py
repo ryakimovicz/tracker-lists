@@ -13,6 +13,7 @@ class UserResponse(UserBase):
     created_at: datetime
     photo_url: str | None = None
     banner_url: str | None = None
+    background_url: str | None = None
     is_admin: bool = False
     show_nsfw: bool = False
     is_pro: bool = False
@@ -42,6 +43,7 @@ class UserDashboardResponse(BaseModel):
     created_at: datetime
     photo_url: str | None = None
     banner_url: str | None = None
+    background_url: str | None = None
     is_admin: bool = False
     show_nsfw: bool = False
     is_pro: bool = False
@@ -55,5 +57,6 @@ class UserDashboardResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
 
 

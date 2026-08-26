@@ -22,6 +22,7 @@ class User(Base):
     profile_color = Column(String(20), nullable=True)
     custom_photo_url = Column(String(500), nullable=True)
     custom_banner_url = Column(String(500), nullable=True)
+    custom_background_url = Column(String(500), nullable=True)
 
     # Relationships
     lists = relationship("ReadingList", back_populates="creator", cascade="all, delete-orphan")
@@ -47,5 +48,14 @@ class User(Base):
     @banner_url.setter
     def banner_url(self, value: str | None):
         self.custom_banner_url = value
+
+    @property
+    def background_url(self) -> str | None:
+        return self.custom_background_url
+
+    @background_url.setter
+    def background_url(self, value: str | None):
+        self.custom_background_url = value
+
 
 

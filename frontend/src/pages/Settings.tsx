@@ -29,7 +29,9 @@ import {
 
 import { AvatarSelectorModal } from '../components/AvatarSelectorModal';
 import { BannerSelectorModal } from '../components/BannerSelectorModal';
+import { BackgroundSelectorModal } from '../components/BackgroundSelectorModal';
 import { ProModal } from '../components/ProModal';
+
 
 export const SettingsPage: React.FC = () => {
   const { user, refreshProfile, logout } = useAuth();
@@ -41,7 +43,9 @@ export const SettingsPage: React.FC = () => {
   // Modal states
   const [showAvatarModal, setShowAvatarModal] = useState(false);
   const [showBannerModal, setShowBannerModal] = useState(false);
+  const [showBackgroundModal, setShowBackgroundModal] = useState(false);
   const [showProModal, setShowProModal] = useState(false);
+
 
 
 
@@ -352,6 +356,104 @@ export const SettingsPage: React.FC = () => {
             )}
           </div>
         </div>
+
+        {/* Section 1c: Profile Background Wallpaper (Premium) */}
+        <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1.5rem', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+              {/* Wallpaper Preview thumbnail */}
+              <div
+                style={{
+                  width: '90px',
+                  height: '52px',
+                  borderRadius: '10px',
+                  overflow: 'hidden',
+                  background: user?.background_url
+                    ? `url(${user.background_url}) center/cover no-repeat`
+                    : 'var(--surface-color)',
+                  border: '1px solid var(--border-color)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                }}
+              >
+                {!user?.background_url && (
+                  <Monitor size={20} color="var(--text-muted)" opacity={0.6} />
+                )}
+              </div>
+
+              <div>
+                <h2 style={{ fontSize: '1.2rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
+                  <Monitor size={20} color="#10b981" />
+                  {isEs ? 'Fondo de Pantalla del Perfil' : 'Profile Background Wallpaper'}
+                  <span
+                    style={{
+                      fontSize: '0.7rem',
+                      background: 'rgba(245, 158, 11, 0.15)',
+                      color: '#f59e0b',
+                      padding: '0.15rem 0.45rem',
+                      borderRadius: '4px',
+                      fontWeight: 700,
+                    }}
+                  >
+                    PREMIUM
+                  </span>
+                </h2>
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: '0.35rem 0 0' }}>
+                  {user?.is_pro
+                    ? isEs
+                      ? 'Fondo ambiental inmersivo en 1080p y 4K para toda tu página de perfil.'
+                      : 'Immersive 1080p and 4K wallpaper covering your entire profile page.'
+                    : isEs
+                    ? 'Desbloquea fondos ambientales en 1080p y 4K con Pathd Premium.'
+                    : 'Unlock full-page 1080p and 4K wallpapers with Pathd Premium.'}
+                </p>
+              </div>
+            </div>
+
+            {user?.is_pro ? (
+              <button
+                onClick={() => setShowBackgroundModal(true)}
+                className="btn-primary"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  padding: '0.65rem 1.25rem',
+                  fontSize: '0.9rem',
+                  background: 'linear-gradient(135deg, #10b981, #059669)',
+                  border: 'none',
+                  color: '#fff',
+                }}
+              >
+                <Monitor size={16} />
+                {isEs ? 'Cambiar Fondo' : 'Change Background'}
+              </button>
+            ) : (
+              <button
+                onClick={() => setShowProModal(true)}
+                className="btn-primary"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  padding: '0.65rem 1.25rem',
+                  fontSize: '0.9rem',
+                  background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                  border: 'none',
+                  color: '#fff',
+                  boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)',
+                }}
+              >
+                <Star size={16} fill="#fff" />
+                {isEs ? 'Desbloquear con Premium' : 'Unlock with Premium'}
+              </button>
+            )}
+          </div>
+        </div>
+
 
 
 
@@ -911,10 +1013,21 @@ export const SettingsPage: React.FC = () => {
         }}
       />
 
+      {/* Background Selector Modal (Premium) */}
+      <BackgroundSelectorModal
+        isOpen={showBackgroundModal}
+        onClose={() => setShowBackgroundModal(false)}
+        currentBackgroundUrl={user?.background_url}
+        onBackgroundUpdated={async () => {
+          await refreshProfile();
+        }}
+      />
+
       {/* Pro / Premium Modal */}
       {showProModal && (
         <ProModal onClose={() => setShowProModal(false)} />
       )}
+
 
     </div>
   );
