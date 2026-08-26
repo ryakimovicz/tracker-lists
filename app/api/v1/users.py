@@ -507,7 +507,24 @@ def delete_account(
 
     user_id = current_user.id
 
+    # 0. Cancel Dodo Payments subscription if active so user is never billed again
+    if current_user.dodo_subscription_id:
+        try:
+            import asyncio
+            from app.api.v1.payments import cancel_dodo_subscription_direct
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    asyncio.create_task(cancel_dodo_subscription_direct(current_user.dodo_subscription_id))
+                else:
+                    loop.run_until_complete(cancel_dodo_subscription_direct(current_user.dodo_subscription_id))
+            except Exception:
+                pass
+        except Exception:
+            pass
+
     # 1. Delete comments and review votes/reports
+
     db.query(CommentVote).filter(CommentVote.user_id == user_id).delete()
     db.query(CommentReport).filter(CommentReport.user_id == user_id).delete()
     db.query(Comment).filter(Comment.user_id == user_id).delete()

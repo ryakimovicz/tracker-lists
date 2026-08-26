@@ -26,8 +26,11 @@ class User(Base):
     suspension_reason = Column(String(500), nullable=True)
     admin_warning = Column(String(500), nullable=True)
     admin_warning_at = Column(DateTime(timezone=True), nullable=True)
+    dodo_subscription_id = Column(String(100), nullable=True)
+    dodo_customer_id = Column(String(100), nullable=True)
     profile_color = Column(String(20), nullable=True)
     custom_photo_url = Column(String(500), nullable=True)
+
     custom_banner_url = Column(String(500), nullable=True)
     custom_background_url = Column(String(500), nullable=True)
 

@@ -59,6 +59,34 @@ export const SettingsPage: React.FC = () => {
   const [colorMsg, setColorMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isUpdatingColor, setIsUpdatingColor] = useState(false);
 
+  // Subscription management
+  const [cancelSubLoading, setCancelSubLoading] = useState(false);
+  const [cancelSubMsg, setCancelSubMsg] = useState<string | null>(null);
+  const [cancelSubError, setCancelSubError] = useState<string | null>(null);
+
+  const handleCancelSubscription = async () => {
+    const confirmCancel = window.confirm(
+      isEs
+        ? '¿Deseas cancelar la renovación de tu suscripción Premium? No se te volverá a cobrar ningún cargo futuro y mantendrás el acceso a todas las funciones Premium hasta que finalice el ciclo que ya pagaste.'
+        : 'Do you want to cancel your Premium renewal? You will retain full access until the end of your current billing period, and you will not be charged again.'
+    );
+    if (!confirmCancel) return;
+
+    setCancelSubLoading(true);
+    setCancelSubMsg(null);
+    setCancelSubError(null);
+    try {
+      const res = await apiClient.post('/payments/cancel-subscription');
+      setCancelSubMsg(res.data.message || (isEs ? 'Suscripción cancelada con éxito.' : 'Subscription cancelled successfully.'));
+      await refreshProfile();
+    } catch (err: any) {
+      setCancelSubError(err.response?.data?.detail || 'Error cancelling subscription');
+    } finally {
+      setCancelSubLoading(false);
+    }
+  };
+
+
 
   useEffect(() => {
     if (user?.profile_color) {
@@ -1019,8 +1047,52 @@ export const SettingsPage: React.FC = () => {
           </form>
         </div>
 
-        {/* Section 4: Legal & Policies */}
+        {/* Section 4: Membership & Subscription Management */}
+        {user?.is_pro && !user?.is_admin && !user?.is_vip && (
+          <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', marginBottom: '1rem' }}>
+              <div>
+                <h2 style={{ fontSize: '1.2rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0, color: 'var(--text-primary)' }}>
+                  <Star size={20} color="#f59e0b" fill="#f59e0b" />
+                  {isEs ? 'Membresía Pathd Premium' : 'Pathd Premium Membership'}
+                </h2>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: '0.4rem 0 0' }}>
+                  {isEs
+                    ? 'Tu suscripción está activa. Puedes cancelar la renovación automática en cualquier momento.'
+                    : 'Your subscription is active. You can cancel auto-renewal at any time.'}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                disabled={cancelSubLoading}
+                onClick={handleCancelSubscription}
+                className="btn-secondary"
+                style={{ color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.4)', fontSize: '0.85rem', padding: '0.55rem 1.1rem' }}
+              >
+                {cancelSubLoading ? (isEs ? 'Cancelando...' : 'Cancelling...') : (isEs ? 'Cancelar Suscripción' : 'Cancel Subscription')}
+              </button>
+            </div>
+
+            {cancelSubMsg && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', border: '1px solid #10b981', padding: '0.75rem 1rem', borderRadius: 10, fontSize: '0.85rem' }}>
+                <CheckCircle size={16} />
+                <span>{cancelSubMsg}</span>
+              </div>
+            )}
+
+            {cancelSubError && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', border: '1px solid #ef4444', padding: '0.75rem 1rem', borderRadius: 10, fontSize: '0.85rem' }}>
+                <AlertCircle size={16} />
+                <span>{cancelSubError}</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Section 5: Legal & Policies */}
         <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px' }}>
+
           <h2 style={{ fontSize: '1.2rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: 0 }}>
             <FileText size={20} color="var(--accent-primary)" />
             {isEs ? 'Legal y Términos' : 'Legal & Policies'}

@@ -10,7 +10,8 @@ from standardwebhooks import Webhook
 
 from app.core.config import settings
 from app.core.database import get_db
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, get_current_user_allow_suspended
+
 from app.models.user import User
 
 from app.api.v1.users import trim_downgraded_user_favorites
@@ -93,11 +94,62 @@ async def verify_payment_success(
     """
     if payload.status in ["active", "succeeded", "success"] or payload.subscription_id:
         current_user.is_pro = True
+        if payload.subscription_id:
+            current_user.dodo_subscription_id = payload.subscription_id
         db.commit()
         db.refresh(current_user)
-        logger.info(f"User {current_user.username} verified and activated Pro via return flow")
+        logger.info(f"User {current_user.username} verified and activated Pro via return flow (sub={payload.subscription_id})")
         return {"status": "success", "is_pro": True}
     return {"status": "pending", "is_pro": current_user.is_pro}
+
+
+async def cancel_dodo_subscription_direct(subscription_id: str):
+    """
+    Directly requests Dodo Payments to cancel a subscription at next billing date (stops renewals)
+    """
+    if not subscription_id or not settings.DODO_PAYMENTS_API_KEY:
+        return
+    client = get_dodo_client()
+    try:
+        await client.subscriptions.update(
+            subscription_id=subscription_id,
+            cancel_at_next_billing_date=True,
+            cancel_reason="cancelled_by_customer"
+        )
+        logger.info(f"Dodo subscription {subscription_id} scheduled for cancellation at next billing date.")
+    except Exception as e:
+        logger.error(f"Error cancelling Dodo subscription {subscription_id}: {e}")
+
+
+@router.post("/cancel-subscription")
+async def cancel_my_subscription(
+    current_user: User = Depends(get_current_user_allow_suspended),
+    db: Session = Depends(get_db)
+):
+
+    """
+    Cancels auto-renewal of Premium subscription. Access remains active until the end of the paid period.
+    """
+    sub_id = current_user.dodo_subscription_id
+    if sub_id:
+        await cancel_dodo_subscription_direct(sub_id)
+        return {
+            "message": "Tu suscripción ha sido cancelada. Mantendrás todos los beneficios Premium hasta que finalice tu período ya abonado y no se te volverá a cobrar.",
+            "status": "cancelled_at_period_end"
+        }
+    else:
+        # If user had a manual grant or mock pro
+        current_user.is_pro = False
+        trim_downgraded_user_favorites(db, current_user.id)
+        current_user.banner_url = None
+        current_user.background_url = None
+        current_user.profile_color = None
+        db.commit()
+        return {
+            "message": "Suscripción Premium cancelada con éxito.",
+            "status": "cancelled"
+        }
+
 
 
 @router.post("/webhook")

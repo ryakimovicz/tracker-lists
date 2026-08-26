@@ -2,13 +2,16 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../context/LanguageContext';
 import { apiClient } from '../api/client';
-import { Ban, LogOut, Mail, Clock, Trash2 } from 'lucide-react';
+import { Ban, LogOut, Mail, Clock, Trash2, Star, CheckCircle } from 'lucide-react';
 
 export const SuspendedAccountModal: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, refreshProfile } = useAuth();
   const { language } = useTranslation();
   const isEs = language === 'es';
+  
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isCancellingSub, setIsCancellingSub] = useState(false);
+  const [cancelSubMessage, setCancelSubMessage] = useState<string | null>(null);
 
   if (!user || !user.is_suspended) {
     return null;
@@ -17,11 +20,31 @@ export const SuspendedAccountModal: React.FC = () => {
   const isPermanent = !user.suspended_until;
   const suspensionEndDate = user.suspended_until ? new Date(user.suspended_until) : null;
 
+  const handleCancelSubscription = async () => {
+    const confirmCancel = window.confirm(
+      isEs
+        ? '¿Deseas cancelar la renovación de tu suscripción Premium? No se te volverá a cobrar ningún cargo futuro y mantendrás el acceso a todas las funciones Premium hasta que finalice el ciclo que ya pagaste.'
+        : 'Do you want to cancel your Premium renewal? You will retain full access until the end of your current billing period, and you will not be charged again.'
+    );
+    if (!confirmCancel) return;
+
+    setIsCancellingSub(true);
+    try {
+      const res = await apiClient.post('/payments/cancel-subscription');
+      setCancelSubMessage(res.data.message || (isEs ? 'Renovación de suscripción cancelada.' : 'Subscription renewal cancelled.'));
+      await refreshProfile();
+    } catch (err) {
+      alert(isEs ? 'Error al cancelar la suscripción. Contáctanos a support@pathd.net' : 'Error cancelling subscription. Please contact support@pathd.net');
+    } finally {
+      setIsCancellingSub(false);
+    }
+  };
+
   const handleDeleteMyAccount = async () => {
     const confirmDelete = window.confirm(
       isEs
-        ? '¿Estás seguro de que deseas eliminar tu cuenta permanentemente? Conforme a las leyes de privacidad, se borrarán todos tus datos personales, listas y contenido de forma irreversible.'
-        : 'Are you sure you want to permanently delete your account? Under privacy laws, all your personal data, lists, and content will be irreversibly wiped.'
+        ? '¿Estás seguro de que deseas eliminar tu cuenta permanentemente? Conforme a las leyes de privacidad, se cancelarán de inmediato todas tus suscripciones activas y se borrarán tus datos personales de forma irreversible.'
+        : 'Are you sure you want to permanently delete your account? Under privacy laws, all active subscriptions will be cancelled and your data permanently wiped.'
     );
     if (!confirmDelete) return;
 
@@ -127,6 +150,29 @@ export const SuspendedAccountModal: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* Premium Subscription Cancellation Option for Suspended Users */}
+        {user.is_pro && (
+          <div style={{ width: '100%', marginBottom: '1.25rem' }}>
+            {cancelSubMessage ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', padding: '0.6rem 0.9rem', borderRadius: 8, fontSize: '0.85rem' }}>
+                <CheckCircle size={15} />
+                <span>{cancelSubMessage}</span>
+              </div>
+            ) : (
+              <button
+                type="button"
+                disabled={isCancellingSub}
+                onClick={handleCancelSubscription}
+                className="btn-secondary"
+                style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', fontSize: '0.85rem', padding: '0.55rem', color: '#f59e0b', borderColor: 'rgba(245, 158, 11, 0.4)' }}
+              >
+                <Star size={15} />
+                {isCancellingSub ? (isEs ? 'Cancelando suscripción...' : 'Cancelling subscription...') : (isEs ? 'Cancelar renovación de suscripción Premium' : 'Cancel Premium subscription renewal')}
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Support appeal info */}
         <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>

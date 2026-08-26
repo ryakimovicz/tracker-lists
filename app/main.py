@@ -61,6 +61,17 @@ with engine.connect() as conn:
         conn.commit()
     except Exception:
         pass
+    try:
+        conn.execute(text("ALTER TABLE users ADD COLUMN dodo_subscription_id VARCHAR(100);"))
+        conn.commit()
+    except Exception:
+        pass
+    try:
+        conn.execute(text("ALTER TABLE users ADD COLUMN dodo_customer_id VARCHAR(100);"))
+        conn.commit()
+    except Exception:
+        pass
+
 
 
 
