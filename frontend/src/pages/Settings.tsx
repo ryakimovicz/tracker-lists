@@ -271,8 +271,35 @@ export const SettingsPage: React.FC = () => {
           </div>
         </div>
 
+        {/* Section 2: Preferences & NSFW */}
+        <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px' }}>
+          <h2 style={{ fontSize: '1.2rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: 0 }}>
+            <Eye size={20} color="var(--accent-primary)" />
+            {isEs ? 'Preferencias de Contenido' : 'Content Preferences'}
+          </h2>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '1rem' }}>
+            <div>
+              <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>
+                {isEs ? 'Mostrar contenido para adultos (NSFW / +18)' : 'Show mature content (NSFW / 18+)'}
+              </div>
+              <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                {isEs
+                  ? 'Desenfoca o muestra portadas de contenido explícito o gore.'
+                  : 'Blurs or unblurs explicit or gore cover art.'}
+              </div>
+            </div>
+            <button
+              onClick={handleToggleNsfw}
+              disabled={isUpdatingNsfw}
+              className={showNsfw ? 'btn-primary' : 'btn-secondary'}
+              style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}
+            >
+              {showNsfw ? (isEs ? 'Habilitado' : 'Enabled') : isEs ? 'Deshabilitado' : 'Disabled'}
+            </button>
+          </div>
+        </div>
 
-        {/* Section 2: Username */}
+        {/* Section 3: Username */}
         <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px' }}>
           <h2 style={{ fontSize: '1.2rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: 0 }}>
             <User size={20} color="var(--accent-primary)" />
@@ -324,41 +351,13 @@ export const SettingsPage: React.FC = () => {
           </form>
         </div>
 
-        {/* Section 2: Preferences & NSFW */}
-
-        <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px' }}>
-          <h2 style={{ fontSize: '1.2rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: 0 }}>
-            <Eye size={20} color="var(--accent-primary)" />
-            {isEs ? 'Preferencias de Contenido' : 'Content Preferences'}
-          </h2>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '1rem' }}>
-            <div>
-              <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>
-                {isEs ? 'Mostrar contenido para adultos (NSFW / +18)' : 'Show mature content (NSFW / 18+)'}
-              </div>
-              <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                {isEs
-                  ? 'Desenfoca o muestra portadas de contenido explícito o gore.'
-                  : 'Blurs or unblurs explicit or gore cover art.'}
-              </div>
-            </div>
-            <button
-              onClick={handleToggleNsfw}
-              disabled={isUpdatingNsfw}
-              className={showNsfw ? 'btn-primary' : 'btn-secondary'}
-              style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}
-            >
-              {showNsfw ? (isEs ? 'Habilitado' : 'Enabled') : isEs ? 'Deshabilitado' : 'Disabled'}
-            </button>
-          </div>
-        </div>
-
-        {/* Section 3: Password Change */}
+        {/* Section 4: Password Change */}
         <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px' }}>
           <h2 style={{ fontSize: '1.2rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: 0 }}>
             <Lock size={20} color="var(--accent-primary)" />
             {isEs ? 'Cambiar Contraseña' : 'Change Password'}
           </h2>
+
 
           {passwordMsg && (
             <div
