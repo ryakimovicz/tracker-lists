@@ -11,7 +11,7 @@ class CharacterSearchResult:
     def __init__(self, name: str, image_url: str, category: str, origin: str = "", score: int = 0):
         self.name = name
         self.image_url = image_url
-        self.category = category # 'anime', 'comic', 'game', 'series', 'movie'
+        self.category = category # 'anime', 'comic', 'game', 'series'
         self.origin = origin
         self.score = score
 
@@ -24,32 +24,13 @@ class CharacterSearchResult:
         }
 
 class CharacterService:
-    # Common movie franchise keywords that shouldn't be labeled as anime
-    MOVIE_FRANCHISES = [
-        "star wars", "lord of the rings", "harry potter", "indiana jones",
-        "pirates of the caribbean", "jurassic park", "godfather", "matrix",
-        "terminator", "alien", "predator", "back to the future", "james bond",
-        "avatar", "hunger games", "twilight", "marvel cinematic universe"
-    ]
-
-    @classmethod
-    def _detect_category(cls, name: str, origin: str, default_cat: str) -> str:
-        origin_lower = (origin or "").lower()
-        name_lower = name.lower()
-        
-        for mf in cls.MOVIE_FRANCHISES:
-            if mf in origin_lower or mf in name_lower:
-                return "movie"
-                
-        return default_cat
-
     @staticmethod
     def _clean_query_terms(query: str) -> str:
         cleaned = re.sub(r'^(el|la|los|las|the|un|una)\s+', '', query.strip(), flags=re.IGNORECASE).strip()
         return cleaned if len(cleaned) >= 2 else query.strip()
 
-    @classmethod
-    def _search_anilist(cls, query: str) -> List[CharacterSearchResult]:
+    @staticmethod
+    def _search_anilist(query: str) -> List[CharacterSearchResult]:
         if not query:
             return []
         url = "https://graphql.anilist.co"
@@ -113,22 +94,20 @@ class CharacterService:
                             first_media = media_nodes[0]
                             title_obj = first_media.get("title", {})
                             origin = title_obj.get("english") or title_obj.get("romaji") or ""
-                            
-                        category = cls._detect_category(full_name, origin, "anime")
 
                         if img_url and not img_url.endswith("default.jpg"):
                             results.append(CharacterSearchResult(
                                 name=full_name,
                                 image_url=img_url,
-                                category=category,
+                                category="anime",
                                 origin=origin
                             ))
         except Exception as e:
             print(f"AniList Character Search Error: {e}")
         return results
 
-    @classmethod
-    def _search_comicvine(cls, query: str) -> List[CharacterSearchResult]:
+    @staticmethod
+    def _search_comicvine(query: str) -> List[CharacterSearchResult]:
         if not query or not settings.COMIC_VINE_API_KEY:
             return []
         
@@ -156,14 +135,12 @@ class CharacterService:
                         img_obj = ch.get("image", {}) or {}
                         img_url = img_obj.get("medium_url") or img_obj.get("super_url") or img_obj.get("small_url")
                         publisher = (ch.get("publisher") or {}).get("name") or "Comic"
-                        
-                        category = cls._detect_category(name, publisher, "comic")
 
                         if img_url and "default" not in img_url.lower():
                             results.append(CharacterSearchResult(
                                 name=display_name,
                                 image_url=img_url,
-                                category=category,
+                                category="comic",
                                 origin=publisher
                             ))
         except Exception as e:
@@ -305,7 +282,7 @@ class CharacterService:
                             name = person.get("name") or "Actor"
                             img_obj = person.get("image") or {}
                             img_url = img_obj.get("medium") or img_obj.get("original")
-                            country = (person.get("country") or {}).get("name") or "TV & Cinema"
+                            country = (person.get("country") or {}).get("name") or "TV Series"
                             
                             if img_url and name not in seen_char_keys:
                                 seen_char_keys.add(name)
@@ -321,67 +298,18 @@ class CharacterService:
         return results
 
     @classmethod
-    def _search_movies(cls, query: str) -> List[CharacterSearchResult]:
-        """Search Wikipedia / Cinema encyclopedia for movie & film characters."""
-        if not query or len(query.strip()) < 2:
-            return []
-        
-        results = []
-        encoded = urllib.parse.quote(query + " fictional character")
-        search_url = f"https://en.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch={encoded}&gsrlimit=3&prop=pageimages|extracts&exintro=1&explaintext=1&pithumbsize=600&format=json"
-        
-        try:
-            req = urllib.request.Request(search_url, headers={"User-Agent": "Pathd/1.0 (contact@pathd.app)"})
-            with urllib.request.urlopen(req, timeout=5) as resp:
-                if resp.status == 200:
-                    data = json.loads(resp.read().decode())
-                    pages = data.get("query", {}).get("pages", {})
-                    for pid, page in pages.items():
-                        title = page.get("title", "")
-                        thumb = page.get("thumbnail", {}).get("source")
-                        extract = (page.get("extract") or "").lower()
-                        
-                        if thumb and any(k in extract for k in ["character", "film", "movie", "star wars", "protagonist", "franchise", "novel"]):
-                            clean_name = title.split("(")[0].strip()
-                            
-                            origin = "Movie"
-                            if "star wars" in extract:
-                                origin = "Star Wars"
-                            elif "pirates of the caribbean" in extract:
-                                origin = "Pirates of the Caribbean"
-                            elif "harry potter" in extract:
-                                origin = "Harry Potter"
-                            elif "lord of the rings" in extract:
-                                origin = "The Lord of the Rings"
-                            elif "marvel" in extract or "mcu" in extract:
-                                origin = "Marvel Cinema"
-                            elif "dc" in extract or "batman" in extract:
-                                origin = "DC Cinema"
-                                
-                            results.append(CharacterSearchResult(
-                                name=clean_name,
-                                image_url=thumb,
-                                category="movie",
-                                origin=origin
-                            ))
-        except Exception as e:
-            print(f"Movie Characters Search Error: {e}")
-            
-        return results
-
-    @classmethod
     def _calculate_relevance(cls, item: CharacterSearchResult, clean_query: str, raw_query: str) -> int:
         score = 0
         name_lower = item.name.lower()
         origin_lower = (item.origin or "").lower()
         
-        # 1. Exact string match
+        # 1. Exact string match on name
         if name_lower == clean_query or name_lower == raw_query:
             return 3000
 
-        # Exact prefix match (e.g. "gordon freema" -> "gordon freeman")
+        # Exact prefix match (e.g. "luke skywalk" -> "luke skywalker")
         if name_lower.startswith(clean_query) or name_lower.startswith(raw_query):
-            return 2500
+            return 2600
             
         clean_tokens = [w for w in re.findall(r'\b[\w\'-]+\b', clean_query) if len(w) > 1]
         name_tokens = re.findall(r'\b[\w\'-]+\b', name_lower)
@@ -391,14 +319,14 @@ class CharacterService:
         if len(clean_tokens) > 1:
             all_in_name = all(any(nt.startswith(ct) for nt in name_tokens) for ct in clean_tokens)
             if all_in_name:
-                score += 2200
+                score += 2400
                 if name_lower.startswith(clean_tokens[0]):
                     score += 300
                 return score
                 
             all_in_origin = all(any(ot.startswith(ct) for ot in origin_tokens) for ct in clean_tokens)
             if all_in_origin:
-                score += 1200
+                score += 1500
                 return score
 
             matched_name_tokens = sum(1 for ct in clean_tokens if any(nt.startswith(ct) for nt in name_tokens))
@@ -426,8 +354,6 @@ class CharacterService:
             ("Goku", "anime"),
             ("Monkey D. Luffy", "anime"),
             ("Naruto Uzumaki", "anime"),
-            ("Darth Vader", "movie"),
-            ("Jack Sparrow", "movie"),
             ("Spider-Man", "comic"),
             ("Batman", "comic"),
             ("Deadpool", "comic"),
@@ -449,8 +375,6 @@ class CharacterService:
                     f = executor.submit(cls._search_comicvine, name)
                 elif cat == "game":
                     f = executor.submit(cls._search_igdb, name)
-                elif cat == "movie":
-                    f = executor.submit(cls._search_movies, name)
                 else:
                     f = executor.submit(cls._search_tvmaze, name, name)
                 future_map[f] = (name, cat)
@@ -483,14 +407,13 @@ class CharacterService:
         search_term = clean_query if len(clean_query) >= 2 else raw_query
 
         all_results = []
-        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
             future_anilist = executor.submit(cls._search_anilist, search_term)
             future_comicvine = executor.submit(cls._search_comicvine, search_term)
             future_igdb = executor.submit(cls._search_igdb, search_term)
             future_tvmaze = executor.submit(cls._search_tvmaze, search_term, raw_query)
-            future_movies = executor.submit(cls._search_movies, search_term)
 
-            for future in (future_anilist, future_comicvine, future_igdb, future_tvmaze, future_movies):
+            for future in (future_anilist, future_comicvine, future_igdb, future_tvmaze):
                 try:
                     res = future.result()
                     all_results.extend(res)
