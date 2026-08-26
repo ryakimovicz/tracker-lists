@@ -57,7 +57,10 @@ export const AdminPanel: React.FC = () => {
   // Action states for modal
   const [giftMonths, setGiftMonths] = useState<number>(1);
   const [warningMessage, setWarningMessage] = useState('');
-  const [suspensionDays, setSuspensionDays] = useState<number | null>(7);
+  
+  // Granular suspension states
+  const [suspensionValue, setSuspensionValue] = useState<number>(7);
+  const [suspensionUnit, setSuspensionUnit] = useState<'hours' | 'days' | 'weeks' | 'months' | 'years' | 'permanent'>('days');
   const [suspensionReason, setSuspensionReason] = useState('');
   
   // Feedback messages
@@ -99,12 +102,15 @@ export const AdminPanel: React.FC = () => {
     setSelectedUser(user);
     setWarningMessage(user.admin_warning || '');
     setSuspensionReason(user.suspension_reason || '');
+    setGiftMonths(1);
+    setSuspensionValue(7);
+    setSuspensionUnit('days');
     setModalFeedback(null);
   };
 
   // Actions
   const handleToggleVip = async () => {
-    if (!selectedUser) return;
+    if (!selectedUser || selectedUser.is_admin) return;
     setActionLoading(true);
     try {
       const newVip = !selectedUser.is_vip;
@@ -124,10 +130,10 @@ export const AdminPanel: React.FC = () => {
   };
 
   const handleGiftPro = async () => {
-    if (!selectedUser) return;
+    if (!selectedUser || giftMonths <= 0) return;
     setActionLoading(true);
     try {
-      const res = await apiClient.post(`/admin/users/${selectedUser.id}/grant-pro`, { months: giftMonths });
+      const res = await apiClient.post(`/admin/users/${selectedUser.id}/grant-pro`, { months: Number(giftMonths) });
       const updated = { ...selectedUser, is_pro: res.data.is_pro, pro_expires_at: res.data.pro_expires_at };
       setSelectedUser(updated);
       setUsers(prev => prev.map(u => u.id === selectedUser.id ? updated : u));
@@ -162,11 +168,12 @@ export const AdminPanel: React.FC = () => {
   };
 
   const handleSuspendUser = async () => {
-    if (!selectedUser) return;
+    if (!selectedUser || selectedUser.is_admin) return;
     setActionLoading(true);
     try {
       const res = await apiClient.post(`/admin/users/${selectedUser.id}/suspend`, {
-        days: suspensionDays,
+        duration_value: suspensionUnit === 'permanent' ? null : Number(suspensionValue),
+        duration_unit: suspensionUnit,
         reason: suspensionReason
       });
       const updated = {
@@ -472,7 +479,7 @@ export const AdminPanel: React.FC = () => {
             className="glass-card"
             style={{
               width: '100%',
-              maxWidth: 580,
+              maxWidth: 600,
               maxHeight: '90vh',
               overflowY: 'auto',
               borderRadius: 20,
@@ -498,7 +505,10 @@ export const AdminPanel: React.FC = () => {
                 </div>
               )}
               <div>
-                <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800 }}>{selectedUser.username}</h2>
+                <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  {selectedUser.username}
+                  {selectedUser.is_admin && <span style={{ fontSize: '0.7rem', background: '#ef4444', color: 'white', padding: '0.1rem 0.4rem', borderRadius: 4 }}>ADMIN</span>}
+                </h2>
                 <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{selectedUser.email} • ID #{selectedUser.id}</div>
               </div>
             </div>
@@ -527,36 +537,40 @@ export const AdminPanel: React.FC = () => {
             {/* Action Sections */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
               
-              {/* Action 1: VIP Toggle */}
-              <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '1rem 1.25rem', borderRadius: 12, border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              {/* Action 1: VIP Toggle (Disabled on Admins) */}
+              <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '1rem 1.25rem', borderRadius: 12, border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', opacity: selectedUser.is_admin ? 0.6 : 1 }}>
                 <div>
                   <div style={{ fontWeight: 700, fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#a78bfa' }}>
                     <Crown size={16} /> {isEs ? 'Estatus VIP' : 'VIP Status'}
                   </div>
                   <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
-                    {isEs ? 'Habilita todas las funciones Premium gratis. Insignia VIP visible solo para Admins y VIPs.' : 'Unlocks all Premium features for free. VIP badge visible only to Admins & VIPs.'}
+                    {selectedUser.is_admin
+                      ? (isEs ? 'Los administradores ya poseen todos los beneficios y no requieren VIP.' : 'Admins already possess all perks and do not need VIP.')
+                      : (isEs ? 'Habilita todas las funciones Premium gratis. Insignia VIP visible solo para Admins y VIPs.' : 'Unlocks all Premium features for free. VIP badge visible only to Admins & VIPs.')}
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  disabled={actionLoading}
-                  onClick={handleToggleVip}
-                  className={selectedUser.is_vip ? 'btn-secondary' : 'btn-primary'}
-                  style={{
-                    background: selectedUser.is_vip ? 'rgba(239, 68, 68, 0.15)' : 'linear-gradient(135deg, #8b5cf6, #6d28d9)',
-                    color: selectedUser.is_vip ? '#ef4444' : 'white',
-                    borderColor: selectedUser.is_vip ? '#ef4444' : 'transparent',
-                    fontSize: '0.85rem',
-                    padding: '0.45rem 1rem',
-                    flexShrink: 0
-                  }}
-                >
-                  {selectedUser.is_vip ? (isEs ? 'Quitar VIP' : 'Remove VIP') : (isEs ? 'Otorgar VIP' : 'Grant VIP')}
-                </button>
+                {!selectedUser.is_admin && (
+                  <button
+                    type="button"
+                    disabled={actionLoading}
+                    onClick={handleToggleVip}
+                    className={selectedUser.is_vip ? 'btn-secondary' : 'btn-primary'}
+                    style={{
+                      background: selectedUser.is_vip ? 'rgba(239, 68, 68, 0.15)' : 'linear-gradient(135deg, #8b5cf6, #6d28d9)',
+                      color: selectedUser.is_vip ? '#ef4444' : 'white',
+                      borderColor: selectedUser.is_vip ? '#ef4444' : 'transparent',
+                      fontSize: '0.85rem',
+                      padding: '0.45rem 1rem',
+                      flexShrink: 0
+                    }}
+                  >
+                    {selectedUser.is_vip ? (isEs ? 'Quitar VIP' : 'Otorgar VIP') : (isEs ? 'Otorgar VIP' : 'Grant VIP')}
+                  </button>
+                )}
               </div>
 
-              {/* Action 2: Regalar Premium */}
+              {/* Action 2: Regalar Premium con input numérico manual */}
               <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '1rem 1.25rem', borderRadius: 12, border: '1px solid var(--border-color)' }}>
                 <div style={{ fontWeight: 700, fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#f59e0b', marginBottom: '0.3rem' }}>
                   <Gift size={16} /> {isEs ? 'Regalar Suscripción Premium' : 'Gift Premium Access'}
@@ -564,25 +578,49 @@ export const AdminPanel: React.FC = () => {
                 <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
                   {selectedUser.pro_expires_at
                     ? (isEs ? `Actualmente tiene Premium hasta el ${new Date(selectedUser.pro_expires_at).toLocaleDateString()}` : `Currently has Premium until ${new Date(selectedUser.pro_expires_at).toLocaleDateString()}`)
-                    : (isEs ? 'Otorga acceso Premium temporal por la cantidad de meses especificada.' : 'Grant temporary Premium access for specified months.')}
+                    : (isEs ? 'Ingresa la cantidad exacta de meses que deseas otorgar:' : 'Enter the exact amount of months you want to gift:')}
                 </div>
 
-                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                  <select
-                    value={giftMonths}
-                    onChange={e => setGiftMonths(Number(e.target.value))}
-                    className="input-field"
-                    style={{ padding: '0.45rem 0.8rem', fontSize: '0.85rem', flex: 1 }}
-                  >
-                    <option value={1}>1 {isEs ? 'Mes' : 'Month'}</option>
-                    <option value={3}>3 {isEs ? 'Meses' : 'Months'}</option>
-                    <option value={6}>6 {isEs ? 'Meses' : 'Months'}</option>
-                    <option value={12}>1 {isEs ? 'Año (12 meses)' : 'Year (12 months)'}</option>
-                  </select>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                  {/* Preset quick buttons */}
+                  <div style={{ display: 'flex', gap: '0.35rem' }}>
+                    {[1, 3, 6, 12].map(m => (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => setGiftMonths(m)}
+                        style={{
+                          background: giftMonths === m ? 'rgba(245, 158, 11, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                          border: giftMonths === m ? '1px solid #f59e0b' : '1px solid var(--border-color)',
+                          color: giftMonths === m ? '#f59e0b' : 'var(--text-secondary)',
+                          borderRadius: 6,
+                          padding: '0.3rem 0.6rem',
+                          fontSize: '0.8rem',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        +{m}m
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Manual input */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flex: 1, minWidth: 140 }}>
+                    <input
+                      type="number"
+                      min={1}
+                      max={120}
+                      value={giftMonths}
+                      onChange={e => setGiftMonths(Math.max(1, parseInt(e.target.value) || 1))}
+                      className="input-field"
+                      style={{ width: '70px', padding: '0.4rem 0.6rem', fontSize: '0.85rem', textAlign: 'center' }}
+                    />
+                    <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{isEs ? 'meses' : 'months'}</span>
+                  </div>
 
                   <button
                     type="button"
-                    disabled={actionLoading}
+                    disabled={actionLoading || giftMonths <= 0}
                     onClick={handleGiftPro}
                     className="btn-primary"
                     style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', fontSize: '0.85rem', padding: '0.45rem 1.2rem', whiteSpace: 'nowrap' }}
@@ -598,7 +636,7 @@ export const AdminPanel: React.FC = () => {
                   <AlertTriangle size={16} /> {isEs ? 'Enviar Alerta de Moderación' : 'Send Moderation Warning'}
                 </div>
                 <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
-                  {isEs ? 'Muestra un aviso destacado en el perfil del usuario advirtiéndole sobre alguna infracción.' : 'Displays a prominent warning banner on the user’s profile.'}
+                  {isEs ? 'Muestra un banner destacado en el perfil del usuario advirtiéndole sobre alguna infracción.' : 'Displays a prominent warning banner on the user’s profile.'}
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -614,7 +652,7 @@ export const AdminPanel: React.FC = () => {
                   <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                     <button
                       type="button"
-                      disabled={actionLoading || !warningMessage.trim()}
+                      disabled={actionLoading || !warningMessage.trim() || selectedUser.is_admin}
                       onClick={handleSendWarning}
                       className="btn-secondary"
                       style={{ fontSize: '0.85rem', padding: '0.4rem 1rem', color: '#f59e0b', borderColor: '#f59e0b' }}
@@ -625,7 +663,7 @@ export const AdminPanel: React.FC = () => {
                 </div>
               </div>
 
-              {/* Action 4: Suspender / Levantar Suspensión */}
+              {/* Action 4: Suspender con duración manual flexible */}
               <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '1rem 1.25rem', borderRadius: 12, border: '1px solid var(--border-color)' }}>
                 <div style={{ fontWeight: 700, fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#ef4444', marginBottom: '0.3rem' }}>
                   <Ban size={16} /> {isEs ? 'Suspensión de Cuenta' : 'Account Suspension'}
@@ -636,7 +674,7 @@ export const AdminPanel: React.FC = () => {
                     <div style={{ fontSize: '0.85rem', color: '#ef4444', margin: '0.5rem 0' }}>
                       <strong>{isEs ? 'Actualmente suspendido' : 'Currently suspended'}</strong>
                       {selectedUser.suspended_until ? ` (${isEs ? 'Hasta' : 'Until'} ${new Date(selectedUser.suspended_until).toLocaleString()})` : ` (${isEs ? 'Permanente' : 'Permanent'})`}
-                      {selectedUser.suspension_reason && <div>{isEs ? 'Motivo:' : 'Reason:'} {selectedUser.suspension_reason}</div>}
+                      {selectedUser.suspension_reason && <div style={{ marginTop: '0.2rem', color: 'var(--text-secondary)' }}>{isEs ? 'Motivo:' : 'Reason:'} {selectedUser.suspension_reason}</div>}
                     </div>
 
                     <button
@@ -652,28 +690,42 @@ export const AdminPanel: React.FC = () => {
                 ) : (
                   <div>
                     <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
-                      {isEs ? 'Bloquea el inicio de sesión y la navegación del usuario por el período seleccionado.' : 'Blocks user login and navigation for the selected duration.'}
+                      {isEs ? 'Configura la duración exacta a mano o aplica una sanción permanente:' : 'Set custom duration manually or apply permanent suspension:'}
                     </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      {/* Duration selector */}
+                      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                        {suspensionUnit !== 'permanent' && (
+                          <input
+                            type="number"
+                            min={1}
+                            max={999}
+                            value={suspensionValue}
+                            onChange={e => setSuspensionValue(Math.max(1, parseInt(e.target.value) || 1))}
+                            className="input-field"
+                            style={{ width: '80px', padding: '0.45rem 0.6rem', fontSize: '0.85rem', textAlign: 'center' }}
+                          />
+                        )}
+
                         <select
-                          value={suspensionDays === null ? 'perm' : suspensionDays}
-                          onChange={e => setSuspensionDays(e.target.value === 'perm' ? null : Number(e.target.value))}
+                          value={suspensionUnit}
+                          onChange={e => setSuspensionUnit(e.target.value as any)}
                           className="input-field"
-                          style={{ padding: '0.45rem 0.8rem', fontSize: '0.85rem', flex: 1 }}
+                          style={{ padding: '0.45rem 0.8rem', fontSize: '0.85rem', flex: 1, minWidth: 140 }}
                         >
-                          <option value={1}>1 {isEs ? 'Día' : 'Day'}</option>
-                          <option value={3}>3 {isEs ? 'Días' : 'Days'}</option>
-                          <option value={7}>7 {isEs ? 'Días (1 Semana)' : 'Days (1 Week)'}</option>
-                          <option value={30}>30 {isEs ? 'Días (1 Mes)' : 'Days (1 Month)'}</option>
-                          <option value="perm">{isEs ? 'Permanente (Indefinida)' : 'Permanent (Indefinite)'}</option>
+                          <option value="hours">{isEs ? 'Hora(s)' : 'Hour(s)'}</option>
+                          <option value="days">{isEs ? 'Día(s)' : 'Day(s)'}</option>
+                          <option value="weeks">{isEs ? 'Semana(s)' : 'Week(s)'}</option>
+                          <option value="months">{isEs ? 'Mes(es)' : 'Month(s)'}</option>
+                          <option value="years">{isEs ? 'Año(s)' : 'Year(s)'}</option>
+                          <option value="permanent">{isEs ? '⛔ Permanente (Indefinida)' : '⛔ Permanent (Indefinite)'}</option>
                         </select>
                       </div>
 
                       <input
                         type="text"
-                        placeholder={isEs ? 'Motivo de la suspensión...' : 'Reason for suspension...'}
+                        placeholder={isEs ? 'Motivo de la suspensión (ej: Spam, lenguaje inapropiado)...' : 'Reason for suspension...'}
                         value={suspensionReason}
                         onChange={e => setSuspensionReason(e.target.value)}
                         className="input-field"

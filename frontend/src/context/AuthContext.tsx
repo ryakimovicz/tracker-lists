@@ -11,9 +11,16 @@ interface UserProfile {
   is_admin: boolean;
   show_nsfw: boolean;
   is_pro?: boolean;
+  is_vip?: boolean;
+  pro_expires_at?: string;
+  is_suspended?: boolean;
+  suspended_until?: string;
+  suspension_reason?: string;
+  admin_warning?: string;
   profile_color?: string;
   lastfm_username?: string;
 }
+
 
 
 

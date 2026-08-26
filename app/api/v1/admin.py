@@ -194,6 +194,9 @@ def admin_toggle_vip(
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+    if user.is_admin:
+        raise HTTPException(status_code=400, detail="Los administradores ya poseen todos los beneficios y no requieren VIP.")
+        
     user.is_vip = req.is_vip
     if not req.is_vip and not user.is_pro and not user.is_admin:
         trim_downgraded_user_favorites(db, user.id)
@@ -260,7 +263,8 @@ def admin_warn_user(
 
 
 class SuspendUserRequest(BaseModel):
-    days: int | None = None
+    duration_value: int | None = None
+    duration_unit: str = "days"  # "hours", "days", "weeks", "months", "years", "permanent"
     reason: str = ""
 
 @router.post("/users/{user_id}/suspend")
@@ -277,11 +281,22 @@ def admin_suspend_user(
         raise HTTPException(status_code=400, detail="Cannot suspend an admin account")
 
     user.is_suspended = True
-    user.suspension_reason = req.reason.strip() or "Violation of Community Guidelines"
-    if req.days and req.days > 0:
-        user.suspended_until = datetime.now(timezone.utc) + timedelta(days=req.days)
-    else:
-        user.suspended_until = None  # Permanent suspension
+    user.suspension_reason = req.reason.strip() or "Violación de las Normas de la Comunidad"
+    
+    now = datetime.now(timezone.utc)
+    if req.duration_unit == "permanent" or req.duration_value is None or req.duration_value <= 0:
+        user.suspended_until = None
+    elif req.duration_unit == "hours":
+        user.suspended_until = now + timedelta(hours=req.duration_value)
+    elif req.duration_unit == "weeks":
+        user.suspended_until = now + timedelta(weeks=req.duration_value)
+    elif req.duration_unit == "months":
+        user.suspended_until = now + timedelta(days=req.duration_value * 30)
+    elif req.duration_unit == "years":
+        user.suspended_until = now + timedelta(days=req.duration_value * 365)
+    else:  # default "days"
+        user.suspended_until = now + timedelta(days=req.duration_value)
+
     db.commit()
     return {
         "message": "User suspended successfully",
@@ -289,6 +304,7 @@ def admin_suspend_user(
         "suspended_until": user.suspended_until,
         "suspension_reason": user.suspension_reason
     }
+
 
 
 @router.post("/users/{user_id}/unsuspend")
