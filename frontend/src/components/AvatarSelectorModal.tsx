@@ -168,17 +168,13 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
                 {isEs ? 'Avatar de Personaje' : 'Character Avatar'}
               </h2>
               <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                {isPro
-                  ? isEs
-                    ? 'Exclusivo de Pathd Premium'
-                    : 'Exclusive to Pathd Premium'
-                  : isEs
-                  ? '🔒 Requiere suscripción Pathd Premium'
-                  : '🔒 Requires Pathd Premium subscription'}
-
+                {isEs
+                  ? 'Elige tu personaje favorito para tu imagen de perfil'
+                  : 'Choose your favorite character for your profile picture'}
               </span>
             </div>
           </div>
+
 
           <button
             onClick={onClose}

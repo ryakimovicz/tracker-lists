@@ -620,18 +620,12 @@ export const Profile: React.FC = () => {
                 }}
                 onClick={() => {
                   if (isOwnProfile) {
-                    if (profile.is_pro) {
-                      setShowAvatarModal(true);
-                    } else {
-                      setShowProModal(true);
-                    }
+                    setShowAvatarModal(true);
                   }
                 }}
                 title={
                   isOwnProfile
-                    ? profile.is_pro
-                      ? (language === 'es' ? 'Cambiar avatar de personaje' : 'Change character avatar')
-                      : (language === 'es' ? 'Desbloquear avatar de personaje con Premium' : 'Unlock character avatar with Premium')
+                    ? (language === 'es' ? 'Cambiar foto de perfil' : 'Change profile picture')
                     : undefined
                 }
               />
@@ -639,11 +633,7 @@ export const Profile: React.FC = () => {
               <div
                 onClick={() => {
                   if (isOwnProfile) {
-                    if (profile.is_pro) {
-                      setShowAvatarModal(true);
-                    } else {
-                      setShowProModal(true);
-                    }
+                    setShowAvatarModal(true);
                   }
                 }}
                 style={{
@@ -663,9 +653,7 @@ export const Profile: React.FC = () => {
                 }}
                 title={
                   isOwnProfile
-                    ? profile.is_pro
-                      ? (language === 'es' ? 'Elegir avatar de personaje' : 'Choose character avatar')
-                      : (language === 'es' ? 'Desbloquear avatar de personaje con Premium' : 'Unlock character avatar with Premium')
+                    ? (language === 'es' ? 'Elegir avatar de personaje' : 'Choose character avatar')
                     : undefined
                 }
               >
@@ -673,8 +661,8 @@ export const Profile: React.FC = () => {
               </div>
             )}
 
-            {/* Sparkles button ONLY visible for Premium users */}
-            {isOwnProfile && profile.is_pro && (
+            {/* Edit avatar button visible for all profile owners */}
+            {isOwnProfile && (
               <button
                 onClick={() => setShowAvatarModal(true)}
                 style={{
@@ -693,11 +681,12 @@ export const Profile: React.FC = () => {
                   cursor: 'pointer',
                   boxShadow: '0 2px 6px rgba(0,0,0,0.4)',
                 }}
-                title={language === 'es' ? 'Elegir avatar de personaje (Premium)' : 'Choose character avatar (Premium)'}
+                title={language === 'es' ? 'Elegir avatar de personaje' : 'Choose character avatar'}
               >
                 <Sparkles size={14} />
               </button>
             )}
+
           </div>
 
 

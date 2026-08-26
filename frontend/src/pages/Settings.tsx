@@ -230,56 +230,30 @@ export const SettingsPage: React.FC = () => {
                   {isEs ? 'Avatar de Personaje' : 'Character Avatar'}
                 </h2>
                 <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: '0.35rem 0 0' }}>
-                  {user?.is_pro
-                    ? isEs
-                      ? 'Como usuario Premium, puedes buscar tu personaje favorito y usarlo de avatar.'
-                      : 'As a Premium user, you can search and choose any favorite character as your avatar.'
-                    : isEs
-                    ? 'Función exclusiva de Pathd Premium. Los usuarios gratuitos usan el avatar por defecto.'
-                    : 'Exclusive to Pathd Premium. Free users have default initial avatars.'}
+                  {isEs
+                    ? 'Personaliza tu imagen de perfil eligiendo tu personaje favorito de anime, videojuegos, series o cómics.'
+                    : 'Customize your profile picture by choosing your favorite character from anime, games, shows, or comics.'}
                 </p>
-
-
               </div>
             </div>
 
-            {user?.is_pro ? (
-              <button
-                onClick={() => setShowAvatarModal(true)}
-                className="btn-primary"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  padding: '0.65rem 1.25rem',
-                  fontSize: '0.9rem',
-                }}
-              >
-                <Sparkles size={16} />
-                {isEs ? 'Cambiar Avatar' : 'Change Avatar'}
-              </button>
-            ) : (
-              <button
-                onClick={() => setShowProModal(true)}
-                className="btn-primary"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  padding: '0.65rem 1.25rem',
-                  fontSize: '0.9rem',
-                  background: 'linear-gradient(135deg, #f59e0b, #d97706)',
-                  border: 'none',
-                  color: '#fff',
-                  boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)',
-                }}
-              >
-                <Star size={16} fill="#fff" />
-                {isEs ? 'Desbloquear con Premium' : 'Unlock with Premium'}
-              </button>
-            )}
+            <button
+              onClick={() => setShowAvatarModal(true)}
+              className="btn-primary"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                padding: '0.65rem 1.25rem',
+                fontSize: '0.9rem',
+              }}
+            >
+              <Sparkles size={16} />
+              {isEs ? 'Cambiar Avatar' : 'Change Avatar'}
+            </button>
           </div>
         </div>
+
 
         {/* Section 2: Preferences & NSFW */}
         <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px' }}>
