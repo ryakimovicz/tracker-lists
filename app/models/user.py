@@ -19,12 +19,20 @@ class User(Base):
     is_admin = Column(Boolean, default=False, nullable=False)
     show_nsfw = Column(Boolean, default=False, nullable=False)
     is_pro = Column(Boolean, default=False, nullable=False)
+    is_vip = Column(Boolean, default=False, nullable=False)
+    pro_expires_at = Column(DateTime(timezone=True), nullable=True)
+    is_suspended = Column(Boolean, default=False, nullable=False)
+    suspended_until = Column(DateTime(timezone=True), nullable=True)
+    suspension_reason = Column(String(500), nullable=True)
+    admin_warning = Column(String(500), nullable=True)
+    admin_warning_at = Column(DateTime(timezone=True), nullable=True)
     profile_color = Column(String(20), nullable=True)
     custom_photo_url = Column(String(500), nullable=True)
     custom_banner_url = Column(String(500), nullable=True)
     custom_background_url = Column(String(500), nullable=True)
 
     # Relationships
+
     lists = relationship("ReadingList", back_populates="creator", cascade="all, delete-orphan")
     saved_lists = relationship("SavedList", back_populates="user", cascade="all, delete-orphan")
     progress_records = relationship("ItemProgress", back_populates="user", cascade="all, delete-orphan")

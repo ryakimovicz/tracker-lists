@@ -38,7 +38,36 @@ def get_current_user(
     user = db.query(User).filter(User.id == user_id).first()
     if user is None:
         raise credentials_exception
+
+    # Check suspension
+    if user.is_suspended:
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc)
+        if user.suspended_until:
+            susp_end = user.suspended_until
+            if susp_end.tzinfo is None:
+                susp_end = susp_end.replace(tzinfo=timezone.utc)
+            if susp_end <= now:
+                user.is_suspended = False
+                user.suspended_until = None
+                user.suspension_reason = None
+                db.commit()
+            else:
+                formatted_date = susp_end.strftime('%Y-%m-%d %H:%M UTC')
+                reason = user.suspension_reason or "Infracción de las Normas Comunitarias"
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"Cuenta suspendida temporalmente hasta el {formatted_date}. Motivo: {reason}"
+                )
+        else:
+            reason = user.suspension_reason or "Infracción de las Normas Comunitarias"
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Tu cuenta ha sido suspendida permanentemente. Motivo: {reason}"
+            )
+
     return user
+
 
 def get_current_user_optional(
     db: Session = Depends(get_db),

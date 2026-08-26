@@ -17,6 +17,12 @@ class UserResponse(UserBase):
     is_admin: bool = False
     show_nsfw: bool = False
     is_pro: bool = False
+    is_vip: bool = False
+    pro_expires_at: datetime | None = None
+    is_suspended: bool = False
+    suspended_until: datetime | None = None
+    suspension_reason: str | None = None
+    admin_warning: str | None = None
     profile_color: str | None = None
     lastfm_username: str | None = None
     followers_count: int = 0
@@ -47,6 +53,12 @@ class UserDashboardResponse(BaseModel):
     is_admin: bool = False
     show_nsfw: bool = False
     is_pro: bool = False
+    is_vip: bool = False
+    pro_expires_at: datetime | None = None
+    is_suspended: bool = False
+    suspended_until: datetime | None = None
+    suspension_reason: str | None = None
+    admin_warning: str | None = None
     profile_color: str | None = None
     lastfm_username: str | None = None
     followers_count: int = 0
@@ -54,6 +66,7 @@ class UserDashboardResponse(BaseModel):
     is_following: bool = False
     created_lists: List[ReadingListResponse] = []
     saved_lists: List[ReadingListResponse] = []
+
 
     class Config:
         from_attributes = True

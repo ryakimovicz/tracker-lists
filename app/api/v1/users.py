@@ -18,12 +18,26 @@ from app.services.lastfm import LastFMService
 from app.models.activity import UserActivityLog
 from app.schemas.user import UserResponse, UserDashboardResponse
 from app.schemas.social import UpNextResponse, UpNextItemResponse
+from datetime import datetime, timezone
 from app.schemas.auth import PasswordChangeRequest, UsernameUpdateRequest
 
 router = APIRouter()
 
+def check_user_is_pro(user: User) -> bool:
+    if not user:
+        return False
+    now = datetime.now(timezone.utc)
+    expires_active = False
+    if user.pro_expires_at:
+        exp = user.pro_expires_at
+        if exp.tzinfo is None:
+            exp = exp.replace(tzinfo=timezone.utc)
+        expires_active = exp > now
+    return bool(user.is_pro or user.is_admin or user.is_vip or expires_active)
+
 @router.get("/me", response_model=UserDashboardResponse)
 def get_user_dashboard(
+
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -58,7 +72,13 @@ def get_user_dashboard(
         background_url=current_user.background_url,
         is_admin=current_user.is_admin,
         show_nsfw=current_user.show_nsfw,
-        is_pro=bool(current_user.is_pro or current_user.is_admin),
+        is_pro=check_user_is_pro(current_user),
+        is_vip=bool(current_user.is_vip),
+        pro_expires_at=current_user.pro_expires_at,
+        is_suspended=bool(current_user.is_suspended),
+        suspended_until=current_user.suspended_until,
+        suspension_reason=current_user.suspension_reason,
+        admin_warning=current_user.admin_warning,
         profile_color=current_user.profile_color,
 
         lastfm_username=current_user.lastfm_username,
@@ -625,9 +645,14 @@ def get_any_user_profile(
         background_url=user.background_url,
         is_admin=user.is_admin,
         show_nsfw=user.show_nsfw,
-        is_pro=bool(user.is_pro or user.is_admin),
+        is_pro=check_user_is_pro(user),
+        is_vip=bool(user.is_vip),
+        pro_expires_at=user.pro_expires_at,
+        is_suspended=bool(user.is_suspended),
+        suspended_until=user.suspended_until,
+        suspension_reason=user.suspension_reason,
+        admin_warning=user.admin_warning if (current_user and (current_user.id == user.id or current_user.is_admin)) else None,
         profile_color=user.profile_color,
-
         lastfm_username=user.lastfm_username,
         followers_count=followers_count,
         following_count=following_count,
@@ -635,6 +660,17 @@ def get_any_user_profile(
         created_lists=created_lists,
         saved_lists=saved_lists
     )
+
+@router.post("/me/dismiss-warning")
+def dismiss_admin_warning(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    current_user.admin_warning = None
+    current_user.admin_warning_at = None
+    db.commit()
+    return {"message": "Warning dismissed"}
+
 
 
 @router.get("/{user_id}/activity")

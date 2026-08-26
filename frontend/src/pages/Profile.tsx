@@ -32,7 +32,10 @@ import {
   X,
   Pencil,
   Image as ImageIcon,
-  Monitor
+  Monitor,
+  Crown,
+  AlertTriangle
+
 } from 'lucide-react';
 
 
@@ -71,12 +74,15 @@ interface UserProfile {
   created_lists: any[];
   saved_lists: any[];
   is_pro?: boolean;
+  is_vip?: boolean;
+  admin_warning?: string;
   profile_color?: string;
   lastfm_username?: string;
   followers_count?: number;
   following_count?: number;
   is_following?: boolean;
 }
+
 
 export const getTagClass = (type: string) => {
   switch (type) {
@@ -379,7 +385,17 @@ export const Profile: React.FC = () => {
 
 
 
+  const handleDismissWarning = async () => {
+    try {
+      await apiClient.post('/users/me/dismiss-warning');
+      setProfile(prev => prev ? { ...prev, admin_warning: undefined } : null);
+    } catch (e) {
+      console.error('Failed to dismiss warning:', e);
+    }
+  };
+
   const handleStatusChange = async (itemId: number, newStatus: string) => {
+
     setErrorMsg('');
     setSuccessMsg('');
     try {
@@ -784,11 +800,34 @@ export const Profile: React.FC = () => {
                 </span>
               )}
 
+              {/* VIP Badge - only visible if viewer is Admin or VIP */}
+              {profile.is_vip && (currentUser?.is_admin || currentUser?.is_vip) && (
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.3rem',
+                    background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)',
+                    color: 'white',
+                    padding: '0.2rem 0.6rem',
+                    borderRadius: '12px',
+                    fontSize: '0.8rem',
+                    fontWeight: 700,
+                    boxShadow: '0 2px 8px rgba(139, 92, 246, 0.4)'
+                  }}
+                  title={language === 'es' ? 'Usuario VIP (Insignia visible solo para Admins y VIPs)' : 'VIP User (Badge visible only to Admins & VIPs)'}
+                >
+                  <Crown size={12} fill="white" />
+                  VIP
+                </span>
+              )}
+
               {profile.is_admin && (
                 <span style={{ fontSize: '0.75rem', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: 600 }}>
                   ADMIN
                 </span>
               )}
+
 
               {/* Follow / Unfollow button on other users' profiles */}
 
@@ -908,12 +947,34 @@ export const Profile: React.FC = () => {
         </div>
       )}
 
+      {profile?.admin_warning && isOwnProfile && (
+
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.4)', color: '#ef4444', padding: '1rem 1.25rem', borderRadius: 12, fontSize: '0.95rem', margin: '1rem 0' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <AlertTriangle size={22} style={{ flexShrink: 0 }} />
+            <div>
+              <strong>{language === 'es' ? 'Aviso de la Administración:' : 'Administration Warning:'}</strong>
+              <p style={{ margin: '0.2rem 0 0', color: 'var(--text-primary)', fontSize: '0.9rem' }}>{profile.admin_warning}</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleDismissWarning}
+            className="btn-secondary"
+            style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem', flexShrink: 0, background: 'rgba(0,0,0,0.4)' }}
+          >
+            {language === 'es' ? 'Entendido' : 'Dismiss'}
+          </button>
+        </div>
+      )}
+
       {errorMsg && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', padding: '0.75rem', borderRadius: 8, fontSize: '0.9rem' }}>
           <AlertCircle size={18} />
           <span>{errorMsg}</span>
         </div>
       )}
+
 
       {successMsg && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', padding: '0.75rem', borderRadius: 8, fontSize: '0.9rem' }}>

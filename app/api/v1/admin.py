@@ -122,3 +122,190 @@ def admin_delete_review(
     return None
 
 
+# -------------------------------------------------------------
+# User Management Endpoints
+# -------------------------------------------------------------
+
+from datetime import datetime, timezone, timedelta
+from app.api.v1.users import check_user_is_pro, trim_downgraded_user_favorites
+
+@router.get("/users")
+def admin_get_users(
+    q: str = "",
+    page: int = 1,
+    limit: int = 50,
+    current_admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    Search and paginate all registered users with admin and moderation metadata.
+    """
+    query = db.query(User)
+    if q.strip():
+        search_term = f"%{q.strip()}%"
+        query = query.filter(
+            (User.username.ilike(search_term)) | (User.email.ilike(search_term))
+        )
+    
+    total = query.count()
+    users = query.order_by(User.id.desc()).offset((page - 1) * limit).limit(limit).all()
+    
+    formatted_users = []
+    for u in users:
+        formatted_users.append({
+            "id": u.id,
+            "username": u.username,
+            "email": u.email,
+            "photo_url": u.photo_url,
+            "banner_url": u.banner_url,
+            "created_at": u.created_at,
+            "is_admin": u.is_admin,
+            "is_vip": bool(u.is_vip),
+            "is_pro": check_user_is_pro(u),
+            "is_pro_paid": bool(u.is_pro),
+            "pro_expires_at": u.pro_expires_at,
+            "is_suspended": bool(u.is_suspended),
+            "suspended_until": u.suspended_until,
+            "suspension_reason": u.suspension_reason,
+            "admin_warning": u.admin_warning,
+            "admin_warning_at": u.admin_warning_at,
+            "lists_count": len(u.lists),
+            "profile_color": u.profile_color
+        })
+
+    return {
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "users": formatted_users
+    }
+
+
+class ToggleVipRequest(BaseModel):
+    is_vip: bool
+
+@router.post("/users/{user_id}/vip")
+def admin_toggle_vip(
+    user_id: int,
+    req: ToggleVipRequest,
+    current_admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    user.is_vip = req.is_vip
+    if not req.is_vip and not user.is_pro and not user.is_admin:
+        trim_downgraded_user_favorites(db, user.id)
+    db.commit()
+    return {"message": f"User VIP status set to {req.is_vip}", "is_vip": user.is_vip, "is_pro": check_user_is_pro(user)}
+
+
+class GrantProRequest(BaseModel):
+    months: int = 1
+
+@router.post("/users/{user_id}/grant-pro")
+def admin_grant_pro(
+    user_id: int,
+    req: GrantProRequest,
+    current_admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    if req.months <= 0:
+        raise HTTPException(status_code=400, detail="Months must be greater than 0")
+
+    now = datetime.now(timezone.utc)
+    base_time = now
+    if user.pro_expires_at:
+        exp = user.pro_expires_at
+        if exp.tzinfo is None:
+            exp = exp.replace(tzinfo=timezone.utc)
+        if exp > now:
+            base_time = exp
+            
+    user.pro_expires_at = base_time + timedelta(days=req.months * 30)
+    user.is_pro = True
+    db.commit()
+    return {
+        "message": f"Granted {req.months} month(s) of Premium",
+        "pro_expires_at": user.pro_expires_at,
+        "is_pro": check_user_is_pro(user)
+    }
+
+
+class WarnUserRequest(BaseModel):
+    message: str
+
+@router.post("/users/{user_id}/warn")
+def admin_warn_user(
+    user_id: int,
+    req: WarnUserRequest,
+    current_admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.is_admin:
+        raise HTTPException(status_code=400, detail="Cannot warn an admin account")
+
+    user.admin_warning = req.message.strip()
+    user.admin_warning_at = datetime.now(timezone.utc)
+    db.commit()
+    return {"message": "Warning sent to user", "admin_warning": user.admin_warning}
+
+
+class SuspendUserRequest(BaseModel):
+    days: int | None = None
+    reason: str = ""
+
+@router.post("/users/{user_id}/suspend")
+def admin_suspend_user(
+    user_id: int,
+    req: SuspendUserRequest,
+    current_admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.is_admin:
+        raise HTTPException(status_code=400, detail="Cannot suspend an admin account")
+
+    user.is_suspended = True
+    user.suspension_reason = req.reason.strip() or "Violation of Community Guidelines"
+    if req.days and req.days > 0:
+        user.suspended_until = datetime.now(timezone.utc) + timedelta(days=req.days)
+    else:
+        user.suspended_until = None  # Permanent suspension
+    db.commit()
+    return {
+        "message": "User suspended successfully",
+        "is_suspended": True,
+        "suspended_until": user.suspended_until,
+        "suspension_reason": user.suspension_reason
+    }
+
+
+@router.post("/users/{user_id}/unsuspend")
+def admin_unsuspend_user(
+    user_id: int,
+    current_admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user.is_suspended = False
+    user.suspended_until = None
+    user.suspension_reason = None
+    db.commit()
+    return {"message": "User suspension removed", "is_suspended": False}
+
+
+
