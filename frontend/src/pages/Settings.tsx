@@ -540,27 +540,8 @@ export const SettingsPage: React.FC = () => {
                   : 'Choose the accent and glow color for your profile.'}
               </p>
             </div>
-
-            {!user?.is_pro && (
-              <button
-                onClick={() => setShowProModal(true)}
-                className="btn-primary"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.4rem',
-                  padding: '0.4rem 0.85rem',
-                  fontSize: '0.8rem',
-                  background: 'linear-gradient(135deg, #f59e0b, #d97706)',
-                  border: 'none',
-                  color: '#fff',
-                }}
-              >
-                <Star size={13} fill="#fff" />
-                {isEs ? 'Desbloquear con Premium' : 'Unlock with Premium'}
-              </button>
-            )}
           </div>
+
 
           {colorMsg && (
             <div
