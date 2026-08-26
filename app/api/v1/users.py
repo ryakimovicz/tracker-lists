@@ -667,9 +667,13 @@ def mock_pro_status(
     current_user.is_pro = req.is_pro
     if was_pro and not req.is_pro:
         trim_downgraded_user_favorites(db, current_user.id)
+        current_user.banner_url = None
+        current_user.background_url = None
+        current_user.profile_color = None
     db.commit()
     db.refresh(current_user)
     return {"message": f"User is now {'Pro' if req.is_pro else 'Free'}", "is_pro": req.is_pro}
+
 
 
 class ColorUpdateRequest(BaseModel):

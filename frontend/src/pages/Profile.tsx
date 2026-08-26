@@ -341,14 +341,16 @@ export const Profile: React.FC = () => {
   const handleRemovePro = async () => {
     if (!isOwnProfile) return;
     try {
-      await apiClient.put('/users/me', { is_pro: false });
-      setProfile(prev => prev ? { ...prev, is_pro: false } : null);
+      await apiClient.post('/users/me/mock-pro', { is_pro: false });
+      await fetchProfileAndLibrary();
       setSuccessMsg(language === 'es' ? 'Plan Premium removido.' : 'Premium plan removed.');
       setTimeout(() => setSuccessMsg(''), 3000);
     } catch (err) {
       setErrorMsg('Error updating status');
     }
   };
+
+
 
 
   const handleStatusChange = async (itemId: number, newStatus: string) => {
@@ -594,8 +596,8 @@ export const Profile: React.FC = () => {
       }}
     >
 
-      {/* Immersive Ambient Background Wallpaper (Fixed Background Layer) */}
-      {profile?.background_url && (
+      {/* Immersive Ambient Background Wallpaper (Fixed Background Layer - Only for Premium) */}
+      {profile?.is_pro && profile?.background_url && (
         <div
           style={{
             position: 'fixed',
@@ -635,11 +637,11 @@ export const Profile: React.FC = () => {
             padding: '2.5rem',
             borderRadius: '20px',
             overflow: 'hidden',
-            border: profile.banner_url ? '1px solid rgba(255, 255, 255, 0.12)' : undefined,
-            boxShadow: profile.banner_url ? '0 12px 30px rgba(0, 0, 0, 0.4)' : undefined,
+            border: profile.is_pro && profile.banner_url ? '1px solid rgba(255, 255, 255, 0.12)' : undefined,
+            boxShadow: profile.is_pro && profile.banner_url ? '0 12px 30px rgba(0, 0, 0, 0.4)' : undefined,
           }}
         >
-          {profile.banner_url && (
+          {profile.is_pro && profile.banner_url && (
             <>
               {/* Banner Image Layer */}
               <div
