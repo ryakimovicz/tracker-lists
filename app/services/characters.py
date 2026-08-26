@@ -89,10 +89,10 @@ class CharacterService:
         results = []
         seen_names = set()
 
-        url = "https://graphql.anilist.co"
-        graphql_query = """
+        # 1. Search characters directly
+        graphql_char_query = """
         query ($search: String) {
-          Page(page: 1, perPage: 12) {
+          Page(page: 1, perPage: 10) {
             characters(search: $search, sort: FAVOURITES_DESC) {
               id
               name {
@@ -118,24 +118,50 @@ class CharacterService:
         }
         """
 
+        # 2. Search anime/manga titles to extract their main cast and official cover
+        graphql_media_query = """
+        query ($search: String) {
+          Page(page: 1, perPage: 3) {
+            media(search: $search, sort: POPULARITY_DESC) {
+              id
+              title {
+                english
+                romaji
+              }
+              coverImage {
+                large
+              }
+              characters(perPage: 8, sort: FAVOURITES_DESC) {
+                nodes {
+                  name {
+                    full
+                    native
+                  }
+                  image {
+                    large
+                  }
+                }
+              }
+            }
+          }
+        }
+        """
+
         for term in variants[:3]:
-            payload = json.dumps({
-                "query": graphql_query,
+            # Direct character query
+            payload_char = json.dumps({
+                "query": graphql_char_query,
                 "variables": {"search": term}
             }).encode("utf-8")
 
-            req = urllib.request.Request(
+            req_char = urllib.request.Request(
                 url,
-                data=payload,
-                headers={
-                    "Content-Type": "application/json",
-                    "Accept": "application/json",
-                    "User-Agent": "Pathd/1.0"
-                }
+                data=payload_char,
+                headers={"Content-Type": "application/json", "Accept": "application/json", "User-Agent": "Pathd/1.0"}
             )
 
             try:
-                with urllib.request.urlopen(req, timeout=5) as response:
+                with urllib.request.urlopen(req_char, timeout=5) as response:
                     if response.status == 200:
                         data = json.loads(response.read().decode())
                         characters = data.get("data", {}).get("Page", {}).get("characters", [])
@@ -165,11 +191,56 @@ class CharacterService:
                                 ))
             except Exception as e:
                 print(f"AniList Character Search Error: {e}")
+
+            # Media cast query (when searching anime titles like "Death Note", "Attack on Titan", "Bleach")
+            payload_media = json.dumps({
+                "query": graphql_media_query,
+                "variables": {"search": term}
+            }).encode("utf-8")
+
+            req_media = urllib.request.Request(
+                url,
+                data=payload_media,
+                headers={"Content-Type": "application/json", "Accept": "application/json", "User-Agent": "Pathd/1.0"}
+            )
+
+            try:
+                with urllib.request.urlopen(req_media, timeout=5) as response:
+                    if response.status == 200:
+                        data = json.loads(response.read().decode())
+                        media_list = data.get("data", {}).get("Page", {}).get("media", [])
+                        for m in media_list:
+                            m_title = m.get("title", {}).get("english") or m.get("title", {}).get("romaji") or "Anime"
+                            cover_url = m.get("coverImage", {}).get("large")
+                            if cover_url and m_title not in seen_names:
+                                seen_names.add(m_title)
+                                results.append(CharacterSearchResult(
+                                    name=m_title,
+                                    image_url=cover_url,
+                                    category="anime",
+                                    origin=m_title
+                                ))
+
+                            cast_chars = m.get("characters", {}).get("nodes", [])
+                            for c in cast_chars:
+                                c_name = c.get("name", {}).get("full") or c.get("name", {}).get("native")
+                                c_img = c.get("image", {}).get("large")
+                                if c_name and c_img and c_name not in seen_names:
+                                    seen_names.add(c_name)
+                                    results.append(CharacterSearchResult(
+                                        name=c_name,
+                                        image_url=c_img,
+                                        category="anime",
+                                        origin=m_title
+                                    ))
+            except Exception as e:
+                print(f"AniList Media Cast Search Error: {e}")
                 
-            if len(results) >= 8:
+            if len(results) >= 12:
                 break
 
         return results
+
 
     @classmethod
     def _search_comicvine(cls, query: str) -> List[CharacterSearchResult]:
@@ -510,11 +581,11 @@ class CharacterService:
         if name_norm == query_norm_clean or name_norm == query_norm_raw:
             return 5000
         if name_norm.startswith(query_norm_clean) or name_norm.startswith(query_norm_raw):
-            return 4200
+            return 4300
 
-        # Exact franchise/game origin match
+        # Exact franchise/game/show origin match (characters belonging to this searched work)
         if origin_norm == query_norm_clean or origin_norm == query_norm_raw or origin_norm.startswith(query_norm_clean):
-            return 3800
+            return 4850
 
         # Extract normalized tokens from search query
         clean_q_spaces = f"{clean_query} {raw_query}".replace("-", " ")
@@ -544,9 +615,10 @@ class CharacterService:
         elif name_matches > 0:
             score += 2000 + (name_matches * 200)
         elif origin_matches > 0:
-            score += 3200 + (origin_matches * 200)
+            score += 4200 + (origin_matches * 200)
             
         return int(score)
+
 
     @classmethod
     def get_popular_suggestions(cls) -> List[Dict[str, Any]]:
