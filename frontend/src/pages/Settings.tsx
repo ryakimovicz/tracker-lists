@@ -345,12 +345,12 @@ export const SettingsPage: React.FC = () => {
               background: user?.background_url
                 ? `url(${user.background_url}) center/cover no-repeat`
                 : 'var(--bg-primary)',
-              padding: '1.25rem',
-              boxShadow: 'inset 0 0 40px rgba(0,0,0,0.5)',
-              minHeight: '220px',
+              padding: '1.75rem 1.5rem 3.5rem 1.5rem',
+              boxShadow: 'inset 0 0 50px rgba(0,0,0,0.5)',
+              minHeight: '360px',
               display: 'flex',
               flexDirection: 'column',
-              justifyContent: 'flex-end',
+              justifyContent: 'flex-start',
             }}
           >
             {/* Ambient Background Dark Tint Overlay if background wallpaper exists */}
@@ -359,7 +359,7 @@ export const SettingsPage: React.FC = () => {
                 style={{
                   position: 'absolute',
                   inset: 0,
-                  background: 'radial-gradient(circle at center, rgba(9, 13, 22, 0.45) 0%, rgba(9, 13, 22, 0.85) 100%)',
+                  background: 'radial-gradient(circle at center, rgba(9, 13, 22, 0.4) 0%, rgba(9, 13, 22, 0.85) 100%)',
                   backdropFilter: 'blur(2px)',
                   zIndex: 0,
                 }}
@@ -372,11 +372,11 @@ export const SettingsPage: React.FC = () => {
               style={{
                 position: 'relative',
                 zIndex: 1,
-                borderRadius: '14px',
+                borderRadius: '16px',
                 overflow: 'hidden',
-                padding: '1.5rem',
+                padding: '1.75rem',
                 border: user?.banner_url ? '1px solid rgba(255, 255, 255, 0.15)' : '1px solid var(--border-color)',
-                boxShadow: '0 10px 25px rgba(0, 0, 0, 0.4)',
+                boxShadow: '0 12px 30px rgba(0, 0, 0, 0.45)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
@@ -544,14 +544,12 @@ export const SettingsPage: React.FC = () => {
                       </span>
                     )}
                   </div>
-                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                    {isEs ? 'Haz clic en el avatar, portada o fondo para personalizarlos' : 'Click on avatar, banner, or background to customize'}
-                  </span>
                 </div>
               </div>
             </div>
           </div>
         </div>
+
 
 
         {/* Section 1d: Profile Accent & Modal Color (Premium) */}
