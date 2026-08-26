@@ -278,12 +278,12 @@ class CharacterService:
             except Exception as e:
                 print(f"IGDB Character Search Error: {e}")
 
-        # 2. Search game titles to discover full cast of characters (e.g. searching "half-life" or "the witcher")
+        # 2. Search game titles to discover full cast of characters and game artworks/covers (e.g. "hollow knight", "silksong", "the witcher")
         game_terms = [v for v in variants if len(v) >= 3][:3]
         all_game_ids = []
         for term in game_terms:
             safe_game_query = term.replace('"', '\\"')
-            body_game = f'search "{safe_game_query}"; fields id, name; limit 8;'
+            body_game = f'search "{safe_game_query}"; fields id, name, cover.image_id, artworks.image_id; limit 6;'
             req_g = urllib.request.Request(
                 "https://api.igdb.com/v4/games",
                 data=body_game.encode("utf-8"),
@@ -294,8 +294,37 @@ class CharacterService:
                     if resp_g.status == 200:
                         games_data = json.loads(resp_g.read().decode())
                         for g in games_data:
-                            if 'id' in g:
-                                all_game_ids.append(str(g['id']))
+                            g_id = g.get('id')
+                            if g_id:
+                                all_game_ids.append(str(g_id))
+                            
+                            gname = g.get('name') or "Video Game"
+                            # Add game cover
+                            cover = g.get('cover')
+                            if cover and cover.get('image_id'):
+                                c_url = f"https://images.igdb.com/igdb/image/upload/t_cover_big/{cover['image_id']}.jpg"
+                                if c_url not in seen_ids:
+                                    seen_ids.add(c_url)
+                                    results.append(CharacterSearchResult(
+                                        name=gname,
+                                        image_url=c_url,
+                                        category="game",
+                                        origin=gname
+                                    ))
+                            
+                            # Add character artworks
+                            artworks = g.get('artworks') or []
+                            for art in artworks[:3]:
+                                if art.get('image_id'):
+                                    a_url = f"https://images.igdb.com/igdb/image/upload/t_720p/{art['image_id']}.jpg"
+                                    if a_url not in seen_ids:
+                                        seen_ids.add(a_url)
+                                        results.append(CharacterSearchResult(
+                                            name=f"{gname} (Art)",
+                                            image_url=a_url,
+                                            category="game",
+                                            origin=gname
+                                        ))
             except Exception:
                 pass
 
@@ -334,6 +363,7 @@ class CharacterService:
                 print(f"IGDB Game Cast Search Error: {e}")
 
         return results
+
 
     @classmethod
     def _search_tvmaze(cls, query: str, raw_query: str = "") -> List[CharacterSearchResult]:
