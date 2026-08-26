@@ -599,10 +599,11 @@ export const AdminPanel: React.FC = () => {
                           cursor: 'pointer'
                         }}
                       >
-                        +{m}m
+                        {m}m
                       </button>
                     ))}
                   </div>
+
 
                   {/* Manual input */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flex: 1, minWidth: 140 }}>

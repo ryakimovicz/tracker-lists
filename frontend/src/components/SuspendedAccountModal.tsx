@@ -1,12 +1,14 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../context/LanguageContext';
-import { Ban, ShieldAlert, LogOut, Mail, Clock } from 'lucide-react';
+import { apiClient } from '../api/client';
+import { Ban, LogOut, Mail, Clock, Trash2 } from 'lucide-react';
 
 export const SuspendedAccountModal: React.FC = () => {
   const { user, logout } = useAuth();
   const { language } = useTranslation();
   const isEs = language === 'es';
+  const [isDeleting, setIsDeleting] = useState(false);
 
   if (!user || !user.is_suspended) {
     return null;
@@ -14,6 +16,25 @@ export const SuspendedAccountModal: React.FC = () => {
 
   const isPermanent = !user.suspended_until;
   const suspensionEndDate = user.suspended_until ? new Date(user.suspended_until) : null;
+
+  const handleDeleteMyAccount = async () => {
+    const confirmDelete = window.confirm(
+      isEs
+        ? '¿Estás seguro de que deseas eliminar tu cuenta permanentemente? Conforme a las leyes de privacidad, se borrarán todos tus datos personales, listas y contenido de forma irreversible.'
+        : 'Are you sure you want to permanently delete your account? Under privacy laws, all your personal data, lists, and content will be irreversibly wiped.'
+    );
+    if (!confirmDelete) return;
+
+    setIsDeleting(true);
+    try {
+      await apiClient.delete('/users/me');
+      await logout();
+    } catch (err) {
+      alert(isEs ? 'Error al eliminar la cuenta. Por favor contáctanos a support@pathd.net' : 'Error deleting account. Please contact support@pathd.net');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   return (
     <div
@@ -81,7 +102,7 @@ export const SuspendedAccountModal: React.FC = () => {
             borderRadius: 14,
             padding: '1.25rem',
             textAlign: 'left',
-            marginBottom: '1.75rem',
+            marginBottom: '1.5rem',
             boxSizing: 'border-box'
           }}
         >
@@ -108,7 +129,7 @@ export const SuspendedAccountModal: React.FC = () => {
         </div>
 
         {/* Support appeal info */}
-        <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+        <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
           <Mail size={15} />
           <span>
             {isEs ? 'Si consideras que esto es un error, contáctanos en ' : 'If you believe this is a mistake, contact us at '}
@@ -118,25 +139,51 @@ export const SuspendedAccountModal: React.FC = () => {
           </span>
         </div>
 
-        {/* Logout Button */}
-        <button
-          type="button"
-          onClick={logout}
-          className="btn-secondary"
-          style={{
-            width: '100%',
-            padding: '0.75rem',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '0.5rem',
-            borderRadius: 12,
-            fontSize: '0.95rem',
-            fontWeight: 600
-          }}
-        >
-          <LogOut size={18} /> {isEs ? 'Cerrar Sesión' : 'Log Out'}
-        </button>
+        {/* Action Buttons */}
+        <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          <button
+            type="button"
+            onClick={logout}
+            className="btn-primary"
+            style={{
+              width: '100%',
+              padding: '0.75rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.5rem',
+              borderRadius: 12,
+              fontSize: '0.95rem',
+              fontWeight: 600
+            }}
+          >
+            <LogOut size={18} /> {isEs ? 'Cerrar Sesión' : 'Log Out'}
+          </button>
+
+          <button
+            type="button"
+            disabled={isDeleting}
+            onClick={handleDeleteMyAccount}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--text-muted)',
+              fontSize: '0.8rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.35rem',
+              padding: '0.4rem',
+              transition: 'color 0.2s ease'
+            }}
+            onMouseEnter={e => { e.currentTarget.style.color = '#ef4444'; }}
+            onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; }}
+          >
+            <Trash2 size={13} />
+            {isDeleting ? (isEs ? 'Eliminando cuenta...' : 'Deleting account...') : (isEs ? 'Eliminar mi cuenta definitivamente (Derecho al olvido)' : 'Permanently delete my account (Right to be forgotten)')}
+          </button>
+        </div>
       </div>
     </div>
   );

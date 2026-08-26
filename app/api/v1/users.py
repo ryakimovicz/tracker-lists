@@ -4,7 +4,8 @@ from fastapi import APIRouter, Depends, Query, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.api.deps import get_current_user, get_current_user_optional
+from app.api.deps import get_current_user, get_current_user_optional, get_current_user_allow_suspended
+
 from app.models.user import User
 from app.models.list import ReadingList, VisibilityEnum
 from app.models.list_item import ListItem
@@ -491,9 +492,10 @@ def change_password(
 
 @router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
 def delete_account(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_allow_suspended),
     db: Session = Depends(get_db)
 ):
+
     from app.models.library import UserLibraryItem
     from app.models.consumption import ConsumptionHistory
     from app.models.activity import UserActivityLog
