@@ -620,13 +620,36 @@ export const Profile: React.FC = () => {
             padding: '2.5rem',
             borderRadius: '20px',
             overflow: 'hidden',
-            background: profile.banner_url 
-              ? `linear-gradient(180deg, rgba(15, 15, 20, 0.45) 0%, rgba(15, 15, 20, 0.88) 60%, rgba(15, 15, 20, 0.98) 100%), url(${profile.banner_url}) center/cover no-repeat` 
-              : undefined,
             border: profile.banner_url ? '1px solid rgba(255, 255, 255, 0.12)' : undefined,
             boxShadow: profile.banner_url ? '0 12px 30px rgba(0, 0, 0, 0.4)' : undefined,
           }}
         >
+          {profile.banner_url && (
+            <>
+              {/* Banner Image Layer */}
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  backgroundImage: `url(${profile.banner_url})`,
+                  backgroundPosition: 'center',
+                  backgroundSize: 'cover',
+                  backgroundRepeat: 'no-repeat',
+                  zIndex: 0,
+                }}
+              />
+              {/* Darkening & Gradient overlay */}
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  background: 'linear-gradient(180deg, rgba(15, 15, 20, 0.45) 0%, rgba(15, 15, 20, 0.85) 55%, rgba(15, 15, 20, 0.98) 100%)',
+                  zIndex: 1,
+                }}
+              />
+            </>
+          )}
+
           {/* Change Banner Button (for profile owner) */}
           {isOwnProfile && (
             <button
@@ -653,7 +676,7 @@ export const Profile: React.FC = () => {
                 border: '1px solid rgba(255, 255, 255, 0.2)',
                 color: 'white',
                 cursor: 'pointer',
-                zIndex: 2,
+                zIndex: 3,
               }}
               title={
                 profile.is_pro || currentUser?.is_pro
@@ -670,7 +693,8 @@ export const Profile: React.FC = () => {
             </button>
           )}
 
-          <div style={{ position: 'relative', zIndex: 1 }}>
+          <div style={{ position: 'relative', zIndex: 2 }}>
+
 
             {profile.photo_url ? (
               <img

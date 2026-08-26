@@ -237,9 +237,7 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
             height: '175px',
             borderRadius: '16px',
             overflow: 'hidden',
-            background: selectedUrl
-              ? `linear-gradient(180deg, rgba(15, 15, 20, 0.4) 0%, rgba(15, 15, 20, 0.85) 60%, rgba(15, 15, 20, 0.98) 100%), url(${selectedUrl}) center/cover no-repeat`
-              : 'var(--surface-color)',
+            background: 'var(--surface-color)',
             border: selectedUrl ? '1px solid rgba(255, 255, 255, 0.12)' : '1px solid var(--border-color)',
             boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
             display: 'flex',
@@ -248,8 +246,35 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
             gap: '1.25rem',
           }}
         >
+          {selectedUrl && (
+            <>
+              {/* Banner Image Layer */}
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  backgroundImage: `url(${selectedUrl})`,
+                  backgroundPosition: 'center',
+                  backgroundSize: 'cover',
+                  backgroundRepeat: 'no-repeat',
+                  zIndex: 0,
+                }}
+              />
+              {/* Darkening & Gradient overlay */}
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  background: 'linear-gradient(180deg, rgba(15, 15, 20, 0.4) 0%, rgba(15, 15, 20, 0.85) 55%, rgba(15, 15, 20, 0.98) 100%)',
+                  zIndex: 1,
+                }}
+              />
+            </>
+          )}
+
           {/* Avatar simulation */}
           <div style={{ position: 'relative', zIndex: 2, flexShrink: 0 }}>
+
             {user?.photo_url ? (
               <img
                 src={user.photo_url}
