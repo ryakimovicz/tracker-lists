@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import ReactDOM from 'react-dom';
 import { useTranslation } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
-import { Star, Check, X, Palette, Lock, Crown, Sparkles } from 'lucide-react';
+import { Star, Check, X, Palette, Lock, Crown } from 'lucide-react';
 import { apiClient } from '../api/client';
+
 
 interface ProModalProps {
   onClose: () => void;
@@ -116,24 +117,8 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
         )}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          {/* Benefit 1: Avatars */}
-          <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
-            <div style={{ background: 'rgba(245, 158, 11, 0.15)', padding: '0.5rem', borderRadius: '8px', color: '#f59e0b', flexShrink: 0 }}>
-              <Sparkles size={20} />
-            </div>
-            <div>
-              <h4 style={{ margin: '0 0 0.25rem 0', fontSize: '1rem' }}>
-                {isEs ? 'Avatares de Personajes' : 'Character Avatars'}
-              </h4>
-              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
-                {isEs
-                  ? 'Busca y usa a tus personajes favoritos de Anime, Cómics y Videojuegos como tu foto de perfil oficial.'
-                  : 'Search and set your favorite characters from Anime, Comics, and Games as your official avatar.'}
-              </p>
-            </div>
-          </div>
+          {/* Benefit 1: 10 Favorites per category */}
 
-          {/* Benefit 2: 10 Favorites per category */}
           <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
             <div style={{ background: 'rgba(245, 158, 11, 0.15)', padding: '0.5rem', borderRadius: '8px', color: '#f59e0b', flexShrink: 0 }}>
               <Star size={20} />
