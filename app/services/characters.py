@@ -6,12 +6,14 @@ import concurrent.futures
 from typing import List, Dict, Any
 from app.core.config import settings
 from app.services.igdb import IGDBService
+from app.services.omdb import OMDbService
+from app.services.googlebooks import GoogleBooksService
 
 class CharacterSearchResult:
     def __init__(self, name: str, image_url: str, category: str, origin: str = "", score: int = 0):
         self.name = name
         self.image_url = image_url
-        self.category = category # 'anime', 'comic', 'game', 'series'
+        self.category = category # 'anime', 'comic', 'game', 'series', 'movie', 'book', 'manga'
         self.origin = origin
         self.score = score
 
@@ -39,8 +41,7 @@ class CharacterService:
     def _generate_query_variants(cls, query: str) -> List[str]:
         variants = []
         
-        # 1. First add primary tokens and aliases so providers query individual components
-        # e.g. "gman half-life" -> ["gman", "g-man", "half-life", "half life"]
+        # 1. Primary individual tokens & aliases
         tokens = re.findall(r'\b[\w\'-]+\b', query)
         for t in tokens:
             if len(t) >= 2:
@@ -52,7 +53,7 @@ class CharacterService:
                 if t.lower() == "spiderman":
                     variants.append("spider-man")
 
-        # 2. Add full query and hyphen/space normalized variants
+        # 2. Full query and hyphen/space variants
         variants.append(query.strip())
         if "-" in query:
             variants.append(query.replace("-", " "))
@@ -60,7 +61,7 @@ class CharacterService:
         if " " in query:
             variants.append(query.replace(" ", "-"))
 
-        # 3. Specific common aliases on full string
+        # 3. Aliases
         q_lower = query.lower()
         if "gman" in q_lower:
             variants.append(re.sub(r'\bgman\b', 'g-man', query, flags=re.IGNORECASE))
@@ -74,6 +75,8 @@ class CharacterService:
         # Gaming franchise helpers
         if "half" in q_lower and "life" in q_lower:
             variants.extend(["half-life", "half life", "half-life 2", "gordon freeman"])
+        if "hollow" in q_lower and "knight" in q_lower:
+            variants.extend(["hollow knight", "silksong", "hollow knight silksong"])
 
         return list(dict.fromkeys([v for v in variants if len(v.strip()) >= 2]))
 
@@ -115,7 +118,7 @@ class CharacterService:
         }
         """
 
-        for term in variants[:4]:
+        for term in variants[:3]:
             payload = json.dumps({
                 "query": graphql_query,
                 "variables": {"search": term}
@@ -177,7 +180,7 @@ class CharacterService:
         results = []
         seen_names = set()
 
-        for term in variants[:4]:
+        for term in variants[:3]:
             encoded_query = urllib.parse.quote(term)
             url = f"https://comicvine.gamespot.com/api/search/?api_key={settings.COMIC_VINE_API_KEY}&format=json&resources=character&query={encoded_query}&limit=12&field_list=id,name,real_name,image,publisher"
             
@@ -234,8 +237,8 @@ class CharacterService:
         seen_ids = set()
         variants = cls._generate_query_variants(query)
 
-        # 1. Direct character search across all query variants (including aliases like g-man)
-        for term in variants[:6]:
+        # 1. Direct character search
+        for term in variants[:5]:
             safe_query = term.replace('"', '\\"')
             body = f'search "{safe_query}"; fields id, name, mug_shot.image_id, games.name; limit 12;'
             
@@ -278,7 +281,7 @@ class CharacterService:
             except Exception as e:
                 print(f"IGDB Character Search Error: {e}")
 
-        # 2. Search game titles to discover full cast of characters and game artworks/covers (e.g. "hollow knight", "silksong", "the witcher")
+        # 2. Search game titles: extract covers, artworks, and game characters
         game_terms = [v for v in variants if len(v) >= 3][:3]
         all_game_ids = []
         for term in game_terms:
@@ -299,7 +302,6 @@ class CharacterService:
                                 all_game_ids.append(str(g_id))
                             
                             gname = g.get('name') or "Video Game"
-                            # Add game cover
                             cover = g.get('cover')
                             if cover and cover.get('image_id'):
                                 c_url = f"https://images.igdb.com/igdb/image/upload/t_cover_big/{cover['image_id']}.jpg"
@@ -312,7 +314,6 @@ class CharacterService:
                                         origin=gname
                                     ))
                             
-                            # Add character artworks
                             artworks = g.get('artworks') or []
                             for art in artworks[:3]:
                                 if art.get('image_id'):
@@ -364,7 +365,6 @@ class CharacterService:
 
         return results
 
-
     @classmethod
     def _search_tvmaze(cls, query: str, raw_query: str = "") -> List[CharacterSearchResult]:
         if not query and not raw_query:
@@ -372,23 +372,32 @@ class CharacterService:
         
         results = []
         seen_char_keys = set()
-        
         search_terms = list(dict.fromkeys([q for q in [raw_query, query] if q and len(q.strip()) >= 2]))
         
         for term in search_terms:
             encoded_query = urllib.parse.quote(term)
-            
-            # 1. Search TV shows to get main cast characters
             shows_url = f"https://api.tvmaze.com/search/shows?q={encoded_query}"
             try:
                 req_shows = urllib.request.Request(shows_url, headers={"User-Agent": "Pathd/1.0"})
                 with urllib.request.urlopen(req_shows, timeout=5) as response:
                     if response.status == 200:
                         shows_data = json.loads(response.read().decode())
-                        for s_item in shows_data[:2]:
+                        for s_item in shows_data[:3]:
                             show = s_item.get("show", {}) or {}
                             show_id = show.get("id")
                             show_name = show.get("name") or "Series"
+                            
+                            # Add show main poster
+                            s_img = show.get("image") or {}
+                            s_poster = s_img.get("original") or s_img.get("medium")
+                            if s_poster and show_name not in seen_char_keys:
+                                seen_char_keys.add(show_name)
+                                results.append(CharacterSearchResult(
+                                    name=show_name,
+                                    image_url=s_poster,
+                                    category="series",
+                                    origin=show_name
+                                ))
                             
                             if show_id:
                                 cast_url = f"https://api.tvmaze.com/shows/{show_id}/cast"
@@ -423,14 +432,14 @@ class CharacterService:
             except Exception as e:
                 print(f"TVMaze Show Cast Search Error: {e}")
 
-            # 2. Search people/actors in TVMaze
+            # 2. Search people/actors
             people_url = f"https://api.tvmaze.com/search/people?q={encoded_query}"
             try:
                 req_people = urllib.request.Request(people_url, headers={"User-Agent": "Pathd/1.0"})
                 with urllib.request.urlopen(req_people, timeout=5) as p_resp:
                     if p_resp.status == 200:
                         people_data = json.loads(p_resp.read().decode())
-                        for p_item in people_data[:5]:
+                        for p_item in people_data[:4]:
                             person = p_item.get("person", {}) or {}
                             name = person.get("name") or "Actor"
                             img_obj = person.get("image") or {}
@@ -451,6 +460,44 @@ class CharacterService:
         return results
 
     @classmethod
+    def _search_movies(cls, query: str) -> List[CharacterSearchResult]:
+        if not query:
+            return []
+        results = []
+        try:
+            movies = OMDbService.search_movies(query)
+            for m in movies[:6]:
+                if m.image_url and "unsplash" not in m.image_url and "default" not in m.image_url.lower():
+                    results.append(CharacterSearchResult(
+                        name=m.title,
+                        image_url=m.image_url,
+                        category="movie",
+                        origin=m.title
+                    ))
+        except Exception as e:
+            print(f"OMDb Movies Search Error: {e}")
+        return results
+
+    @classmethod
+    def _search_books(cls, query: str) -> List[CharacterSearchResult]:
+        if not query:
+            return []
+        results = []
+        try:
+            books_data = GoogleBooksService.fetch_google_books(query)
+            for b, _ in books_data[:5]:
+                if b.image_url:
+                    results.append(CharacterSearchResult(
+                        name=b.title,
+                        image_url=b.image_url,
+                        category="book",
+                        origin=b.title
+                    ))
+        except Exception as e:
+            print(f"Google Books Search Error: {e}")
+        return results
+
+    @classmethod
     def _calculate_relevance(cls, item: CharacterSearchResult, clean_query: str, raw_query: str) -> int:
         score = 0
         name_norm = cls._normalize_text(item.name)
@@ -459,13 +506,13 @@ class CharacterService:
         query_norm_clean = cls._normalize_text(clean_query)
         query_norm_raw = cls._normalize_text(raw_query)
 
-        # 1. Exact normalized match (e.g. "gman" == "gman" for "G-Man")
+        # 1. Exact normalized match on character / work name
         if name_norm == query_norm_clean or name_norm == query_norm_raw:
             return 5000
         if name_norm.startswith(query_norm_clean) or name_norm.startswith(query_norm_raw):
             return 4200
 
-        # Exact franchise/game origin match (e.g. searched "half life 2" or "half-life")
+        # Exact franchise/game origin match
         if origin_norm == query_norm_clean or origin_norm == query_norm_raw or origin_norm.startswith(query_norm_clean):
             return 3800
 
@@ -473,7 +520,6 @@ class CharacterService:
         clean_q_spaces = f"{clean_query} {raw_query}".replace("-", " ")
         tokens = list(dict.fromkeys([cls._normalize_text(w) for w in re.findall(r'\b[\w\'-]+\b', clean_q_spaces) if len(w) >= 2]))
         
-        # Add compound tokens if present
         if "half" in tokens and "life" in tokens:
             tokens.append("halflife")
         if "g" in clean_q_spaces.split() or "gman" in clean_q_spaces:
@@ -491,10 +537,9 @@ class CharacterService:
                 origin_matches += 1
                 
         # 2. Cross match: both character name AND game/series origin match!
-        # e.g. "gman half-life", "half-life gman", "half life gman"
         if name_matches > 0 and origin_matches > 0:
             score += 4800 + (name_matches * 300) + (origin_matches * 200)
-        elif total_matched := (name_matches + origin_matches) >= len(tokens) and len(tokens) > 1:
+        elif (name_matches + origin_matches) >= len(tokens) and len(tokens) > 1:
             score += 3000
         elif name_matches > 0:
             score += 2000 + (name_matches * 200)
@@ -502,7 +547,6 @@ class CharacterService:
             score += 3200 + (origin_matches * 200)
             
         return int(score)
-
 
     @classmethod
     def get_popular_suggestions(cls) -> List[Dict[str, Any]]:
@@ -515,11 +559,15 @@ class CharacterService:
             ("Deadpool", "comic"),
             ("Gordon Freeman", "game"),
             ("G-Man", "game"),
+            ("Hollow Knight", "game"),
             ("Kratos", "game"),
-            ("Geralt of Rivia", "game"),
             ("Walter White", "series"),
             ("Patrick Jane", "series"),
-            ("Thomas Shelby", "series"),
+            ("Inception", "movie"),
+            ("Star Wars", "movie"),
+            ("Interstellar", "movie"),
+            ("Pulp Fiction", "movie"),
+            ("Harry Potter", "book"),
         ]
         
         all_results = []
@@ -532,6 +580,10 @@ class CharacterService:
                     f = executor.submit(cls._search_comicvine, name)
                 elif cat == "game":
                     f = executor.submit(cls._search_igdb, name)
+                elif cat == "movie":
+                    f = executor.submit(cls._search_movies, name)
+                elif cat == "book":
+                    f = executor.submit(cls._search_books, name)
                 else:
                     f = executor.submit(cls._search_tvmaze, name, name)
                 future_map[f] = (name, cat)
@@ -551,7 +603,7 @@ class CharacterService:
                 seen_images.add(r.image_url)
                 deduped.append(r.to_dict())
 
-        return deduped[:36]
+        return deduped[:40]
 
     @classmethod
     def search_all(cls, query: str) -> List[Dict[str, Any]]:
@@ -560,17 +612,18 @@ class CharacterService:
 
         raw_query = query.strip().lower()
         clean_query = cls._clean_query_terms(query).lower()
-
         search_term = clean_query if len(clean_query) >= 2 else raw_query
 
         all_results = []
-        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
-            future_anilist = executor.submit(cls._search_anilist, search_term)
-            future_comicvine = executor.submit(cls._search_comicvine, search_term)
-            future_igdb = executor.submit(cls._search_igdb, search_term)
-            future_tvmaze = executor.submit(cls._search_tvmaze, search_term, raw_query)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
+            f_anilist = executor.submit(cls._search_anilist, search_term)
+            f_comicvine = executor.submit(cls._search_comicvine, search_term)
+            f_igdb = executor.submit(cls._search_igdb, search_term)
+            f_tvmaze = executor.submit(cls._search_tvmaze, search_term, raw_query)
+            f_movies = executor.submit(cls._search_movies, search_term)
+            f_books = executor.submit(cls._search_books, search_term)
 
-            for future in (future_anilist, future_comicvine, future_igdb, future_tvmaze):
+            for future in (f_anilist, f_comicvine, f_igdb, f_tvmaze, f_movies, f_books):
                 try:
                     res = future.result()
                     all_results.extend(res)
@@ -592,4 +645,4 @@ class CharacterService:
                 seen_images.add(r.image_url)
                 deduped.append(r.to_dict())
 
-        return deduped[:36]
+        return deduped[:40]

@@ -198,8 +198,8 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
             className="input-field"
             placeholder={
               isEs
-                ? 'Buscar personaje o serie (El Mentalista, Patrick Jane, Batman, Goku, Walter White...)'
-                : 'Search character or show (The Mentalist, Patrick Jane, Batman, Goku, Walter White...)'
+                ? 'Buscar personaje o portada (Batman, Inception, Breaking Bad, Goku, Hollow Knight, Harry Potter...)'
+                : 'Search character or cover (Batman, Inception, Breaking Bad, Goku, Hollow Knight, Harry Potter...)'
             }
 
             value={query}
@@ -235,12 +235,12 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
         {errorMsg && (
           <div
             style={{
-              background: 'rgba(239, 68, 68, 0.15)',
-              color: '#ef4444',
               padding: '0.65rem 1rem',
               borderRadius: '8px',
-              fontSize: '0.85rem',
+              background: 'rgba(239, 68, 68, 0.15)',
               border: '1px solid rgba(239, 68, 68, 0.3)',
+              color: '#ef4444',
+              fontSize: '0.85rem',
             }}
           >
             {errorMsg}
@@ -272,11 +272,11 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
             >
               {query.trim().length >= 2
                 ? isEs
-                  ? 'No se encontraron personajes con ese nombre.'
-                  : 'No characters found with that name.'
+                  ? 'No se encontraron resultados con ese nombre.'
+                  : 'No results found with that name.'
                 : isEs
-                ? 'Escribe el nombre de un personaje para buscar en Anime, Cómics y Videojuegos.'
-                : 'Type a character name to search across Anime, Comics, and Games.'}
+                ? 'Escribe para buscar personajes y portadas de Películas, Series, Videojuegos, Anime, Libros y Cómics.'
+                : 'Type to search characters and covers across Movies, Shows, Games, Anime, Books, and Comics.'}
             </div>
           )}
 
