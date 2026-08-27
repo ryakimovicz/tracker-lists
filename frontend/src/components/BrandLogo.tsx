@@ -65,15 +65,16 @@ export const BrandLogo: React.FC = () => {
   };
 
 
-  // Schedule periodic wave every 7 seconds
+  // Schedule periodic wave every 16 seconds
   const startPeriodicWave = () => {
     if (intervalRef.current) clearInterval(intervalRef.current);
     intervalRef.current = setInterval(() => {
       if (!isHoveredRef.current) {
         runWave();
       }
-    }, 7000);
+    }, 16000);
   };
+
 
   useEffect(() => {
     startPeriodicWave();
