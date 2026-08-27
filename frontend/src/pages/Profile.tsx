@@ -12,6 +12,8 @@ import { AvatarSelectorModal } from '../components/AvatarSelectorModal';
 import { BannerSelectorModal } from '../components/BannerSelectorModal';
 import { BackgroundSelectorModal } from '../components/BackgroundSelectorModal';
 import { ProModal } from '../components/ProModal';
+import { ReplaceFavoriteModal } from '../components/ReplaceFavoriteModal';
+
 
 import {
   BookOpen,
@@ -114,8 +116,18 @@ export const Profile: React.FC = () => {
   const [showBannerModal, setShowBannerModal] = useState(false);
   const [showBackgroundModal, setShowBackgroundModal] = useState(false);
   const [showProModal, setShowProModal] = useState(false);
+  const [replaceModalState, setReplaceModalState] = useState<{
+    isOpen: boolean;
+    newItem: LibraryItem | null;
+    currentFavorites: LibraryItem[];
+  }>({
+    isOpen: false,
+    newItem: null,
+    currentFavorites: []
+  });
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
+
 
 
   const [libraryItems, setLibraryItems] = useState<LibraryItem[]>([]);
@@ -439,26 +451,16 @@ export const Profile: React.FC = () => {
       const maxAllowed = isPro ? 10 : 1;
 
       if (sameCategoryFavs.length >= maxAllowed) {
-        if (!isPro) {
-          setErrorMsg(
-            language === 'es'
-              ? `Los usuarios gratuitos pueden destacar 1 elemento por categoría. ¡Hazte Premium para destacar hasta 10!`
-              : `Free users can feature 1 item per category. Upgrade to Pathd Premium to feature up to 10!`
-          );
-        } else {
-          setErrorMsg(
-            language === 'es'
-              ? `Has alcanzado el límite máximo de 10 destacados para esta categoría.`
-              : `Premium limit reached: Maximum 10 featured items allowed for this category.`
-          );
-        }
-        setTimeout(() => setErrorMsg(''), 5000);
+        // Open confirmation/replace modal instead of hard blocking or blind swapping
+        setReplaceModalState({
+          isOpen: true,
+          newItem: targetItem,
+          currentFavorites: sameCategoryFavs
+        });
         return;
       }
     }
 
-
-    
     try {
       await apiClient.put(`/library/${itemId}`, { is_favorite: !currentFav });
       setLibraryItems(prev => prev.map(item => item.id === itemId ? { ...item, is_favorite: !currentFav } : item));
@@ -480,6 +482,41 @@ export const Profile: React.FC = () => {
       setTimeout(() => setErrorMsg(''), 5000);
     }
   };
+
+  const handleConfirmReplace = async (itemToReplaceId: number, newItemId: number) => {
+    const newItemObj = libraryItems.find(li => li.id === newItemId);
+    if (!newItemObj) return;
+
+    try {
+      // 1. Unfavorite the old item
+      await apiClient.put(`/library/${itemToReplaceId}`, { is_favorite: false });
+      // 2. Favorite the new item
+      await apiClient.put(`/library/${newItemId}`, { is_favorite: true });
+
+      setLibraryItems(prev => prev.map(item => {
+        if (item.id === itemToReplaceId) return { ...item, is_favorite: false };
+        if (item.id === newItemId) return { ...item, is_favorite: true };
+        return item;
+      }));
+
+      setFavorites(prev => {
+        const filtered = prev.filter(li => li.id !== itemToReplaceId && li.id !== newItemId);
+        return [...filtered, { ...newItemObj, is_favorite: true }];
+      });
+
+      setSuccessMsg(language === 'es' ? 'Obra destacada actualizada correctamente.' : 'Featured item updated successfully.');
+      setTimeout(() => setSuccessMsg(''), 4000);
+
+      // Refresh activities
+      const targetActivityUrl = userIdParam ? `/users/${userIdParam}/activity` : '/users/me/activity';
+      const actRes = await apiClient.get(targetActivityUrl);
+      setActivities(actRes.data);
+    } catch(err: any) {
+      setErrorMsg(err.response?.data?.detail || (language === 'es' ? 'Error al reemplazar destacado' : 'Failed to replace favorite'));
+      setTimeout(() => setErrorMsg(''), 5000);
+    }
+  };
+
 
 
   const handleOpenItemDetails = (item: any) => {
@@ -2043,11 +2080,21 @@ export const Profile: React.FC = () => {
         <ProModal onClose={() => setShowProModal(false)} />
       )}
 
-
+      {/* Replace Favorite Modal (Confirmation & 10/10 Selector) */}
+      <ReplaceFavoriteModal
+        isOpen={replaceModalState.isOpen}
+        onClose={() => setReplaceModalState({ isOpen: false, newItem: null, currentFavorites: [] })}
+        newItem={replaceModalState.newItem}
+        currentFavorites={replaceModalState.currentFavorites}
+        isPro={Boolean(profile?.is_pro || currentUser?.is_pro)}
+        onConfirmReplace={handleConfirmReplace}
+        onOpenProModal={() => setShowProModal(true)}
+      />
     </div>
   );
 };
 export default Profile;
+
 
 
 
