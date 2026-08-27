@@ -20,20 +20,24 @@ import {
   ClipboardPaste,
   Copy,
   Menu,
-  Eye
+  Eye,
+  Crown
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { ProModal } from '../components/ProModal';
 
 interface CreatedGuide {
   id: number;
   title: string;
   description: string;
   visibility: string;
+  can_edit?: boolean;
   importance_labels: Record<string, string>;
   section_importances: Record<string, number>;
   section_descriptions: any; // Will store the rich document JSON structure
   items: any[];
 }
+
 
 interface DocElement {
   id: string;
@@ -137,9 +141,11 @@ export const CreateGuide: React.FC = () => {
   // Feedback states
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [showProModal, setShowProModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAutoSaving, setIsAutoSaving] = useState(false);
   const [lastSavedTime, setLastSavedTime] = useState<string | null>(null);
+
 
   const parseError = (err: any) => {
     const detail = err.response?.data?.detail;
@@ -1423,6 +1429,39 @@ export const CreateGuide: React.FC = () => {
         /* STEP 2: RICH DOCUMENT-STYLE EDITOR CANVAS */
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
           
+          {guide && guide.can_edit === false && (
+            <div 
+              style={{
+                background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(124, 58, 237, 0.15))',
+                border: '1px solid rgba(245, 158, 11, 0.4)',
+                borderRadius: '12px',
+                padding: '1rem 1.5rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '1rem',
+                flexWrap: 'wrap'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <Crown size={24} color="#f59e0b" style={{ flexShrink: 0 }} />
+                <div>
+                  <h4 style={{ margin: '0 0 0.25rem 0', color: '#f59e0b', fontSize: '0.95rem' }}>
+                    {language === 'es' ? 'Guía en modo Solo Lectura' : 'Read-Only Guide'}
+                  </h4>
+                  <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                    {language === 'es' 
+                      ? 'En el plan gratuito puedes editar tus 2 primeras guías creadas. Pasa a Pathd Premium para editar todas tus guías.' 
+                      : 'Free plan allows editing your first 2 created guides. Upgrade to Pathd Premium to edit all your guides.'}
+                  </p>
+                </div>
+              </div>
+              <button onClick={() => setShowProModal(true)} className="btn-primary" style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}>
+                {language === 'es' ? 'Desbloquear con Premium' : 'Unlock with Premium'}
+              </button>
+            </div>
+          )}
+
           {/* Editor Header Tools */}
           <div className="glass-card" style={{ 
             padding: '1.25rem 2rem', 
@@ -1432,10 +1471,11 @@ export const CreateGuide: React.FC = () => {
             position: 'sticky', 
             top: '75px', 
             zIndex: 100,
-            opacity: pointerDrag ? 0.75 : 1,
-            pointerEvents: pointerDrag ? 'none' : 'auto',
+            opacity: (pointerDrag || guide?.can_edit === false) ? 0.75 : 1,
+            pointerEvents: (pointerDrag || guide?.can_edit === false) ? 'none' : 'auto',
             transition: 'opacity 0.2s ease'
           }}>
+
             {/* Top Row: Auto-save status & Main Actions (Visibility, View Guide, Publish Changes) */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
               {/* Auto-save status indicator */}
@@ -2926,6 +2966,10 @@ export const CreateGuide: React.FC = () => {
             </>
           )}
         </div>
+      )}
+      {/* Pro Modal */}
+      {showProModal && (
+        <ProModal onClose={() => setShowProModal(false)} />
       )}
     </div>
   );

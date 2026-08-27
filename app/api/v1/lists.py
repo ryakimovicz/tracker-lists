@@ -16,6 +16,7 @@ from app.models.social import ListVote
 from app.services.tvmaze import TVMazeService
 from app.models.library import UserLibraryItem, UserLibraryStatusEnum
 from app.models.activity import UserActivityLog
+from app.api.v1.users import check_user_is_pro
 from app.schemas.list import (
     ReadingListCreate,
     ReadingListUpdate,
@@ -38,9 +39,9 @@ router = APIRouter()
 # 1. Feed: Get public lists
 @router.get("/", response_model=List[ReadingListResponse])
 def get_public_lists(
-    db: Session = Depends(get_db),
     skip: int = 0,
-    limit: int = 100
+    limit: int = 20,
+    db: Session = Depends(get_db)
 ):
     lists = db.query(ReadingList).filter(
         ReadingList.visibility == VisibilityEnum.PUBLIC
@@ -54,8 +55,21 @@ def create_list(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    # Enforce draft state on initial creation, saving intended visibility inside section_descriptions
-    intended = list_in.visibility.value if list_in.visibility else "public"
+    # Enforce limit of 2 created guides for free users
+    is_pro = check_user_is_pro(current_user)
+    if not is_pro:
+        existing_created = db.query(ReadingList).filter(ReadingList.creator_id == current_user.id).count()
+        if existing_created >= 2:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Los usuarios gratuitos pueden crear un máximo de 2 guías. Pásate a Pathd Premium para crear guías ilimitadas."
+            )
+        # Free users can only create public guides
+        intended = "public"
+    else:
+        # Enforce draft state on initial creation, saving intended visibility inside section_descriptions
+        intended = list_in.visibility.value if list_in.visibility else "public"
+
     new_list = ReadingList(
         creator_id=current_user.id,
         title=list_in.title,
@@ -120,10 +134,21 @@ def get_list_details(
             SavedList.list_id == list_id
         ).first()
         is_saved_by_me = saved_record is not None
+    
+    creator = db.query(User).filter(User.id == reading_list.creator_id).first() if reading_list.creator_id else None
+    creator_username = creator.username if creator else "Comunidad de Pathd"
 
-    # Fetch creator username
-    creator = db.query(User).filter(User.id == reading_list.creator_id).first()
-    creator_username = creator.username if creator else "Unknown"
+    # Calculate edit permissions
+    can_edit = False
+    if current_user:
+        if bool(getattr(current_user, 'is_admin', False)):
+            can_edit = True
+        elif reading_list.creator_id == current_user.id:
+            if check_user_is_pro(current_user):
+                can_edit = True
+            else:
+                user_lists_ids = [l.id for l in db.query(ReadingList.id).filter(ReadingList.creator_id == current_user.id).order_by(ReadingList.created_at.asc()).limit(2).all()]
+                can_edit = reading_list.id in user_lists_ids
 
     # Fetch list items and their progress
     items = reading_list.items
@@ -163,28 +188,51 @@ def get_list_details(
             UserAdoptedAddition.user_id == current_user.id
         ).all()
         
-        all_active_additions = list(set(user_additions + adopted_additions))
-        
-        for add in all_active_additions:
-            addition_items.extend(add.items)
+        seen_addition_ids = set()
+        for add in (user_additions + adopted_additions):
+            if add.id in seen_addition_ids:
+                continue
+            seen_addition_ids.add(add.id)
+            for item in add.items:
+                is_comp, is_skip = addition_progress_map.get(item.id, (False, False))
+                # For additions, inherited_importance_rank is the target item rank or 1
+                inherited_rank = None
+                if add.target_list_item:
+                    inherited_rank = add.target_list_item.importance_rank
+                
+                addition_items.append(
+                    ListItemProgressResponse(
+                        id=item.id,
+                        list_id=item.list_id,
+                        order_index=item.order_index,
+                        item_type=item.item_type,
+                        external_id=item.external_id,
+                        title=item.title,
+                        image_url=item.image_url,
+                        custom_notes=item.custom_notes,
+                        section=item.section,
+                        importance_rank=item.importance_rank,
+                        is_nsfw=item.is_nsfw,
+                        is_completed=is_comp,
+                        is_skipped=is_skip,
+                        is_addition=True,
+                        addition_id=add.id,
+                        addition_item_id=item.id,
+                        inherited_importance_rank=inherited_rank
+                    )
+                )
 
-    # Sort addition items by order_index so they inject sequentially
-    addition_items.sort(key=lambda x: x.order_index)
-
-    # Map base items
-    merged_items = []
-    sec_importances = reading_list.section_importances or {}
+    # Process base items
+    formatted_base_items = []
     for item in items:
+        # Check progress
         if item.external_id:
-            is_completed, is_skipped = external_progress_map.get((item.item_type.lower(), item.external_id), (False, False))
+            key = (item.item_type.value.lower() if hasattr(item.item_type, 'value') else str(item.item_type).lower(), item.external_id)
+            is_comp, is_skip = external_progress_map.get(key, (False, False))
         else:
-            is_completed, is_skipped = custom_progress_map.get(item.id, (False, False))
-            
-        inherited = item.importance_rank
-        if inherited is None and item.section:
-            inherited = sec_importances.get(item.section)
-            
-        merged_items.append(
+            is_comp, is_skip = custom_progress_map.get(item.id, (False, False))
+
+        formatted_base_items.append(
             ListItemProgressResponse(
                 id=item.id,
                 list_id=item.list_id,
@@ -195,78 +243,53 @@ def get_list_details(
                 image_url=item.image_url,
                 custom_notes=item.custom_notes,
                 section=item.section,
-                is_completed=is_completed,
-                is_skipped=is_skipped,
-                is_addition=False,
                 importance_rank=item.importance_rank,
-                inherited_importance_rank=inherited
+                is_nsfw=item.is_nsfw,
+                is_completed=is_comp,
+                is_skipped=is_skip,
+                is_addition=False
             )
         )
 
-    # Inject addition items after anchor items
-    for ai in addition_items:
-        if ai.external_id:
-            is_completed, is_skipped = external_progress_map.get((ai.item_type.lower(), ai.external_id), (False, False))
-        else:
-            is_completed, is_skipped = addition_progress_map.get(ai.id, (False, False))
-            
-        inherited = ai.importance_rank
-        if inherited is None and ai.section:
-            inherited = sec_importances.get(ai.section)
-            
-        ai_resp = ListItemProgressResponse(
-            id=ai.id,
-            list_id=list_id,
-            order_index=ai.order_index,
-            item_type=ai.item_type,
-            external_id=ai.external_id,
-            title=ai.title,
-            image_url=ai.image_url,
-            custom_notes=ai.custom_notes,
-            section=ai.section,
-            is_completed=is_completed,
-            is_skipped=is_skipped,
-            is_addition=True,
-            addition_id=ai.addition_id,
-            addition_item_id=ai.id,
-            importance_rank=ai.importance_rank,
-            inherited_importance_rank=inherited
-        )
-        
-        inserted = False
-        if ai.after_item_id:
-            for index, base_item in enumerate(merged_items):
-                if not base_item.is_addition and base_item.id == ai.after_item_id:
-                    # Find last addition item inserted after this base item to insert after it
-                    insert_idx = index + 1
-                    while insert_idx < len(merged_items) and merged_items[insert_idx].is_addition:
-                        insert_idx += 1
-                    merged_items.insert(insert_idx, ai_resp)
-                    inserted = True
-                    break
-        if not inserted:
-            merged_items.append(ai_resp)
-
-    # Recalculate metrics dynamically based on merged items list
-    merged_total = len(merged_items)
-    completed_count = sum(1 for x in merged_items if x.is_completed)
-    skipped_count = sum(1 for x in merged_items if x.is_skipped)
-
-    progress_percentage = 0.0
-    skipped_percentage = 0.0
-    if merged_total > 0:
-        progress_percentage = (completed_count / merged_total) * 100.0
-        skipped_percentage = (skipped_count / merged_total) * 100.0
-
+    # If draft mode requested and user is creator, return draft metadata
     list_title = reading_list.title
     list_desc = reading_list.description
+    
     if draft and current_user and reading_list.creator_id == current_user.id:
         sd = reading_list.section_descriptions or {}
-        list_title = sd.get("draft_title") or list_title
-        list_desc = sd.get("draft_description") or list_desc
+        if "draft_title" in sd:
+            list_title = sd.get("draft_title")
+        if "draft_description" in sd:
+            list_desc = sd.get("draft_description")
+        
+        # When drafting, return items mapped by draft_flow
+        draft_flow = sd.get("draft_flow", None)
+        if draft_flow is not None:
+            # Reconstruct list from draft_flow metadata
+            items_by_id = {item.id: item for item in formatted_base_items}
+            reconstructed = []
+            order = 0
+            for entry in draft_flow:
+                if entry.get("type") == "item":
+                    base_id = entry.get("id")
+                    if base_id in items_by_id:
+                        itm = items_by_id[base_id]
+                        itm.order_index = order
+                        itm.section = entry.get("section")
+                        reconstructed.append(itm)
+                        order += 1
+            formatted_base_items = reconstructed
 
-    # Ratings metrics
-    all_votes = db.query(ListVote).filter(ListVote.list_id == list_id, ListVote.rating != None).all()
+    # Merge base items with addition items
+    merged_items = formatted_base_items + addition_items
+    merged_total = len(merged_items)
+
+    completed_count = sum(1 for i in merged_items if i.is_completed)
+    skipped_count = sum(1 for i in merged_items if i.is_skipped)
+    progress_percentage = (completed_count / merged_total * 100) if merged_total > 0 else 0
+    skipped_percentage = (skipped_count / merged_total * 100) if merged_total > 0 else 0
+
+    all_votes = db.query(ListVote).filter(ListVote.list_id == list_id).all()
     total_ratings = len(all_votes)
     avg_rating = sum(v.rating for v in all_votes) / total_ratings if total_ratings > 0 else None
     user_rating = None
@@ -288,6 +311,7 @@ def get_list_details(
         creator_username=creator_username,
         creator_photo_url=creator.photo_url if creator else None,
         is_saved_by_me=is_saved_by_me,
+        can_edit=can_edit,
         completed_count=completed_count,
         skipped_count=skipped_count,
         total_count=merged_total,
@@ -313,12 +337,25 @@ def update_list(
     if not reading_list:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="List not found")
         
-    if reading_list.creator_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only the creator can modify this list"
-        )
-        
+    is_admin = bool(getattr(current_user, 'is_admin', False))
+    if not is_admin:
+        if reading_list.creator_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Solo el creador puede modificar esta guía"
+            )
+        if not check_user_is_pro(current_user):
+            # Check if this list is among the first 2 created
+            user_lists_ids = [l.id for l in db.query(ReadingList.id).filter(ReadingList.creator_id == current_user.id).order_by(ReadingList.created_at.asc()).limit(2).all()]
+            if reading_list.id not in user_lists_ids:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Esta guía está en modo solo lectura. Pasa a Premium para editarla."
+                )
+            # Free users cannot switch to private or unlisted
+            if list_in.visibility in (VisibilityEnum.PRIVATE, VisibilityEnum.UNLISTED):
+                list_in.visibility = VisibilityEnum.PUBLIC
+                
     old_title = reading_list.title
     old_visibility = reading_list.visibility
     old_flow = reading_list.section_descriptions.get("flow", []) if reading_list.section_descriptions else []
@@ -420,24 +457,43 @@ def delete_list(
     if not reading_list:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="List not found")
         
-    if reading_list.creator_id != current_user.id:
+    is_admin = bool(getattr(current_user, 'is_admin', False))
+    if not is_admin and reading_list.creator_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only the creator can delete this list"
+            detail="Solo el creador puede eliminar esta guía"
         )
         
     # Record activity log before deletion
     activity = UserActivityLog(
-            user_id=current_user.id,
-            activity_type="guide_deleted",
-            item_title=reading_list.title,
-            item_type="guide",
-            list_id=reading_list.id,
-            details="deleted"
-        )
+        user_id=current_user.id,
+        activity_type="guide_deleted",
+        item_title=reading_list.title,
+        item_type="guide",
+        list_id=reading_list.id,
+        details="deleted"
+    )
     db.add(activity)
-    db.delete(reading_list)
-    db.commit()
+
+    # Check if other users are following this guide
+    other_followers = db.query(SavedList).filter(
+        SavedList.list_id == list_id,
+        SavedList.user_id != current_user.id
+    ).count()
+
+    if other_followers > 0:
+        # Soft Orphan: Disassociate from author so it becomes a community guide and frees author's creation slot
+        reading_list.creator_id = None
+        # Remove author's own saved entry
+        db.query(SavedList).filter(
+            SavedList.list_id == list_id,
+            SavedList.user_id == current_user.id
+        ).delete()
+        db.commit()
+    else:
+        # Hard delete if no one else follows it
+        db.delete(reading_list)
+        db.commit()
     return None
 
 # 6. Add item to reading list
@@ -452,11 +508,20 @@ def add_item_to_list(
     if not reading_list:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="List not found")
         
-    if reading_list.creator_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only the creator can add items to this list"
-        )
+    is_admin = bool(getattr(current_user, 'is_admin', False))
+    if not is_admin:
+        if reading_list.creator_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only the creator can modify this list"
+            )
+        if not check_user_is_pro(current_user):
+            user_lists_ids = [l.id for l in db.query(ReadingList.id).filter(ReadingList.creator_id == current_user.id).order_by(ReadingList.created_at.asc()).limit(2).all()]
+            if reading_list.id not in user_lists_ids:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Esta guía está en modo solo lectura. Pasa a Premium para editarla."
+                )
         
     new_item = ListItem(
         list_id=list_id,
@@ -474,10 +539,12 @@ def add_item_to_list(
     db.refresh(new_item)
 
     activity = UserActivityLog(
-            user_id=current_user.id,
-            activity_type="item_added",
-        item_title=item_in.title,
-        item_type=item_in.item_type,
+        user_id=current_user.id,
+        activity_type="item_added",
+        item_title=new_item.title,
+        item_type=new_item.item_type,
+        external_id=new_item.external_id,
+        image_url=new_item.image_url,
         details=f"list_id:{list_id}"
     )
     db.add(activity)
@@ -485,9 +552,9 @@ def add_item_to_list(
 
     return new_item
 
-# 7. Delete item from list
+# 7. Remove item from list
 @router.delete("/{list_id}/items/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
-def remove_item_from_list(
+def delete_item_from_list(
     list_id: int,
     item_id: int,
     current_user: User = Depends(get_current_user),
@@ -497,27 +564,39 @@ def remove_item_from_list(
     if not reading_list:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="List not found")
         
-    if reading_list.creator_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only the creator can edit this list"
-        )
+    is_admin = bool(getattr(current_user, 'is_admin', False))
+    if not is_admin:
+        if reading_list.creator_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only the creator can modify this list"
+            )
+        if not check_user_is_pro(current_user):
+            user_lists_ids = [l.id for l in db.query(ReadingList.id).filter(ReadingList.creator_id == current_user.id).order_by(ReadingList.created_at.asc()).limit(2).all()]
+            if reading_list.id not in user_lists_ids:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Esta guía está en modo solo lectura. Pasa a Premium para editarla."
+                )
         
-    item = db.query(ListItem).filter(ListItem.id == item_id, ListItem.list_id == list_id).first()
+    item = db.query(ListItem).filter(
+        ListItem.id == item_id,
+        ListItem.list_id == list_id
+    ).first()
     if not item:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found in this list")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found in list")
         
     db.delete(item)
     
     activity = UserActivityLog(
         user_id=current_user.id,
         activity_type="item_removed",
-            item_title=item.title,
-            item_type=item.item_type,
-            external_id=item.external_id,
-            image_url=item.image_url,
-            details=f"list_id:{list_id}"
-        )
+        item_title=item.title,
+        item_type=item.item_type,
+        external_id=item.external_id,
+        image_url=item.image_url,
+        details=f"list_id:{list_id}"
+    )
     db.add(activity)
     
     db.commit()
@@ -527,6 +606,7 @@ def remove_item_from_list(
 @router.post("/{list_id}/save", status_code=status.HTTP_200_OK)
 def save_list_to_library(
     list_id: int,
+    replace_last: bool = Query(False, description="Replace the 3rd followed guide if Free limit of 3 is reached"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -547,6 +627,33 @@ def save_list_to_library(
     if existing_save:
         return {"message": "List already saved to library"}
         
+    # Free users limit: max 3 followed guides of other users (own created guides don't count)
+    is_pro = check_user_is_pro(current_user)
+    if not is_pro and reading_list.creator_id != current_user.id:
+        saved_others = db.query(SavedList).join(ReadingList, SavedList.list_id == ReadingList.id)\
+            .filter(SavedList.user_id == current_user.id, ReadingList.creator_id != current_user.id)\
+            .order_by(SavedList.saved_at.asc()).all()
+
+        if len(saved_others) >= 3:
+            third_saved = saved_others[2]
+            third_guide = third_saved.reading_list
+            third_title = third_guide.title if third_guide else f"Guía #{third_saved.list_id}"
+
+            if replace_last:
+                # Automatically swap the 3rd followed guide
+                db.delete(third_saved)
+                db.flush()
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail={
+                        "code": "FOLLOW_LIMIT_REACHED",
+                        "message": f"Has alcanzado el límite de 3 guías seguidas de otros usuarios. Si continúas, se intercambiará por '{third_title}'.",
+                        "replace_guide_id": third_saved.list_id,
+                        "replace_guide_title": third_title
+                    }
+                )
+
     saved = SavedList(user_id=current_user.id, list_id=list_id)
     db.add(saved)
 
@@ -581,6 +688,14 @@ def unsave_list_from_library(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Saved list not found")
         
     db.delete(saved_record)
+    db.commit()
+
+    # If the list is a community soft-orphan (creator_id is None) and has no remaining followers, purge it
+    if reading_list and reading_list.creator_id is None:
+        remaining = db.query(SavedList).filter(SavedList.list_id == list_id).count()
+        if remaining == 0:
+            db.delete(reading_list)
+            db.commit()
 
     # Record activity log
     activity = UserActivityLog(
@@ -588,6 +703,7 @@ def unsave_list_from_library(
         activity_type="guide_unfollowed",
         item_title=list_title,
         item_type="guide",
+        list_id=list_id,
         details="unfollowed"
     )
     db.add(activity)

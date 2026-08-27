@@ -60,16 +60,18 @@ class ReadingListUpdate(BaseModel):
 
 class ReadingListResponse(ReadingListBase):
     id: int
-    creator_id: int
+    creator_id: Optional[int] = None
     created_at: datetime
+    can_edit: bool = True
 
     class Config:
         from_attributes = True
 
 class ReadingListDetailsResponse(ReadingListResponse):
-    creator_username: str
+    creator_username: Optional[str] = "Comunidad de Pathd"
     creator_photo_url: Optional[str] = None
     is_saved_by_me: bool = False
+    can_edit: bool = False
     completed_count: int = 0
     skipped_count: int = 0
     total_count: int = 0
@@ -79,6 +81,7 @@ class ReadingListDetailsResponse(ReadingListResponse):
     average_rating: Optional[float] = None
     total_ratings: int = 0
     items: List[ListItemProgressResponse] = []
+
 
 import enum
 class TVImportType(str, enum.Enum):

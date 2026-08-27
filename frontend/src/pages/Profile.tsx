@@ -36,9 +36,10 @@ import {
   Image as ImageIcon,
   Monitor,
   Crown,
-  AlertTriangle
-
+  AlertTriangle,
+  Lock
 } from 'lucide-react';
+
 
 
 
@@ -1474,6 +1475,21 @@ export const Profile: React.FC = () => {
                             )
                         }
                       </span>
+                      {list.can_edit === false && (
+                        <span style={{
+                          fontSize: '0.75rem',
+                          padding: '0.2rem 0.5rem',
+                          borderRadius: '4px',
+                          background: 'rgba(245, 158, 11, 0.15)',
+                          color: '#f59e0b',
+                          fontWeight: 600,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.3rem'
+                        }}>
+                          <Lock size={12} /> {language === 'es' ? 'Solo Lectura' : 'Read-Only'}
+                        </span>
+                      )}
                     </div>
 
                     <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
@@ -1482,8 +1498,26 @@ export const Profile: React.FC = () => {
                       </button>
                       {isOwnProfile && (
                         <>
-                          <button onClick={() => navigate(`/create?edit=${list.id}`)} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', padding: '0.35rem 0.75rem' }}>
-                            <Edit size={14} /> {language === 'es' ? 'Editar' : 'Edit'}
+                          <button 
+                            onClick={() => {
+                              if (list.can_edit !== false) {
+                                navigate(`/create?edit=${list.id}`);
+                              } else {
+                                setShowProModal(true);
+                              }
+                            }} 
+                            className="btn-secondary" 
+                            style={{ 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              gap: '0.4rem', 
+                              fontSize: '0.82rem', 
+                              padding: '0.35rem 0.75rem',
+                              color: list.can_edit === false ? '#f59e0b' : 'inherit',
+                              borderColor: list.can_edit === false ? 'rgba(245, 158, 11, 0.3)' : 'var(--border-color)'
+                            }}
+                          >
+                            {list.can_edit === false ? <Lock size={14} /> : <Edit size={14} />} {language === 'es' ? 'Editar' : 'Edit'}
                           </button>
                           <button onClick={() => handleDeleteGuide(list.id)} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', padding: '0.35rem 0.75rem', color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.2)' }}>
                             <Trash2 size={14} /> {language === 'es' ? 'Eliminar' : 'Delete'}
@@ -1493,6 +1527,7 @@ export const Profile: React.FC = () => {
                     </div>
                   </div>
                 ))}
+
               </div>
             )}
           </div>

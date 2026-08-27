@@ -48,17 +48,41 @@ def get_user_dashboard(
         UserLibraryItem.tracking_list_id.isnot(None)
     )
     
-    created_lists = db.query(ReadingList).filter(
+    is_pro = check_user_is_pro(current_user)
+    raw_created_lists = db.query(ReadingList).filter(
         ReadingList.creator_id == current_user.id,
         ~ReadingList.id.in_(tracker_list_ids_query)
-    ).all()
+    ).order_by(ReadingList.created_at.asc()).all()
+    
+    created_lists = []
+    for idx, rl in enumerate(raw_created_lists):
+        rl_data = ReadingListResponse.model_validate(rl)
+        rl_data.can_edit = True if (is_pro or idx < 2) else False
+        created_lists.append(rl_data)
     
     # Fetch lists saved/followed by the user
-    saved_lists = db.query(ReadingList).join(
-        SavedList, SavedList.list_id == ReadingList.id
+    saved_entries = db.query(SavedList).join(
+        ReadingList, SavedList.list_id == ReadingList.id
     ).filter(
         SavedList.user_id == current_user.id
-    ).all()
+    ).order_by(SavedList.saved_at.asc()).all()
+
+    saved_lists = []
+    other_saved_count = 0
+    for se in saved_entries:
+        rl = se.reading_list
+        if not rl:
+            continue
+        is_own = (rl.creator_id == current_user.id)
+        if is_pro or is_own:
+            rl_data = ReadingListResponse.model_validate(rl)
+            saved_lists.append(rl_data)
+        else:
+            # Free user: include up to 3 followed guides of other users
+            if other_saved_count < 3:
+                rl_data = ReadingListResponse.model_validate(rl)
+                saved_lists.append(rl_data)
+                other_saved_count += 1
 
     followers_count = db.query(Follow).filter(Follow.followed_id == current_user.id).count()
     following_count = db.query(Follow).filter(Follow.follower_id == current_user.id).count()
@@ -73,7 +97,7 @@ def get_user_dashboard(
         background_url=current_user.background_url,
         is_admin=current_user.is_admin,
         show_nsfw=current_user.show_nsfw,
-        is_pro=check_user_is_pro(current_user),
+        is_pro=is_pro,
         is_vip=bool(current_user.is_vip),
         pro_expires_at=current_user.pro_expires_at,
         is_suspended=bool(current_user.is_suspended),
@@ -81,7 +105,6 @@ def get_user_dashboard(
         suspension_reason=current_user.suspension_reason,
         admin_warning=current_user.admin_warning,
         profile_color=current_user.profile_color,
-
         lastfm_username=current_user.lastfm_username,
         followers_count=followers_count,
         following_count=following_count,
@@ -89,6 +112,7 @@ def get_user_dashboard(
         created_lists=created_lists,
         saved_lists=saved_lists
     )
+
 
 
 @router.post("/me/lastfm/connect")
@@ -623,18 +647,41 @@ def get_any_user_profile(
         UserLibraryItem.tracking_list_id.isnot(None)
     )
     
-    created_lists = db.query(ReadingList).filter(
+    is_pro = check_user_is_pro(user)
+    raw_created_lists = db.query(ReadingList).filter(
         ReadingList.creator_id == user.id,
         ReadingList.visibility == VisibilityEnum.PUBLIC,
         ~ReadingList.id.in_(tracker_list_ids_query)
-    ).all()
+    ).order_by(ReadingList.created_at.asc()).all()
+
+    created_lists = []
+    for idx, rl in enumerate(raw_created_lists):
+        rl_data = ReadingListResponse.model_validate(rl)
+        rl_data.can_edit = True if (is_pro or idx < 2) else False
+        created_lists.append(rl_data)
     
-    saved_lists = db.query(ReadingList).join(
-        SavedList, SavedList.list_id == ReadingList.id
+    saved_entries = db.query(SavedList).join(
+        ReadingList, SavedList.list_id == ReadingList.id
     ).filter(
         SavedList.user_id == user.id,
         ReadingList.visibility == VisibilityEnum.PUBLIC
-    ).all()
+    ).order_by(SavedList.saved_at.asc()).all()
+
+    saved_lists = []
+    other_saved_count = 0
+    for se in saved_entries:
+        rl = se.reading_list
+        if not rl:
+            continue
+        is_own = (rl.creator_id == user.id)
+        if is_pro or is_own:
+            rl_data = ReadingListResponse.model_validate(rl)
+            saved_lists.append(rl_data)
+        else:
+            if other_saved_count < 3:
+                rl_data = ReadingListResponse.model_validate(rl)
+                saved_lists.append(rl_data)
+                other_saved_count += 1
 
     followers_count = db.query(Follow).filter(Follow.followed_id == user.id).count()
     following_count = db.query(Follow).filter(Follow.follower_id == user.id).count()
@@ -655,7 +702,7 @@ def get_any_user_profile(
         background_url=user.background_url,
         is_admin=user.is_admin,
         show_nsfw=user.show_nsfw,
-        is_pro=check_user_is_pro(user),
+        is_pro=is_pro,
         is_vip=bool(user.is_vip),
         pro_expires_at=user.pro_expires_at,
         is_suspended=bool(user.is_suspended),
@@ -670,6 +717,7 @@ def get_any_user_profile(
         created_lists=created_lists,
         saved_lists=saved_lists
     )
+
 
 @router.post("/me/dismiss-warning")
 def dismiss_admin_warning(

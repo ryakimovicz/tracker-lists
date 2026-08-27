@@ -14,9 +14,13 @@ import {
   Trash2,
   ThumbsUp,
   Reply,
-  Pencil
+  Pencil,
+  Lock
 } from 'lucide-react';
 import { ItemDetailsModal } from '../components/ItemDetailsModal';
+import { ReplaceSavedGuideModal } from '../components/ReplaceSavedGuideModal';
+import { ProModal } from '../components/ProModal';
+
 
 interface CommentItem {
   id: number;
@@ -71,6 +75,14 @@ export const ViewGuide: React.FC = () => {
   // Standalone details modal states
   const [selectedItem, setSelectedItem] = useState<any | null>(null);
   const [currentUser, setCurrentUser] = useState<any | null>(null);
+  const [showProModal, setShowProModal] = useState(false);
+  const [replaceGuideModal, setReplaceGuideModal] = useState<{
+    isOpen: boolean;
+    guideToReplaceTitle: string;
+  }>({
+    isOpen: false,
+    guideToReplaceTitle: ''
+  });
 
   const getPriorityLabel = (rank: number | null, lang: string) => {
     if (!rank) return '';
@@ -84,24 +96,35 @@ export const ViewGuide: React.FC = () => {
     }
   };
 
-  const handleToggleSaveGuide = async () => {
+  const handleToggleSaveGuide = async (replaceLast = false) => {
     if (!guide || isTogglingSave) return;
     setIsTogglingSave(true);
-    const nextState = !isSaved;
-    setIsSaved(nextState);
+    setErrorMsg('');
     try {
       if (isSaved) {
         await apiClient.delete(`/lists/${guide.id}/save`);
+        setIsSaved(false);
       } else {
-        await apiClient.post(`/lists/${guide.id}/save`);
+        const url = replaceLast ? `/lists/${guide.id}/save?replace_last=true` : `/lists/${guide.id}/save`;
+        await apiClient.post(url);
+        setIsSaved(true);
       }
-    } catch (err) {
-      setIsSaved(!nextState);
-      console.error("Failed to toggle guide follow/save", err);
+    } catch (err: any) {
+      const errData = err.response?.data?.detail;
+      if (errData && typeof errData === 'object' && errData.code === 'FOLLOW_LIMIT_REACHED') {
+        setReplaceGuideModal({
+          isOpen: true,
+          guideToReplaceTitle: errData.replace_guide_title || (language === 'es' ? 'tu última guía seguida' : 'your last followed guide')
+        });
+      } else {
+        setErrorMsg(typeof errData === 'string' ? errData : (language === 'es' ? 'Error al actualizar el seguimiento de la guía' : 'Failed to toggle guide follow'));
+        setTimeout(() => setErrorMsg(''), 5000);
+      }
     } finally {
       setIsTogglingSave(false);
     }
   };
+
 
   const handleSaveRating = async (ratingVal: number | null) => {
     if (!guide || isSavingRating) return;
@@ -574,15 +597,21 @@ export const ViewGuide: React.FC = () => {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-            {currentUser && guide && currentUser.id === guide.creator_id && (
+            {currentUser && guide && (currentUser.id === guide.creator_id || currentUser.is_admin) && (
               <button
                 type="button"
-                onClick={() => navigate(`/create?id=${guide.id}`)}
-                title={language === 'es' ? 'Editar guía' : 'Edit guide'}
+                onClick={() => {
+                  if (guide.can_edit) {
+                    navigate(`/create?id=${guide.id}`);
+                  } else {
+                    setShowProModal(true);
+                  }
+                }}
+                title={guide.can_edit ? (language === 'es' ? 'Editar guía' : 'Edit guide') : (language === 'es' ? 'Guía en modo solo lectura (Pasa a Premium para editar)' : 'Read-only guide (Upgrade to Premium to edit)')}
                 style={{
-                  background: 'var(--bg-secondary)',
-                  border: '1px solid var(--border-color)',
-                  color: 'var(--text-secondary)',
+                  background: guide.can_edit ? 'var(--bg-secondary)' : 'rgba(245, 158, 11, 0.15)',
+                  border: guide.can_edit ? '1px solid var(--border-color)' : '1px solid rgba(245, 158, 11, 0.4)',
+                  color: guide.can_edit ? 'var(--text-secondary)' : '#f59e0b',
                   borderRadius: '50%',
                   width: '42px',
                   height: '42px',
@@ -595,24 +624,26 @@ export const ViewGuide: React.FC = () => {
                   flexShrink: 0
                 }}
                 onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLElement).style.color = 'var(--accent-primary)';
-                  (e.currentTarget as HTMLElement).style.borderColor = 'var(--accent-primary)';
-                  (e.currentTarget as HTMLElement).style.background = 'rgba(124, 58, 237, 0.1)';
+                  (e.currentTarget as HTMLElement).style.color = guide.can_edit ? 'var(--accent-primary)' : '#f59e0b';
+                  (e.currentTarget as HTMLElement).style.borderColor = guide.can_edit ? 'var(--accent-primary)' : '#f59e0b';
+                  (e.currentTarget as HTMLElement).style.background = guide.can_edit ? 'rgba(124, 58, 237, 0.1)' : 'rgba(245, 158, 11, 0.25)';
                 }}
                 onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)';
-                  (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-color)';
-                  (e.currentTarget as HTMLElement).style.background = 'var(--bg-secondary)';
+                  (e.currentTarget as HTMLElement).style.color = guide.can_edit ? 'var(--text-secondary)' : '#f59e0b';
+                  (e.currentTarget as HTMLElement).style.borderColor = guide.can_edit ? 'var(--border-color)' : 'rgba(245, 158, 11, 0.4)';
+                  (e.currentTarget as HTMLElement).style.background = guide.can_edit ? 'var(--bg-secondary)' : 'rgba(245, 158, 11, 0.15)';
                 }}
               >
-                <Pencil size={18} />
+                {guide.can_edit ? <Pencil size={18} /> : <Lock size={18} />}
               </button>
             )}
 
+
             <button
               type="button"
-              onClick={handleToggleSaveGuide}
+              onClick={() => handleToggleSaveGuide(false)}
               disabled={isTogglingSave}
+
               title={isSaved ? (language === 'es' ? 'Dejar de seguir guía' : 'Unfollow guide') : (language === 'es' ? 'Seguir guía' : 'Follow guide')}
               style={{
                 background: isSaved ? 'rgba(239, 68, 68, 0.15)' : 'var(--bg-secondary)',
@@ -1601,7 +1632,23 @@ export const ViewGuide: React.FC = () => {
           />
         </div>
       )}
+
+      {/* Replace Followed Guide Modal */}
+      <ReplaceSavedGuideModal
+        isOpen={replaceGuideModal.isOpen}
+        onClose={() => setReplaceGuideModal({ isOpen: false, guideToReplaceTitle: '' })}
+        targetGuideTitle={guide?.title || ''}
+        guideToReplaceTitle={replaceGuideModal.guideToReplaceTitle}
+        onConfirmReplace={() => handleToggleSaveGuide(true)}
+        onOpenProModal={() => setShowProModal(true)}
+      />
+
+      {/* Pro Modal */}
+      {showProModal && (
+        <ProModal onClose={() => setShowProModal(false)} />
+      )}
     </div>
   );
 };
 export default ViewGuide;
+
