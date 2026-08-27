@@ -15,3 +15,5 @@ class SearchResultItem(BaseModel):
     page_count: Optional[int] = None
     latest_season: Optional[int] = None
     latest_episode: Optional[int] = None
+    badge: Optional[str] = None
+

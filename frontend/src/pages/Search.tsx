@@ -6,7 +6,7 @@ import { apiClient } from '../api/client';
 import { ItemDetailsModal } from '../components/ItemDetailsModal';
 import { MediaPoster } from '../components/MediaPoster';
 
-import { Search as SearchIcon, AlertCircle, CheckCircle, Plus, X, Heart, Star, Users, BookOpen } from 'lucide-react';
+import { Search as SearchIcon, AlertCircle, CheckCircle, Plus, X, Heart, Star, Users, BookOpen, Package, Puzzle, Sparkles, Gamepad2 } from 'lucide-react';
 
 interface SearchResultItem {
   external_id: string;
@@ -18,7 +18,68 @@ interface SearchResultItem {
   imdb_id?: string;
   is_nsfw?: boolean;
   status?: string;
+  badge?: string;
 }
+
+export const renderMediaBadge = (badge?: string | null, language: string = 'es') => {
+  if (!badge) return null;
+  let label = badge;
+  let icon = null;
+  let borderColor = 'rgba(255, 255, 255, 0.25)';
+
+  if (badge === 'collection') {
+    label = language === 'es' ? 'Colección' : 'Collection';
+    icon = <Package size={11} color="#10b981" />;
+    borderColor = 'rgba(16, 185, 129, 0.5)';
+  } else if (badge === 'dlc') {
+    label = 'DLC';
+    icon = <Puzzle size={11} color="#8b5cf6" />;
+    borderColor = 'rgba(139, 92, 246, 0.5)';
+  } else if (badge === 'expansion') {
+    label = language === 'es' ? 'Expansión' : 'Expansion';
+    icon = <Sparkles size={11} color="#3b82f6" />;
+    borderColor = 'rgba(59, 130, 246, 0.5)';
+  } else if (badge === 'edition') {
+    label = language === 'es' ? 'Edición' : 'Edition';
+    icon = <Sparkles size={11} color="#f59e0b" />;
+    borderColor = 'rgba(245, 158, 11, 0.5)';
+  } else if (badge === 'remake') {
+    label = 'Remake';
+    icon = <Gamepad2 size={11} color="#ec4899" />;
+    borderColor = 'rgba(236, 72, 153, 0.5)';
+  } else if (badge === 'remaster') {
+    label = 'Remaster';
+    icon = <Sparkles size={11} color="#06b6d4" />;
+    borderColor = 'rgba(6, 182, 212, 0.5)';
+  }
+
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        top: '0.5rem',
+        left: '0.5rem',
+        padding: '0.2rem 0.45rem',
+        borderRadius: '6px',
+        fontSize: '0.72rem',
+        fontWeight: 700,
+        background: 'rgba(0, 0, 0, 0.8)',
+        color: '#ffffff',
+        border: `1px solid ${borderColor}`,
+        backdropFilter: 'blur(6px)',
+        boxShadow: '0 2px 6px rgba(0,0,0,0.6)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.3rem',
+        zIndex: 2,
+        letterSpacing: '0.02em'
+      }}
+    >
+      {icon}
+      <span>{label}</span>
+    </div>
+  );
+};
 
 const stripHtml = (html: string) => {
   if (!html) return '';
@@ -71,8 +132,12 @@ const ExploreSection = React.memo<ExploreSectionProps>(({
                   showNsfw={currentUser?.show_nsfw}
                 />
 
+                {/* Game/Media Badge (Colección, DLC, etc.) */}
+                {renderMediaBadge(item.badge, language)}
+
                 {/* Status Badge */}
                 {item.status && ['completed', 'watching', 'dropped', 'read', 'reading'].includes(item.status) && (
+
                   <div style={{ 
                     position: 'absolute', top: '0.5rem', right: '0.5rem', 
                     padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600,
@@ -608,7 +673,7 @@ export const Search: React.FC = () => {
             return (
               <div key={`${item.external_id}-${item.item_type}`} className="glass-card" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', cursor: 'pointer', position: 'relative' }} onClick={() => handleOpenItemDetails(item)}>
 
-                <div style={{ width: '100%', height: '260px', borderRadius: '8px', overflow: 'hidden' }}>
+                <div style={{ position: 'relative', width: '100%', height: '260px', borderRadius: '8px', overflow: 'hidden' }}>
                   <MediaPoster
                     src={item.image_url}
                     title={item.title}
@@ -619,7 +684,9 @@ export const Search: React.FC = () => {
                     isNsfw={item.is_nsfw}
                     showNsfw={currentUser?.show_nsfw}
                   />
+                  {renderMediaBadge(item.badge, language)}
                 </div>
+
                 <div style={{ flex: 1, textAlign: 'left' }}>
                   <h4 style={{ margin: '0 0 0.15rem 0', fontSize: '1rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.title}>
                     {item.title}

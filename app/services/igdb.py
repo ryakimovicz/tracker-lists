@@ -157,6 +157,28 @@ class IGDBService:
                         age_ratings = [ar.get("rating") for ar in item.get("age_ratings", []) if isinstance(ar, dict)]
                         is_mature_game = 42 in themes or 5 in age_ratings or 12 in age_ratings
 
+                        # Determine game badge (Collection, DLC, Expansion, Edition, Remake, Remaster)
+                        cat = item.get("category", 0)
+                        item_name_lower = (item.get("name") or "").lower()
+                        has_parent = "parent_game" in item
+                        is_bundle = cat == 3 or any(re.search(rf"\b{kw}\b", item_name_lower) for kw in bundle_keywords)
+                        is_dlc = has_parent or cat in (1, 5, 14) or any(re.search(rf"\b{kw}\b", item_name_lower) for kw in dlc_keywords)
+                        is_expansion = cat in (2, 4)
+
+                        badge = None
+                        if is_bundle:
+                            badge = "collection"
+                        elif is_dlc:
+                            badge = "dlc"
+                        elif is_expansion:
+                            badge = "expansion"
+                        elif cat == 8 or "remake" in item_name_lower:
+                            badge = "remake"
+                        elif cat == 9 or "remaster" in item_name_lower:
+                            badge = "remaster"
+                        elif cat == 10 or "edition" in item_name_lower or "goty" in item_name_lower or "version" in item_name_lower:
+                            badge = "edition"
+
                         results.append(
                             SearchResultItem(
                                 external_id=str(item.get("id")),
@@ -166,10 +188,12 @@ class IGDBService:
                                 item_type="game",
                                 release_date=release_date,
                                 popularity=pop_val,
-                                is_nsfw=is_mature_game
+                                is_nsfw=is_mature_game,
+                                badge=badge
                             )
                         )
                     return results
+
 
         except Exception as e:
             print(f"IGDB API Error: {e}")
