@@ -1691,13 +1691,12 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                     </div>
                   )}
 
-                  {/* Modern and intuitive Hours & Minutes Duration Picker for movies and games */}
+                  {/* Clean & Comfortable Hours and Minutes Picker */}
                   {!isEpisode && selectedItem && ( (selectedItem.item_type === 'game' && ['completed', 'playing', 'dropped', 'endless'].includes(selectedItem.status)) || (selectedItem.item_type === 'movie' && ['watching', 'dropped'].includes(selectedItem.status)) ) && (() => {
                     const currentTotalMins = typeof pagesReadVal === 'number' ? pagesReadVal : 0;
                     const currentHours = Math.floor(currentTotalMins / 60);
                     const currentMinutes = currentTotalMins % 60;
                     const maxDurationMins = selectedItem.total_pages || selectedItem.page_count || 0;
-                    const progressPercent = maxDurationMins > 0 ? Math.min(100, Math.round((currentTotalMins / maxDurationMins) * 100)) : 0;
 
                     const updateDuration = (newTotalMins: number) => {
                       let finalMins = Math.max(0, newTotalMins);
@@ -1725,246 +1724,116 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                       }
                     };
 
-                    const handleAddMinutes = (delta: number) => {
-                      updateDuration(currentTotalMins + delta);
-                    };
-
                     return (
                       <div style={{
                         marginTop: '0.6rem',
-                        padding: '0.75rem 1rem',
+                        padding: '0.65rem 0.9rem',
                         background: 'rgba(255, 255, 255, 0.03)',
                         border: '1px solid var(--border-color)',
-                        borderRadius: '12px',
+                        borderRadius: '10px',
                         display: 'flex',
                         flexDirection: 'column',
-                        gap: '0.6rem'
+                        gap: '0.5rem'
                       }}>
-                        {/* Header with Title and Total */}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <h5 style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 600 }}>
+                        {/* Main row: Label + [ HH ] h : [ MM ] min + Total Duration */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+                          <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                             <Clock size={15} color="var(--accent-primary)" />
                             {selectedItem.item_type === 'movie' 
-                              ? (language === 'es' ? 'Tiempo visto' : 'Time watched')
-                              : (language === 'es' ? 'Horas jugadas' : 'Hours played')}
-                          </h5>
+                              ? (language === 'es' ? 'Tiempo visto:' : 'Time watched:')
+                              : (language === 'es' ? 'Horas jugadas:' : 'Hours played:')}
+                          </span>
 
-                          {maxDurationMins > 0 && (
-                            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                              {language === 'es' ? 'Total:' : 'Total:'} {Math.floor(maxDurationMins / 60)}h {String(maxDurationMins % 60).padStart(2, '0')}m
-                              {progressPercent > 0 ? ` (${progressPercent}%)` : ''}
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Interactive Hours & Minutes Steppers */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-                          {/* Hours Stepper */}
-                          <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            background: 'var(--bg-secondary)',
-                            border: '1px solid var(--border-color)',
-                            borderRadius: '8px',
-                            padding: '0.2rem 0.35rem',
-                            gap: '0.25rem'
-                          }}>
-                            {isOwnProfile && (
-                              <button
-                                type="button"
-                                disabled={currentHours <= 0}
-                                onClick={() => handleHoursChange(currentHours - 1)}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                            {/* Hours Input Box */}
+                            <div style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              background: 'var(--bg-secondary)',
+                              border: '1px solid var(--border-color)',
+                              borderRadius: '6px',
+                              padding: '0.2rem 0.4rem',
+                              gap: '0.2rem'
+                            }}>
+                              <input
+                                type="number"
+                                min={0}
+                                max={999}
+                                disabled={!isOwnProfile}
+                                value={currentHours}
+                                onChange={(e) => handleHoursChange(parseInt(e.target.value) || 0)}
+                                onWheel={(e) => {
+                                  if (isOwnProfile) {
+                                    e.preventDefault();
+                                    handleHoursChange(currentHours + (e.deltaY < 0 ? 1 : -1));
+                                  }
+                                }}
                                 style={{
+                                  width: '32px',
+                                  textAlign: 'center',
                                   background: 'transparent',
                                   border: 'none',
-                                  color: currentHours <= 0 ? 'var(--text-muted)' : 'var(--text-secondary)',
-                                  padding: '0.25rem',
-                                  cursor: currentHours <= 0 ? 'default' : 'pointer',
-                                  display: 'flex',
-                                  alignItems: 'center'
+                                  color: 'var(--text-primary)',
+                                  fontWeight: 700,
+                                  fontSize: '0.9rem',
+                                  outline: 'none',
+                                  padding: 0
                                 }}
-                                title={language === 'es' ? 'Reducir 1 hora' : 'Decrease 1 hour'}
-                              >
-                                <ChevronDown size={14} />
-                              </button>
-                            )}
-
-                            <input
-                              type="number"
-                              min={0}
-                              max={999}
-                              disabled={!isOwnProfile}
-                              value={currentHours}
-                              onChange={(e) => handleHoursChange(parseInt(e.target.value) || 0)}
-                              onWheel={(e) => {
-                                if (isOwnProfile) {
-                                  e.preventDefault();
-                                  handleHoursChange(currentHours + (e.deltaY < 0 ? 1 : -1));
-                                }
-                              }}
-                              style={{
-                                width: '38px',
-                                textAlign: 'center',
-                                background: 'transparent',
-                                border: 'none',
-                                color: 'var(--text-primary)',
-                                fontWeight: 700,
-                                fontSize: '0.95rem',
-                                outline: 'none'
-                              }}
-                            />
-                            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600, paddingRight: '0.2rem' }}>h</span>
-
-                            {isOwnProfile && (
-                              <button
-                                type="button"
-                                onClick={() => handleHoursChange(currentHours + 1)}
-                                style={{
-                                  background: 'transparent',
-                                  border: 'none',
-                                  color: 'var(--text-secondary)',
-                                  padding: '0.25rem',
-                                  cursor: 'pointer',
-                                  display: 'flex',
-                                  alignItems: 'center'
-                                }}
-                                title={language === 'es' ? 'Aumentar 1 hora' : 'Increase 1 hour'}
-                              >
-                                <ChevronUp size={14} />
-                              </button>
-                            )}
-                          </div>
-
-                          <span style={{ fontWeight: 700, color: 'var(--text-muted)', fontSize: '1.1rem' }}>:</span>
-
-                          {/* Minutes Stepper */}
-                          <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            background: 'var(--bg-secondary)',
-                            border: '1px solid var(--border-color)',
-                            borderRadius: '8px',
-                            padding: '0.2rem 0.35rem',
-                            gap: '0.25rem'
-                          }}>
-                            {isOwnProfile && (
-                              <button
-                                type="button"
-                                disabled={currentTotalMins <= 0}
-                                onClick={() => handleMinutesChange(currentMinutes - 1)}
-                                style={{
-                                  background: 'transparent',
-                                  border: 'none',
-                                  color: currentTotalMins <= 0 ? 'var(--text-muted)' : 'var(--text-secondary)',
-                                  padding: '0.25rem',
-                                  cursor: currentTotalMins <= 0 ? 'default' : 'pointer',
-                                  display: 'flex',
-                                  alignItems: 'center'
-                                }}
-                                title={language === 'es' ? 'Reducir 1 minuto' : 'Decrease 1 min'}
-                              >
-                                <ChevronDown size={14} />
-                              </button>
-                            )}
-
-                            <input
-                              type="number"
-                              min={0}
-                              max={59}
-                              disabled={!isOwnProfile}
-                              value={String(currentMinutes).padStart(2, '0')}
-                              onChange={(e) => handleMinutesChange(parseInt(e.target.value) || 0)}
-                              onWheel={(e) => {
-                                if (isOwnProfile) {
-                                  e.preventDefault();
-                                  handleMinutesChange(currentMinutes + (e.deltaY < 0 ? 1 : -1));
-                                }
-                              }}
-                              style={{
-                                width: '38px',
-                                textAlign: 'center',
-                                background: 'transparent',
-                                border: 'none',
-                                color: 'var(--text-primary)',
-                                fontWeight: 700,
-                                fontSize: '0.95rem',
-                                outline: 'none'
-                              }}
-                            />
-                            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600, paddingRight: '0.2rem' }}>min</span>
-
-                            {isOwnProfile && (
-                              <button
-                                type="button"
-                                onClick={() => handleMinutesChange(currentMinutes + 1)}
-                                style={{
-                                  background: 'transparent',
-                                  border: 'none',
-                                  color: 'var(--text-secondary)',
-                                  padding: '0.25rem',
-                                  cursor: 'pointer',
-                                  display: 'flex',
-                                  alignItems: 'center'
-                                }}
-                                title={language === 'es' ? 'Aumentar 1 minuto' : 'Increase 1 min'}
-                              >
-                                <ChevronUp size={14} />
-                              </button>
-                            )}
-                          </div>
-
-                          {/* Quick Add Presets (+15m, +30m, Reset) */}
-                          {isOwnProfile && (
-                            <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center', marginLeft: 'auto', flexWrap: 'wrap' }}>
-                              {[15, 30].map((mins) => (
-                                <button
-                                  key={mins}
-                                  type="button"
-                                  onClick={() => handleAddMinutes(mins)}
-                                  style={{
-                                    background: 'rgba(255, 255, 255, 0.05)',
-                                    border: '1px solid var(--border-color)',
-                                    color: 'var(--text-secondary)',
-                                    borderRadius: '6px',
-                                    padding: '0.25rem 0.5rem',
-                                    fontSize: '0.75rem',
-                                    cursor: 'pointer',
-                                    fontWeight: 600
-                                  }}
-                                  title={`+${mins} ${language === 'es' ? 'minutos' : 'minutes'}`}
-                                >
-                                  +{mins}m
-                                </button>
-                              ))}
-
-                              {currentTotalMins > 0 && (
-                                <button
-                                  type="button"
-                                  onClick={() => updateDuration(0)}
-                                  style={{
-                                    background: 'rgba(239, 68, 68, 0.1)',
-                                    border: '1px solid rgba(239, 68, 68, 0.25)',
-                                    color: '#ef4444',
-                                    borderRadius: '6px',
-                                    padding: '0.25rem 0.45rem',
-                                    fontSize: '0.75rem',
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '0.2rem'
-                                  }}
-                                  title={language === 'es' ? 'Restablecer a 0' : 'Reset to 0'}
-                                >
-                                  <RotateCcw size={12} />
-                                </button>
-                              )}
+                              />
+                              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>h</span>
                             </div>
-                          )}
+
+                            <span style={{ fontWeight: 700, color: 'var(--text-muted)' }}>:</span>
+
+                            {/* Minutes Input Box */}
+                            <div style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              background: 'var(--bg-secondary)',
+                              border: '1px solid var(--border-color)',
+                              borderRadius: '6px',
+                              padding: '0.2rem 0.4rem',
+                              gap: '0.2rem'
+                            }}>
+                              <input
+                                type="number"
+                                min={0}
+                                max={59}
+                                disabled={!isOwnProfile}
+                                value={String(currentMinutes).padStart(2, '0')}
+                                onChange={(e) => handleMinutesChange(parseInt(e.target.value) || 0)}
+                                onWheel={(e) => {
+                                  if (isOwnProfile) {
+                                    e.preventDefault();
+                                    handleMinutesChange(currentMinutes + (e.deltaY < 0 ? 1 : -1));
+                                  }
+                                }}
+                                style={{
+                                  width: '32px',
+                                  textAlign: 'center',
+                                  background: 'transparent',
+                                  border: 'none',
+                                  color: 'var(--text-primary)',
+                                  fontWeight: 700,
+                                  fontSize: '0.9rem',
+                                  outline: 'none',
+                                  padding: 0
+                                }}
+                              />
+                              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>m</span>
+                            </div>
+
+                            {maxDurationMins > 0 && (
+                              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginLeft: '0.35rem' }}>
+                                / {Math.floor(maxDurationMins / 60)}h {String(maxDurationMins % 60).padStart(2, '0')}m
+                              </span>
+                            )}
+                          </div>
                         </div>
 
-                        {/* Interactive Slider Bar for Movies when Total Duration is Known */}
+                        {/* Subtle Progress Slider for Movies */}
                         {isOwnProfile && maxDurationMins > 0 && (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', marginTop: '0.2rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.1rem' }}>
                             <input
                               type="range"
                               min={0}
@@ -1975,18 +1844,18 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                 width: '100%',
                                 accentColor: 'var(--accent-primary)',
                                 cursor: 'pointer',
-                                height: '6px'
+                                height: '5px'
                               }}
                             />
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                              <span>0:00</span>
-                              <span>{Math.floor(maxDurationMins / 60)}h {String(maxDurationMins % 60).padStart(2, '0')}m</span>
-                            </div>
+                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', minWidth: '35px', textAlign: 'right' }}>
+                              {Math.min(100, Math.round((currentTotalMins / maxDurationMins) * 100))}%
+                            </span>
                           </div>
                         )}
                       </div>
                     );
                   })()}
+
 
 
                   {/* Completion / Status Buttons */}
