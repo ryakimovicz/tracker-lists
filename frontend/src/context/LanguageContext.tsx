@@ -138,10 +138,19 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   }, []);
 
+  useEffect(() => {
+    if (language === 'es') {
+      document.title = 'Pathd • Seguimiento Multimedia Todo en Uno y Guías';
+    } else {
+      document.title = 'Pathd • All-in-One Media Tracker & Guides';
+    }
+  }, [language]);
+
   const setLanguage = (lang: Language) => {
     setLanguageState(lang);
     localStorage.setItem('language', lang);
   };
+
 
   const t = (key: string): string => {
     const translation = translations[key];

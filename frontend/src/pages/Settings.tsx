@@ -1164,7 +1164,30 @@ export const SettingsPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Version Footer */}
+      <div style={{ textAlign: 'center', padding: '2.5rem 0 1rem 0', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+        <div style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '0.5rem',
+          background: 'var(--bg-secondary)',
+          padding: '0.35rem 0.85rem',
+          borderRadius: '9999px',
+          border: '1px solid var(--border-color)',
+          fontWeight: 600,
+          color: 'var(--text-secondary)',
+          marginBottom: '0.5rem'
+        }}>
+          <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent-primary)', display: 'inline-block' }} />
+          Pathd v0.9.5 Beta
+        </div>
+        <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+          {isEs ? 'Seguimiento Multimedia Todo en Uno y Guías' : 'All-in-One Media Tracker & Guides'}
+        </p>
+      </div>
+
       {/* Delete Confirmation Modal */}
+
       {showDeleteModal && (
         <div
           style={{
