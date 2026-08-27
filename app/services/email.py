@@ -183,3 +183,135 @@ class EmailService:
             subject="🚀 Confirma tu cuenta en Pathd",
             html_content=html_content
         )
+
+    @classmethod
+    def send_password_reset_email(cls, to_email: str, username: str, token: str) -> bool:
+        """
+        Sends password reset email with a secure link.
+        """
+        frontend_url = getattr(settings, "FRONTEND_URL", "http://localhost:5173").rstrip("/")
+        reset_link = f"{frontend_url}/reset-password?token={token}"
+
+        html_content = f"""
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Restablecer contraseña en Pathd</title>
+  <style>
+    body {{
+      margin: 0;
+      padding: 0;
+      background-color: #0b0f19;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      color: #f8fafc;
+    }}
+    .container {{
+      max-width: 560px;
+      margin: 40px auto;
+      background: #111827;
+      border: 1px solid #1f2937;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+    }}
+    .header {{
+      background: linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%);
+      padding: 32px 24px;
+      text-align: center;
+    }}
+    .header h1 {{
+      margin: 0;
+      font-size: 28px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      color: #ffffff;
+    }}
+    .content {{
+      padding: 36px 32px;
+      line-height: 1.6;
+    }}
+    .content h2 {{
+      margin-top: 0;
+      font-size: 20px;
+      color: #ffffff;
+      font-weight: 600;
+    }}
+    .content p {{
+      color: #94a3b8;
+      font-size: 15px;
+      margin: 16px 0;
+    }}
+    .btn-container {{
+      text-align: center;
+      margin: 32px 0;
+    }}
+    .btn {{
+      display: inline-block;
+      background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
+      color: #ffffff !important;
+      text-decoration: none;
+      padding: 14px 32px;
+      font-weight: 600;
+      font-size: 16px;
+      border-radius: 10px;
+      box-shadow: 0 4px 15px rgba(124, 58, 237, 0.4);
+    }}
+    .footer {{
+      padding: 24px 32px;
+      background: #0d131f;
+      border-top: 1px solid #1f2937;
+      text-align: center;
+      font-size: 12px;
+      color: #64748b;
+    }}
+    .alt-link {{
+      margin-top: 24px;
+      padding-top: 20px;
+      border-top: 1px solid #1f2937;
+      font-size: 13px;
+      color: #64748b;
+      word-break: break-all;
+    }}
+    .alt-link a {{
+      color: #a78bfa;
+      text-decoration: underline;
+    }}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Pathd</h1>
+    </div>
+    <div class="content">
+      <h2>Restablecer contraseña 🔑</h2>
+      <p>Hola, <strong>{username}</strong>. Recibimos una solicitud para restablecer la contraseña de tu cuenta en Pathd.</p>
+      <p>Haz clic en el siguiente botón para elegir una nueva contraseña:</p>
+      
+      <div class="btn-container">
+        <a href="{reset_link}" class="btn" target="_blank">Restablecer mi Contraseña</a>
+      </div>
+
+      <p>Este enlace es válido durante <strong>1 hora</strong> por motivos de seguridad.</p>
+
+      <div class="alt-link">
+        <p>Si el botón no funciona, copia y pega este enlace en tu navegador:</p>
+        <a href="{reset_link}">{reset_link}</a>
+      </div>
+    </div>
+    <div class="footer">
+      <p>Si tú no solicitaste este cambio, puedes ignorar este mensaje; tu contraseña actual seguirá siendo segura.</p>
+      <p>© {settings.PROJECT_NAME} • Tu universo de entretenimiento organizado.</p>
+    </div>
+  </div>
+</body>
+</html>
+        """
+        return cls.send_email(
+            to_email=to_email,
+            subject="🔑 Restablece tu contraseña en Pathd",
+            html_content=html_content
+        )
+

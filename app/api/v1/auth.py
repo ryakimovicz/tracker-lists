@@ -44,14 +44,9 @@ def send_reset_email(to_email: str, username: str, token: str):
 
     # Send through Resend if configured
     if getattr(settings, "RESEND_API_KEY", None):
-        html_content = f"""
-        <p>Hola, <strong>{username}</strong>,</p>
-        <p>Has solicitado restablecer tu contraseña en Pathd. Haz clic en el siguiente enlace:</p>
-        <p><a href="{reset_link}">Restablecer mi Contraseña</a></p>
-        <p>Este enlace es válido por 1 hora.</p>
-        """
-        EmailService.send_email(to_email, "Restablecer tu contraseña en Pathd", html_content)
+        EmailService.send_password_reset_email(to_email, username, token)
         return
+
 
     if not settings.SMTP_HOST or not settings.SMTP_USER or not settings.SMTP_PASSWORD:
         print(f"[SMTP Warning] SMTP credentials not set. Skipping real email dispatch to {to_email}")
