@@ -1116,6 +1116,84 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
   const epHeaderInfo = isEpisode ? getEpisodeHeaderInfo() : null;
 
+  const getModalTheme = () => {
+    let cat = selectedItem?.item_type || 'movie';
+    if (isEpisode) {
+      if (selectedItem.parent_series?.item_type === 'anime' || selectedItem.category === 'anime') {
+        cat = 'anime';
+      } else {
+        cat = 'series';
+      }
+    }
+
+    const colorConfig: Record<string, { accent: string; text: string; border: string; glow: string }> = {
+      movie: {
+        accent: 'var(--color-movie)',
+        text: 'var(--color-text-movie)',
+        border: 'rgba(74, 222, 128, 0.35)',
+        glow: 'rgba(74, 222, 128, 0.25)'
+      },
+      series: {
+        accent: 'var(--color-series)',
+        text: 'var(--color-text-series)',
+        border: 'rgba(253, 224, 71, 0.35)',
+        glow: 'rgba(253, 224, 71, 0.25)'
+      },
+      anime: {
+        accent: 'var(--color-anime)',
+        text: 'var(--color-text-anime)',
+        border: 'rgba(251, 146, 60, 0.35)',
+        glow: 'rgba(251, 146, 60, 0.25)'
+      },
+      game: {
+        accent: 'var(--color-game)',
+        text: 'var(--color-text-game)',
+        border: 'rgba(192, 132, 252, 0.35)',
+        glow: 'rgba(192, 132, 252, 0.25)'
+      },
+      comic: {
+        accent: 'var(--color-comic)',
+        text: 'var(--color-text-comic)',
+        border: 'rgba(248, 113, 113, 0.35)',
+        glow: 'rgba(248, 113, 113, 0.25)'
+      },
+      manga: {
+        accent: 'var(--color-manga)',
+        text: 'var(--color-text-manga)',
+        border: 'rgba(96, 165, 250, 0.35)',
+        glow: 'rgba(96, 165, 250, 0.25)'
+      },
+      book: {
+        accent: 'var(--color-book)',
+        text: 'var(--color-text-book)',
+        border: 'rgba(180, 83, 9, 0.4)',
+        glow: 'rgba(180, 83, 9, 0.3)'
+      },
+      music: {
+        accent: 'var(--color-user)',
+        text: 'var(--color-text-user)',
+        border: 'rgba(244, 114, 182, 0.35)',
+        glow: 'rgba(244, 114, 182, 0.25)'
+      }
+    };
+
+    const cfg = colorConfig[cat] || colorConfig.movie;
+    return {
+      category: cat,
+      ...cfg,
+      cssVariables: {
+        '--accent-primary': cfg.accent,
+        '--accent-secondary': cfg.accent,
+        '--accent-hover': cfg.accent,
+        '--border-color': cfg.border,
+        '--border-glow': cfg.glow,
+        '--card-shadow': `0 20px 50px -10px ${cfg.glow}`
+      } as React.CSSProperties
+    };
+  };
+
+  const modalTheme = getModalTheme();
+
   if (!selectedItem) return null;
   
   return (
@@ -1144,10 +1222,14 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                 gap: '1.5rem',
                 overflowY: 'auto',
                 textAlign: 'left',
+                border: `1px solid ${modalTheme.border}`,
+                boxShadow: `0 20px 50px -10px ${modalTheme.glow}`,
+                ...modalTheme.cssVariables,
                 ...(isProActive && effectiveColor ? profileTheme.modalStyles : {})
               }}
             >
               {/* Back Button (for episode or game history navigation) */}
+
               {(isEpisode || historyStack.length > 0) && (
                 <button
                     onClick={async () => {
@@ -1430,7 +1512,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         }}
                       title={language === 'es' ? 'Marcar como visto' : 'Mark as seen'}
                       style={{
-                        background: (selectedItem.completed_at || selectedItem.is_completed) ? `var(--color-${selectedItem.item_type === 'episode' ? 'series' : (selectedItem.item_type || 'movie')})` : 'transparent',
+                        background: (selectedItem.completed_at || selectedItem.is_completed) ? modalTheme.accent : 'transparent',
                         border: (selectedItem.completed_at || selectedItem.is_completed) ? 'none' : '2px solid var(--text-muted)',
                         borderRadius: '50%',
                         width: '32px',
@@ -1439,11 +1521,12 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         alignItems: 'center',
                         justifyContent: 'center',
                         cursor: 'pointer',
-                        color: (selectedItem.completed_at || selectedItem.is_completed) ? `var(--color-text-${selectedItem.item_type === 'episode' ? 'series' : (selectedItem.item_type || 'movie')})` : 'var(--text-muted)',
+                        color: (selectedItem.completed_at || selectedItem.is_completed) ? modalTheme.text : 'var(--text-muted)',
                         opacity: (selectedItem.completed_at || selectedItem.is_completed) ? 1 : 0.6,
                         transition: 'all 0.2s ease',
                         padding: 0
                       }}
+
                     >
                       <Check size={18} strokeWidth={3} />
                     </button>
