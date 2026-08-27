@@ -27,7 +27,8 @@ export const ForgotPassword: React.FC = () => {
   };
 
   return (
-    <div className="glass-card" style={{ maxWidth: 450, margin: '4rem auto', padding: '2rem' }}>
+    <div className="auth-card" style={{ maxWidth: 450, margin: '4rem auto', padding: '2rem' }}>
+
       {isSuccess ? (
         <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'center' }}>
           <CheckCircle size={48} color="#10b981" />

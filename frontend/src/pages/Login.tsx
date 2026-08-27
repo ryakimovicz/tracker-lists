@@ -120,8 +120,9 @@ export const Login: React.FC = () => {
 
 
   return (
-    <div className="glass-card" style={{ maxWidth: 450, margin: '4rem auto', padding: '2.5rem' }}>
+    <div className="auth-card" style={{ maxWidth: 450, margin: '4rem auto', padding: '2.5rem' }}>
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+
         <h2 style={{ textAlign: 'center', marginBottom: '0.5rem' }}>{t('authLoginButton')}</h2>
 
         {errorMsg && (

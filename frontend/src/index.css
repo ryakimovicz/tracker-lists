@@ -253,6 +253,27 @@ h1, h2, h3, h4, h5, h6 {
   box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.7) !important;
 }
 
+/* Static Card for Auth forms (Login, Register, Forgot Password) */
+.auth-card {
+  background: var(--bg-secondary);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  box-shadow: var(--card-shadow);
+  position: relative;
+  overflow: hidden;
+  transform: none !important;
+  transition: none !important;
+}
+
+.auth-card:hover {
+  transform: none !important;
+  box-shadow: var(--card-shadow) !important;
+  border-color: var(--border-color) !important;
+}
+
+
 
   /* Interactive elements */
 .btn-primary {
