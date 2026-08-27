@@ -70,7 +70,7 @@ export const AdminPanel: React.FC = () => {
   // Feedback messages
   const [modalFeedback, setModalFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, refreshProfile } = useAuth();
 
   const handleChangeUserId = async () => {
     if (!selectedUser) return;
@@ -95,7 +95,10 @@ export const AdminPanel: React.FC = () => {
     try {
       const res = await apiClient.post(`/admin/users/${selectedUser.id}/change-id`, { new_id: targetId });
       if (res.data.access_token) {
-        localStorage.setItem('token', res.data.access_token);
+        localStorage.setItem('access_token', res.data.access_token);
+        if (refreshProfile) {
+          await refreshProfile();
+        }
       }
       const updated = { ...selectedUser, id: targetId };
       setSelectedUser(updated);
@@ -110,6 +113,7 @@ export const AdminPanel: React.FC = () => {
       setActionLoading(false);
     }
   };
+
 
   useEffect(() => {
     fetchUsers();
