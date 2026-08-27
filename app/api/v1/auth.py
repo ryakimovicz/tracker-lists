@@ -1,7 +1,7 @@
 import secrets
 from datetime import datetime, timezone, timedelta
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Response, Cookie, BackgroundTasks, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Response, Request, Cookie, BackgroundTasks, Query
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 import smtplib
