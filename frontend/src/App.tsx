@@ -10,6 +10,8 @@ import { AdminPanel } from './pages/AdminPanel';
 import { Recommended } from './pages/Recommended';
 import { ForgotPassword } from './pages/ForgotPassword';
 import { ResetPassword } from './pages/ResetPassword';
+import { VerifyEmail } from './pages/VerifyEmail';
+
 import { Home } from './pages/Home';
 import { Profile } from './pages/Profile';
 import { Social } from './pages/Social';
@@ -44,10 +46,12 @@ function AppRoutes() {
             <Route path="/recommended" element={<Recommended />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/verify-email" element={<VerifyEmail />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route path="/terms" element={<TermsOfService />} />
+
             
             {/* Authenticated Routes */}
             <Route

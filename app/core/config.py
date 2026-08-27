@@ -46,12 +46,17 @@ class Settings(BaseSettings):
     LASTFM_SHARED_SECRET: str = ""
     GOOGLE_CLIENT_ID: str = ""
     
-    # SMTP Email Settings
+    # Email Settings (Resend / SMTP)
+    RESEND_API_KEY: str = ""
+    EMAILS_FROM_EMAIL: str = "Pathd <noreply@pathd.net>"
+    EMAILS_FROM_NAME: str = "Pathd"
+    FRONTEND_URL: str = "http://localhost:5173"
     SMTP_TLS: bool = True
     SMTP_PORT: int = 587
     SMTP_HOST: str = ""
     SMTP_USER: str = ""
     SMTP_PASSWORD: str = ""
+
     # Dodo Payments Settings
     DODO_PAYMENTS_API_KEY: str = ""
     DODO_PAYMENTS_PRODUCT_ID: str = ""
@@ -59,4 +64,5 @@ class Settings(BaseSettings):
     DODO_PAYMENTS_ENVIRONMENT: str = "test_mode"
 
 settings = Settings()
+
 

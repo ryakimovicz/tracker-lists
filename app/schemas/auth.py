@@ -26,3 +26,12 @@ class GoogleAuthResponse(BaseModel):
     suggested_username: Optional[str] = None
     email: Optional[str] = None
 
+class ResendVerificationRequest(BaseModel):
+    email: EmailStr
+
+class VerifyEmailResponse(BaseModel):
+    message: str
+    access_token: Optional[str] = None
+    token_type: Optional[str] = "bearer"
+
+

@@ -139,16 +139,37 @@ export const Register: React.FC = () => {
       {isSuccess ? (
 
         <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '1.25rem', alignItems: 'center' }}>
-          <CheckCircle size={48} color="#10b981" />
-          <h2>Account Created Successfully</h2>
-          <p style={{ color: 'var(--text-secondary)' }}>
-            Your account has been registered. You can now log in using your credentials.
+          <div style={{
+            width: 72,
+            height: 72,
+            borderRadius: '50%',
+            background: 'rgba(124, 58, 237, 0.15)',
+            border: '2px solid var(--accent-primary)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}>
+            <Mail size={38} color="var(--accent-primary)" />
+          </div>
+          <h2 style={{ margin: 0 }}>
+            {language === 'es' ? '¡Revisa tu correo electrónico! 🚀' : 'Check your email! 🚀'}
+          </h2>
+          <p style={{ color: 'var(--text-secondary)', margin: 0, fontSize: '0.95rem', lineHeight: '1.5' }}>
+            {language === 'es' 
+              ? `Hemos enviado un enlace de confirmación a ` 
+              : `We sent a confirmation link to `}
+            <strong style={{ color: 'var(--text-primary)' }}>{email}</strong>.
+            <br />
+            {language === 'es'
+              ? 'Por favor haz clic en el enlace para activar tu cuenta antes de iniciar sesión.'
+              : 'Please click the link to activate your account before logging in.'}
           </p>
-          <Link to="/login" className="btn-primary" style={{ width: '100%', textDecoration: 'none' }}>
+          <Link to="/login" className="btn-primary" style={{ width: '100%', textDecoration: 'none', marginTop: '0.5rem' }}>
             {t('navLogin')}
           </Link>
         </div>
       ) : (
+
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           <h2 style={{ textAlign: 'center', marginBottom: '0.5rem' }}>{t('authRegisterButton')}</h2>
 

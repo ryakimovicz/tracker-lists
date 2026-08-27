@@ -23,7 +23,9 @@ export const Login: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-
+  const [isUnverified, setIsUnverified] = useState(false);
+  const [resendSuccess, setResendSuccess] = useState(false);
+  const [isResending, setIsResending] = useState(false);
 
   // Google modal state
   const [showGoogleModal, setShowGoogleModal] = useState(false);
@@ -32,12 +34,29 @@ export const Login: React.FC = () => {
   const [pendingGoogleToken, setPendingGoogleToken] = useState('');
   const [googleModalError, setGoogleModalError] = useState('');
 
+  const handleResend = async () => {
+    if (!usernameOrEmail) return;
+    setIsResending(true);
+    try {
+      await apiClient.post('/auth/resend-verification', {
+        email: usernameOrEmail.trim()
+      });
+      setResendSuccess(true);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsResending(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!usernameOrEmail || !password) return;
 
     setIsSubmitting(true);
     setErrorMsg('');
+    setIsUnverified(false);
+    setResendSuccess(false);
 
     try {
       // Backend expects standard OAuth2 request form URLencoded format: username and password
@@ -55,7 +74,11 @@ export const Login: React.FC = () => {
       await login(access_token);
       navigate('/profile');
     } catch (err: any) {
-      setErrorMsg(t('errLoginFailed'));
+      if (err.response?.status === 403 && err.response?.data?.detail === 'EMAIL_NOT_VERIFIED') {
+        setIsUnverified(true);
+      } else {
+        setErrorMsg(t('errLoginFailed'));
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -117,13 +140,57 @@ export const Login: React.FC = () => {
     }
   };
 
-
-
   return (
     <div className="auth-card" style={{ maxWidth: 450, margin: '4rem auto', padding: '2.5rem' }}>
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
 
         <h2 style={{ textAlign: 'center', marginBottom: '0.5rem' }}>{t('authLoginButton')}</h2>
+
+        {isUnverified && (
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.75rem',
+            background: 'rgba(245, 158, 11, 0.12)',
+            border: '1px solid rgba(245, 158, 11, 0.4)',
+            color: '#fbbf24',
+            padding: '1rem',
+            borderRadius: 8,
+            fontSize: '0.9rem'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <AlertCircle size={20} color="#fbbf24" style={{ flexShrink: 0 }} />
+              <span style={{ fontWeight: 600 }}>Cuenta pendiente de confirmación</span>
+            </div>
+            <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.86rem', lineHeight: '1.4' }}>
+              Tu correo electrónico aún no ha sido confirmado. Revisa tu casilla o solicita un nuevo correo de activación.
+            </p>
+            {resendSuccess ? (
+              <div style={{ color: '#10b981', fontWeight: 500, fontSize: '0.85rem' }}>
+                ✓ ¡Correo reenviado con éxito! Revisa tu bandeja de entrada.
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={handleResend}
+                disabled={isResending}
+                style={{
+                  background: 'rgba(245, 158, 11, 0.2)',
+                  border: '1px solid rgba(245, 158, 11, 0.4)',
+                  color: '#fbbf24',
+                  padding: '0.45rem 0.75rem',
+                  borderRadius: 6,
+                  fontSize: '0.82rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  alignSelf: 'flex-start'
+                }}
+              >
+                {isResending ? 'Enviando...' : 'Reenviar correo de confirmación'}
+              </button>
+            )}
+          </div>
+        )}
 
         {errorMsg && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', padding: '0.75rem', borderRadius: 8, fontSize: '0.9rem' }}>
@@ -131,6 +198,7 @@ export const Login: React.FC = () => {
             <span>{errorMsg}</span>
           </div>
         )}
+
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
           <label style={{ fontSize: '0.9rem', fontWeight: 500 }}>{t('authEmail')} / {t('authUsername')}</label>

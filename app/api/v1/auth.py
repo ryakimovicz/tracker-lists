@@ -1,7 +1,7 @@
 import secrets
 from datetime import datetime, timezone, timedelta
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Response, Cookie, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, status, Response, Cookie, BackgroundTasks, Query
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 import smtplib
@@ -9,23 +9,49 @@ from email.mime.text import MIMEText
 
 from app.core.config import settings
 from app.core.database import get_db
-from app.core.security import create_access_token, verify_password, get_password_hash
+from app.core.security import (
+    create_access_token,
+    verify_password,
+    get_password_hash,
+    create_verification_token,
+    verify_verification_token
+)
+from app.services.email import EmailService
 from app.models.user import User
 from app.schemas.user import UserCreate, UserResponse, Token
-from app.schemas.auth import ForgotPasswordRequest, ResetPasswordRequest, GoogleLoginRequest, GoogleAuthResponse
+from app.schemas.auth import (
+    ForgotPasswordRequest,
+    ResetPasswordRequest,
+    GoogleLoginRequest,
+    GoogleAuthResponse,
+    ResendVerificationRequest,
+    VerifyEmailResponse
+)
 
 router = APIRouter()
 
 
 def send_reset_email(to_email: str, username: str, token: str):
     # Print local fallback simulation for developer logs
-    reset_link = f"http://localhost:5173/reset-password?token={token}"
+    frontend_url = getattr(settings, "FRONTEND_URL", "http://localhost:5173").rstrip("/")
+    reset_link = f"{frontend_url}/reset-password?token={token}"
     print("\n" + "="*50)
     print("SIMULATED RESET PASSWORD EMAIL SEND")
     print(f"To: {to_email}")
     print(f"Token: {token}")
     print(f"Reset URL: {reset_link}")
     print("="*50 + "\n")
+
+    # Send through Resend if configured
+    if getattr(settings, "RESEND_API_KEY", None):
+        html_content = f"""
+        <p>Hola, <strong>{username}</strong>,</p>
+        <p>Has solicitado restablecer tu contraseña en Pathd. Haz clic en el siguiente enlace:</p>
+        <p><a href="{reset_link}">Restablecer mi Contraseña</a></p>
+        <p>Este enlace es válido por 1 hora.</p>
+        """
+        EmailService.send_email(to_email, "Restablecer tu contraseña en Pathd", html_content)
+        return
 
     if not settings.SMTP_HOST or not settings.SMTP_USER or not settings.SMTP_PASSWORD:
         print(f"[SMTP Warning] SMTP credentials not set. Skipping real email dispatch to {to_email}")
@@ -35,7 +61,7 @@ def send_reset_email(to_email: str, username: str, token: str):
         msg_content = f"Hello {username},\n\nYou requested a password reset. Click the link below to reset your password:\n{reset_link}\n\nThis link is valid for 1 hour."
         
         msg = MIMEText(msg_content)
-        msg['Subject'] = "Reset your Password - Tracker Lists"
+        msg['Subject'] = "Reset your Password - Pathd"
         msg['From'] = settings.EMAILS_FROM_EMAIL
         msg['To'] = to_email
         
@@ -63,7 +89,11 @@ def set_refresh_cookie(response: Response, refresh_token: str):
 from sqlalchemy import func
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-def register(user_in: UserCreate, db: Session = Depends(get_db)):
+def register(
+    user_in: UserCreate,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
     # Check if username or email already exists (case-insensitive)
     user_db = db.query(User).filter(
         (func.lower(User.email) == user_in.email.strip().lower()) |
@@ -81,16 +111,82 @@ def register(user_in: UserCreate, db: Session = Depends(get_db)):
         )
     
     hashed_password = get_password_hash(user_in.password)
+    verification_tok = create_verification_token(user_in.email.strip().lower())
 
     new_user = User(
-        username=user_in.username,
-        email=user_in.email,
-        hashed_password=hashed_password
+        username=user_in.username.strip(),
+        email=user_in.email.strip().lower(),
+        hashed_password=hashed_password,
+        is_verified=False,
+        verification_token=verification_tok
     )
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
+
+    # Send verification email asynchronously
+    background_tasks.add_task(
+        EmailService.send_verification_email,
+        new_user.email,
+        new_user.username,
+        verification_tok
+    )
+
     return new_user
+
+@router.get("/verify-email", response_model=VerifyEmailResponse)
+def verify_email(
+    response: Response,
+    token: str = Query(..., description="The email verification token"),
+    db: Session = Depends(get_db)
+):
+    email = verify_verification_token(token)
+    user = None
+    if email:
+        user = db.query(User).filter(func.lower(User.email) == email.lower()).first()
+    if not user:
+        user = db.query(User).filter(User.verification_token == token).first()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired verification link."
+        )
+
+    user.is_verified = True
+    user.verification_token = None
+
+    # Auto-login after verification
+    rf_token = secrets.token_urlsafe(64)
+    user.refresh_token = rf_token
+    db.commit()
+
+    set_refresh_cookie(response, rf_token)
+    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        subject=user.id, expires_delta=access_token_expires
+    )
+
+    return {
+        "message": "Email verified successfully! Welcome to Pathd.",
+        "access_token": access_token,
+        "token_type": "bearer"
+    }
+
+@router.post("/resend-verification")
+def resend_verification(
+    payload: ResendVerificationRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
+    user = db.query(User).filter(func.lower(User.email) == payload.email.strip().lower()).first()
+    if user and not user.is_verified:
+        tok = create_verification_token(user.email)
+        user.verification_token = tok
+        db.commit()
+        background_tasks.add_task(EmailService.send_verification_email, user.email, user.username, tok)
+
+    return {"message": "If the email is unverified, a new confirmation link has been sent."}
 
 @router.post("/login", response_model=Token)
 def login(
@@ -111,7 +207,13 @@ def login(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    
+    if not user.is_verified:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="EMAIL_NOT_VERIFIED",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     # Generate Refresh Token
     rf_token = secrets.token_urlsafe(64)
     user.refresh_token = rf_token
@@ -128,6 +230,7 @@ def login(
 
 @router.post("/refresh", response_model=Token)
 def refresh_session(
+
     response: Response,
     refresh_token: Optional[str] = Cookie(None),
     db: Session = Depends(get_db)
@@ -274,16 +377,22 @@ def google_auth(
         user = User(
             username=chosen_username,
             email=email,
-            hashed_password=get_password_hash(random_pwd)
+            hashed_password=get_password_hash(random_pwd),
+            is_verified=True
         )
         db.add(user)
         db.commit()
         db.refresh(user)
+    else:
+        if not user.is_verified:
+            user.is_verified = True
+            db.commit()
         
     # Generate Refresh Token
     rf_token = secrets.token_urlsafe(64)
     user.refresh_token = rf_token
     db.commit()
+
     
     set_refresh_cookie(response, rf_token)
     
