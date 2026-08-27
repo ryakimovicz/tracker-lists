@@ -1,10 +1,12 @@
 import urllib.request
 import urllib.parse
 import json
+import re
 from datetime import datetime, timedelta
 from typing import List
 from app.core.config import settings
 from app.services.base import SearchResultItem
+
 
 class IGDBService:
     _access_token = None
@@ -348,6 +350,9 @@ class IGDBService:
                 if response.status == 200:
                     data = json.loads(response.read().decode())
                     results = []
+                    dlc_keywords = ["skin", "skins", "pack", "dlc", "soundtrack", "season pass", "costume", "expansion pack", "avatar", "theme", "wallpaper", "challenge", "challenge map", "story pack", "bundle", "booster"]
+                    real_bundle_keywords = ["collection", "trilogy", "anthology", "saga", "duology", "compilation", "all-in-one"]
+
                     for item in data:
                         image_url = None
                         cover = item.get("cover")
@@ -355,12 +360,35 @@ class IGDBService:
                             image_url = f"https://images.igdb.com/igdb/image/upload/t_cover_big/{cover['image_id']}.jpg"
                         release_timestamp = item.get("first_release_date")
                         release_date = datetime.fromtimestamp(release_timestamp).strftime("%Y-%m-%d") if release_timestamp else None
+
+                        cat = item.get("category", 0)
+                        item_name_lower = (item.get("name") or "").lower()
+                        has_parent = "parent_game" in item
+                        is_real_bundle = any(re.search(rf"\b{kw}\b", item_name_lower) for kw in real_bundle_keywords)
+                        is_dlc_like = (has_parent or cat in (1, 5, 14) or any(re.search(rf"\b{kw}\b", item_name_lower) for kw in dlc_keywords)) and not is_real_bundle
+                        is_expansion = cat in (2, 4)
+
+                        badge = None
+                        if is_real_bundle or (cat == 3 and not is_dlc_like):
+                            badge = "collection"
+                        elif is_dlc_like:
+                            badge = "dlc"
+                        elif is_expansion:
+                            badge = "expansion"
+                        elif cat == 8 or "remake" in item_name_lower:
+                            badge = "remake"
+                        elif cat == 9 or "remaster" in item_name_lower:
+                            badge = "remaster"
+                        elif cat == 10 or "edition" in item_name_lower or "goty" in item_name_lower or "version" in item_name_lower:
+                            badge = "edition"
+
                         results.append(SearchResultItem(
                             external_id=str(item.get("id")),
                             title=item.get("name") or "Untitled Game",
                             image_url=image_url,
                             item_type="game",
-                            release_date=release_date
+                            release_date=release_date,
+                            badge=badge
                         ))
                     return results
         except Exception as e:
@@ -371,7 +399,7 @@ class IGDBService:
     def get_new_games(cls) -> List[SearchResultItem]:
         import time
         now = int(time.time())
-        body = f'fields id, name, cover.image_id, first_release_date, summary; where first_release_date < {now} & cover != null; sort first_release_date desc; limit 40;'
+        body = f'fields id, name, category, parent_game, cover.image_id, first_release_date, summary; where first_release_date < {now} & cover != null; sort first_release_date desc; limit 40;'
         return cls._execute_query(body)
 
     @classmethod
@@ -379,6 +407,7 @@ class IGDBService:
         import time
         now = int(time.time())
         six_months_ago = now - (180 * 86400)
-        body = f'fields id, name, cover.image_id, first_release_date, summary, total_rating; where first_release_date > {six_months_ago} & first_release_date < {now} & cover != null & total_rating != null; sort total_rating desc; limit 15;'
+        body = f'fields id, name, category, parent_game, cover.image_id, first_release_date, summary, total_rating; where first_release_date > {six_months_ago} & first_release_date < {now} & cover != null & total_rating != null; sort total_rating desc; limit 15;'
         return cls._execute_query(body)
+
 
