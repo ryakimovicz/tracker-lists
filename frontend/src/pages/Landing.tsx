@@ -1,3 +1,4 @@
+import React from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from '../context/LanguageContext';
 import { Flame, Star, Compass, Layers } from 'lucide-react';
@@ -30,33 +31,36 @@ export const Landing: React.FC = () => {
 
       {/* Feature Grids */}
       <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '2rem', marginTop: '2rem' }}>
+        {/* Card 1: All-in-One Tracker */}
         <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <div style={{ color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Compass size={28} />
-            <h3 style={{ margin: 0, fontSize: '1.25rem' }}>{t('featSearchTitle')}</h3>
+          <div style={{ color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <Layers size={28} />
+            <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700 }}>{t('featTrackerTitle')}</h3>
           </div>
-          <p style={{ color: 'var(--text-secondary)', lineHeight: 1.6, margin: 0 }}>
+          <p style={{ color: 'var(--text-secondary)', lineHeight: 1.6, margin: 0, fontSize: '0.95rem' }}>
+            {t('featTrackerDesc')}
+          </p>
+        </div>
+
+        {/* Card 2: Guides & Universes */}
+        <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div style={{ color: 'var(--accent-secondary)', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <Compass size={28} />
+            <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700 }}>{t('featSearchTitle')}</h3>
+          </div>
+          <p style={{ color: 'var(--text-secondary)', lineHeight: 1.6, margin: 0, fontSize: '0.95rem' }}>
             {t('featSearchDesc')}
           </p>
         </div>
 
+        {/* Card 3: Community & Customization */}
         <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <div style={{ color: 'var(--accent-secondary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <div style={{ color: '#ec4899', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
             <Star size={28} />
-            <h3 style={{ margin: 0, fontSize: '1.25rem' }}>{t('featModsTitle')}</h3>
+            <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700 }}>{t('featModsTitle')}</h3>
           </div>
-          <p style={{ color: 'var(--text-secondary)', lineHeight: 1.6, margin: 0 }}>
+          <p style={{ color: 'var(--text-secondary)', lineHeight: 1.6, margin: 0, fontSize: '0.95rem' }}>
             {t('featModsDesc')}
-          </p>
-        </div>
-
-        <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <div style={{ color: '#ec4899', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Layers size={28} />
-            <h3 style={{ margin: 0, fontSize: '1.25rem' }}>{t('featShelfTitle')}</h3>
-          </div>
-          <p style={{ color: 'var(--text-secondary)', lineHeight: 1.6, margin: 0 }}>
-            {t('featShelfDesc')}
           </p>
         </div>
       </section>

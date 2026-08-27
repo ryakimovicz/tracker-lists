@@ -36,14 +36,15 @@ const translations: Translations = {
   btnExploreGuides: { en: 'Explore Guides', es: 'Explorar Guías' },
   
   // Features
-  featSearchTitle: { en: 'Endless Universes', es: 'Universos Sin Fronteras' },
-  featSearchDesc: { en: 'Want to build the chronological order of Star Wars mixing movies, comics, and video games? Here you can. Our global search connects with the largest databases in the world so you don\'t miss anything.', es: '¿Quieres armar el orden cronológico de Star Wars mezclando las películas, los cómics y los videojuegos? Aquí puedes. Nuestro buscador global se conecta con las bases de datos más grandes del mundo para que no te falte nada.' },
+  featTrackerTitle: { en: 'Your Ultimate All-in-One Tracker', es: 'Tu Tracker Definitivo (Todo en Uno)' },
+  featTrackerDesc: { en: 'Track movies, TV shows, anime, books, comics, manga, and video games. Log your activity, rate, and visualize your stats in a single unified profile.', es: 'Lleva el control de películas, series, anime, libros, cómics, mangas y videojuegos. Registra tu consumo, puntúa y visualiza estadísticas en un solo perfil unificado.' },
   
-  featModsTitle: { en: 'Make It Yours (Community Mods)', es: 'Hazlo Tuyo (Mods de la Comunidad)' },
-  featModsDesc: { en: 'Missing an indie comic or a special episode? Add custom items to any public guide. The community will be able to vote and integrate your contributions into their own lists.', es: '¿Falta un cómic independiente o un episodio especial? Añade ítems personalizados a cualquier guía pública. La comunidad podrá votar e incorporar tus aportes a sus propias listas.' },
+  featSearchTitle: { en: 'Guides & Endless Universes', es: 'Guías y Universos Sin Fronteras' },
+  featSearchDesc: { en: 'Create and explore chronological or thematic lists combining any format. The ideal tool for organizing complex sagas and franchises.', es: 'Crea y explora listas cronológicas o temáticas combinando cualquier formato. La herramienta perfecta para organizar sagas y franquicias complejas.' },
   
-  featShelfTitle: { en: 'Your Progress, Your Rules', es: 'Tu Progreso, Tus Reglas' },
-  featShelfDesc: { en: 'Forget about getting lost between seasons and volumes. Save community guides, check off what you have consumed, and discover exactly what to follow next.', es: 'Olvídate de perderte entre temporadas y volúmenes. Guarda las listas de la comunidad, marca lo que ya consumiste y descubre exactamente por dónde seguir.' },
+  featModsTitle: { en: 'Community & Customization', es: 'Comunidad y Personalización' },
+  featModsDesc: { en: 'Follow friends\' progress, share recommendations, and enrich any guide by adding custom items and special notes.', es: 'Sigue el progreso de amigos, comparte recomendaciones y enriquece cualquier guía añadiendo ítems personalizados y notas especiales.' },
+
 
   // Priority Levels
   priorityOptional: { en: 'Optional', es: 'Opcional' },
