@@ -349,10 +349,6 @@ async def admin_cancel_user_subscription(
         user.dodo_subscription_id = None
         user.is_pro = False
         user.pro_expires_at = None
-        trim_downgraded_user_favorites(db, user.id)
-        user.banner_url = None
-        user.background_url = None
-        user.profile_color = None
         db.commit()
         return {
             "message": f"Suscripción de Dodo Payments cancelada con éxito para @{user.username}.",
@@ -361,15 +357,12 @@ async def admin_cancel_user_subscription(
     else:
         user.is_pro = False
         user.pro_expires_at = None
-        trim_downgraded_user_favorites(db, user.id)
-        user.banner_url = None
-        user.background_url = None
-        user.profile_color = None
         db.commit()
         return {
             "message": f"Beneficio Premium cancelado para @{user.username}.",
             "is_pro": check_user_is_pro(user)
         }
+
 
 
 

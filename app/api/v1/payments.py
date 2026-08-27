@@ -240,14 +240,9 @@ async def dodo_webhook(
         logger.info(f"User {user.username} (ID: {user.id}) upgraded to Pro via webhook event: {event_type}")
 
     elif event_type in pro_revoked_events:
-        was_pro = user.is_pro
         user.is_pro = False
-        if was_pro:
-            trim_downgraded_user_favorites(db, user.id)
-            user.banner_url = None
-            user.background_url = None
-            user.profile_color = None
         db.commit()
         logger.info(f"User {user.username} (ID: {user.id}) downgraded from Pro via webhook event: {event_type}")
+
 
     return {"status": "success", "event": event_type}

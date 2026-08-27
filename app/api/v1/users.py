@@ -349,19 +349,9 @@ def update_username(
 
 
 def trim_downgraded_user_favorites(db: Session, user_id: int):
-    from app.models.library import UserLibraryItem
-    categories = ['movie', 'series', 'anime', 'book', 'comic', 'manga', 'game']
-    for cat in categories:
-        favs = db.query(UserLibraryItem).filter(
-            UserLibraryItem.user_id == user_id,
-            UserLibraryItem.item_type == cat,
-            UserLibraryItem.is_favorite == True
-        ).order_by(UserLibraryItem.updated_at.desc(), UserLibraryItem.id.asc()).all()
-        
-        # Keep only the 1st one, untag any extra 9
-        if len(favs) > 1:
-            for extra in favs[1:]:
-                extra.is_favorite = False
+    # Retain user favorites in database without deleting so they restore when re-subscribing
+    pass
+
                 
 class AvatarUpdateRequest(BaseModel):
     photo_url: str | None = None
@@ -724,16 +714,11 @@ def mock_pro_status(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    was_pro = current_user.is_pro
     current_user.is_pro = req.is_pro
-    if was_pro and not req.is_pro:
-        trim_downgraded_user_favorites(db, current_user.id)
-        current_user.banner_url = None
-        current_user.background_url = None
-        current_user.profile_color = None
     db.commit()
     db.refresh(current_user)
     return {"message": f"User is now {'Pro' if req.is_pro else 'Free'}", "is_pro": req.is_pro}
+
 
 
 

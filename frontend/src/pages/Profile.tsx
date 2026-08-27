@@ -177,6 +177,23 @@ export const Profile: React.FC = () => {
   // Favorites state (local highlight mock for UX polish)
   const [favorites, setFavorites] = useState<LibraryItem[]>([]);
 
+  // Only display extra favorites beyond 1-per-category if user has active Pro
+  const displayedFavorites = React.useMemo(() => {
+    if (profile?.is_pro) {
+      return favorites;
+    }
+    const seenCategories = new Set<string>();
+    return favorites.filter(item => {
+      const type = item.item_type;
+      if (!seenCategories.has(type)) {
+        seenCategories.add(type);
+        return true;
+      }
+      return false;
+    });
+  }, [favorites, profile?.is_pro]);
+
+
   // Last.fm states
   const [nowPlaying, setNowPlaying] = useState<any>(null);
   const [topAlbums, setTopAlbums] = useState<any[]>([]);
@@ -1490,17 +1507,18 @@ export const Profile: React.FC = () => {
               color: profile?.is_pro ? 'var(--accent-primary)' : 'var(--text-secondary)',
               border: '1px solid var(--border-color)'
             }}>
-              {favorites.length} / {profile?.is_pro ? '70' : '7'} {language === 'es' ? 'destacados' : 'featured'}
+              {displayedFavorites.length} / {profile?.is_pro ? '70' : '7'} {language === 'es' ? 'destacados' : 'featured'}
             </span>
           </div>
 
-          {favorites.length === 0 ? (
+          {displayedFavorites.length === 0 ? (
             <div className="glass-card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
               {language === 'es' ? 'Marca obras en tu estantería como favoritas (con el ícono de corazón) para destacarlas aquí.' : 'Mark items on your shelf as favorites (with the heart icon) to highlight them here.'}
             </div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1.5rem' }}>
-              {favorites.map(item => (
+              {displayedFavorites.map(item => (
+
                 <div
                   key={item.id}
                   className="glass-card"
