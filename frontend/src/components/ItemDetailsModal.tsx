@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
 import { getProfileTheme } from '../utils/profileThemes';
 import { apiClient } from '../api/client';
-import { Star, Heart, X, Flag, CheckCircle, Check, Plus, MoreVertical, Trash2, ArrowLeft, Clock, ChevronUp, ChevronDown, RotateCcw, BookOpen, Gamepad2, Package, Sparkles, Puzzle, Layers } from 'lucide-react';
+import { Star, Heart, X, Flag, CheckCircle, Check, Plus, MoreVertical, Trash2, ArrowLeft, Clock, ChevronUp, ChevronDown, RotateCcw, BookOpen, Gamepad2, Package, Sparkles, Puzzle, Layers, ChevronLeft, ChevronRight } from 'lucide-react';
+
 
 
 
@@ -47,9 +48,90 @@ class ErrorBoundary extends React.Component<{children: any}, {hasError: boolean,
   }
 }
 
+const ModalScrollRow: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const scroll = (direction: 'left' | 'right') => {
+    if (scrollRef.current) {
+      const scrollAmount = 260;
+      scrollRef.current.scrollBy({ left: direction === 'left' ? -scrollAmount : scrollAmount, behavior: 'smooth' });
+    }
+  };
+
+  return (
+    <div style={{ position: 'relative', width: '100%', display: 'flex', alignItems: 'center' }}>
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); scroll('left'); }}
+        style={{
+          position: 'absolute',
+          left: '-8px',
+          top: '50%',
+          transform: 'translateY(-50%)',
+          zIndex: 5,
+          background: 'var(--bg-tertiary)',
+          border: '1px solid var(--border-color)',
+          borderRadius: '50%',
+          width: '32px',
+          height: '32px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          boxShadow: '0 4px 10px rgba(0,0,0,0.5)',
+          color: 'var(--text-primary)'
+        }}
+      >
+        <ChevronLeft size={18} />
+      </button>
+
+      <div
+        ref={scrollRef}
+        style={{
+          display: 'flex',
+          gap: '0.65rem',
+          overflowX: 'auto',
+          scrollbarWidth: 'none',
+          msOverflowStyle: 'none',
+          width: '100%',
+          padding: '0.25rem 1.25rem'
+        }}
+      >
+        {children}
+      </div>
+
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); scroll('right'); }}
+        style={{
+          position: 'absolute',
+          right: '-8px',
+          top: '50%',
+          transform: 'translateY(-50%)',
+          zIndex: 5,
+          background: 'var(--bg-tertiary)',
+          border: '1px solid var(--border-color)',
+          borderRadius: '50%',
+          width: '32px',
+          height: '32px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          boxShadow: '0 4px 10px rgba(0,0,0,0.5)',
+          color: 'var(--text-primary)'
+        }}
+      >
+        <ChevronRight size={18} />
+      </button>
+    </div>
+  );
+};
+
 export const ItemDetailsModal: React.FC<ItemDetailsModalProps> = (props) => {
   return <ErrorBoundary><ItemDetailsModalInner {...props} /></ErrorBoundary>;
 };
+
 
 const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   item: initialItem,
@@ -2590,7 +2672,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         {language === 'es' ? 'Juegos y Contenido de esta Colección' : 'Games in this Collection'}
                         <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400 }}>({gameRelations.bundle_games.length})</span>
                       </h5>
-                      <div style={{ display: 'flex', gap: '0.65rem', overflowX: 'auto', paddingBottom: '0.4rem' }}>
+                      <ModalScrollRow>
                         {gameRelations.bundle_games.map((g: any) => (
                           <div
                             key={g.id || g.external_id}
@@ -2638,7 +2720,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                             </div>
                           </div>
                         ))}
-                      </div>
+                      </ModalScrollRow>
                     </div>
                   )}
 
@@ -2650,7 +2732,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         {language === 'es' ? 'Incluido en Colecciones y Trilogías' : 'Included in Collections & Bundles'}
                         <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400 }}>({gameRelations.collections.length})</span>
                       </h5>
-                      <div style={{ display: 'flex', gap: '0.65rem', overflowX: 'auto', paddingBottom: '0.4rem' }}>
+                      <ModalScrollRow>
                         {gameRelations.collections.map((g: any) => (
                           <div
                             key={g.id || g.external_id}
@@ -2698,7 +2780,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                             </div>
                           </div>
                         ))}
-                      </div>
+                      </ModalScrollRow>
                     </div>
                   )}
 
@@ -2710,7 +2792,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         {language === 'es' ? 'Distintas Ediciones y Versiones' : 'Editions & Alternative Versions'}
                         <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400 }}>({gameRelations.editions.length})</span>
                       </h5>
-                      <div style={{ display: 'flex', gap: '0.65rem', overflowX: 'auto', paddingBottom: '0.4rem' }}>
+                      <ModalScrollRow>
                         {gameRelations.editions.map((g: any) => (
                           <div
                             key={g.id || g.external_id}
@@ -2758,7 +2840,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                             </div>
                           </div>
                         ))}
-                      </div>
+                      </ModalScrollRow>
                     </div>
                   )}
 
@@ -2770,7 +2852,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         {language === 'es' ? 'Expansiones y DLCs' : 'Expansions & DLCs'}
                         <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400 }}>({gameRelations.dlcs.length})</span>
                       </h5>
-                      <div style={{ display: 'flex', gap: '0.65rem', overflowX: 'auto', paddingBottom: '0.4rem' }}>
+                      <ModalScrollRow>
                         {gameRelations.dlcs.map((g: any) => (
                           <div
                             key={g.id || g.external_id}
@@ -2818,9 +2900,10 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                             </div>
                           </div>
                         ))}
-                      </div>
+                      </ModalScrollRow>
                     </div>
                   )}
+
                 </div>
               )}
 
