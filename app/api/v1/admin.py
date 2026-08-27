@@ -6,7 +6,9 @@ from app.core.database import get_db
 from app.api.deps import get_current_admin
 from app.models.user import User
 from app.models.list import ReadingList
+from app.models.library import UserLibraryItem
 from app.models.social import ListReport, Comment, CommentReport
+
 from app.models.review import MediaReview, MediaReviewReport
 from pydantic import BaseModel
 
@@ -150,6 +152,24 @@ def admin_get_users(
     total = query.count()
     users = query.order_by(User.id.desc()).offset((page - 1) * limit).limit(limit).all()
     
+    user_ids = [u.id for u in users]
+    tracker_list_ids = set()
+    if user_ids:
+        tracker_list_rows = db.query(UserLibraryItem.tracking_list_id).filter(
+            UserLibraryItem.user_id.in_(user_ids),
+            UserLibraryItem.tracking_list_id.isnot(None)
+        ).all()
+        tracker_list_ids = {r[0] for r in tracker_list_rows if r[0]}
+
+    real_lists_count_by_user = {}
+    if user_ids:
+        all_user_lists = db.query(ReadingList.creator_id, ReadingList.id).filter(
+            ReadingList.creator_id.in_(user_ids)
+        ).all()
+        for creator_id, list_id in all_user_lists:
+            if list_id not in tracker_list_ids:
+                real_lists_count_by_user[creator_id] = real_lists_count_by_user.get(creator_id, 0) + 1
+
     formatted_users = []
     for u in users:
         formatted_users.append({
@@ -169,9 +189,10 @@ def admin_get_users(
             "suspension_reason": u.suspension_reason,
             "admin_warning": u.admin_warning,
             "admin_warning_at": u.admin_warning_at,
-            "lists_count": len(u.lists),
+            "lists_count": real_lists_count_by_user.get(u.id, 0),
             "profile_color": u.profile_color
         })
+
 
     return {
         "total": total,
