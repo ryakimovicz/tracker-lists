@@ -3016,38 +3016,37 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                     IGDB / Twitch
                   </a>
                 )}
+                {selectedItem.item_type === 'book' && (
+                  (selectedItem.external_id || '').startsWith('openlibrary-') ? (
+                    <a href="https://openlibrary.org" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}>
+                      Open Library
+                    </a>
+                  ) : (
+                    <a href="https://books.google.com" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}>
+                      Google Books
+                    </a>
+                  )
+                )}
                 {selectedItem.item_type === 'movie' && (
-                  <>
-                    <a href="https://www.omdbapi.com" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}>
-                      OMDb API
-                    </a>
-                    {' & '}
-                    <a href="https://fanart.tv" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}>
-                      Fanart.tv
-                    </a>
-                  </>
+                  <a href="https://www.omdbapi.com" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}>
+                    OMDb API
+                  </a>
                 )}
                 {selectedItem.item_type === 'series' && (
-                  <>
+                  <a href="https://www.tvmaze.com" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}>
+                    TVMaze
+                  </a>
+                )}
+                {selectedItem.item_type === 'anime' && (
+                  (selectedItem.external_id || '').startsWith('tvm-') ? (
                     <a href="https://www.tvmaze.com" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}>
                       TVMaze
                     </a>
-                    {' & '}
-                    <a href="https://fanart.tv" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}>
-                      Fanart.tv
-                    </a>
-                  </>
-                )}
-                {selectedItem.item_type === 'anime' && (
-                  <>
+                  ) : (
                     <a href="https://anilist.co" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}>
                       AniList
                     </a>
-                    {' & '}
-                    <a href="https://www.tvmaze.com" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}>
-                      TVMaze
-                    </a>
-                  </>
+                  )
                 )}
                 {selectedItem.item_type === 'manga' && (
                   <a href="https://anilist.co" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}>
@@ -3058,17 +3057,6 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                   <a href="https://comicvine.gamespot.com" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}>
                     Comic Vine
                   </a>
-                )}
-                {selectedItem.item_type === 'book' && (
-                  <>
-                    <a href="https://books.google.com" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}>
-                      Google Books
-                    </a>
-                    {' & '}
-                    <a href="https://openlibrary.org" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}>
-                      Open Library
-                    </a>
-                  </>
                 )}
                 {selectedItem.item_type === 'music' && (
                   <a href="https://www.last.fm" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}>
