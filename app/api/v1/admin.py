@@ -421,8 +421,14 @@ def admin_change_user_id(
         )
     
     old_id = target_user.id
+    target_username = str(target_user.username)
+    is_self = (current_admin.id == old_id)
     
-    child_refs = [
+    from sqlalchemy import inspect
+    inspector = inspect(db.bind)
+    existing_tables = set(inspector.get_table_names()) if db.bind else set()
+    
+    all_child_refs = [
         ("user_library_items", "user_id"),
         ("item_progress", "user_id"),
         ("reading_lists", "creator_id"),
@@ -445,6 +451,8 @@ def admin_change_user_id(
         ("follows", "follower_id"),
         ("follows", "followed_id"),
     ]
+    
+    child_refs = [(tbl, col) for tbl, col in all_child_refs if tbl in existing_tables]
     
     is_postgres = (db.bind.dialect.name == "postgresql") if db.bind else False
     
@@ -483,15 +491,16 @@ def admin_change_user_id(
         
     # If the user being changed is the current logged-in admin, generate a new token
     new_access_token = None
-    if current_admin.id == old_id:
-        new_access_token = create_access_token(data={"sub": str(new_id)})
+    if is_self:
+        new_access_token = create_access_token(subject=str(new_id))
 
     return {
         "success": True,
-        "message": f"¡El usuario @{target_user.username} fue cambiado al ID {new_id} exitosamente!",
+        "message": f"¡El usuario @{target_username} fue cambiado al ID {new_id} exitosamente!",
         "new_id": new_id,
         "access_token": new_access_token
     }
+
 
 
 
