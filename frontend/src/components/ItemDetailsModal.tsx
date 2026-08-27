@@ -80,7 +80,9 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   const [userComment, setUserComment] = useState<string>('');
   const [pagesReadVal, setPagesReadVal] = useState<number | ''>(0);
   const [totalPagesVal, setTotalPagesVal] = useState<number | ''>('');
+  const [hasInteractedWithTime, setHasInteractedWithTime] = useState<boolean>(false);
   const [isSavingReview, setIsSavingReview] = useState(false);
+
   const [descExpanded, setDescExpanded] = useState(false);
   const [translatedDesc, setTranslatedDesc] = useState<string | null>(null);
   const [isTranslating, setIsTranslating] = useState(false);
@@ -378,8 +380,10 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       setUserComment('');
       setPagesReadVal(item.pages_read || 0);
       setTotalPagesVal(item.total_pages || item.page_count || '');
+      setHasInteractedWithTime(false);
       setItemReviews([]);
       setDescExpanded(false);
+
 
       const isActualEpisode = item.external_id && item.external_id.startsWith('tvm-ep-');
       if ((item.item_type === 'series' || item.item_type === 'anime') && !isActualEpisode) {
@@ -1692,17 +1696,27 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                   )}
 
                   {/* Clean & Comfortable Hours and Minutes Picker */}
-                  {!isEpisode && selectedItem && ( (selectedItem.item_type === 'game' && ['completed', 'playing', 'dropped', 'endless'].includes(selectedItem.status)) || (selectedItem.item_type === 'movie' && ['watching', 'dropped'].includes(selectedItem.status)) ) && (() => {
+                  {!isEpisode && selectedItem && ( 
+                    (selectedItem.item_type === 'game' && ['completed', 'playing', 'dropped', 'endless'].includes(selectedItem.status)) || 
+                    (selectedItem.item_type === 'movie' && (['watching', 'dropped'].includes(selectedItem.status) || (hasInteractedWithTime && selectedItem.status === 'completed'))) 
+                  ) && (() => {
                     const currentTotalMins = typeof pagesReadVal === 'number' ? pagesReadVal : 0;
                     const currentHours = Math.floor(currentTotalMins / 60);
                     const currentMinutes = currentTotalMins % 60;
                     const maxDurationMins = selectedItem.total_pages || selectedItem.page_count || 0;
 
                     const updateDuration = (newTotalMins: number) => {
+                      setHasInteractedWithTime(true);
                       let finalMins = Math.max(0, newTotalMins);
-                      if (selectedItem.item_type === 'movie' && maxDurationMins > 0 && finalMins >= maxDurationMins) {
-                        finalMins = maxDurationMins;
-                        handleToggleStatus('completed');
+                      if (selectedItem.item_type === 'movie' && maxDurationMins > 0) {
+                        if (finalMins >= maxDurationMins) {
+                          finalMins = maxDurationMins;
+                          if (selectedItem.status !== 'completed') {
+                            handleToggleStatus('completed');
+                          }
+                        } else if (selectedItem.status === 'completed') {
+                          handleToggleStatus('watching');
+                        }
                       }
                       setPagesReadVal(finalMins);
                       handleSavePagesRead(finalMins);
@@ -1723,6 +1737,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         updateDuration(currentHours * 60 + validM);
                       }
                     };
+
 
                     return (
                       <div style={{
