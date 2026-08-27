@@ -367,7 +367,16 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   const lastInitialKeyRef = React.useRef<string>('');
 
   useEffect(() => {
+    const originalStyle = window.getComputedStyle(document.body).overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = originalStyle;
+    };
+  }, []);
+
+  useEffect(() => {
     if (!initialItem) return;
+
     const currentKey = `${initialItem.external_id || initialItem.id}_${initialItem.item_type}`;
     if (lastInitialKeyRef.current === currentKey) {
       // Avoid resetting all episode progress states when only parent shelf list refreshed
@@ -1685,10 +1694,10 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                 }}
                                 onWheel={(e) => {
                                   if (isOwnProfile) {
-                                    e.preventDefault();
                                     handleUpdatePages(currentPages + (e.deltaY < 0 ? 1 : -1));
                                   }
                                 }}
+
                                 style={{
                                   width: '46px',
                                   textAlign: 'center',
@@ -1865,7 +1874,6 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                 onChange={(e) => handleHoursChange(parseInt(e.target.value) || 0)}
                                 onWheel={(e) => {
                                   if (isOwnProfile) {
-                                    e.preventDefault();
                                     handleHoursChange(currentHours + (e.deltaY < 0 ? 1 : -1));
                                   }
                                 }}
@@ -1905,10 +1913,10 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                 onChange={(e) => handleMinutesChange(parseInt(e.target.value) || 0)}
                                 onWheel={(e) => {
                                   if (isOwnProfile) {
-                                    e.preventDefault();
                                     handleMinutesChange(currentMinutes + (e.deltaY < 0 ? 1 : -1));
                                   }
                                 }}
+
                                 style={{
                                   width: '32px',
                                   textAlign: 'center',

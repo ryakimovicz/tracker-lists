@@ -78,7 +78,17 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
 
   // Initial popular character suggestions when opening
   useEffect(() => {
+    if (!isOpen) return;
+    const originalStyle = window.getComputedStyle(document.body).overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = originalStyle;
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
     if (isOpen) {
+
       setSelectedUrl(currentPhotoUrl || null);
       setErrorMsg('');
       setQuery('');

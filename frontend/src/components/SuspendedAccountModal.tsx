@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../context/LanguageContext';
 import { apiClient } from '../api/client';
@@ -13,9 +13,19 @@ export const SuspendedAccountModal: React.FC = () => {
   const [isCancellingSub, setIsCancellingSub] = useState(false);
   const [cancelSubMessage, setCancelSubMessage] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (!user || !user.is_suspended) return;
+    const originalStyle = window.getComputedStyle(document.body).overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = originalStyle;
+    };
+  }, [user?.is_suspended]);
+
   if (!user || !user.is_suspended) {
     return null;
   }
+
 
   const isPermanent = !user.suspended_until;
   const suspensionEndDate = user.suspended_until ? new Date(user.suspended_until) : null;
