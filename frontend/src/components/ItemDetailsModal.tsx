@@ -845,13 +845,14 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     initModal(initialItem);
   }, [initialItem?.external_id, initialItem?.id, profileId]);
 
+  const isItemTracked = Boolean(selectedItem?.id && selectedItem?.status);
+
   const handleSaveRating = async (ratingVal: number) => {
-    if (!selectedItem) return;
+    if (!selectedItem || !selectedItem.external_id || !isItemTracked) return;
     setUserRating(ratingVal);
     try {
       await apiClient.post(`/reviews/${selectedItem.item_type}/${selectedItem.external_id}`, {
-        rating: ratingVal,
-        content: userComment || null
+        rating: ratingVal
       });
       const revRes = await apiClient.get(`/reviews/${selectedItem.item_type}/${selectedItem.external_id}`);
       setItemReviews(revRes.data);
@@ -860,28 +861,12 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     }
   };
 
-  const handleToggleFavoriteInner = async () => {
-    if (!selectedItem) return;
-    setUserRating(0);
-    try {
-      await apiClient.post(`/reviews/${selectedItem.item_type}/${selectedItem.external_id}`, {
-        rating: null,
-        content: userComment || null
-      });
-      const revRes = await apiClient.get(`/reviews/${selectedItem.item_type}/${selectedItem.external_id}`);
-      setItemReviews(revRes.data);
-    } catch (err) {
-      console.error("Failed to delete rating", err);
-    }
-  };
-
   const handleDeleteRating = async () => {
-    if (!selectedItem) return;
+    if (!selectedItem || !selectedItem.external_id) return;
     setUserRating(0);
     try {
       await apiClient.post(`/reviews/${selectedItem.item_type}/${selectedItem.external_id}`, {
-        rating: null,
-        content: userComment || null
+        rating: null
       });
       const revRes = await apiClient.get(`/reviews/${selectedItem.item_type}/${selectedItem.external_id}`);
       setItemReviews(revRes.data);
@@ -890,24 +875,39 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     }
   };
 
-  const handleSaveReview = async () => {
-    if (!selectedItem) return;
+  const handleSaveComment = async () => {
+    if (!selectedItem || !selectedItem.external_id) return;
     setIsSavingReview(true);
     try {
       await apiClient.post(`/reviews/${selectedItem.item_type}/${selectedItem.external_id}`, {
-        rating: userRating || null,
-        content: userComment || null
+        content: userComment.trim() ? userComment : null
       });
       const revRes = await apiClient.get(`/reviews/${selectedItem.item_type}/${selectedItem.external_id}`);
       setItemReviews(revRes.data);
-      alert(language === 'es' ? 'Comentario guardado con éxito.' : 'Comment saved successfully.');
     } catch(err) {
-      console.error(err);
-      alert(language === 'es' ? 'Error al guardar el comentario.' : 'Failed to save comment.');
+      console.error("Failed to save comment", err);
     } finally {
       setIsSavingReview(false);
     }
   };
+
+  const handleDeleteComment = async () => {
+    if (!selectedItem || !selectedItem.external_id) return;
+    setIsSavingReview(true);
+    try {
+      await apiClient.post(`/reviews/${selectedItem.item_type}/${selectedItem.external_id}`, {
+        content: null
+      });
+      setUserComment('');
+      const revRes = await apiClient.get(`/reviews/${selectedItem.item_type}/${selectedItem.external_id}`);
+      setItemReviews(revRes.data);
+    } catch(err) {
+      console.error("Failed to delete comment", err);
+    } finally {
+      setIsSavingReview(false);
+    }
+  };
+
 
   
   const ensureTrackedPromiseRef = React.useRef<Promise<any | null> | null>(null);
@@ -1996,13 +1996,24 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                   {/* Star rating selector */}
                   <div>
                     <h5 style={{ margin: '0 0 0.4rem 0', color: 'var(--text-secondary)' }}>{language === 'es' ? 'Tu Calificación:' : 'Your Rating:'}</h5>
-                    <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center', flexWrap: 'wrap' }}>
                       {[1, 2, 3, 4, 5].map((star) => (
                         <button
                           key={star}
-                          disabled={!user}
+                          disabled={!user || !isItemTracked}
                           onClick={() => handleSaveRating(star)}
-                          style={{ background: 'transparent', border: 'none', cursor: user ? 'pointer' : 'default', padding: 0 }}
+                          title={!isItemTracked 
+                            ? (language === 'es' ? 'Añade este elemento a tu estantería para calificarlo' : 'Add this item to your shelf to rate it')
+                            : `${star} ${star === 1 ? 'estrella' : 'estrellas'}`
+                          }
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            cursor: (user && isItemTracked) ? 'pointer' : 'not-allowed',
+                            padding: 0,
+                            opacity: (user && isItemTracked) ? 1 : 0.35,
+                            transition: 'opacity 0.2s ease'
+                          }}
                         >
                           <Star
                             size={24}
@@ -2011,7 +2022,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                           />
                         </button>
                       ))}
-                      {user && userRating > 0 && (
+                      {user && isItemTracked && userRating > 0 && (
                         <button
                           onClick={handleDeleteRating}
                           style={{
@@ -2029,6 +2040,13 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         </button>
                       )}
                     </div>
+                    {!isItemTracked && user && (
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic', display: 'block', marginTop: '0.25rem' }}>
+                        {language === 'es' 
+                          ? 'Añade este elemento a tu estantería para poder puntuarlo con estrellas.'
+                          : 'Add this item to your shelf to rate it with stars.'}
+                      </span>
+                    )}
                   </div>
 
                   {/* Favorite toggler moved to 3-dots menu */}
@@ -3188,26 +3206,45 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
               {/* Comment write area */}
               <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-
-                <h4 style={{ margin: 0, fontSize: '1.1rem' }}>{language === 'es' ? 'Escribe tu reseña o comentario' : 'Write your review or comment'}</h4>
+                <h4 style={{ margin: 0, fontSize: '1.1rem' }}>{language === 'es' ? 'Tu Comentario' : 'Your Comment'}</h4>
                 <textarea
                   className="input-field"
                   value={userComment}
                   onChange={(e) => setUserComment(e.target.value)}
-                  placeholder={language === 'es' ? '¿Qué te pareció este elemento? Escribe aquí...' : 'What did you think of this item? Write here...'}
+                  placeholder={language === 'es' ? '¿Qué te pareció este elemento? Escribe tu comentario aquí...' : 'What did you think of this item? Write your comment here...'}
                   style={{ width: '100%', minHeight: '80px', padding: '0.75rem', background: 'var(--bg-secondary)', resize: 'vertical' }}
                 />
-                <button
-                  onClick={handleSaveReview}
-                  className="btn-primary"
-                  disabled={isSavingReview}
-                  style={{ alignSelf: 'flex-end', padding: '0.4rem 1rem', fontSize: '0.85rem' }}
-                >
-                  {isSavingReview
-                    ? (language === 'es' ? 'Guardando...' : 'Saving...')
-                    : (language === 'es' ? 'Guardar Valoración' : 'Save Review')
-                  }
-                </button>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', alignItems: 'center' }}>
+                  {userComment && (
+                    <button
+                      type="button"
+                      onClick={handleDeleteComment}
+                      disabled={isSavingReview}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: '#ef4444',
+                        fontSize: '0.82rem',
+                        cursor: 'pointer',
+                        padding: '0.4rem 0.6rem'
+                      }}
+                    >
+                      {language === 'es' ? 'Eliminar comentario' : 'Delete comment'}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleSaveComment}
+                    className="btn-primary"
+                    disabled={isSavingReview || !user}
+                    style={{ padding: '0.4rem 1rem', fontSize: '0.85rem' }}
+                  >
+                    {isSavingReview
+                      ? (language === 'es' ? 'Guardando...' : 'Saving...')
+                      : (language === 'es' ? 'Guardar Comentario' : 'Save Comment')
+                    }
+                  </button>
+                </div>
               </div>
 
               {/* Community Reviews List */}

@@ -22,7 +22,7 @@ def create_or_update_review(
     db: Session = Depends(get_db)
 ):
     item_type_lower = item_type.lower()
-    valid_types = {"comic", "manga", "book", "movie", "series", "game"}
+    valid_types = {"comic", "manga", "book", "movie", "series", "game", "anime", "music", "episode"}
     if item_type_lower not in valid_types:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -36,9 +36,13 @@ def create_or_update_review(
         MediaReview.external_id == external_id
     ).first()
 
+    fields_set = review_in.model_fields_set if hasattr(review_in, 'model_fields_set') else set(getattr(review_in, '__fields_set__', []))
+
     if review:
-        review.rating = review_in.rating
-        review.content = review_in.content
+        if "rating" in fields_set:
+            review.rating = review_in.rating
+        if "content" in fields_set:
+            review.content = review_in.content
         review.created_at = datetime.now(timezone.utc)
     else:
         review = MediaReview(
