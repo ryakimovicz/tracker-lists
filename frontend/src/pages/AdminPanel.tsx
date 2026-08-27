@@ -148,6 +148,37 @@ export const AdminPanel: React.FC = () => {
     }
   };
 
+  const handleCancelUserSubscription = async () => {
+    if (!selectedUser || selectedUser.is_admin || selectedUser.is_vip) return;
+    const confirmCancel = window.confirm(
+      isEs
+        ? `¿Estás seguro de que deseas cancelar la suscripción Premium de "${selectedUser.username}"? Se detendrán los cobros automáticos en Dodo Payments.`
+        : `Are you sure you want to cancel the Premium subscription for "${selectedUser.username}"? Auto-billing will be stopped in Dodo Payments.`
+    );
+    if (!confirmCancel) return;
+
+    setActionLoading(true);
+    try {
+      const res = await apiClient.post(`/admin/users/${selectedUser.id}/cancel-subscription`);
+      const updated = {
+        ...selectedUser,
+        is_pro: res.data.is_pro,
+        pro_expires_at: undefined
+      };
+      setSelectedUser(updated);
+      setUsers(prev => prev.map(u => u.id === selectedUser.id ? updated : u));
+      setModalFeedback({
+        type: 'success',
+        text: res.data.message || (isEs ? 'Suscripción cancelada.' : 'Subscription cancelled.')
+      });
+    } catch (err: any) {
+      setModalFeedback({ type: 'error', text: err.response?.data?.detail || 'Error cancelling user subscription.' });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+
   const handleSendWarning = async () => {
     if (!selectedUser || !warningMessage.trim()) return;
     setActionLoading(true);
@@ -631,11 +662,38 @@ export const AdminPanel: React.FC = () => {
                 </div>
               </div>
 
+              {/* Action 2.5: Cancelar Suscripción Premium del Usuario (Solo si tiene Pro y no es Admin ni VIP) */}
+              {selectedUser.is_pro && !selectedUser.is_admin && !selectedUser.is_vip && (
+                <div style={{ background: 'rgba(239, 68, 68, 0.04)', padding: '1rem 1.25rem', borderRadius: 12, border: '1px solid rgba(239, 68, 68, 0.25)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#ef4444' }}>
+                      <Star size={16} /> {isEs ? 'Cancelar Suscripción Premium' : 'Cancel Premium Subscription'}
+                    </div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
+                      {isEs
+                        ? 'Detiene la renovación automática en Dodo Payments y anula futuros cobros del usuario.'
+                        : 'Stops automatic renewal in Dodo Payments and prevents future billing for this user.'}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={actionLoading}
+                    onClick={handleCancelUserSubscription}
+                    className="btn-secondary"
+                    style={{ color: '#ef4444', borderColor: '#ef4444', fontSize: '0.85rem', padding: '0.45rem 1rem' }}
+                  >
+                    {isEs ? 'Cancelar Suscripción' : 'Cancel Subscription'}
+                  </button>
+                </div>
+              )}
+
               {/* Action 3: Enviar Alerta / Advertencia */}
               <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '1rem 1.25rem', borderRadius: 12, border: '1px solid var(--border-color)' }}>
                 <div style={{ fontWeight: 700, fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#f59e0b', marginBottom: '0.3rem' }}>
                   <AlertTriangle size={16} /> {isEs ? 'Enviar Alerta de Moderación' : 'Send Moderation Warning'}
                 </div>
+
                 <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
                   {isEs ? 'Muestra un banner destacado en el perfil del usuario advirtiéndole sobre alguna infracción.' : 'Displays a prominent warning banner on the user’s profile.'}
                 </div>

@@ -324,4 +324,53 @@ def admin_unsuspend_user(
     return {"message": "User suspension removed", "is_suspended": False}
 
 
+@router.post("/users/{user_id}/cancel-subscription")
+async def admin_cancel_user_subscription(
+    user_id: int,
+    current_admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    Cancels an active subscription for a specific user (only if not admin and not VIP).
+    """
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if user.is_admin:
+        raise HTTPException(status_code=400, detail="No aplica para cuentas de Administradores.")
+    if user.is_vip:
+        raise HTTPException(status_code=400, detail="No aplica para usuarios con estatus VIP.")
+
+    sub_id = user.dodo_subscription_id
+    if sub_id:
+        from app.api.v1.payments import cancel_dodo_subscription_direct
+        await cancel_dodo_subscription_direct(sub_id)
+        user.dodo_subscription_id = None
+        user.is_pro = False
+        user.pro_expires_at = None
+        trim_downgraded_user_favorites(db, user.id)
+        user.banner_url = None
+        user.background_url = None
+        user.profile_color = None
+        db.commit()
+        return {
+            "message": f"Suscripción de Dodo Payments cancelada con éxito para @{user.username}.",
+            "is_pro": check_user_is_pro(user)
+        }
+    else:
+        user.is_pro = False
+        user.pro_expires_at = None
+        trim_downgraded_user_favorites(db, user.id)
+        user.banner_url = None
+        user.background_url = None
+        user.profile_color = None
+        db.commit()
+        return {
+            "message": f"Beneficio Premium cancelado para @{user.username}.",
+            "is_pro": check_user_is_pro(user)
+        }
+
+
+
 
