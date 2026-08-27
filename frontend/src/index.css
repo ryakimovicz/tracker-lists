@@ -377,7 +377,14 @@ h1, h2, h3, h4, h5, h6 {
   transition: color 0.2s ease;
 }
 .card-series-title:hover {
-  color: var(--accent-primary);
+  color: var(--title-hover-color, var(--accent-primary)) !important;
+}
+
+.card-item-title {
+  transition: color 0.2s ease;
+}
+.activity-card:hover:not(:has(.btn-check-seen:hover)) .card-item-title {
+  color: var(--title-hover-color, var(--accent-primary));
 }
 
 .btn-check-seen {

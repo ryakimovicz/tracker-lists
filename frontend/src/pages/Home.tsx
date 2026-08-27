@@ -107,13 +107,14 @@ const CustomCard = ({
         border: `1px solid ${themeColor || "var(--border-color)"}`, borderRadius: "12px", 
         overflow: "hidden", cursor: "pointer", position: "relative",
         display: "flex", flexDirection: "column",
-        boxShadow: themeColor ? `0 0 10px ${themeColor}33` : "none"
-      }}
+        boxShadow: themeColor ? `0 0 10px ${themeColor}33` : "none",
+        "--title-hover-color": themeColor
+      } as React.CSSProperties}
       className="activity-card"
     >
       <div 
         onClick={onTitleClick ? (e) => { e.stopPropagation(); onTitleClick(e); } : undefined}
-        className={onTitleClick ? "card-series-title" : ""}
+        className={onTitleClick ? "card-series-title" : "card-item-title"}
         style={{ 
           padding: "0.5rem 0.75rem", 
           fontSize: "0.85rem", 
@@ -400,8 +401,9 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
           border: `1px solid ${themeColor || "var(--border-color)"}`, borderRadius: "12px", 
           overflow: "hidden", cursor: "pointer", position: "relative",
           display: "flex", flexDirection: "column",
-          boxShadow: themeColor ? `0 0 10px ${themeColor}33` : "none"
-        }}
+          boxShadow: themeColor ? `0 0 10px ${themeColor}33` : "none",
+          "--title-hover-color": themeColor
+        } as React.CSSProperties}
         className="activity-card"
       >
         <div 
@@ -488,20 +490,24 @@ const ActiveItemCard = ({ item, onUpdate, language, onOpenItem, themeColor, them
     onOpenItem(item);
   };
 
+  const itemThemeColor = themeColor || (item ? `var(--color-${item.item_type})` : undefined);
+
   return (
     <div 
       onClick={handleCardClick}
       style={{ 
         minWidth: "220px", maxWidth: "220px", background: "var(--bg-secondary)", 
-        border: "1px solid var(--border-color)", borderRadius: "12px", 
+        border: `1px solid ${itemThemeColor || "var(--border-color)"}`, borderRadius: "12px", 
         overflow: "hidden", cursor: "pointer", position: "relative",
-        display: "flex", flexDirection: "column"
-      }}
+        display: "flex", flexDirection: "column",
+        boxShadow: itemThemeColor ? `0 0 10px ${itemThemeColor}33` : "none",
+        "--title-hover-color": itemThemeColor
+      } as React.CSSProperties}
       className="activity-card"
     >
       <div 
         onClick={(e) => { e.stopPropagation(); onOpenItem(item); }}
-        className="card-series-title"
+        className="card-item-title"
         style={{ padding: "0.5rem 0.75rem", fontSize: "0.85rem", fontWeight: 600, borderBottom: "1px solid var(--border-color)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between" }}
       >
         <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{item.title}</span>
