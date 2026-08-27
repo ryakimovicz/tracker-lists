@@ -28,32 +28,42 @@ export const BrandLogo: React.FC = () => {
     timeoutsRef.current = [];
   };
 
-  // Run the back-and-forth wave animation
+  // Run the back-and-forth wave animation with a subtle pause on 'P'
   const runWave = () => {
     if (isHoveredRef.current) return;
     clearAllTimeouts();
 
-    // Sequence: 4(d) -> 3(h) -> 2(t) -> 1(a) -> 0(P) -> 1(a) -> 2(t) -> 3(h) -> 4(d)
-    const waveSequence = [4, 3, 2, 1, 0, 1, 2, 3, 4];
-    const stepDelay = 110; // ms per step
+    // Sequence with extra hold time on 'P' (index 0)
+    const waveTimeline: { index: number; delay: number }[] = [
+      { index: 4, delay: 0 },    // 'd' (orange)
+      { index: 3, delay: 110 },  // 'h' (red)
+      { index: 2, delay: 220 },  // 't' (purple)
+      { index: 1, delay: 330 },  // 'a' (blue)
+      { index: 0, delay: 440 },  // 'P' (green) - arrives and holds
+      { index: 1, delay: 740 },  // 'a' (blue) - returns forward after ~300ms hold on 'P'
+      { index: 2, delay: 850 },  // 't' (purple)
+      { index: 3, delay: 960 },  // 'h' (red)
+      { index: 4, delay: 1070 }, // 'd' (orange)
+    ];
 
-    waveSequence.forEach((letterIndex, step) => {
+    waveTimeline.forEach(({ index, delay }) => {
       const t = setTimeout(() => {
         if (!isHoveredRef.current) {
-          setActiveLetter(letterIndex);
+          setActiveLetter(index);
         }
-      }, step * stepDelay);
+      }, delay);
       timeoutsRef.current.push(t);
     });
 
-    // Settle back to idle resting state (d painted orange at normal position)
+    // Settle back to idle resting state (d painted orange at normal baseline position)
     const settleTimeout = setTimeout(() => {
       if (!isHoveredRef.current) {
         setActiveLetter(-1);
       }
-    }, waveSequence.length * stepDelay + 120);
+    }, 1240);
     timeoutsRef.current.push(settleTimeout);
   };
+
 
   // Schedule periodic wave every 7 seconds
   const startPeriodicWave = () => {
