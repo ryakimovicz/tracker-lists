@@ -47,22 +47,8 @@ export const GoogleUsernameModal: React.FC<GoogleUsernameModalProps> = ({
   };
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.8)',
-        backdropFilter: 'blur(8px)',
-        WebkitBackdropFilter: 'blur(8px)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 9999,
-        padding: '1rem',
-        isolation: 'isolate',
-        pointerEvents: 'auto',
-      }}
-    >
+    <div className="content-modal-overlay">
+
 
       <div
         className="modal-card"
