@@ -61,8 +61,14 @@ class CharacterService:
         if " " in query:
             variants.append(query.replace(" ", "-"))
 
-        # 3. Aliases
+        # 3. Singular / Plural logic
         q_lower = query.lower()
+        if q_lower.endswith('s') and len(q_lower) > 3:
+            variants.append(query[:-1])
+        elif not q_lower.endswith('s') and len(q_lower) >= 3:
+            variants.append(query + 's')
+
+        # 4. Aliases and franchise expansions
         if "gman" in q_lower:
             variants.append(re.sub(r'\bgman\b', 'g-man', query, flags=re.IGNORECASE))
         if "g-man" in q_lower:
@@ -73,12 +79,17 @@ class CharacterService:
             variants.append(re.sub(r'\bpacman\b', 'pac-man', query, flags=re.IGNORECASE))
 
         # Gaming franchise helpers
-        if "half" in q_lower and "life" in q_lower:
+        if q_lower == "half":
+            variants.extend(["half-life", "half life", "gordon freeman"])
+        elif "half" in q_lower and "life" in q_lower:
             variants.extend(["half-life", "half life", "half-life 2", "gordon freeman"])
-        if "hollow" in q_lower and "knight" in q_lower:
+        elif q_lower == "hollow":
+            variants.extend(["hollow knight", "silksong", "hollow knight silksong"])
+        elif "hollow" in q_lower and "knight" in q_lower:
             variants.extend(["hollow knight", "silksong", "hollow knight silksong"])
 
         return list(dict.fromkeys([v for v in variants if len(v.strip()) >= 2]))
+
 
     @classmethod
     def _search_anilist(cls, query: str) -> List[CharacterSearchResult]:
@@ -577,47 +588,53 @@ class CharacterService:
         query_norm_clean = cls._normalize_text(clean_query)
         query_norm_raw = cls._normalize_text(raw_query)
 
-        # 1. Exact normalized match on character / work name
-        if name_norm == query_norm_clean or name_norm == query_norm_raw:
-            return 5000
-        if name_norm.startswith(query_norm_clean) or name_norm.startswith(query_norm_raw):
-            return 4300
+        # Level 1: Exact normalized match on character name or work name
+        if name_norm == query_norm_raw or name_norm == query_norm_clean:
+            return 10000 + max(0, 50 - len(name_norm))
+        if origin_norm == query_norm_raw or origin_norm == query_norm_clean:
+            return 9500 + max(0, 50 - len(origin_norm))
 
-        # Exact franchise/game/show origin match (characters belonging to this searched work)
-        if origin_norm == query_norm_clean or origin_norm == query_norm_raw or origin_norm.startswith(query_norm_clean):
-            return 4850
+        # Level 2: Starts with exact search term
+        if name_norm.startswith(query_norm_raw) or name_norm.startswith(query_norm_clean):
+            return 7500 + max(0, 50 - len(name_norm))
+        if origin_norm.startswith(query_norm_raw) or origin_norm.startswith(query_norm_clean):
+            return 7000 + max(0, 50 - len(origin_norm))
 
-        # Extract normalized tokens from search query
+        # Level 3: Singular / Plural match
+        variants = [cls._normalize_text(v) for v in cls._generate_query_variants(raw_query)]
+        for v in variants:
+            if v == name_norm or v == origin_norm:
+                return 6500
+            if name_norm.startswith(v) or origin_norm.startswith(v):
+                return 6000
+
+        # Level 4: Contains query phrase anywhere
+        if query_norm_raw in name_norm or query_norm_clean in name_norm:
+            return 4500 + max(0, 30 - len(name_norm))
+        if query_norm_raw in origin_norm or query_norm_clean in origin_norm:
+            return 4000 + max(0, 30 - len(origin_norm))
+
+        # Level 5: Token matches
         clean_q_spaces = f"{clean_query} {raw_query}".replace("-", " ")
         tokens = list(dict.fromkeys([cls._normalize_text(w) for w in re.findall(r'\b[\w\'-]+\b', clean_q_spaces) if len(w) >= 2]))
         
-        if "half" in tokens and "life" in tokens:
-            tokens.append("halflife")
-        if "g" in clean_q_spaces.split() or "gman" in clean_q_spaces:
-            tokens.append("gman")
-
         name_matches = 0
         origin_matches = 0
-        
         for t in tokens:
-            if not t:
-                continue
-            if t in name_norm or name_norm.startswith(t):
+            if t in name_norm:
                 name_matches += 1
-            elif t in origin_norm or origin_norm.startswith(t):
+            if t in origin_norm:
                 origin_matches += 1
-                
-        # 2. Cross match: both character name AND game/series origin match!
+
         if name_matches > 0 and origin_matches > 0:
-            score += 4800 + (name_matches * 300) + (origin_matches * 200)
-        elif (name_matches + origin_matches) >= len(tokens) and len(tokens) > 1:
-            score += 3000
+            score += 3500 + (name_matches * 300) + (origin_matches * 200)
         elif name_matches > 0:
             score += 2000 + (name_matches * 200)
         elif origin_matches > 0:
-            score += 4200 + (origin_matches * 200)
+            score += 1800 + (origin_matches * 200)
             
         return int(score)
+
 
 
     @classmethod
@@ -717,4 +734,5 @@ class CharacterService:
                 seen_images.add(r.image_url)
                 deduped.append(r.to_dict())
 
-        return deduped[:40]
+        return deduped[:60]
+
