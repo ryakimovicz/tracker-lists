@@ -3,7 +3,8 @@ import { useTranslation } from '../context/LanguageContext';
 import { Flame, Star, Compass, Layers } from 'lucide-react';
 
 export const Landing: React.FC = () => {
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
+  const isEs = language === 'es';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '4rem', padding: '2rem 0' }}>
@@ -28,48 +29,34 @@ export const Landing: React.FC = () => {
       </section>
 
       {/* Feature Grids */}
-      <section style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-        gap: '2.5rem',
-        marginTop: '2rem'
-      }}>
-        {/* Feature 1: Universos Sin Fronteras */}
-        <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', textAlign: 'left' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <div style={{ display: 'inline-flex', padding: '0.6rem', borderRadius: '10px', background: 'rgba(124,58,237,0.1)', color: 'var(--accent-primary)' }}>
-              <Compass size={20} />
-            </div>
-            <h3 style={{ fontSize: '1.25rem', fontWeight: 600 }}>{t('featSearchTitle')}</h3>
+      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '2rem', marginTop: '2rem' }}>
+        <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div style={{ color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Compass size={28} />
+            <h3 style={{ margin: 0, fontSize: '1.25rem' }}>{t('featSearchTitle')}</h3>
           </div>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', lineHeight: '1.5' }}>
+          <p style={{ color: 'var(--text-secondary)', lineHeight: 1.6, margin: 0 }}>
             {t('featSearchDesc')}
           </p>
         </div>
 
-        {/* Feature 2: Tu Progreso, Tus Reglas */}
-        <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', textAlign: 'left' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <div style={{ display: 'inline-flex', padding: '0.6rem', borderRadius: '10px', background: 'rgba(124,58,237,0.1)', color: 'var(--accent-primary)' }}>
-              <Star size={20} />
-            </div>
-            <h3 style={{ fontSize: '1.25rem', fontWeight: 600 }}>{t('featShelfTitle')}</h3>
+        <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div style={{ color: 'var(--accent-secondary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Star size={28} />
+            <h3 style={{ margin: 0, fontSize: '1.25rem' }}>{t('featModsTitle')}</h3>
           </div>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', lineHeight: '1.5' }}>
-            {t('featShelfDesc')}
+          <p style={{ color: 'var(--text-secondary)', lineHeight: 1.6, margin: 0 }}>
+            {t('featModsDesc')}
           </p>
         </div>
 
-        {/* Feature 3: Hazlo Tuyo (Mods de la Comunidad) */}
-        <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', textAlign: 'left' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <div style={{ display: 'inline-flex', padding: '0.6rem', borderRadius: '10px', background: 'rgba(124,58,237,0.1)', color: 'var(--accent-primary)' }}>
-              <Layers size={20} />
-            </div>
-            <h3 style={{ fontSize: '1.25rem', fontWeight: 600 }}>{t('featModsTitle')}</h3>
+        <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div style={{ color: '#ec4899', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Layers size={28} />
+            <h3 style={{ margin: 0, fontSize: '1.25rem' }}>{t('featShelfTitle')}</h3>
           </div>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', lineHeight: '1.5' }}>
-            {t('featModsDesc')}
+          <p style={{ color: 'var(--text-secondary)', lineHeight: 1.6, margin: 0 }}>
+            {t('featShelfDesc')}
           </p>
         </div>
       </section>
@@ -88,19 +75,19 @@ export const Landing: React.FC = () => {
         color: 'var(--text-muted)'
       }}>
         <div>
-          © {new Date().getFullYear()} Pathd (pathd.net). All rights reserved.
+          © {new Date().getFullYear()} Pathd (pathd.net). {isEs ? 'Todos los derechos reservados.' : 'All rights reserved.'}
         </div>
         <div style={{ display: 'flex', gap: '1.5rem' }}>
           <Link to="/terms" style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>
-            Terms & APIs
+            {isEs ? 'Términos y APIs' : 'Terms & APIs'}
           </Link>
           <Link to="/privacy" style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>
-            Privacy Policy
+            {isEs ? 'Política de Privacidad' : 'Privacy Policy'}
           </Link>
         </div>
       </footer>
     </div>
   );
 };
-export default Landing;
 
+export default Landing;

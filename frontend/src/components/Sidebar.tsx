@@ -15,11 +15,13 @@ export const Sidebar: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [showProModal, setShowProModal] = useState(false);
+  const isUserLoggedIn = Boolean(user && isAuthenticated);
 
   const handleLogout = async () => {
     await logout();
     navigate('/login');
   };
+
 
   const toggleLanguage = () => {
     setLanguage(language === 'en' ? 'es' : 'en');
@@ -85,7 +87,7 @@ export const Sidebar: React.FC = () => {
       {/* Main Navigation */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1 }}>
         <NavItem to="/" icon={Home} label={t('navHome') || 'Inicio'} />
-        {isAuthenticated && (
+        {isUserLoggedIn && (
           <>
             <NavItem to="/social" icon={Users} label={t('navSocial') || 'Social'} />
             <NavItem to="/create" icon={PlusCircle} label={t('navCreate') || 'Crear'} />
@@ -98,13 +100,11 @@ export const Sidebar: React.FC = () => {
         )}
       </div>
 
-
       {/* Bottom Area */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: 'auto', paddingTop: '1.5rem', borderTop: '1px solid var(--border-color)' }}>
         
         {/* Toggles */}
         <div style={{ display: 'flex', gap: '0.5rem', padding: '0 0.5rem' }}>
-
           <button onClick={toggleLanguage} className="btn-secondary" style={{ padding: '0.4rem 0.6rem', flex: 1 }}>
             <Globe size={16} /> {language.toUpperCase()}
           </button>
@@ -113,7 +113,8 @@ export const Sidebar: React.FC = () => {
           </button>
         </div>
 
-        {isAuthenticated ? (
+        {isUserLoggedIn ? (
+
           <>
             {user && !user.is_pro && (
               <button
