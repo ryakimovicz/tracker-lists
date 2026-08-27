@@ -3,7 +3,8 @@ import { useTranslation } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
 import { getProfileTheme } from '../utils/profileThemes';
 import { apiClient } from '../api/client';
-import { Star, Heart, X, Flag, CheckCircle, Check, Plus, MoreVertical, Trash2, ArrowLeft, Clock, ChevronUp, ChevronDown, RotateCcw, BookOpen } from 'lucide-react';
+import { Star, Heart, X, Flag, CheckCircle, Check, Plus, MoreVertical, Trash2, ArrowLeft, Clock, ChevronUp, ChevronDown, RotateCcw, BookOpen, Gamepad2, Package, Sparkles, Puzzle, Layers } from 'lucide-react';
+
 
 
 import { getCachedSeries, setCachedSeries } from '../utils/seriesCache';
@@ -84,6 +85,11 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   const [hasInteractedWithTime, setHasInteractedWithTime] = useState<boolean>(false);
   const [isSavingReview, setIsSavingReview] = useState(false);
 
+  // Game relations & Navigation history
+  const [gameRelations, setGameRelations] = useState<{ collections?: any[], bundle_games?: any[], editions?: any[], dlcs?: any[], parent_game?: any } | null>(null);
+  const [isLoadingGameRelations, setIsLoadingGameRelations] = useState<boolean>(false);
+  const [historyStack, setHistoryStack] = useState<any[]>([]);
+
   const [descExpanded, setDescExpanded] = useState(false);
   const [translatedDesc, setTranslatedDesc] = useState<string | null>(null);
   const [isTranslating, setIsTranslating] = useState(false);
@@ -95,6 +101,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   const [globalProgress, setGlobalProgress] = useState<Record<string, boolean>>({});
   const [isLoadingSeasonEpisodes, setIsLoadingSeasonEpisodes] = useState(false);
   const [isLoadingMetadata, setIsLoadingMetadata] = useState(false);
+
   
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
   const [showMenu, setShowMenu] = useState(false);
@@ -498,8 +505,25 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
         setSeasons([]);
       }
 
+      // Fetch game relations (collections, DLCs, editions, base game)
+      if (item.item_type === 'game' && item.external_id) {
+        setIsLoadingGameRelations(true);
+        apiClient.get(`/search/game/${item.external_id}/relations`)
+          .then(res => {
+            setGameRelations(res.data || null);
+          })
+          .catch(e => {
+            console.error("Failed to load game relations", e);
+            setGameRelations(null);
+          })
+          .finally(() => setIsLoadingGameRelations(false));
+      } else {
+        setGameRelations(null);
+      }
+
       try {
         const res = await apiClient.get(`/reviews/${item.item_type}/${item.external_id}`);
+
         setItemReviews(res.data);
         
         if (profileId) {
@@ -811,7 +835,35 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     }
   };
 
+  const handleOpenRelatedGame = (related: any) => {
+    setHistoryStack(prev => [...prev, selectedItem]);
+    const target = {
+      external_id: String(related.external_id || related.id),
+      title: related.title,
+      image_url: related.image_url,
+      item_type: 'game'
+    };
+    if (onOpenItem) {
+      onOpenItem(target);
+    } else {
+      setSelectedItem(target);
+    }
+  };
+
+  const handleGoBackHistory = () => {
+    if (historyStack.length > 0) {
+      const prevItem = historyStack[historyStack.length - 1];
+      setHistoryStack(prev => prev.slice(0, -1));
+      if (onOpenItem) {
+        onOpenItem(prevItem);
+      } else {
+        setSelectedItem(prevItem);
+      }
+    }
+  };
+
   const handleToggleEpisode = async (listId: number, ep: any, action?: string) => {
+
     let effectiveListId = listId;
     if (!effectiveListId) {
       if (selectedItem.parent_series) {
@@ -928,47 +980,51 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                 ...(isProActive && effectiveColor ? profileTheme.modalStyles : {})
               }}
             >
-
-              {isEpisode && (
+              {/* Back Button (for episode or game history navigation) */}
+              {(isEpisode || historyStack.length > 0) && (
                 <button
                     onClick={async () => {
+                      if (historyStack.length > 0) {
+                        handleGoBackHistory();
+                        return;
+                      }
                       if (selectedItem.parent_series && selectedItem.parent_series.external_id && onOpenItem) {
                         onOpenItem(selectedItem.parent_series);
                       } else if (onOpenItem) {
                         try {
-                           if (selectedItem.list_id || selectedItem.tracking_list_id) {
-                             const libRes = await apiClient.get('/library/');
-                             const libraryItems = libRes.data || [];
-                             const parentSeriesInLib = libraryItems.find((li: any) => 
-                               (li.item_type === 'series' || li.item_type === 'anime') && 
-                               li.tracking_list_id && 
-                               (li.tracking_list_id === selectedItem.tracking_list_id || li.tracking_list_id === selectedItem.list_id)
-                             );
-                             if (parentSeriesInLib) {
-                                onOpenItem(parentSeriesInLib);
-                                return;
-                             }
-                           }
-                           
-                           const match = selectedItem.title?.match(/^(.*?)\s*-\s*S(\d+)E(\d+)/i);
-                           const seriesName = selectedItem.parent_series?.title || selectedItem.series_title || selectedItem.last_seen_episode || (match ? match[1].trim() : null);
-                           
-                           if (seriesName) {
-                              const searchRes = await apiClient.get(`/search?q=${encodeURIComponent(seriesName)}&type=series`);
-                              if (searchRes.data && searchRes.data.length > 0) {
-                                 const matchedSeries = searchRes.data[0];
-                                 const libRes2 = await apiClient.get('/library/');
-                                 const libSeries = (libRes2.data || []).find((li: any) => 
-                                    li.external_id === matchedSeries.external_id || 
-                                    ( (li.item_type === 'series' || li.item_type === 'anime') && li.title.toLowerCase() === matchedSeries.title.toLowerCase() )
-                                 );
-                                 onOpenItem(libSeries || matchedSeries);
+                            if (selectedItem.list_id || selectedItem.tracking_list_id) {
+                              const libRes = await apiClient.get('/library/');
+                              const libraryItems = libRes.data || [];
+                              const parentSeriesInLib = libraryItems.find((li: any) => 
+                                (li.item_type === 'series' || li.item_type === 'anime') && 
+                                li.tracking_list_id && 
+                                (li.tracking_list_id === selectedItem.tracking_list_id || li.tracking_list_id === selectedItem.list_id)
+                              );
+                              if (parentSeriesInLib) {
+                                 onOpenItem(parentSeriesInLib);
                                  return;
                               }
-                           }
-                           onClose();
+                            }
+                            
+                            const match = selectedItem.title?.match(/^(.*?)\s*-\s*S(\d+)E(\d+)/i);
+                            const seriesName = selectedItem.parent_series?.title || selectedItem.series_title || selectedItem.last_seen_episode || (match ? match[1].trim() : null);
+                            
+                            if (seriesName) {
+                               const searchRes = await apiClient.get(`/search?q=${encodeURIComponent(seriesName)}&type=series`);
+                               if (searchRes.data && searchRes.data.length > 0) {
+                                  const matchedSeries = searchRes.data[0];
+                                  const libRes2 = await apiClient.get('/library/');
+                                  const libSeries = (libRes2.data || []).find((li: any) => 
+                                     li.external_id === matchedSeries.external_id || 
+                                     ( (li.item_type === 'series' || li.item_type === 'anime') && li.title.toLowerCase() === matchedSeries.title.toLowerCase() )
+                                  );
+                                  onOpenItem(libSeries || matchedSeries);
+                                  return;
+                               }
+                            }
+                            onClose();
                         } catch {
-                           onClose();
+                            onClose();
                         }
                       } else {
                         onClose();
@@ -978,13 +1034,23 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                     position: 'absolute',
                     top: '1.25rem',
                     left: '1.25rem',
-                    background: 'transparent', border: 'none', color: 'var(--text-secondary)',
-                    cursor: 'pointer', padding: '0.25rem', display: 'flex', alignItems: 'center',
-                    justifyContent: 'center', borderRadius: '50%'
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid var(--border-color)',
+                    color: 'var(--text-primary)',
+                    cursor: 'pointer',
+                    padding: '0.4rem 0.6rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                    borderRadius: '8px',
+                    fontSize: '0.8rem',
+                    fontWeight: 600,
+                    zIndex: 10
                   }}
-                  title={language === 'es' ? 'Volver a la serie' : 'Back to series'}
+                  title={historyStack.length > 0 ? (language === 'es' ? 'Volver al elemento anterior' : 'Back to previous item') : (language === 'es' ? 'Volver a la serie' : 'Back to series')}
                 >
-                  <ArrowLeft size={20} />
+                  <ArrowLeft size={16} />
+                  <span>{language === 'es' ? 'Volver' : 'Back'}</span>
                 </button>
               )}
 
@@ -2453,8 +2519,314 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                 </div>
               )}
 
+              {/* Game Relations: Base Game, Collections, Editions, DLCs */}
+              {selectedItem?.item_type === 'game' && !isEpisode && (gameRelations || isLoadingGameRelations) && (
+                <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                  {isLoadingGameRelations && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                      <span className="spinner" style={{ width: '16px', height: '16px' }} />
+                      {language === 'es' ? 'Cargando contenido relacionado...' : 'Loading related content...'}
+                    </div>
+                  )}
+
+                  {/* Parent Base Game (if current item is a DLC or expansion) */}
+                  {gameRelations?.parent_game && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      <h5 style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 600 }}>
+                        <Gamepad2 size={16} color="var(--accent-primary)" />
+                        {language === 'es' ? 'Juego Base Principal' : 'Base Game'}
+                      </h5>
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => handleOpenRelatedGame(gameRelations.parent_game)}
+                        className="glass-card"
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.75rem',
+                          padding: '0.6rem 0.8rem',
+                          borderRadius: '8px',
+                          cursor: 'pointer',
+                          background: 'var(--bg-secondary)',
+                          border: '1px solid var(--border-color)',
+                          transition: 'all 0.15s ease'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.borderColor = 'var(--accent-primary)';
+                          e.currentTarget.style.transform = 'translateX(4px)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.borderColor = 'var(--border-color)';
+                          e.currentTarget.style.transform = 'translateX(0)';
+                        }}
+                      >
+                        <div style={{ width: '40px', height: '52px', borderRadius: '4px', overflow: 'hidden', background: '#111', flexShrink: 0 }}>
+                          {gameRelations.parent_game.image_url ? (
+                            <img src={gameRelations.parent_game.image_url} alt={gameRelations.parent_game.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          ) : (
+                            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Gamepad2 size={18} /></div>
+                          )}
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                          <span style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                            {gameRelations.parent_game.title}
+                          </span>
+                          {gameRelations.parent_game.release_year && (
+                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                              {gameRelations.parent_game.release_year}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Bundle Games (if current item is a collection or bundle) */}
+                  {gameRelations?.bundle_games && gameRelations.bundle_games.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      <h5 style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 600 }}>
+                        <Package size={16} color="#10b981" />
+                        {language === 'es' ? 'Juegos y Contenido de esta Colección' : 'Games in this Collection'}
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400 }}>({gameRelations.bundle_games.length})</span>
+                      </h5>
+                      <div style={{ display: 'flex', gap: '0.65rem', overflowX: 'auto', paddingBottom: '0.4rem' }}>
+                        {gameRelations.bundle_games.map((g: any) => (
+                          <div
+                            key={g.id || g.external_id}
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => handleOpenRelatedGame(g)}
+                            className="glass-card"
+                            style={{
+                              minWidth: '120px',
+                              maxWidth: '120px',
+                              padding: '0.4rem',
+                              borderRadius: '8px',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '0.35rem',
+                              transition: 'transform 0.15s ease, border-color 0.15s ease',
+                              border: '1px solid var(--border-color)',
+                              background: 'var(--bg-secondary)',
+                              flexShrink: 0
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.transform = 'translateY(-2px)';
+                              e.currentTarget.style.borderColor = 'var(--accent-primary)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.transform = 'translateY(0)';
+                              e.currentTarget.style.borderColor = 'var(--border-color)';
+                            }}
+                          >
+                            <div style={{ width: '100%', height: '140px', borderRadius: '6px', overflow: 'hidden', background: '#111', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              {g.image_url ? (
+                                <img src={g.image_url} alt={g.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              ) : (
+                                <Gamepad2 size={24} color="var(--text-muted)" />
+                              )}
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+                              <span style={{ fontSize: '0.76rem', fontWeight: 600, color: 'var(--text-primary)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: '1.2' }}>
+                                {g.title}
+                              </span>
+                              {g.release_year && (
+                                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{g.release_year}</span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Collections Containing This Game */}
+                  {gameRelations?.collections && gameRelations.collections.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      <h5 style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 600 }}>
+                        <Layers size={16} color="#3b82f6" />
+                        {language === 'es' ? 'Incluido en Colecciones y Trilogías' : 'Included in Collections & Bundles'}
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400 }}>({gameRelations.collections.length})</span>
+                      </h5>
+                      <div style={{ display: 'flex', gap: '0.65rem', overflowX: 'auto', paddingBottom: '0.4rem' }}>
+                        {gameRelations.collections.map((g: any) => (
+                          <div
+                            key={g.id || g.external_id}
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => handleOpenRelatedGame(g)}
+                            className="glass-card"
+                            style={{
+                              minWidth: '120px',
+                              maxWidth: '120px',
+                              padding: '0.4rem',
+                              borderRadius: '8px',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '0.35rem',
+                              transition: 'transform 0.15s ease, border-color 0.15s ease',
+                              border: '1px solid var(--border-color)',
+                              background: 'var(--bg-secondary)',
+                              flexShrink: 0
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.transform = 'translateY(-2px)';
+                              e.currentTarget.style.borderColor = 'var(--accent-primary)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.transform = 'translateY(0)';
+                              e.currentTarget.style.borderColor = 'var(--border-color)';
+                            }}
+                          >
+                            <div style={{ width: '100%', height: '140px', borderRadius: '6px', overflow: 'hidden', background: '#111', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              {g.image_url ? (
+                                <img src={g.image_url} alt={g.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              ) : (
+                                <Package size={24} color="var(--text-muted)" />
+                              )}
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+                              <span style={{ fontSize: '0.76rem', fontWeight: 600, color: 'var(--text-primary)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: '1.2' }}>
+                                {g.title}
+                              </span>
+                              {g.release_year && (
+                                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{g.release_year}</span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Editions and Versions */}
+                  {gameRelations?.editions && gameRelations.editions.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      <h5 style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 600 }}>
+                        <Sparkles size={16} color="#f59e0b" />
+                        {language === 'es' ? 'Distintas Ediciones y Versiones' : 'Editions & Alternative Versions'}
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400 }}>({gameRelations.editions.length})</span>
+                      </h5>
+                      <div style={{ display: 'flex', gap: '0.65rem', overflowX: 'auto', paddingBottom: '0.4rem' }}>
+                        {gameRelations.editions.map((g: any) => (
+                          <div
+                            key={g.id || g.external_id}
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => handleOpenRelatedGame(g)}
+                            className="glass-card"
+                            style={{
+                              minWidth: '120px',
+                              maxWidth: '120px',
+                              padding: '0.4rem',
+                              borderRadius: '8px',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '0.35rem',
+                              transition: 'transform 0.15s ease, border-color 0.15s ease',
+                              border: '1px solid var(--border-color)',
+                              background: 'var(--bg-secondary)',
+                              flexShrink: 0
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.transform = 'translateY(-2px)';
+                              e.currentTarget.style.borderColor = 'var(--accent-primary)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.transform = 'translateY(0)';
+                              e.currentTarget.style.borderColor = 'var(--border-color)';
+                            }}
+                          >
+                            <div style={{ width: '100%', height: '140px', borderRadius: '6px', overflow: 'hidden', background: '#111', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              {g.image_url ? (
+                                <img src={g.image_url} alt={g.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              ) : (
+                                <Sparkles size={24} color="var(--text-muted)" />
+                              )}
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+                              <span style={{ fontSize: '0.76rem', fontWeight: 600, color: 'var(--text-primary)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: '1.2' }}>
+                                {g.title}
+                              </span>
+                              {g.release_year && (
+                                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{g.release_year}</span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* DLCs & Expansions */}
+                  {gameRelations?.dlcs && gameRelations.dlcs.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      <h5 style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 600 }}>
+                        <Puzzle size={16} color="#8b5cf6" />
+                        {language === 'es' ? 'Expansiones y DLCs' : 'Expansions & DLCs'}
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400 }}>({gameRelations.dlcs.length})</span>
+                      </h5>
+                      <div style={{ display: 'flex', gap: '0.65rem', overflowX: 'auto', paddingBottom: '0.4rem' }}>
+                        {gameRelations.dlcs.map((g: any) => (
+                          <div
+                            key={g.id || g.external_id}
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => handleOpenRelatedGame(g)}
+                            className="glass-card"
+                            style={{
+                              minWidth: '120px',
+                              maxWidth: '120px',
+                              padding: '0.4rem',
+                              borderRadius: '8px',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '0.35rem',
+                              transition: 'transform 0.15s ease, border-color 0.15s ease',
+                              border: '1px solid var(--border-color)',
+                              background: 'var(--bg-secondary)',
+                              flexShrink: 0
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.transform = 'translateY(-2px)';
+                              e.currentTarget.style.borderColor = 'var(--accent-primary)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.transform = 'translateY(0)';
+                              e.currentTarget.style.borderColor = 'var(--border-color)';
+                            }}
+                          >
+                            <div style={{ width: '100%', height: '140px', borderRadius: '6px', overflow: 'hidden', background: '#111', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              {g.image_url ? (
+                                <img src={g.image_url} alt={g.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              ) : (
+                                <Puzzle size={24} color="var(--text-muted)" />
+                              )}
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+                              <span style={{ fontSize: '0.76rem', fontWeight: 600, color: 'var(--text-primary)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: '1.2' }}>
+                                {g.title}
+                              </span>
+                              {g.release_year && (
+                                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{g.release_year}</span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Comment write area */}
               <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+
                 <h4 style={{ margin: 0, fontSize: '1.1rem' }}>{language === 'es' ? 'Escribe tu reseña o comentario' : 'Write your review or comment'}</h4>
                 <textarea
                   className="input-field"

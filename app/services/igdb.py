@@ -78,10 +78,11 @@ class IGDBService:
                     if not data:
                         return []
 
-                    # Smart sorting: Prioritize main games, remakes, remasters, and popular titles over DLCs/skins
+                    # Smart sorting: Collections first, then Main Games, then Expansions, then DLCs/Skins
                     import re
                     q_lower = query.lower().strip()
                     dlc_keywords = ["skin", "skins", "pack", "dlc", "soundtrack", "season pass", "costume", "expansion pack", "avatar", "theme", "wallpaper"]
+                    bundle_keywords = ["collection", "trilogy", "bundle", "anthology", "compilation", "saga", "duology"]
 
                     def calculate_score(item):
                         name = item.get("name", "")
@@ -90,14 +91,20 @@ class IGDBService:
                         has_parent = "parent_game" in item
                         
                         is_dlc_like = has_parent or cat in (1, 5, 13, 14) or any(re.search(rf"\b{kw}\b", name_lower) for kw in dlc_keywords)
+                        is_bundle = cat == 3 or any(re.search(rf"\b{kw}\b", name_lower) for kw in bundle_keywords)
                         
-                        # Tier 0: Standalone main games / Remakes / Remasters / Standalone Expansions
-                        if not is_dlc_like and cat in (0, 8, 9, 4, 10, None):
+                        # Tier 0: Collections and Bundles
+                        if is_bundle and not is_dlc_like:
                             tier = 0
-                        elif not is_dlc_like and cat in (2, 3, 6, 7, 11):
+                        # Tier 1: Main Games / Remakes / Remasters / Standalone Expansions / Editions
+                        elif not is_dlc_like and cat in (0, 8, 9, 4, 10, None):
                             tier = 1
-                        else:
+                        # Tier 2: Expansions / Ports / Episodes
+                        elif not is_dlc_like and cat in (2, 6, 7, 11):
                             tier = 2
+                        # Tier 3: DLCs / Skins / Packs / Mods
+                        else:
+                            tier = 3
                             
                         rating_count = item.get("rating_count") or 0
                         hypes = item.get("hypes") or 0
@@ -169,6 +176,141 @@ class IGDBService:
             return []
         return []
 
+    @classmethod
+    def get_game_relations(cls, game_id: str):
+        """
+        Fetches bidirectional relations for a game:
+        - collections/bundles containing this game
+        - bundle_games: games included in this bundle (if current item is a bundle/edition)
+        - editions: alternative versions (GOTY, remakes, remasters, version_parent)
+        - dlcs: expansions, DLCs, standalone expansions
+        - parent_game: base game (if current item is a DLC/expansion)
+        """
+        try:
+            gid = int(game_id)
+        except (ValueError, TypeError):
+            return {}
+
+        client_id = getattr(settings, "TWITCH_CLIENT_ID", None)
+        token = cls._get_access_token()
+        if not client_id or not token:
+            return {}
+
+        def format_item(item_data):
+            if not item_data or not isinstance(item_data, dict):
+                return None
+            image_url = None
+            cover = item_data.get("cover")
+            if cover and isinstance(cover, dict) and cover.get("image_id"):
+                image_url = f"https://images.igdb.com/igdb/image/upload/t_cover_big/{cover['image_id']}.jpg"
+            
+            release_date = None
+            release_ts = item_data.get("first_release_date")
+            if release_ts:
+                try:
+                    release_date = datetime.fromtimestamp(release_ts).strftime("%Y")
+                except Exception:
+                    pass
+
+            return {
+                "id": str(item_data.get("id")),
+                "external_id": str(item_data.get("id")),
+                "title": item_data.get("name") or "Untitled Game",
+                "image_url": image_url,
+                "release_year": release_date,
+                "item_type": "game"
+            }
+
+        # Query 1: Main relations of this game
+        body_main = f'''fields id, name, category,
+            bundles.id, bundles.name, bundles.cover.image_id, bundles.first_release_date,
+            dlcs.id, dlcs.name, dlcs.cover.image_id, dlcs.first_release_date,
+            expansions.id, expansions.name, expansions.cover.image_id, expansions.first_release_date,
+            standalone_expansions.id, standalone_expansions.name, standalone_expansions.cover.image_id, standalone_expansions.first_release_date,
+            parent_game.id, parent_game.name, parent_game.cover.image_id, parent_game.first_release_date,
+            version_parent.id, version_parent.name, version_parent.cover.image_id, version_parent.first_release_date,
+            remakes.id, remakes.name, remakes.cover.image_id, remakes.first_release_date,
+            remasters.id, remasters.name, remasters.cover.image_id, remasters.first_release_date;
+            where id = {gid};'''
+
+        # Query 2: Children/Members if this game is a bundle or has edition variants
+        body_children = f'''fields id, name, category, cover.image_id, first_release_date;
+            where bundles = ({gid}) | version_parent = ({gid}); limit 50;'''
+
+        relations = {
+            "collections": [],
+            "bundle_games": [],
+            "editions": [],
+            "dlcs": [],
+            "parent_game": None
+        }
+
+        try:
+            req1 = urllib.request.Request("https://api.igdb.com/v4/games", data=body_main.encode("utf-8"), headers={"Client-ID": client_id, "Authorization": f"Bearer {token}", "Accept": "application/json"})
+            with urllib.request.urlopen(req1, timeout=8) as resp1:
+                data_main = json.loads(resp1.read().decode())
+                if data_main and len(data_main) > 0:
+                    game = data_main[0]
+
+                    # Parent game (if this is a DLC or expansion)
+                    if game.get("parent_game"):
+                        relations["parent_game"] = format_item(game.get("parent_game"))
+
+                    # Collections/Bundles containing this game
+                    seen_coll = set()
+                    for b in game.get("bundles", []):
+                        item = format_item(b)
+                        if item and item["id"] not in seen_coll and item["id"] != str(gid):
+                            seen_coll.add(item["id"])
+                            relations["collections"].append(item)
+
+                    # DLCs and Expansions
+                    seen_dlcs = set()
+                    for d in game.get("dlcs", []) + game.get("expansions", []) + game.get("standalone_expansions", []):
+                        item = format_item(d)
+                        if item and item["id"] not in seen_dlcs and item["id"] != str(gid):
+                            seen_dlcs.add(item["id"])
+                            relations["dlcs"].append(item)
+
+                    # Editions / Remakes / Remasters
+                    seen_editions = set()
+                    if game.get("version_parent"):
+                        item = format_item(game.get("version_parent"))
+                        if item and item["id"] not in seen_editions and item["id"] != str(gid):
+                            seen_editions.add(item["id"])
+                            relations["editions"].append(item)
+
+                    for e in game.get("remakes", []) + game.get("remasters", []):
+                        item = format_item(e)
+                        if item and item["id"] not in seen_editions and item["id"] != str(gid):
+                            seen_editions.add(item["id"])
+                            relations["editions"].append(item)
+
+            req2 = urllib.request.Request("https://api.igdb.com/v4/games", data=body_children.encode("utf-8"), headers={"Client-ID": client_id, "Authorization": f"Bearer {token}", "Accept": "application/json"})
+            with urllib.request.urlopen(req2, timeout=8) as resp2:
+                data_children = json.loads(resp2.read().decode())
+                for child in data_children:
+                    item = format_item(child)
+                    if not item or item["id"] == str(gid):
+                        continue
+                    cat = child.get("category", 0)
+                    # If this is an edition (GOTY, Special Edition, etc.)
+                    if cat in (8, 9, 10) or "version_parent" in child or "edition" in item["title"].lower():
+                        if not any(e["id"] == item["id"] for e in relations["editions"]):
+                            relations["editions"].append(item)
+                    # If this is a DLC or expansion
+                    elif cat in (1, 2, 4, 13) or "dlc" in item["title"].lower() or "pack" in item["title"].lower():
+                        if not any(d["id"] == item["id"] for d in relations["dlcs"]):
+                            relations["dlcs"].append(item)
+                    # Otherwise it's a game in this bundle/collection
+                    else:
+                        if not any(b["id"] == item["id"] for b in relations["bundle_games"]):
+                            relations["bundle_games"].append(item)
+
+        except Exception as e:
+            print(f"IGDB Relations Error: {e}")
+
+        return relations
 
     @classmethod
     def _execute_query(cls, body: str) -> List[SearchResultItem]:
@@ -214,3 +356,4 @@ class IGDBService:
         six_months_ago = now - (180 * 86400)
         body = f'fields id, name, cover.image_id, first_release_date, summary, total_rating; where first_release_date > {six_months_ago} & first_release_date < {now} & cover != null & total_rating != null; sort total_rating desc; limit 15;'
         return cls._execute_query(body)
+

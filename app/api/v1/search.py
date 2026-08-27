@@ -543,3 +543,15 @@ def get_explore_tabs(
         descubrir=[]
     )
 
+@router.get("/game/{game_id}/relations")
+def get_game_relations(
+    game_id: str,
+    request: Request
+):
+    try:
+        return IGDBService.get_game_relations(game_id)
+    except Exception as e:
+        print(f"Error fetching game relations for {game_id}: {e}")
+        return {"collections": [], "bundle_games": [], "editions": [], "dlcs": [], "parent_game": None}
+
+
