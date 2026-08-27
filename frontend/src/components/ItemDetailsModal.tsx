@@ -3,7 +3,8 @@ import { useTranslation } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
 import { getProfileTheme } from '../utils/profileThemes';
 import { apiClient } from '../api/client';
-import { Star, Heart, X, Flag, CheckCircle, Check, Plus, MoreVertical, Trash2, ArrowLeft, Clock, ChevronUp, ChevronDown, RotateCcw } from 'lucide-react';
+import { Star, Heart, X, Flag, CheckCircle, Check, Plus, MoreVertical, Trash2, ArrowLeft, Clock, ChevronUp, ChevronDown, RotateCcw, BookOpen } from 'lucide-react';
+
 
 import { getCachedSeries, setCachedSeries } from '../utils/seriesCache';
 import { useAuth } from '../context/AuthContext';
@@ -1596,104 +1597,189 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
                   {/* Favorite toggler moved to 3-dots menu */}
 
-                  {/* Pages read input for books/comics/mangas */}
-                  {!isEpisode && selectedItem && ['book', 'comic', 'manga'].includes(selectedItem.item_type) && ['read', 'reading', 'dropped'].includes(selectedItem.status) && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.5rem' }}>
-                      <h5 style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-                        {language === 'es' ? 'Páginas leídas:' : 'Pages read:'}
-                      </h5>
-                      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                        <input
-                          type="number"
-                          className="input-field"
-                          disabled={!isOwnProfile}
-                          value={pagesReadVal}
-                          min={0}
-                          max={(totalPagesVal !== '' && totalPagesVal !== 0) ? totalPagesVal : undefined}
-                          onFocus={() => {
-                            if (pagesReadVal === 0) setPagesReadVal('');
-                          }}
-                          onBlur={() => {
-                            const finalVal = pagesReadVal === '' ? 0 : pagesReadVal;
-                            setPagesReadVal(finalVal);
-                            handleSavePagesRead(finalVal);
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              const finalVal = pagesReadVal === '' ? 0 : pagesReadVal;
-                              setPagesReadVal(finalVal);
-                              handleSavePagesRead(finalVal);
-                              (e.target as HTMLInputElement).blur();
-                            }
-                          }}
-                          onChange={(e) => {
-                            let val: number | '' = e.target.value === '' ? '' : parseInt(e.target.value) || 0;
-                            if (val !== '' && totalPagesVal !== '' && totalPagesVal !== 0 && val > totalPagesVal) {
-                              val = totalPagesVal;
-                            }
-                            setPagesReadVal(val);
-                          }}
-                          style={{
-                            padding: '0.4rem 0.8rem',
-                            fontSize: '0.85rem',
-                            background: 'var(--bg-secondary)',
-                            border: '1px solid var(--border-color)',
-                            color: 'var(--text-primary)',
-                            borderRadius: '6px',
-                            maxWidth: '100px'
-                          }}
-                        />
-                        <span style={{ color: 'var(--text-muted)' }}>{language === 'es' ? 'de' : 'of'}</span>
-                        <input
-                          type="number"
-                          className="input-field"
-                          disabled={!isOwnProfile}
-                          value={totalPagesVal}
-                          min={0}
-                          placeholder={language === 'es' ? 'Total' : 'Total'}
-                          onFocus={() => {
-                            if (totalPagesVal === 0) setTotalPagesVal('');
-                          }}
-                          onBlur={() => {
-                            const finalVal = totalPagesVal === '' ? null : totalPagesVal;
-                            setTotalPagesVal(totalPagesVal);
-                            if (selectedItem.id) {
-                              apiClient.put(`/library/${selectedItem.id}`, { total_pages: finalVal }).then(() => {
-                                setSelectedItem((prev: any) => prev ? { ...prev, total_pages: finalVal } : null);
-                                onUpdate && onUpdate();
-                              });
-                            }
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              const finalVal = totalPagesVal === '' ? null : totalPagesVal;
-                              setTotalPagesVal(totalPagesVal);
-                              if (selectedItem.id) {
-                                apiClient.put(`/library/${selectedItem.id}`, { total_pages: finalVal }).then(() => {
-                                  setSelectedItem((prev: any) => prev ? { ...prev, total_pages: finalVal } : null);
-                                  onUpdate && onUpdate();
-                                });
-                              }
-                              (e.target as HTMLInputElement).blur();
-                            }
-                          }}
-                          onChange={(e) => {
-                            const val = e.target.value === '' ? '' : parseInt(e.target.value) || 0;
-                            setTotalPagesVal(val);
-                          }}
-                          style={{
-                            padding: '0.4rem 0.8rem',
-                            fontSize: '0.85rem',
-                            background: 'var(--bg-secondary)',
-                            border: '1px solid var(--border-color)',
-                            color: 'var(--text-primary)',
-                            borderRadius: '6px',
-                            maxWidth: '100px'
-                          }}
-                        />
+                  {/* Modern & Comfortable Pages Read Picker for books, comics and mangas */}
+                  {!isEpisode && selectedItem && ['book', 'comic', 'manga'].includes(selectedItem.item_type) && (
+                    ['reading', 'dropped'].includes(selectedItem.status) || (hasInteractedWithTime && selectedItem.status === 'read')
+                  ) && (() => {
+                    const currentPages = typeof pagesReadVal === 'number' ? pagesReadVal : 0;
+                    const maxPages = (typeof totalPagesVal === 'number' && totalPagesVal > 0) ? totalPagesVal : 0;
+                    const progressPercent = maxPages > 0 ? Math.min(100, Math.round((currentPages / maxPages) * 100)) : 0;
+
+                    const handleUpdatePages = (newPages: number) => {
+                      setHasInteractedWithTime(true);
+                      let finalPages = Math.max(0, isNaN(newPages) ? 0 : newPages);
+                      if (maxPages > 0) {
+                        if (finalPages >= maxPages) {
+                          finalPages = maxPages;
+                          if (selectedItem.status !== 'read') {
+                            handleToggleStatus('read');
+                          }
+                        } else if (selectedItem.status === 'read') {
+                          handleToggleStatus('reading');
+                        }
+                      }
+                      setPagesReadVal(finalPages);
+                      handleSavePagesRead(finalPages);
+                    };
+
+                    const handleTotalPagesBlur = () => {
+                      const finalTotal = (totalPagesVal === '' || totalPagesVal === 0) ? null : totalPagesVal;
+                      setTotalPagesVal(totalPagesVal);
+                      if (selectedItem.id) {
+                        apiClient.put(`/library/${selectedItem.id}`, { total_pages: finalTotal }).then(() => {
+                          setSelectedItem((prev: any) => prev ? { ...prev, total_pages: finalTotal } : null);
+                          onUpdate && onUpdate();
+                        });
+                      }
+                    };
+
+                    return (
+                      <div style={{
+                        marginTop: '0.6rem',
+                        padding: '0.65rem 0.9rem',
+                        background: 'rgba(255, 255, 255, 0.03)',
+                        border: '1px solid var(--border-color)',
+                        borderRadius: '10px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.5rem'
+                      }}>
+                        {/* Main row: Label + [ Pages Read ] / [ Total Pages ] */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+                          <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                            <BookOpen size={15} color="var(--accent-primary)" />
+                            {language === 'es' ? 'Páginas leídas:' : 'Pages read:'}
+                          </span>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                            {/* Current Pages Input Box */}
+                            <div style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              background: 'var(--bg-secondary)',
+                              border: '1px solid var(--border-color)',
+                              borderRadius: '6px',
+                              padding: '0.2rem 0.4rem',
+                              gap: '0.2rem'
+                            }}>
+                              <input
+                                type="number"
+                                min={0}
+                                max={maxPages > 0 ? maxPages : 99999}
+                                disabled={!isOwnProfile}
+                                value={currentPages === 0 ? (pagesReadVal === '' ? '' : 0) : currentPages}
+                                placeholder="0"
+                                onFocus={() => {
+                                  if (pagesReadVal === 0) setPagesReadVal('');
+                                }}
+                                onChange={(e) => {
+                                  const val = e.target.value === '' ? '' : parseInt(e.target.value) || 0;
+                                  if (typeof val === 'number') {
+                                    handleUpdatePages(val);
+                                  } else {
+                                    setPagesReadVal('');
+                                  }
+                                }}
+                                onBlur={() => {
+                                  if (pagesReadVal === '') handleUpdatePages(0);
+                                }}
+                                onWheel={(e) => {
+                                  if (isOwnProfile) {
+                                    e.preventDefault();
+                                    handleUpdatePages(currentPages + (e.deltaY < 0 ? 1 : -1));
+                                  }
+                                }}
+                                style={{
+                                  width: '46px',
+                                  textAlign: 'center',
+                                  background: 'transparent',
+                                  border: 'none',
+                                  color: 'var(--text-primary)',
+                                  fontWeight: 700,
+                                  fontSize: '0.9rem',
+                                  outline: 'none',
+                                  padding: 0
+                                }}
+                              />
+                            </div>
+
+                            <span style={{ fontWeight: 700, color: 'var(--text-muted)' }}>/</span>
+
+                            {/* Total Pages Input Box (Editable if needed) */}
+                            <div style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              background: 'var(--bg-secondary)',
+                              border: '1px solid var(--border-color)',
+                              borderRadius: '6px',
+                              padding: '0.2rem 0.4rem',
+                              gap: '0.2rem'
+                            }}>
+                              <input
+                                type="number"
+                                min={0}
+                                max={99999}
+                                disabled={!isOwnProfile}
+                                value={totalPagesVal}
+                                placeholder={language === 'es' ? 'Total' : 'Total'}
+                                onFocus={() => {
+                                  if (totalPagesVal === 0) setTotalPagesVal('');
+                                }}
+                                onChange={(e) => {
+                                  const val = e.target.value === '' ? '' : parseInt(e.target.value) || 0;
+                                  setTotalPagesVal(val);
+                                }}
+                                onBlur={handleTotalPagesBlur}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    handleTotalPagesBlur();
+                                    (e.target as HTMLInputElement).blur();
+                                  }
+                                }}
+                                style={{
+                                  width: '46px',
+                                  textAlign: 'center',
+                                  background: 'transparent',
+                                  border: 'none',
+                                  color: totalPagesVal ? 'var(--text-primary)' : 'var(--text-muted)',
+                                  fontWeight: 700,
+                                  fontSize: '0.9rem',
+                                  outline: 'none',
+                                  padding: 0
+                                }}
+                              />
+                              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                                {language === 'es' ? 'págs' : 'pages'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Subtle Progress Slider when Total Pages is Known */}
+                        {isOwnProfile && maxPages > 0 && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.1rem' }}>
+                            <input
+                              type="range"
+                              min={0}
+                              max={maxPages}
+                              value={currentPages}
+                              onChange={(e) => handleUpdatePages(parseInt(e.target.value) || 0)}
+                              style={{
+                                width: '100%',
+                                accentColor: 'var(--accent-primary)',
+                                cursor: 'pointer',
+                                height: '5px'
+                              }}
+                            />
+                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', minWidth: '35px', textAlign: 'right' }}>
+                              {progressPercent}%
+                            </span>
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  )}
+                    );
+                  })()}
+
 
                   {/* Clean & Comfortable Hours and Minutes Picker */}
                   {!isEpisode && selectedItem && ( 
