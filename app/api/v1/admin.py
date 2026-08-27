@@ -239,8 +239,15 @@ def admin_grant_pro(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
+    if user.is_admin or user.is_vip:
+        raise HTTPException(
+            status_code=400,
+            detail="Los administradores y usuarios VIP ya poseen todos los beneficios de Premium de forma permanente."
+        )
+    
     if req.months <= 0:
         raise HTTPException(status_code=400, detail="Months must be greater than 0")
+
 
     now = datetime.now(timezone.utc)
     base_time = now

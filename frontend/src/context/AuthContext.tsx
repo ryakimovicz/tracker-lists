@@ -45,9 +45,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const resp = await apiClient.get('/users/me');
       const userData = {
         ...resp.data,
-        is_pro: Boolean(resp.data.is_pro || resp.data.is_admin)
+        is_pro: Boolean(resp.data.is_pro || resp.data.is_admin || resp.data.is_vip)
       };
       setUser(userData);
+
       window.dispatchEvent(new CustomEvent('profile-updated', { detail: userData }));
     } catch (err) {
       setUser(null);

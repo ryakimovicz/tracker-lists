@@ -703,65 +703,71 @@ export const AdminPanel: React.FC = () => {
               </div>
 
               {/* Action 2: Regalar Premium con input numérico manual */}
-              <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '1rem 1.25rem', borderRadius: 12, border: '1px solid var(--border-color)' }}>
+              <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '1rem 1.25rem', borderRadius: 12, border: '1px solid var(--border-color)', opacity: (selectedUser.is_admin || selectedUser.is_vip) ? 0.7 : 1 }}>
                 <div style={{ fontWeight: 700, fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#f59e0b', marginBottom: '0.3rem' }}>
                   <Gift size={16} /> {isEs ? 'Regalar Suscripción Premium' : 'Gift Premium Access'}
                 </div>
-                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
-                  {selectedUser.pro_expires_at
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: (!selectedUser.is_admin && !selectedUser.is_vip) ? '0.75rem' : '0' }}>
+                  {selectedUser.is_admin
+                    ? (isEs ? 'Los administradores ya poseen todos los beneficios de Premium de forma permanente.' : 'Admins already possess all Premium perks permanently.')
+                    : selectedUser.is_vip
+                    ? (isEs ? 'Los usuarios VIP ya poseen todos los beneficios de Premium de forma gratuita.' : 'VIP users already possess all Premium perks for free.')
+                    : selectedUser.pro_expires_at
                     ? (isEs ? `Actualmente tiene Premium hasta el ${new Date(selectedUser.pro_expires_at).toLocaleDateString()}` : `Currently has Premium until ${new Date(selectedUser.pro_expires_at).toLocaleDateString()}`)
                     : (isEs ? 'Ingresa la cantidad exacta de meses que deseas otorgar:' : 'Enter the exact amount of months you want to gift:')}
                 </div>
 
-                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                  {/* Preset quick buttons */}
-                  <div style={{ display: 'flex', gap: '0.35rem' }}>
-                    {[1, 3, 6, 12].map(m => (
-                      <button
-                        key={m}
-                        type="button"
-                        onClick={() => setGiftMonths(m)}
-                        style={{
-                          background: giftMonths === m ? 'rgba(245, 158, 11, 0.2)' : 'rgba(255, 255, 255, 0.05)',
-                          border: giftMonths === m ? '1px solid #f59e0b' : '1px solid var(--border-color)',
-                          color: giftMonths === m ? '#f59e0b' : 'var(--text-secondary)',
-                          borderRadius: 6,
-                          padding: '0.3rem 0.6rem',
-                          fontSize: '0.8rem',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        {m}m
-                      </button>
-                    ))}
+                {!selectedUser.is_admin && !selectedUser.is_vip && (
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                    {/* Preset quick buttons */}
+                    <div style={{ display: 'flex', gap: '0.35rem' }}>
+                      {[1, 3, 6, 12].map(m => (
+                        <button
+                          key={m}
+                          type="button"
+                          onClick={() => setGiftMonths(m)}
+                          style={{
+                            background: giftMonths === m ? 'rgba(245, 158, 11, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                            border: giftMonths === m ? '1px solid #f59e0b' : '1px solid var(--border-color)',
+                            color: giftMonths === m ? '#f59e0b' : 'var(--text-secondary)',
+                            borderRadius: 6,
+                            padding: '0.3rem 0.6rem',
+                            fontSize: '0.8rem',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {m}m
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Manual input */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flex: 1, minWidth: 140 }}>
+                      <input
+                        type="number"
+                        min={1}
+                        max={120}
+                        value={giftMonths}
+                        onChange={e => setGiftMonths(Math.max(1, parseInt(e.target.value) || 1))}
+                        className="input-field"
+                        style={{ width: '70px', padding: '0.4rem 0.6rem', fontSize: '0.85rem', textAlign: 'center' }}
+                      />
+                      <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{isEs ? 'meses' : 'months'}</span>
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={actionLoading || giftMonths <= 0}
+                      onClick={handleGiftPro}
+                      className="btn-primary"
+                      style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', fontSize: '0.85rem', padding: '0.45rem 1.2rem', whiteSpace: 'nowrap' }}
+                    >
+                      {isEs ? 'Regalar' : 'Gift Pro'}
+                    </button>
                   </div>
-
-
-                  {/* Manual input */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flex: 1, minWidth: 140 }}>
-                    <input
-                      type="number"
-                      min={1}
-                      max={120}
-                      value={giftMonths}
-                      onChange={e => setGiftMonths(Math.max(1, parseInt(e.target.value) || 1))}
-                      className="input-field"
-                      style={{ width: '70px', padding: '0.4rem 0.6rem', fontSize: '0.85rem', textAlign: 'center' }}
-                    />
-                    <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{isEs ? 'meses' : 'months'}</span>
-                  </div>
-
-                  <button
-                    type="button"
-                    disabled={actionLoading || giftMonths <= 0}
-                    onClick={handleGiftPro}
-                    className="btn-primary"
-                    style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', fontSize: '0.85rem', padding: '0.45rem 1.2rem', whiteSpace: 'nowrap' }}
-                  >
-                    {isEs ? 'Regalar' : 'Gift Pro'}
-                  </button>
-                </div>
+                )}
               </div>
+
 
               {/* Action 2.5: Cancelar Suscripción Premium del Usuario (Solo si tiene Pro y no es Admin ni VIP) */}
               {selectedUser.is_pro && !selectedUser.is_admin && !selectedUser.is_vip && (
