@@ -3038,15 +3038,9 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                   </a>
                 )}
                 {selectedItem.item_type === 'anime' && (
-                  (selectedItem.external_id || '').startsWith('tvm-') ? (
-                    <a href="https://www.tvmaze.com" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}>
-                      TVMaze
-                    </a>
-                  ) : (
-                    <a href="https://anilist.co" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}>
-                      AniList
-                    </a>
-                  )
+                  <a href="https://www.tvmaze.com" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}>
+                    TVMaze
+                  </a>
                 )}
                 {selectedItem.item_type === 'manga' && (
                   <a href="https://anilist.co" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}>
