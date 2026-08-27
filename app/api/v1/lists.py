@@ -1545,8 +1545,22 @@ def toggle_series_episode(
     reading_list = db.query(ReadingList).filter(ReadingList.id == list_id).first()
     if not reading_list:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="List not found")
-    if reading_list.creator_id != current_user.id:
+    
+    has_access = (reading_list.creator_id == current_user.id or getattr(current_user, 'is_admin', False))
+    if not has_access:
+        tracking_lib_item = db.query(UserLibraryItem).filter(
+            UserLibraryItem.user_id == current_user.id,
+            UserLibraryItem.tracking_list_id == list_id
+        ).first()
+        if tracking_lib_item:
+            has_access = True
+            if reading_list.creator_id != current_user.id:
+                reading_list.creator_id = current_user.id
+                db.commit()
+                
+    if not has_access:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You do not have access to this list")
+
         
     ext_id = f"tvm-ep-{ep_req.episode_id}"
     
@@ -1712,8 +1726,22 @@ def bulk_toggle_season(
     reading_list = db.query(ReadingList).filter(ReadingList.id == list_id).first()
     if not reading_list:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="List not found")
-    if reading_list.creator_id != current_user.id:
+    
+    has_access = (reading_list.creator_id == current_user.id or getattr(current_user, 'is_admin', False))
+    if not has_access:
+        tracking_lib_item = db.query(UserLibraryItem).filter(
+            UserLibraryItem.user_id == current_user.id,
+            UserLibraryItem.tracking_list_id == list_id
+        ).first()
+        if tracking_lib_item:
+            has_access = True
+            if reading_list.creator_id != current_user.id:
+                reading_list.creator_id = current_user.id
+                db.commit()
+                
+    if not has_access:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+
         
     lib_item = db.query(UserLibraryItem).filter(
         UserLibraryItem.user_id == current_user.id,
