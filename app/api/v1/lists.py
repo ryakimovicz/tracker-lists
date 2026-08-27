@@ -120,11 +120,36 @@ def get_list_details(
 
     # Access checks
     if reading_list.visibility in (VisibilityEnum.PRIVATE, VisibilityEnum.DRAFT):
-        if not current_user or reading_list.creator_id != current_user.id:
+        has_access = False
+        if current_user:
+            if reading_list.creator_id == current_user.id or getattr(current_user, 'is_admin', False):
+                has_access = True
+            else:
+                # Check if this list belongs to a library item tracking card of the user
+                tracking_lib_item = db.query(UserLibraryItem).filter(
+                    UserLibraryItem.user_id == current_user.id,
+                    UserLibraryItem.tracking_list_id == list_id
+                ).first()
+                if tracking_lib_item:
+                    has_access = True
+                    if reading_list.creator_id != current_user.id:
+                        reading_list.creator_id = current_user.id
+                        db.commit()
+        if not has_access:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You do not have access to this list"
             )
+
+    # Auto-heal creator_id if orphaned tracking list
+    if current_user and reading_list.creator_id is None:
+        tracking_lib_item = db.query(UserLibraryItem).filter(
+            UserLibraryItem.user_id == current_user.id,
+            UserLibraryItem.tracking_list_id == list_id
+        ).first()
+        if tracking_lib_item:
+            reading_list.creator_id = current_user.id
+            db.commit()
 
     # Check if saved by current user
     is_saved_by_me = False
@@ -134,6 +159,7 @@ def get_list_details(
             SavedList.list_id == list_id
         ).first()
         is_saved_by_me = saved_record is not None
+
     
     creator = db.query(User).filter(User.id == reading_list.creator_id).first() if reading_list.creator_id else None
     creator_username = creator.username if creator else "Comunidad de Pathd"

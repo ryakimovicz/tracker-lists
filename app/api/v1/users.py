@@ -44,6 +44,18 @@ def get_user_dashboard(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    # Auto-repair creator_id for any tracking lists owned by current_user
+    db.execute(text("""
+        UPDATE reading_lists 
+        SET creator_id = :uid 
+        WHERE id IN (
+            SELECT tracking_list_id 
+            FROM user_library_items 
+            WHERE user_id = :uid AND tracking_list_id IS NOT NULL
+        ) AND (creator_id IS NULL OR creator_id != :uid)
+    """), {"uid": current_user.id})
+    db.commit()
+
     # Fetch lists created by the user (exclude personal trackers from the dashboard guides)
     tracker_list_ids_query = db.query(UserLibraryItem.tracking_list_id).filter(
         UserLibraryItem.user_id == current_user.id,
@@ -55,6 +67,7 @@ def get_user_dashboard(
         ReadingList.creator_id == current_user.id,
         ~ReadingList.id.in_(tracker_list_ids_query)
     ).order_by(ReadingList.created_at.asc()).all()
+
     
     created_lists = []
     for idx, rl in enumerate(raw_created_lists):
