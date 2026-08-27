@@ -57,9 +57,9 @@ class IGDBService:
                 )
             ]
 
-        # IGDB Apicalypse query
+        # IGDB Apicalypse query with metadata for smart ranking
         safe_query = query.replace('"', '\\"')
-        body = f'search "{safe_query}"; fields id, name, cover.image_id, first_release_date, summary, total_rating, themes, age_ratings.rating; limit 15;'
+        body = f'search "{safe_query}"; fields id, name, category, parent_game, version_parent, cover.image_id, first_release_date, summary, total_rating, rating_count, hypes, follows, themes, age_ratings.rating; limit 100;'
         
         req = urllib.request.Request(
             "https://api.igdb.com/v4/games",
@@ -75,8 +75,50 @@ class IGDBService:
             with urllib.request.urlopen(req, timeout=8) as response:
                 if response.status == 200:
                     data = json.loads(response.read().decode())
+                    if not data:
+                        return []
+
+                    # Smart sorting: Prioritize main games, remakes, remasters, and popular titles over DLCs/skins
+                    import re
+                    q_lower = query.lower().strip()
+                    dlc_keywords = ["skin", "skins", "pack", "dlc", "soundtrack", "season pass", "costume", "expansion pack", "avatar", "theme", "wallpaper"]
+
+                    def calculate_score(item):
+                        name = item.get("name", "")
+                        name_lower = name.lower().strip()
+                        cat = item.get("category", 0)
+                        has_parent = "parent_game" in item
+                        
+                        is_dlc_like = has_parent or cat in (1, 5, 13, 14) or any(re.search(rf"\b{kw}\b", name_lower) for kw in dlc_keywords)
+                        
+                        # Tier 0: Standalone main games / Remakes / Remasters / Standalone Expansions
+                        if not is_dlc_like and cat in (0, 8, 9, 4, 10, None):
+                            tier = 0
+                        elif not is_dlc_like and cat in (2, 3, 6, 7, 11):
+                            tier = 1
+                        else:
+                            tier = 2
+                            
+                        rating_count = item.get("rating_count") or 0
+                        hypes = item.get("hypes") or 0
+                        follows = item.get("follows") or 0
+                        total_rating = item.get("total_rating") or 0
+                        
+                        # Exact or prefix match bonus
+                        exact_boost = 500 if name_lower == q_lower else (150 if name_lower.startswith(q_lower) else 0)
+                        
+                        # Cover & release date bonus
+                        cover_boost = 100 if item.get("cover") else -200
+                        has_date_boost = 50 if item.get("first_release_date") else -50
+                        has_summary_boost = 30 if item.get("summary") else 0
+                        
+                        pop_score = (rating_count * 5) + (hypes * 3) + (follows * 3) + (total_rating / 5.0) + exact_boost + cover_boost + has_date_boost + has_summary_boost
+                        return (tier, -pop_score)
+
+                    sorted_items = sorted(data, key=calculate_score)
+
                     results = []
-                    for item in data:
+                    for item in sorted_items:
                         image_url = None
                         cover = item.get("cover")
                         if cover and cover.get("image_id"):
@@ -126,6 +168,7 @@ class IGDBService:
             print(f"IGDB API Error: {e}")
             return []
         return []
+
 
     @classmethod
     def _execute_query(cls, body: str) -> List[SearchResultItem]:
