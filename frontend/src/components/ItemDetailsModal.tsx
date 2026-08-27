@@ -3,7 +3,8 @@ import { useTranslation } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
 import { getProfileTheme } from '../utils/profileThemes';
 import { apiClient } from '../api/client';
-import { Star, Heart, X, Flag, CheckCircle, Check, Plus, MoreVertical, Trash2, ArrowLeft } from 'lucide-react';
+import { Star, Heart, X, Flag, CheckCircle, Check, Plus, MoreVertical, Trash2, ArrowLeft, Clock, ChevronUp, ChevronDown, RotateCcw } from 'lucide-react';
+
 import { getCachedSeries, setCachedSeries } from '../utils/seriesCache';
 import { useAuth } from '../context/AuthContext';
 
@@ -1690,74 +1691,303 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                     </div>
                   )}
 
-                  {/* Hours/Minutes played/watched input for games and movies */}
-                  {!isEpisode && selectedItem && ( (selectedItem.item_type === 'game' && ['completed', 'playing', 'dropped', 'endless'].includes(selectedItem.status)) || (selectedItem.item_type === 'movie' && ['watching', 'dropped'].includes(selectedItem.status)) ) && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.5rem' }}>
-                      <h5 style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-                        {selectedItem.item_type === 'movie' 
-                          ? (language === 'es' ? 'Tiempo visto:' : 'Time watched:')
-                          : (language === 'es' ? 'Horas jugadas:' : 'Hours played:')}
-                      </h5>
-                      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                        <input
-                          key={pagesReadVal}
-                          type="text"
-                          className="input-field"
-                          disabled={!isOwnProfile}
-                          placeholder="HH:mm"
-                          defaultValue={
-                            pagesReadVal === '' || pagesReadVal === 0
-                              ? ''
-                              : `${Math.floor((pagesReadVal as number) / 60)}:${String((pagesReadVal as number) % 60).padStart(2, '0')}`
-                          }
-                          onFocus={(e) => {
-                             if (e.target.value === '0:00') {
-                                e.target.value = '';
-                             }
-                          }}
-                          onBlur={(e) => {
-                            let totalMins = 0;
-                            const val = e.target.value.trim();
-                            if (val) {
-                                if (val.includes(':')) {
-                                    const [hh, mm] = val.split(':');
-                                    totalMins = (parseInt(hh) || 0) * 60 + (parseInt(mm) || 0);
-                                } else {
-                                    totalMins = (parseInt(val) || 0) * 60;
-                                }
-                            }
-                            if (selectedItem.item_type === 'movie') {
-                                const maxMins = selectedItem.total_pages || selectedItem.page_count;
-                                if (maxMins && totalMins >= maxMins) {
-                                    totalMins = maxMins;
-                                    handleToggleStatus('completed');
-                                }
-                            }
-                            setPagesReadVal(totalMins);
-                            handleSavePagesRead(totalMins);
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                                (e.target as HTMLInputElement).blur();
-                            }
-                          }}
-                          onChange={(e) => {
-                            // Only allow numbers and colon visually
-                            e.target.value = e.target.value.replace(/[^0-9:]/g, '');
-                          }}
-                          style={{
-                            padding: '0.4rem 0.8rem',
-                            fontSize: '0.85rem',
+                  {/* Modern and intuitive Hours & Minutes Duration Picker for movies and games */}
+                  {!isEpisode && selectedItem && ( (selectedItem.item_type === 'game' && ['completed', 'playing', 'dropped', 'endless'].includes(selectedItem.status)) || (selectedItem.item_type === 'movie' && ['watching', 'dropped'].includes(selectedItem.status)) ) && (() => {
+                    const currentTotalMins = typeof pagesReadVal === 'number' ? pagesReadVal : 0;
+                    const currentHours = Math.floor(currentTotalMins / 60);
+                    const currentMinutes = currentTotalMins % 60;
+                    const maxDurationMins = selectedItem.total_pages || selectedItem.page_count || 0;
+                    const progressPercent = maxDurationMins > 0 ? Math.min(100, Math.round((currentTotalMins / maxDurationMins) * 100)) : 0;
+
+                    const updateDuration = (newTotalMins: number) => {
+                      let finalMins = Math.max(0, newTotalMins);
+                      if (selectedItem.item_type === 'movie' && maxDurationMins > 0 && finalMins >= maxDurationMins) {
+                        finalMins = maxDurationMins;
+                        handleToggleStatus('completed');
+                      }
+                      setPagesReadVal(finalMins);
+                      handleSavePagesRead(finalMins);
+                    };
+
+                    const handleHoursChange = (h: number) => {
+                      const validH = Math.max(0, isNaN(h) ? 0 : h);
+                      updateDuration(validH * 60 + currentMinutes);
+                    };
+
+                    const handleMinutesChange = (m: number) => {
+                      let validM = isNaN(m) ? 0 : m;
+                      if (validM >= 60) {
+                        updateDuration((currentHours + Math.floor(validM / 60)) * 60 + (validM % 60));
+                      } else if (validM < 0) {
+                        updateDuration(Math.max(0, currentHours * 60 + validM));
+                      } else {
+                        updateDuration(currentHours * 60 + validM);
+                      }
+                    };
+
+                    const handleAddMinutes = (delta: number) => {
+                      updateDuration(currentTotalMins + delta);
+                    };
+
+                    return (
+                      <div style={{
+                        marginTop: '0.6rem',
+                        padding: '0.75rem 1rem',
+                        background: 'rgba(255, 255, 255, 0.03)',
+                        border: '1px solid var(--border-color)',
+                        borderRadius: '12px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.6rem'
+                      }}>
+                        {/* Header with Title and Total */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <h5 style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 600 }}>
+                            <Clock size={15} color="var(--accent-primary)" />
+                            {selectedItem.item_type === 'movie' 
+                              ? (language === 'es' ? 'Tiempo visto' : 'Time watched')
+                              : (language === 'es' ? 'Horas jugadas' : 'Hours played')}
+                          </h5>
+
+                          {maxDurationMins > 0 && (
+                            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                              {language === 'es' ? 'Total:' : 'Total:'} {Math.floor(maxDurationMins / 60)}h {String(maxDurationMins % 60).padStart(2, '0')}m
+                              {progressPercent > 0 ? ` (${progressPercent}%)` : ''}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Interactive Hours & Minutes Steppers */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                          {/* Hours Stepper */}
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
                             background: 'var(--bg-secondary)',
                             border: '1px solid var(--border-color)',
-                            color: 'var(--text-primary)',
-                            borderRadius: '6px',
-                            maxWidth: '120px'
-                          }}
-                        />
+                            borderRadius: '8px',
+                            padding: '0.2rem 0.35rem',
+                            gap: '0.25rem'
+                          }}>
+                            {isOwnProfile && (
+                              <button
+                                type="button"
+                                disabled={currentHours <= 0}
+                                onClick={() => handleHoursChange(currentHours - 1)}
+                                style={{
+                                  background: 'transparent',
+                                  border: 'none',
+                                  color: currentHours <= 0 ? 'var(--text-muted)' : 'var(--text-secondary)',
+                                  padding: '0.25rem',
+                                  cursor: currentHours <= 0 ? 'default' : 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center'
+                                }}
+                                title={language === 'es' ? 'Reducir 1 hora' : 'Decrease 1 hour'}
+                              >
+                                <ChevronDown size={14} />
+                              </button>
+                            )}
+
+                            <input
+                              type="number"
+                              min={0}
+                              max={999}
+                              disabled={!isOwnProfile}
+                              value={currentHours}
+                              onChange={(e) => handleHoursChange(parseInt(e.target.value) || 0)}
+                              onWheel={(e) => {
+                                if (isOwnProfile) {
+                                  e.preventDefault();
+                                  handleHoursChange(currentHours + (e.deltaY < 0 ? 1 : -1));
+                                }
+                              }}
+                              style={{
+                                width: '38px',
+                                textAlign: 'center',
+                                background: 'transparent',
+                                border: 'none',
+                                color: 'var(--text-primary)',
+                                fontWeight: 700,
+                                fontSize: '0.95rem',
+                                outline: 'none'
+                              }}
+                            />
+                            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600, paddingRight: '0.2rem' }}>h</span>
+
+                            {isOwnProfile && (
+                              <button
+                                type="button"
+                                onClick={() => handleHoursChange(currentHours + 1)}
+                                style={{
+                                  background: 'transparent',
+                                  border: 'none',
+                                  color: 'var(--text-secondary)',
+                                  padding: '0.25rem',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center'
+                                }}
+                                title={language === 'es' ? 'Aumentar 1 hora' : 'Increase 1 hour'}
+                              >
+                                <ChevronUp size={14} />
+                              </button>
+                            )}
+                          </div>
+
+                          <span style={{ fontWeight: 700, color: 'var(--text-muted)', fontSize: '1.1rem' }}>:</span>
+
+                          {/* Minutes Stepper */}
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            background: 'var(--bg-secondary)',
+                            border: '1px solid var(--border-color)',
+                            borderRadius: '8px',
+                            padding: '0.2rem 0.35rem',
+                            gap: '0.25rem'
+                          }}>
+                            {isOwnProfile && (
+                              <button
+                                type="button"
+                                disabled={currentTotalMins <= 0}
+                                onClick={() => handleMinutesChange(currentMinutes - 1)}
+                                style={{
+                                  background: 'transparent',
+                                  border: 'none',
+                                  color: currentTotalMins <= 0 ? 'var(--text-muted)' : 'var(--text-secondary)',
+                                  padding: '0.25rem',
+                                  cursor: currentTotalMins <= 0 ? 'default' : 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center'
+                                }}
+                                title={language === 'es' ? 'Reducir 1 minuto' : 'Decrease 1 min'}
+                              >
+                                <ChevronDown size={14} />
+                              </button>
+                            )}
+
+                            <input
+                              type="number"
+                              min={0}
+                              max={59}
+                              disabled={!isOwnProfile}
+                              value={String(currentMinutes).padStart(2, '0')}
+                              onChange={(e) => handleMinutesChange(parseInt(e.target.value) || 0)}
+                              onWheel={(e) => {
+                                if (isOwnProfile) {
+                                  e.preventDefault();
+                                  handleMinutesChange(currentMinutes + (e.deltaY < 0 ? 1 : -1));
+                                }
+                              }}
+                              style={{
+                                width: '38px',
+                                textAlign: 'center',
+                                background: 'transparent',
+                                border: 'none',
+                                color: 'var(--text-primary)',
+                                fontWeight: 700,
+                                fontSize: '0.95rem',
+                                outline: 'none'
+                              }}
+                            />
+                            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600, paddingRight: '0.2rem' }}>min</span>
+
+                            {isOwnProfile && (
+                              <button
+                                type="button"
+                                onClick={() => handleMinutesChange(currentMinutes + 1)}
+                                style={{
+                                  background: 'transparent',
+                                  border: 'none',
+                                  color: 'var(--text-secondary)',
+                                  padding: '0.25rem',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center'
+                                }}
+                                title={language === 'es' ? 'Aumentar 1 minuto' : 'Increase 1 min'}
+                              >
+                                <ChevronUp size={14} />
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Quick Add Presets (+15m, +30m, Reset) */}
+                          {isOwnProfile && (
+                            <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center', marginLeft: 'auto', flexWrap: 'wrap' }}>
+                              {[15, 30].map((mins) => (
+                                <button
+                                  key={mins}
+                                  type="button"
+                                  onClick={() => handleAddMinutes(mins)}
+                                  style={{
+                                    background: 'rgba(255, 255, 255, 0.05)',
+                                    border: '1px solid var(--border-color)',
+                                    color: 'var(--text-secondary)',
+                                    borderRadius: '6px',
+                                    padding: '0.25rem 0.5rem',
+                                    fontSize: '0.75rem',
+                                    cursor: 'pointer',
+                                    fontWeight: 600
+                                  }}
+                                  title={`+${mins} ${language === 'es' ? 'minutos' : 'minutes'}`}
+                                >
+                                  +{mins}m
+                                </button>
+                              ))}
+
+                              {currentTotalMins > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => updateDuration(0)}
+                                  style={{
+                                    background: 'rgba(239, 68, 68, 0.1)',
+                                    border: '1px solid rgba(239, 68, 68, 0.25)',
+                                    color: '#ef4444',
+                                    borderRadius: '6px',
+                                    padding: '0.25rem 0.45rem',
+                                    fontSize: '0.75rem',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.2rem'
+                                  }}
+                                  title={language === 'es' ? 'Restablecer a 0' : 'Reset to 0'}
+                                >
+                                  <RotateCcw size={12} />
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Interactive Slider Bar for Movies when Total Duration is Known */}
+                        {isOwnProfile && maxDurationMins > 0 && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', marginTop: '0.2rem' }}>
+                            <input
+                              type="range"
+                              min={0}
+                              max={maxDurationMins}
+                              value={currentTotalMins}
+                              onChange={(e) => updateDuration(parseInt(e.target.value) || 0)}
+                              style={{
+                                width: '100%',
+                                accentColor: 'var(--accent-primary)',
+                                cursor: 'pointer',
+                                height: '6px'
+                              }}
+                            />
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                              <span>0:00</span>
+                              <span>{Math.floor(maxDurationMins / 60)}h {String(maxDurationMins % 60).padStart(2, '0')}m</span>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  )}
+                    );
+                  })()}
+
 
                   {/* Completion / Status Buttons */}
                   {isOwnProfile && !isEpisode && selectedItem?.item_type !== 'series' && selectedItem?.item_type !== 'anime' && (
