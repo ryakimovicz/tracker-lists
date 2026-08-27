@@ -192,6 +192,20 @@ def search_all_media(
     def calculate_score(item: SearchResultItem):
         title_clean = item.title.lower().strip()
         score = 0.0
+
+        # Game hierarchy tier boost (Collections -> Base Games -> Editions -> Expansions -> DLCs)
+        if item.item_type == "game":
+            if item.badge == "collection":
+                score += 2000.0
+            elif item.badge is None:
+                score += 1000.0
+            elif item.badge in ("edition", "remake", "remaster"):
+                score += 800.0
+            elif item.badge == "expansion":
+                score += 500.0
+            elif item.badge == "dlc":
+                score -= 2000.0
+
         if title_clean == query_clean:
             score += 100.0
         elif title_clean.startswith(query_clean):
@@ -210,6 +224,7 @@ def search_all_media(
 
     combined.sort(key=calculate_score, reverse=True)
     return combined
+
 
 @router.get("/series/{series_id}/episodes")
 def get_all_episodes(

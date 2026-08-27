@@ -81,8 +81,8 @@ class IGDBService:
                     # Smart sorting: Collections first, then Main Games, then Expansions, then DLCs/Skins
                     import re
                     q_lower = query.lower().strip()
-                    dlc_keywords = ["skin", "skins", "pack", "dlc", "soundtrack", "season pass", "costume", "expansion pack", "avatar", "theme", "wallpaper"]
-                    bundle_keywords = ["collection", "trilogy", "bundle", "anthology", "compilation", "saga", "duology"]
+                    dlc_keywords = ["skin", "skins", "pack", "dlc", "soundtrack", "season pass", "costume", "expansion pack", "avatar", "theme", "wallpaper", "challenge", "challenge map", "story pack", "bundle", "booster"]
+                    real_bundle_keywords = ["collection", "trilogy", "anthology", "saga", "duology", "compilation", "all-in-one"]
 
                     def calculate_score(item):
                         name = item.get("name", "")
@@ -90,11 +90,11 @@ class IGDBService:
                         cat = item.get("category", 0)
                         has_parent = "parent_game" in item
                         
-                        is_dlc_like = has_parent or cat in (1, 5, 13, 14) or any(re.search(rf"\b{kw}\b", name_lower) for kw in dlc_keywords)
-                        is_bundle = cat == 3 or any(re.search(rf"\b{kw}\b", name_lower) for kw in bundle_keywords)
+                        is_real_bundle = any(re.search(rf"\b{kw}\b", name_lower) for kw in real_bundle_keywords)
+                        is_dlc_like = (has_parent or cat in (1, 5, 14) or any(re.search(rf"\b{kw}\b", name_lower) for kw in dlc_keywords)) and not is_real_bundle
                         
-                        # Tier 0: Collections and Bundles
-                        if is_bundle and not is_dlc_like:
+                        # Tier 0: Real Collections and Full Game Bundles
+                        if is_real_bundle or (cat == 3 and not is_dlc_like):
                             tier = 0
                         # Tier 1: Main Games / Remakes / Remasters / Standalone Expansions / Editions
                         elif not is_dlc_like and cat in (0, 8, 9, 4, 10, None):
@@ -161,14 +161,14 @@ class IGDBService:
                         cat = item.get("category", 0)
                         item_name_lower = (item.get("name") or "").lower()
                         has_parent = "parent_game" in item
-                        is_bundle = cat == 3 or any(re.search(rf"\b{kw}\b", item_name_lower) for kw in bundle_keywords)
-                        is_dlc = has_parent or cat in (1, 5, 14) or any(re.search(rf"\b{kw}\b", item_name_lower) for kw in dlc_keywords)
+                        is_real_bundle = any(re.search(rf"\b{kw}\b", item_name_lower) for kw in real_bundle_keywords)
+                        is_dlc_like = (has_parent or cat in (1, 5, 14) or any(re.search(rf"\b{kw}\b", item_name_lower) for kw in dlc_keywords)) and not is_real_bundle
                         is_expansion = cat in (2, 4)
 
                         badge = None
-                        if is_bundle:
+                        if is_real_bundle or (cat == 3 and not is_dlc_like):
                             badge = "collection"
-                        elif is_dlc:
+                        elif is_dlc_like:
                             badge = "dlc"
                         elif is_expansion:
                             badge = "expansion"
@@ -178,6 +178,7 @@ class IGDBService:
                             badge = "remaster"
                         elif cat == 10 or "edition" in item_name_lower or "goty" in item_name_lower or "version" in item_name_lower:
                             badge = "edition"
+
 
                         results.append(
                             SearchResultItem(
