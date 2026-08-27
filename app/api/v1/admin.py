@@ -385,6 +385,101 @@ async def admin_cancel_user_subscription(
         }
 
 
+from sqlalchemy import text
+from app.core.security import create_access_token
+
+@router.post("/claim-id-one")
+def admin_claim_id_one(
+    current_admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    Safely migrates the current admin user to ID 1 in cascade across all PostgreSQL/SQLite relations.
+    """
+    if current_admin.id == 1:
+        return {"success": True, "message": "Tu usuario ya tiene el ID 1.", "new_id": 1, "access_token": None}
+    
+    # Verify ID 1 is not occupied
+    user_one = db.query(User).filter(User.id == 1).first()
+    if user_one:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"El ID 1 ya está ocupado por el usuario @{user_one.username} ({user_one.email})."
+        )
+    
+    old_id = current_admin.id
+    new_id = 1
+    
+    child_refs = [
+        ("user_library_items", "user_id"),
+        ("item_progress", "user_id"),
+        ("reading_lists", "creator_id"),
+        ("saved_lists", "user_id"),
+        ("consumptions", "user_id"),
+        ("user_activity_logs", "user_id"),
+        ("list_additions", "user_id"),
+        ("list_addition_votes", "user_id"),
+        ("user_adopted_additions", "user_id"),
+        ("list_addition_reports", "user_id"),
+        ("list_reports", "user_id"),
+        ("comments", "user_id"),
+        ("comment_votes", "user_id"),
+        ("comment_reports", "user_id"),
+        ("list_votes", "user_id"),
+        ("list_ratings", "user_id"),
+        ("media_reviews", "user_id"),
+        ("media_review_votes", "user_id"),
+        ("media_review_reports", "user_id"),
+        ("follows", "follower_id"),
+        ("follows", "followed_id"),
+    ]
+    
+    is_postgres = (db.bind.dialect.name == "postgresql") if db.bind else False
+    
+    try:
+        if is_postgres:
+            db.execute(text("SET session_replication_role = 'replica';"))
+        else:
+            db.execute(text("PRAGMA foreign_keys = OFF;"))
+            
+        # Update user
+        db.execute(text("UPDATE users SET id = :new_id WHERE id = :old_id"), {"new_id": new_id, "old_id": old_id})
+        
+        # Update child tables
+        for table, col in child_refs:
+            try:
+                db.execute(
+                    text(f"UPDATE {table} SET {col} = :new_id WHERE {col} = :old_id"),
+                    {"new_id": new_id, "old_id": old_id}
+                )
+            except Exception as table_err:
+                print(f"Notice updating {table}.{col}: {table_err}")
+                
+        if is_postgres:
+            db.execute(text("SET session_replication_role = 'origin';"))
+            try:
+                db.execute(text("SELECT setval('users_id_seq', (SELECT COALESCE(MAX(id), 1) FROM users));"))
+            except Exception:
+                pass
+        else:
+            db.execute(text("PRAGMA foreign_keys = ON;"))
+            
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error al migrar al ID 1: {str(e)}")
+        
+    # Generate fresh JWT token for user ID 1
+    new_access_token = create_access_token(data={"sub": str(new_id)})
+    return {
+        "success": True,
+        "message": f"¡Tu usuario @{current_admin.username} ahora tiene el ID 1 exitosamente!",
+        "new_id": new_id,
+        "access_token": new_access_token
+    }
+
+
+
 
 
 

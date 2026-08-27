@@ -20,10 +20,13 @@ import {
   Mail,
   User as UserIcon,
   MessageSquare,
-  FileText
+  FileText,
+  Sparkles
 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 interface AdminUser {
+
   id: number;
   username: string;
   email: string;
@@ -66,6 +69,34 @@ export const AdminPanel: React.FC = () => {
   // Feedback messages
   const [modalFeedback, setModalFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [isClaimingId, setIsClaimingId] = useState(false);
+  const [claimFeedback, setClaimFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const { user: currentUser } = useAuth();
+
+  const handleClaimIdOne = async () => {
+    const confirmAction = window.confirm(
+      isEs
+        ? "¿Deseas migrar tu cuenta de Administrador al ID 1? Todas tus guías creadas, biblioteca, favoritos y progreso se reasignarán automáticamente al ID 1 sin pérdida de datos."
+        : "Do you want to migrate your Admin account to ID 1? All your guides, library, favorites and progress will be safely remapped to ID 1."
+    );
+    if (!confirmAction) return;
+
+    setIsClaimingId(true);
+    setClaimFeedback(null);
+    try {
+      const res = await apiClient.post('/admin/claim-id-one');
+      if (res.data.access_token) {
+        localStorage.setItem('token', res.data.access_token);
+      }
+      setClaimFeedback({ type: 'success', text: res.data.message });
+      fetchUsers();
+    } catch (err: any) {
+      setClaimFeedback({ type: 'error', text: err.response?.data?.detail || 'Error al reclamar ID 1.' });
+    } finally {
+      setIsClaimingId(false);
+    }
+  };
+
 
   useEffect(() => {
     fetchUsers();
@@ -316,7 +347,70 @@ export const AdminPanel: React.FC = () => {
         </div>
       </div>
 
+      {/* Claim ID 1 Action Banner (if admin is not ID 1 and ID 1 is available) */}
+      {currentUser && currentUser.id !== 1 && (
+        <div 
+          className="glass-card" 
+          style={{ 
+            padding: '1.25rem 1.75rem', 
+            borderRadius: 14, 
+            marginBottom: '1.5rem',
+            background: 'linear-gradient(135deg, rgba(124, 58, 237, 0.12), rgba(245, 158, 11, 0.12))',
+            border: '1px solid rgba(124, 58, 237, 0.3)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '1rem',
+            flexWrap: 'wrap'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <Sparkles size={24} color="#f59e0b" style={{ flexShrink: 0 }} />
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-primary)' }}>
+                {isEs ? 'Reasignar cuenta a ID 1' : 'Reassign account to ID 1'}
+              </div>
+              <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                {isEs 
+                  ? 'El ID 1 está disponible. Puedes migrar tu usuario para ser el primer registro sin romper guías, biblioteca ni progreso.'
+                  : 'ID 1 is available. You can safely migrate your user to ID 1 without losing any guides, library or progress.'
+                }
+              </div>
+            </div>
+          </div>
+          <button 
+            onClick={handleClaimIdOne}
+            disabled={isClaimingId}
+            className="btn-primary"
+            style={{ padding: '0.5rem 1.25rem', fontSize: '0.85rem', whiteSpace: 'nowrap' }}
+          >
+            {isClaimingId 
+              ? (isEs ? 'Migrando...' : 'Migrating...') 
+              : (isEs ? '✨ Reclamar ID 1' : '✨ Claim ID 1')
+            }
+          </button>
+        </div>
+      )}
+
+      {claimFeedback && (
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: '0.5rem', 
+          padding: '0.85rem 1.25rem', 
+          borderRadius: 10, 
+          marginBottom: '1.5rem',
+          background: claimFeedback.type === 'success' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+          color: claimFeedback.type === 'success' ? '#10b981' : '#ef4444',
+          border: `1px solid ${claimFeedback.type === 'success' ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`
+        }}>
+          {claimFeedback.type === 'success' ? <CheckCircle size={18} /> : <AlertCircle size={18} />}
+          <span>{claimFeedback.text}</span>
+        </div>
+      )}
+
       {/* Users Tab */}
+
       {activeTab === 'users' && (
         <div>
           {/* Search bar and refresh */}
