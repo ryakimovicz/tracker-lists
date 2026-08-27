@@ -432,32 +432,29 @@ def update_library_item(
         
     if item_in.is_favorite is not None:
         if item_in.is_favorite and not lib_item.is_favorite:
-            # Check limits per category: 1 for free, 10 for pro/admin
-            is_pro_user = bool(getattr(current_user, 'is_pro', False) or getattr(current_user, 'is_admin', False))
-            max_limit = 10 if is_pro_user else 1
-            existing_count = db.query(UserLibraryItem).filter(
+            # Check limits per category: 1 for free, 10 for pro/admin/vip
+            is_pro_user = bool(getattr(current_user, 'is_pro', False) or getattr(current_user, 'is_admin', False) or getattr(current_user, 'is_vip', False))
+            existing_favs = db.query(UserLibraryItem).filter(
                 UserLibraryItem.user_id == current_user.id,
                 UserLibraryItem.item_type == lib_item.item_type,
                 UserLibraryItem.is_favorite == True,
                 UserLibraryItem.id != lib_item.id
-            ).count()
+            ).order_by(UserLibraryItem.updated_at.desc()).all()
             
-            if existing_count >= max_limit:
-                category_name = str(lib_item.item_type).capitalize()
-                if not is_pro_user:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"Free users can feature 1 {category_name} on their profile. Upgrade to Pathd Premium to feature up to 10!"
-                    )
-                else:
+            if is_pro_user:
+                if len(existing_favs) >= 10:
+                    category_name = str(lib_item.item_type).capitalize()
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
                         detail=f"Premium limit reached: Maximum 10 featured items allowed for {category_name}."
                     )
-
-
+            else:
+                # For free users: smoothly swap the active featured favorite
+                for old_fav in existing_favs:
+                    old_fav.is_favorite = False
                     
         lib_item.is_favorite = item_in.is_favorite
+
         lib_item.updated_at = datetime.now(timezone.utc)
         
         # Record activity log

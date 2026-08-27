@@ -435,7 +435,7 @@ export const Profile: React.FC = () => {
 
     if (!currentFav) {
       const isPro = Boolean(profile?.is_pro || currentUser?.is_pro);
-      const sameCategoryFavs = favorites.filter(f => f.item_type === targetItem.item_type);
+      const sameCategoryFavs = displayedFavorites.filter(f => f.item_type === targetItem.item_type);
       const maxAllowed = isPro ? 10 : 1;
 
       if (sameCategoryFavs.length >= maxAllowed) {
@@ -456,6 +456,7 @@ export const Profile: React.FC = () => {
         return;
       }
     }
+
 
     
     try {
@@ -1205,31 +1206,37 @@ export const Profile: React.FC = () => {
                               </div>
                             )}
                             
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleToggleFavorite(item.id, item.is_favorite);
-                              }}
-                              style={{
-                                position: 'absolute',
-                                top: '0.5rem',
-                                right: '0.5rem',
-                                background: 'rgba(9, 9, 12, 0.75)',
-                                border: 'none',
-                                borderRadius: '50%',
-                                width: '32px',
-                                height: '32px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                cursor: 'pointer',
-                                color: item.is_favorite ? 'var(--accent-primary)' : 'var(--text-secondary)',
-                                transition: 'transform 0.2s ease'
-                              }}
-                              title={language === 'es' ? 'Destacar' : 'Favorite'}
-                            >
-                              <Heart size={16} fill={item.is_favorite ? 'var(--accent-primary)' : 'none'} />
-                            </button>
+                            {(() => {
+                              const isEffectiveFav = displayedFavorites.some(df => df.id === item.id);
+                              return (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleToggleFavorite(item.id, isEffectiveFav);
+                                  }}
+                                  style={{
+                                    position: 'absolute',
+                                    top: '0.5rem',
+                                    right: '0.5rem',
+                                    background: 'rgba(9, 9, 12, 0.75)',
+                                    border: 'none',
+                                    borderRadius: '50%',
+                                    width: '32px',
+                                    height: '32px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    cursor: 'pointer',
+                                    color: isEffectiveFav ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                                    transition: 'transform 0.2s ease'
+                                  }}
+                                  title={language === 'es' ? 'Destacar' : 'Favorite'}
+                                >
+                                  <Heart size={16} fill={isEffectiveFav ? 'var(--accent-primary)' : 'none'} />
+                                </button>
+                              );
+                            })()}
+
                           </div>
                           <div style={{ flex: 1, textAlign: 'left', cursor: 'pointer' }} onClick={() => handleOpenItemDetails(item)}>
                             {(() => {
