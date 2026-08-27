@@ -1176,8 +1176,13 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
         glow: 'rgba(244, 114, 182, 0.25)'
       }
     };
-
     const cfg = colorConfig[cat] || colorConfig.movie;
+    const isLightMode = document.documentElement.getAttribute('data-theme') === 'light';
+    const bgGradient = isLightMode
+      ? `linear-gradient(180deg, ${cfg.border} 0%, rgba(255, 255, 255, 0.98) 45%)`
+      : `linear-gradient(180deg, ${cfg.border} 0%, rgba(9, 13, 22, 0.98) 45%)`;
+
+
     return {
       category: cat,
       ...cfg,
@@ -1188,7 +1193,12 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
         '--border-color': cfg.border,
         '--border-glow': cfg.glow,
         '--card-shadow': `0 20px 50px -10px ${cfg.glow}`
-      } as React.CSSProperties
+      } as React.CSSProperties,
+      modalStyles: {
+        background: bgGradient,
+        border: `1px solid ${cfg.border}`,
+        boxShadow: `0 25px 50px rgba(0,0,0,0.6), 0 0 35px ${cfg.glow}`
+      }
     };
   };
 
@@ -1207,7 +1217,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
               alignItems: 'center',
               justifyContent: 'center',
               zIndex: 2000,
-              ...(isProActive && effectiveColor ? profileTheme.cssVariables : {})
+              ...modalTheme.cssVariables
             }}
           >
             <div
@@ -1222,12 +1232,11 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                 gap: '1.5rem',
                 overflowY: 'auto',
                 textAlign: 'left',
-                border: `1px solid ${modalTheme.border}`,
-                boxShadow: `0 20px 50px -10px ${modalTheme.glow}`,
-                ...modalTheme.cssVariables,
-                ...(isProActive && effectiveColor ? profileTheme.modalStyles : {})
+                ...modalTheme.modalStyles,
+                ...modalTheme.cssVariables
               }}
             >
+
               {/* Back Button (for episode or game history navigation) */}
 
               {(isEpisode || historyStack.length > 0) && (
