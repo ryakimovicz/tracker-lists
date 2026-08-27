@@ -615,12 +615,51 @@ export const AdminPanel: React.FC = () => {
             {/* Action Sections */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
               
+              {/* Action 0: Reasignar ID de Usuario */}
+              <div style={{ background: 'rgba(124, 58, 237, 0.08)', padding: '1rem 1.25rem', borderRadius: 12, border: '1px solid rgba(124, 58, 237, 0.3)' }}>
+                <div style={{ fontWeight: 700, fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--accent-primary)', marginBottom: '0.3rem' }}>
+                  <Sparkles size={16} /> {isEs ? 'Reasignar ID de Usuario' : 'Reassign User ID'}
+                </div>
+
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
+                  {isEs 
+                    ? 'Reasigna el ID numérico de este usuario. Todas sus guías creadas, biblioteca, favoritos y progreso se actualizarán en cascada sin pérdida de datos.' 
+                    : 'Reassign this user’s numeric ID. All relational guides, library, favorites and progress will be safely remapped in cascade.'}
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flex: 1 }}>
+                    <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>ID:</span>
+                    <input
+                      type="number"
+                      min={1}
+                      value={newUserIdInput}
+                      onChange={e => setNewUserIdInput(e.target.value)}
+                      className="input-field"
+                      style={{ width: '100%', padding: '0.45rem 0.8rem', fontSize: '0.85rem' }}
+                      placeholder="Nuevo ID..."
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={actionLoading || !newUserIdInput || Number(newUserIdInput) === selectedUser.id}
+                    onClick={handleChangeUserId}
+                    className="btn-primary"
+                    style={{ fontSize: '0.85rem', padding: '0.45rem 1.25rem', whiteSpace: 'nowrap' }}
+                  >
+                    {isEs ? 'Guardar ID' : 'Save ID'}
+                  </button>
+                </div>
+              </div>
+
               {/* Action 1: VIP Toggle (Disabled on Admins) */}
               <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '1rem 1.25rem', borderRadius: 12, border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', opacity: selectedUser.is_admin ? 0.6 : 1 }}>
                 <div>
                   <div style={{ fontWeight: 700, fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#a78bfa' }}>
                     <Crown size={16} /> {isEs ? 'Estatus VIP' : 'VIP Status'}
                   </div>
+
                   <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
                     {selectedUser.is_admin
                       ? (isEs ? 'Los administradores ya poseen todos los beneficios y no requieren VIP.' : 'Admins already possess all perks and do not need VIP.')
@@ -854,46 +893,9 @@ export const AdminPanel: React.FC = () => {
                 )}
               </div>
 
-              {/* Action 5: Reasignar ID de Usuario */}
-              <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '1rem 1.25rem', borderRadius: 12, border: '1px solid var(--border-color)' }}>
-                <div style={{ fontWeight: 700, fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--accent-primary)', marginBottom: '0.3rem' }}>
-                  <Sparkles size={16} /> {isEs ? 'Reasignar ID de Usuario' : 'Reassign User ID'}
-                </div>
-
-                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
-                  {isEs 
-                    ? 'Reasigna el ID numérico de este usuario. Todas sus guías creadas, biblioteca, favoritos y progreso se actualizarán en cascada sin pérdida de datos.' 
-                    : 'Reassign this user’s numeric ID. All relational guides, library, favorites and progress will be safely remapped in cascade.'}
-                </div>
-
-                <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flex: 1 }}>
-                    <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>ID:</span>
-                    <input
-                      type="number"
-                      min={1}
-                      value={newUserIdInput}
-                      onChange={e => setNewUserIdInput(e.target.value)}
-                      className="input-field"
-                      style={{ width: '100%', padding: '0.45rem 0.8rem', fontSize: '0.85rem' }}
-                      placeholder="Nuevo ID..."
-                    />
-                  </div>
-
-                  <button
-                    type="button"
-                    disabled={actionLoading || !newUserIdInput || Number(newUserIdInput) === selectedUser.id}
-                    onClick={handleChangeUserId}
-                    className="btn-primary"
-                    style={{ fontSize: '0.85rem', padding: '0.45rem 1.25rem', whiteSpace: 'nowrap' }}
-                  >
-                    {isEs ? 'Guardar ID' : 'Save ID'}
-                  </button>
-                </div>
-              </div>
-
-              {/* Action 6: Eliminar Cuenta */}
+              {/* Action 5: Eliminar Cuenta */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '0.5rem' }}>
+
 
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                   {isEs ? 'Acción irreversible' : 'Irreversible action'}
