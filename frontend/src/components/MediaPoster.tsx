@@ -103,7 +103,15 @@ export const MediaPoster: React.FC<MediaPosterProps> = ({
     }
   };
 
-  const hasValidImage = Boolean(src && !imgError && !src.includes('photo-1543002588-bfa74002ed7e'));
+  const isGenericImage = Boolean(
+    src && (
+      src.includes('photo-1543002588-bfa74002ed7e') ||
+      src.includes('photo-1489599849927-2ee91cede3ba') ||
+      src.includes('images.unsplash.com/photo-')
+    )
+  );
+
+  const hasValidImage = Boolean(src && !imgError && !isGenericImage);
 
   if (hasValidImage) {
     return (
@@ -140,49 +148,67 @@ export const MediaPoster: React.FC<MediaPosterProps> = ({
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        justifyContent: 'center',
-        padding: '1.25rem 0.75rem',
+        justifyContent: 'space-between',
+        padding: '1.25rem 0.85rem',
         textAlign: 'center',
         boxSizing: 'border-box',
         position: 'relative',
         overflow: 'hidden',
-        boxShadow: 'inset 0 0 30px rgba(0,0,0,0.4)',
+        boxShadow: 'inset 0 0 30px rgba(0,0,0,0.5)',
         ...style
       }}
     >
+      {/* Title in top-center area */}
+      <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '44px', marginTop: '0.25rem' }}>
+        <span
+          style={{
+            color: '#f8fafc',
+            fontSize: '0.92rem',
+            fontWeight: 700,
+            lineHeight: '1.3',
+            textShadow: '0 2px 6px rgba(0,0,0,0.9)',
+            display: '-webkit-box',
+            WebkitLineClamp: 3,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+            maxWidth: '100%',
+            wordBreak: 'break-word'
+          }}
+          title={title}
+        >
+          {title}
+        </span>
+      </div>
+
+      {/* Central themed icon */}
       <div style={{
-        padding: '0.85rem',
+        padding: '0.9rem',
         borderRadius: '50%',
-        background: 'rgba(15, 23, 42, 0.7)',
+        background: 'rgba(15, 23, 42, 0.75)',
         backdropFilter: 'blur(8px)',
-        border: `1px solid ${config.color}40`,
-        marginBottom: '0.75rem',
+        border: `1px solid ${config.color}50`,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+        boxShadow: `0 4px 16px rgba(0,0,0,0.4), 0 0 12px ${config.color}25`
       }}>
         {config.icon}
       </div>
 
-      <span
-        style={{
-          color: '#f8fafc',
-          fontSize: '0.85rem',
+      {/* Bottom media label */}
+      <div style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
+        <span style={{
+          fontSize: '0.7rem',
           fontWeight: 600,
-          lineHeight: '1.25',
-          textShadow: '0 1px 4px rgba(0,0,0,0.8)',
-          display: '-webkit-box',
-          WebkitLineClamp: 3,
-          WebkitBoxOrient: 'vertical',
-          overflow: 'hidden',
-          maxWidth: '100%',
-          wordBreak: 'break-word'
-        }}
-        title={title}
-      >
-        {title}
-      </span>
+          color: config.color,
+          textTransform: 'uppercase',
+          letterSpacing: '0.05em',
+          opacity: 0.85
+        }}>
+          {config.label}
+        </span>
+      </div>
     </div>
   );
 };
+

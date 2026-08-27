@@ -603,8 +603,48 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
         setGameRelations(null);
       }
 
+      // Movie metadata enrichment (if poster is missing or placeholder)
+      if (item.item_type === 'movie') {
+        const hasPlaceholderPoster = !item.image_url || item.image_url.includes('photo-1489599849927') || item.image_url.includes('photo-1543002588');
+        const isWikiItem = item.external_id && item.external_id.startsWith('wiki_');
+
+        if (hasPlaceholderPoster || isWikiItem || !item.description) {
+          apiClient.get(`/search/?q=${encodeURIComponent(item.title)}&type=movie`)
+            .then(movieSearchRes => {
+              const matches = movieSearchRes.data || [];
+              if (matches.length > 0) {
+                const found = matches[0];
+                const validNewPoster = found.image_url && !found.image_url.includes('photo-1489599849927') && !found.image_url.includes('photo-1543002588');
+                if (validNewPoster || found.description) {
+                  setSelectedItem((prev: any) => prev ? {
+                    ...prev,
+                    image_url: validNewPoster ? found.image_url : prev.image_url,
+                    description: found.description || prev.description,
+                    release_date: found.release_date || prev.release_date,
+                    external_id: found.external_id || prev.external_id
+                  } : null);
+
+                  // If this item was in the user library, sync it permanently
+                  if (item.id && validNewPoster) {
+                    apiClient.put(`/library/${item.id}`, {
+                      image_url: found.image_url,
+                      description: found.description || item.description,
+                      release_date: found.release_date || item.release_date,
+                      external_id: found.external_id || item.external_id
+                    }).then(() => {
+                      onUpdate && onUpdate();
+                    }).catch(console.error);
+                  }
+                }
+              }
+            })
+            .catch(console.error);
+        }
+      }
+
       try {
         const res = await apiClient.get(`/reviews/${item.item_type}/${item.external_id}`);
+
 
         setItemReviews(res.data);
         
