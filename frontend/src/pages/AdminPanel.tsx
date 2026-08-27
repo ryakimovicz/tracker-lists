@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../api/client';
+
 import { useTranslation } from '../context/LanguageContext';
 import {
   ShieldAlert,
@@ -70,7 +72,8 @@ export const AdminPanel: React.FC = () => {
   // Feedback messages
   const [modalFeedback, setModalFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
-  const { user: currentUser, refreshProfile } = useAuth();
+  const { user: currentUser, logout } = useAuth();
+  const navigate = useNavigate();
 
   const handleChangeUserId = async () => {
     if (!selectedUser) return;
@@ -84,22 +87,28 @@ export const AdminPanel: React.FC = () => {
       return;
     }
 
+    const isChangingSelf = (currentUser?.id === selectedUser.id);
     const confirmChange = window.confirm(
       isEs
-        ? `¿Confirmas reasignar al usuario "${selectedUser.username}" del ID #${selectedUser.id} al nuevo ID #${targetId}? Todas sus guías, biblioteca, favoritos y progreso se reasignarán en cascada de forma segura.`
-        : `Confirm reassigning user "${selectedUser.username}" from ID #${selectedUser.id} to new ID #${targetId}? All related guides, library, favorites and progress will be safely remapped in cascade.`
+        ? `¿Confirmas reasignar al usuario "${selectedUser.username}" del ID #${selectedUser.id} al nuevo ID #${targetId}? ${isChangingSelf ? 'Al cambiar tu propio ID se cerrará tu sesión para que inicies con tus nuevos datos.' : 'Todas sus guías, biblioteca, favoritos y progreso se reasignarán en cascada de forma segura.'}`
+        : `Confirm reassigning user "${selectedUser.username}" from ID #${selectedUser.id} to new ID #${targetId}? ${isChangingSelf ? 'Changing your own ID will log you out to authenticate with new ID.' : 'All related guides, library, favorites and progress will be safely remapped in cascade.'}`
     );
     if (!confirmChange) return;
 
     setActionLoading(true);
     try {
       const res = await apiClient.post(`/admin/users/${selectedUser.id}/change-id`, { new_id: targetId });
-      if (res.data.access_token) {
-        localStorage.setItem('access_token', res.data.access_token);
-        if (refreshProfile) {
-          await refreshProfile();
-        }
+      
+      if (res.data.is_self || isChangingSelf) {
+        alert(isEs 
+          ? `¡Tu ID fue actualizado al ID #${targetId}! Tu sesión se cerrará automáticamente. Por favor inicia sesión nuevamente.`
+          : `Your user ID was updated to #${targetId}! You will be logged out. Please log in again.`
+        );
+        await logout();
+        navigate('/login');
+        return;
       }
+
       const updated = { ...selectedUser, id: targetId };
       setSelectedUser(updated);
       setUsers(prev => prev.map(u => u.id === selectedUser.id ? updated : u));
@@ -113,6 +122,7 @@ export const AdminPanel: React.FC = () => {
       setActionLoading(false);
     }
   };
+
 
 
   useEffect(() => {

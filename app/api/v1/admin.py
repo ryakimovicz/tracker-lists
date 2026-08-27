@@ -462,8 +462,8 @@ def admin_change_user_id(
         else:
             db.execute(text("PRAGMA foreign_keys = OFF;"))
             
-        # Update user
-        db.execute(text("UPDATE users SET id = :new_id WHERE id = :old_id"), {"new_id": new_id, "old_id": old_id})
+        # Update user and invalidate existing refresh session
+        db.execute(text("UPDATE users SET id = :new_id, refresh_token = NULL WHERE id = :old_id"), {"new_id": new_id, "old_id": old_id})
         
         # Update child tables
         for table, col in child_refs:
@@ -488,18 +488,14 @@ def admin_change_user_id(
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Error al cambiar el ID: {str(e)}")
-        
-    # If the user being changed is the current logged-in admin, generate a new token
-    new_access_token = None
-    if is_self:
-        new_access_token = create_access_token(subject=str(new_id))
 
     return {
         "success": True,
         "message": f"¡El usuario @{target_username} fue cambiado al ID {new_id} exitosamente!",
         "new_id": new_id,
-        "access_token": new_access_token
+        "is_self": is_self
     }
+
 
 
 
