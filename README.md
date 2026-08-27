@@ -1,6 +1,6 @@
 # Pathd 🌌
 
-**Pathd** es una plataforma premium y unificada para el seguimiento de bibliotecas personales y monitorización del consumo multimedia. Permite a los usuarios indexar, organizar y hacer seguimiento de su progreso en **libros, mangas, cómics, películas, series, animes, música y videojuegos** en una única interfaz cohesiva, complementada con modificaciones de la comunidad, guías cronológicas interactivas, planes de suscripción y un feed social en tiempo real.
+**Pathd** es una plataforma premium y unificada para el seguimiento de bibliotecas personales y monitorización del consumo multimedia. Permite a los usuarios indexar, organizar y hacer seguimiento de su progreso en **películas, series, animes, libros, cómics, mangas, música y videojuegos** en una única interfaz cohesiva, complementada con modificaciones de la comunidad, guías cronológicas interactivas, planes de suscripción, feed social en tiempo real y confirmación de cuentas por correo electrónico.
 
 ---
 
@@ -10,16 +10,17 @@
 - **Framework**: FastAPI (Python 3.11+)
 - **Base de Datos y ORM**: SQLite / PostgreSQL via SQLAlchemy
 - **Autenticación**: OAuth2 Password Bearer con JWT + cookie HttpOnly segura para renovación de token de refresco
-- **Pagos y Suscripciones**: Stripe API (Checkout Sessions, Customer Portal y Webhooks de ciclo de vida de suscripción)
+- **Email Transaccional**: Integración con **Resend API** con dominio personalizado `@pathd.net`, plantillas HTML responsivas y adaptación dinámica de idioma (Español / Inglés).
+- **Pagos y Suscripciones**: Dodo Payments / Stripe API (Checkout Sessions, Customer Portal y Webhooks de ciclo de vida de suscripción)
 - **Rate Limiting**: `slowapi` con límites por IP
-- **Tareas en Segundo Plano**: FastAPI `BackgroundTasks` (envío de emails SMTP y sincronizaciones)
+- **Tareas en Segundo Plano**: FastAPI `BackgroundTasks` (despacho asíncrono de emails y sincronizaciones)
 
 ### Frontend
 - **Framework**: React 19 + TypeScript + Vite
-- **Estilos**: Vanilla CSS con sistema de diseño premium "Galería Cultural" basado en variables CSS (Tonos Pizarra y Acentos Vibrantes), *Glassmorphism* (tarjetas translúcidas con desenfoque) y tipografía Inter.
-- **Cliente HTTP**: Axios con interceptores para renovación automática de tokens y manejo centralizado de sesiones.
+- **Estilos**: Vanilla CSS con sistema de diseño premium basado en variables CSS (**Solar Amber `#f59e0b`** y **Deep Cinema Charcoal `#090d16`**), *Glassmorphism* (tarjetas translúcidas con desenfoque de fondo) y tipografía Inter.
+- **Cliente HTTP**: Axios con interceptores para renovación automática de tokens y propagación reactiva del idioma (`Accept-Language`).
 - **Estado Global**: Contextos de React (`AuthContext`, `LanguageContext`, `ThemeContext`).
-- **Localización**: Español e Inglés, con selector dinámico persistente.
+- **Localización (i18n)**: Español e Inglés con selector dinámico persistente en navegador.
 
 ---
 
@@ -27,18 +28,18 @@
 
 | Servicio | Uso |
 |---|---|
-| [OMDb](https://www.omdbapi.com/) + [Fanart.tv](https://fanart.tv/) | Películas (con duración y sinopsis completas) y pósters en HD |
-| [TVMaze](https://www.tvmaze.com/api) | Series, animes y detalle de episodios/temporadas |
-| [Google Books](https://developers.google.com/books/docs/v1/using) + [Open Library](https://openlibrary.org/developers/api) | Libros (con tracking de páginas) |
+| [Resend](https://resend.com/) | Envío de correos transaccionales (confirmación de cuentas y recuperación de contraseñas) desde `noreply@pathd.net` |
+| [OMDb](https://www.omdbapi.com/) + [Fanart.tv](https://fanart.tv/) | Películas (con duración, director y sinopsis completas) y pósters en alta definición |
+| [TVMaze](https://www.tvmaze.com/api) | Series, animes y detalle estructurado de temporadas y episodios |
+| [Google Books](https://developers.google.com/books/docs/v1/using) + [Open Library](https://openlibrary.org/developers/api) | Libros (con tracking de páginas leídas y portadas) |
 | [Comic Vine](https://comicvine.gamespot.com/api/) | Cómics occidentales (con tracking de volúmenes y grapas) |
 | [AniList](https://graphql.anilist.co) | Mangas, novelas ligeras y one-shots (GraphQL) |
-| [IGDB](https://api-docs.igdb.com/) | Videojuegos (autenticado via Twitch OAuth2) |
+| [IGDB](https://api-docs.igdb.com/) | Videojuegos, colecciones, ediciones, DLCs y expansiones (autenticado via Twitch OAuth2) |
 | [Last.fm](https://www.last.fm/api) | Música, álbumes destacados y scrobbling en tiempo real |
-| [Wikipedia API](https://www.mediawiki.org/wiki/API:Main_page) | Calendario de estrenos de películas y sinopsis enriquecidas (CC BY-SA) |
-| [Stripe](https://stripe.com/) | Procesamiento de pagos seguros y gestión de suscripciones Premium |
-| [deep-translator](https://github.com/nidhaloff/deep-translator) (Google) | Traducción dinámica y gratuita de sinopsis con caché en base de datos |
+| [Wikipedia API](https://www.mediawiki.org/wiki/API:Main_page) | Calendario de estrenos de cine y sinopsis abiertas (CC BY-SA) |
+| [Dodo Payments](https://dodopayments.com/) / [Stripe](https://stripe.com/) | Procesamiento de pagos seguros y gestión de suscripciones Premium |
+| [deep-translator](https://github.com/nidhaloff/deep-translator) (Google) | Traducción dinámica de sinopsis con almacenamiento en caché |
 | [UptimeRobot](https://uptimerobot.com/) | Monitorización continua y mantenimiento activo 24/7 mediante `GET /health` |
-
 
 ---
 
@@ -53,67 +54,66 @@ Pathd cuenta con un sistema de roles y privilegios que personaliza la experienci
 - Acceso a la comunidad, feed social, valoraciones y reseñas.
 
 ### 👑 Pathd Premium / VIP / Admin
-- **Personalización Completa del Perfil**: Subida de banner personalizado y selección de color de acento propio que se refleja en todo el perfil y guías públicas.
+- **Personalización Completa del Perfil**: Subida de avatar, banner y fondo de pantalla personalizado, además de selección de color de acento propio.
 - **Hasta 70 Obras Destacadas**: Expansión del escaparate de favoritos en el perfil.
 - **Guías Privadas y No Listadas**: Creación de guías cronológicas secretas o accesibles solo mediante enlace directo.
 - **Creación Ilimitada de Guías**: Sin límite en la cantidad de guías activas.
-- **Estatus VIP**: Rol especial otorgado por administradores que desbloquea todas las funciones Premium gratis y de por vida, con insignia VIP exclusiva.
+- **Estatus VIP**: Rol especial otorgado por administradores que desbloquea todas las funciones Premium gratis y de por vida, con insignia VIP dorada exclusiva.
 - **Administradores**: Acceso al panel de administración y privilegios Premium permanentes.
 
 ---
 
-## 📖 Secciones del Frontend
+## 📖 Secciones del Frontend y Características Principales
 
-La interfaz está estructurada en **secciones principales** accesibles desde la barra lateral (Sidebar):
+### 🏠 Home (Inicio y Seguimiento)
+Centro de control personal del usuario dividido en 5 pestañas:
+- **Continuar**: Series y animes en progreso (muestran el siguiente episodio por ver con botón `✓`), libros/cómics (con páginas leídas y barra de progreso reactiva), y juegos y películas (con tiempo consumido en horas y minutos).
+- **No comenzado**: Obras pendientes (*Plan to watch/read/play*).
+- **Terminado**: Obras completadas, mostrando métricas finales de tiempo, páginas o episodios.
+- **Abandonado**: Obras dejadas a medias con registro del momento de abandono.
+- **Actualizaciones**: Cambios y nuevos ítems agregados en las guías seguidas.
 
-### 🏠 Home (Inicio)
-Centro de control personal del usuario dividido en 4 pestañas:
-- **Continuar**: Series y animes en progreso (muestran el siguiente episodio por ver con botón `✓`), libros/cómics (muestran páginas leídas), y juegos y películas (muestran tiempo activo en horas y minutos). También incluye el progreso activo en guías cronológicas.
-- **No comenzado**: Obras pendientes (Plan to watch/read/play).
-- **Terminado**: Obras completadas. Muestra directamente el total de páginas, duración en minutos o horas jugadas en lugar del estado.
-- **Abandonado**: Obras dejadas a medias, detallando el progreso hasta el momento del abandono.
-- **Actualizaciones**: Cambios recientes en las guías seguidas.
+### 🎮 Explorador de Videojuegos y Jerarquías (IGDB)
+- **Ranking Inteligente por Tiers**: Priorización en búsquedas de **Colecciones y Trilogías (Tier 0)** ➔ **Juegos Base (Tier 1)** ➔ **Ediciones Especiales y GOTY (Tier 2)** ➔ **Expansiones (Tier 3)** ➔ **DLCs y Packs cosméticos (Tier 4)**.
+- **Exploración Bidireccional en Modal**: Permite navegar interactivamente entre una Colección, sus Juegos Base, sus Ediciones y sus DLCs con historial de navegación y botón de retroceso `← Volver`.
+- **Botones de Desplazamiento Lateral (`ModalScrollRow`)**: Carruseles fluidos con botones circulares de navegación en modales sin barras de scroll nativas.
+- **Etiquetas Visuales sobre Portadas**: Badges estilo cristal en las portadas de búsqueda (`📦 Colección`, `🧩 DLC`, `⚡ Expansión`, `🌟 Edición`, `🔨 Remake`, `✨ Remaster`).
 
-### 📱 Social (Feed)
-Timeline comunitaria unificada:
-- **Muro Cronológico**: Feed que agrupa en tiempo real la actividad de la comunidad (nuevas guías, ítems marcados, progreso, votos, finalizaciones) ordenado cronológicamente.
-- **Interacciones**: Votos, comentarios y reportes en guías y opiniones.
+### ⏱️ Selectores Interactivos de Tiempo y Páginas
+- **Selector de Tiempo en Línea (`[ HH ] h : [ MM ] min`)**: Selector minimalista para películas y juegos con soporte para rueda del mouse (*scroll wheel*), validación de límites y conversión automática a minutos.
+- **Selector de Lectura Reactivo**: Para libros, cómics y mangas, permitiendo editar el total de páginas y deslizar la barra de lectura con actualización inmediata de porcentajes.
+- **Bloqueo de Scroll en Fondo (`useScrollLock`)**: Bloqueo automático del scroll de la página de fondo al abrir cualquier modal de la aplicación.
 
-### ✏️ Crear (Editor de Guías)
-Constructor interactivo de guías y listas cronológicas con flujo documental estilo procesador de texto:
-- **Estructura Jerárquica Flexible**: Organización multinivel en **Secciones maestras**, **Bloques** con escala de importancia (1 a 5: Extra, Opcional, Recomendado, Importante, Obligatorio) y **Subbloques** anidados.
-- **Sistema Unificado de Arrastrar y Soltar (Drag & Drop)**:
-  - Tirador unificado (`≡`) para reordenamiento fluido por eventos de puntero (*Pointer Events*).
-  - Desplazamiento continuo con la rueda del ratón mientras se arrastran elementos por documentos extensos.
-  - Colapso dinámico de bloques asociados al mover secciones.
-  - Ranuras de inserción animadas (*drop slots*) y vista previa flotante (*ghost preview*).
-- **Portapapeles y Selección Múltiple**: Copiar, cortar, eliminar y zonas inteligentes de pegado (`PasteZone`).
-- **Autoguardado Automático (Auto-Save)**: Guarda los borradores en la base de datos de manera continua (`draft_flow`).
+### 🔍 Explorar y Búsqueda Global
+- **Novedades y Tendencias**: Lanzamientos recientes y destacados organizados por categorías multimedia.
+- **Portadas Cinematográficas de Respaldo**: Detección de pósters genéricos con fondo fotográfico cinematográfico y tipografía del título destacada en la parte central superior.
+- **Auto-Sincronización de Metadatos**: Enriquecimiento y actualización automática de portadas oficiales en la estantería del usuario cuando las APIs externas se recuperan.
 
-### 🔍 Explorar (Buscador)
-- **Dashboard de Recomendaciones**: Tendencias globales, guías destacadas y recomendaciones personalizadas "Para Ti".
-- **Buscador Global**: Conecta con TVMaze, OMDb, IGDB, Google Books, AniList y Comic Vine con filtros por categoría.
-- **Modal de Detalle del Ítem**: Ficha completa con seguimiento de progreso, acordeón de temporadas/capítulos para series y traducción de sinopsis con caché.
-- **Búsqueda de Usuarios y Guías**: Localización ágil de perfiles y listas comunitarias.
+### 💌 Flujos de Correo Electrónico (Resend + @pathd.net)
+- **Verificación de Cuentas (`/verify-email`)**: Activación de cuenta por enlace seguro de 24 horas y auto-login al confirmar.
+- **Recuperación de Contraseña (`/forgot-password` & `/reset-password`)**: Restablecimiento seguro en 1 hora con validación de contraseña interactiva y visibilidad `Eye / EyeOff`.
+- **Plantillas HTML Adaptativas y Bilingües**: Diseño con la paleta oficial de Pathd que ajusta automáticamente los textos y asuntos a Español o Inglés según el idioma activo del usuario.
 
-### 👤 Perfil (Estantería Personal)
-- **Estadísticas**: Seguidores, seguidos, fecha de registro e historial de actividad.
-- **Estantería (Shelf)**: Catálogo personal organizado por categoría y estado de consumo, insignias visuales de estado y formateo inteligente de series y capítulos.
-- **Favoritos / Destacados**: Obras destacadas visibles en el perfil (hasta 70 para Premium/VIP).
-- **Música en Tiempo Real**: Integración con Last.fm para mostrar el scrobble actual y los mejores álbumes semanales.
+### 📱 Social (Feed Comunitario)
+- **Timeline en Tiempo Real**: Feed cronológico que agrupa la actividad de la comunidad (nuevas guías creadas, avances, reseñas, votos y comentarios).
+- **Interacciones**: Votos, comentarios y reportes sobre guías y reseñas.
+
+### ✏️ Crear (Editor Avanzado de Guías)
+Constructor interactivo de listas cronológicas con flujo documental estilo procesador de texto:
+- **Estructura Multinivel**: Secciones maestras, Bloques con escala de importancia (1 a 5: Extra, Opcional, Recomendado, Importante, Obligatorio) y Subbloques anidados.
+- **Drag & Drop Unificado**: Tirador (`≡`) con soporte para eventos de puntero, autoscroll al arrastrar, colapso de bloques y ranuras animadas de inserción.
+- **Portapapeles y Pegado Inteligente**: Zonas de pegado contextual (`PasteZone`) y autoguardado continuo de borradores (`draft_flow`).
+
+### 👤 Perfil y Estantería (Shelf)
+- **Estadísticas Personales**: Métricas de consumo, seguidores, seguidos y registro de actividad reciente.
+- **Estantería Unificada**: Catálogo personal filtrable por tipo de medio y estado de consumo.
+- **Música en Vivo (Last.fm)**: Muestra en tiempo real la canción en reproducción y los álbumes más escuchados de la semana.
 
 ### 🛡️ Panel de Administración (`/admin`)
 Panel completo de gestión y moderación disponible exclusivamente para administradores:
-- **Reasignación Atómica de ID de Usuario**: Modificación segura del ID numérico del usuario actualizando automáticamente todas las tablas relacionales y secuencias de PostgreSQL/SQLite.
-- **Gestión de Roles y Membresías**:
-  - Asignación y revocación de Estatus VIP.
-  - Regalo de meses de suscripción Premium con input numérico manual o selectores rápidos (1, 3, 6, 12 meses).
-  - Cancelación directa de suscripciones Premium activas.
-- **Sanciones y Moderación de Usuarios**:
-  - Suspensión temporal (con fecha y motivo) o permanente de cuentas.
-  - Envío y limpieza de advertencias administrativas directas en el panel del usuario.
-  - Eliminación definitiva de cuentas de usuario.
-- **Moderación de Contenido**: Ver, atender y resolver reportes activos sobre guías, reseñas y comentarios.
+- **Reasignación Atómica de ID de Usuario**: Modificación segura del ID numérico del usuario actualizando automáticamente todas las tablas relacionales.
+- **Gestión de Roles y Membresías**: Asignación/revocación de Estatus VIP, regalo de meses de suscripción Premium y cancelación de suscripciones.
+- **Moderación de Usuarios y Contenido**: Suspensión temporal/permanente de cuentas, advertencias administrativas, eliminación de cuentas y resolución de reportes sobre guías, comentarios y reseñas.
 
 ---
 
@@ -122,17 +122,20 @@ Panel completo de gestión y moderación disponible exclusivamente para administ
 ### Health Check (`/health`)
 | Método | Ruta | Descripción |
 |---|---|---|
-| GET | `/health` | Endpoint ligero de estado utilizado por UptimeRobot para mantener activo el servicio |
+| GET | `/health` | Endpoint de monitorización utilizado por UptimeRobot para mantener activo el servicio |
 
 ### Autenticación (`/api/v1/auth`)
 | Método | Ruta | Descripción |
 |---|---|---|
-| POST | `/register` | Registro de nueva cuenta |
-| POST | `/login` | Inicio de sesión (devuelve JWT + cookie de refresco) |
-| POST | `/refresh` | Renovar token de acceso |
-| POST | `/logout` | Cerrar sesión y eliminar cookie |
-| POST | `/forgot-password` | Envía link de recuperación por email |
-| POST | `/reset-password` | Valida token y actualiza contraseña |
+| POST | `/register` | Registro de nueva cuenta y despacho de correo de verificación |
+| GET | `/verify-email?token={token}` | Confirmación de correo electrónico y auto-login |
+| POST | `/resend-verification` | Reenviar correo de confirmación de cuenta |
+| POST | `/login` | Inicio de sesión (bloquea cuentas no verificadas con `403`) |
+| POST | `/refresh` | Renovar token de acceso con cookie HttpOnly |
+| POST | `/logout` | Cerrar sesión y revocar tokens |
+| POST | `/forgot-password` | Envía enlace de restablecimiento de contraseña por email |
+| POST | `/reset-password` | Valida token y actualiza la contraseña del usuario |
+| POST | `/google` | Autenticación y registro con Google OAuth2 |
 
 ### Usuarios (`/api/v1/users`)
 | Método | Ruta | Descripción |
@@ -140,106 +143,108 @@ Panel completo de gestión y moderación disponible exclusivamente para administ
 | GET | `/me` | Perfil del usuario autenticado y auto-reparación de listas |
 | PUT | `/me/username` | Cambiar nombre de usuario |
 | PUT | `/me/password` | Cambiar contraseña |
-| PUT | `/me/profile-customization` | Actualizar color de acento y banner (Premium/VIP/Admin) |
-| DELETE | `/me` | Eliminar cuenta |
-| GET | `/me/activity` | Historial de actividad del usuario |
-| GET | `/me/up-next` | Próximos ítems pendientes en guías seguidas y listas personales |
+| PUT | `/me/profile-customization` | Actualizar color de acento, avatar, fondo y banner |
+| DELETE | `/me` | Eliminar cuenta definitivamente |
+| GET | `/me/activity` | Historial de actividad personal |
+| GET | `/me/up-next` | Próximos ítems pendientes en guías seguidas y listas |
 | GET | `/me/feed/guides-updates` | Actualizaciones recientes de guías seguidas |
 | POST | `/me/lastfm/connect` | Conectar cuenta de Last.fm |
 | DELETE | `/me/lastfm/disconnect` | Desconectar cuenta de Last.fm |
-| GET | `/me/music/now-playing` | Obtener canción que se está escuchando ahora |
-| GET | `/me/music/top-albums` | Obtener los álbumes más escuchados de la semana |
+| GET | `/me/music/now-playing` | Canción en reproducción en vivo |
+| GET | `/me/music/top-albums` | Álbumes más escuchados de la semana |
 | GET | `/profile/{user_id}` | Perfil público de otro usuario |
-| GET | `/{user_id}/activity` | Historial de actividad de otro usuario |
-| GET | `/search?q={query}` | Buscar usuarios por username |
-
-### Suscripciones y Stripe (`/api/v1/stripe`)
-| Método | Ruta | Descripción |
-|---|---|---|
-| POST | `/create-checkout-session` | Iniciar sesión de pago en Stripe Checkout para suscripción Premium |
-| POST | `/create-portal-session` | Abrir el Portal de Cliente de Stripe para gestionar pagos y facturación |
-| POST | `/cancel-subscription` | Cancelar la renovación automática de la suscripción |
-| POST | `/webhook` | Webhook para procesar altas, renovaciones y cancelaciones automáticas |
+| GET | `/{user_id}/activity` | Historial de actividad pública de otro usuario |
+| GET | `/search?q={query}` | Buscar usuarios por nombre de usuario |
 
 ### Búsqueda de Medios (`/api/v1/search`)
 | Método | Ruta | Descripción |
 |---|---|---|
-| GET | `/?q={query}&type={type}` | Búsqueda por tipo de medio |
-| GET | `/all?q={query}` | Búsqueda unificada en todas las fuentes |
+| GET | `/?q={query}&type={type}` | Búsqueda por categoría multimedia |
+| GET | `/all?q={query}` | Búsqueda global con ranking unificado por tiers |
+| GET | `/game/{game_id}/relations` | Obtener colecciones, ediciones, DLCs y juego base de un videojuego |
 | GET | `/series/{id}` | Detalle de serie/anime (TVMaze) con temporadas |
-| GET | `/series/{id}/episodes` | Episodios de una serie (TVMaze) |
+| GET | `/series/{id}/episodes` | Lista de episodios estructurados por temporada |
+| GET | `/explore/tabs` | Datos de pestañas de exploración (Novedades, Tendencias, Para Ti) |
 
 ### Guías Cronológicas (`/api/v1/lists`)
 | Método | Ruta | Descripción |
 |---|---|---|
 | GET | `/` | Listar guías propias |
-| POST | `/` | Crear nueva guía |
-| GET | `/{list_id}` | Detalle de guía con progreso (soporta visibilidad privada y auto-reparación) |
+| POST | `/` | Crear nueva guía cronológica |
+| GET | `/{list_id}` | Detalle completo de guía con progreso |
 | PUT | `/{list_id}` | Editar guía |
 | DELETE | `/{list_id}` | Eliminar guía |
-| POST | `/{list_id}/save` | Guardar/seguir guía de otro usuario |
+| POST | `/{list_id}/save` | Guardar / seguir guía de otro usuario |
 | DELETE | `/{list_id}/save` | Dejar de seguir guía |
 | POST | `/{list_id}/items` | Añadir ítem a la guía |
 | PUT | `/{list_id}/items/{item_id}` | Editar ítem de la guía |
 | DELETE | `/{list_id}/items/{item_id}` | Eliminar ítem de la guía |
-| POST | `/{list_id}/items/tv-import` | Importar temporada completa desde TVMaze |
-| POST | `/{list_id}/items/bulk-toggle` | Marcar múltiples ítems de una vez |
+| POST | `/{list_id}/items/tv-import` | Importar temporada completa de serie |
+| POST | `/{list_id}/items/bulk-toggle` | Marcar múltiples ítems de forma masiva |
 | POST | `/{list_id}/toggle-series-episode` | Marcar/desmarcar episodio individual |
 | POST | `/{list_id}/bulk-toggle-season` | Marcar toda una temporada de una vez |
 | POST | `/{list_id}/sections/bulk-action` | Acción masiva sobre una sección |
 | POST | `/items/{item_id}/toggle` | Marcar ítem como completado/pendiente |
 | POST | `/items/{item_id}/toggle-skip` | Marcar ítem como saltado |
-| GET | `/items/lookup` | Buscar guías que contienen un ítem externo |
+| GET | `/items/lookup` | Buscar guías que contienen una obra externa |
 | GET | `/db/search` | Buscar guías en la base de datos local |
 
 ### Estantería Personal (`/api/v1/library`)
 | Método | Ruta | Descripción |
 |---|---|---|
-| POST | `/` | Añadir obra a la estantería (sincronizando progreso previo) |
-| GET | `/` | Obtener estantería del usuario |
-| PUT | `/{library_item_id}` | Actualizar estado u opciones de una obra |
+| POST | `/` | Añadir obra a la estantería personal |
+| GET | `/` | Obtener estantería del usuario autenticado |
+| PUT | `/{library_item_id}` | Actualizar estado, tiempo o páginas leídas de una obra |
 | DELETE | `/{library_item_id}` | Eliminar obra de la estantería |
 
 ### Social (`/api/v1/social`)
 | Método | Ruta | Descripción |
 |---|---|---|
-| POST | `/users/{user_id}/follow` | Seguir / dejar de seguir usuario (toggle) |
-| GET | `/users/{user_id}/followers` | Seguidores de un usuario |
-| GET | `/users/{user_id}/following` | Usuarios seguidos |
+| POST | `/users/{user_id}/follow` | Seguir / dejar de seguir a un usuario (toggle) |
+| GET | `/users/{user_id}/followers` | Lista de seguidores de un usuario |
+| GET | `/users/{user_id}/following` | Lista de usuarios seguidos |
 | GET | `/users/feed/activity` | Feed de actividad de seguidos |
-| GET | `/lists/feed/social` | Nuevas guías públicas |
-| POST | `/lists/{list_id}/vote` | Votar una guía |
-| POST | `/lists/{list_id}/report` | Reportar guía |
+| GET | `/lists/feed/social` | Nuevas guías públicas de la comunidad |
+| POST | `/lists/{list_id}/vote` | Votar positivamente una guía |
+| POST | `/lists/{list_id}/report` | Reportar una guía por contenido indebido |
 | GET | `/lists/{list_id}/comments` | Obtener comentarios de una guía |
-| POST | `/lists/{list_id}/comments` | Comentar en una guía |
+| POST | `/lists/{list_id}/comments` | Publicar comentario en una guía |
 | DELETE | `/lists/{list_id}/comments/{comment_id}` | Eliminar comentario |
 | POST | `/lists/{list_id}/comments/{comment_id}/vote` | Votar un comentario |
-| POST | `/lists/{list_id}/comments/{comment_id}/report` | Reportar comentario |
+| POST | `/lists/{list_id}/comments/{comment_id}/report` | Reportar un comentario |
 
 ### Reseñas (`/api/v1/reviews`)
 | Método | Ruta | Descripción |
 |---|---|---|
-| POST | `/{item_type}/{external_id}` | Escribir reseña y calificación (1–5 estrellas) |
-| GET | `/{item_type}/{external_id}` | Obtener reseñas de una obra |
+| POST | `/{item_type}/{external_id}` | Publicar reseña y calificación (1 a 5 estrellas) |
+| GET | `/{item_type}/{external_id}` | Consultar reseñas de una obra |
 
 ### Modificaciones / Mods (`/api/v1/additions`)
 | Método | Ruta | Descripción |
 |---|---|---|
 | POST | `/lists/{list_id}/additions` | Crear bloque de adiciones a una guía |
-| POST | `/additions/{addition_id}/items` | Añadir ítems a un bloque |
+| POST | `/additions/{addition_id}/items` | Añadir ítems a un bloque de adiciones |
 | GET | `/lists/{list_id}/additions/community` | Consultar adiciones públicas de la comunidad |
-| POST | `/additions/{addition_id}/adopt` | Adoptar las adiciones de otro usuario |
-| DELETE | `/additions/{addition_id}/adopt` | Desadoptar adiciones |
+| POST | `/additions/{addition_id}/adopt` | Adoptar adiciones de otro usuario |
+| DELETE | `/additions/{addition_id}/adopt` | Desadoptar bloque de adiciones |
 | POST | `/additions/{addition_id}/vote` | Votar un bloque de adiciones |
 | POST | `/additions/{addition_id}/comments` | Comentar en un bloque de adiciones |
-| GET | `/additions/{addition_id}/comments` | Ver comentarios de un bloque |
+| GET | `/additions/{addition_id}/comments` | Ver comentarios de un bloque de adiciones |
 | POST | `/items/additions/{addition_item_id}/toggle` | Marcar ítem de adición como completado |
 | POST | `/items/additions/{addition_item_id}/toggle-skip` | Marcar ítem de adición como saltado |
+
+### Suscripciones y Pagos (`/api/v1/stripe` / Dodo Payments)
+| Método | Ruta | Descripción |
+|---|---|---|
+| POST | `/create-checkout-session` | Iniciar checkout de pago para suscripción Premium |
+| POST | `/create-portal-session` | Abrir portal de cliente para gestión de facturación |
+| POST | `/cancel-subscription` | Cancelar renovación automática de la suscripción |
+| POST | `/webhook` | Webhook para altas, renovaciones y cancelaciones automáticas |
 
 ### Administración (`/api/v1/admin`)
 | Método | Ruta | Descripción |
 |---|---|---|
-| GET | `/stats` | Estadísticas generales de la plataforma |
+| GET | `/stats` | Estadísticas globales de la plataforma |
 | GET | `/users` | Buscar y listar usuarios registrados |
 | POST | `/users/{user_id}/change-id` | Reasignación atómica de ID de usuario |
 | POST | `/users/{user_id}/toggle-vip` | Otorgar o revocar Estatus VIP |
@@ -247,10 +252,10 @@ Panel completo de gestión y moderación disponible exclusivamente para administ
 | POST | `/users/{user_id}/cancel-pro` | Cancelar suscripción Premium de un usuario |
 | POST | `/users/{user_id}/suspend` | Suspender cuenta temporal o permanentemente |
 | POST | `/users/{user_id}/unsuspend` | Levantar suspensión a una cuenta |
-| POST | `/users/{user_id}/warn` | Enviar advertencia administrativa |
+| POST | `/users/{user_id}/warn` | Enviar advertencia administrativa directa |
 | POST | `/users/{user_id}/clear-warning` | Limpiar advertencia administrativa |
 | DELETE | `/users/{user_id}` | Banear y eliminar cuenta de usuario |
-| GET | `/reports` | Ver todos los reportes activos |
+| GET | `/reports` | Consultar reportes activos de la comunidad |
 | DELETE | `/lists/{list_id}` | Eliminar guía por moderación |
 | DELETE | `/comments/{comment_id}` | Eliminar comentario por moderación |
 | DELETE | `/reviews/{review_id}` | Eliminar reseña por moderación |
@@ -278,7 +283,7 @@ pip install -r requirements.txt
 # 3. Configurar variables de entorno
 cp .env.example .env
 
-# 4. Levantar el servidor
+# 4. Levantar el servidor de desarrollo
 uvicorn app.main:app --reload
 ```
 
@@ -295,7 +300,7 @@ npm run build     # Build de producción
 
 ## 🔑 Variables de Entorno
 
-Crea un archivo `.env` en la raíz del proyecto basado en `.env.example`:
+Crea un archivo `.env` en la raíz del proyecto:
 
 ```env
 # App
@@ -313,10 +318,16 @@ SECRET_KEY="genera-una-clave-segura-con-openssl-rand-hex-32"
 ALGORITHM="HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES=11520
 
-# Stripe (Suscripciones y Pagos)
-STRIPE_SECRET_KEY="sk_test_..."
-STRIPE_WEBHOOK_SECRET="whsec_..."
-STRIPE_PRICE_ID_MONTHLY="price_..."
+# Email Transaccional (Resend)
+RESEND_API_KEY="re_..."
+EMAILS_FROM_EMAIL="Pathd <noreply@pathd.net>"
+EMAILS_FROM_NAME="Pathd"
+
+# Dodo Payments / Stripe (Suscripciones)
+DODO_PAYMENTS_API_KEY=""
+DODO_PAYMENTS_PRODUCT_ID=""
+DODO_PAYMENTS_WEBHOOK_KEY=""
+DODO_PAYMENTS_ENVIRONMENT="test_mode"
 
 # APIs Externas
 TVMAZE_API_KEY=""
@@ -331,15 +342,11 @@ GOOGLE_BOOKS_API_KEY=""
 TWITCH_CLIENT_ID=""
 TWITCH_CLIENT_SECRET=""
 
+# Google OAuth2
+GOOGLE_CLIENT_ID=""
+
 # CORS
 BACKEND_CORS_ORIGINS='["http://localhost:5173", "https://pathd.net"]'
-
-# Email (para recuperación de contraseña)
-SMTP_HOST=""
-SMTP_PORT=587
-SMTP_USER=""
-SMTP_PASSWORD=""
-EMAILS_FROM_EMAIL="noreply@pathd.net"
 ```
 
 ---
@@ -349,29 +356,18 @@ EMAILS_FROM_EMAIL="noreply@pathd.net"
 ```
 tracker-lists/
 ├── app/
-│   ├── api/v1/           # Endpoints REST
-│   │   ├── auth.py       # Autenticación y recuperación de contraseña
-│   │   ├── users.py      # Perfil, personalización, actividad, feed
-│   │   ├── lists.py      # Guías cronológicas y tracking de episodios
-│   │   ├── library.py    # Estantería personal
-│   │   ├── search.py     # Búsqueda multi-fuente
-│   │   ├── social.py     # Follows, feed, comentarios, votos
-│   │   ├── reviews.py    # Reseñas y calificaciones
-│   │   ├── additions.py  # Modificaciones comunitarias
-│   │   ├── admin.py      # Moderación, roles VIP/Pro y gestión de IDs
-│   │   ├── stripe.py     # Checkout, Portal de cliente y Webhooks
-│   │   └── translate.py  # Traducción de sinopsis con caché
+│   ├── api/v1/           # Endpoints REST (auth, lists, library, search, social, admin, etc.)
 │   ├── core/             # Configuración, base de datos, seguridad, rate limiting
-│   ├── models/           # Modelos SQLAlchemy (User, ReadingList, ListItem, etc.)
-│   ├── schemas/          # Schemas Pydantic para validación de requests/responses
-│   └── services/         # Clientes externos (TVMaze, OMDb, IGDB, Stripe, etc.)
+│   ├── models/           # Modelos SQLAlchemy (User, ReadingList, ListItem, UserLibraryItem, etc.)
+│   ├── schemas/          # Schemas Pydantic para validación y serialización
+│   └── services/         # Clientes e integraciones externas (EmailService, IGDB, OMDb, TVMaze, etc.)
 ├── frontend/
 │   ├── src/
-│   │   ├── api/          # Cliente Axios con interceptores de autenticación
-│   │   ├── components/   # Componentes reutilizables (Sidebar, ItemDetailsModal, ProModal)
+│   │   ├── api/          # Cliente Axios con interceptores de autenticación y lenguaje
+│   │   ├── components/   # Componentes modulares (Sidebar, ItemDetailsModal, MediaPoster, etc.)
 │   │   ├── context/      # Contextos globales (AuthContext, ThemeContext, LanguageContext)
-│   │   ├── hooks/        # Custom hooks
-│   │   ├── pages/        # Páginas (Home, Social, CreateGuide, Search, Profile, AdminPanel)
+│   │   ├── hooks/        # Custom hooks (useScrollLock, etc.)
+│   │   ├── pages/        # Páginas principales (Home, Search, Social, CreateGuide, Profile, VerifyEmail, etc.)
 │   │   └── utils/        # Utilidades y caché de APIs
 │   └── index.html
 ├── .env.example
