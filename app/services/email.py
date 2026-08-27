@@ -56,7 +56,7 @@ class EmailService:
     @classmethod
     def send_verification_email(cls, to_email: str, username: str, token: str) -> bool:
         """
-        Sends account confirmation email with a verification link.
+        Sends account confirmation email with a verification link in Pathd solar amber branding.
         """
         frontend_url = getattr(settings, "FRONTEND_URL", "http://localhost:5173").rstrip("/")
         verification_link = f"{frontend_url}/verify-email?token={token}"
@@ -72,30 +72,34 @@ class EmailService:
     body {{
       margin: 0;
       padding: 0;
-      background-color: #0b0f19;
+      background-color: #090d16;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
       color: #f8fafc;
     }}
     .container {{
       max-width: 560px;
       margin: 40px auto;
-      background: #111827;
-      border: 1px solid #1f2937;
+      background-color: #121826;
+      border: 1px solid rgba(245, 158, 11, 0.22);
       border-radius: 16px;
       overflow: hidden;
-      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.7);
     }}
     .header {{
-      background: linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%);
+      background-color: #0d131f;
       padding: 32px 24px;
       text-align: center;
+      border-bottom: 1px solid rgba(245, 158, 11, 0.16);
     }}
-    .header h1 {{
-      margin: 0;
-      font-size: 28px;
+    .logo-text {{
+      font-size: 32px;
       font-weight: 800;
       letter-spacing: -0.5px;
-      color: #ffffff;
+      color: #f8fafc;
+      text-decoration: none;
+    }}
+    .logo-accent {{
+      color: #f59e0b;
     }}
     .content {{
       padding: 36px 32px;
@@ -103,9 +107,9 @@ class EmailService:
     }}
     .content h2 {{
       margin-top: 0;
-      font-size: 20px;
-      color: #ffffff;
-      font-weight: 600;
+      font-size: 22px;
+      color: #f8fafc;
+      font-weight: 700;
     }}
     .content p {{
       color: #94a3b8;
@@ -118,33 +122,33 @@ class EmailService:
     }}
     .btn {{
       display: inline-block;
-      background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
-      color: #ffffff !important;
+      background-color: #f59e0b;
+      color: #090d16 !important;
       text-decoration: none;
-      padding: 14px 32px;
-      font-weight: 600;
-      font-size: 16px;
-      border-radius: 10px;
-      box-shadow: 0 4px 15px rgba(124, 58, 237, 0.4);
+      padding: 14px 34px;
+      font-weight: 700;
+      font-size: 15px;
+      border-radius: 12px;
+      box-shadow: 0 4px 16px rgba(245, 158, 11, 0.35);
     }}
     .footer {{
       padding: 24px 32px;
-      background: #0d131f;
-      border-top: 1px solid #1f2937;
+      background-color: #090d16;
+      border-top: 1px solid #1e293b;
       text-align: center;
       font-size: 12px;
       color: #64748b;
     }}
     .alt-link {{
-      margin-top: 24px;
+      margin-top: 28px;
       padding-top: 20px;
-      border-top: 1px solid #1f2937;
+      border-top: 1px solid #1e293b;
       font-size: 13px;
       color: #64748b;
       word-break: break-all;
     }}
     .alt-link a {{
-      color: #a78bfa;
+      color: #f59e0b;
       text-decoration: underline;
     }}
   </style>
@@ -152,7 +156,7 @@ class EmailService:
 <body>
   <div class="container">
     <div class="header">
-      <h1>Pathd</h1>
+      <span class="logo-text">Path<span class="logo-accent">d</span></span>
     </div>
     <div class="content">
       <h2>¡Hola, {username}! 👋</h2>
@@ -187,7 +191,7 @@ class EmailService:
     @classmethod
     def send_password_reset_email(cls, to_email: str, username: str, token: str) -> bool:
         """
-        Sends password reset email with a secure link.
+        Sends password reset email with Pathd solar amber branding.
         """
         frontend_url = getattr(settings, "FRONTEND_URL", "http://localhost:5173").rstrip("/")
         reset_link = f"{frontend_url}/reset-password?token={token}"
@@ -203,30 +207,34 @@ class EmailService:
     body {{
       margin: 0;
       padding: 0;
-      background-color: #0b0f19;
+      background-color: #090d16;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
       color: #f8fafc;
     }}
     .container {{
       max-width: 560px;
       margin: 40px auto;
-      background: #111827;
-      border: 1px solid #1f2937;
+      background-color: #121826;
+      border: 1px solid rgba(245, 158, 11, 0.22);
       border-radius: 16px;
       overflow: hidden;
-      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.7);
     }}
     .header {{
-      background: linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%);
+      background-color: #0d131f;
       padding: 32px 24px;
       text-align: center;
+      border-bottom: 1px solid rgba(245, 158, 11, 0.16);
     }}
-    .header h1 {{
-      margin: 0;
-      font-size: 28px;
+    .logo-text {{
+      font-size: 32px;
       font-weight: 800;
       letter-spacing: -0.5px;
-      color: #ffffff;
+      color: #f8fafc;
+      text-decoration: none;
+    }}
+    .logo-accent {{
+      color: #f59e0b;
     }}
     .content {{
       padding: 36px 32px;
@@ -234,9 +242,9 @@ class EmailService:
     }}
     .content h2 {{
       margin-top: 0;
-      font-size: 20px;
-      color: #ffffff;
-      font-weight: 600;
+      font-size: 22px;
+      color: #f8fafc;
+      font-weight: 700;
     }}
     .content p {{
       color: #94a3b8;
@@ -249,33 +257,33 @@ class EmailService:
     }}
     .btn {{
       display: inline-block;
-      background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
-      color: #ffffff !important;
+      background-color: #f59e0b;
+      color: #090d16 !important;
       text-decoration: none;
-      padding: 14px 32px;
-      font-weight: 600;
-      font-size: 16px;
-      border-radius: 10px;
-      box-shadow: 0 4px 15px rgba(124, 58, 237, 0.4);
+      padding: 14px 34px;
+      font-weight: 700;
+      font-size: 15px;
+      border-radius: 12px;
+      box-shadow: 0 4px 16px rgba(245, 158, 11, 0.35);
     }}
     .footer {{
       padding: 24px 32px;
-      background: #0d131f;
-      border-top: 1px solid #1f2937;
+      background-color: #090d16;
+      border-top: 1px solid #1e293b;
       text-align: center;
       font-size: 12px;
       color: #64748b;
     }}
     .alt-link {{
-      margin-top: 24px;
+      margin-top: 28px;
       padding-top: 20px;
-      border-top: 1px solid #1f2937;
+      border-top: 1px solid #1e293b;
       font-size: 13px;
       color: #64748b;
       word-break: break-all;
     }}
     .alt-link a {{
-      color: #a78bfa;
+      color: #f59e0b;
       text-decoration: underline;
     }}
   </style>
@@ -283,7 +291,7 @@ class EmailService:
 <body>
   <div class="container">
     <div class="header">
-      <h1>Pathd</h1>
+      <span class="logo-text">Path<span class="logo-accent">d</span></span>
     </div>
     <div class="content">
       <h2>Restablecer contraseña 🔑</h2>
@@ -314,4 +322,3 @@ class EmailService:
             subject="🔑 Restablece tu contraseña en Pathd",
             html_content=html_content
         )
-
