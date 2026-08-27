@@ -158,7 +158,7 @@ export const MediaPoster: React.FC<MediaPosterProps> = ({
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        justifyContent: 'space-between',
+        justifyContent: 'space-around',
         padding: '1.25rem 0.85rem',
         textAlign: 'center',
         boxSizing: 'border-box',
@@ -168,7 +168,6 @@ export const MediaPoster: React.FC<MediaPosterProps> = ({
         ...style
       }}
     >
-
       {/* Title in top-center area */}
       <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '44px', marginTop: '0.25rem' }}>
         <span
@@ -205,21 +204,8 @@ export const MediaPoster: React.FC<MediaPosterProps> = ({
       }}>
         {config.icon}
       </div>
-
-      {/* Bottom media label */}
-      <div style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
-        <span style={{
-          fontSize: '0.7rem',
-          fontWeight: 600,
-          color: config.color,
-          textTransform: 'uppercase',
-          letterSpacing: '0.05em',
-          opacity: 0.85
-        }}>
-          {config.label}
-        </span>
-      </div>
     </div>
   );
 };
+
 
