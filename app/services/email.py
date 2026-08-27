@@ -54,20 +54,43 @@ class EmailService:
             return False
 
     @classmethod
-    def send_verification_email(cls, to_email: str, username: str, token: str) -> bool:
+    def send_verification_email(cls, to_email: str, username: str, token: str, lang: str = "es") -> bool:
         """
         Sends account confirmation email with a verification link in Pathd solar amber branding.
+        Supports both Spanish ('es') and English ('en').
         """
         frontend_url = getattr(settings, "FRONTEND_URL", "http://localhost:5173").rstrip("/")
         verification_link = f"{frontend_url}/verify-email?token={token}"
+        is_en = str(lang).lower().startswith("en")
+
+        if is_en:
+            subject = "🚀 Verify your Pathd account"
+            heading = f"Hello, {username}! 👋"
+            intro = "Thank you for joining <strong>Pathd</strong>, your unified platform to organize, track, and explore your favorite movies, TV shows, anime, books, comics, manga, and video games."
+            action_text = "To activate your account and start building your collection, please confirm your email address by clicking the button below:"
+            btn_text = "Confirm My Account"
+            expiry_text = "This verification link will expire in 24 hours."
+            alt_text = "If the button does not work, copy and paste this link into your browser:"
+            ignore_text = "If you did not create this account on Pathd, you can safely ignore this message."
+            tagline = f"© {settings.PROJECT_NAME} • Your entertainment universe, organized."
+        else:
+            subject = "🚀 Confirma tu cuenta en Pathd"
+            heading = f"¡Hola, {username}! 👋"
+            intro = "Gracias por unirte a <strong>Pathd</strong>, tu plataforma para organizar, descubrir y llevar el seguimiento de tus películas, series, animes, libros, cómics, mangas y videojuegos favoritos."
+            action_text = "Para activar tu cuenta y empezar a crear tus estanterías, por favor confirma tu dirección de correo electrónico haciendo clic en el siguiente botón:"
+            btn_text = "Confirmar mi Cuenta"
+            expiry_text = "Este enlace de confirmación expirará en 24 horas."
+            alt_text = "Si el botón no funciona, copia y pega este enlace en tu navegador:"
+            ignore_text = "Si tú no creaste esta cuenta en Pathd, puedes ignorar este mensaje con total tranquilidad."
+            tagline = f"© {settings.PROJECT_NAME} • Tu universo de entretenimiento organizado."
 
         html_content = f"""
 <!DOCTYPE html>
-<html lang="es">
+<html lang="{ 'en' if is_en else 'es' }">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Verifica tu cuenta en Pathd</title>
+  <title>{subject}</title>
   <style>
     body {{
       margin: 0;
@@ -159,24 +182,24 @@ class EmailService:
       <span class="logo-text">Path<span class="logo-accent">d</span></span>
     </div>
     <div class="content">
-      <h2>¡Hola, {username}! 👋</h2>
-      <p>Gracias por unirte a <strong>Pathd</strong>, tu plataforma para organizar, descubrir y llevar el seguimiento de tus películas, series, animes, libros, cómics, mangas y videojuegos favoritos.</p>
-      <p>Para activar tu cuenta y empezar a crear tus estanterías, por favor confirma tu dirección de correo electrónico haciendo clic en el siguiente botón:</p>
+      <h2>{heading}</h2>
+      <p>{intro}</p>
+      <p>{action_text}</p>
       
       <div class="btn-container">
-        <a href="{verification_link}" class="btn" target="_blank">Confirmar mi Cuenta</a>
+        <a href="{verification_link}" class="btn" target="_blank">{btn_text}</a>
       </div>
 
-      <p>Este enlace de confirmación expirará en 24 horas.</p>
+      <p>{expiry_text}</p>
 
       <div class="alt-link">
-        <p>Si el botón no funciona, copia y pega este enlace en tu navegador:</p>
+        <p>{alt_text}</p>
         <a href="{verification_link}">{verification_link}</a>
       </div>
     </div>
     <div class="footer">
-      <p>Si tú no creaste esta cuenta en Pathd, puedes ignorar este mensaje con total tranquilidad.</p>
-      <p>© {settings.PROJECT_NAME} • Tu universo de entretenimiento organizado.</p>
+      <p>{ignore_text}</p>
+      <p>{tagline}</p>
     </div>
   </div>
 </body>
@@ -184,25 +207,48 @@ class EmailService:
         """
         return cls.send_email(
             to_email=to_email,
-            subject="🚀 Confirma tu cuenta en Pathd",
+            subject=subject,
             html_content=html_content
         )
 
     @classmethod
-    def send_password_reset_email(cls, to_email: str, username: str, token: str) -> bool:
+    def send_password_reset_email(cls, to_email: str, username: str, token: str, lang: str = "es") -> bool:
         """
         Sends password reset email with Pathd solar amber branding.
+        Supports both Spanish ('es') and English ('en').
         """
         frontend_url = getattr(settings, "FRONTEND_URL", "http://localhost:5173").rstrip("/")
         reset_link = f"{frontend_url}/reset-password?token={token}"
+        is_en = str(lang).lower().startswith("en")
+
+        if is_en:
+            subject = "🔑 Reset your Pathd password"
+            heading = "Reset your password 🔑"
+            intro = f"Hello, <strong>{username}</strong>. We received a request to reset the password for your Pathd account."
+            action_text = "Click the button below to choose a new password:"
+            btn_text = "Reset My Password"
+            expiry_text = "This link is valid for <strong>1 hour</strong> for security reasons."
+            alt_text = "If the button does not work, copy and paste this link into your browser:"
+            ignore_text = "If you did not request a password reset, you can safely ignore this email; your current password remains secure."
+            tagline = f"© {settings.PROJECT_NAME} • Your entertainment universe, organized."
+        else:
+            subject = "🔑 Restablece tu contraseña en Pathd"
+            heading = "Restablecer contraseña 🔑"
+            intro = f"Hola, <strong>{username}</strong>. Recibimos una solicitud para restablecer la contraseña de tu cuenta en Pathd."
+            action_text = "Haz clic en el siguiente botón para elegir una nueva contraseña:"
+            btn_text = "Restablecer mi Contraseña"
+            expiry_text = "Este enlace es válido durante <strong>1 hora</strong> por motivos de seguridad."
+            alt_text = "Si el botón no funciona, copia y pega este enlace en tu navegador:"
+            ignore_text = "Si tú no solicitaste este cambio, puedes ignorar este mensaje; tu contraseña actual seguirá siendo segura."
+            tagline = f"© {settings.PROJECT_NAME} • Tu universo de entretenimiento organizado."
 
         html_content = f"""
 <!DOCTYPE html>
-<html lang="es">
+<html lang="{ 'en' if is_en else 'es' }">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Restablecer contraseña en Pathd</title>
+  <title>{subject}</title>
   <style>
     body {{
       margin: 0;
@@ -294,24 +340,24 @@ class EmailService:
       <span class="logo-text">Path<span class="logo-accent">d</span></span>
     </div>
     <div class="content">
-      <h2>Restablecer contraseña 🔑</h2>
-      <p>Hola, <strong>{username}</strong>. Recibimos una solicitud para restablecer la contraseña de tu cuenta en Pathd.</p>
-      <p>Haz clic en el siguiente botón para elegir una nueva contraseña:</p>
+      <h2>{heading}</h2>
+      <p>{intro}</p>
+      <p>{action_text}</p>
       
       <div class="btn-container">
-        <a href="{reset_link}" class="btn" target="_blank">Restablecer mi Contraseña</a>
+        <a href="{reset_link}" class="btn" target="_blank">{btn_text}</a>
       </div>
 
-      <p>Este enlace es válido durante <strong>1 hora</strong> por motivos de seguridad.</p>
+      <p>{expiry_text}</p>
 
       <div class="alt-link">
-        <p>Si el botón no funciona, copia y pega este enlace en tu navegador:</p>
+        <p>{alt_text}</p>
         <a href="{reset_link}">{reset_link}</a>
       </div>
     </div>
     <div class="footer">
-      <p>Si tú no solicitaste este cambio, puedes ignorar este mensaje; tu contraseña actual seguirá siendo segura.</p>
-      <p>© {settings.PROJECT_NAME} • Tu universo de entretenimiento organizado.</p>
+      <p>{ignore_text}</p>
+      <p>{tagline}</p>
     </div>
   </div>
 </body>
@@ -319,6 +365,6 @@ class EmailService:
         """
         return cls.send_email(
             to_email=to_email,
-            subject="🔑 Restablece tu contraseña en Pathd",
+            subject=subject,
             html_content=html_content
         )

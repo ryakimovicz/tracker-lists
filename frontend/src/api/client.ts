@@ -11,12 +11,16 @@ export const apiClient = axios.create({
   },
 });
 
-// Request interceptor to automatically attach JWT token if present in localStorage
+// Request interceptor to automatically attach JWT token and language if present in localStorage
 apiClient.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('access_token');
-    if (token && config.headers) {
-      config.headers['Authorization'] = `Bearer ${token}`;
+    const lang = localStorage.getItem('language') || 'es';
+    if (config.headers) {
+      if (token) {
+        config.headers['Authorization'] = `Bearer ${token}`;
+      }
+      config.headers['Accept-Language'] = lang;
     }
     return config;
   },
@@ -24,6 +28,7 @@ apiClient.interceptors.request.use(
     return Promise.reject(error);
   }
 );
+
 
 // Response interceptor to handle token renewal automatically
 let isRefreshing = false;

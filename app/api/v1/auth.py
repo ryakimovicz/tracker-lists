@@ -31,7 +31,7 @@ from app.schemas.auth import (
 router = APIRouter()
 
 
-def send_reset_email(to_email: str, username: str, token: str):
+def send_reset_email(to_email: str, username: str, token: str, lang: str = "es"):
     # Print local fallback simulation for developer logs
     frontend_url = getattr(settings, "FRONTEND_URL", "http://localhost:5173").rstrip("/")
     reset_link = f"{frontend_url}/reset-password?token={token}"
@@ -44,8 +44,9 @@ def send_reset_email(to_email: str, username: str, token: str):
 
     # Send through Resend if configured
     if getattr(settings, "RESEND_API_KEY", None):
-        EmailService.send_password_reset_email(to_email, username, token)
+        EmailService.send_password_reset_email(to_email, username, token, lang=lang)
         return
+
 
 
     if not settings.SMTP_HOST or not settings.SMTP_USER or not settings.SMTP_PASSWORD:
@@ -85,6 +86,7 @@ from sqlalchemy import func
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 def register(
+    request: Request,
     user_in: UserCreate,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
@@ -119,12 +121,15 @@ def register(
     db.commit()
     db.refresh(new_user)
 
+    lang = (request.headers.get("accept-language") or "es")[:2].lower()
+
     # Send verification email asynchronously
     background_tasks.add_task(
         EmailService.send_verification_email,
         new_user.email,
         new_user.username,
-        verification_tok
+        verification_tok,
+        lang
     )
 
     return new_user
@@ -170,6 +175,7 @@ def verify_email(
 
 @router.post("/resend-verification")
 def resend_verification(
+    request: Request,
     payload: ResendVerificationRequest,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
@@ -179,9 +185,11 @@ def resend_verification(
         tok = create_verification_token(user.email)
         user.verification_token = tok
         db.commit()
-        background_tasks.add_task(EmailService.send_verification_email, user.email, user.username, tok)
+        lang = (request.headers.get("accept-language") or "es")[:2].lower()
+        background_tasks.add_task(EmailService.send_verification_email, user.email, user.username, tok, lang)
 
     return {"message": "If the email is unverified, a new confirmation link has been sent."}
+
 
 @router.post("/login", response_model=Token)
 def login(
@@ -407,6 +415,7 @@ def google_auth(
 # --- Password Reset Flow ---
 @router.post("/forgot-password")
 def forgot_password(
+    request: Request,
     payload: ForgotPasswordRequest,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
@@ -421,10 +430,13 @@ def forgot_password(
     user.reset_token_expires = datetime.now(timezone.utc) + timedelta(hours=1)
     db.commit()
     
+    lang = (request.headers.get("accept-language") or "es")[:2].lower()
+
     # Asynchronously dispatch reset email via BackgroundTasks
-    background_tasks.add_task(send_reset_email, user.email, user.username, token)
+    background_tasks.add_task(send_reset_email, user.email, user.username, token, lang)
     
     return {"message": "If the email is registered, a password reset link has been generated."}
+
 
 @router.post("/reset-password")
 def reset_password(
