@@ -158,9 +158,9 @@ export const ReplaceFavoriteModal: React.FC<ReplaceFavoriteModalProps> = ({
             {/* Pro Upsell Callout */}
             <div 
               onClick={() => {
-                onClose();
                 onOpenProModal();
               }}
+
               style={{
                 display: 'flex',
                 alignItems: 'center',
