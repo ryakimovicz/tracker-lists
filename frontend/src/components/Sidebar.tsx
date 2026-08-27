@@ -7,6 +7,7 @@ import type { Theme } from '../context/ThemeContext';
 import { LogOut, Shield, Globe, Sun, Moon, Monitor, Home, Users, PlusCircle, Compass, User, Star } from 'lucide-react';
 
 import { ProModal } from './ProModal';
+import { BrandLogo } from './BrandLogo';
 
 export const Sidebar: React.FC = () => {
   const { user, isAuthenticated, logout } = useAuth();
@@ -75,14 +76,9 @@ export const Sidebar: React.FC = () => {
     <div className="sidebar">
       {/* Title */}
       <div style={{ padding: '0.5rem 0 2rem 0' }}>
-        <Link to="/" className="brand-logo-text" title="Pathd">
-          <span className="brand-letter">P</span>
-          <span className="brand-letter">a</span>
-          <span className="brand-letter">t</span>
-          <span className="brand-letter">h</span>
-          <span className="brand-letter">d</span>
-        </Link>
+        <BrandLogo />
       </div>
+
 
       {/* Main Navigation */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1 }}>
