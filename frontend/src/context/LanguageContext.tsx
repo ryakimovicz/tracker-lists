@@ -36,8 +36,9 @@ const translations: Translations = {
   btnExploreGuides: { en: 'Explore Guides', es: 'Explorar Guías' },
   
   // Features
-  featTrackerTitle: { en: 'Your Ultimate All-in-One Tracker', es: 'Tu Tracker Definitivo (Todo en Uno)' },
+  featTrackerTitle: { en: 'All-in-One Tracker', es: 'Tracker Todo en Uno' },
   featTrackerDesc: { en: 'Track movies, TV shows, anime, books, comics, manga, and video games. Log your activity, rate, and visualize your stats in a single unified profile.', es: 'Lleva el control de películas, series, anime, libros, cómics, mangas y videojuegos. Registra tu consumo, puntúa y visualiza estadísticas en un solo perfil unificado.' },
+
   
   featSearchTitle: { en: 'Guides & Endless Universes', es: 'Guías y Universos Sin Fronteras' },
   featSearchDesc: { en: 'Create and explore chronological or thematic lists combining any format. The ideal tool for organizing complex sagas and franchises.', es: 'Crea y explora listas cronológicas o temáticas combinando cualquier formato. La herramienta perfecta para organizar sagas y franquicias complejas.' },

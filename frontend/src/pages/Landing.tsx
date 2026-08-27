@@ -31,39 +31,40 @@ export const Landing: React.FC = () => {
 
       {/* Feature Grids */}
       <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '2rem', marginTop: '2rem' }}>
-        {/* Card 1: All-in-One Tracker */}
+        {/* Card 1: All-in-One Tracker (Emerald Green) */}
         <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <div style={{ color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+          <div style={{ color: '#10b981', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
             <Layers size={28} />
-            <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700 }}>{t('featTrackerTitle')}</h3>
+            <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)' }}>{t('featTrackerTitle')}</h3>
           </div>
           <p style={{ color: 'var(--text-secondary)', lineHeight: 1.6, margin: 0, fontSize: '0.95rem' }}>
             {t('featTrackerDesc')}
           </p>
         </div>
 
-        {/* Card 2: Guides & Universes */}
+        {/* Card 2: Guides & Universes (Royal Blue) */}
         <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <div style={{ color: 'var(--accent-secondary)', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+          <div style={{ color: '#3b82f6', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
             <Compass size={28} />
-            <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700 }}>{t('featSearchTitle')}</h3>
+            <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)' }}>{t('featSearchTitle')}</h3>
           </div>
           <p style={{ color: 'var(--text-secondary)', lineHeight: 1.6, margin: 0, fontSize: '0.95rem' }}>
             {t('featSearchDesc')}
           </p>
         </div>
 
-        {/* Card 3: Community & Customization */}
+        {/* Card 3: Community & Customization (Vibrant Pink) */}
         <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <div style={{ color: '#ec4899', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
             <Star size={28} />
-            <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700 }}>{t('featModsTitle')}</h3>
+            <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)' }}>{t('featModsTitle')}</h3>
           </div>
           <p style={{ color: 'var(--text-secondary)', lineHeight: 1.6, margin: 0, fontSize: '0.95rem' }}>
             {t('featModsDesc')}
           </p>
         </div>
       </section>
+
 
       {/* Footer */}
       <footer style={{
