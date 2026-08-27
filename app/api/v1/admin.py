@@ -457,15 +457,31 @@ def admin_change_user_id(
     is_postgres = (db.bind.dialect.name == "postgresql") if db.bind else False
     
     try:
-        if is_postgres:
-            db.execute(text("SET session_replication_role = 'replica';"))
-        else:
-            db.execute(text("PRAGMA foreign_keys = OFF;"))
+        # Step 1: Read existing user record
+        user_row = db.execute(text("SELECT * FROM users WHERE id = :old_id"), {"old_id": old_id}).mappings().first()
+        if not user_row:
+            raise Exception("Usuario no encontrado.")
             
-        # Update user and invalidate existing refresh session
-        db.execute(text("UPDATE users SET id = :new_id, refresh_token = NULL WHERE id = :old_id"), {"new_id": new_id, "old_id": old_id})
+        user_dict = dict(user_row)
+        user_dict["id"] = new_id
+        user_dict["refresh_token"] = None
         
-        # Update child tables
+        # Temporarily rename old user's unique fields to avoid unique constraint collisions
+        temp_username = f"__tmp_{old_id}_{user_dict['username']}"
+        temp_email = f"__tmp_{old_id}_{user_dict['email']}"
+        db.execute(text("UPDATE users SET username = :tu, email = :te WHERE id = :old_id"), {
+            "tu": temp_username,
+            "te": temp_email,
+            "old_id": old_id
+        })
+        
+        # Insert cloned user with new_id and original username/email
+        cols = [k for k in user_dict.keys()]
+        placeholders = [f":{k}" for k in cols]
+        insert_sql = f"INSERT INTO users ({', '.join(cols)}) VALUES ({', '.join(placeholders)})"
+        db.execute(text(insert_sql), user_dict)
+        
+        # Step 2: Relink all child relations to new_id (foreign keys remain 100% valid)
         for table, col in child_refs:
             try:
                 db.execute(
@@ -475,19 +491,21 @@ def admin_change_user_id(
             except Exception as table_err:
                 print(f"Notice updating {table}.{col}: {table_err}")
                 
+        # Step 3: Delete old temporary user row
+        db.execute(text("DELETE FROM users WHERE id = :old_id"), {"old_id": old_id})
+        
+        # Step 4: Adjust PostgreSQL sequence if applicable
         if is_postgres:
-            db.execute(text("SET session_replication_role = 'origin';"))
             try:
                 db.execute(text("SELECT setval('users_id_seq', (SELECT COALESCE(MAX(id), 1) FROM users));"))
             except Exception:
                 pass
-        else:
-            db.execute(text("PRAGMA foreign_keys = ON;"))
             
         db.commit()
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Error al cambiar el ID: {str(e)}")
+
 
     return {
         "success": True,
