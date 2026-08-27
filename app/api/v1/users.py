@@ -300,11 +300,12 @@ def search_users(
     limit: int = 20,
     db: Session = Depends(get_db)
 ):
-    search_pattern = f"%{q.lower()}%"
+    search_pattern = f"%{q.strip()}%"
     users = db.query(User).filter(
-        User.username.like(search_pattern)
+        User.username.ilike(search_pattern)
     ).offset(skip).limit(limit).all()
     return users
+
 
 @router.put("/me/username", response_model=UserResponse)
 def update_username(

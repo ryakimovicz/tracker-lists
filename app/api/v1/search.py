@@ -147,12 +147,13 @@ def search_all_media(
     seen_users = set()
     seen_guides = set()
     for var in variations:
-        search_pattern = f"%{var.lower()}%"
-        db_users = db.query(User).filter(User.username.like(search_pattern)).limit(20).all()
+        search_pattern = f"%{var.strip()}%"
+        db_users = db.query(User).filter(User.username.ilike(search_pattern)).limit(20).all()
         db_guides = db.query(ReadingList).filter(
             ReadingList.visibility == VisibilityEnum.PUBLIC,
-            (ReadingList.title.like(search_pattern) | ReadingList.description.like(search_pattern))
+            (ReadingList.title.ilike(search_pattern) | ReadingList.description.ilike(search_pattern))
         ).limit(20).all()
+
         
         for u in db_users:
             if u.id not in seen_users:

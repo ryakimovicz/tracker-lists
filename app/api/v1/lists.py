@@ -1073,12 +1073,13 @@ def search_lists_in_db(
     limit: int = 20,
     db: Session = Depends(get_db)
 ):
-    search_pattern = f"%{q.lower()}%"
+    search_pattern = f"%{q.strip()}%"
     lists = db.query(ReadingList).filter(
         ReadingList.visibility == VisibilityEnum.PUBLIC,
-        (ReadingList.title.like(search_pattern) | ReadingList.description.like(search_pattern))
+        (ReadingList.title.ilike(search_pattern) | ReadingList.description.ilike(search_pattern))
     ).offset(skip).limit(limit).all()
     return lists
+
 
 # 14. Update item inside list (customization / reordering)
 @router.put("/{list_id}/items/{item_id}", response_model=ListItemResponse)
