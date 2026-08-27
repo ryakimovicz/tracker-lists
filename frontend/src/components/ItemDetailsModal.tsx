@@ -3032,12 +3032,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                     OMDb API
                   </a>
                 )}
-                {selectedItem.item_type === 'series' && (
-                  <a href="https://www.tvmaze.com" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}>
-                    TVMaze
-                  </a>
-                )}
-                {selectedItem.item_type === 'anime' && (
+                {(selectedItem.item_type === 'series' || selectedItem.item_type === 'anime' || selectedItem.item_type === 'episode' || (selectedItem.external_id || '').startsWith('tvm-ep-')) && (
                   <a href="https://www.tvmaze.com" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}>
                     TVMaze
                   </a>
