@@ -352,16 +352,25 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
     if (nextEp) {
       onOpenSeries({
         id: nextEp.id,
+        rawEpisodeId: nextEp.id,
+        list_id: item.tracking_list_id,
+        tracking_list_id: item.tracking_list_id,
         item_type: 'episode',
-        title: nextEp.name || `Episode ${nextEp.episode_number}`,
+        title: `${item.title} - S${pad(nextEp.season_number)}E${pad(nextEp.episode_number)} - ${nextEp.name || 'Untitled'}`,
+        episode_name: nextEp.name || `Episode ${nextEp.episode_number}`,
+        season_number: nextEp.season_number,
+        episode_number: nextEp.episode_number,
         external_id: `tvm-ep-${nextEp.id}`,
-        image_url: nextEp.still_path || null,
-        custom_notes: JSON.stringify({ description: nextEp.overview || '', release_date: nextEp.air_date || null }),
+        image_url: nextEp.still_path || nextEp.image?.original || nextEp.image?.medium || item.image_url,
+        custom_notes: JSON.stringify({ description: nextEp.overview || '', release_date: nextEp.air_date || nextEp.airdate || null }),
+        release_date: nextEp.air_date || nextEp.airdate || null,
+        is_completed: false,
         parent_series: item
       });
     } else {
       onOpenSeries(item);
     }
+
   };
 
   const getCoverUrl = () => {

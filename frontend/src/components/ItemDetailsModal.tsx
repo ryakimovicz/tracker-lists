@@ -1067,9 +1067,54 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     }
   };
 
-  const isEpisode = !!(String(selectedItem?.external_id || '').startsWith('tvm-ep-') || selectedItem?.list_id);
+  const isEpisode = !!(String(selectedItem?.external_id || '').startsWith('tvm-ep-') || selectedItem?.item_type === 'episode' || selectedItem?.list_id);
   const ratings = (itemReviews || []).filter(r => r.rating !== null && r.rating !== 0).map(r => r.rating);
   const avgRating = ratings.length > 0 ? (ratings.reduce((a: number, b: number) => a + b, 0) / ratings.length).toFixed(1) : null;
+
+  const getEpisodeHeaderInfo = () => {
+    if (!isEpisode) return null;
+    let seriesName = selectedItem.parent_series?.title || selectedItem.series_title || '';
+    let seasonNum = selectedItem.season_number;
+    let episodeNum = selectedItem.episode_number;
+    let episodeName = selectedItem.episode_name || '';
+
+    const rawTitle = selectedItem.title || '';
+    const matchFull = rawTitle.match(/^(.*?)\s*-\s*S(\d+)E(\d+)\s*-\s*(.*)$/i);
+    if (matchFull) {
+      if (!seriesName) seriesName = matchFull[1].trim();
+      if (!seasonNum) seasonNum = parseInt(matchFull[2], 10);
+      if (!episodeNum) episodeNum = parseInt(matchFull[3], 10);
+      if (!episodeName) episodeName = matchFull[4].trim();
+    } else {
+      const matchSimple = rawTitle.match(/^(.*?)\s*-\s*S(\d+)E(\d+)/i);
+      if (matchSimple) {
+        if (!seriesName) seriesName = matchSimple[1].trim();
+        if (!seasonNum) seasonNum = parseInt(matchSimple[2], 10);
+        if (!episodeNum) episodeNum = parseInt(matchSimple[3], 10);
+      }
+    }
+
+    if (!episodeName && rawTitle) {
+      const cleaned = rawTitle.replace(/^(.*?)\s*-\s*S\d+E\d+\s*-\s*/i, '').trim();
+      episodeName = cleaned || rawTitle;
+    }
+    if (!episodeName) {
+      episodeName = language === 'es' ? 'Episodio sin título' : 'Untitled Episode';
+    }
+
+    const sStr = seasonNum !== undefined && seasonNum !== null ? (seasonNum < 10 ? `0${seasonNum}` : `${seasonNum}`) : null;
+    const eStr = episodeNum !== undefined && episodeNum !== null ? (episodeNum < 10 ? `0${episodeNum}` : `${episodeNum}`) : null;
+
+    return {
+      seriesName: seriesName || (selectedItem.parent_series ? selectedItem.parent_series.title : null),
+      seasonNum,
+      episodeNum,
+      seasonBadge: sStr && eStr ? (language === 'es' ? `Temporada ${seasonNum} • Episodio ${episodeNum}` : `Season ${seasonNum} • Episode ${episodeNum}`) : null,
+      episodeName
+    };
+  };
+
+  const epHeaderInfo = isEpisode ? getEpisodeHeaderInfo() : null;
 
   if (!selectedItem) return null;
   
@@ -1179,32 +1224,94 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
               {/* Modal Header */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem' }}>
                 <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                  <div>
-                    <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700 }}>{selectedItem.title}</h2>
-                    <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                      {selectedItem?.item_type !== 'episode' && (
-                        <span className={`tag-badge tag-${selectedItem?.item_type || 'movie'}`} style={{ fontSize: '0.7rem' }}>
-                          {selectedItem?.item_type === 'comic' ? (language === 'es' ? 'Cómic' : 'Comic') : selectedItem?.item_type === 'manga' ? 'Manga' : t('media' + (selectedItem?.item_type || 'movie').charAt(0).toUpperCase() + (selectedItem?.item_type || 'movie').slice(1))}
-                        </span>
+                  {isEpisode && epHeaderInfo ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                      {epHeaderInfo.seriesName && (
+                        <div 
+                          onClick={async () => {
+                            if (selectedItem.parent_series && onOpenItem) {
+                              onOpenItem(selectedItem.parent_series);
+                            } else {
+                              handleGoBackHistory();
+                            }
+                          }}
+                          style={{ 
+                            fontSize: '0.9rem', 
+                            fontWeight: 600, 
+                            color: 'var(--accent-primary)', 
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.35rem',
+                            width: 'fit-content'
+                          }}
+                          title={language === 'es' ? 'Ver serie completa' : 'View full series'}
+                        >
+                          <span>{epHeaderInfo.seriesName}</span>
+                        </div>
                       )}
 
-                      {avgRating && (
-                        <span style={{ fontSize: '0.78rem', color: '#f59e0b', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.1rem' }}>
-                          ★ {avgRating} / 5 ({ratings.length} {language === 'es' ? 'val.' : 'ratings'})
-                        </span>
-                      )}
-                      {selectedItem.completed_at && (
-                        <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
-                          ✓ {selectedItem.item_type === 'movie' || selectedItem.item_type === 'series' || selectedItem.item_type === 'anime'
-                            ? (language === 'es' ? 'Visto el: ' : 'Watched on: ')
-                            : (language === 'es' ? 'Terminado el: ' : 'Completed on: ')
-                          }
-                          {formatDate(new Date(selectedItem.completed_at))}
-                        </span>
-                      )}
+                      <h2 style={{ margin: 0, fontSize: '1.45rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: '1.25' }}>
+                        {epHeaderInfo.episodeName}
+                      </h2>
+
+                      <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap', marginTop: '0.2rem' }}>
+                        {epHeaderInfo.seasonBadge && (
+                          <span style={{
+                            background: 'var(--bg-tertiary)',
+                            border: '1px solid var(--border-color)',
+                            borderRadius: '6px',
+                            padding: '0.15rem 0.5rem',
+                            fontSize: '0.78rem',
+                            fontWeight: 600,
+                            color: 'var(--text-secondary)'
+                          }}>
+                            {epHeaderInfo.seasonBadge}
+                          </span>
+                        )}
+
+                        {avgRating && (
+                          <span style={{ fontSize: '0.78rem', color: '#f59e0b', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.1rem' }}>
+                            ★ {avgRating} / 5 ({ratings.length} {language === 'es' ? 'val.' : 'ratings'})
+                          </span>
+                        )}
+                        {selectedItem.completed_at && (
+                          <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                            ✓ {language === 'es' ? 'Visto el: ' : 'Watched on: '}
+                            {formatDate(new Date(selectedItem.completed_at))}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div>
+                      <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700 }}>{selectedItem.title}</h2>
+                      <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap', marginTop: '0.3rem' }}>
+                        {selectedItem?.item_type !== 'episode' && (
+                          <span className={`tag-badge tag-${selectedItem?.item_type || 'movie'}`} style={{ fontSize: '0.7rem' }}>
+                            {selectedItem?.item_type === 'comic' ? (language === 'es' ? 'Cómic' : 'Comic') : selectedItem?.item_type === 'manga' ? 'Manga' : t('media' + (selectedItem?.item_type || 'movie').charAt(0).toUpperCase() + (selectedItem?.item_type || 'movie').slice(1))}
+                          </span>
+                        )}
+
+                        {avgRating && (
+                          <span style={{ fontSize: '0.78rem', color: '#f59e0b', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.1rem' }}>
+                            ★ {avgRating} / 5 ({ratings.length} {language === 'es' ? 'val.' : 'ratings'})
+                          </span>
+                        )}
+                        {selectedItem.completed_at && (
+                          <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                            ✓ {selectedItem.item_type === 'movie' || selectedItem.item_type === 'series' || selectedItem.item_type === 'anime'
+                              ? (language === 'es' ? 'Visto el: ' : 'Watched on: ')
+                              : (language === 'es' ? 'Terminado el: ' : 'Completed on: ')
+                            }
+                            {formatDate(new Date(selectedItem.completed_at))}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
+
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                   {/* Button + (Add to Shelf / Follow) */}
                   {isOwnProfile && !isEpisode && (
