@@ -1417,18 +1417,11 @@ export const CreateGuide: React.FC = () => {
             </p>
           </div>
 
-          <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem', flexWrap: 'wrap', justifyContent: 'center' }}>
-            <button 
-              onClick={() => navigate('/explore')} 
-              className="btn-primary" 
-              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 1.75rem' }}
-            >
-              <Compass size={18} /> {language === 'es' ? 'Explorar Guías' : 'Explore Guides'}
-            </button>
+          <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem', justifyContent: 'center' }}>
             <button 
               onClick={() => navigate('/')} 
-              className="btn-secondary" 
-              style={{ padding: '0.75rem 1.5rem' }}
+              className="btn-primary" 
+              style={{ padding: '0.75rem 2rem' }}
             >
               {language === 'es' ? 'Volver al Inicio' : 'Back to Home'}
             </button>
@@ -1437,6 +1430,7 @@ export const CreateGuide: React.FC = () => {
       </div>
     );
   }
+
 
   return (
     <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '2rem 0', display: 'flex', flexDirection: 'column', gap: '2rem', textAlign: 'left' }}>
