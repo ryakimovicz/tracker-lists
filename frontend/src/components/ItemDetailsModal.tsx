@@ -473,7 +473,44 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     }
     lastInitialKeyRef.current = currentKey;
     
-    const initModal = async (item: any) => {
+    const initModal = async (incomingItem: any) => {
+      let item = incomingItem;
+
+      // If viewing another user's profile, decouple personal tracking and check the logged-in user's own library
+      const isOtherUserProfile = !isOwnProfile || (userIdParam && user?.id && String(userIdParam) !== String(user.id));
+      if (isOtherUserProfile && user && incomingItem.external_id) {
+        try {
+          const myLibRes = await apiClient.get('/library/');
+          const myLib = myLibRes.data || [];
+          const myMatch = myLib.find((li: any) => li.external_id === incomingItem.external_id && li.item_type === incomingItem.item_type);
+          if (myMatch) {
+            item = {
+              ...incomingItem,
+              id: myMatch.id,
+              status: myMatch.status,
+              completed_at: myMatch.completed_at,
+              pages_read: myMatch.pages_read,
+              total_pages: myMatch.total_pages || incomingItem.total_pages,
+              tracking_list_id: myMatch.tracking_list_id,
+              is_favorite: myMatch.is_favorite
+            };
+          } else {
+            // Logged-in user does not have this item tracked
+            item = {
+              ...incomingItem,
+              id: undefined,
+              status: undefined,
+              completed_at: null,
+              pages_read: 0,
+              tracking_list_id: undefined,
+              is_favorite: false
+            };
+          }
+        } catch (err) {
+          console.error("Failed to check personal library state", err);
+        }
+      }
+
       setSelectedItem(item);
       setUserRating(0);
       setUserComment('');
@@ -644,15 +681,18 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
       try {
         const res = await apiClient.get(`/reviews/${item.item_type}/${item.external_id}`);
-
-
         setItemReviews(res.data);
         
-        if (profileId) {
-          const myReview = res.data.find((r: any) => r.user_id === profileId);
+        // Find review belonging to the CURRENT logged-in user (not foreign profileId!)
+        const currentUserId = user?.id;
+        if (currentUserId) {
+          const myReview = res.data.find((r: any) => r.user_id === currentUserId);
           if (myReview) {
             setUserRating(myReview.rating || 0);
             setUserComment(myReview.content || '');
+          } else {
+            setUserRating(0);
+            setUserComment('');
           }
         }
       } catch(e) {
@@ -1405,7 +1445,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                   {/* Button + (Add to Shelf / Follow) */}
-                  {isOwnProfile && !isEpisode && (
+                  {user && !isEpisode && (
                     <div style={{ position: 'relative' }}>
                       <button
                         type="button"
@@ -1624,7 +1664,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                   )}
 
                   {/* Button ⋮ (Vertical 3 dots menu) */}
-                  {isOwnProfile && !isEpisode && (
+                  {user && selectedItem?.id && !isEpisode && (
                     <div style={{ position: 'relative' }}>
                       <button
                         type="button"
@@ -1960,9 +2000,9 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                       {[1, 2, 3, 4, 5].map((star) => (
                         <button
                           key={star}
-                          disabled={!isOwnProfile}
+                          disabled={!user}
                           onClick={() => handleSaveRating(star)}
-                          style={{ background: 'transparent', border: 'none', cursor: isOwnProfile ? 'pointer' : 'default', padding: 0 }}
+                          style={{ background: 'transparent', border: 'none', cursor: user ? 'pointer' : 'default', padding: 0 }}
                         >
                           <Star
                             size={24}
@@ -1971,7 +2011,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                           />
                         </button>
                       ))}
-                      {isOwnProfile && userRating > 0 && (
+                      {user && userRating > 0 && (
                         <button
                           onClick={handleDeleteRating}
                           style={{
