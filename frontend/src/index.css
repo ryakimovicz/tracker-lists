@@ -235,6 +235,25 @@ h1, h2, h3, h4, h5, h6 {
     border-color: rgba(255, 255, 255, 0.1);
   }
 
+/* Fixed solid styling for popups and modals (No hover jitter, scaling or blur ghosting) */
+.modal-card {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  padding: 2rem;
+  box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.7);
+  position: relative;
+  overflow: hidden;
+  transform: none !important;
+  transition: none !important;
+}
+
+.modal-card:hover {
+  transform: none !important;
+  box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.7) !important;
+}
+
+
   /* Interactive elements */
 .btn-primary {
   display: inline-flex;

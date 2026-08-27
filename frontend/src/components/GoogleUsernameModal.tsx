@@ -61,7 +61,7 @@ export const GoogleUsernameModal: React.FC<GoogleUsernameModalProps> = ({
       }}
     >
       <div
-        className="glass-card"
+        className="modal-card"
         style={{
           width: '100%',
           maxWidth: '440px',
@@ -69,10 +69,10 @@ export const GoogleUsernameModal: React.FC<GoogleUsernameModalProps> = ({
           position: 'relative',
           borderRadius: '16px',
           border: '1px solid var(--border-color)',
-          boxShadow: '0 20px 40px rgba(0, 0, 0, 0.5)',
-          animation: 'fadeInScale 0.2s ease-out',
+          boxShadow: '0 20px 40px rgba(0, 0, 0, 0.7)',
         }}
       >
+
         <button
           onClick={onClose}
           disabled={isLoading}
