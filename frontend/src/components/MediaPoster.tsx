@@ -103,10 +103,17 @@ export const MediaPoster: React.FC<MediaPosterProps> = ({
     }
   };
 
+  const isCinemaPlaceholder = Boolean(
+    src && (
+      src.includes('photo-1489599849927-2ee91cede3ba') ||
+      src.includes('photo-1489599849927')
+    )
+  );
+
   const isGenericImage = Boolean(
     src && (
+      isCinemaPlaceholder ||
       src.includes('photo-1543002588-bfa74002ed7e') ||
-      src.includes('photo-1489599849927-2ee91cede3ba') ||
       src.includes('images.unsplash.com/photo-')
     )
   );
@@ -135,6 +142,9 @@ export const MediaPoster: React.FC<MediaPosterProps> = ({
   }
 
   const config = getPlaceholderConfig();
+  const backgroundStyle = isCinemaPlaceholder
+    ? `linear-gradient(180deg, rgba(0, 0, 0, 0.88) 0%, rgba(15, 23, 42, 0.45) 45%, rgba(0, 0, 0, 0.92) 100%), url("https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=500") center/cover no-repeat`
+    : config.bg;
 
   return (
     <div
@@ -143,8 +153,8 @@ export const MediaPoster: React.FC<MediaPosterProps> = ({
         height,
         aspectRatio,
         borderRadius,
-        background: config.bg,
-        border: '1px solid rgba(255, 255, 255, 0.08)',
+        background: backgroundStyle,
+        border: '1px solid rgba(255, 255, 255, 0.12)',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -154,10 +164,11 @@ export const MediaPoster: React.FC<MediaPosterProps> = ({
         boxSizing: 'border-box',
         position: 'relative',
         overflow: 'hidden',
-        boxShadow: 'inset 0 0 30px rgba(0,0,0,0.5)',
+        boxShadow: 'inset 0 0 30px rgba(0,0,0,0.6)',
         ...style
       }}
     >
+
       {/* Title in top-center area */}
       <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '44px', marginTop: '0.25rem' }}>
         <span
