@@ -21,10 +21,20 @@ import {
   Copy,
   Menu,
   Eye,
-  Crown
+  Crown,
+  Sparkles,
+  Compass
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { ProModal } from '../components/ProModal';
+
+// ============================================================================
+// FEATURE FLAG: SECCIÓN EN DESARROLLO
+// Cambiar a `false` cuando se desee habilitar "Crear Guía" para todos los usuarios.
+// Si está en `true`, solo los administradores pueden acceder y crear guías.
+// ============================================================================
+export const IS_CREATE_GUIDE_IN_DEVELOPMENT = true;
+
 
 interface CreatedGuide {
   id: number;
@@ -1355,8 +1365,82 @@ export const CreateGuide: React.FC = () => {
 
 
 
+  if (IS_CREATE_GUIDE_IN_DEVELOPMENT && !currentUser?.is_admin) {
+    return (
+      <div style={{ maxWidth: '640px', margin: '4rem auto', padding: '0 1rem', textAlign: 'center' }}>
+        <div 
+          className="glass-card" 
+          style={{ 
+            padding: '3.5rem 2rem', 
+            display: 'flex', 
+            flexDirection: 'column', 
+            alignItems: 'center', 
+            gap: '1.5rem',
+            borderRadius: '16px'
+          }}
+        >
+          <div style={{
+            width: '72px',
+            height: '72px',
+            borderRadius: '50%',
+            background: 'linear-gradient(135deg, rgba(124, 58, 237, 0.2), rgba(245, 158, 11, 0.2))',
+            border: '1px solid rgba(245, 158, 11, 0.4)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#f59e0b'
+          }}>
+            <Sparkles size={36} />
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <span style={{ 
+              fontSize: '0.8rem', 
+              fontWeight: 700, 
+              color: '#f59e0b', 
+              textTransform: 'uppercase', 
+              letterSpacing: '0.08em',
+              background: 'rgba(245, 158, 11, 0.12)',
+              padding: '0.3rem 0.8rem',
+              borderRadius: '20px',
+              alignSelf: 'center'
+            }}>
+              {language === 'es' ? 'Próximamente' : 'Coming Soon'}
+            </span>
+            <h2 style={{ margin: '0.5rem 0 0 0', fontSize: '1.75rem', fontWeight: 800 }}>
+              {language === 'es' ? 'Sección en Desarrollo' : 'Section in Development'}
+            </h2>
+            <p style={{ margin: 0, fontSize: '0.95rem', color: 'var(--text-secondary)', lineHeight: 1.5, maxWidth: '480px' }}>
+              {language === 'es' 
+                ? 'Estamos perfeccionando la herramienta de creación de guías interactivas para que tengas la mejor experiencia. ¡Muy pronto disponible para toda la comunidad de Pathd!'
+                : 'We are perfecting the interactive guide creator to give you the best experience. It will be available to all Pathd users very soon!'}
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+            <button 
+              onClick={() => navigate('/explore')} 
+              className="btn-primary" 
+              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 1.75rem' }}
+            >
+              <Compass size={18} /> {language === 'es' ? 'Explorar Guías' : 'Explore Guides'}
+            </button>
+            <button 
+              onClick={() => navigate('/')} 
+              className="btn-secondary" 
+              style={{ padding: '0.75rem 1.5rem' }}
+            >
+              {language === 'es' ? 'Volver al Inicio' : 'Back to Home'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '2rem 0', display: 'flex', flexDirection: 'column', gap: '2rem', textAlign: 'left' }}>
+
       
       {errorMsg && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', padding: '0.75rem', borderRadius: 8, fontSize: '0.9rem' }}>
