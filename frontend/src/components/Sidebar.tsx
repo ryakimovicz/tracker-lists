@@ -85,14 +85,19 @@ export const Sidebar: React.FC = () => {
       {/* Main Navigation */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1 }}>
         <NavItem to="/" icon={Home} label={t('navHome') || 'Inicio'} />
-        <NavItem to="/social" icon={Users} label={t('navSocial') || 'Social'} />
-        <NavItem to="/create" icon={PlusCircle} label={t('navCreate') || 'Crear'} />
-        <NavItem to="/search" icon={Compass} label={t('navExplore') || 'Explorar'} />
-        {isAuthenticated && <NavItem to="/profile" icon={User} label={t('navProfile') || 'Perfil'} />}
-        {user?.is_admin && (
-          <NavItem to="/admin" icon={Shield} label={t('navAdmin') || 'Admin'} />
+        {isAuthenticated && (
+          <>
+            <NavItem to="/social" icon={Users} label={t('navSocial') || 'Social'} />
+            <NavItem to="/create" icon={PlusCircle} label={t('navCreate') || 'Crear'} />
+            <NavItem to="/search" icon={Compass} label={t('navExplore') || 'Explorar'} />
+            <NavItem to="/profile" icon={User} label={t('navProfile') || 'Perfil'} />
+            {user?.is_admin && (
+              <NavItem to="/admin" icon={Shield} label={t('navAdmin') || 'Admin'} />
+            )}
+          </>
         )}
       </div>
+
 
       {/* Bottom Area */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: 'auto', paddingTop: '1.5rem', borderTop: '1px solid var(--border-color)' }}>
