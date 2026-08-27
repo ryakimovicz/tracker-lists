@@ -22,7 +22,16 @@
 - **Estado Global**: Contextos de React (`AuthContext`, `LanguageContext`, `ThemeContext`).
 - **Localización (i18n)**: Español e Inglés con selector dinámico persistente en navegador.
 
+### 🏗️ Infraestructura y Despliegue en Producción
+- **Frontend SPA**: [Cloudflare Pages](https://pages.cloudflare.com/) con CI/CD automático en cada push a la rama `main`.
+- **Backend API**: [Render](https://render.com/) (Web Service FastAPI / Uvicorn con auto-deploy).
+- **Base de Datos**: [Neon.tech](https://neon.tech/) (PostgreSQL Serverless gestionado con pool de conexiones).
+- **Dominio & DNS**: [Cloudflare](https://cloudflare.com/) gestionando `pathd.net`, certificados SSL universales y registros DNS (DKIM/SPF para correo).
+- **Servicio de Correos**: [Resend](https://resend.com/) para despacho de emails transaccionales desde `noreply@pathd.net`.
+- **Monitorización & Keep-Alive**: [UptimeRobot](https://uptimerobot.com/) realizando pings continuos a `GET /health` para mantener activo el backend 24/7.
+
 ---
+
 
 ## 🌐 APIs Externas e Integraciones
 
