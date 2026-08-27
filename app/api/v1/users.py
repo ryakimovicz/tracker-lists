@@ -1,7 +1,9 @@
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
 from fastapi import APIRouter, Depends, Query, HTTPException, status
+from sqlalchemy import text
 from sqlalchemy.orm import Session
+
 
 from app.core.database import get_db
 from app.api.deps import get_current_user, get_current_user_optional, get_current_user_allow_suspended
