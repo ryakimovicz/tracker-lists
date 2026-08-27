@@ -34,9 +34,11 @@
 | [AniList](https://graphql.anilist.co) | Mangas, novelas ligeras y one-shots (GraphQL) |
 | [IGDB](https://api-docs.igdb.com/) | Videojuegos (autenticado via Twitch OAuth2) |
 | [Last.fm](https://www.last.fm/api) | Música, álbumes destacados y scrobbling en tiempo real |
+| [Wikipedia API](https://www.mediawiki.org/wiki/API:Main_page) | Calendario de estrenos de películas y sinopsis enriquecidas (CC BY-SA) |
 | [Stripe](https://stripe.com/) | Procesamiento de pagos seguros y gestión de suscripciones Premium |
 | [deep-translator](https://github.com/nidhaloff/deep-translator) (Google) | Traducción dinámica y gratuita de sinopsis con caché en base de datos |
 | [UptimeRobot](https://uptimerobot.com/) | Monitorización continua y mantenimiento activo 24/7 mediante `GET /health` |
+
 
 ---
 
