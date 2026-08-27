@@ -18,9 +18,11 @@ from app.core.security import verify_password, get_password_hash
 from app.services.lastfm import LastFMService
 from app.models.activity import UserActivityLog
 from app.schemas.user import UserResponse, UserDashboardResponse
+from app.schemas.list import ReadingListResponse
 from app.schemas.social import UpNextResponse, UpNextItemResponse
 from datetime import datetime, timezone
 from app.schemas.auth import PasswordChangeRequest, UsernameUpdateRequest
+
 
 router = APIRouter()
 
