@@ -16,13 +16,12 @@ const LETTERS: LetterConfig[] = [
 ];
 
 export const BrandLogo: React.FC = () => {
-  // 'd' is index 4, normally active by default
-  const [activeLetter, setActiveLetter] = useState<number>(4);
+  // activeLetter is the letter currently highlighted by wave or hover (-1 when in idle state)
+  const [activeLetter, setActiveLetter] = useState<number>(-1);
   const isHoveredRef = useRef(false);
   const lastHoveredIndexRef = useRef<number>(4);
   const timeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
 
   const clearAllTimeouts = () => {
     timeoutsRef.current.forEach((t) => clearTimeout(t));
@@ -46,6 +45,14 @@ export const BrandLogo: React.FC = () => {
       }, step * stepDelay);
       timeoutsRef.current.push(t);
     });
+
+    // Settle back to idle resting state (d painted orange at normal position)
+    const settleTimeout = setTimeout(() => {
+      if (!isHoveredRef.current) {
+        setActiveLetter(-1);
+      }
+    }, waveSequence.length * stepDelay + 120);
+    timeoutsRef.current.push(settleTimeout);
   };
 
   // Schedule periodic wave every 7 seconds
@@ -79,13 +86,12 @@ export const BrandLogo: React.FC = () => {
 
     const fromIndex = lastHoveredIndexRef.current;
     if (fromIndex >= 4) {
-      setActiveLetter(4);
+      setActiveLetter(-1);
       startPeriodicWave();
       return;
     }
 
     // Smooth cascade from last hovered index forward to 'd' (index 4)
-    // Example: if mouse left at 't' (2) -> activates 'h' (3) -> settles on 'd' (4)
     const forwardSteps: number[] = [];
     for (let i = fromIndex + 1; i <= 4; i++) {
       forwardSteps.push(i);
@@ -96,13 +102,19 @@ export const BrandLogo: React.FC = () => {
       const t = setTimeout(() => {
         if (!isHoveredRef.current) {
           setActiveLetter(letterIndex);
-          if (letterIndex === 4) {
-            startPeriodicWave();
-          }
         }
       }, (step + 1) * stepDelay);
       timeoutsRef.current.push(t);
     });
+
+    // Return to resting position once cascade completes
+    const settleTimeout = setTimeout(() => {
+      if (!isHoveredRef.current) {
+        setActiveLetter(-1);
+        startPeriodicWave();
+      }
+    }, (forwardSteps.length + 1) * stepDelay + 100);
+    timeoutsRef.current.push(settleTimeout);
   };
 
   return (
@@ -123,7 +135,14 @@ export const BrandLogo: React.FC = () => {
       }}
     >
       {LETTERS.map((letter, idx) => {
-        const isActive = activeLetter === idx;
+        // Is actively being animated or hovered right now
+        const isDynamicActive = activeLetter === idx;
+        // In idle state (activeLetter === -1), 'd' is always painted orange
+        const isIdleD = activeLetter === -1 && idx === 4;
+
+        const isColored = isDynamicActive || isIdleD;
+        const isLifted = isDynamicActive; // Only lifted while animating or hovered
+
         return (
           <span
             key={letter.char}
@@ -131,10 +150,10 @@ export const BrandLogo: React.FC = () => {
             style={{
               display: 'inline-block',
               cursor: 'pointer',
-              color: isActive ? letter.colorVar : 'var(--text-primary)',
-              textShadow: isActive ? `0 0 16px ${letter.glow}` : 'none',
-              transform: isActive ? 'translateY(-2.5px)' : 'translateY(0)',
-              transition: 'color 0.18s cubic-bezier(0.4, 0, 0.2, 1), transform 0.18s cubic-bezier(0.4, 0, 0.2, 1), text-shadow 0.18s cubic-bezier(0.4, 0, 0.2, 1)',
+              color: isColored ? letter.colorVar : 'var(--text-primary)',
+              textShadow: isDynamicActive ? `0 0 16px ${letter.glow}` : 'none',
+              transform: isLifted ? 'translateY(-2.5px)' : 'translateY(0)',
+              transition: 'color 0.18s cubic-bezier(0.4, 0, 0.2, 1), transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), text-shadow 0.18s cubic-bezier(0.4, 0, 0.2, 1)',
             }}
           >
             {letter.char}
