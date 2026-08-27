@@ -388,27 +388,39 @@ async def admin_cancel_user_subscription(
 from sqlalchemy import text
 from app.core.security import create_access_token
 
-@router.post("/claim-id-one")
-def admin_claim_id_one(
+class ChangeUserIdRequest(BaseModel):
+    new_id: int
+
+@router.post("/users/{user_id}/change-id")
+def admin_change_user_id(
+    user_id: int,
+    req: ChangeUserIdRequest,
     current_admin: User = Depends(get_current_admin),
     db: Session = Depends(get_db)
 ):
     """
-    Safely migrates the current admin user to ID 1 in cascade across all PostgreSQL/SQLite relations.
+    Safely migrates a user to a specific new ID in cascade across all PostgreSQL/SQLite relations.
     """
-    if current_admin.id == 1:
-        return {"success": True, "message": "Tu usuario ya tiene el ID 1.", "new_id": 1, "access_token": None}
+    target_user = db.query(User).filter(User.id == user_id).first()
+    if not target_user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+
+    new_id = req.new_id
+    if new_id <= 0:
+        raise HTTPException(status_code=400, detail="El nuevo ID debe ser un número entero positivo mayor a 0.")
+
+    if new_id == target_user.id:
+        return {"success": True, "message": f"El usuario ya posee el ID {new_id}.", "new_id": new_id, "access_token": None}
     
-    # Verify ID 1 is not occupied
-    user_one = db.query(User).filter(User.id == 1).first()
-    if user_one:
+    # Verify new_id is not already in use
+    existing_user = db.query(User).filter(User.id == new_id).first()
+    if existing_user:
         raise HTTPException(
             status_code=400, 
-            detail=f"El ID 1 ya está ocupado por el usuario @{user_one.username} ({user_one.email})."
+            detail=f"El ID {new_id} ya está en uso por el usuario @{existing_user.username} ({existing_user.email})."
         )
     
-    old_id = current_admin.id
-    new_id = 1
+    old_id = target_user.id
     
     child_refs = [
         ("user_library_items", "user_id"),
@@ -467,16 +479,20 @@ def admin_claim_id_one(
         db.commit()
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error al migrar al ID 1: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error al cambiar el ID: {str(e)}")
         
-    # Generate fresh JWT token for user ID 1
-    new_access_token = create_access_token(data={"sub": str(new_id)})
+    # If the user being changed is the current logged-in admin, generate a new token
+    new_access_token = None
+    if current_admin.id == old_id:
+        new_access_token = create_access_token(data={"sub": str(new_id)})
+
     return {
         "success": True,
-        "message": f"¡Tu usuario @{current_admin.username} ahora tiene el ID 1 exitosamente!",
+        "message": f"¡El usuario @{target_user.username} fue cambiado al ID {new_id} exitosamente!",
         "new_id": new_id,
         "access_token": new_access_token
     }
+
 
 
 

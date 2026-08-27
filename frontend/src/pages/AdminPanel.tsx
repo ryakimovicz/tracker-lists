@@ -60,6 +60,7 @@ export const AdminPanel: React.FC = () => {
   // Action states for modal
   const [giftMonths, setGiftMonths] = useState<number>(1);
   const [warningMessage, setWarningMessage] = useState('');
+  const [newUserIdInput, setNewUserIdInput] = useState<number | string>('');
   
   // Granular suspension states
   const [suspensionValue, setSuspensionValue] = useState<number>(7);
@@ -69,34 +70,46 @@ export const AdminPanel: React.FC = () => {
   // Feedback messages
   const [modalFeedback, setModalFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
-  const [isClaimingId, setIsClaimingId] = useState(false);
-  const [claimFeedback, setClaimFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const { user: currentUser } = useAuth();
 
-  const handleClaimIdOne = async () => {
-    const confirmAction = window.confirm(
-      isEs
-        ? "¿Deseas migrar tu cuenta de Administrador al ID 1? Todas tus guías creadas, biblioteca, favoritos y progreso se reasignarán automáticamente al ID 1 sin pérdida de datos."
-        : "Do you want to migrate your Admin account to ID 1? All your guides, library, favorites and progress will be safely remapped to ID 1."
-    );
-    if (!confirmAction) return;
+  const handleChangeUserId = async () => {
+    if (!selectedUser) return;
+    const targetId = Number(newUserIdInput);
+    if (!targetId || targetId <= 0) {
+      setModalFeedback({ type: 'error', text: isEs ? 'Ingresa un ID válido mayor a 0.' : 'Please enter a valid ID greater than 0.' });
+      return;
+    }
+    if (targetId === selectedUser.id) {
+      setModalFeedback({ type: 'error', text: isEs ? 'El usuario ya tiene ese ID.' : 'User already has this ID.' });
+      return;
+    }
 
-    setIsClaimingId(true);
-    setClaimFeedback(null);
+    const confirmChange = window.confirm(
+      isEs
+        ? `¿Confirmas reasignar al usuario "${selectedUser.username}" del ID #${selectedUser.id} al nuevo ID #${targetId}? Todas sus guías, biblioteca, favoritos y progreso se reasignarán en cascada de forma segura.`
+        : `Confirm reassigning user "${selectedUser.username}" from ID #${selectedUser.id} to new ID #${targetId}? All related guides, library, favorites and progress will be safely remapped in cascade.`
+    );
+    if (!confirmChange) return;
+
+    setActionLoading(true);
     try {
-      const res = await apiClient.post('/admin/claim-id-one');
+      const res = await apiClient.post(`/admin/users/${selectedUser.id}/change-id`, { new_id: targetId });
       if (res.data.access_token) {
         localStorage.setItem('token', res.data.access_token);
       }
-      setClaimFeedback({ type: 'success', text: res.data.message });
-      fetchUsers();
+      const updated = { ...selectedUser, id: targetId };
+      setSelectedUser(updated);
+      setUsers(prev => prev.map(u => u.id === selectedUser.id ? updated : u));
+      setModalFeedback({
+        type: 'success',
+        text: res.data.message || (isEs ? `ID cambiado exitosamente a #${targetId}.` : `ID successfully changed to #${targetId}.`)
+      });
     } catch (err: any) {
-      setClaimFeedback({ type: 'error', text: err.response?.data?.detail || 'Error al reclamar ID 1.' });
+      setModalFeedback({ type: 'error', text: err.response?.data?.detail || 'Error al cambiar ID.' });
     } finally {
-      setIsClaimingId(false);
+      setActionLoading(false);
     }
   };
-
 
   useEffect(() => {
     fetchUsers();
@@ -131,6 +144,7 @@ export const AdminPanel: React.FC = () => {
 
   const handleOpenUserModal = (user: AdminUser) => {
     setSelectedUser(user);
+    setNewUserIdInput(user.id);
     setWarningMessage(user.admin_warning || '');
     setSuspensionReason(user.suspension_reason || '');
     setGiftMonths(1);
@@ -138,6 +152,7 @@ export const AdminPanel: React.FC = () => {
     setSuspensionUnit('days');
     setModalFeedback(null);
   };
+
 
   // Actions
   const handleToggleVip = async () => {
@@ -347,72 +362,10 @@ export const AdminPanel: React.FC = () => {
         </div>
       </div>
 
-      {/* Claim ID 1 Action Banner (if admin is not ID 1 and ID 1 is available) */}
-      {currentUser && currentUser.id !== 1 && (
-        <div 
-          className="glass-card" 
-          style={{ 
-            padding: '1.25rem 1.75rem', 
-            borderRadius: 14, 
-            marginBottom: '1.5rem',
-            background: 'linear-gradient(135deg, rgba(124, 58, 237, 0.12), rgba(245, 158, 11, 0.12))',
-            border: '1px solid rgba(124, 58, 237, 0.3)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '1rem',
-            flexWrap: 'wrap'
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <Sparkles size={24} color="#f59e0b" style={{ flexShrink: 0 }} />
-            <div>
-              <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-primary)' }}>
-                {isEs ? 'Reasignar cuenta a ID 1' : 'Reassign account to ID 1'}
-              </div>
-              <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
-                {isEs 
-                  ? 'El ID 1 está disponible. Puedes migrar tu usuario para ser el primer registro sin romper guías, biblioteca ni progreso.'
-                  : 'ID 1 is available. You can safely migrate your user to ID 1 without losing any guides, library or progress.'
-                }
-              </div>
-            </div>
-          </div>
-          <button 
-            onClick={handleClaimIdOne}
-            disabled={isClaimingId}
-            className="btn-primary"
-            style={{ padding: '0.5rem 1.25rem', fontSize: '0.85rem', whiteSpace: 'nowrap' }}
-          >
-            {isClaimingId 
-              ? (isEs ? 'Migrando...' : 'Migrating...') 
-              : (isEs ? '✨ Reclamar ID 1' : '✨ Claim ID 1')
-            }
-          </button>
-        </div>
-      )}
-
-      {claimFeedback && (
-        <div style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: '0.5rem', 
-          padding: '0.85rem 1.25rem', 
-          borderRadius: 10, 
-          marginBottom: '1.5rem',
-          background: claimFeedback.type === 'success' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-          color: claimFeedback.type === 'success' ? '#10b981' : '#ef4444',
-          border: `1px solid ${claimFeedback.type === 'success' ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`
-        }}>
-          {claimFeedback.type === 'success' ? <CheckCircle size={18} /> : <AlertCircle size={18} />}
-          <span>{claimFeedback.text}</span>
-        </div>
-      )}
-
       {/* Users Tab */}
-
       {activeTab === 'users' && (
         <div>
+
           {/* Search bar and refresh */}
           <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
             <form onSubmit={handleSearchSubmit} style={{ flex: 1, minWidth: 280, display: 'flex', gap: '0.5rem' }}>
@@ -901,8 +854,47 @@ export const AdminPanel: React.FC = () => {
                 )}
               </div>
 
-              {/* Action 5: Eliminar Cuenta */}
+              {/* Action 5: Reasignar ID de Usuario */}
+              <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '1rem 1.25rem', borderRadius: 12, border: '1px solid var(--border-color)' }}>
+                <div style={{ fontWeight: 700, fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--accent-primary)', marginBottom: '0.3rem' }}>
+                  <Sparkles size={16} /> {isEs ? 'Reasignar ID de Usuario' : 'Reassign User ID'}
+                </div>
+
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
+                  {isEs 
+                    ? 'Reasigna el ID numérico de este usuario. Todas sus guías creadas, biblioteca, favoritos y progreso se actualizarán en cascada sin pérdida de datos.' 
+                    : 'Reassign this user’s numeric ID. All relational guides, library, favorites and progress will be safely remapped in cascade.'}
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flex: 1 }}>
+                    <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>ID:</span>
+                    <input
+                      type="number"
+                      min={1}
+                      value={newUserIdInput}
+                      onChange={e => setNewUserIdInput(e.target.value)}
+                      className="input-field"
+                      style={{ width: '100%', padding: '0.45rem 0.8rem', fontSize: '0.85rem' }}
+                      placeholder="Nuevo ID..."
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={actionLoading || !newUserIdInput || Number(newUserIdInput) === selectedUser.id}
+                    onClick={handleChangeUserId}
+                    className="btn-primary"
+                    style={{ fontSize: '0.85rem', padding: '0.45rem 1.25rem', whiteSpace: 'nowrap' }}
+                  >
+                    {isEs ? 'Guardar ID' : 'Save ID'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Action 6: Eliminar Cuenta */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '0.5rem' }}>
+
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                   {isEs ? 'Acción irreversible' : 'Irreversible action'}
                 </div>
