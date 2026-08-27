@@ -3007,6 +3007,75 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                   </div>
                 )}
               </div>
+
+              {/* Data Provider Attribution Footer */}
+              <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem', marginTop: '0.5rem', textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                {language === 'es' ? 'Datos y recursos provistos por ' : 'Data and resources powered by '}
+                {selectedItem.item_type === 'game' && (
+                  <a href="https://www.igdb.com" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}>
+                    IGDB / Twitch
+                  </a>
+                )}
+                {selectedItem.item_type === 'movie' && (
+                  <>
+                    <a href="https://www.omdbapi.com" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}>
+                      OMDb API
+                    </a>
+                    {' & '}
+                    <a href="https://fanart.tv" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}>
+                      Fanart.tv
+                    </a>
+                  </>
+                )}
+                {selectedItem.item_type === 'series' && (
+                  <>
+                    <a href="https://www.tvmaze.com" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}>
+                      TVMaze
+                    </a>
+                    {' & '}
+                    <a href="https://fanart.tv" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}>
+                      Fanart.tv
+                    </a>
+                  </>
+                )}
+                {selectedItem.item_type === 'anime' && (
+                  <>
+                    <a href="https://anilist.co" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}>
+                      AniList
+                    </a>
+                    {' & '}
+                    <a href="https://www.tvmaze.com" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}>
+                      TVMaze
+                    </a>
+                  </>
+                )}
+                {selectedItem.item_type === 'manga' && (
+                  <a href="https://anilist.co" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}>
+                    AniList
+                  </a>
+                )}
+                {selectedItem.item_type === 'comic' && (
+                  <a href="https://comicvine.gamespot.com" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}>
+                    Comic Vine
+                  </a>
+                )}
+                {selectedItem.item_type === 'book' && (
+                  <>
+                    <a href="https://books.google.com" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}>
+                      Google Books
+                    </a>
+                    {' & '}
+                    <a href="https://openlibrary.org" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}>
+                      Open Library
+                    </a>
+                  </>
+                )}
+                {selectedItem.item_type === 'music' && (
+                  <a href="https://www.last.fm" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}>
+                    Last.fm
+                  </a>
+                )}
+              </div>
             </div>
           </div>
         );

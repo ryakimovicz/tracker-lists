@@ -1,6 +1,6 @@
 import React from 'react';
 import { useTranslation } from '../context/LanguageContext';
-import { FileText, CheckCircle, AlertTriangle, HelpCircle, ArrowLeft } from 'lucide-react';
+import { FileText, CheckCircle, AlertTriangle, HelpCircle, ArrowLeft, ExternalLink } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export const TermsOfService: React.FC = () => {
@@ -21,7 +21,7 @@ export const TermsOfService: React.FC = () => {
           </h1>
         </div>
         <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '2rem' }}>
-          {isEs ? 'Última actualización: 25 de agosto de 2026' : 'Last updated: August 25, 2026'}
+          {isEs ? 'Última actualización: 27 de agosto de 2026' : 'Last updated: August 27, 2026'}
         </p>
 
         <section style={{ marginBottom: '2rem' }}>
@@ -53,21 +53,113 @@ export const TermsOfService: React.FC = () => {
 
         <section style={{ marginBottom: '2rem' }}>
           <h2 style={{ fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)' }}>
-            <HelpCircle size={20} /> {isEs ? '3. Atribución de APIs y Fuentes de Contenido' : '3. API Attributions & Data Sources'}
+            <HelpCircle size={20} /> {isEs ? '3. Fuentes de Datos, APIs y Atribuciones de Terceros' : '3. Data Sources, APIs & Third-Party Attributions'}
           </h2>
           <p style={{ color: 'var(--text-secondary)' }}>
             {isEs
-              ? 'Pathd indexa y muestra información descriptiva e imágenes de medios proporcionadas por APIs de terceros. Pathd no es propietaria del material con derechos de autor mostrado.'
-              : 'Pathd indexes and displays descriptive metadata and cover art provided by third-party APIs. Pathd does not claim ownership of the copyrighted media displayed.'}
+              ? 'Pathd indexa, organiza y muestra información descriptiva, sinopsis y portadas de medios mediante APIs y fuentes públicas de terceros. Pathd es un cliente independiente y no reclama propiedad sobre las obras con derechos de autor mostradas. Expresamos nuestro agradecimiento y crédito a las siguientes plataformas:'
+              : 'Pathd indexes, organizes, and presents descriptive metadata, synopses, and artwork using public third-party APIs and sources. Pathd is an independent service and does not claim ownership over the copyrighted media displayed. We acknowledge and credit the following data providers:'}
           </p>
-          <ul style={{ color: 'var(--text-secondary)', paddingLeft: '1.5rem' }}>
-            <li><strong>Videojuegos:</strong> {isEs ? 'Datos e imágenes provistos por IGDB / Twitch.' : 'Data and media powered by IGDB / Twitch.'}</li>
-            <li><strong>Series y TV:</strong> {isEs ? 'Datos y cronogramas de episodios provistos por TVmaze API.' : 'Episode guides and schedules powered by TVmaze API.'}</li>
-            <li><strong>Películas:</strong> {isEs ? 'Metadatos provistos por OMDb y fuentes abiertas.' : 'Metadata powered by OMDb and open sources.'}</li>
-            <li><strong>Libros:</strong> {isEs ? 'Información y portadas provistas por Google Books API.' : 'Book information and covers provided by Google Books API.'}</li>
-            <li><strong>Cómics & Manga:</strong> {isEs ? 'Metadatos provistos por Comic Vine y AniList.' : 'Metadata provided by Comic Vine and AniList.'}</li>
-            <li><strong>Música:</strong> {isEs ? 'Scrobbling y datos provistos por Last.fm.' : 'Scrobbling and music metadata powered by Last.fm.'}</li>
-          </ul>
+          
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem', marginTop: '1.25rem' }}>
+            
+            <div style={{ background: 'var(--bg-tertiary)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+              <div style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span>🎮 IGDB / Twitch</span>
+                <a href="https://www.igdb.com" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.85rem' }}>
+                  igdb.com <ExternalLink size={13} />
+                </a>
+              </div>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0.5rem 0 0' }}>
+                {isEs ? 'Metadatos, fechas de estreno y jerarquía de videojuegos.' : 'Video game metadata, release dates, and franchise relations.'}
+              </p>
+            </div>
+
+            <div style={{ background: 'var(--bg-tertiary)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+              <div style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span>🎬 OMDb API</span>
+                <a href="https://www.omdbapi.com" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.85rem' }}>
+                  omdbapi.com <ExternalLink size={13} />
+                </a>
+              </div>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0.5rem 0 0' }}>
+                {isEs ? 'Información cinematográfica y sinopsis de películas bajo licencia CC BY-NC 4.0.' : 'Movie metadata and synopses provided under CC BY-NC 4.0 license.'}
+              </p>
+            </div>
+
+            <div style={{ background: 'var(--bg-tertiary)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+              <div style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span>🎨 Fanart.tv</span>
+                <a href="https://fanart.tv" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.85rem' }}>
+                  fanart.tv <ExternalLink size={13} />
+                </a>
+              </div>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0.5rem 0 0' }}>
+                {isEs ? 'Imágenes, pósters y fondos de alta definición de la comunidad.' : 'Community-contributed high definition artwork, posters, and backgrounds.'}
+              </p>
+            </div>
+
+            <div style={{ background: 'var(--bg-tertiary)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+              <div style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span>📺 TVMaze</span>
+                <a href="https://www.tvmaze.com" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.85rem' }}>
+                  tvmaze.com <ExternalLink size={13} />
+                </a>
+              </div>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0.5rem 0 0' }}>
+                {isEs ? 'Estructura de temporadas, episodios y calendarios de series.' : 'TV show schedules, season guides, and episode descriptions.'}
+              </p>
+            </div>
+
+            <div style={{ background: 'var(--bg-tertiary)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+              <div style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span>💥 Comic Vine</span>
+                <a href="https://comicvine.gamespot.com" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.85rem' }}>
+                  comicvine.gamespot.com <ExternalLink size={13} />
+                </a>
+              </div>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0.5rem 0 0' }}>
+                {isEs ? 'Datos y tracking de volúmenes de cómics occidentales.' : 'Western comic book database and volume information.'}
+              </p>
+            </div>
+
+            <div style={{ background: 'var(--bg-tertiary)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+              <div style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span>🌸 AniList</span>
+                <a href="https://anilist.co" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.85rem' }}>
+                  anilist.co <ExternalLink size={13} />
+                </a>
+              </div>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0.5rem 0 0' }}>
+                {isEs ? 'Catálogo de manga, novelas ligeras y anime (API GraphQL).' : 'Manga, light novel, and anime catalog powered by AniList GraphQL.'}
+              </p>
+            </div>
+
+            <div style={{ background: 'var(--bg-tertiary)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+              <div style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span>📚 Google Books & Open Library</span>
+                <a href="https://openlibrary.org" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.85rem' }}>
+                  openlibrary.org <ExternalLink size={13} />
+                </a>
+              </div>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0.5rem 0 0' }}>
+                {isEs ? 'Metadatos bibliográficos, autores, páginas y portadas de libros.' : 'Book metadata, authors, page counts, and cover images.'}
+              </p>
+            </div>
+
+            <div style={{ background: 'var(--bg-tertiary)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+              <div style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span>🎵 Last.fm</span>
+                <a href="https://www.last.fm" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.85rem' }}>
+                  last.fm <ExternalLink size={13} />
+                </a>
+              </div>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0.5rem 0 0' }}>
+                {isEs ? 'Scrobbling en tiempo real, artistas y álbumes musicales.' : 'Real-time music scrobbling, artist, and album metadata.'}
+              </p>
+            </div>
+
+          </div>
         </section>
 
         <section>
