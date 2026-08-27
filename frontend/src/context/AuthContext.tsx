@@ -90,12 +90,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Listen for logout events dispatched by Axios interceptor on refresh failure
     const handleLogoutEvent = () => {
       setUser(null);
+      localStorage.removeItem('access_token');
+      if (window.location.pathname !== '/login' && window.location.pathname !== '/register') {
+        window.location.href = '/login';
+      }
     };
 
     window.addEventListener('auth-logout', handleLogoutEvent);
     return () => {
       window.removeEventListener('auth-logout', handleLogoutEvent);
     };
+
   }, []);
 
   return (

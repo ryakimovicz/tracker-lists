@@ -104,10 +104,11 @@ export const AdminPanel: React.FC = () => {
           ? `¡Tu ID fue actualizado al ID #${targetId}! Tu sesión se cerrará automáticamente. Por favor inicia sesión nuevamente.`
           : `Your user ID was updated to #${targetId}! You will be logged out. Please log in again.`
         );
-        await logout();
-        navigate('/login');
+        localStorage.removeItem('access_token');
+        window.location.href = '/login';
         return;
       }
+
 
       const updated = { ...selectedUser, id: targetId };
       setSelectedUser(updated);
