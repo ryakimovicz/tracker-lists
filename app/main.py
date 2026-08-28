@@ -62,6 +62,16 @@ with engine.connect() as conn:
     except Exception:
         pass
     try:
+        conn.execute(text("ALTER TABLE users ADD COLUMN is_verified BOOLEAN DEFAULT TRUE;"))
+        conn.commit()
+    except Exception:
+        pass
+    try:
+        conn.execute(text("ALTER TABLE users ADD COLUMN verification_token VARCHAR(250);"))
+        conn.commit()
+    except Exception:
+        pass
+    try:
         conn.execute(text("ALTER TABLE users ADD COLUMN dodo_subscription_id VARCHAR(100);"))
         conn.commit()
     except Exception:
