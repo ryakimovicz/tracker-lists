@@ -145,7 +145,15 @@ export const Login: React.FC = () => {
     <div className="auth-card" style={{ maxWidth: 450, margin: '4rem auto', padding: '2.5rem' }}>
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
 
-        <h2 style={{ textAlign: 'center', marginBottom: '0.5rem' }}>{t('authLoginButton')}</h2>
+        <div style={{ textAlign: 'center', marginBottom: '0.25rem' }}>
+          <img
+            src="/logo-transparent.svg"
+            alt="Pathd"
+            style={{ width: '48px', height: '48px', filter: 'drop-shadow(0 4px 14px rgba(245, 158, 11, 0.3))' }}
+          />
+        </div>
+
+        <h2 style={{ textAlign: 'center', margin: 0 }}>{t('authLoginButton')}</h2>
 
         {isUnverified && (
           <div style={{

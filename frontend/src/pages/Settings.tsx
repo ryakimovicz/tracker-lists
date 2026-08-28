@@ -1138,7 +1138,7 @@ export const SettingsPage: React.FC = () => {
           color: 'var(--text-secondary)',
           marginBottom: '0.5rem'
         }}>
-          <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent-primary)', display: 'inline-block' }} />
+          <img src="/logo-transparent.svg" alt="Pathd" style={{ width: 16, height: 16 }} />
           Pathd v0.9.6 Beta
         </div>
         <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>

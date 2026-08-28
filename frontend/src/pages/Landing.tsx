@@ -11,8 +11,13 @@ export const Landing: React.FC = () => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '4rem', padding: '2rem 0' }}>
       {/* Hero Section */}
-      <section style={{ textAlign: 'center', maxWidth: '1000px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-        <h1 className="gradient-text" style={{ fontSize: '3.5rem', fontWeight: 800, lineHeight: 1.15, whiteSpace: 'normal' }}>
+      <section style={{ textAlign: 'center', maxWidth: '1000px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.5rem', alignItems: 'center' }}>
+        <img
+          src="/logo-transparent.svg"
+          alt="Pathd"
+          style={{ width: '64px', height: '64px', filter: 'drop-shadow(0 6px 20px rgba(245, 158, 11, 0.35))', marginBottom: '0.5rem' }}
+        />
+        <h1 className="gradient-text" style={{ fontSize: '3.5rem', fontWeight: 800, lineHeight: 1.15, whiteSpace: 'normal', margin: 0 }}>
           {t('heroTitleLine1')}
           <br />
           {t('heroTitleLine2')}

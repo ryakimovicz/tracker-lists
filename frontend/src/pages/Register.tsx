@@ -172,7 +172,15 @@ export const Register: React.FC = () => {
       ) : (
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          <h2 style={{ textAlign: 'center', marginBottom: '0.5rem' }}>{t('authRegisterButton')}</h2>
+          <div style={{ textAlign: 'center', marginBottom: '0.25rem' }}>
+            <img
+              src="/logo-transparent.svg"
+              alt="Pathd"
+              style={{ width: '48px', height: '48px', filter: 'drop-shadow(0 4px 14px rgba(245, 158, 11, 0.3))' }}
+            />
+          </div>
+
+          <h2 style={{ textAlign: 'center', margin: 0 }}>{t('authRegisterButton')}</h2>
 
           {errorMsg && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', padding: '0.75rem', borderRadius: 8, fontSize: '0.9rem' }}>
