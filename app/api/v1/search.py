@@ -259,7 +259,14 @@ def get_series_detail(
                 raise HTTPException(status_code=404, detail="Anime not found")
             return detail
         return TVMazeService.get_series_detail(series_id)
+    except HTTPException:
+        raise
     except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to fetch series detail: {str(e)}"
+        )
+
 @router.get("/movies/{movie_id}")
 def get_movie_detail(
     movie_id: str
