@@ -715,7 +715,7 @@ export const SettingsPage: React.FC = () => {
                     }}
                   >
                     <ExternalLink size={14} />
-                    {isEs ? 'Vincular Spotify / Apple Music' : 'Link Spotify / Apple Music'}
+                    {isEs ? 'Vincular servicios de música' : 'Link Music Services'}
                   </a>
                   <button
                     onClick={handleLastFmDisconnect}
@@ -747,8 +747,8 @@ export const SettingsPage: React.FC = () => {
                   💡 {isEs ? '¿Cómo registrar la música que escuchas?' : 'How to track the music you listen to?'}
                 </strong>
                 {isEs
-                  ? 'Para que Last.fm detecte lo que escuchas, vincula tu reproductor favorito (Spotify, Apple Music, YouTube Music) desde la configuración de aplicaciones de Last.fm. Las canciones se actualizarán en tiempo real en tu perfil de Pathd.'
-                  : 'For Last.fm to detect what you listen to, connect your streaming app (Spotify, Apple Music, YouTube Music) in Last.fm Applications settings. Tracks will update in real-time on your Pathd profile.'}
+                  ? 'Last.fm registra las canciones que escuchas en tus plataformas (Spotify, Apple Music, YouTube Music, Deezer, Tidal, SoundCloud, reproductores locales, etc.). Para conectarlas, pulsa en "Vincular servicios de música" y autoriza tu reproductor.'
+                  : 'Last.fm tracks the songs you listen to on your platforms (Spotify, Apple Music, YouTube Music, Deezer, Tidal, SoundCloud, desktop players, etc.). To connect them, click "Link Music Services" and authorize your player.'}
               </div>
             </div>
           ) : (
@@ -782,11 +782,11 @@ export const SettingsPage: React.FC = () => {
                 lineHeight: '1.45'
               }}>
                 <strong style={{ color: '#ef4444', display: 'block', marginBottom: '0.25rem' }}>
-                  ℹ️ {isEs ? '¿Primera vez usando Last.fm?' : 'First time using Last.fm?'}
+                  ℹ️ {isEs ? '¿Cómo funciona?' : 'How does it work?'}
                 </strong>
                 {isEs
-                  ? 'Al conectar tu cuenta de Last.fm, asegúrate de vincular tu servicio de música (Spotify, Apple Music, YouTube Music, etc.) en Last.fm para que tus reproducciones se sincronicen automáticamente con tu perfil.'
-                  : 'When connecting your Last.fm account, make sure to connect your music service (Spotify, Apple Music, YouTube Music, etc.) inside Last.fm so your scrobbles sync automatically to your profile.'}
+                  ? '1. Conecta o crea tu cuenta de Last.fm aquí.\n2. En Last.fm, vincula tu servicio de música habitual (Spotify, Apple Music, YouTube Music, Deezer, Tidal, etc.).\n3. Lo que escuches se reflejará automáticamente en tu perfil de Pathd.'
+                  : '1. Connect or create your Last.fm account here.\n2. In Last.fm, link your preferred music service (Spotify, Apple Music, YouTube Music, Deezer, Tidal, etc.).\n3. What you listen to will automatically reflect on your Pathd profile.'}
               </div>
             </div>
           )}
