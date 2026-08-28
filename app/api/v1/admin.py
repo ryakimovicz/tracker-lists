@@ -71,12 +71,64 @@ def admin_delete_user(
     current_admin: User = Depends(get_current_admin),
     db: Session = Depends(get_db)
 ):
+    from app.models.library import UserLibraryItem
+    from app.models.consumption import ConsumptionHistory
+    from app.models.activity import UserActivityLog
+    from app.models.social import Follow, Comment, CommentVote, ListVote, ListReport, CommentReport
+    from app.models.review import MediaReview, MediaReviewVote, MediaReviewReport
+    from app.models.addition import ListAddition, UserAdoptedAddition, AdditionVote, AdditionComment
+    from app.models.saved_list import SavedList
+    from app.models.item_progress import ItemProgress
+
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     if user.is_admin:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot delete an admin account")
         
+    # 0. Cancel Dodo Payments subscription if active
+    if user.dodo_subscription_id:
+        try:
+            import asyncio
+            from app.api.v1.payments import cancel_dodo_subscription_direct
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    asyncio.create_task(cancel_dodo_subscription_direct(user.dodo_subscription_id))
+                else:
+                    loop.run_until_complete(cancel_dodo_subscription_direct(user.dodo_subscription_id))
+            except Exception:
+                pass
+        except Exception:
+            pass
+
+    # 1. Delete comments and review votes/reports
+    db.query(CommentVote).filter(CommentVote.user_id == user_id).delete()
+    db.query(CommentReport).filter(CommentReport.user_id == user_id).delete()
+    db.query(Comment).filter(Comment.user_id == user_id).delete()
+
+    db.query(ListVote).filter(ListVote.user_id == user_id).delete()
+    db.query(ListReport).filter(ListReport.user_id == user_id).delete()
+
+    db.query(MediaReviewVote).filter(MediaReviewVote.user_id == user_id).delete()
+    db.query(MediaReviewReport).filter(MediaReviewReport.user_id == user_id).delete()
+    db.query(MediaReview).filter(MediaReview.user_id == user_id).delete()
+
+    # 2. Additions and votes
+    db.query(AdditionVote).filter(AdditionVote.user_id == user_id).delete()
+    db.query(AdditionComment).filter(AdditionComment.user_id == user_id).delete()
+    db.query(UserAdoptedAddition).filter(UserAdoptedAddition.user_id == user_id).delete()
+    db.query(ListAddition).filter(ListAddition.user_id == user_id).delete()
+
+    # 3. Follows, activities, progress, library and consumptions
+    db.query(Follow).filter((Follow.follower_id == user_id) | (Follow.followed_id == user_id)).delete()
+    db.query(UserActivityLog).filter(UserActivityLog.user_id == user_id).delete()
+    db.query(ItemProgress).filter(ItemProgress.user_id == user_id).delete()
+    db.query(UserLibraryItem).filter(UserLibraryItem.user_id == user_id).delete()
+    db.query(ConsumptionHistory).filter(ConsumptionHistory.user_id == user_id).delete()
+    db.query(SavedList).filter(SavedList.user_id == user_id).delete()
+
+    # 4. Delete user (cascades to owned lists)
     db.delete(user)
     db.commit()
     return None
