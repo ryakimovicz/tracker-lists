@@ -17,6 +17,7 @@ class UserResponse(UserBase):
     is_admin: bool = False
     show_nsfw: bool = False
     is_pro: bool = False
+    is_pro_cancelled: bool = False
     is_vip: bool = False
     pro_expires_at: datetime | None = None
     is_suspended: bool = False
@@ -53,6 +54,7 @@ class UserDashboardResponse(BaseModel):
     is_admin: bool = False
     show_nsfw: bool = False
     is_pro: bool = False
+    is_pro_cancelled: bool = False
     is_vip: bool = False
     pro_expires_at: datetime | None = None
     is_suspended: bool = False

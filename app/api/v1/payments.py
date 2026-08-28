@@ -93,13 +93,14 @@ async def verify_payment_success(
     """
     if payload.status in ["active", "succeeded", "success"] or payload.subscription_id:
         current_user.is_pro = True
+        current_user.is_pro_cancelled = False
         if payload.subscription_id:
             current_user.dodo_subscription_id = payload.subscription_id
         db.commit()
         db.refresh(current_user)
         logger.info(f"User {current_user.username} verified and activated Pro via return flow (sub={payload.subscription_id})")
-        return {"status": "success", "is_pro": True}
-    return {"status": "pending", "is_pro": current_user.is_pro}
+        return {"status": "success", "is_pro": True, "is_pro_cancelled": False}
+    return {"status": "pending", "is_pro": current_user.is_pro, "is_pro_cancelled": current_user.is_pro_cancelled}
 
 
 async def cancel_dodo_subscription_direct(subscription_id: str):
@@ -125,20 +126,24 @@ async def cancel_my_subscription(
     current_user: User = Depends(get_current_user_allow_suspended),
     db: Session = Depends(get_db)
 ):
-
     """
     Cancels auto-renewal of Premium subscription. Access remains active until the end of the paid period.
     """
     sub_id = current_user.dodo_subscription_id
     if sub_id:
         await cancel_dodo_subscription_direct(sub_id)
+        current_user.is_pro_cancelled = True
+        db.commit()
+        db.refresh(current_user)
         return {
             "message": "Tu suscripción ha sido cancelada. Mantendrás todos los beneficios Premium hasta que finalice tu período ya abonado y no se te volverá a cobrar.",
-            "status": "cancelled_at_period_end"
+            "status": "cancelled_at_period_end",
+            "is_pro_cancelled": True
         }
     else:
         # If user had a manual grant or mock pro
         current_user.is_pro = False
+        current_user.is_pro_cancelled = True
         trim_downgraded_user_favorites(db, current_user.id)
         current_user.banner_url = None
         current_user.background_url = None
@@ -146,7 +151,8 @@ async def cancel_my_subscription(
         db.commit()
         return {
             "message": "Suscripción Premium cancelada con éxito.",
-            "status": "cancelled"
+            "status": "cancelled",
+            "is_pro_cancelled": True
         }
 
 
@@ -156,29 +162,29 @@ async def dodo_webhook(
     request: Request,
     db: Session = Depends(get_db)
 ):
-
     """
     Handles incoming webhook notifications from Dodo Payments
     """
     raw_body = await request.body()
     body_str = raw_body.decode("utf-8")
     
-    webhook_secret = settings.DODO_PAYMENTS_WEBHOOK_KEY or os.environ.get("DODO_PAYMENTS_WEBHOOK_KEY", "")
-    
-    # Verify webhook signature if secret is present
+    headers = request.headers
+    webhook_secret = settings.DODO_PAYMENTS_WEBHOOK_KEY
+
     if webhook_secret:
         webhook_headers = {
-            "webhook-id": request.headers.get("webhook-id", ""),
-            "webhook-signature": request.headers.get("webhook-signature", ""),
-            "webhook-timestamp": request.headers.get("webhook-timestamp", ""),
+            "webhook-id": headers.get("webhook-id", ""),
+            "webhook-signature": headers.get("webhook-signature", ""),
+            "webhook-timestamp": headers.get("webhook-timestamp", "")
         }
         try:
             wh = Webhook(webhook_secret)
             wh.verify(body_str, webhook_headers)
-        except Exception as e:
-            logger.warning(f"Webhook signature verification failed: {e}")
-            # In test environments or when headers differ, fallback to payload parsing if verification fails but log it
-            # raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid signature")
+        except WebhookVerificationError as e:
+            logger.error(f"Dodo webhook signature verification failed: {e}")
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid webhook signature")
+    else:
+        logger.warning("Dodo Payments webhook secret not configured. Skipping verification (dev mode only).")
 
     try:
         payload = json.loads(body_str)
@@ -195,6 +201,8 @@ async def dodo_webhook(
     user_id = metadata.get("user_id")
     customer = data.get("customer", {}) or {}
     customer_email = customer.get("email")
+    subscription_id = data.get("subscription_id")
+    customer_id = data.get("customer_id")
 
     user = None
     if user_id:
@@ -209,6 +217,11 @@ async def dodo_webhook(
     if not user:
         logger.warning(f"Webhook received for unknown user (user_id={user_id}, email={customer_email})")
         return {"status": "ignored", "reason": "User not found"}
+
+    if subscription_id:
+        user.dodo_subscription_id = subscription_id
+    if customer_id:
+        user.dodo_customer_id = customer_id
 
     # Events that grant or maintain Pro / Premium
     pro_active_events = [
@@ -232,16 +245,24 @@ async def dodo_webhook(
         "payment.cancelled"
     ]
 
-
     if event_type in pro_active_events:
         user.is_pro = True
+        user.is_pro_cancelled = False
         db.commit()
         logger.info(f"User {user.username} (ID: {user.id}) upgraded to Pro via webhook event: {event_type}")
 
     elif event_type in pro_revoked_events:
         user.is_pro = False
+        user.is_pro_cancelled = True
+        trim_downgraded_user_favorites(db, user.id)
         db.commit()
         logger.info(f"User {user.username} (ID: {user.id}) downgraded from Pro via webhook event: {event_type}")
 
+    elif event_type in ["subscription.updated"]:
+        cancel_at_period_end = data.get("cancel_at_next_billing_date", False)
+        if cancel_at_period_end:
+            user.is_pro_cancelled = True
+            db.commit()
+            logger.info(f"User {user.username} marked as pro_cancelled (will expire at period end).")
 
     return {"status": "success", "event": event_type}

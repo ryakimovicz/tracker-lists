@@ -81,6 +81,11 @@ with engine.connect() as conn:
         conn.commit()
     except Exception:
         pass
+    try:
+        conn.execute(text("ALTER TABLE users ADD COLUMN is_pro_cancelled BOOLEAN DEFAULT FALSE;"))
+        conn.commit()
+    except Exception:
+        pass
 
 
 

@@ -11,6 +11,7 @@ interface UserProfile {
   is_admin: boolean;
   show_nsfw: boolean;
   is_pro?: boolean;
+  is_pro_cancelled?: boolean;
   is_vip?: boolean;
   pro_expires_at?: string;
   is_suspended?: boolean;

@@ -1018,26 +1018,63 @@ export const SettingsPage: React.FC = () => {
           <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', marginBottom: '1rem' }}>
               <div>
-                <h2 style={{ fontSize: '1.2rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0, color: 'var(--text-primary)' }}>
-                  <Star size={20} color="#f59e0b" fill="#f59e0b" />
-                  {isEs ? 'Membresía Pathd Premium' : 'Pathd Premium Membership'}
-                </h2>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  <h2 style={{ fontSize: '1.2rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0, color: 'var(--text-primary)' }}>
+                    <Star size={20} color="#f59e0b" fill="#f59e0b" />
+                    {isEs ? 'Membresía Pathd Premium' : 'Pathd Premium Membership'}
+                  </h2>
+                  {user?.is_pro_cancelled ? (
+                    <span
+                      style={{
+                        fontSize: '0.75rem',
+                        padding: '0.2rem 0.55rem',
+                        borderRadius: '6px',
+                        background: 'rgba(239, 68, 68, 0.15)',
+                        color: '#ef4444',
+                        border: '1px solid rgba(239, 68, 68, 0.3)',
+                        fontWeight: 600
+                      }}
+                    >
+                      {isEs ? 'Renovación Cancelada' : 'Renewal Cancelled'}
+                    </span>
+                  ) : (
+                    <span
+                      style={{
+                        fontSize: '0.75rem',
+                        padding: '0.2rem 0.55rem',
+                        borderRadius: '6px',
+                        background: 'rgba(16, 185, 129, 0.15)',
+                        color: '#10b981',
+                        border: '1px solid rgba(16, 185, 129, 0.3)',
+                        fontWeight: 600
+                      }}
+                    >
+                      {isEs ? 'Activa' : 'Active'}
+                    </span>
+                  )}
+                </div>
                 <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: '0.4rem 0 0' }}>
-                  {isEs
-                    ? 'Tu suscripción está activa. Puedes cancelar la renovación automática en cualquier momento.'
-                    : 'Your subscription is active. You can cancel auto-renewal at any time.'}
+                  {user?.is_pro_cancelled
+                    ? (isEs
+                      ? 'La renovación automática está desactivada. Mantienes el acceso a todas las funciones Premium hasta que finalice el ciclo que ya pagaste y no se te cobrará ningún cargo futuro.'
+                      : 'Auto-renewal is turned off. You keep full Premium access until the end of your paid billing period and will not be charged again.')
+                    : (isEs
+                      ? 'Tu suscripción está activa. Puedes cancelar la renovación automática en cualquier momento.'
+                      : 'Your subscription is active. You can cancel auto-renewal at any time.')}
                 </p>
               </div>
 
-              <button
-                type="button"
-                disabled={cancelSubLoading}
-                onClick={handleCancelSubscription}
-                className="btn-secondary"
-                style={{ color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.4)', fontSize: '0.85rem', padding: '0.55rem 1.1rem' }}
-              >
-                {cancelSubLoading ? (isEs ? 'Cancelando...' : 'Cancelling...') : (isEs ? 'Cancelar Suscripción' : 'Cancel Subscription')}
-              </button>
+              {!user?.is_pro_cancelled && (
+                <button
+                  type="button"
+                  disabled={cancelSubLoading}
+                  onClick={handleCancelSubscription}
+                  className="btn-secondary"
+                  style={{ color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.4)', fontSize: '0.85rem', padding: '0.55rem 1.1rem' }}
+                >
+                  {cancelSubLoading ? (isEs ? 'Cancelando...' : 'Cancelling...') : (isEs ? 'Cancelar Suscripción' : 'Cancel Subscription')}
+                </button>
+              )}
             </div>
 
             {cancelSubMsg && (
