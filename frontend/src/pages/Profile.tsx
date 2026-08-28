@@ -419,17 +419,7 @@ export const Profile: React.FC = () => {
 
 
 
-  const handleRemovePro = async () => {
-    if (!isOwnProfile) return;
-    try {
-      await apiClient.post('/users/me/mock-pro', { is_pro: false });
-      await fetchProfileAndLibrary();
-      setSuccessMsg(language === 'es' ? 'Plan Premium removido.' : 'Premium plan removed.');
-      setTimeout(() => setSuccessMsg(''), 3000);
-    } catch (err) {
-      setErrorMsg('Error updating status');
-    }
-  };
+
 
 
 
@@ -868,7 +858,6 @@ export const Profile: React.FC = () => {
               <h1 style={{ margin: 0, fontSize: '2rem', fontWeight: 800 }}>{profile.username}</h1>
               {profile.is_pro && (
                 <span 
-                  onClick={isOwnProfile ? handleRemovePro : undefined}
                   style={{ 
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -879,10 +868,10 @@ export const Profile: React.FC = () => {
                     borderRadius: '12px',
                     fontSize: '0.8rem',
                     fontWeight: 700,
-                    cursor: isOwnProfile ? 'pointer' : 'default',
-                    boxShadow: '0 2px 8px rgba(245, 158, 11, 0.4)'
+                    cursor: 'default',
+                    boxShadow: '0 2px 8px rgba(245, 158, 11, 0.4)',
+                    userSelect: 'none'
                   }}
-                  title={isOwnProfile ? (language === 'es' ? 'Haz clic para remover Plan Premium' : 'Click to remove Premium plan') : undefined}
                 >
                   <Star size={12} fill="white" />
                   PREMIUM

@@ -44,20 +44,6 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
     }
   };
 
-  const handleTogglePro = async (isPro: boolean) => {
-    setLoading(true);
-    setErrorMsg('');
-    try {
-      await apiClient.post('/users/me/mock-pro', { is_pro: isPro });
-      await refreshProfile();
-      onClose();
-    } catch (err) {
-      setErrorMsg(language === 'es' ? 'Error al procesar la solicitud.' : 'Error processing request.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const isEs = language === 'es';
 
 
@@ -243,18 +229,10 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
               {loading ? (isEs ? 'Preparando pago...' : 'Preparing checkout...') : (isEs ? 'Suscribirse a Premium ($2.99/mes)' : 'Subscribe to Premium ($2.99/mo)')}
             </button>
           ) : (
-            <div style={{ textAlign: 'center' }}>
-              <p style={{ color: '#10b981', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+            <div style={{ textAlign: 'center', padding: '0.5rem 0' }}>
+              <p style={{ color: '#10b981', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', margin: 0 }}>
                 <Check size={18} /> {isEs ? '¡Ya eres usuario Premium!' : 'You are a Premium user!'}
               </p>
-              <button 
-                className="btn-secondary" 
-                style={{ width: '100%', padding: '0.65rem', fontSize: '0.85rem' }}
-                onClick={() => handleTogglePro(false)}
-                disabled={loading}
-              >
-                {loading ? '...' : (isEs ? 'Revertir a Gratuito (Dev)' : 'Revert to Free (Dev)')}
-              </button>
             </div>
           )}
         </div>
