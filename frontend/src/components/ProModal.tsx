@@ -71,14 +71,14 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
           width: '100%',
           maxWidth: '520px',
           maxHeight: '90vh',
-          overflowY: 'auto',
-          padding: '2.5rem',
           display: 'flex',
           flexDirection: 'column',
-          gap: '1.5rem',
+          padding: '2rem',
           position: 'relative',
           borderRadius: '20px',
-          boxShadow: '0 25px 50px rgba(0,0,0,0.6)'
+          boxShadow: '0 25px 50px rgba(0,0,0,0.6)',
+          background: 'var(--bg-secondary)',
+          border: '1px solid var(--border-color)'
         }} 
         onClick={e => e.stopPropagation()}
       >
@@ -99,19 +99,19 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
           <X size={22} />
         </button>
 
-        <div style={{ textAlign: 'center', marginBottom: '0.5rem' }}>
+        <div style={{ textAlign: 'center', marginBottom: '1rem', flexShrink: 0 }}>
           <div style={{
             display: 'inline-flex',
-            padding: '1rem',
+            padding: '0.75rem',
             borderRadius: '50%',
             background: 'rgba(245, 158, 11, 0.15)',
-            marginBottom: '0.75rem'
+            marginBottom: '0.5rem'
           }}>
-            <Crown size={40} color="#f59e0b" />
+            <Crown size={32} color="#f59e0b" />
           </div>
           <h2 style={{
             margin: 0,
-            fontSize: '2rem',
+            fontSize: '1.75rem',
             fontWeight: 800,
             background: 'linear-gradient(135deg, #f59e0b, #fbbf24)',
             WebkitBackgroundClip: 'text',
@@ -120,28 +120,36 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
             Pathd Premium
           </h2>
 
-          <p style={{ color: 'var(--text-secondary)', fontSize: '1rem', margin: '0.5rem 0 0 0' }}>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', margin: '0.25rem 0 0 0' }}>
             {isEs ? 'Desbloquea el verdadero poder de Pathd.' : 'Unlock the true power of Pathd.'}
           </p>
         </div>
 
         {errorMsg && (
-          <div style={{ padding: '0.75rem', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', borderRadius: '8px', fontSize: '0.9rem', textAlign: 'center' }}>
+          <div style={{ padding: '0.75rem', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', borderRadius: '8px', fontSize: '0.9rem', textAlign: 'center', marginBottom: '0.75rem', flexShrink: 0 }}>
             {errorMsg}
           </div>
         )}
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+        {/* Scrollable Benefits List */}
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '1rem',
+          overflowY: 'auto',
+          paddingRight: '0.4rem',
+          marginBottom: '1.25rem'
+        }}>
           {/* Benefit 0: Profile Banners & Ambient Backgrounds */}
-          <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
-            <div style={{ background: 'rgba(245, 158, 11, 0.15)', padding: '0.5rem', borderRadius: '8px', color: '#f59e0b', flexShrink: 0 }}>
-              <ImageIcon size={20} />
+          <div style={{ display: 'flex', gap: '0.85rem', alignItems: 'flex-start' }}>
+            <div style={{ background: 'rgba(245, 158, 11, 0.15)', padding: '0.45rem', borderRadius: '8px', color: '#f59e0b', flexShrink: 0 }}>
+              <ImageIcon size={18} />
             </div>
             <div>
-              <h4 style={{ margin: '0 0 0.25rem 0', fontSize: '1rem' }}>
+              <h4 style={{ margin: '0 0 0.15rem 0', fontSize: '0.92rem', fontWeight: 600 }}>
                 {isEs ? 'Portadas y Fondos de Pantalla de Perfil' : 'Profile Banners & Ambient Wallpapers'}
               </h4>
-              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+              <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.35 }}>
                 {isEs
                   ? 'Personaliza tu portada y el fondo completo de tu perfil con imágenes panorámicas en alta resolución de tus obras favoritas.'
                   : 'Customize your profile banner and full-page ambient wallpaper with high-resolution artworks from your favorite titles.'}
@@ -149,17 +157,16 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
             </div>
           </div>
 
-
           {/* Benefit 1: 10 Favorites per category */}
-          <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
-            <div style={{ background: 'rgba(245, 158, 11, 0.15)', padding: '0.5rem', borderRadius: '8px', color: '#f59e0b', flexShrink: 0 }}>
-              <Star size={20} />
+          <div style={{ display: 'flex', gap: '0.85rem', alignItems: 'flex-start' }}>
+            <div style={{ background: 'rgba(245, 158, 11, 0.15)', padding: '0.45rem', borderRadius: '8px', color: '#f59e0b', flexShrink: 0 }}>
+              <Star size={18} />
             </div>
             <div>
-              <h4 style={{ margin: '0 0 0.25rem 0', fontSize: '1rem' }}>
+              <h4 style={{ margin: '0 0 0.15rem 0', fontSize: '0.92rem', fontWeight: 600 }}>
                 {isEs ? 'Hasta 10 Destacados por Categoría' : 'Up to 10 Favorites per Category'}
               </h4>
-              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+              <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.35 }}>
                 {isEs
                   ? 'Arma tu Top 10 en Películas, Series, Anime, Libros, Cómics, Manga y Juegos (hasta 70 obras en total).'
                   : 'Build your ultimate Top 10 in Movies, Shows, Anime, Books, Comics, Manga, and Games (up to 70 total).'}
@@ -167,16 +174,16 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
             </div>
           </div>
 
-          {/* Benefit 3: Custom Accent Color */}
-          <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
-            <div style={{ background: 'rgba(245, 158, 11, 0.15)', padding: '0.5rem', borderRadius: '8px', color: '#f59e0b', flexShrink: 0 }}>
-              <Palette size={20} />
+          {/* Benefit 2: Custom Accent Color */}
+          <div style={{ display: 'flex', gap: '0.85rem', alignItems: 'flex-start' }}>
+            <div style={{ background: 'rgba(245, 158, 11, 0.15)', padding: '0.45rem', borderRadius: '8px', color: '#f59e0b', flexShrink: 0 }}>
+              <Palette size={18} />
             </div>
             <div>
-              <h4 style={{ margin: '0 0 0.25rem 0', fontSize: '1rem' }}>
+              <h4 style={{ margin: '0 0 0.15rem 0', fontSize: '0.92rem', fontWeight: 600 }}>
                 {isEs ? 'Personalización de Color de Perfil' : 'Custom Profile Accent Color'}
               </h4>
-              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+              <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.35 }}>
                 {isEs
                   ? 'Elige tu propio color distintivo que se aplicará en todo tu perfil y guías públicas.'
                   : 'Choose a distinctive accent color that reflects across your profile and public guides.'}
@@ -184,16 +191,16 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
             </div>
           </div>
 
-          {/* Benefit 4: Private Guides */}
-          <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
-            <div style={{ background: 'rgba(245, 158, 11, 0.15)', padding: '0.5rem', borderRadius: '8px', color: '#f59e0b', flexShrink: 0 }}>
-              <Lock size={20} />
+          {/* Benefit 3: Private Guides */}
+          <div style={{ display: 'flex', gap: '0.85rem', alignItems: 'flex-start' }}>
+            <div style={{ background: 'rgba(245, 158, 11, 0.15)', padding: '0.45rem', borderRadius: '8px', color: '#f59e0b', flexShrink: 0 }}>
+              <Lock size={18} />
             </div>
             <div>
-              <h4 style={{ margin: '0 0 0.25rem 0', fontSize: '1rem' }}>
+              <h4 style={{ margin: '0 0 0.15rem 0', fontSize: '0.92rem', fontWeight: 600 }}>
                 {isEs ? 'Guías Privadas y No Listadas' : 'Private & Unlisted Guides'}
               </h4>
-              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+              <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.35 }}>
                 {isEs
                   ? 'Crea listas secretas solo para ti o enlaces no listados para compartir con quien elijas.'
                   : 'Create secret lists for yourself, or unlisted links to share with selected friends.'}
@@ -201,16 +208,16 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
             </div>
           </div>
 
-          {/* Benefit 5: Unlimited Re-consumption & History */}
-          <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
-            <div style={{ background: 'rgba(245, 158, 11, 0.15)', padding: '0.5rem', borderRadius: '8px', color: '#f59e0b', flexShrink: 0 }}>
-              <RotateCcw size={20} />
+          {/* Benefit 4: Unlimited Re-consumption & History */}
+          <div style={{ display: 'flex', gap: '0.85rem', alignItems: 'flex-start' }}>
+            <div style={{ background: 'rgba(245, 158, 11, 0.15)', padding: '0.45rem', borderRadius: '8px', color: '#f59e0b', flexShrink: 0 }}>
+              <RotateCcw size={18} />
             </div>
             <div>
-              <h4 style={{ margin: '0 0 0.25rem 0', fontSize: '1rem' }}>
+              <h4 style={{ margin: '0 0 0.15rem 0', fontSize: '0.92rem', fontWeight: 600 }}>
                 {isEs ? 'Re-consumo Ilimitado e Historial' : 'Unlimited Re-consumption & History'}
               </h4>
-              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+              <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.35 }}>
                 {isEs
                   ? 'Vuelve a marcar obras completadas cuantas veces quieras y accede a tu lista cronológica de fechas de visualización, lectura y juego.'
                   : 'Re-mark completed titles as many times as you want and access your full historical timeline of watches, reads, and plays.'}
@@ -219,14 +226,15 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
           </div>
         </div>
 
-        <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+        {/* Sticky Bottom Action */}
+        <div style={{ flexShrink: 0 }}>
           {!user?.is_pro ? (
             <button 
               className="btn-primary" 
               style={{
                 width: '100%',
-                padding: '0.9rem',
-                fontSize: '1.05rem',
+                padding: '0.85rem',
+                fontSize: '1rem',
                 fontWeight: 700,
                 background: 'linear-gradient(135deg, #f59e0b, #d97706)',
                 border: 'none',
@@ -242,7 +250,7 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
               onClick={handleSubscribe}
               disabled={loading}
             >
-              <Crown size={20} />
+              <Crown size={18} />
               {loading ? (isEs ? 'Preparando pago...' : 'Preparing checkout...') : (isEs ? 'Suscribirse a Premium ($2.99/mes)' : 'Subscribe to Premium ($2.99/mo)')}
             </button>
           ) : (
