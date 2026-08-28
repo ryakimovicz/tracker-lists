@@ -20,6 +20,7 @@ import {
 import { ItemDetailsModal } from '../components/ItemDetailsModal';
 import { ReplaceSavedGuideModal } from '../components/ReplaceSavedGuideModal';
 import { ProModal } from '../components/ProModal';
+import { AdBanner } from '../components/AdBanner';
 
 
 interface CommentItem {
@@ -1120,6 +1121,9 @@ export const ViewGuide: React.FC = () => {
           })()}
         </div>
       </div>
+
+      {/* Non-intrusive Guide AdBanner */}
+      <AdBanner />
 
       {/* Public Comments Section */}
       <div className="glass-card" style={{ marginTop: '2rem', padding: '2.5rem', textAlign: 'left' }}>

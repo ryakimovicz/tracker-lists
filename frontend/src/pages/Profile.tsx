@@ -13,6 +13,7 @@ import { BannerSelectorModal } from '../components/BannerSelectorModal';
 import { BackgroundSelectorModal } from '../components/BackgroundSelectorModal';
 import { ProModal } from '../components/ProModal';
 import { ReplaceFavoriteModal } from '../components/ReplaceFavoriteModal';
+import { AdBanner } from '../components/AdBanner';
 
 
 import {
@@ -2075,6 +2076,9 @@ export const Profile: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Non-intrusive Profile Bottom AdBanner */}
+      <AdBanner />
 
       {/* Avatar Selector Modal */}
       <AvatarSelectorModal

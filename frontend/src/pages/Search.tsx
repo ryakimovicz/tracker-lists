@@ -5,6 +5,7 @@ import { useTranslation } from '../context/LanguageContext';
 import { apiClient } from '../api/client';
 import { ItemDetailsModal } from '../components/ItemDetailsModal';
 import { MediaPoster } from '../components/MediaPoster';
+import { AdBanner } from '../components/AdBanner';
 
 import { Search as SearchIcon, AlertCircle, CheckCircle, Plus, X, Heart, Star, Users, BookOpen, Package, Puzzle, Sparkles, Gamepad2 } from 'lucide-react';
 
@@ -727,6 +728,9 @@ export const Search: React.FC = () => {
       )}
 
       {/* Add To Shelf Overlay Modal */}
+      {/* Non-intrusive Explore / Search Bottom AdBanner */}
+      <AdBanner />
+
       {selectedItemForShelf && (
         <div style={{
           position: 'fixed',

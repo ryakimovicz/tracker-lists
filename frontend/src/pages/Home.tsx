@@ -4,6 +4,7 @@ import { apiClient } from '../api/client';
 import { useTranslation } from '../context/LanguageContext';
 import { getCachedSeries, setCachedSeries } from '../utils/seriesCache';
 import { ItemDetailsModal } from '../components/ItemDetailsModal';
+import { AdBanner } from '../components/AdBanner';
 import { ChevronLeft, ChevronRight, Check } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -916,6 +917,9 @@ export const Home: React.FC = () => {
           </div>
         </>
       )}
+
+      {/* Non-intrusive bottom sponsor / AdBanner */}
+      <AdBanner />
 
       {selectedItem && (
         <ItemDetailsModal
