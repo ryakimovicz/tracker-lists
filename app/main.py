@@ -106,7 +106,7 @@ if settings.BACKEND_CORS_ORIGINS:
         allow_headers=["*"],
     )
 
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD", "POST", "OPTIONS"])
 def root():
     return {
         "message": "Welcome to the Tracker Lists API",
@@ -114,8 +114,8 @@ def root():
         "project": settings.PROJECT_NAME
     }
 
-@app.get("/health")
-@app.get(f"{settings.API_V1_STR}/health")
+@app.api_route("/health", methods=["GET", "HEAD", "POST", "OPTIONS"])
+@app.api_route(f"{settings.API_V1_STR}/health", methods=["GET", "HEAD", "POST", "OPTIONS"])
 def health_check():
     return {
         "status": "healthy",
