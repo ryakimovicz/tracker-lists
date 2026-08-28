@@ -35,7 +35,6 @@ class GoogleBooksService:
                     for item in data.get("items", []):
                         v_info = item.get("volumeInfo", {})
                         
-                        is_mature = (v_info.get("maturityRating") == "MATURE")
                         title = v_info.get("title") or "Untitled Book"
                         authors = v_info.get("authors", [])
                         author_str = f"Author: {authors[0]}." if authors else ""
@@ -43,7 +42,7 @@ class GoogleBooksService:
                         pub_str = f" Published: {pub_date}." if pub_date else ""
                         desc = v_info.get("description") or (author_str + pub_str)
 
-                        if is_mature or not is_safe_media_item(title, desc):
+                        if not is_safe_media_item(title, desc):
                             continue
 
                         isbns = []
