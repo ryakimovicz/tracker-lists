@@ -170,6 +170,20 @@ def get_top_albums(current_user: User = Depends(get_current_user)):
         return []
     return LastFMService.get_top_albums(current_user.lastfm_username)
 
+@router.get("/{user_id}/music/now-playing")
+def get_user_now_playing(user_id: int, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user or not user.lastfm_username:
+        return None
+    return LastFMService.get_now_playing(user.lastfm_username)
+
+@router.get("/{user_id}/music/top-albums")
+def get_user_top_albums(user_id: int, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user or not user.lastfm_username:
+        return []
+    return LastFMService.get_top_albums(user.lastfm_username)
+
 @router.get("/me/up-next", response_model=UpNextResponse)
 def get_user_up_next(
     current_user: User = Depends(get_current_user),

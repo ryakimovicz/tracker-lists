@@ -347,13 +347,22 @@ export const Profile: React.FC = () => {
       setActivities(activityRes.data);
       
       // Fetch Last.fm data if applicable
-      if (profileRes.data.lastfm_username || (!userIdParam && meRes.data.lastfm_username)) {
-         try {
-           const npRes = await apiClient.get('/users/me/music/now-playing'); // This works for 'me'. If checking another profile, we might need a target endpoint, but for now we only added /me/ endpoints. Let's just use /me/ for now.
-           setNowPlaying(npRes.data);
-           const taRes = await apiClient.get('/users/me/music/top-albums');
-           setTopAlbums(taRes.data);
-         } catch(e) {}
+      const hasLastfm = Boolean(profileRes.data.lastfm_username);
+      if (hasLastfm) {
+        try {
+          const targetNpUrl = userIdParam ? `/users/${userIdParam}/music/now-playing` : '/users/me/music/now-playing';
+          const targetTaUrl = userIdParam ? `/users/${userIdParam}/music/top-albums` : '/users/me/music/top-albums';
+          const npRes = await apiClient.get(targetNpUrl);
+          setNowPlaying(npRes.data);
+          const taRes = await apiClient.get(targetTaUrl);
+          setTopAlbums(taRes.data);
+        } catch(e) {
+          setNowPlaying(null);
+          setTopAlbums([]);
+        }
+      } else {
+        setNowPlaying(null);
+        setTopAlbums([]);
       }
       
     } catch (err: any) {
