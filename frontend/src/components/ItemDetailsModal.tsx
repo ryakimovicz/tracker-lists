@@ -250,11 +250,25 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     const compStatus = getCompletedStatus(selectedItem.item_type);
     if (selectedItem.id) {
       try {
-        await apiClient.put(`/library/${selectedItem.id}`, { status: compStatus });
-        setSelectedItem((prev: any) => prev ? { ...prev, status: compStatus, completed_at: new Date().toISOString() } : null);
+        const res = await apiClient.put(`/library/${selectedItem.id}`, { status: compStatus });
+        setSelectedItem((prev: any) => prev ? { ...prev, status: compStatus, ...res.data } : null);
+        
+        if (user?.is_pro) {
+          apiClient.get(`/library/${selectedItem.id}/consumption-history`)
+            .then(hRes => {
+              if (hRes.data && hRes.data.history) {
+                setConsumptionHistory(hRes.data.history);
+              }
+            })
+            .catch(console.error);
+        }
         onUpdate && onUpdate();
-      } catch (e) {
-        console.error(e);
+      } catch (e: any) {
+        if (e.response?.data?.detail) {
+          alert(e.response.data.detail);
+        } else {
+          console.error(e);
+        }
       }
     } else {
       await ensureTracked(compStatus);
@@ -364,11 +378,25 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     
     if (selectedItem.id) {
       try {
-        await apiClient.put(`/library/${selectedItem.id}`, { status: newStatus });
-        setSelectedItem((prev: any) => prev ? { ...prev, status: newStatus } : null);
+        const res = await apiClient.put(`/library/${selectedItem.id}`, { status: newStatus });
+        setSelectedItem((prev: any) => prev ? { ...prev, status: newStatus, ...res.data } : null);
+        
+        if (['completed', 'read'].includes(newStatus) && user?.is_pro) {
+          apiClient.get(`/library/${selectedItem.id}/consumption-history`)
+            .then(hRes => {
+              if (hRes.data && hRes.data.history) {
+                setConsumptionHistory(hRes.data.history);
+              }
+            })
+            .catch(console.error);
+        }
         onUpdate && onUpdate();
-      } catch (e) {
-        console.error(e);
+      } catch (e: any) {
+        if (e.response?.data?.detail) {
+          alert(e.response.data.detail);
+        } else {
+          console.error(e);
+        }
       }
     } else {
       await ensureTracked(newStatus);

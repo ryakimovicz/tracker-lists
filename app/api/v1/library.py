@@ -516,20 +516,27 @@ def update_library_item(
                 if last_title:
                     lib_item.last_seen_episode = last_title
             
-            # Ensure at least initial consumption is recorded in ConsumptionHistory
+            # If transitioning from a non-completed status into completed/read, add a consumption record
             from app.models.consumption import ConsumptionHistory
-            has_history = db.query(ConsumptionHistory).filter(
+            is_user_pro = bool(current_user.is_pro or current_user.is_vip or current_user.is_admin)
+            existing_count = db.query(ConsumptionHistory).filter(
                 ConsumptionHistory.user_id == current_user.id,
                 ConsumptionHistory.external_id == lib_item.external_id
-            ).first()
-            if not has_history:
-                ch = ConsumptionHistory(
-                    user_id=current_user.id,
-                    item_type=lib_item.item_type.value if hasattr(lib_item.item_type, 'value') else lib_item.item_type,
-                    external_id=lib_item.external_id,
-                    consumed_at=now_dt
+            ).count()
+            
+            if not is_user_pro and existing_count >= 2:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Los usuarios gratuitos solo pueden registrar hasta 2 visualizaciones/lecturas. ¡Pásate a Premium para registros ilimitados e historial detallado!"
                 )
-                db.add(ch)
+                
+            ch = ConsumptionHistory(
+                user_id=current_user.id,
+                item_type=lib_item.item_type.value if hasattr(lib_item.item_type, 'value') else lib_item.item_type,
+                external_id=lib_item.external_id,
+                consumed_at=now_dt
+            )
+            db.add(ch)
         else:
             lib_item.completed_at = None
             
