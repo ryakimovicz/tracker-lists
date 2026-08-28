@@ -2,19 +2,19 @@
   <!-- Fondo Soft Slate Light -->
   <rect width="500" height="500" rx="54" fill="#f1f5f9" stroke="#e2e8f0" stroke-width="2" />
 
-  <!-- Isotipo P Proporcionado -->
-  <g transform="translate(160, 44)">
-    <rect x="0" y="0" width="34" height="206" rx="17" fill="#f59e0b" />
-    <rect x="48" y="0" width="98" height="34" rx="17" fill="#16a34a" />
-    <rect x="48" y="48" width="132" height="34" rx="17" fill="#2563eb" />
-    <rect x="48" y="96" width="84" height="34" rx="17" fill="#9333ea" />
+  <!-- Isotipo P (Escala Uniforme Idéntica) -->
+  <g transform="translate(98, 18) scale(1.52)">
+    <rect x="24" y="24" width="28" height="152" rx="14" fill="#f59e0b" />
+    <rect x="64" y="24" width="86" height="28" rx="14" fill="#16a34a" />
+    <rect x="64" y="66" width="112" height="28" rx="14" fill="#2563eb" />
+    <rect x="64" y="108" width="72" height="28" rx="14" fill="#9333ea" />
   </g>
 
   <!-- Tipografía Pathd Centrada -->
-  <text x="250" y="372" text-anchor="middle" font-family="'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif" font-size="94" font-weight="800" letter-spacing="-2" fill="#0f172a">
+  <text x="250" y="378" text-anchor="middle" font-family="'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif" font-size="88" font-weight="800" letter-spacing="-2" fill="#0f172a">
     Path<tspan fill="#f59e0b">d</tspan>
   </text>
-  <text x="250" y="424" text-anchor="middle" font-family="'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif" font-size="20" font-weight="600" letter-spacing="3" fill="#475569">
+  <text x="250" y="428" text-anchor="middle" font-family="'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif" font-size="20" font-weight="600" letter-spacing="3" fill="#475569">
     MEDIA TRACKER &amp; GUIDES
   </text>
 </svg>

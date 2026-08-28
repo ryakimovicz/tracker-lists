@@ -2,20 +2,20 @@
   <!-- Fondo Dark Charcoal -->
   <rect width="500" height="500" rx="54" fill="#090d16" />
 
-  <!-- Isotipo P Grande y Centrado -->
-  <g transform="translate(155, 52)">
-    <!-- Tallo: Ámbar Solar -->
-    <rect x="0" y="0" width="36" height="232" rx="18" fill="#f59e0b" />
-    <!-- Barra Superior: Películas -->
-    <rect x="52" y="0" width="110" height="36" rx="18" fill="#4ade80" />
-    <!-- Barra Media: Manga / Lectura -->
-    <rect x="52" y="54" width="144" height="36" rx="18" fill="#60a5fa" />
-    <!-- Barra Inferior: Videojuegos -->
-    <rect x="52" y="108" width="92" height="36" rx="18" fill="#c084fc" />
+  <!-- Isotipo P (Escala Uniforme Idéntica a logo-transparent.svg) -->
+  <g transform="translate(85, 25) scale(1.65)">
+    <!-- Tallo: Ámbar Solar (Identidad Pathd) -->
+    <rect x="24" y="24" width="28" height="152" rx="14" fill="#f59e0b" />
+    <!-- Barra Superior: Películas (#4ADE80) -->
+    <rect x="64" y="24" width="86" height="28" rx="14" fill="#4ade80" />
+    <!-- Barra Media: Manga / Lectura (#60A5FA) -->
+    <rect x="64" y="66" width="112" height="28" rx="14" fill="#60a5fa" />
+    <!-- Barra Inferior: Videojuegos (#C084FC) -->
+    <rect x="64" y="108" width="72" height="28" rx="14" fill="#c084fc" />
   </g>
 
-  <!-- Tipografía Pathd Imponente -->
-  <text x="250" y="416" text-anchor="middle" font-family="'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif" font-size="108" font-weight="800" letter-spacing="-2.5" fill="#f8fafc">
+  <!-- Tipografía Pathd -->
+  <text x="250" y="415" text-anchor="middle" font-family="'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif" font-size="96" font-weight="800" letter-spacing="-2" fill="#f8fafc">
     Path<tspan fill="#f59e0b">d</tspan>
   </text>
 </svg>

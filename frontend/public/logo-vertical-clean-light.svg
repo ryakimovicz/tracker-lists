@@ -2,16 +2,16 @@
   <!-- Fondo Soft Slate Light -->
   <rect width="500" height="500" rx="54" fill="#f1f5f9" stroke="#e2e8f0" stroke-width="2" />
 
-  <!-- Isotipo P Grande y Centrado -->
-  <g transform="translate(155, 52)">
-    <rect x="0" y="0" width="36" height="232" rx="18" fill="#f59e0b" />
-    <rect x="52" y="0" width="110" height="36" rx="18" fill="#16a34a" />
-    <rect x="52" y="54" width="144" height="36" rx="18" fill="#2563eb" />
-    <rect x="52" y="108" width="92" height="36" rx="18" fill="#9333ea" />
+  <!-- Isotipo P (Escala Uniforme Idéntica) -->
+  <g transform="translate(85, 25) scale(1.65)">
+    <rect x="24" y="24" width="28" height="152" rx="14" fill="#f59e0b" />
+    <rect x="64" y="24" width="86" height="28" rx="14" fill="#16a34a" />
+    <rect x="64" y="66" width="112" height="28" rx="14" fill="#2563eb" />
+    <rect x="64" y="108" width="72" height="28" rx="14" fill="#9333ea" />
   </g>
 
-  <!-- Tipografía Pathd Imponente -->
-  <text x="250" y="416" text-anchor="middle" font-family="'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif" font-size="108" font-weight="800" letter-spacing="-2.5" fill="#0f172a">
+  <!-- Tipografía Pathd -->
+  <text x="250" y="415" text-anchor="middle" font-family="'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif" font-size="96" font-weight="800" letter-spacing="-2" fill="#0f172a">
     Path<tspan fill="#f59e0b">d</tspan>
   </text>
 </svg>
