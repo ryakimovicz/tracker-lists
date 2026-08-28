@@ -3,10 +3,10 @@
   <rect x="2" y="2" width="508" height="508" rx="110" fill="#090d16" />
 
   <!-- Círculo Ámbar Translúcido Oficial de Pathd -->
-  <circle cx="256" cy="176" r="76" fill="rgba(245, 158, 11, 0.15)" />
+  <circle cx="256" cy="156" r="74" fill="rgba(245, 158, 11, 0.15)" />
 
-  <!-- Corona Lineal Oficial de Lucide Crown Proporcionada y Equilibrada -->
-  <g transform="translate(206, 126) scale(4.16)">
+  <!-- Corona Lineal Oficial de Lucide Crown -->
+  <g transform="translate(206, 106) scale(4.16)">
     <path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z" 
           stroke="#f59e0b" 
           stroke-width="1.8" 
@@ -20,11 +20,11 @@
           stroke-linejoin="round" />
   </g>
 
-  <!-- Tipografía Oficial: Pathd PREMIUM -->
-  <text x="256" y="348" text-anchor="middle" font-family="system-ui, -apple-system, 'Inter', 'Segoe UI', Roboto, sans-serif" font-size="64" font-weight="800" letter-spacing="-2" fill="#f8fafc">
+  <!-- Tipografía Oficial Pathd PREMIUM con Mayor Peso y Presencia -->
+  <text x="256" y="352" text-anchor="middle" font-family="system-ui, -apple-system, 'Inter', 'Segoe UI', Roboto, sans-serif" font-size="84" font-weight="800" letter-spacing="-2.5" fill="#f8fafc">
     Path<tspan fill="#f59e0b">d</tspan>
   </text>
-  <text x="256" y="408" text-anchor="middle" font-family="system-ui, -apple-system, 'Inter', 'Segoe UI', Roboto, sans-serif" font-size="24" font-weight="700" letter-spacing="8" fill="#f59e0b">
+  <text x="256" y="420" text-anchor="middle" font-family="system-ui, -apple-system, 'Inter', 'Segoe UI', Roboto, sans-serif" font-size="30" font-weight="700" letter-spacing="10" fill="#f59e0b">
     PREMIUM
   </text>
 </svg>
