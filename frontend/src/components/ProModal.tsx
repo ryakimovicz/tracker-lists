@@ -157,8 +157,8 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
               </h4>
               <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
                 {isEs
-                  ? 'Personaliza tu portada y el fondo completo de tu perfil con imágenes panorámicas en alta resolución de tus obras favoritas (todas las categorías) o sube tus propias imágenes.'
-                  : 'Customize your profile banner and full-page ambient wallpaper with high-resolution artworks from your favorite titles across all categories, or upload your own images.'}
+                  ? 'Personaliza tu portada y el fondo completo de tu perfil con imágenes panorámicas en alta resolución de tus obras favoritas.'
+                  : 'Customize your profile banner and full-page ambient wallpaper with high-resolution artworks from your favorite titles.'}
               </p>
             </div>
           </div>
