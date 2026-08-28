@@ -104,9 +104,19 @@ def root():
         "project": settings.PROJECT_NAME
     }
 
+@app.get("/health")
+@app.get(f"{settings.API_V1_STR}/health")
+def health_check():
+    return {
+        "status": "healthy",
+        "service": "Pathd API",
+        "project": settings.PROJECT_NAME
+    }
+
 @app.get("/ping")
 def ping_test():
     return {"ping": "pong"}
+
 # Trigger uvicorn hot-reload configuration update (v7)
 # Trigger uvicorn reload
 
