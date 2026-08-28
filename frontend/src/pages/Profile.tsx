@@ -14,6 +14,7 @@ import { BackgroundSelectorModal } from '../components/BackgroundSelectorModal';
 import { ProModal } from '../components/ProModal';
 import { ReplaceFavoriteModal } from '../components/ReplaceFavoriteModal';
 import { AdBanner } from '../components/AdBanner';
+import { ConfirmModal } from '../components/ConfirmModal';
 
 
 import {
@@ -138,6 +139,14 @@ export const Profile: React.FC = () => {
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [loading, setLoading] = useState(true);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    type?: 'danger' | 'warning';
+    confirmText?: string;
+    onConfirm: () => void;
+  } | null>(null);
 
   const isOwnProfile = !userIdParam || String(profile?.id) === String(currentUser?.id);
 
@@ -386,17 +395,26 @@ export const Profile: React.FC = () => {
     window.location.href = `http://www.last.fm/api/auth/?api_key=de5acce61bdd8b3e4bd181ebce8a69e8&cb=${encodeURIComponent('http://localhost:5173/profile')}`;
   };
 
-  const handleLastFmDisconnect = async () => {
-    if (!window.confirm(language === 'es' ? '¿Desconectar cuenta de Last.fm?' : 'Disconnect Last.fm account?')) return;
-    try {
-      await apiClient.delete('/users/me/lastfm/disconnect');
-      setProfile(prev => prev ? { ...prev, lastfm_username: undefined } : null);
-      setNowPlaying(null);
-      setTopAlbums([]);
-      setSuccessMsg(language === 'es' ? 'Desconectado de Last.fm.' : 'Disconnected from Last.fm.');
-    } catch(err) {
-      setErrorMsg('Error disconnecting from Last.fm');
-    }
+  const handleLastFmDisconnect = () => {
+    setConfirmDialog({
+      isOpen: true,
+      title: language === 'es' ? '¿Desconectar Last.fm?' : 'Disconnect Last.fm?',
+      message: language === 'es' ? 'Tu cuenta de Last.fm se desvinculará de tu perfil.' : 'Your Last.fm account will be unlinked from your profile.',
+      type: 'danger',
+      confirmText: language === 'es' ? 'Desconectar' : 'Disconnect',
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        try {
+          await apiClient.delete('/users/me/lastfm/disconnect');
+          setProfile(prev => prev ? { ...prev, lastfm_username: undefined } : null);
+          setNowPlaying(null);
+          setTopAlbums([]);
+          setSuccessMsg(language === 'es' ? 'Desconectado de Last.fm.' : 'Disconnected from Last.fm.');
+        } catch(err) {
+          setErrorMsg('Error disconnecting from Last.fm');
+        }
+      }
+    });
   };
 
 
@@ -525,55 +543,69 @@ export const Profile: React.FC = () => {
     setSelectedItem(item);
   };
 
-  const handleDeleteItem = async (itemId: number) => {
-    if (!window.confirm(language === 'es' ? '¿Seguro que deseas eliminar este elemento?' : 'Are you sure you want to delete this item?')) return;
-    setErrorMsg('');
-    setSuccessMsg('');
-    try {
-      await apiClient.delete(`/library/${itemId}`);
-      setLibraryItems(prev => prev.filter(item => item.id !== itemId));
-      setSuccessMsg(language === 'es' ? 'Elemento eliminado de la estantería.' : 'Item removed from shelf.');
-      
-      const targetActivityUrl = userIdParam ? `/users/${userIdParam}/activity` : '/users/me/activity';
-      const actRes = await apiClient.get(targetActivityUrl);
-      setActivities(actRes.data);
-      
-      setTimeout(() => setSuccessMsg(''), 3000);
-    } catch (err: any) {
-      setErrorMsg(err.response?.data?.detail || 'Failed to delete item.');
-    }
+  const handleDeleteItem = (itemId: number) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: language === 'es' ? '¿Eliminar de la estantería?' : 'Remove from shelf?',
+      message: language === 'es' ? 'Esta obra se eliminará de tu estantería y de tu historial.' : 'This title will be removed from your shelf and activity history.',
+      type: 'danger',
+      confirmText: language === 'es' ? 'Eliminar' : 'Delete',
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        setErrorMsg('');
+        setSuccessMsg('');
+        try {
+          await apiClient.delete(`/library/${itemId}`);
+          setLibraryItems(prev => prev.filter(item => item.id !== itemId));
+          setSuccessMsg(language === 'es' ? 'Elemento eliminado de la estantería.' : 'Item removed from shelf.');
+          
+          const targetActivityUrl = userIdParam ? `/users/${userIdParam}/activity` : '/users/me/activity';
+          const actRes = await apiClient.get(targetActivityUrl);
+          setActivities(actRes.data);
+          
+          setTimeout(() => setSuccessMsg(''), 3000);
+        } catch (err: any) {
+          setErrorMsg(err.response?.data?.detail || 'Failed to delete item.');
+        }
+      }
+    });
   };
+
   const handleOpenGuide = (guideId: number) => {
     navigate(`/guide/${guideId}`);
   };
 
 
-  const handleDeleteGuide = async (listId: number) => {
-    if (!window.confirm(language === 'es' ? '¿Estás seguro de que deseas eliminar esta guía?' : 'Are you sure you want to delete this guide?')) return;
-    setErrorMsg('');
-    setSuccessMsg('');
-    try {
-      await apiClient.delete(`/lists/${listId}`);
-      
-      // Update local profile list
-      setProfile((prev: any) => {
-        if (!prev) return null;
-        return {
-          ...prev,
-          created_lists: (prev.created_lists || []).filter((l: any) => l.id !== listId),
-          saved_lists: (prev.saved_lists || []).filter((l: any) => l.id !== listId)
-        };
-      });
-
-      const targetActivityUrl = userIdParam ? `/users/${userIdParam}/activity` : '/users/me/activity';
-      const actRes = await apiClient.get(targetActivityUrl);
-      setActivities(actRes.data);
-
-      setSuccessMsg(language === 'es' ? 'Guía eliminada con éxito.' : 'Guide deleted successfully.');
-      setTimeout(() => setSuccessMsg(''), 3000);
-    } catch (err: any) {
-      setErrorMsg(language === 'es' ? 'No se pudo eliminar la guía.' : 'Failed to delete guide.');
-    }
+  const handleDeleteGuide = (listId: number) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: language === 'es' ? '¿Eliminar esta guía?' : 'Delete this guide?',
+      message: language === 'es' ? 'Esta acción eliminará la guía y sus elementos de forma permanente.' : 'This action will permanently delete this guide and its items.',
+      type: 'danger',
+      confirmText: language === 'es' ? 'Eliminar Guía' : 'Delete Guide',
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        setErrorMsg('');
+        setSuccessMsg('');
+        try {
+          await apiClient.delete(`/lists/${listId}`);
+          
+          // Update local profile list
+          setProfile((prev: any) => {
+            if (!prev) return null;
+            return {
+              ...prev,
+              created_lists: (prev.created_lists || []).filter((l: any) => l.id !== listId),
+              saved_lists: (prev.saved_lists || []).filter((l: any) => l.id !== listId)
+            };
+          });
+          setSuccessMsg(language === 'es' ? 'Guía eliminada con éxito.' : 'Guide deleted successfully.');
+          setTimeout(() => setSuccessMsg(''), 3000);
+        } catch (err: any) {
+          setErrorMsg(err.response?.data?.detail || 'Failed to delete guide.');
+        }
+      }
+    });
   };
   // Get allowed statuses based on item type
   const getAllowedStatuses = (type: string) => {
@@ -2129,6 +2161,19 @@ export const Profile: React.FC = () => {
         onConfirmReplace={handleConfirmReplace}
         onOpenProModal={() => setShowProModal(true)}
       />
+
+      {/* Global Confirm Modal */}
+      {confirmDialog && (
+        <ConfirmModal
+          isOpen={confirmDialog.isOpen}
+          title={confirmDialog.title}
+          message={confirmDialog.message}
+          confirmText={confirmDialog.confirmText}
+          type={confirmDialog.type || 'danger'}
+          onConfirm={confirmDialog.onConfirm}
+          onClose={() => setConfirmDialog(null)}
+        />
+      )}
     </div>
   );
 };

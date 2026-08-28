@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../context/LanguageContext';
 import { apiClient } from '../api/client';
 import { Ban, LogOut, Mail, Clock, Trash2, Star, CheckCircle } from 'lucide-react';
+import { ConfirmModal } from './ConfirmModal';
 
 export const SuspendedAccountModal: React.FC = () => {
   const { user, logout, refreshProfile } = useAuth();
@@ -12,6 +13,9 @@ export const SuspendedAccountModal: React.FC = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isCancellingSub, setIsCancellingSub] = useState(false);
   const [cancelSubMessage, setCancelSubMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [confirmCancelModal, setConfirmCancelModal] = useState(false);
+  const [confirmDeleteModal, setConfirmDeleteModal] = useState(false);
 
   useEffect(() => {
     if (!user || !user.is_suspended) return;
@@ -26,44 +30,34 @@ export const SuspendedAccountModal: React.FC = () => {
     return null;
   }
 
-
   const isPermanent = !user.suspended_until;
   const suspensionEndDate = user.suspended_until ? new Date(user.suspended_until) : null;
 
-  const handleCancelSubscription = async () => {
-    const confirmCancel = window.confirm(
-      isEs
-        ? '¿Deseas cancelar la renovación de tu suscripción Premium? No se te volverá a cobrar ningún cargo futuro y mantendrás el acceso a todas las funciones Premium hasta que finalice el ciclo que ya pagaste.'
-        : 'Do you want to cancel your Premium renewal? You will retain full access until the end of your current billing period, and you will not be charged again.'
-    );
-    if (!confirmCancel) return;
-
+  const executeCancelSubscription = async () => {
     setIsCancellingSub(true);
+    setErrorMessage(null);
     try {
       const res = await apiClient.post('/payments/cancel-subscription');
       setCancelSubMessage(res.data.message || (isEs ? 'Renovación de suscripción cancelada.' : 'Subscription renewal cancelled.'));
       await refreshProfile();
+      setConfirmCancelModal(false);
     } catch (err) {
-      alert(isEs ? 'Error al cancelar la suscripción. Contáctanos a support@pathd.net' : 'Error cancelling subscription. Please contact support@pathd.net');
+      setErrorMessage(isEs ? 'Error al cancelar la suscripción. Contáctanos a support@pathd.net' : 'Error cancelling subscription. Please contact support@pathd.net');
+      setConfirmCancelModal(false);
     } finally {
       setIsCancellingSub(false);
     }
   };
 
-  const handleDeleteMyAccount = async () => {
-    const confirmDelete = window.confirm(
-      isEs
-        ? '¿Estás seguro de que deseas eliminar tu cuenta permanentemente? Conforme a las leyes de privacidad, se cancelarán de inmediato todas tus suscripciones activas y se borrarán tus datos personales de forma irreversible.'
-        : 'Are you sure you want to permanently delete your account? Under privacy laws, all active subscriptions will be cancelled and your data permanently wiped.'
-    );
-    if (!confirmDelete) return;
-
+  const executeDeleteMyAccount = async () => {
     setIsDeleting(true);
+    setErrorMessage(null);
     try {
       await apiClient.delete('/users/me');
       await logout();
     } catch (err) {
-      alert(isEs ? 'Error al eliminar la cuenta. Por favor contáctanos a support@pathd.net' : 'Error deleting account. Please contact support@pathd.net');
+      setErrorMessage(isEs ? 'Error al eliminar la cuenta. Por favor contáctanos a support@pathd.net' : 'Error deleting account. Please contact support@pathd.net');
+      setConfirmDeleteModal(false);
     } finally {
       setIsDeleting(false);
     }
@@ -173,7 +167,7 @@ export const SuspendedAccountModal: React.FC = () => {
               <button
                 type="button"
                 disabled={isCancellingSub}
-                onClick={handleCancelSubscription}
+                onClick={() => setConfirmCancelModal(true)}
                 className="btn-secondary"
                 style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', fontSize: '0.85rem', padding: '0.55rem', color: '#f59e0b', borderColor: 'rgba(245, 158, 11, 0.4)' }}
               >
@@ -181,6 +175,12 @@ export const SuspendedAccountModal: React.FC = () => {
                 {isCancellingSub ? (isEs ? 'Cancelando suscripción...' : 'Cancelling subscription...') : (isEs ? 'Cancelar renovación de suscripción Premium' : 'Cancel Premium subscription renewal')}
               </button>
             )}
+          </div>
+        )}
+
+        {errorMessage && (
+          <div style={{ width: '100%', padding: '0.75rem', borderRadius: 8, background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', fontSize: '0.85rem', marginBottom: '1rem' }}>
+            {errorMessage}
           </div>
         )}
 
@@ -219,7 +219,7 @@ export const SuspendedAccountModal: React.FC = () => {
           <button
             type="button"
             disabled={isDeleting}
-            onClick={handleDeleteMyAccount}
+            onClick={() => setConfirmDeleteModal(true)}
             style={{
               background: 'none',
               border: 'none',
@@ -240,6 +240,39 @@ export const SuspendedAccountModal: React.FC = () => {
             {isDeleting ? (isEs ? 'Eliminando cuenta...' : 'Deleting account...') : (isEs ? 'Eliminar mi cuenta definitivamente (Derecho al olvido)' : 'Permanently delete my account (Right to be forgotten)')}
           </button>
         </div>
+
+        {/* Confirm Modals */}
+        <ConfirmModal
+          isOpen={confirmCancelModal}
+          title={isEs ? '¿Cancelar renovación Premium?' : 'Cancel Premium Renewal?'}
+          message={
+            isEs
+              ? 'No se te volverá a cobrar ningún cargo futuro y mantendrás el acceso a todas las funciones Premium hasta que finalice el ciclo que ya pagaste.'
+              : 'You will retain full access until the end of your current billing period, and you will not be charged again.'
+          }
+          confirmText={isEs ? 'Confirmar Cancelación' : 'Confirm Cancellation'}
+          cancelText={isEs ? 'Volver' : 'Back'}
+          type="warning"
+          isLoading={isCancellingSub}
+          onConfirm={executeCancelSubscription}
+          onClose={() => setConfirmCancelModal(false)}
+        />
+
+        <ConfirmModal
+          isOpen={confirmDeleteModal}
+          title={isEs ? '¿Eliminar cuenta definitivamente?' : 'Permanently delete account?'}
+          message={
+            isEs
+              ? 'Conforme a las leyes de privacidad, se cancelarán de inmediato todas tus suscripciones activas y se borrarán tus datos personales de forma irreversible.'
+              : 'Under privacy laws, all active subscriptions will be cancelled and your personal data permanently wiped.'
+          }
+          confirmText={isEs ? 'Eliminar Cuenta' : 'Delete Account'}
+          cancelText={isEs ? 'Cancelar' : 'Cancel'}
+          type="danger"
+          isLoading={isDeleting}
+          onConfirm={executeDeleteMyAccount}
+          onClose={() => setConfirmDeleteModal(false)}
+        />
       </div>
     </div>
   );

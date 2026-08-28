@@ -26,6 +26,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { ConfirmModal } from '../components/ConfirmModal';
 
 interface AdminUser {
 
@@ -72,10 +73,18 @@ export const AdminPanel: React.FC = () => {
   // Feedback messages
   const [modalFeedback, setModalFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    type?: 'danger' | 'warning';
+    confirmText?: string;
+    onConfirm: () => void;
+  } | null>(null);
   const { user: currentUser, logout } = useAuth();
   const navigate = useNavigate();
 
-  const handleChangeUserId = async () => {
+  const handleChangeUserId = () => {
     if (!selectedUser) return;
     const targetId = Number(newUserIdInput);
     if (!targetId || targetId <= 0) {
@@ -88,40 +97,38 @@ export const AdminPanel: React.FC = () => {
     }
 
     const isChangingSelf = (currentUser?.id === selectedUser.id);
-    const confirmChange = window.confirm(
-      isEs
+    setConfirmDialog({
+      isOpen: true,
+      title: isEs ? '¿Reasignar ID de Usuario?' : 'Reassign User ID?',
+      message: isEs
         ? `¿Confirmas reasignar al usuario "${selectedUser.username}" del ID #${selectedUser.id} al nuevo ID #${targetId}? ${isChangingSelf ? 'Al cambiar tu propio ID se cerrará tu sesión para que inicies con tus nuevos datos.' : 'Todas sus guías, biblioteca, favoritos y progreso se reasignarán en cascada de forma segura.'}`
-        : `Confirm reassigning user "${selectedUser.username}" from ID #${selectedUser.id} to new ID #${targetId}? ${isChangingSelf ? 'Changing your own ID will log you out to authenticate with new ID.' : 'All related guides, library, favorites and progress will be safely remapped in cascade.'}`
-    );
-    if (!confirmChange) return;
+        : `Confirm reassigning user "${selectedUser.username}" from ID #${selectedUser.id} to new ID #${targetId}? ${isChangingSelf ? 'Changing your own ID will log you out to authenticate with new ID.' : 'All related guides, library, favorites and progress will be safely remapped in cascade.'}`,
+      type: 'warning',
+      confirmText: isEs ? 'Reasignar ID' : 'Reassign ID',
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        setActionLoading(true);
+        try {
+          const res = await apiClient.post(`/admin/users/${selectedUser.id}/change-id`, { new_id: targetId });
+          
+          if (res.data.is_self || isChangingSelf) {
+            localStorage.removeItem('access_token');
+            window.location.href = '/login';
+            return;
+          }
 
-    setActionLoading(true);
-    try {
-      const res = await apiClient.post(`/admin/users/${selectedUser.id}/change-id`, { new_id: targetId });
-      
-      if (res.data.is_self || isChangingSelf) {
-        alert(isEs 
-          ? `¡Tu ID fue actualizado al ID #${targetId}! Tu sesión se cerrará automáticamente. Por favor inicia sesión nuevamente.`
-          : `Your user ID was updated to #${targetId}! You will be logged out. Please log in again.`
-        );
-        localStorage.removeItem('access_token');
-        window.location.href = '/login';
-        return;
+          const updated = { ...selectedUser, id: targetId };
+          setSelectedUser(updated);
+          setUsers(prev => prev.map(u => u.id === selectedUser.id ? updated : u));
+          setNewUserIdInput('');
+          setModalFeedback({ type: 'success', text: isEs ? `ID de usuario actualizado a #${targetId} exitosamente.` : `User ID updated to #${targetId} successfully.` });
+        } catch (err: any) {
+          setModalFeedback({ type: 'error', text: err.response?.data?.detail || 'Error changing User ID.' });
+        } finally {
+          setActionLoading(false);
+        }
       }
-
-
-      const updated = { ...selectedUser, id: targetId };
-      setSelectedUser(updated);
-      setUsers(prev => prev.map(u => u.id === selectedUser.id ? updated : u));
-      setModalFeedback({
-        type: 'success',
-        text: res.data.message || (isEs ? `ID cambiado exitosamente a #${targetId}.` : `ID successfully changed to #${targetId}.`)
-      });
-    } catch (err: any) {
-      setModalFeedback({ type: 'error', text: err.response?.data?.detail || 'Error al cambiar ID.' });
-    } finally {
-      setActionLoading(false);
-    }
+    });
   };
 
 
@@ -209,36 +216,40 @@ export const AdminPanel: React.FC = () => {
     }
   };
 
-  const handleCancelUserSubscription = async () => {
+  const handleCancelUserSubscription = () => {
     if (!selectedUser || selectedUser.is_admin || selectedUser.is_vip) return;
-    const confirmCancel = window.confirm(
-      isEs
+    setConfirmDialog({
+      isOpen: true,
+      title: isEs ? '¿Cancelar Suscripción?' : 'Cancel Subscription?',
+      message: isEs
         ? `¿Estás seguro de que deseas cancelar la suscripción Premium de "${selectedUser.username}"? Se detendrán los cobros automáticos en Dodo Payments.`
-        : `Are you sure you want to cancel the Premium subscription for "${selectedUser.username}"? Auto-billing will be stopped in Dodo Payments.`
-    );
-    if (!confirmCancel) return;
-
-    setActionLoading(true);
-    try {
-      const res = await apiClient.post(`/admin/users/${selectedUser.id}/cancel-subscription`);
-      const updated = {
-        ...selectedUser,
-        is_pro: res.data.is_pro,
-        pro_expires_at: undefined
-      };
-      setSelectedUser(updated);
-      setUsers(prev => prev.map(u => u.id === selectedUser.id ? updated : u));
-      setModalFeedback({
-        type: 'success',
-        text: res.data.message || (isEs ? 'Suscripción cancelada.' : 'Subscription cancelled.')
-      });
-    } catch (err: any) {
-      setModalFeedback({ type: 'error', text: err.response?.data?.detail || 'Error cancelling user subscription.' });
-    } finally {
-      setActionLoading(false);
-    }
+        : `Are you sure you want to cancel the Premium subscription for "${selectedUser.username}"? Auto-billing will be stopped in Dodo Payments.`,
+      type: 'warning',
+      confirmText: isEs ? 'Cancelar Suscripción' : 'Cancel Subscription',
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        setActionLoading(true);
+        try {
+          const res = await apiClient.post(`/admin/users/${selectedUser.id}/cancel-subscription`);
+          const updated = {
+            ...selectedUser,
+            is_pro: res.data.is_pro,
+            pro_expires_at: undefined
+          };
+          setSelectedUser(updated);
+          setUsers(prev => prev.map(u => u.id === selectedUser.id ? updated : u));
+          setModalFeedback({
+            type: 'success',
+            text: isEs ? `Suscripción de "${selectedUser.username}" cancelada exitosamente.` : `Subscription for "${selectedUser.username}" cancelled successfully.`
+          });
+        } catch (err: any) {
+          setModalFeedback({ type: 'error', text: err.response?.data?.detail || 'Error cancelling subscription.' });
+        } finally {
+          setActionLoading(false);
+        }
+      }
+    });
   };
-
 
   const handleSendWarning = async () => {
     if (!selectedUser || !warningMessage.trim()) return;
@@ -260,17 +271,19 @@ export const AdminPanel: React.FC = () => {
   };
 
   const handleSuspendUser = async () => {
-    if (!selectedUser || selectedUser.is_admin) return;
+    if (!selectedUser) return;
     setActionLoading(true);
+    setModalFeedback(null);
     try {
-      const res = await apiClient.post(`/admin/users/${selectedUser.id}/suspend`, {
-        duration_value: suspensionUnit === 'permanent' ? null : Number(suspensionValue),
-        duration_unit: suspensionUnit,
-        reason: suspensionReason
-      });
+      const payload: any = {
+        value: suspensionValue,
+        unit: suspensionUnit,
+        reason: suspensionReason.trim() || undefined
+      };
+      const res = await apiClient.post(`/admin/users/${selectedUser.id}/suspend`, payload);
       const updated = {
         ...selectedUser,
-        is_suspended: true,
+        is_suspended: res.data.is_suspended,
         suspended_until: res.data.suspended_until,
         suspension_reason: res.data.suspension_reason
       };
@@ -278,8 +291,9 @@ export const AdminPanel: React.FC = () => {
       setUsers(prev => prev.map(u => u.id === selectedUser.id ? updated : u));
       setModalFeedback({
         type: 'success',
-        text: isEs ? 'Usuario suspendido correctamente.' : 'User suspended successfully.'
+        text: isEs ? `Usuario "${selectedUser.username}" suspendido correctamente.` : `User "${selectedUser.username}" suspended successfully.`
       });
+      setSuspensionReason('');
     } catch (err: any) {
       setModalFeedback({ type: 'error', text: err.response?.data?.detail || 'Error suspending user.' });
     } finally {
@@ -290,11 +304,12 @@ export const AdminPanel: React.FC = () => {
   const handleUnsuspendUser = async () => {
     if (!selectedUser) return;
     setActionLoading(true);
+    setModalFeedback(null);
     try {
-      await apiClient.post(`/admin/users/${selectedUser.id}/unsuspend`);
+      const res = await apiClient.post(`/admin/users/${selectedUser.id}/unsuspend`);
       const updated = {
         ...selectedUser,
-        is_suspended: false,
+        is_suspended: res.data.is_suspended,
         suspended_until: undefined,
         suspension_reason: undefined
       };
@@ -302,7 +317,7 @@ export const AdminPanel: React.FC = () => {
       setUsers(prev => prev.map(u => u.id === selectedUser.id ? updated : u));
       setModalFeedback({
         type: 'success',
-        text: isEs ? 'Suspensión levantada correctamente.' : 'User suspension removed successfully.'
+        text: isEs ? `Suspensión de "${selectedUser.username}" removida.` : `Suspension for "${selectedUser.username}" removed.`
       });
     } catch (err: any) {
       setModalFeedback({ type: 'error', text: err.response?.data?.detail || 'Error removing suspension.' });
@@ -311,25 +326,30 @@ export const AdminPanel: React.FC = () => {
     }
   };
 
-  const handleDeleteUser = async () => {
+  const handleDeleteUser = () => {
     if (!selectedUser) return;
-    const confirmDelete = window.confirm(
-      isEs
+    setConfirmDialog({
+      isOpen: true,
+      title: isEs ? '¿Eliminar Usuario Permanentemente?' : 'Permanently Delete User?',
+      message: isEs
         ? `¿Estás seguro de que deseas eliminar permanentemente al usuario "${selectedUser.username}"? Esta acción no se puede deshacer.`
-        : `Are you sure you want to permanently delete user "${selectedUser.username}"? This cannot be undone.`
-    );
-    if (!confirmDelete) return;
-
-    setActionLoading(true);
-    try {
-      await apiClient.delete(`/admin/users/${selectedUser.id}`);
-      setUsers(prev => prev.filter(u => u.id !== selectedUser.id));
-      setSelectedUser(null);
-    } catch (err: any) {
-      setModalFeedback({ type: 'error', text: err.response?.data?.detail || 'Error deleting user.' });
-    } finally {
-      setActionLoading(false);
-    }
+        : `Are you sure you want to permanently delete user "${selectedUser.username}"? This cannot be undone.`,
+      type: 'danger',
+      confirmText: isEs ? 'Eliminar Usuario' : 'Delete User',
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        setActionLoading(true);
+        try {
+          await apiClient.delete(`/admin/users/${selectedUser.id}`);
+          setUsers(prev => prev.filter(u => u.id !== selectedUser.id));
+          setSelectedUser(null);
+        } catch (err: any) {
+          setModalFeedback({ type: 'error', text: err.response?.data?.detail || 'Error deleting user.' });
+        } finally {
+          setActionLoading(false);
+        }
+      }
+    });
   };
 
   const handleDeleteReportItem = async (type: 'list' | 'comment' | 'review', id: number) => {
@@ -944,6 +964,20 @@ export const AdminPanel: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Global Confirm Modal */}
+      {confirmDialog && (
+        <ConfirmModal
+          isOpen={confirmDialog.isOpen}
+          title={confirmDialog.title}
+          message={confirmDialog.message}
+          confirmText={confirmDialog.confirmText}
+          type={confirmDialog.type || 'warning'}
+          isLoading={actionLoading}
+          onConfirm={confirmDialog.onConfirm}
+          onClose={() => setConfirmDialog(null)}
+        />
       )}
     </div>
   );

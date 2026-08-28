@@ -38,6 +38,7 @@ import { AvatarSelectorModal } from '../components/AvatarSelectorModal';
 import { BannerSelectorModal } from '../components/BannerSelectorModal';
 import { BackgroundSelectorModal } from '../components/BackgroundSelectorModal';
 import { ProModal } from '../components/ProModal';
+import { ConfirmModal } from '../components/ConfirmModal';
 
 
 export const SettingsPage: React.FC = () => {
@@ -63,15 +64,10 @@ export const SettingsPage: React.FC = () => {
   const [cancelSubLoading, setCancelSubLoading] = useState(false);
   const [cancelSubMsg, setCancelSubMsg] = useState<string | null>(null);
   const [cancelSubError, setCancelSubError] = useState<string | null>(null);
+  const [showCancelSubModal, setShowCancelSubModal] = useState(false);
+  const [showDisconnectLastFmModal, setShowDisconnectLastFmModal] = useState(false);
 
-  const handleCancelSubscription = async () => {
-    const confirmCancel = window.confirm(
-      isEs
-        ? '¿Deseas cancelar la renovación de tu suscripción Premium? No se te volverá a cobrar ningún cargo futuro y mantendrás el acceso a todas las funciones Premium hasta que finalice el ciclo que ya pagaste.'
-        : 'Do you want to cancel your Premium renewal? You will retain full access until the end of your current billing period, and you will not be charged again.'
-    );
-    if (!confirmCancel) return;
-
+  const executeCancelSubscription = async () => {
     setCancelSubLoading(true);
     setCancelSubMsg(null);
     setCancelSubError(null);
@@ -79,11 +75,16 @@ export const SettingsPage: React.FC = () => {
       const res = await apiClient.post('/payments/cancel-subscription');
       setCancelSubMsg(res.data.message || (isEs ? 'Suscripción cancelada con éxito.' : 'Subscription cancelled successfully.'));
       await refreshProfile();
+      setShowCancelSubModal(false);
     } catch (err: any) {
       setCancelSubError(err.response?.data?.detail || 'Error cancelling subscription');
     } finally {
       setCancelSubLoading(false);
     }
+  };
+
+  const handleCancelSubscription = () => {
+    setShowCancelSubModal(true);
   };
 
 
@@ -158,8 +159,11 @@ export const SettingsPage: React.FC = () => {
     window.location.href = `http://www.last.fm/api/auth/?api_key=de5acce61bdd8b3e4bd181ebce8a69e8&cb=${encodeURIComponent(`${currentOrigin}/settings`)}`;
   };
 
-  const handleLastFmDisconnect = async () => {
-    if (!window.confirm(isEs ? '¿Desconectar cuenta de Last.fm?' : 'Disconnect Last.fm account?')) return;
+  const handleLastFmDisconnect = () => {
+    setShowDisconnectLastFmModal(true);
+  };
+
+  const executeDisconnectLastFm = async () => {
     setIsDisconnectingLastFm(true);
     setLastfmMsg(null);
     try {
@@ -169,12 +173,14 @@ export const SettingsPage: React.FC = () => {
         type: 'success',
         text: isEs ? 'Cuenta de Last.fm desconectada.' : 'Last.fm account disconnected.',
       });
+      setShowDisconnectLastFmModal(false);
       setTimeout(() => setLastfmMsg(null), 3000);
     } catch (err: any) {
       setLastfmMsg({
         type: 'error',
-        text: isEs ? 'Error al desconectar de Last.fm.' : 'Error disconnecting from Last.fm.',
+        text: isEs ? 'Error al desconectar la cuenta.' : 'Error disconnecting account.',
       });
+      setShowDisconnectLastFmModal(false);
     } finally {
       setIsDisconnectingLastFm(false);
     }
@@ -1316,6 +1322,40 @@ export const SettingsPage: React.FC = () => {
       {showProModal && (
         <ProModal onClose={() => setShowProModal(false)} />
       )}
+
+      {/* Cancel Subscription Modal */}
+      <ConfirmModal
+        isOpen={showCancelSubModal}
+        title={isEs ? '¿Cancelar renovación Premium?' : 'Cancel Premium Renewal?'}
+        message={
+          isEs
+            ? 'No se te volverá a cobrar ningún cargo futuro y mantendrás el acceso completo a todas las funciones Premium hasta que finalice el ciclo que ya pagaste.'
+            : 'You will retain full access to all Premium features until the end of your current billing period, and you will not be charged again.'
+        }
+        confirmText={isEs ? 'Confirmar Cancelación' : 'Confirm Cancellation'}
+        cancelText={isEs ? 'Mantener Plan' : 'Keep Plan'}
+        type="warning"
+        isLoading={cancelSubLoading}
+        onConfirm={executeCancelSubscription}
+        onClose={() => setShowCancelSubModal(false)}
+      />
+
+      {/* Disconnect Last.fm Modal */}
+      <ConfirmModal
+        isOpen={showDisconnectLastFmModal}
+        title={isEs ? '¿Desconectar Last.fm?' : 'Disconnect Last.fm?'}
+        message={
+          isEs
+            ? 'Tu cuenta de Last.fm se desvinculará de Pathd. Podrás volver a conectarla cuando quieras.'
+            : 'Your Last.fm account will be unlinked from Pathd. You can reconnect it anytime.'
+        }
+        confirmText={isEs ? 'Desconectar' : 'Disconnect'}
+        cancelText={isEs ? 'Cancelar' : 'Cancel'}
+        type="danger"
+        isLoading={isDisconnectingLastFm}
+        onConfirm={executeDisconnectLastFm}
+        onClose={() => setShowDisconnectLastFmModal(false)}
+      />
 
 
     </div>
