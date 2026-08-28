@@ -235,6 +235,7 @@ def admin_get_users(
             "is_vip": bool(u.is_vip),
             "is_pro": check_user_is_pro(u),
             "is_pro_paid": bool(u.is_pro),
+            "is_pro_cancelled": bool(u.is_pro_cancelled),
             "pro_expires_at": u.pro_expires_at,
             "is_suspended": bool(u.is_suspended),
             "suspended_until": u.suspended_until,
@@ -427,20 +428,22 @@ async def admin_cancel_user_subscription(
         from app.api.v1.payments import cancel_dodo_subscription_direct
         await cancel_dodo_subscription_direct(sub_id)
         user.dodo_subscription_id = None
-        user.is_pro = False
-        user.pro_expires_at = None
+        user.is_pro_cancelled = True
         db.commit()
         return {
             "message": f"Suscripción de Dodo Payments cancelada con éxito para @{user.username}.",
-            "is_pro": check_user_is_pro(user)
+            "is_pro": check_user_is_pro(user),
+            "is_pro_cancelled": True
         }
     else:
         user.is_pro = False
+        user.is_pro_cancelled = True
         user.pro_expires_at = None
         db.commit()
         return {
             "message": f"Beneficio Premium cancelado para @{user.username}.",
-            "is_pro": check_user_is_pro(user)
+            "is_pro": check_user_is_pro(user),
+            "is_pro_cancelled": True
         }
 
 

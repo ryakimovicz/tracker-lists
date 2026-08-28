@@ -40,6 +40,7 @@ interface AdminUser {
   is_vip: boolean;
   is_pro: boolean;
   is_pro_paid: boolean;
+  is_pro_cancelled?: boolean;
   pro_expires_at?: string;
   is_suspended: boolean;
   suspended_until?: string;
@@ -499,8 +500,8 @@ export const AdminPanel: React.FC = () => {
                     )}
 
                     {u.is_pro && (
-                      <span style={{ fontSize: '0.7rem', background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: 'white', padding: '0.15rem 0.45rem', borderRadius: 4, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
-                        <Star size={10} fill="white" /> PREMIUM
+                      <span style={{ fontSize: '0.7rem', background: u.is_pro_cancelled ? 'rgba(239, 68, 68, 0.15)' : 'linear-gradient(135deg, #f59e0b, #d97706)', color: u.is_pro_cancelled ? '#ef4444' : 'white', border: u.is_pro_cancelled ? '1px solid rgba(239, 68, 68, 0.3)' : 'none', padding: '0.15rem 0.45rem', borderRadius: 4, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
+                        <Star size={10} fill={u.is_pro_cancelled ? '#ef4444' : 'white'} /> {u.is_pro_cancelled ? (isEs ? 'PREMIUM (CANCELADO)' : 'PREMIUM (CANCELLED)') : 'PREMIUM'}
                       </span>
                     )}
 
@@ -791,27 +792,36 @@ export const AdminPanel: React.FC = () => {
 
               {/* Action 2.5: Cancelar Suscripción Premium del Usuario (Solo si tiene Pro y no es Admin ni VIP) */}
               {selectedUser.is_pro && !selectedUser.is_admin && !selectedUser.is_vip && (
-                <div style={{ background: 'rgba(239, 68, 68, 0.04)', padding: '1rem 1.25rem', borderRadius: 12, border: '1px solid rgba(239, 68, 68, 0.25)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+                <div style={{ background: selectedUser.is_pro_cancelled ? 'rgba(245, 158, 11, 0.04)' : 'rgba(239, 68, 68, 0.04)', padding: '1rem 1.25rem', borderRadius: 12, border: selectedUser.is_pro_cancelled ? '1px solid rgba(245, 158, 11, 0.25)' : '1px solid rgba(239, 68, 68, 0.25)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
                   <div>
-                    <div style={{ fontWeight: 700, fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#ef4444' }}>
-                      <Star size={16} /> {isEs ? 'Cancelar Suscripción Premium' : 'Cancel Premium Subscription'}
+                    <div style={{ fontWeight: 700, fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.4rem', color: selectedUser.is_pro_cancelled ? '#f59e0b' : '#ef4444' }}>
+                      <Star size={16} fill={selectedUser.is_pro_cancelled ? '#f59e0b' : 'none'} />
+                      {selectedUser.is_pro_cancelled 
+                        ? (isEs ? 'Renovación de Suscripción Cancelada' : 'Subscription Renewal Cancelled')
+                        : (isEs ? 'Cancelar Suscripción Premium' : 'Cancel Premium Subscription')}
                     </div>
                     <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
-                      {isEs
-                        ? 'Detiene la renovación automática en Dodo Payments y anula futuros cobros del usuario.'
-                        : 'Stops automatic renewal in Dodo Payments and prevents future billing for this user.'}
+                      {selectedUser.is_pro_cancelled
+                        ? (isEs
+                          ? 'El usuario ya canceló la renovación automática. Mantiene acceso Premium hasta el fin de su ciclo de facturación y no se le cobrará de nuevo.'
+                          : 'User already cancelled auto-renewal. Premium access remains active until the end of their billing period without future charges.')
+                        : (isEs
+                          ? 'Detiene la renovación automática en Dodo Payments y anula futuros cobros del usuario.'
+                          : 'Stops automatic renewal in Dodo Payments and prevents future billing for this user.')}
                     </div>
                   </div>
 
-                  <button
-                    type="button"
-                    disabled={actionLoading}
-                    onClick={handleCancelUserSubscription}
-                    className="btn-secondary"
-                    style={{ color: '#ef4444', borderColor: '#ef4444', fontSize: '0.85rem', padding: '0.45rem 1rem' }}
-                  >
-                    {isEs ? 'Cancelar Suscripción' : 'Cancel Subscription'}
-                  </button>
+                  {!selectedUser.is_pro_cancelled && (
+                    <button
+                      type="button"
+                      disabled={actionLoading}
+                      onClick={handleCancelUserSubscription}
+                      className="btn-secondary"
+                      style={{ color: '#ef4444', borderColor: '#ef4444', fontSize: '0.85rem', padding: '0.45rem 1rem' }}
+                    >
+                      {isEs ? 'Cancelar Suscripción' : 'Cancel Subscription'}
+                    </button>
+                  )}
                 </div>
               )}
 
