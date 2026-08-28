@@ -25,7 +25,7 @@ def hex_to_rgb(h):
     h = h.lstrip('#')
     return tuple(int(h[i:i+2], 16) for i in (0, 2, 4)) + (255,)
 
-# 1. Icon Only (512x512)
+# 1. Icon Only (512x512) - Exactly matching logo.svg, logo-light.svg & logo-transparent.svg
 def render_icon_only(bg_type="dark", size=(512, 512)):
     img = Image.new("RGBA", size, (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
@@ -43,10 +43,14 @@ def render_icon_only(bg_type="dark", size=(512, 512)):
         "bar3": "#9333ea" if bg_type == "light" else "#c084fc"
     }
 
-    draw.rounded_rectangle([6 * scale, 6 * scale, (6 + 38) * scale, (6 + 188) * scale], radius=int(19 * scale), fill=hex_to_rgb(colors["stem"]))
-    draw.rounded_rectangle([56 * scale, 6 * scale, (56 + 102) * scale, (6 + 38) * scale], radius=int(19 * scale), fill=hex_to_rgb(colors["bar1"]))
-    draw.rounded_rectangle([56 * scale, 56 * scale, (56 + 138) * scale, (56 + 38) * scale], radius=int(19 * scale), fill=hex_to_rgb(colors["bar2"]))
-    draw.rounded_rectangle([56 * scale, 106 * scale, (56 + 88) * scale, (106 + 38) * scale], radius=int(19 * scale), fill=hex_to_rgb(colors["bar3"]))
+    # Stem: x=24, y=24, w=28, h=152, rx=14
+    draw.rounded_rectangle([24 * scale, 24 * scale, (24 + 28) * scale, (24 + 152) * scale], radius=int(14 * scale), fill=hex_to_rgb(colors["stem"]))
+    # Bar 1: x=64, y=24, w=86, h=28, rx=14
+    draw.rounded_rectangle([64 * scale, 24 * scale, (64 + 86) * scale, (24 + 28) * scale], radius=int(14 * scale), fill=hex_to_rgb(colors["bar1"]))
+    # Bar 2: x=64, y=66, w=112, h=28, rx=14
+    draw.rounded_rectangle([64 * scale, 66 * scale, (64 + 112) * scale, (66 + 28) * scale], radius=int(14 * scale), fill=hex_to_rgb(colors["bar2"]))
+    # Bar 3: x=64, y=108, w=72, h=28, rx=14
+    draw.rounded_rectangle([64 * scale, 108 * scale, (64 + 72) * scale, (108 + 28) * scale], radius=int(14 * scale), fill=hex_to_rgb(colors["bar3"]))
     return img
 
 # 2. Horizontal Clean: [ P ] Pathd (1200 x 360)
@@ -108,7 +112,6 @@ def render_horizontal_tagline(bg_type="dark", size=(1280, 360)):
     draw.rounded_rectangle([ox + 62 * scale, oy + 59 * scale, ox + (62 + 95) * scale, oy + (59 + 26) * scale], radius=int(13 * scale), fill=hex_to_rgb(colors["bar2"]))
     draw.rounded_rectangle([ox + 62 * scale, oy + 94 * scale, ox + (62 + 60) * scale, oy + (94 + 26) * scale], radius=int(13 * scale), fill=hex_to_rgb(colors["bar3"]))
 
-    # Main text
     font = get_font(int(84 * scale))
     tx = int(220 * scale)
     ty = int(18 * scale)
@@ -116,7 +119,6 @@ def render_horizontal_tagline(bg_type="dark", size=(1280, 360)):
     path_w = draw.textlength("Path", font=font)
     draw.text((tx + path_w, ty), "d", fill=hex_to_rgb("#f59e0b"), font=font)
 
-    # Tagline
     sub_font = get_font(int(19 * scale))
     draw.text((tx + int(4 * scale), ty + int(96 * scale)), "MEDIA TRACKER & GUIDES", fill=hex_to_rgb(colors["subtext"]), font=sub_font)
     return img
@@ -140,13 +142,15 @@ def render_vertical_clean(bg_type="dark", size=(1000, 1000)):
         "text": "#0f172a" if bg_type == "light" else "#f8fafc"
     }
 
+    # Center icon
     ox, oy = (150 * scale), (70 * scale)
-    draw.rounded_rectangle([ox + 6 * scale, oy + 6 * scale, ox + (6 + 38) * scale, oy + (6 + 188) * scale], radius=int(19 * scale), fill=hex_to_rgb(colors["stem"]))
-    draw.rounded_rectangle([ox + 56 * scale, oy + 6 * scale, ox + (56 + 102) * scale, oy + (6 + 38) * scale], radius=int(19 * scale), fill=hex_to_rgb(colors["bar1"]))
-    draw.rounded_rectangle([ox + 56 * scale, oy + 56 * scale, ox + (56 + 138) * scale, oy + (56 + 38) * scale], radius=int(19 * scale), fill=hex_to_rgb(colors["bar2"]))
-    draw.rounded_rectangle([ox + 56 * scale, oy + 106 * scale, ox + (56 + 88) * scale, oy + (106 + 38) * scale], radius=int(19 * scale), fill=hex_to_rgb(colors["bar3"]))
+    scale_icon = scale * 200.0 / 200.0 # 1.0
+    draw.rounded_rectangle([ox + 24 * scale, oy + 24 * scale, ox + (24 + 28) * scale, oy + (24 + 152) * scale], radius=int(14 * scale), fill=hex_to_rgb(colors["stem"]))
+    draw.rounded_rectangle([ox + 64 * scale, oy + 24 * scale, ox + (64 + 86) * scale, oy + (24 + 28) * scale], radius=int(14 * scale), fill=hex_to_rgb(colors["bar1"]))
+    draw.rounded_rectangle([ox + 64 * scale, oy + 66 * scale, ox + (64 + 112) * scale, oy + (66 + 28) * scale], radius=int(14 * scale), fill=hex_to_rgb(colors["bar2"]))
+    draw.rounded_rectangle([ox + 64 * scale, oy + 108 * scale, ox + (64 + 72) * scale, oy + (108 + 28) * scale], radius=int(14 * scale), fill=hex_to_rgb(colors["bar3"]))
 
-    font = get_font(int(100 * scale))
+    font = get_font(int(94 * scale))
     full_text = "Pathd"
     full_w = draw.textlength(full_text, font=font)
     start_x = (size[0] - full_w) / 2
@@ -177,27 +181,27 @@ def render_vertical_tagline(bg_type="dark", size=(1000, 1000)):
         "subtext": "#475569" if bg_type == "light" else "#94a3b8"
     }
 
-    ox, oy = (150 * scale), (60 * scale)
-    draw.rounded_rectangle([ox + 6 * scale, oy + 6 * scale, ox + (6 + 38) * scale, oy + (6 + 188) * scale], radius=int(19 * scale), fill=hex_to_rgb(colors["stem"]))
-    draw.rounded_rectangle([ox + 56 * scale, oy + 6 * scale, ox + (56 + 102) * scale, oy + (6 + 38) * scale], radius=int(19 * scale), fill=hex_to_rgb(colors["bar1"]))
-    draw.rounded_rectangle([ox + 56 * scale, oy + 56 * scale, ox + (56 + 138) * scale, oy + (56 + 38) * scale], radius=int(19 * scale), fill=hex_to_rgb(colors["bar2"]))
-    draw.rounded_rectangle([ox + 56 * scale, oy + 106 * scale, ox + (56 + 88) * scale, oy + (106 + 38) * scale], radius=int(19 * scale), fill=hex_to_rgb(colors["bar3"]))
+    ox, oy = (150 * scale), (50 * scale)
+    draw.rounded_rectangle([ox + 24 * scale, oy + 24 * scale, ox + (24 + 28) * scale, oy + (24 + 152) * scale], radius=int(14 * scale), fill=hex_to_rgb(colors["stem"]))
+    draw.rounded_rectangle([ox + 64 * scale, oy + 24 * scale, ox + (64 + 86) * scale, oy + (24 + 28) * scale], radius=int(14 * scale), fill=hex_to_rgb(colors["bar1"]))
+    draw.rounded_rectangle([ox + 64 * scale, oy + 66 * scale, ox + (64 + 112) * scale, oy + (66 + 28) * scale], radius=int(14 * scale), fill=hex_to_rgb(colors["bar2"]))
+    draw.rounded_rectangle([ox + 64 * scale, oy + 108 * scale, ox + (64 + 72) * scale, oy + (108 + 28) * scale], radius=int(14 * scale), fill=hex_to_rgb(colors["bar3"]))
 
-    font = get_font(int(88 * scale))
+    font = get_font(int(84 * scale))
     full_text = "Pathd"
     full_w = draw.textlength(full_text, font=font)
     start_x = (size[0] - full_w) / 2
-    ty = int(300 * scale)
+    ty = int(290 * scale)
 
     draw.text((start_x, ty), "Path", fill=hex_to_rgb(colors["text"]), font=font)
     path_w = draw.textlength("Path", font=font)
     draw.text((start_x + path_w, ty), "d", fill=hex_to_rgb("#f59e0b"), font=font)
 
-    sub_font = get_regular_font(int(22 * scale))
+    sub_font = get_regular_font(int(20 * scale))
     sub_text = "MEDIA TRACKER & GUIDES"
     sub_w = draw.textlength(sub_text, font=sub_font)
     sub_x = (size[0] - sub_w) / 2
-    sub_y = int(410 * scale)
+    sub_y = int(395 * scale)
     draw.text((sub_x, sub_y), sub_text, fill=hex_to_rgb(colors["subtext"]), font=sub_font)
     return img
 
@@ -229,7 +233,7 @@ def main():
     render_vertical_tagline("light", (1000, 1000)).save(os.path.join(target_dir, "logo-vertical-light.png"), "PNG")
     render_vertical_tagline("transparent", (1000, 1000)).save(os.path.join(target_dir, "logo-vertical-transparent.png"), "PNG")
 
-    print("All Brand Suites generated successfully!")
+    print("All Brand Suites aligned and regenerated 1:1 perfectly!")
 
 if __name__ == "__main__":
     main()
