@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%" fill="none">
+  <!-- Fondo Soft Slate Light (#f1f5f9) -->
+  <rect width="200" height="200" rx="44" fill="#f1f5f9" stroke="#e2e8f0" stroke-width="2" />
+
+  <g transform="translate(6, 0)">
+    <!-- Tallo 1: Marca Pathd / Libros (#f59e0b) -->
+    <rect x="36" y="36" width="11" height="128" rx="5.5" fill="#f59e0b" />
+
+    <!-- Tallo 2: Videojuegos (#9333ea) -->
+    <rect x="52" y="36" width="11" height="128" rx="5.5" fill="#9333ea" />
+
+    <!-- Barra 1: Películas (#16a34a) -->
+    <rect x="68" y="36" width="56" height="11" rx="5.5" fill="#16a34a" />
+
+    <!-- Barra 2: Series (#ca8a04) -->
+    <rect x="68" y="52" width="78" height="11" rx="5.5" fill="#ca8a04" />
+
+    <!-- Barra 3: Anime (#ea580c) -->
+    <rect x="68" y="68" width="88" height="11" rx="5.5" fill="#ea580c" />
+
+    <!-- Barra 4: Cómics (#dc2626) -->
+    <rect x="68" y="84" width="78" height="11" rx="5.5" fill="#dc2626" />
+
+    <!-- Barra 5: Manga (#2563eb) -->
+    <rect x="68" y="100" width="52" height="11" rx="5.5" fill="#2563eb" />
+  </g>
+</svg>
