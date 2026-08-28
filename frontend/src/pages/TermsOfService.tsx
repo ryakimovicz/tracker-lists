@@ -46,6 +46,7 @@ export const TermsOfService: React.FC = () => {
           </p>
           <ul style={{ color: 'var(--text-secondary)', paddingLeft: '1.5rem' }}>
             <li>{isEs ? 'Publicar contenido difamatorio, acosador, de odio o que infrinja derechos de autor.' : 'Posting defamatory, harassing, hateful, or copyright-infringing content.'}</li>
+            <li>{isEs ? 'Publicar, buscar o distribuir contenido para adultos (+18), explícito, erótico o pornográfico. Pathd es una plataforma estrictamente orientada a entretenimiento general y familiar (SFW).' : 'Posting, searching, or sharing adult (+18), explicit, erotic, or pornographic content. Pathd is strictly a Safe For Work (SFW) / general-audience entertainment platform.'}</li>
             <li>{isEs ? 'Intentar vulnerar la seguridad, realizar scraping abusivo o saturar los servidores.' : 'Attempting to breach security, perform abusive scraping, or overload the servers.'}</li>
             <li>{isEs ? 'Crear cuentas falsas o automatizadas para manipular votos y reseñas.' : 'Creating fake or automated accounts to manipulate votes and reviews.'}</li>
           </ul>

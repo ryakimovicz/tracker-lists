@@ -198,9 +198,7 @@ export const SettingsPage: React.FC = () => {
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
 
 
-  // NSFW state
-  const [showNsfw, setShowNsfw] = useState(user?.show_nsfw || false);
-  const [isUpdatingNsfw, setIsUpdatingNsfw] = useState(false);
+
 
   // Delete account modal state
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -271,19 +269,7 @@ export const SettingsPage: React.FC = () => {
     }
   };
 
-  const handleToggleNsfw = async () => {
-    const nextVal = !showNsfw;
-    setShowNsfw(nextVal);
-    setIsUpdatingNsfw(true);
-    try {
-      await apiClient.put('/users/me', { show_nsfw: nextVal });
-      await refreshProfile();
-    } catch (err) {
-      setShowNsfw(!nextVal); // Revert on fail
-    } finally {
-      setIsUpdatingNsfw(false);
-    }
-  };
+
 
   const handleDeleteAccount = async () => {
     if (deleteConfirmText !== user?.username) {
@@ -720,33 +706,7 @@ export const SettingsPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Section 3: Preferences & NSFW */}
-        <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px' }}>
-          <h2 style={{ fontSize: '1.2rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: 0 }}>
-            <Eye size={20} color="var(--accent-primary)" />
-            {isEs ? 'Preferencias de Contenido' : 'Content Preferences'}
-          </h2>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '1rem' }}>
-            <div>
-              <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>
-                {isEs ? 'Mostrar contenido para adultos (NSFW / +18)' : 'Show mature content (NSFW / 18+)'}
-              </div>
-              <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                {isEs
-                  ? 'Desenfoca o muestra portadas de contenido explícito o gore.'
-                  : 'Blurs or unblurs explicit or gore cover art.'}
-              </div>
-            </div>
-            <button
-              onClick={handleToggleNsfw}
-              disabled={isUpdatingNsfw}
-              className={showNsfw ? 'btn-primary' : 'btn-secondary'}
-              style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}
-            >
-              {showNsfw ? (isEs ? 'Activado' : 'Enabled') : isEs ? 'Desactivado' : 'Disabled'}
-            </button>
-          </div>
-        </div>
+
 
         {/* Section 4: Theme */}
         <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px' }}>

@@ -13,7 +13,7 @@ class AnilistService:
         graphql_query = """
         query ($search: String) {
           Page(page: 1, perPage: 20) {
-            media(search: $search, type: MANGA, sort: POPULARITY_DESC) {
+            media(search: $search, type: MANGA, sort: POPULARITY_DESC, isAdult: false) {
               id
               isAdult
               genres
@@ -58,6 +58,10 @@ class AnilistService:
                     media_list = data.get("data", {}).get("Page", {}).get("media", [])
                     results = []
                     for item in media_list:
+                        genres = item.get("genres", [])
+                        if item.get("isAdult") or "Hentai" in genres or "Ecchi" in genres:
+                            continue
+
                         title_obj = item.get("title", {})
                         title = title_obj.get("english") or title_obj.get("romaji") or "Untitled Manga"
                         cover_obj = item.get("coverImage", {})
@@ -76,7 +80,6 @@ class AnilistService:
                         desc = item.get("description") or ""
                         import re
                         desc = re.sub('<[^<]+?>', '', desc)
-                        is_adult = bool(item.get("isAdult") or "Hentai" in item.get("genres", []))
                         results.append(
                             SearchResultItem(
                                 external_id=str(item.get("id")),
@@ -86,7 +89,7 @@ class AnilistService:
                                 item_type="manga",
                                 release_date=release_date,
                                 popularity=float(item.get("averageScore") or 0),
-                                is_nsfw=is_adult
+                                is_nsfw=False
                             )
                         )
                     return results
@@ -110,7 +113,7 @@ class AnilistService:
         graphql_query = '''
         query {
           Page(page: 1, perPage: 15) {
-            media(type: MANGA, sort: [TRENDING_DESC, POPULARITY_DESC], status: RELEASING) {
+            media(type: MANGA, sort: [TRENDING_DESC, POPULARITY_DESC], status: RELEASING, isAdult: false) {
               id
               title { romaji english }
               description
@@ -323,7 +326,7 @@ class AnilistService:
         graphql_query = '''
         query {
           Page(page: 1, perPage: 15) {
-            media(type: ANIME, sort: TRENDING_DESC) {
+            media(type: ANIME, sort: TRENDING_DESC, isAdult: false) {
               id
               title { romaji english }
               description
