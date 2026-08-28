@@ -189,6 +189,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   const [showShelfMenu, setShowShelfMenu] = useState(false);
   const [showEpisodeMenu, setShowEpisodeMenu] = useState(false);
   const [openEpisodeMenuId, setOpenEpisodeMenuId] = useState<number | null>(null);
+  const [openSeasonMenuId, setOpenSeasonMenuId] = useState<number | null>(null);
+  const [showAllWatchedMenu, setShowAllWatchedMenu] = useState(false);
 
   const handleTranslateDescription = async (textToTranslate: string) => {
     if (!textToTranslate) return;
@@ -251,7 +253,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     }
   };
 
-  const handleToggleAllEpisodes = async () => {
+  const handleToggleAllEpisodes = async (action?: 'mark_all' | 'remove') => {
     if (!selectedItem) return;
     let effectiveListId = selectedItem.tracking_list_id;
     if (!effectiveListId) {
@@ -261,7 +263,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     }
 
     const isAllCompleted = selectedItem.status === 'completed';
-    const targetCompleted = !isAllCompleted;
+    const targetCompleted = action === 'mark_all' ? true : action === 'remove' ? false : !isAllCompleted;
 
     const cacheKeyAll = `${selectedItem.external_id}_all_episodes`;
     let cachedAll = getCachedSeries(cacheKeyAll);
@@ -276,7 +278,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     }
 
     try {
-      const res = await apiClient.post(`/lists/${effectiveListId}/bulk-toggle-all-seasons`, {
+      await apiClient.post(`/lists/${effectiveListId}/bulk-toggle-all-seasons`, {
         episodes: cachedAll || null,
         completed: targetCompleted
       });
@@ -332,7 +334,15 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   const handleToggleStatus = async (statusId: string) => {
     if (!selectedItem) return;
     const isCurrentlyActive = selectedItem.status === statusId;
-    const newStatus = isCurrentlyActive ? getDefaultStatus(selectedItem.item_type) : statusId;
+    let newStatus = statusId;
+    if (isCurrentlyActive) {
+      if (statusId === 'dropped' && (selectedItem.item_type === 'series' || selectedItem.item_type === 'anime')) {
+        const hasProgress = episodes.some((ep: any) => ep.is_completed) || Object.values(globalProgress).some(Boolean) || !!selectedItem.last_seen_episode;
+        newStatus = hasProgress ? 'watching' : getDefaultStatus(selectedItem.item_type);
+      } else {
+        newStatus = getDefaultStatus(selectedItem.item_type);
+      }
+    }
     
     if (selectedItem.id) {
       try {
@@ -2569,24 +2579,99 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         </div>
                       ) : (selectedItem?.item_type === 'series' || selectedItem?.item_type === 'anime') ? (
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem' }}>
-                          <button
-                            type="button"
-                            onClick={handleToggleAllEpisodes}
-                            style={{
-                              background: selectedItem?.status === 'completed' ? `var(--color-${selectedItem.item_type || 'series'})` : 'var(--bg-tertiary)',
-                              border: selectedItem?.status === 'completed' ? 'none' : '1px solid var(--border-color)',
-                              borderRadius: '8px',
-                              padding: '0.5rem',
-                              textAlign: 'center',
-                              cursor: 'pointer',
-                              color: selectedItem?.status === 'completed' ? '#ffffff' : 'var(--text-primary)',
-                              fontSize: '0.85rem',
-                              fontWeight: 600,
-                              transition: 'all 0.2s ease'
-                            }}
-                          >
-                            {language === 'es' ? 'Todo visto' : 'All watched'}
-                          </button>
+                          <div style={{ position: 'relative' }}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (selectedItem?.status === 'completed') {
+                                  setShowAllWatchedMenu(!showAllWatchedMenu);
+                                } else {
+                                  handleToggleAllEpisodes();
+                                }
+                              }}
+                              style={{
+                                width: '100%',
+                                background: selectedItem?.status === 'completed' ? `var(--color-${selectedItem.item_type || 'series'})` : 'var(--bg-tertiary)',
+                                border: selectedItem?.status === 'completed' ? 'none' : '1px solid var(--border-color)',
+                                borderRadius: '8px',
+                                padding: '0.5rem',
+                                textAlign: 'center',
+                                cursor: 'pointer',
+                                color: selectedItem?.status === 'completed' ? '#ffffff' : 'var(--text-primary)',
+                                fontSize: '0.85rem',
+                                fontWeight: 600,
+                                transition: 'all 0.2s ease'
+                              }}
+                            >
+                              {language === 'es' ? 'Todo visto' : 'All watched'}
+                            </button>
+
+                            {showAllWatchedMenu && selectedItem?.status === 'completed' && (
+                              <div
+                                className="glass-card"
+                                style={{
+                                  position: 'absolute',
+                                  top: '100%',
+                                  left: 0,
+                                  marginTop: '0.5rem',
+                                  zIndex: 3000,
+                                  padding: '0.5rem',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  gap: '0.4rem',
+                                  minWidth: '220px',
+                                  boxShadow: '0 10px 25px rgba(0,0,0,0.5)'
+                                }}
+                              >
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    setShowAllWatchedMenu(false);
+                                    await handleToggleAllEpisodes('mark_all');
+                                  }}
+                                  style={{
+                                    background: 'transparent',
+                                    border: 'none',
+                                    color: 'var(--text-primary)',
+                                    textAlign: 'left',
+                                    padding: '0.4rem 0.6rem',
+                                    cursor: 'pointer',
+                                    fontSize: '0.85rem',
+                                    borderRadius: '4px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.4rem'
+                                  }}
+                                >
+                                  <span>🔁</span>
+                                  {language === 'es' ? 'Volver a marcar todo como visto' : 'Mark all as watched again'}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    setShowAllWatchedMenu(false);
+                                    await handleToggleAllEpisodes('remove');
+                                  }}
+                                  style={{
+                                    background: 'transparent',
+                                    border: 'none',
+                                    color: '#ef4444',
+                                    textAlign: 'left',
+                                    padding: '0.4rem 0.6rem',
+                                    cursor: 'pointer',
+                                    fontSize: '0.85rem',
+                                    borderRadius: '4px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.4rem'
+                                  }}
+                                >
+                                  <Trash2 size={14} />
+                                  {language === 'es' ? 'Desmarcar / Quitar' : 'Unwatch / Remove'}
+                                </button>
+                              </div>
+                            )}
+                          </div>
                           <button
                             type="button"
                             onClick={() => handleToggleStatus('dropped')}
@@ -2763,80 +2848,214 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                             }}
                           >
                             <span>
-                              <span
-                                role="button"
-                                tabIndex={0}
-                                onClick={async (e) => {
-                                  e.stopPropagation();
-                                  let effectiveListId = selectedItem.tracking_list_id;
-                                  if (!effectiveListId) {
-                                    const tracked = await ensureTracked('watching');
-                                    if (!tracked) return;
-                                    effectiveListId = tracked.tracking_list_id || tracked;
-                                  }
-                                  
-                                  const checkedVal = !isSeasonDone;
-                                  let seriesEps = seasonEpisodes[s.season_number];
-                                  if (!seriesEps || seriesEps.length === 0) {
-                                    const cacheKeyAll = `${selectedItem.external_id}_all_episodes`;
-                                    const cachedAll = getCachedSeries(cacheKeyAll);
-                                    if (cachedAll && Array.isArray(cachedAll)) {
-                                      seriesEps = cachedAll.filter((ep: any) => ep.season_number === s.season_number);
-                                    }
-                                  }
-                                  
-                                  // Update global progress optimistically
-                                  if (seriesEps && seriesEps.length > 0) {
-                                    const newProg: Record<string, boolean> = {};
-                                    seriesEps.forEach((ep: any) => {
-                                      newProg[`tvm-ep-${ep.id}`] = checkedVal;
-                                    });
-                                    setGlobalProgress(prev => ({ ...prev, ...newProg }));
-                                  }
-
-                                  try {
-                                    await apiClient.post(`/lists/${effectiveListId}/bulk-toggle-season`, {
-                                      season_number: s.season_number,
-                                      episodes: seriesEps || null,
-                                      completed: checkedVal
-                                    });
-                                    
-                                    const listRes = await apiClient.get(`/lists/${effectiveListId}`);
-                                    const updatedList = listRes.data.items || [];
-                                    setEpisodes(updatedList);
-                                    
-                                    // Also sync global progress in case backend populated new episodes
-                                    const extIds = updatedList.map((x: any) => x.external_id).filter(Boolean);
-                                    if (extIds.length > 0) {
-                                      const progRes = await apiClient.post('/users/me/progress/bulk-check', { external_ids: extIds });
-                                      setGlobalProgress(prev => ({ ...prev, ...progRes.data }));
+                              <span style={{ position: 'relative', display: 'inline-flex', verticalAlign: 'middle' }}>
+                                <span
+                                  role="button"
+                                  tabIndex={0}
+                                  onClick={async (e) => {
+                                    e.stopPropagation();
+                                    if (isSeasonDone) {
+                                      setOpenSeasonMenuId(openSeasonMenuId === s.season_number ? null : s.season_number);
+                                      return;
                                     }
 
-                                    await checkCompletionStatus(effectiveListId, updatedList);
-                                    onUpdate && onUpdate();
-                                  } catch (err) {
-                                    console.error("Bulk toggle failed", err);
-                                  }
-                                }}
-                                style={{
-                                  background: isSeasonDone ? `var(--color-${selectedItem.item_type || 'movie'})` : 'transparent',
-                                  border: isSeasonDone ? 'none' : '1px solid var(--border-color)',
-                                  borderRadius: '50%',
-                                  width: '20px',
-                                  height: '20px',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  cursor: 'pointer',
-                                  marginRight: '0.6rem',
-                                  verticalAlign: 'middle',
-                                  color: isSeasonDone ? `var(--color-text-${selectedItem.item_type || 'movie'})` : 'var(--text-muted)',
-                                  opacity: isSeasonDone ? 1 : 0.6,
-                                  padding: 0,
-                                  transition: 'all 0.2s ease'
-                                }}
-                              >
-                                <Check size={12} strokeWidth={3} />
+                                    let effectiveListId = selectedItem.tracking_list_id;
+                                    if (!effectiveListId) {
+                                      const tracked = await ensureTracked('watching');
+                                      if (!tracked) return;
+                                      effectiveListId = tracked.tracking_list_id || tracked;
+                                    }
+                                    
+                                    let seriesEps = seasonEpisodes[s.season_number];
+                                    if (!seriesEps || seriesEps.length === 0) {
+                                      const cacheKeyAll = `${selectedItem.external_id}_all_episodes`;
+                                      const cachedAll = getCachedSeries(cacheKeyAll);
+                                      if (cachedAll && Array.isArray(cachedAll)) {
+                                        seriesEps = cachedAll.filter((ep: any) => ep.season_number === s.season_number);
+                                      }
+                                    }
+                                    
+                                    // Update global progress optimistically
+                                    if (seriesEps && seriesEps.length > 0) {
+                                      const newProg: Record<string, boolean> = {};
+                                      seriesEps.forEach((ep: any) => {
+                                        newProg[`tvm-ep-${ep.id}`] = true;
+                                      });
+                                      setGlobalProgress(prev => ({ ...prev, ...newProg }));
+                                    }
+
+                                    try {
+                                      await apiClient.post(`/lists/${effectiveListId}/bulk-toggle-season`, {
+                                        season_number: s.season_number,
+                                        episodes: seriesEps || null,
+                                        completed: true
+                                      });
+                                      
+                                      const listRes = await apiClient.get(`/lists/${effectiveListId}`);
+                                      const updatedList = listRes.data.items || [];
+                                      setEpisodes(updatedList);
+                                      
+                                      // Also sync global progress in case backend populated new episodes
+                                      const extIds = updatedList.map((x: any) => x.external_id).filter(Boolean);
+                                      if (extIds.length > 0) {
+                                        const progRes = await apiClient.post('/users/me/progress/bulk-check', { external_ids: extIds });
+                                        setGlobalProgress(prev => ({ ...prev, ...progRes.data }));
+                                      }
+
+                                      await checkCompletionStatus(effectiveListId, updatedList);
+                                      onUpdate && onUpdate();
+                                    } catch (err) {
+                                      console.error("Bulk toggle failed", err);
+                                    }
+                                  }}
+                                  style={{
+                                    background: isSeasonDone ? `var(--color-${selectedItem.item_type || 'movie'})` : 'transparent',
+                                    border: isSeasonDone ? 'none' : '1px solid var(--border-color)',
+                                    borderRadius: '50%',
+                                    width: '20px',
+                                    height: '20px',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    cursor: 'pointer',
+                                    marginRight: '0.6rem',
+                                    color: isSeasonDone ? `var(--color-text-${selectedItem.item_type || 'movie'})` : 'var(--text-muted)',
+                                    opacity: isSeasonDone ? 1 : 0.6,
+                                    padding: 0,
+                                    transition: 'all 0.2s ease'
+                                  }}
+                                >
+                                  <Check size={12} strokeWidth={3} />
+                                </span>
+
+                                {openSeasonMenuId === s.season_number && isSeasonDone && (
+                                  <div
+                                    className="glass-card"
+                                    onClick={(e) => e.stopPropagation()}
+                                    style={{
+                                      position: 'absolute',
+                                      top: '100%',
+                                      left: 0,
+                                      marginTop: '0.5rem',
+                                      zIndex: 3000,
+                                      padding: '0.5rem',
+                                      display: 'flex',
+                                      flexDirection: 'column',
+                                      gap: '0.4rem',
+                                      minWidth: '260px',
+                                      boxShadow: '0 10px 25px rgba(0,0,0,0.5)'
+                                    }}
+                                  >
+                                    <button
+                                      type="button"
+                                      onClick={async () => {
+                                        setOpenSeasonMenuId(null);
+                                        let effectiveListId = selectedItem.tracking_list_id;
+                                        if (!effectiveListId) {
+                                          const tracked = await ensureTracked('watching');
+                                          if (!tracked) return;
+                                          effectiveListId = tracked.tracking_list_id || tracked;
+                                        }
+
+                                        let seriesEps = seasonEpisodes[s.season_number];
+                                        if (!seriesEps || seriesEps.length === 0) {
+                                          const cacheKeyAll = `${selectedItem.external_id}_all_episodes`;
+                                          const cachedAll = getCachedSeries(cacheKeyAll);
+                                          if (cachedAll && Array.isArray(cachedAll)) {
+                                            seriesEps = cachedAll.filter((ep: any) => ep.season_number === s.season_number);
+                                          }
+                                        }
+
+                                        try {
+                                          await apiClient.post(`/lists/${effectiveListId}/bulk-toggle-season`, {
+                                            season_number: s.season_number,
+                                            episodes: seriesEps || null,
+                                            completed: true
+                                          });
+                                          const listRes = await apiClient.get(`/lists/${effectiveListId}`);
+                                          const updatedList = listRes.data.items || [];
+                                          setEpisodes(updatedList);
+                                          await checkCompletionStatus(effectiveListId, updatedList);
+                                          onUpdate && onUpdate();
+                                        } catch (err) {
+                                          console.error("Mark season again failed", err);
+                                        }
+                                      }}
+                                      style={{
+                                        background: 'transparent',
+                                        border: 'none',
+                                        color: 'var(--text-primary)',
+                                        textAlign: 'left',
+                                        padding: '0.4rem 0.6rem',
+                                        cursor: 'pointer',
+                                        fontSize: '0.85rem',
+                                        borderRadius: '4px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.4rem'
+                                      }}
+                                    >
+                                      <span>🔁</span>
+                                      {language === 'es' ? 'Volver a marcar toda la temporada' : 'Mark entire season as watched again'}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={async () => {
+                                        setOpenSeasonMenuId(null);
+                                        let effectiveListId = selectedItem.tracking_list_id;
+                                        if (!effectiveListId) return;
+
+                                        let seriesEps = seasonEpisodes[s.season_number];
+                                        if (!seriesEps || seriesEps.length === 0) {
+                                          const cacheKeyAll = `${selectedItem.external_id}_all_episodes`;
+                                          const cachedAll = getCachedSeries(cacheKeyAll);
+                                          if (cachedAll && Array.isArray(cachedAll)) {
+                                            seriesEps = cachedAll.filter((ep: any) => ep.season_number === s.season_number);
+                                          }
+                                        }
+
+                                        if (seriesEps && seriesEps.length > 0) {
+                                          const newProg: Record<string, boolean> = {};
+                                          seriesEps.forEach((ep: any) => {
+                                            newProg[`tvm-ep-${ep.id}`] = false;
+                                          });
+                                          setGlobalProgress(prev => ({ ...prev, ...newProg }));
+                                        }
+
+                                        try {
+                                          await apiClient.post(`/lists/${effectiveListId}/bulk-toggle-season`, {
+                                            season_number: s.season_number,
+                                            episodes: seriesEps || null,
+                                            completed: false
+                                          });
+                                          const listRes = await apiClient.get(`/lists/${effectiveListId}`);
+                                          const updatedList = listRes.data.items || [];
+                                          setEpisodes(updatedList);
+                                          await checkCompletionStatus(effectiveListId, updatedList);
+                                          onUpdate && onUpdate();
+                                        } catch (err) {
+                                          console.error("Remove season failed", err);
+                                        }
+                                      }}
+                                      style={{
+                                        background: 'transparent',
+                                        border: 'none',
+                                        color: '#ef4444',
+                                        textAlign: 'left',
+                                        padding: '0.4rem 0.6rem',
+                                        cursor: 'pointer',
+                                        fontSize: '0.85rem',
+                                        borderRadius: '4px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.4rem'
+                                      }}
+                                    >
+                                      <Trash2 size={14} />
+                                      {language === 'es' ? 'Desmarcar / Quitar' : 'Unwatch / Remove'}
+                                    </button>
+                                  </div>
+                                )}
                               </span>
                               {language === 'es' ? `Temporada ${s.season_number}` : `Season ${s.season_number}`}
                               <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginLeft: '0.5rem', fontWeight: 400 }}>

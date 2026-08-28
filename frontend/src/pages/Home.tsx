@@ -5,7 +5,7 @@ import { useTranslation } from '../context/LanguageContext';
 import { getCachedSeries, setCachedSeries } from '../utils/seriesCache';
 import { ItemDetailsModal } from '../components/ItemDetailsModal';
 import { AdBanner } from '../components/AdBanner';
-import { ChevronLeft, ChevronRight, Check } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Check, Play } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export const getTagClass = (type: string) => {
@@ -69,7 +69,8 @@ const CustomCard = ({
   isNsfw,
   language,
   themeColor,
-  themeTextColor
+  themeTextColor,
+  actionIcon = 'check'
 }: { 
   title: string; 
   coverUrl?: string; 
@@ -85,6 +86,7 @@ const CustomCard = ({
   language?: string;
   themeColor?: string;
   themeTextColor?: string;
+  actionIcon?: 'check' | 'play';
 }) => {
   return (
     <div 
@@ -170,7 +172,7 @@ const CustomCard = ({
             "--btn-hover-text": themeTextColor
           } as React.CSSProperties}
         >
-          <Check size={16} />
+          {actionIcon === 'play' ? <Play size={15} style={{ marginLeft: '2px' }} /> : <Check size={16} />}
         </button>
       )}
     </div>
@@ -437,6 +439,139 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
   );
 };
 
+const DroppedSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, themeTextColor }: { item: any, onUpdate: () => void, language: string, onOpenSeries: (item: any) => void, themeColor?: string, themeTextColor?: string }) => {
+  const [lastEpInfo, setLastEpInfo] = useState<{ seasonText: string; epName: string } | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const pad = (n: number) => n < 10 ? '0' + n : n;
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchLastCompleted = async () => {
+      if (!item.tracking_list_id) return;
+      try {
+        const listRes = await apiClient.get(`/lists/${item.tracking_list_id}`);
+        const trackedEpisodes = listRes.data.items || [];
+        const parseEpInfo = (ep: any): { season: number; episode: number } => {
+          const match = (ep.title || '').match(/S(\d+)E(\d+)/i);
+          if (match) return { season: parseInt(match[1], 10), episode: parseInt(match[2], 10) };
+          return { season: ep.season_number || 0, episode: ep.episode_number || 0 };
+        };
+
+        const completed = trackedEpisodes
+          .filter((e: any) => e.is_completed)
+          .map((e: any) => ({ ...e, ...parseEpInfo(e) }))
+          .sort((a: any, b: any) => a.season !== b.season ? a.season - b.season : a.episode - b.episode);
+
+        if (completed.length > 0) {
+          const last = completed[completed.length - 1];
+          const sStr = pad(last.season);
+          const eStr = pad(last.episode);
+          const seasonText = language === 'es' ? `T${sStr} | E${eStr}` : `S${sStr} | E${eStr}`;
+          
+          let epName = '';
+          const match = (last.title || '').match(/^(.*?)\s*-\s*S\d+E\d+\s*-\s*(.*)$/i);
+          if (match) {
+            epName = match[2].trim();
+          } else {
+            epName = last.title || (language === 'es' ? 'Episodio' : 'Episode');
+          }
+          if (isMounted) setLastEpInfo({ seasonText, epName });
+        } else if (item.last_seen_episode) {
+          const match = item.last_seen_episode.match(/S(\d+)E(\d+)/i);
+          if (match) {
+            const seasonText = language === 'es' ? `T${match[1]} | E${match[2]}` : `S${match[1]} | E${match[2]}`;
+            const nameMatch = item.last_seen_episode.match(/-\s*([^-]+)$/);
+            const epName = nameMatch ? nameMatch[1].trim() : '';
+            if (isMounted) setLastEpInfo({ seasonText, epName });
+          }
+        }
+      } catch (e) {
+        console.error("Failed to load last completed episode for dropped card", e);
+      }
+    };
+    fetchLastCompleted();
+    return () => { isMounted = false; };
+  }, [item, language]);
+
+  const handleResume = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsLoading(true);
+    try {
+      await apiClient.put(`/library/${item.id}`, { status: 'watching' });
+      onUpdate();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div 
+      onClick={() => onOpenSeries(item)}
+      style={{ 
+        minWidth: "180px", maxWidth: "180px", background: "var(--bg-secondary)", 
+        border: `1px solid ${themeColor || "var(--border-color)"}`, borderRadius: "12px", 
+        overflow: "hidden", cursor: "pointer", position: "relative",
+        display: "flex", flexDirection: "column",
+        boxShadow: themeColor ? `0 0 10px ${themeColor}33` : "none",
+        "--title-hover-color": themeColor
+      } as React.CSSProperties}
+      className="activity-card"
+    >
+      <div 
+        onClick={(e) => { e.stopPropagation(); onOpenSeries(item); }}
+        className="card-series-title"
+        style={{ padding: "0.5rem 0.75rem", fontSize: "0.85rem", fontWeight: 600, borderBottom: "1px solid var(--border-color)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between" }}
+      >
+        <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{item.title}</span>
+        <ChevronRight size={14} style={{ flexShrink: 0, marginLeft: "0.25rem", opacity: 0.7 }} />
+      </div>
+
+      <div style={{ width: "100%", height: "240px", background: "var(--bg-tertiary)", position: "relative" }}>
+        {item.image_url ? (
+          <img src={item.image_url} alt={item.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        ) : (
+          <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: "2rem" }}>?</div>
+        )}
+      </div>
+      
+      <div style={{ padding: "0.75rem", display: "flex", flexDirection: "column", gap: "0.25rem", flex: 1, minHeight: "2.5rem", paddingRight: "40px" }}>
+        {lastEpInfo ? (
+          <>
+            <div style={{ fontSize: "0.88rem", color: "var(--text-primary)", fontWeight: 700 }}>{lastEpInfo.seasonText}</div>
+            <div style={{ fontSize: "0.78rem", color: "var(--text-secondary)", fontWeight: 500, lineHeight: 1.2, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{lastEpInfo.epName}</div>
+          </>
+        ) : (
+          <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", fontWeight: 500 }}>
+            {language === 'es' ? 'Sin capítulos vistos' : 'No watched episodes'}
+          </div>
+        )}
+      </div>
+      
+      <button 
+        onClick={handleResume}
+        disabled={isLoading}
+        className="btn-check-seen"
+        title={language === 'es' ? 'Reanudar en Continuar' : 'Resume in Continue'}
+        style={{
+          position: "absolute", bottom: "0.5rem", right: "0.5rem",
+          width: "32px", height: "32px", borderRadius: "50%",
+          background: "var(--bg-tertiary)", border: `2px solid ${themeColor || "var(--text-muted)"}`,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          cursor: isLoading ? "wait" : "pointer", color: themeColor || "var(--text-primary)",
+          opacity: isLoading ? 0.5 : 1,
+          "--btn-hover-bg": themeColor,
+          "--btn-hover-text": themeTextColor
+        } as React.CSSProperties}
+      >
+        <Play size={15} style={{ marginLeft: '2px' }} />
+      </button>
+    </div>
+  );
+};
+
 const ActiveItemCard = ({ item, onUpdate, language, onOpenItem, themeColor, themeTextColor }: { item: any, onUpdate: () => void, language: string, onOpenItem: (item: any) => void, themeColor?: string, themeTextColor?: string }) => {
   const [isLoading, setIsLoading] = useState(false);
 
@@ -652,7 +787,15 @@ export const Home: React.FC = () => {
       } else if (item.item_id) {
         await apiClient.post(`/lists/items/${item.item_id}/toggle`);
       } else {
-        await apiClient.put(`/library/${item.id}`, { status: 'completed' });
+        if (item.status === 'dropped') {
+          let targetStatus = 'watching';
+          if (item.item_type === 'game') targetStatus = 'playing';
+          else if (['book', 'comic', 'manga'].includes(item.item_type)) targetStatus = 'reading';
+          else targetStatus = 'watching';
+          await apiClient.put(`/library/${item.id}`, { status: targetStatus });
+        } else {
+          await apiClient.put(`/library/${item.id}`, { status: ['book', 'comic', 'manga'].includes(item.item_type) ? 'read' : 'completed' });
+        }
       }
       fetchDashboard(true);
     } catch (err) {
@@ -782,6 +925,20 @@ export const Home: React.FC = () => {
                         />
                       );
                     }
+
+                    if (activeTab === "dropped" && (item.item_type === "series" || item.item_type === "anime")) {
+                      return (
+                        <DroppedSeriesCard 
+                          key={item.id}
+                          item={item}
+                          language={language}
+                          onUpdate={() => fetchDashboard(true)}
+                          onOpenSeries={(seriesItem) => setSelectedItem(seriesItem)}
+                          themeColor={`var(--color-${item.item_type})`}
+                          themeTextColor={`var(--color-text-${item.item_type})`}
+                        />
+                      );
+                    }
                     
                     return (
                       <CustomCard 
@@ -789,8 +946,9 @@ export const Home: React.FC = () => {
                         title={item.title}
                         coverUrl={item.image_url}
                         themeColor={`var(--color-${item.item_type})`}
-                          themeTextColor={`var(--color-text-${item.item_type})`}
+                        themeTextColor={`var(--color-text-${item.item_type})`}
                         coverBottomText={undefined}
+                        actionIcon={item.status === 'dropped' ? 'play' : 'check'}
                         subtitle2={(() => {
                           const formatTime = (mins: number) => {
                             if (!mins) return '';
