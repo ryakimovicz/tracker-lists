@@ -1665,8 +1665,40 @@ export const Profile: React.FC = () => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', textAlign: 'left' }}>
           <h3>{language === 'es' ? 'Estantería Musical (Últimos 7 días)' : 'Music Shelf (Last 7 days)'}</h3>
           {topAlbums.length === 0 ? (
-            <div className="glass-card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-              {language === 'es' ? 'No hay álbumes escuchados recientemente.' : 'No recently played albums.'}
+            <div className="glass-card" style={{ padding: '3rem 2rem', textAlign: 'center', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
+              <Music size={32} color="#ef4444" style={{ opacity: 0.8 }} />
+              <div style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                {language === 'es' ? 'No hay álbumes escuchados en los últimos 7 días.' : 'No albums played in the last 7 days.'}
+              </div>
+              <p style={{ margin: 0, fontSize: '0.85rem', maxWidth: '450px', lineHeight: '1.45' }}>
+                {isOwnProfile
+                  ? (language === 'es'
+                    ? 'Asegúrate de vincular tu cuenta de Spotify o Apple Music a Last.fm para que tus canciones y álbumes se sincronicen automáticamente aquí.'
+                    : 'Make sure to connect your Spotify or Apple Music to Last.fm so your tracks and albums sync automatically here.')
+                  : (language === 'es'
+                    ? 'Este usuario aún no ha reproducido música en este período.'
+                    : 'This user has not played any music during this period.')}
+              </p>
+              {isOwnProfile && (
+                <a
+                  href="https://www.last.fm/settings/applications"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn-secondary"
+                  style={{
+                    marginTop: '0.5rem',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.4rem',
+                    fontSize: '0.85rem',
+                    padding: '0.5rem 1rem',
+                    textDecoration: 'none'
+                  }}
+                >
+                  <ExternalLink size={14} />
+                  {language === 'es' ? 'Vincular reproductor en Last.fm' : 'Link player in Last.fm'}
+                </a>
+              )}
             </div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '2rem' }}>
