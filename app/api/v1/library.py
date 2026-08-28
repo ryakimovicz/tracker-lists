@@ -196,21 +196,40 @@ def get_library_item_consumption_history(
     db: Session = Depends(get_db)
 ):
     from app.models.consumption import ConsumptionHistory
+    from app.models.list_item import ListItem
+    
     item = db.query(UserLibraryItem).filter(
         UserLibraryItem.id == item_id,
         UserLibraryItem.user_id == current_user.id
     ).first()
     
+    external_id = item.external_id if item else None
+    
     if not item:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Library item not found")
+        # Check if item_id corresponds to a ListItem (e.g. an episode)
+        list_item = db.query(ListItem).filter(ListItem.id == item_id).first()
+        if list_item:
+            external_id = list_item.external_id
+            
+    if not external_id:
+        # Query by list_item_id in consumption history
+        history = db.query(ConsumptionHistory).filter(
+            ConsumptionHistory.user_id == current_user.id,
+            ConsumptionHistory.list_item_id == item_id
+        ).order_by(ConsumptionHistory.consumed_at.desc()).all()
+        result_dates = [ch.consumed_at for ch in history]
+        return {
+            "count": len(result_dates),
+            "history": result_dates
+        }
         
     history = db.query(ConsumptionHistory).filter(
         ConsumptionHistory.user_id == current_user.id,
-        ConsumptionHistory.external_id == item.external_id
+        ConsumptionHistory.external_id == external_id
     ).order_by(ConsumptionHistory.consumed_at.desc()).all()
     
-    # If no history records yet, but item was completed, backfill the original completion date
-    if not history and item.completed_at:
+    # If no history records yet, but library item was completed, backfill the original completion date
+    if not history and item and item.completed_at:
         ch = ConsumptionHistory(
             user_id=current_user.id,
             item_type=item.item_type.value if hasattr(item.item_type, 'value') else item.item_type,
