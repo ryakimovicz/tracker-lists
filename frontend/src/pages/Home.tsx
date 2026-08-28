@@ -85,23 +85,9 @@ const CustomCard = ({
   themeColor?: string;
   themeTextColor?: string;
 }) => {
-  const { user } = useAuth();
-  const [isPeek, setIsPeek] = useState(false);
-  const shouldBlur = isNsfw && !user?.show_nsfw;
-  const currentlyBlurred = shouldBlur && !isPeek;
-
-  const handleClick = (e: React.MouseEvent) => {
-    if (currentlyBlurred) {
-      e.stopPropagation();
-      setIsPeek(true);
-      return;
-    }
-    if (onClick) onClick();
-  };
-
   return (
     <div 
-      onClick={handleClick}
+      onClick={onClick}
       style={{ 
         minWidth: "180px", maxWidth: "180px", background: "var(--bg-secondary)", 
         border: `1px solid ${themeColor || "var(--border-color)"}`, borderRadius: "12px", 
@@ -141,9 +127,9 @@ const CustomCard = ({
       </div>
       <div style={{ width: "100%", height: "240px", background: "var(--bg-tertiary)", position: "relative" }}>
         {coverUrl ? (
-          <img src={coverUrl} alt={title} style={{ width: "100%", height: "100%", objectFit: "cover", filter: currentlyBlurred ? "blur(15px)" : "none" }} />
+          <img src={coverUrl} alt={title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
         ) : (
-          <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: "2rem", filter: currentlyBlurred ? "blur(15px)" : "none" }}>?</div>
+          <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: "2rem" }}>?</div>
         )}
         {coverTopText && (
           <div style={{ position: "absolute", top: 0, left: 0, right: 0, padding: "0.5rem", background: "linear-gradient(to bottom, rgba(0,0,0,0.8), transparent)", color: "#fff", fontSize: "0.85rem", fontWeight: 700, textShadow: "0 1px 3px rgba(0,0,0,0.8)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
@@ -164,12 +150,12 @@ const CustomCard = ({
           </div>
         )}
       </div>
-      <div style={{ padding: "0.75rem", display: "flex", flexDirection: "column", gap: "0.25rem", flex: 1, minHeight: "2.5rem", paddingRight: onCheck && !currentlyBlurred ? "40px" : "0.75rem" }}>
+      <div style={{ padding: "0.75rem", display: "flex", flexDirection: "column", gap: "0.25rem", flex: 1, minHeight: "2.5rem", paddingRight: onCheck ? "40px" : "0.75rem" }}>
         {preSubtitle && <div style={{ fontSize: "0.95rem", color: "var(--text-primary)", fontWeight: 800, lineHeight: 1.2, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{preSubtitle}</div>}
         {subtitle1 && <div style={{ fontSize: "0.9rem", color: "var(--text-primary)", fontWeight: 700 }}>{subtitle1}</div>}
         {subtitle2 && <div style={{ fontSize: "0.8rem", color: "var(--text-secondary)", fontWeight: 500, lineHeight: 1.2, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{subtitle2}</div>}
       </div>
-      {onCheck && !currentlyBlurred && (
+      {onCheck && (
         <button 
           onClick={onCheck}
           className="btn-check-seen"
@@ -191,13 +177,8 @@ const CustomCard = ({
 };
 
 const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, themeTextColor }: { item: any, onUpdate: () => void, language: string, onOpenSeries: (item: any) => void, themeColor?: string, themeTextColor?: string }) => {
-  const { user } = useAuth();
   const [nextEp, setNextEp] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [isPeek, setIsPeek] = useState(false);
-
-  const shouldBlur = item.is_nsfw && !user?.show_nsfw;
-  const currentlyBlurred = shouldBlur && !isPeek;
 
   const fetchNextEpisode = async () => {
     if (!item.tracking_list_id) {
@@ -344,12 +325,7 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
 
   const pad = (n: number) => n < 10 ? '0' + n : n;
   
-  const handleCardClick = (e: React.MouseEvent) => {
-    if (currentlyBlurred) {
-      e.stopPropagation();
-      setIsPeek(true);
-      return;
-    }
+  const handleCardClick = () => {
     if (nextEp) {
       onOpenSeries({
         id: nextEp.id,
@@ -417,9 +393,9 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
         
         <div style={{ width: "100%", height: "125px", background: "var(--bg-tertiary)", position: "relative" }}>
           {coverUrl ? (
-            <img src={coverUrl} alt={item.title} style={{ width: "100%", height: "100%", objectFit: "cover", filter: currentlyBlurred ? "blur(15px)" : "none" }} />
+            <img src={coverUrl} alt={item.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
           ) : (
-            <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: "2rem", filter: currentlyBlurred ? "blur(15px)" : "none" }}>?</div>
+            <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: "2rem" }}>?</div>
           )}
           
 
@@ -436,7 +412,7 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
           )}
         </div>
         
-        {nextEp && !currentlyBlurred && (
+        {nextEp && (
           <button 
             onClick={handleMarkSeen}
             disabled={isLoading}
@@ -461,12 +437,7 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
 };
 
 const ActiveItemCard = ({ item, onUpdate, language, onOpenItem, themeColor, themeTextColor }: { item: any, onUpdate: () => void, language: string, onOpenItem: (item: any) => void, themeColor?: string, themeTextColor?: string }) => {
-  const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
-  const [isPeek, setIsPeek] = useState(false);
-
-  const shouldBlur = item.is_nsfw && !user?.show_nsfw;
-  const currentlyBlurred = shouldBlur && !isPeek;
 
   const handleMarkSeen = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -481,12 +452,7 @@ const ActiveItemCard = ({ item, onUpdate, language, onOpenItem, themeColor, them
     }
   };
   
-  const handleCardClick = (e: React.MouseEvent) => {
-    if (currentlyBlurred) {
-      e.stopPropagation();
-      setIsPeek(true);
-      return;
-    }
+  const handleCardClick = () => {
     onOpenItem(item);
   };
 
@@ -516,9 +482,9 @@ const ActiveItemCard = ({ item, onUpdate, language, onOpenItem, themeColor, them
 
       <div style={{ width: "100%", height: "125px", background: "var(--bg-tertiary)", position: "relative" }}>
         {item.image_url ? (
-          <img src={item.image_url} alt={item.title} style={{ width: "100%", height: "100%", objectFit: "cover", filter: currentlyBlurred ? "blur(15px)" : "none" }} />
+          <img src={item.image_url} alt={item.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
         ) : (
-          <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: "2rem", filter: currentlyBlurred ? "blur(15px)" : "none" }}>?</div>
+          <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: "2rem" }}>?</div>
         )}
         
         <div className={getTagClass(item.item_type)} style={{ position: "absolute", bottom: "0.25rem", left: "0.5rem", padding: "0.1rem 0.4rem", borderRadius: "4px", fontSize: "0.7rem", fontWeight: 600, opacity: 0.85, backdropFilter: 'blur(4px)' }}>
@@ -569,8 +535,7 @@ const ActiveItemCard = ({ item, onUpdate, language, onOpenItem, themeColor, them
         </div>
       </div>
       
-      {!currentlyBlurred && (
-        <button 
+      <button 
           onClick={handleMarkSeen}
           disabled={isLoading}
           className="btn-check-seen"
@@ -587,7 +552,6 @@ const ActiveItemCard = ({ item, onUpdate, language, onOpenItem, themeColor, them
         >
           <Check size={16} />
         </button>
-      )}
     </div>
   );
 };

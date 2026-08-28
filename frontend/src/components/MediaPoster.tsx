@@ -132,8 +132,8 @@ export const MediaPoster: React.FC<MediaPosterProps> = ({
           aspectRatio,
           objectFit: 'cover',
           borderRadius,
-          filter: isNsfw && !showNsfw ? 'blur(15px)' : 'none',
-          transition: 'filter 0.3s, transform 0.2s',
+          filter: 'none',
+          transition: 'transform 0.2s',
           display: 'block',
           ...style
         }}

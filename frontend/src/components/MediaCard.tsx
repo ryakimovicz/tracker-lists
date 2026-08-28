@@ -31,24 +31,10 @@ export const MediaCard: React.FC<MediaCardProps> = ({
   isLoading = false,
   isNsfw = false,
 }) => {
-  const { user } = useAuth();
-  const [blurOverride, setBlurOverride] = React.useState(false);
-  const shouldBlur = isNsfw && !user?.show_nsfw;
-  const currentlyBlurred = shouldBlur && !blurOverride;
-
-  const handleCardClick = (e: React.MouseEvent) => {
-    if (currentlyBlurred) {
-      e.stopPropagation();
-      setBlurOverride(true);
-      return;
-    }
-    if (onClick) onClick();
-  };
-
   return (
     <div
       className="glass-card"
-      onClick={handleCardClick}
+      onClick={onClick}
       style={{
         padding: '1rem',
         display: 'flex',
@@ -75,19 +61,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({
           height="100%"
           width="100%"
           borderRadius="8px"
-          isNsfw={isNsfw}
-          showNsfw={user?.show_nsfw || blurOverride}
         />
-        {currentlyBlurred && (
-          <div style={{
-            position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'rgba(0,0,0,0.3)', borderRadius: '8px',
-            color: 'white', fontSize: '0.8rem', fontWeight: 'bold', textAlign: 'center', padding: '0.5rem'
-          }}>
-            Haz clic para ver portada
-          </div>
-        )}
         {typeLabel && (
           <span style={{
             position: 'absolute',

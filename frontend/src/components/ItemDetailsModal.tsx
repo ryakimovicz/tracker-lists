@@ -158,7 +158,6 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   const [selectedItem, setSelectedItem] = useState<any>(initialItem);
   const [isCoverPeek, setIsCoverPeek] = useState(false);
   
-  const shouldBlurCover = selectedItem?.is_nsfw && !user?.show_nsfw && !isCoverPeek;
   const [itemReviews, setItemReviews] = useState<any[]>([]);
   const [userRating, setUserRating] = useState<number>(0);
   const [userComment, setUserComment] = useState<string>('');
@@ -1822,19 +1821,15 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         src={selectedItem.image_url}
                         alt={selectedItem.title}
                         onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                        onClick={() => {
-                          if (shouldBlurCover) setIsCoverPeek(true);
-                          else setZoomedImage(selectedItem.image_url);
-                        }}
+                        onClick={() => setZoomedImage(selectedItem.image_url)}
                         style={{ 
                           width: '100%', height: '100%', objectFit: 'cover', borderRadius: '8px', 
-                          cursor: shouldBlurCover ? 'pointer' : 'zoom-in', 
+                          cursor: 'zoom-in', 
                           boxShadow: '0 5px 15px rgba(0,0,0,0.3)',
-                          filter: shouldBlurCover ? 'blur(15px)' : 'none',
-                          transition: 'filter 0.3s'
+                          filter: 'none'
                         }}
                       />
-                      {selectedItem.image_url && selectedItem.image_url.includes('489599849927-2ee91cede3ba') && !shouldBlurCover && (
+                      {selectedItem.image_url && selectedItem.image_url.includes('489599849927-2ee91cede3ba') && (
                         <div style={{
                           position: 'absolute', top: 0, left: 0, width: '100%', height: '52%',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -1849,16 +1844,6 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                           }}>
                             {selectedItem.title}
                           </span>
-                        </div>
-                      )}
-                      {shouldBlurCover && (
-                        <div style={{
-                          position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-                          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                          background: 'rgba(0,0,0,0.3)', borderRadius: '8px', pointerEvents: 'none',
-                          color: 'white', fontSize: '0.8rem', fontWeight: 'bold', textAlign: 'center', padding: '0.5rem'
-                        }}>
-                          Haz clic para ver portada
                         </div>
                       )}
                     </div>
