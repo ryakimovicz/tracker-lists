@@ -11,7 +11,7 @@
 - **Base de Datos y ORM**: SQLite / PostgreSQL via SQLAlchemy
 - **Autenticación**: OAuth2 Password Bearer con JWT + cookie HttpOnly segura para renovación de token de refresco
 - **Email Transaccional**: Integración con **Resend API** con dominio personalizado `@pathd.net`, plantillas HTML responsivas y adaptación dinámica de idioma (Español / Inglés).
-- **Pagos y Suscripciones**: Dodo Payments / Stripe API (Checkout Sessions, Customer Portal y Webhooks de ciclo de vida de suscripción)
+- **Pagos y Suscripciones**: Dodo Payments API (Checkout Sessions, Customer Portal y Webhooks de ciclo de vida de suscripción)
 - **Rate Limiting**: `slowapi` con límites por IP
 - **Tareas en Segundo Plano**: FastAPI `BackgroundTasks` (despacho asíncrono de emails y sincronizaciones)
 
@@ -46,7 +46,7 @@
 | [IGDB](https://api-docs.igdb.com/) | Videojuegos, colecciones, ediciones, DLCs y expansiones (autenticado via Twitch OAuth2) |
 | [Last.fm](https://www.last.fm/api) | Música, álbumes destacados y scrobbling en tiempo real |
 | [Wikipedia API](https://www.mediawiki.org/wiki/API:Main_page) | Calendario de estrenos de cine y sinopsis abiertas (CC BY-SA) |
-| [Dodo Payments](https://dodopayments.com/) / [Stripe](https://stripe.com/) | Procesamiento de pagos seguros y gestión de suscripciones Premium |
+| [Dodo Payments](https://dodopayments.com/) | Procesamiento de pagos seguros y gestión de suscripciones Premium |
 | [Google AdSense](https://adsense.google.com/) | Monetización de audiencia general con bloques responsivos, tarjetas integradas y archivo `ads.txt` oficial |
 | [deep-translator](https://github.com/nidhaloff/deep-translator) (Google) | Traducción dinámica de sinopsis con almacenamiento en caché |
 | [UptimeRobot](https://uptimerobot.com/) | Monitorización continua y mantenimiento activo 24/7 mediante `GET /health` y `HEAD /health` |
