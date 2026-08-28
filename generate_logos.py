@@ -41,21 +41,21 @@ def render_logo(bg_type="dark", size=(512, 512)):
         h = h.lstrip('#')
         return tuple(int(h[i:i+2], 16) for i in (0, 2, 4)) + (255,)
 
-    # 1. Stem: x=24, y=24, w=28, h=152, rx=14
-    x1, y1, w1, h1 = (24 * scale), (24 * scale), (28 * scale), (152 * scale)
-    draw.rounded_rectangle([x1, y1, x1 + w1, y1 + h1], radius=int(14 * scale), fill=hex_to_rgb(colors["stem"]))
+    # 1. Stem: x=6, y=6, w=38, h=188, rx=19
+    x1, y1, w1, h1 = (6 * scale), (6 * scale), (38 * scale), (188 * scale)
+    draw.rounded_rectangle([x1, y1, x1 + w1, y1 + h1], radius=int(19 * scale), fill=hex_to_rgb(colors["stem"]))
 
-    # 2. Bar 1: x=64, y=24, w=86, h=28, rx=14
-    x2, y2, w2, h2 = (64 * scale), (24 * scale), (86 * scale), (28 * scale)
-    draw.rounded_rectangle([x2, y2, x2 + w2, y2 + h2], radius=int(14 * scale), fill=hex_to_rgb(colors["bar1"]))
+    # 2. Bar 1: x=56, y=6, w=102, h=38, rx=19
+    x2, y2, w2, h2 = (56 * scale), (6 * scale), (102 * scale), (38 * scale)
+    draw.rounded_rectangle([x2, y2, x2 + w2, y2 + h2], radius=int(19 * scale), fill=hex_to_rgb(colors["bar1"]))
 
-    # 3. Bar 2: x=64, y=66, w=112, h=28, rx=14
-    x3, y3, w3, h3 = (64 * scale), (66 * scale), (112 * scale), (28 * scale)
-    draw.rounded_rectangle([x3, y3, x3 + w3, y3 + h3], radius=int(14 * scale), fill=hex_to_rgb(colors["bar2"]))
+    # 3. Bar 2: x=56, y=56, w=138, h=38, rx=19
+    x3, y3, w3, h3 = (56 * scale), (56 * scale), (138 * scale), (38 * scale)
+    draw.rounded_rectangle([x3, y3, x3 + w3, y3 + h3], radius=int(19 * scale), fill=hex_to_rgb(colors["bar2"]))
 
-    # 4. Bar 3: x=64, y=108, w=72, h=28, rx=14
-    x4, y4, w4, h4 = (64 * scale), (108 * scale), (72 * scale), (28 * scale)
-    draw.rounded_rectangle([x4, y4, x4 + w4, y4 + h4], radius=int(14 * scale), fill=hex_to_rgb(colors["bar3"]))
+    # 4. Bar 3: x=56, y=106, w=88, h=38, rx=19
+    x4, y4, w4, h4 = (56 * scale), (106 * scale), (88 * scale), (38 * scale)
+    draw.rounded_rectangle([x4, y4, x4 + w4, y4 + h4], radius=int(19 * scale), fill=hex_to_rgb(colors["bar3"]))
 
     return img
 
