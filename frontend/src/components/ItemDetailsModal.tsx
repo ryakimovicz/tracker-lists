@@ -3,7 +3,7 @@ import { useTranslation } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
 import { getProfileTheme } from '../utils/profileThemes';
 import { apiClient } from '../api/client';
-import { Star, Heart, X, Flag, CheckCircle, Check, Plus, MoreVertical, Trash2, ArrowLeft, Clock, ChevronUp, ChevronDown, RotateCcw, BookOpen, Gamepad2, Package, Sparkles, Puzzle, Layers, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Star, Heart, X, Flag, CheckCircle, Check, Plus, MoreVertical, Trash2, ArrowLeft, Clock, ChevronUp, ChevronDown, RotateCcw, BookOpen, Gamepad2, Package, Sparkles, Puzzle, Layers, ChevronLeft, ChevronRight, Calendar, RefreshCw, AlertCircle } from 'lucide-react';
 
 
 
@@ -193,6 +193,12 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   const [showAllWatchedMenu, setShowAllWatchedMenu] = useState(false);
   const [showSingleWatchedMenu, setShowSingleWatchedMenu] = useState(false);
   const [consumptionHistory, setConsumptionHistory] = useState<string[]>([]);
+  
+  // Floating Dialogs (Modals)
+  const [showReconsumedModal, setShowReconsumedModal] = useState(false);
+  const [showStatusChangeModal, setShowStatusChangeModal] = useState(false);
+  const [pendingStatusChange, setPendingStatusChange] = useState<string | null>(null);
+  const [showRemoveShelfModal, setShowRemoveShelfModal] = useState(false);
 
   const handleTranslateDescription = async (textToTranslate: string) => {
     if (!textToTranslate) return;
@@ -333,8 +339,18 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     }
   };
 
-  const handleToggleStatus = async (statusId: string) => {
+  const handleToggleStatus = async (statusId: string, bypassModal = false) => {
     if (!selectedItem) return;
+    const isCurrentlyCompleted = ['completed', 'read'].includes(selectedItem.status);
+    const hasHistory = consumptionHistory && consumptionHistory.length > 0;
+    
+    // If completed or has history, and clicking a different non-completed status, prompt choice modal
+    if (!bypassModal && (isCurrentlyCompleted || hasHistory) && statusId !== selectedItem.status && !['completed', 'read'].includes(statusId)) {
+      setPendingStatusChange(statusId);
+      setShowStatusChangeModal(true);
+      return;
+    }
+
     const isCurrentlyActive = selectedItem.status === statusId;
     let newStatus = statusId;
     if (isCurrentlyActive) {
@@ -357,6 +373,33 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     } else {
       await ensureTracked(newStatus);
     }
+  };
+
+  const applyStatusChangeWithHistory = async (keepHistory: boolean) => {
+    if (!pendingStatusChange || !selectedItem) return;
+    const nextStatus = pendingStatusChange;
+    setShowStatusChangeModal(false);
+    setPendingStatusChange(null);
+
+    if (!keepHistory && selectedItem.id) {
+      // User chose to replace/remove the latest completion record
+      try {
+        await apiClient.delete(`/library/${selectedItem.id}/consumption-history/latest`);
+        if (user?.is_pro) {
+          apiClient.get(`/library/${selectedItem.id}/consumption-history`)
+            .then(hRes => {
+              if (hRes.data && hRes.data.history) {
+                setConsumptionHistory(hRes.data.history);
+              }
+            })
+            .catch(console.error);
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    await handleToggleStatus(nextStatus, true);
   };
 
   const handleMarkConsumedAgain = async () => {
@@ -1602,7 +1645,13 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                     <div style={{ position: 'relative' }}>
                       <button
                         type="button"
-                        onClick={handleAddToShelf}
+                        onClick={() => {
+                          if (selectedItem?.id) {
+                            setShowRemoveShelfModal(true);
+                          } else {
+                            handleAddToShelf();
+                          }
+                        }}
                         className="btn-secondary"
                         title={language === 'es' ? 'Seguir / Añadir' : 'Follow / Add'}
                         style={{
@@ -1619,46 +1668,6 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                       >
                         <Plus size={18} />
                       </button>
-
-                      {showShelfMenu && selectedItem?.id && (
-                        <div
-                          className="glass-card"
-                          style={{
-                            position: 'absolute',
-                            top: '100%',
-                            right: 0,
-                            marginTop: '0.5rem',
-                            zIndex: 3000,
-                            padding: '0.5rem',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '0.4rem',
-                            minWidth: '180px',
-                            boxShadow: '0 10px 25px rgba(0,0,0,0.5)'
-                          }}
-                        >
-                          <button
-                            type="button"
-                            onClick={handleRemoveFromShelf}
-                            style={{
-                              background: 'transparent',
-                              border: 'none',
-                              color: '#ef4444',
-                              textAlign: 'left',
-                              padding: '0.4rem 0.6rem',
-                              cursor: 'pointer',
-                              fontSize: '0.85rem',
-                              borderRadius: '4px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '0.4rem'
-                            }}
-                          >
-                            <Trash2 size={14} />
-                            {language === 'es' ? 'Quitar de estantería' : 'Remove from shelf'}
-                          </button>
-                        </div>
-                      )}
                     </div>
                   )}
 
@@ -2459,96 +2468,31 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                           >
                             {language === 'es' ? 'Jugando' : 'Playing'}
                           </button>
-                          <div style={{ position: 'relative' }}>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (selectedItem?.status === 'completed') {
-                                  setShowSingleWatchedMenu(!showSingleWatchedMenu);
-                                } else {
-                                  handleToggleStatus('completed');
-                                }
-                              }}
-                              style={{
-                                width: '100%',
-                                background: selectedItem?.status === 'completed' ? 'var(--color-game)' : 'var(--bg-tertiary)',
-                                border: selectedItem?.status === 'completed' ? 'none' : '1px solid var(--border-color)',
-                                borderRadius: '8px',
-                                padding: '0.5rem',
-                                textAlign: 'center',
-                                cursor: 'pointer',
-                                color: selectedItem?.status === 'completed' ? '#ffffff' : 'var(--text-primary)',
-                                fontSize: '0.75rem',
-                                fontWeight: 600,
-                                transition: 'all 0.2s ease'
-                              }}
-                            >
-                              {language === 'es' ? 'Completado' : 'Completed'}
-                            </button>
-
-                            {showSingleWatchedMenu && selectedItem?.status === 'completed' && (
-                              <div
-                                className="glass-card"
-                                style={{
-                                  position: 'absolute',
-                                  top: '100%',
-                                  left: 0,
-                                  marginTop: '0.5rem',
-                                  zIndex: 3000,
-                                  padding: '0.5rem',
-                                  display: 'flex',
-                                  flexDirection: 'column',
-                                  gap: '0.4rem',
-                                  minWidth: '220px',
-                                  boxShadow: '0 10px 25px rgba(0,0,0,0.5)'
-                                }}
-                              >
-                                <button
-                                  type="button"
-                                  onClick={async () => {
-                                    setShowSingleWatchedMenu(false);
-                                    await handleMarkConsumedAgain();
-                                  }}
-                                  style={{
-                                    background: 'transparent',
-                                    border: 'none',
-                                    color: 'var(--text-primary)',
-                                    textAlign: 'left',
-                                    padding: '0.4rem 0.6rem',
-                                    cursor: 'pointer',
-                                    fontSize: '0.85rem',
-                                    borderRadius: '4px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '0.4rem'
-                                  }}
-                                >
-                                  <span>🔁</span>
-                                  {language === 'es' ? 'Volver a marcar como jugado' : 'Mark as played again'}
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={handleRemoveLatestConsumption}
-                                  style={{
-                                    background: 'transparent',
-                                    border: 'none',
-                                    color: '#ef4444',
-                                    textAlign: 'left',
-                                    padding: '0.4rem 0.6rem',
-                                    cursor: 'pointer',
-                                    fontSize: '0.85rem',
-                                    borderRadius: '4px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '0.4rem'
-                                  }}
-                                >
-                                  <Trash2 size={14} />
-                                  {language === 'es' ? 'Desmarcar / Quitar' : 'Unmark / Remove'}
-                                </button>
-                              </div>
-                            )}
-                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (selectedItem?.status === 'completed') {
+                                setShowReconsumedModal(true);
+                              } else {
+                                handleToggleStatus('completed');
+                              }
+                            }}
+                            style={{
+                              width: '100%',
+                              background: selectedItem?.status === 'completed' ? 'var(--color-game)' : 'var(--bg-tertiary)',
+                              border: selectedItem?.status === 'completed' ? 'none' : '1px solid var(--border-color)',
+                              borderRadius: '8px',
+                              padding: '0.5rem',
+                              textAlign: 'center',
+                              cursor: 'pointer',
+                              color: selectedItem?.status === 'completed' ? '#ffffff' : 'var(--text-primary)',
+                              fontSize: '0.75rem',
+                              fontWeight: 600,
+                              transition: 'all 0.2s ease'
+                            }}
+                          >
+                            {language === 'es' ? 'Completado' : 'Completed'}
+                          </button>
                           <button
                             type="button"
                             onClick={() => handleToggleStatus('endless')}
@@ -2588,99 +2532,31 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         </div>
                       ) : (selectedItem?.item_type === 'series' || selectedItem?.item_type === 'anime') ? (
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem' }}>
-                          <div style={{ position: 'relative' }}>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (selectedItem?.status === 'completed') {
-                                  setShowAllWatchedMenu(!showAllWatchedMenu);
-                                } else {
-                                  handleToggleAllEpisodes();
-                                }
-                              }}
-                              style={{
-                                width: '100%',
-                                background: selectedItem?.status === 'completed' ? `var(--color-${selectedItem.item_type || 'series'})` : 'var(--bg-tertiary)',
-                                border: selectedItem?.status === 'completed' ? 'none' : '1px solid var(--border-color)',
-                                borderRadius: '8px',
-                                padding: '0.5rem',
-                                textAlign: 'center',
-                                cursor: 'pointer',
-                                color: selectedItem?.status === 'completed' ? '#ffffff' : 'var(--text-primary)',
-                                fontSize: '0.85rem',
-                                fontWeight: 600,
-                                transition: 'all 0.2s ease'
-                              }}
-                            >
-                              {language === 'es' ? 'Todo visto' : 'All watched'}
-                            </button>
-
-                            {showAllWatchedMenu && selectedItem?.status === 'completed' && (
-                              <div
-                                className="glass-card"
-                                style={{
-                                  position: 'absolute',
-                                  top: '100%',
-                                  left: 0,
-                                  marginTop: '0.5rem',
-                                  zIndex: 3000,
-                                  padding: '0.5rem',
-                                  display: 'flex',
-                                  flexDirection: 'column',
-                                  gap: '0.4rem',
-                                  minWidth: '220px',
-                                  boxShadow: '0 10px 25px rgba(0,0,0,0.5)'
-                                }}
-                              >
-                                <button
-                                  type="button"
-                                  onClick={async () => {
-                                    setShowAllWatchedMenu(false);
-                                    await handleToggleAllEpisodes('mark_all');
-                                  }}
-                                  style={{
-                                    background: 'transparent',
-                                    border: 'none',
-                                    color: 'var(--text-primary)',
-                                    textAlign: 'left',
-                                    padding: '0.4rem 0.6rem',
-                                    cursor: 'pointer',
-                                    fontSize: '0.85rem',
-                                    borderRadius: '4px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '0.4rem'
-                                  }}
-                                >
-                                  <span>🔁</span>
-                                  {language === 'es' ? 'Volver a marcar todo como visto' : 'Mark all as watched again'}
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={async () => {
-                                    setShowAllWatchedMenu(false);
-                                    await handleToggleAllEpisodes('remove');
-                                  }}
-                                  style={{
-                                    background: 'transparent',
-                                    border: 'none',
-                                    color: '#ef4444',
-                                    textAlign: 'left',
-                                    padding: '0.4rem 0.6rem',
-                                    cursor: 'pointer',
-                                    fontSize: '0.85rem',
-                                    borderRadius: '4px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '0.4rem'
-                                  }}
-                                >
-                                  <Trash2 size={14} />
-                                  {language === 'es' ? 'Desmarcar / Quitar' : 'Unwatch / Remove'}
-                                </button>
-                              </div>
-                            )}
-                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (selectedItem?.status === 'completed') {
+                                setShowReconsumedModal(true);
+                              } else {
+                                handleToggleAllEpisodes();
+                              }
+                            }}
+                            style={{
+                              width: '100%',
+                              background: selectedItem?.status === 'completed' ? `var(--color-${selectedItem.item_type || 'series'})` : 'var(--bg-tertiary)',
+                              border: selectedItem?.status === 'completed' ? 'none' : '1px solid var(--border-color)',
+                              borderRadius: '8px',
+                              padding: '0.5rem',
+                              textAlign: 'center',
+                              cursor: 'pointer',
+                              color: selectedItem?.status === 'completed' ? '#ffffff' : 'var(--text-primary)',
+                              fontSize: '0.85rem',
+                              fontWeight: 600,
+                              transition: 'all 0.2s ease'
+                            }}
+                          >
+                            {language === 'es' ? 'Todo visto' : 'All watched'}
+                          </button>
                           <button
                             type="button"
                             onClick={() => handleToggleStatus('dropped')}
@@ -2702,116 +2578,48 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         </div>
                       ) : ['movie', 'book', 'comic', 'manga'].includes(selectedItem?.item_type) ? (
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
-                          <div style={{ position: 'relative' }}>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const isCurrentlyActive = selectedItem.status === (['book', 'comic', 'manga'].includes(selectedItem.item_type) ? 'read' : 'completed');
-                                if (isCurrentlyActive) {
-                                  setShowSingleWatchedMenu(!showSingleWatchedMenu);
-                                  return;
-                                }
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const isCurrentlyActive = selectedItem.status === (['book', 'comic', 'manga'].includes(selectedItem.item_type) ? 'read' : 'completed');
+                              if (isCurrentlyActive) {
+                                setShowReconsumedModal(true);
+                                return;
+                              }
 
-                                if (['book', 'comic', 'manga'].includes(selectedItem.item_type) && totalPagesVal !== '') {
-                                  // Auto-fill pages_read to totalPagesVal
-                                  setPagesReadVal(totalPagesVal);
+                              if (['book', 'comic', 'manga'].includes(selectedItem.item_type) && totalPagesVal !== '') {
+                                // Auto-fill pages_read to totalPagesVal
+                                setPagesReadVal(totalPagesVal);
+                                if (selectedItem.id) {
+                                  apiClient.put(`/library/${selectedItem.id}`, { pages_read: totalPagesVal }).catch(console.error);
+                                }
+                              } else if (selectedItem.item_type === 'movie') {
+                                const movieTotal = selectedItem.total_pages || selectedItem.page_count;
+                                if (movieTotal) {
+                                  setPagesReadVal(movieTotal);
                                   if (selectedItem.id) {
-                                    apiClient.put(`/library/${selectedItem.id}`, { pages_read: totalPagesVal }).catch(console.error);
-                                  }
-                                } else if (selectedItem.item_type === 'movie') {
-                                  const movieTotal = selectedItem.total_pages || selectedItem.page_count;
-                                  if (movieTotal) {
-                                    setPagesReadVal(movieTotal);
-                                    if (selectedItem.id) {
-                                      apiClient.put(`/library/${selectedItem.id}`, { pages_read: movieTotal }).catch(console.error);
-                                    }
+                                    apiClient.put(`/library/${selectedItem.id}`, { pages_read: movieTotal }).catch(console.error);
                                   }
                                 }
-                                handleToggleStatus(['book', 'comic', 'manga'].includes(selectedItem.item_type) ? 'read' : 'completed');
-                              }}
-                              style={{
-                                width: '100%',
-                                background: ['completed', 'read'].includes(selectedItem?.status) ? (selectedItem.item_type === 'movie' ? 'var(--color-movie)' : 'var(--color-book)') : 'var(--bg-tertiary)',
-                                border: ['completed', 'read'].includes(selectedItem?.status) ? 'none' : '1px solid var(--border-color)',
-                                borderRadius: '8px',
-                                padding: '0.5rem',
-                                textAlign: 'center',
-                                cursor: 'pointer',
-                                color: ['completed', 'read'].includes(selectedItem?.status) ? '#ffffff' : 'var(--text-primary)',
-                                fontSize: '0.85rem',
-                                fontWeight: 600,
-                                transition: 'all 0.2s ease'
-                              }}
-                            >
-                              {['book', 'comic', 'manga'].includes(selectedItem.item_type) ? (language === 'es' ? 'Leído' : 'Read') : (language === 'es' ? 'Visto' : 'Watched')}
-                            </button>
-
-                            {showSingleWatchedMenu && ['completed', 'read'].includes(selectedItem?.status) && (
-                              <div
-                                className="glass-card"
-                                style={{
-                                  position: 'absolute',
-                                  top: '100%',
-                                  left: 0,
-                                  marginTop: '0.5rem',
-                                  zIndex: 3000,
-                                  padding: '0.5rem',
-                                  display: 'flex',
-                                  flexDirection: 'column',
-                                  gap: '0.4rem',
-                                  minWidth: '220px',
-                                  boxShadow: '0 10px 25px rgba(0,0,0,0.5)'
-                                }}
-                              >
-                                <button
-                                  type="button"
-                                  onClick={async () => {
-                                    setShowSingleWatchedMenu(false);
-                                    await handleMarkConsumedAgain();
-                                  }}
-                                  style={{
-                                    background: 'transparent',
-                                    border: 'none',
-                                    color: 'var(--text-primary)',
-                                    textAlign: 'left',
-                                    padding: '0.4rem 0.6rem',
-                                    cursor: 'pointer',
-                                    fontSize: '0.85rem',
-                                    borderRadius: '4px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '0.4rem'
-                                  }}
-                                >
-                                  <span>🔁</span>
-                                  {selectedItem.item_type === 'movie' 
-                                    ? (language === 'es' ? 'Volver a marcar como vista' : 'Mark as seen again')
-                                    : (language === 'es' ? 'Volver a marcar como leído' : 'Mark as read again')
-                                  }
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={handleRemoveLatestConsumption}
-                                  style={{
-                                    background: 'transparent',
-                                    border: 'none',
-                                    color: '#ef4444',
-                                    textAlign: 'left',
-                                    padding: '0.4rem 0.6rem',
-                                    cursor: 'pointer',
-                                    fontSize: '0.85rem',
-                                    borderRadius: '4px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '0.4rem'
-                                  }}
-                                >
-                                  <Trash2 size={14} />
-                                  {language === 'es' ? 'Desmarcar / Quitar' : 'Unmark / Remove'}
-                                </button>
-                              </div>
-                            )}
-                          </div>
+                              }
+                              handleToggleStatus(['book', 'comic', 'manga'].includes(selectedItem.item_type) ? 'read' : 'completed');
+                            }}
+                            style={{
+                              width: '100%',
+                              background: ['completed', 'read'].includes(selectedItem?.status) ? (selectedItem.item_type === 'movie' ? 'var(--color-movie)' : 'var(--color-book)') : 'var(--bg-tertiary)',
+                              border: ['completed', 'read'].includes(selectedItem?.status) ? 'none' : '1px solid var(--border-color)',
+                              borderRadius: '8px',
+                              padding: '0.5rem',
+                              textAlign: 'center',
+                              cursor: 'pointer',
+                              color: ['completed', 'read'].includes(selectedItem?.status) ? '#ffffff' : 'var(--text-primary)',
+                              fontSize: '0.85rem',
+                              fontWeight: 600,
+                              transition: 'all 0.2s ease'
+                            }}
+                          >
+                            {['book', 'comic', 'manga'].includes(selectedItem.item_type) ? (language === 'es' ? 'Leído' : 'Read') : (language === 'es' ? 'Visto' : 'Watched')}
+                          </button>
                           <button
                             type="button"
                             onClick={() => handleToggleStatus(['book', 'comic', 'manga'].includes(selectedItem.item_type) ? 'reading' : 'watching')}
@@ -2851,108 +2659,40 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         </div>
                       ) : (
                         <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
-                          <div style={{ position: 'relative' }}>
-                            <button
-                              type="button"
-                              disabled={!isOwnProfile}
-                              onClick={() => {
-                                const isComp = (selectedItem?.status === 'completed' || selectedItem?.status === 'read');
-                                if (isComp) {
-                                  setShowSingleWatchedMenu(!showSingleWatchedMenu);
-                                } else {
-                                  handleMarkCompleted();
-                                }
-                              }}
-                              style={{
-                                background: (selectedItem?.status === 'completed' || selectedItem?.status === 'read') ? `var(--color-${selectedItem.item_type || 'movie'})` : 'var(--bg-tertiary)',
-                                border: (selectedItem?.status === 'completed' || selectedItem?.status === 'read') ? 'none' : '1px solid var(--border-color)',
-                                borderRadius: '20px',
-                                padding: '0.45rem 1rem',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '0.5rem',
-                                cursor: isOwnProfile ? 'pointer' : 'default',
-                                color: (selectedItem?.status === 'completed' || selectedItem?.status === 'read') ? `var(--color-text-${selectedItem.item_type || 'movie'})` : 'var(--text-primary)',
-                                fontSize: '0.85rem',
-                                fontWeight: 600,
-                                transition: 'all 0.2s ease'
-                              }}
-                            >
-                              <Check size={16} strokeWidth={3} />
-                              <span>
-                                {(selectedItem?.status === 'completed' || selectedItem?.status === 'read')
-                                  ? (selectedItem.item_type === 'game' ? (language === 'es' ? 'Jugado' : 'Played') : (language === 'es' ? 'Visto' : 'Watched'))
-                                  : (selectedItem.item_type === 'game' ? (language === 'es' ? 'Marcar como jugado' : 'Mark as played') : (language === 'es' ? 'Marcar como visto' : 'Mark as seen'))
-                                }
-                              </span>
-                            </button>
-
-                            {showSingleWatchedMenu && (selectedItem?.status === 'completed' || selectedItem?.status === 'read') && (
-                              <div
-                                className="glass-card"
-                                style={{
-                                  position: 'absolute',
-                                  top: '100%',
-                                  right: 0,
-                                  marginTop: '0.5rem',
-                                  zIndex: 3000,
-                                  padding: '0.5rem',
-                                  display: 'flex',
-                                  flexDirection: 'column',
-                                  gap: '0.4rem',
-                                  minWidth: '220px',
-                                  boxShadow: '0 10px 25px rgba(0,0,0,0.5)'
-                                }}
-                              >
-                                <button
-                                  type="button"
-                                  onClick={async () => {
-                                    setShowSingleWatchedMenu(false);
-                                    await handleMarkConsumedAgain();
-                                  }}
-                                  style={{
-                                    background: 'transparent',
-                                    border: 'none',
-                                    color: 'var(--text-primary)',
-                                    textAlign: 'left',
-                                    padding: '0.4rem 0.6rem',
-                                    cursor: 'pointer',
-                                    fontSize: '0.85rem',
-                                    borderRadius: '4px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '0.4rem'
-                                  }}
-                                >
-                                  <span>🔁</span>
-                                  {selectedItem.item_type === 'game' 
-                                    ? (language === 'es' ? 'Volver a marcar como jugado' : 'Mark as played again')
-                                    : (language === 'es' ? 'Volver a marcar como visto' : 'Mark as seen again')
-                                  }
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={handleRemoveLatestConsumption}
-                                  style={{
-                                    background: 'transparent',
-                                    border: 'none',
-                                    color: '#ef4444',
-                                    textAlign: 'left',
-                                    padding: '0.4rem 0.6rem',
-                                    cursor: 'pointer',
-                                    fontSize: '0.85rem',
-                                    borderRadius: '4px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '0.4rem'
-                                  }}
-                                >
-                                  <Trash2 size={14} />
-                                  {language === 'es' ? 'Desmarcar / Quitar' : 'Unmark / Remove'}
-                                </button>
-                              </div>
-                            )}
-                          </div>
+                          <button
+                            type="button"
+                            disabled={!isOwnProfile}
+                            onClick={() => {
+                              const isComp = (selectedItem?.status === 'completed' || selectedItem?.status === 'read');
+                              if (isComp) {
+                                setShowReconsumedModal(true);
+                              } else {
+                                handleMarkCompleted();
+                              }
+                            }}
+                            style={{
+                              background: (selectedItem?.status === 'completed' || selectedItem?.status === 'read') ? `var(--color-${selectedItem.item_type || 'movie'})` : 'var(--bg-tertiary)',
+                              border: (selectedItem?.status === 'completed' || selectedItem?.status === 'read') ? 'none' : '1px solid var(--border-color)',
+                              borderRadius: '20px',
+                              padding: '0.45rem 1rem',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.5rem',
+                              cursor: isOwnProfile ? 'pointer' : 'default',
+                              color: (selectedItem?.status === 'completed' || selectedItem?.status === 'read') ? `var(--color-text-${selectedItem.item_type || 'movie'})` : 'var(--text-primary)',
+                              fontSize: '0.85rem',
+                              fontWeight: 600,
+                              transition: 'all 0.2s ease'
+                            }}
+                          >
+                            <Check size={16} strokeWidth={3} />
+                            <span>
+                              {(selectedItem?.status === 'completed' || selectedItem?.status === 'read')
+                                ? (selectedItem.item_type === 'game' ? (language === 'es' ? 'Jugado' : 'Played') : (language === 'es' ? 'Visto' : 'Watched'))
+                                : (selectedItem.item_type === 'game' ? (language === 'es' ? 'Marcar como jugado' : 'Mark as played') : (language === 'es' ? 'Marcar como visto' : 'Mark as seen'))
+                              }
+                            </span>
+                          </button>
                         </div>
                       )}
                     </div>
@@ -2981,7 +2721,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         letterSpacing: '0.5px'
                       }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                          <span>📅</span>
+                          <Calendar size={13} />
                           <span>{language === 'es' ? 'Historial de Registros' : 'Consumption History'} ({consumptionHistory.length})</span>
                         </div>
                         <span style={{
@@ -3897,6 +3637,376 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                   </a>
                 )}
               </div>
+
+              {/* Floating Modal 1: Re-consumption Options Dialog */}
+              {showReconsumedModal && (
+                <div
+                  style={{
+                    position: 'fixed',
+                    inset: 0,
+                    zIndex: 9999,
+                    background: 'rgba(0, 0, 0, 0.65)',
+                    backdropFilter: 'blur(4px)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '1rem'
+                  }}
+                  onClick={() => setShowReconsumedModal(false)}
+                >
+                  <div
+                    className="glass-card"
+                    style={{
+                      width: '100%',
+                      maxWidth: '380px',
+                      background: 'var(--bg-secondary)',
+                      borderRadius: '12px',
+                      padding: '1.25rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '1rem',
+                      boxShadow: '0 12px 30px rgba(0,0,0,0.4)',
+                      border: '1px solid var(--border-color)'
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                        {selectedItem.item_type === 'movie'
+                          ? (language === 'es' ? 'Opciones de visualización' : 'Viewing options')
+                          : selectedItem.item_type === 'game'
+                          ? (language === 'es' ? 'Opciones de partida' : 'Play options')
+                          : ['book', 'comic', 'manga'].includes(selectedItem.item_type)
+                          ? (language === 'es' ? 'Opciones de lectura' : 'Reading options')
+                          : (language === 'es' ? 'Opciones de seguimiento' : 'Tracking options')
+                        }
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={() => setShowReconsumedModal(false)}
+                        style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '0.2rem' }}
+                      >
+                        <X size={18} />
+                      </button>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          setShowReconsumedModal(false);
+                          if (selectedItem.item_type === 'series' || selectedItem.item_type === 'anime') {
+                            await handleToggleAllEpisodes('mark_all');
+                          } else {
+                            await handleMarkConsumedAgain();
+                          }
+                        }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.65rem',
+                          padding: '0.75rem 1rem',
+                          borderRadius: '8px',
+                          background: 'var(--bg-tertiary)',
+                          border: '1px solid var(--border-color)',
+                          color: 'var(--text-primary)',
+                          fontWeight: 600,
+                          fontSize: '0.9rem',
+                          cursor: 'pointer',
+                          textAlign: 'left'
+                        }}
+                      >
+                        <RotateCcw size={16} style={{ flexShrink: 0, color: 'var(--accent-primary)' }} />
+                        <span>
+                          {selectedItem.item_type === 'movie' 
+                            ? (language === 'es' ? 'Volver a marcar como vista' : 'Mark as seen again')
+                            : selectedItem.item_type === 'game'
+                            ? (language === 'es' ? 'Volver a marcar como jugado' : 'Mark as played again')
+                            : ['book', 'comic', 'manga'].includes(selectedItem.item_type)
+                            ? (language === 'es' ? 'Volver a marcar como leído' : 'Mark as read again')
+                            : (language === 'es' ? 'Volver a marcar todo como visto' : 'Mark all as watched again')
+                          }
+                        </span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          setShowReconsumedModal(false);
+                          if (selectedItem.item_type === 'series' || selectedItem.item_type === 'anime') {
+                            await handleToggleAllEpisodes('remove');
+                          } else {
+                            await handleRemoveLatestConsumption();
+                          }
+                        }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.65rem',
+                          padding: '0.75rem 1rem',
+                          borderRadius: '8px',
+                          background: 'rgba(239, 68, 68, 0.08)',
+                          border: '1px solid rgba(239, 68, 68, 0.25)',
+                          color: '#ef4444',
+                          fontWeight: 600,
+                          fontSize: '0.9rem',
+                          cursor: 'pointer',
+                          textAlign: 'left'
+                        }}
+                      >
+                        <Trash2 size={16} style={{ flexShrink: 0 }} />
+                        <span>
+                          {language === 'es' ? 'Desmarcar última visualización' : 'Unmark latest completion'}
+                        </span>
+                      </button>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowReconsumedModal(false)}
+                      style={{
+                        padding: '0.55rem',
+                        borderRadius: '6px',
+                        background: 'transparent',
+                        border: 'none',
+                        color: 'var(--text-secondary)',
+                        fontSize: '0.85rem',
+                        cursor: 'pointer',
+                        fontWeight: 500
+                      }}
+                    >
+                      {language === 'es' ? 'Cancelar' : 'Cancel'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Floating Modal 2: Status Change Decision Dialog */}
+              {showStatusChangeModal && pendingStatusChange && (
+                <div
+                  style={{
+                    position: 'fixed',
+                    inset: 0,
+                    zIndex: 9999,
+                    background: 'rgba(0, 0, 0, 0.65)',
+                    backdropFilter: 'blur(4px)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '1rem'
+                  }}
+                  onClick={() => {
+                    setShowStatusChangeModal(false);
+                    setPendingStatusChange(null);
+                  }}
+                >
+                  <div
+                    className="glass-card"
+                    style={{
+                      width: '100%',
+                      maxWidth: '420px',
+                      background: 'var(--bg-secondary)',
+                      borderRadius: '12px',
+                      padding: '1.25rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '1rem',
+                      boxShadow: '0 12px 30px rgba(0,0,0,0.4)',
+                      border: '1px solid var(--border-color)'
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div style={{ display: 'flex', gap: '0.65rem', alignItems: 'center' }}>
+                      <AlertCircle size={22} style={{ color: 'var(--accent-primary)', flexShrink: 0 }} />
+                      <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                        {language === 'es' ? 'Cambio de Estado' : 'Status Change'}
+                      </h3>
+                    </div>
+
+                    <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+                      {language === 'es'
+                        ? 'Esta obra ya tiene registros de finalización en tu historial. ¿Cómo deseas guardar este nuevo estado?'
+                        : 'This title has completion records in your history. How would you like to save this new status?'
+                      }
+                    </p>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                      <button
+                        type="button"
+                        onClick={() => applyStatusChangeWithHistory(true)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.65rem',
+                          padding: '0.75rem 1rem',
+                          borderRadius: '8px',
+                          background: 'var(--bg-tertiary)',
+                          border: '1px solid var(--border-color)',
+                          color: 'var(--text-primary)',
+                          fontWeight: 600,
+                          fontSize: '0.88rem',
+                          cursor: 'pointer',
+                          textAlign: 'left'
+                        }}
+                      >
+                        <RotateCcw size={16} style={{ flexShrink: 0, color: 'var(--accent-primary)' }} />
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                          <span>{language === 'es' ? 'Mantener historial anterior' : 'Keep previous history'}</span>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 400 }}>
+                            {language === 'es' ? 'Conserva las fechas pasadas y actualiza el estado' : 'Preserve past completion dates and update status'}
+                          </span>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => applyStatusChangeWithHistory(false)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.65rem',
+                          padding: '0.75rem 1rem',
+                          borderRadius: '8px',
+                          background: 'rgba(239, 68, 68, 0.08)',
+                          border: '1px solid rgba(239, 68, 68, 0.25)',
+                          color: '#ef4444',
+                          fontWeight: 600,
+                          fontSize: '0.88rem',
+                          cursor: 'pointer',
+                          textAlign: 'left'
+                        }}
+                      >
+                        <Trash2 size={16} style={{ flexShrink: 0 }} />
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                          <span>{language === 'es' ? 'Reemplazar última visualización' : 'Replace latest completion'}</span>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 400 }}>
+                            {language === 'es' ? 'Borra la última fecha de completado y cambia el estado' : 'Delete latest completion date and change status'}
+                          </span>
+                        </div>
+                      </button>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowStatusChangeModal(false);
+                        setPendingStatusChange(null);
+                      }}
+                      style={{
+                        padding: '0.55rem',
+                        borderRadius: '6px',
+                        background: 'transparent',
+                        border: 'none',
+                        color: 'var(--text-secondary)',
+                        fontSize: '0.85rem',
+                        cursor: 'pointer',
+                        fontWeight: 500
+                      }}
+                    >
+                      {language === 'es' ? 'Cancelar' : 'Cancel'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Floating Modal 3: Remove from Shelf Confirmation Dialog */}
+              {showRemoveShelfModal && (
+                <div
+                  style={{
+                    position: 'fixed',
+                    inset: 0,
+                    zIndex: 9999,
+                    background: 'rgba(0, 0, 0, 0.65)',
+                    backdropFilter: 'blur(4px)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '1rem'
+                  }}
+                  onClick={() => setShowRemoveShelfModal(false)}
+                >
+                  <div
+                    className="glass-card"
+                    style={{
+                      width: '100%',
+                      maxWidth: '380px',
+                      background: 'var(--bg-secondary)',
+                      borderRadius: '12px',
+                      padding: '1.25rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '1rem',
+                      boxShadow: '0 12px 30px rgba(0,0,0,0.4)',
+                      border: '1px solid var(--border-color)'
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                        {language === 'es' ? '¿Quitar de la estantería?' : 'Remove from shelf?'}
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={() => setShowRemoveShelfModal(false)}
+                        style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '0.2rem' }}
+                      >
+                        <X size={18} />
+                      </button>
+                    </div>
+
+                    <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+                      {language === 'es'
+                        ? 'La obra se removerá de tu biblioteca actual, pero tu historial de visualizaciones y estadísticas se mantendrán a salvo.'
+                        : 'The item will be removed from your active shelf, but your completion history and stats will remain safe.'
+                      }
+                    </p>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowRemoveShelfModal(false);
+                          handleRemoveFromShelf();
+                        }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '0.5rem',
+                          padding: '0.75rem 1rem',
+                          borderRadius: '8px',
+                          background: '#ef4444',
+                          border: 'none',
+                          color: '#ffffff',
+                          fontWeight: 600,
+                          fontSize: '0.9rem',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <Trash2 size={16} />
+                        <span>{language === 'es' ? 'Quitar de estantería' : 'Remove from shelf'}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setShowRemoveShelfModal(false)}
+                        style={{
+                          padding: '0.65rem 1rem',
+                          borderRadius: '8px',
+                          background: 'var(--bg-tertiary)',
+                          border: '1px solid var(--border-color)',
+                          color: 'var(--text-primary)',
+                          fontWeight: 600,
+                          fontSize: '0.88rem',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        {language === 'es' ? 'Cancelar' : 'Cancel'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         );
