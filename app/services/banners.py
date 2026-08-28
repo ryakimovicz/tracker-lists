@@ -142,8 +142,10 @@ class BannerService:
         graphql_banner = """
         query ($search: String) {
           Page(page: 1, perPage: 15) {
-            media(search: $search, sort: POPULARITY_DESC) {
+            media(search: $search, sort: POPULARITY_DESC, isAdult: false) {
               type
+              isAdult
+              genres
               title { english romaji }
               bannerImage
             }
@@ -163,6 +165,8 @@ class BannerService:
                     if resp.status == 200:
                         data = json.loads(resp.read().decode())
                         for m in data.get("data", {}).get("Page", {}).get("media", []):
+                            if m.get("isAdult") or "Hentai" in m.get("genres", []) or "Ecchi" in m.get("genres", []):
+                                continue
                             b_url = m.get("bannerImage")
                             m_type = (m.get("type") or "ANIME").lower()
                             cat = "manga" if m_type == "manga" else "anime"

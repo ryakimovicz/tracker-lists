@@ -133,8 +133,10 @@ class CharacterService:
         graphql_media_query = """
         query ($search: String) {
           Page(page: 1, perPage: 3) {
-            media(search: $search, sort: POPULARITY_DESC) {
+            media(search: $search, sort: POPULARITY_DESC, isAdult: false) {
               id
+              isAdult
+              genres
               title {
                 english
                 romaji
