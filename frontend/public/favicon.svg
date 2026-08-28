@@ -1,18 +1,16 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%" fill="none">
-  <!-- Fondo Dark Charcoal de Pathd -->
-  <rect width="200" height="200" rx="44" fill="#090d16" />
+  <!-- Fondo Dark Charcoal de Pathd (#090d16) -->
+  <rect width="200" height="200" rx="46" fill="#090d16" />
 
-  <g transform="translate(10, 0)">
-    <!-- Tallo: Ámbar Solar (Identidad Pathd) -->
-    <rect x="40" y="40" width="22" height="120" rx="11" fill="#f59e0b" />
+  <!-- Tallo: Ámbar Solar (Identidad Pathd) -->
+  <rect x="24" y="24" width="28" height="152" rx="14" fill="#f59e0b" />
 
-    <!-- Barra Superior: Películas (#4ADE80) -->
-    <rect x="70" y="40" width="70" height="22" rx="11" fill="#4ade80" />
+  <!-- Barra Superior: Películas (#4ADE80) -->
+  <rect x="64" y="24" width="86" height="28" rx="14" fill="#4ade80" />
 
-    <!-- Barra Media: Manga / Lectura (#60A5FA) -->
-    <rect x="70" y="74" width="85" height="22" rx="11" fill="#60a5fa" />
+  <!-- Barra Media (Punto más ancho): Manga / Lectura (#60A5FA) -->
+  <rect x="64" y="66" width="112" height="28" rx="14" fill="#60a5fa" />
 
-    <!-- Barra Inferior: Videojuegos (#C084FC) -->
-    <rect x="70" y="108" width="55" height="22" rx="11" fill="#c084fc" />
-  </g>
+  <!-- Barra Inferior: Videojuegos (#C084FC) -->
+  <rect x="64" y="108" width="72" height="28" rx="14" fill="#c084fc" />
 </svg>

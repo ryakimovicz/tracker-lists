@@ -1,27 +1,16 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%" fill="none">
   <!-- Fondo Dark Charcoal de Pathd (#090d16) -->
-  <rect width="200" height="200" rx="44" fill="#090d16" />
+  <rect width="200" height="200" rx="46" fill="#090d16" />
 
-  <g transform="translate(6, 0)">
-    <!-- Tallo 1: Marca Pathd / Libros (#f59e0b) -->
-    <rect x="36" y="36" width="11" height="128" rx="5.5" fill="#f59e0b" />
+  <!-- Tallo: Ámbar Solar (Identidad Pathd) -->
+  <rect x="24" y="24" width="28" height="152" rx="14" fill="#f59e0b" />
 
-    <!-- Tallo 2: Videojuegos (#C084FC) -->
-    <rect x="52" y="36" width="11" height="128" rx="5.5" fill="#c084fc" />
+  <!-- Barra Superior: Películas (#4ADE80) -->
+  <rect x="64" y="24" width="86" height="28" rx="14" fill="#4ade80" />
 
-    <!-- Barra 1: Películas (#4ADE80) -->
-    <rect x="68" y="36" width="56" height="11" rx="5.5" fill="#4ade80" />
+  <!-- Barra Media: Manga / Lectura (#60A5FA) -->
+  <rect x="64" y="66" width="112" height="28" rx="14" fill="#60a5fa" />
 
-    <!-- Barra 2: Series (#FDE047) -->
-    <rect x="68" y="52" width="78" height="11" rx="5.5" fill="#fde047" />
-
-    <!-- Barra 3: Anime (#FB923C) -->
-    <rect x="68" y="68" width="88" height="11" rx="5.5" fill="#fb923c" />
-
-    <!-- Barra 4: Cómics (#F87171) -->
-    <rect x="68" y="84" width="78" height="11" rx="5.5" fill="#f87171" />
-
-    <!-- Barra 5: Manga (#60A5FA) -->
-    <rect x="68" y="100" width="52" height="11" rx="5.5" fill="#60a5fa" />
-  </g>
+  <!-- Barra Inferior: Videojuegos (#C084FC) -->
+  <rect x="64" y="108" width="72" height="28" rx="14" fill="#c084fc" />
 </svg>
