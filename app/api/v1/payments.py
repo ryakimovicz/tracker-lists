@@ -58,8 +58,7 @@ async def create_checkout_session(
                 "quantity": 1
             }],
             customer={
-                "email": current_user.email,
-                "name": current_user.username
+                "email": current_user.email
             },
             metadata={
                 "user_id": str(current_user.id),
