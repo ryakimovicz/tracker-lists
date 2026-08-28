@@ -1723,77 +1723,78 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                     </div>
                   )}
 
-                  {/* Button ⋮ (Vertical 3 dots menu) */}
+                  {/* Favorite button for Series/Anime or 3-dots for other items */}
                   {user && selectedItem?.id && !isEpisode && (
-                    <div style={{ position: 'relative' }}>
+                    (selectedItem?.item_type === 'series' || selectedItem?.item_type === 'anime') ? (
                       <button
                         type="button"
-                        onClick={() => setShowMenu(!showMenu)}
+                        onClick={() => onToggleFavorite && onToggleFavorite(selectedItem.id, isFavorite)}
                         className="btn-secondary"
-                        title={language === 'es' ? 'Más opciones' : 'More options'}
+                        title={isFavorite
+                          ? (language === 'es' ? 'Quitar Destacado' : 'Remove Featured')
+                          : (language === 'es' ? 'Destacar (Favorito)' : 'Feature (Favorite)')
+                        }
                         style={{
-                          padding: '0.4rem',
+                          padding: '0.45rem',
                           borderRadius: '50%',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          cursor: 'pointer'
+                          cursor: 'pointer',
+                          color: isFavorite ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                          border: isFavorite ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)',
+                          background: isFavorite ? 'rgba(124, 58, 237, 0.1)' : 'transparent',
+                          transition: 'all 0.2s ease'
                         }}
                       >
-                        <MoreVertical size={18} />
+                        <Heart size={18} fill={isFavorite ? 'var(--accent-primary)' : 'none'} />
                       </button>
-
-                      {showMenu && (
-                        <div
-                          className="glass-card"
+                    ) : (
+                      <div style={{ position: 'relative' }}>
+                        <button
+                          type="button"
+                          onClick={() => setShowMenu(!showMenu)}
+                          className="btn-secondary"
+                          title={language === 'es' ? 'Más opciones' : 'More options'}
                           style={{
-                            position: 'absolute',
-                            top: '100%',
-                            right: 0,
-                            marginTop: '0.5rem',
-                            zIndex: 3000,
-                            padding: '0.5rem',
+                            padding: '0.4rem',
+                            borderRadius: '50%',
                             display: 'flex',
-                            flexDirection: 'column',
-                            gap: '0.4rem',
-                            minWidth: '170px',
-                            boxShadow: '0 10px 25px rgba(0,0,0,0.5)'
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer'
                           }}
                         >
-                          <button
-                            type="button"
-                            onClick={() => {
-                                onToggleFavorite && onToggleFavorite(selectedItem.id, isFavorite);
-                                setShowMenu(false);
-                            }}
+                          <MoreVertical size={18} />
+                        </button>
+
+                        {showMenu && (
+                          <div
+                            className="glass-card"
                             style={{
-                              background: 'transparent',
-                              border: 'none',
-                              color: isFavorite ? 'var(--accent-primary)' : 'var(--text-primary)',
-                              textAlign: 'left',
-                              padding: '0.4rem 0.6rem',
-                              cursor: 'pointer',
-                              fontSize: '0.85rem',
-                              borderRadius: '4px',
+                              position: 'absolute',
+                              top: '100%',
+                              right: 0,
+                              marginTop: '0.5rem',
+                              zIndex: 3000,
+                              padding: '0.5rem',
                               display: 'flex',
-                              alignItems: 'center',
-                              gap: '0.4rem'
+                              flexDirection: 'column',
+                              gap: '0.4rem',
+                              minWidth: '170px',
+                              boxShadow: '0 10px 25px rgba(0,0,0,0.5)'
                             }}
                           >
-                            <Heart size={14} fill={isFavorite ? 'var(--accent-primary)' : 'none'} />
-                            {isFavorite
-                              ? (language === 'es' ? 'Quitar Destacado' : 'Remove Featured')
-                              : (language === 'es' ? 'Destacar (Favorito)' : 'Feature (Favorite)')
-                            }
-                          </button>
-                          {selectedItem?.item_type !== 'movie' && (
                             <button
                               type="button"
-                              onClick={handleMarkDropped}
+                              onClick={() => {
+                                  onToggleFavorite && onToggleFavorite(selectedItem.id, isFavorite);
+                                  setShowMenu(false);
+                              }}
                               style={{
                                 background: 'transparent',
                                 border: 'none',
-                                color: selectedItem?.status === 'dropped' ? '#3b82f6' : '#f59e0b',
+                                color: isFavorite ? 'var(--accent-primary)' : 'var(--text-primary)',
                                 textAlign: 'left',
                                 padding: '0.4rem 0.6rem',
                                 cursor: 'pointer',
@@ -1804,42 +1805,67 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                 gap: '0.4rem'
                               }}
                             >
-                              {selectedItem?.status === 'dropped' ? (
-                                selectedItem?.item_type === 'game' 
-                                  ? (language === 'es' ? '▶️ Seguir jugando' : '▶️ Resume playing')
-                                  : ['book', 'comic', 'manga'].includes(selectedItem?.item_type)
-                                  ? (language === 'es' ? '▶️ Seguir leyendo' : '▶️ Resume reading')
-                                  : (language === 'es' ? '▶️ Seguir viendo' : '▶️ Resume watching')
-                              ) : (
-                                `🚫 ${language === 'es' ? 'Marcar como abandonado' : 'Mark as dropped'}`
-                              )}
+                              <Heart size={14} fill={isFavorite ? 'var(--accent-primary)' : 'none'} />
+                              {isFavorite
+                                ? (language === 'es' ? 'Quitar Destacado' : 'Remove Featured')
+                                : (language === 'es' ? 'Destacar (Favorito)' : 'Feature (Favorite)')
+                              }
                             </button>
-                          )}
-                          {selectedItem?.id && (
-                            <button
-                              type="button"
-                              onClick={handleRemoveFromShelf}
-                              style={{
-                                background: 'transparent',
-                                border: 'none',
-                                color: '#ef4444',
-                                textAlign: 'left',
-                                padding: '0.4rem 0.6rem',
-                                cursor: 'pointer',
-                                fontSize: '0.85rem',
-                                borderRadius: '4px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '0.4rem'
-                              }}
-                            >
-                              <Trash2 size={14} />
-                              {language === 'es' ? 'Quitar de estantería' : 'Remove from shelf'}
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
+                            {selectedItem?.item_type !== 'movie' && (
+                              <button
+                                type="button"
+                                onClick={handleMarkDropped}
+                                style={{
+                                  background: 'transparent',
+                                  border: 'none',
+                                  color: selectedItem?.status === 'dropped' ? '#3b82f6' : '#f59e0b',
+                                  textAlign: 'left',
+                                  padding: '0.4rem 0.6rem',
+                                  cursor: 'pointer',
+                                  fontSize: '0.85rem',
+                                  borderRadius: '4px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '0.4rem'
+                                }}
+                              >
+                                {selectedItem?.status === 'dropped' ? (
+                                  selectedItem?.item_type === 'game' 
+                                    ? (language === 'es' ? '▶️ Seguir jugando' : '▶️ Resume playing')
+                                    : ['book', 'comic', 'manga'].includes(selectedItem?.item_type)
+                                    ? (language === 'es' ? '▶️ Seguir leyendo' : '▶️ Resume reading')
+                                    : (language === 'es' ? '▶️ Seguir viendo' : '▶️ Resume watching')
+                                ) : (
+                                  `🚫 ${language === 'es' ? 'Marcar como abandonado' : 'Mark as dropped'}`
+                                )}
+                              </button>
+                            )}
+                            {selectedItem?.id && (
+                              <button
+                                type="button"
+                                onClick={handleRemoveFromShelf}
+                                style={{
+                                  background: 'transparent',
+                                  border: 'none',
+                                  color: '#ef4444',
+                                  textAlign: 'left',
+                                  padding: '0.4rem 0.6rem',
+                                  cursor: 'pointer',
+                                  fontSize: '0.85rem',
+                                  borderRadius: '4px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '0.4rem'
+                                }}
+                              >
+                                <Trash2 size={14} />
+                                {language === 'es' ? 'Quitar de estantería' : 'Remove from shelf'}
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )
                   )}
 
                   <button
