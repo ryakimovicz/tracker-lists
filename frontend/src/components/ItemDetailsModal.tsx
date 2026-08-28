@@ -251,6 +251,59 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     }
   };
 
+  const handleToggleAllEpisodes = async () => {
+    if (!selectedItem) return;
+    let effectiveListId = selectedItem.tracking_list_id;
+    if (!effectiveListId) {
+      const tracked = await ensureTracked('watching');
+      if (!tracked) return;
+      effectiveListId = tracked.tracking_list_id || tracked;
+    }
+
+    const isAllCompleted = selectedItem.status === 'completed';
+    const targetCompleted = !isAllCompleted;
+
+    const cacheKeyAll = `${selectedItem.external_id}_all_episodes`;
+    let cachedAll = getCachedSeries(cacheKeyAll);
+
+    // Optimistically update global progress
+    if (cachedAll && Array.isArray(cachedAll)) {
+      const newProg: Record<string, boolean> = {};
+      cachedAll.forEach((ep: any) => {
+        newProg[`tvm-ep-${ep.id}`] = targetCompleted;
+      });
+      setGlobalProgress(prev => ({ ...prev, ...newProg }));
+    }
+
+    try {
+      const res = await apiClient.post(`/lists/${effectiveListId}/bulk-toggle-all-seasons`, {
+        episodes: cachedAll || null,
+        completed: targetCompleted
+      });
+
+      const listRes = await apiClient.get(`/lists/${effectiveListId}`);
+      const updatedList = listRes.data.items || [];
+      setEpisodes(updatedList);
+
+      const extIds = updatedList.map((x: any) => x.external_id).filter(Boolean);
+      if (extIds.length > 0) {
+        const progRes = await apiClient.post('/users/me/progress/bulk-check', { external_ids: extIds });
+        setGlobalProgress(prev => ({ ...prev, ...progRes.data }));
+      }
+
+      const nextStatus = targetCompleted ? 'completed' : 'plan_to_watch';
+      setSelectedItem((prev: any) => prev ? {
+        ...prev,
+        status: nextStatus,
+        completed_at: targetCompleted ? new Date().toISOString() : null
+      } : null);
+
+      onUpdate && onUpdate();
+    } catch (err) {
+      console.error("Bulk toggle all seasons failed", err);
+    }
+  };
+
   const handleMarkDropped = async () => {
     if (!selectedItem) return;
     setShowMenu(false);
@@ -2406,7 +2459,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
 
                   {/* Completion / Status Buttons */}
-                  {user && !isEpisode && selectedItem?.item_type !== 'series' && selectedItem?.item_type !== 'anime' && (
+                  {user && !isEpisode && (
                     <div style={{ marginTop: '0.75rem' }}>
                       {selectedItem?.item_type === 'game' ? (
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem' }}>
@@ -2476,6 +2529,45 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                               cursor: 'pointer',
                               color: selectedItem?.status === 'dropped' ? '#ffffff' : 'var(--text-primary)',
                               fontSize: '0.75rem',
+                              fontWeight: 600,
+                              transition: 'all 0.2s ease'
+                            }}
+                          >
+                            {language === 'es' ? 'Abandonado' : 'Dropped'}
+                          </button>
+                        </div>
+                      ) : (selectedItem?.item_type === 'series' || selectedItem?.item_type === 'anime') ? (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem' }}>
+                          <button
+                            type="button"
+                            onClick={handleToggleAllEpisodes}
+                            style={{
+                              background: selectedItem?.status === 'completed' ? `var(--color-${selectedItem.item_type || 'series'})` : 'var(--bg-tertiary)',
+                              border: selectedItem?.status === 'completed' ? 'none' : '1px solid var(--border-color)',
+                              borderRadius: '8px',
+                              padding: '0.5rem',
+                              textAlign: 'center',
+                              cursor: 'pointer',
+                              color: selectedItem?.status === 'completed' ? '#ffffff' : 'var(--text-primary)',
+                              fontSize: '0.85rem',
+                              fontWeight: 600,
+                              transition: 'all 0.2s ease'
+                            }}
+                          >
+                            {language === 'es' ? 'Todo visto' : 'All watched'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleStatus('dropped')}
+                            style={{
+                              background: selectedItem?.status === 'dropped' ? '#ef4444' : 'var(--bg-tertiary)',
+                              border: selectedItem?.status === 'dropped' ? 'none' : '1px solid var(--border-color)',
+                              borderRadius: '8px',
+                              padding: '0.5rem',
+                              textAlign: 'center',
+                              cursor: 'pointer',
+                              color: selectedItem?.status === 'dropped' ? '#ffffff' : 'var(--text-primary)',
+                              fontSize: '0.85rem',
                               fontWeight: 600,
                               transition: 'all 0.2s ease'
                             }}

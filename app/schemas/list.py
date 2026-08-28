@@ -117,3 +117,7 @@ class BulkToggleSeasonRequest(BaseModel):
     episodes: Optional[List[dict]] = None
     completed: bool
 
+class BulkToggleAllSeasonsRequest(BaseModel):
+    episodes: Optional[List[dict]] = None
+    completed: bool
+

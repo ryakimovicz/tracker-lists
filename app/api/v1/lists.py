@@ -31,7 +31,8 @@ from app.schemas.list import (
     SectionBulkActionRequest,
     BulkToggleRequest,
     ToggleSeriesEpisodeRequest,
-    BulkToggleSeasonRequest
+    BulkToggleSeasonRequest,
+    BulkToggleAllSeasonsRequest
 )
 
 router = APIRouter()
@@ -1868,6 +1869,124 @@ def bulk_toggle_season(
         background_tasks.add_task(check_series_completion, current_user.id, list_id, lib_item.id, lib_item.external_id)
 
     return {"message": "Season progress toggled successfully"}
+
+
+@router.post("/{list_id}/bulk-toggle-all-seasons", status_code=status.HTTP_200_OK)
+def bulk_toggle_all_seasons(
+    list_id: int,
+    req: BulkToggleAllSeasonsRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    reading_list = db.query(ReadingList).filter(ReadingList.id == list_id).first()
+    if not reading_list:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="List not found")
+    
+    has_access = (reading_list.creator_id == current_user.id or getattr(current_user, 'is_admin', False))
+    if not has_access:
+        tracking_lib_item = db.query(UserLibraryItem).filter(
+            UserLibraryItem.user_id == current_user.id,
+            UserLibraryItem.tracking_list_id == list_id
+        ).first()
+        if tracking_lib_item:
+            has_access = True
+            if reading_list.creator_id != current_user.id:
+                reading_list.creator_id = current_user.id
+                db.commit()
+                
+    if not has_access:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+
+    lib_item = db.query(UserLibraryItem).filter(
+        UserLibraryItem.user_id == current_user.id,
+        UserLibraryItem.tracking_list_id == list_id
+    ).first()
+    
+    series_title = lib_item.title if lib_item else "Series"
+    
+    # Resolve all episodes list (fetch directly if not supplied)
+    episodes_list = req.episodes
+    if not episodes_list:
+        if lib_item and lib_item.external_id:
+            try:
+                clean_id = lib_item.external_id
+                if clean_id.startswith('tvm_'):
+                    clean_id = clean_id.replace('tvm_', '')
+                series_id = int(clean_id)
+                episodes_list = TVMazeService.get_all_series_episodes(series_id) or []
+            except Exception as e:
+                print(f"Failed to fetch all episodes for bulk toggle in backend: {e}")
+                episodes_list = []
+        else:
+            episodes_list = []
+
+    # Get initial item count to increment index in memory
+    item_count = db.query(ListItem).filter(ListItem.list_id == list_id).count()
+
+    for ep in episodes_list:
+        ext_id = f"tvm-ep-{ep.get('id')}"
+        item = db.query(ListItem).filter(
+            ListItem.list_id == list_id,
+            ListItem.external_id == ext_id
+        ).first()
+        
+        season_num = ep.get('season_number', 1)
+        ep_num = ep.get('episode_number', 1)
+        
+        if not item:
+            item_count += 1
+            item = ListItem(
+                list_id=list_id,
+                order_index=item_count,
+                item_type=ItemTypeEnum.SERIES,
+                external_id=ext_id,
+                title=f"{series_title} - S{season_num:02d}E{ep_num:02d} - {ep.get('name', 'Untitled')}",
+                image_url=ep.get('still_path') if ep.get('still_path') else None,
+                custom_notes=json.dumps({"description": ep.get('overview') or "", "release_date": ep.get('air_date') or None}),
+                section=f"Season {season_num}"
+            )
+            db.add(item)
+            db.flush()
+            
+        progress = db.query(ItemProgress).filter(
+            ItemProgress.user_id == current_user.id,
+            ItemProgress.external_id == ext_id
+        ).first()
+        
+        if progress:
+            progress.is_completed = req.completed
+            progress.completed_at = datetime.now(timezone.utc) if req.completed else None
+        else:
+            progress = ItemProgress(
+                user_id=current_user.id,
+                item_type=ItemTypeEnum.SERIES,
+                external_id=ext_id,
+                list_item_id=item.id,
+                is_completed=req.completed,
+                is_skipped=False,
+                completed_at=datetime.now(timezone.utc) if req.completed else None
+            )
+            db.add(progress)
+            
+    if lib_item:
+        if req.completed:
+            lib_item.status = UserLibraryStatusEnum.COMPLETED
+            lib_item.completed_at = datetime.now(timezone.utc)
+            # Set last seen episode to the last episode in list
+            last_ep = db.query(ListItem).filter(
+                ListItem.list_id == list_id
+            ).order_by(ListItem.id.desc()).first()
+            if last_ep:
+                lib_item.last_seen_episode = last_ep.title
+        else:
+            lib_item.status = UserLibraryStatusEnum.PLAN_TO_WATCH
+            lib_item.completed_at = None
+            lib_item.last_seen_episode = None
+        lib_item.updated_at = datetime.now(timezone.utc)
+
+    db.commit()
+    return {"message": "All seasons progress toggled successfully", "status": lib_item.status if lib_item else "completed"}
+
 
 
 
