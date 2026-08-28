@@ -149,6 +149,15 @@ class OMDbService:
         return result
 
     @classmethod
+    def get_movie_detail(cls, external_id: str) -> Optional[SearchResultItem]:
+        if not external_id:
+            return None
+        imdb_id = external_id.replace("omdb_", "").strip()
+        if not imdb_id or not cls.API_KEY:
+            return None
+        return cls._fetch_movie_details({"imdbID": imdb_id})
+
+    @classmethod
     def search_movies(cls, query: str) -> List[SearchResultItem]:
         if not query or not cls.API_KEY:
             return []

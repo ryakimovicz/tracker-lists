@@ -708,36 +708,64 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
         const isWikiItem = item.external_id && item.external_id.startsWith('wiki_');
 
         if (hasPlaceholderPoster || isWikiItem || !item.description) {
-          apiClient.get(`/search/?q=${encodeURIComponent(item.title)}&type=movie`)
-            .then(movieSearchRes => {
-              const matches = movieSearchRes.data || [];
-              if (matches.length > 0) {
-                const found = matches[0];
-                const validNewPoster = found.image_url && !found.image_url.includes('photo-1489599849927') && !found.image_url.includes('photo-1543002588');
-                if (validNewPoster || found.description) {
-                  setSelectedItem((prev: any) => prev ? {
-                    ...prev,
-                    image_url: validNewPoster ? found.image_url : prev.image_url,
-                    description: found.description || prev.description,
-                    release_date: found.release_date || prev.release_date,
-                    external_id: found.external_id || prev.external_id
-                  } : null);
+          if (item.external_id && item.external_id.startsWith('omdb_')) {
+            apiClient.get(`/search/movies/${item.external_id}`)
+              .then(res => {
+                const found = res.data;
+                if (found) {
+                  const validNewPoster = found.image_url && !found.image_url.includes('photo-1489599849927') && !found.image_url.includes('photo-1543002588');
+                  if (validNewPoster || found.description) {
+                    setSelectedItem((prev: any) => prev ? {
+                      ...prev,
+                      image_url: validNewPoster ? found.image_url : prev.image_url,
+                      description: found.description || prev.description,
+                      release_date: found.release_date || prev.release_date
+                    } : null);
 
-                  // If this item was in the user library, sync it permanently
-                  if (item.id && validNewPoster) {
-                    apiClient.put(`/library/${item.id}`, {
-                      image_url: found.image_url,
-                      description: found.description || item.description,
-                      release_date: found.release_date || item.release_date,
-                      external_id: found.external_id || item.external_id
-                    }).then(() => {
-                      onUpdate && onUpdate();
-                    }).catch(console.error);
+                    if (item.id && validNewPoster) {
+                      apiClient.put(`/library/${item.id}`, {
+                        image_url: found.image_url,
+                        description: found.description || item.description,
+                        release_date: found.release_date || item.release_date
+                      }).then(() => {
+                        onUpdate && onUpdate();
+                      }).catch(console.error);
+                    }
                   }
                 }
-              }
-            })
-            .catch(console.error);
+              })
+              .catch(console.error);
+          } else if (isWikiItem || hasPlaceholderPoster) {
+            apiClient.get(`/search/?q=${encodeURIComponent(item.title)}&type=movie`)
+              .then(movieSearchRes => {
+                const matches = movieSearchRes.data || [];
+                const found = matches.find((m: any) => m.external_id === item.external_id) || (isWikiItem ? matches[0] : null);
+                if (found) {
+                  const validNewPoster = found.image_url && !found.image_url.includes('photo-1489599849927') && !found.image_url.includes('photo-1543002588');
+                  if (validNewPoster || found.description) {
+                    setSelectedItem((prev: any) => prev ? {
+                      ...prev,
+                      image_url: validNewPoster ? found.image_url : prev.image_url,
+                      description: found.description || prev.description,
+                      release_date: found.release_date || prev.release_date,
+                      external_id: found.external_id || prev.external_id
+                    } : null);
+
+                    if (item.id && validNewPoster) {
+                      apiClient.put(`/library/${item.id}`, {
+                        image_url: found.image_url,
+                        description: found.description || item.description,
+                        release_date: found.release_date || item.release_date,
+                        external_id: found.external_id || item.external_id
+                      }).then(() => {
+                        onUpdate && onUpdate();
+                      }).catch(console.error);
+                    }
+                  }
+                }
+              })
+              .catch(console.error);
+          }
         }
       }
 
@@ -883,7 +911,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
           setIsLoadingMetadata(true);
           apiClient.get('/search/', { params: { q: item.title, type: item.item_type === 'anime' ? 'series' : item.item_type } })
             .then(searchRes => {
-              const match = searchRes.data.find((x: any) => x.external_id === item.external_id) || searchRes.data[0];
+              const match = searchRes.data.find((x: any) => x.external_id === item.external_id) || (!item.external_id ? searchRes.data[0] : null);
               if (match) {
                 const cachedVal = { description: match.description || '', release_date: match.release_date || null };
                 setCachedSeries(descCacheKey, cachedVal);

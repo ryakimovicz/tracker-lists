@@ -260,10 +260,23 @@ def get_series_detail(
             return detail
         return TVMazeService.get_series_detail(series_id)
     except Exception as e:
+@router.get("/movies/{movie_id}")
+def get_movie_detail(
+    movie_id: str
+):
+    try:
+        detail = OMDbService.get_movie_detail(movie_id)
+        if not detail:
+            raise HTTPException(status_code=404, detail="Movie not found")
+        return detail
+    except HTTPException:
+        raise
+    except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Failed to fetch series detail: {str(e)}"
+            detail=f"Failed to fetch movie detail: {str(e)}"
         )
+
 from datetime import datetime, timedelta, timezone
 from sqlalchemy import func
 import random
