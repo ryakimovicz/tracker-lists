@@ -16,6 +16,7 @@ class User(Base):
     reset_token = Column(String(250), nullable=True)
     reset_token_expires = Column(DateTime(timezone=True), nullable=True)
     refresh_token = Column(String(250), nullable=True)
+    auth_provider = Column(String(20), default="local", nullable=False)
 
     lastfm_username = Column(String(100), nullable=True)
     lastfm_session_key = Column(String(100), nullable=True)

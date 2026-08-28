@@ -125,6 +125,8 @@ export const Register: React.FC = () => {
       const backendDetail = err.response?.data?.detail;
       if (backendDetail === 'Username already registered') {
         setErrorMsg(t('errUsernameTaken'));
+      } else if (backendDetail === 'GOOGLE_ACCOUNT_EXISTS') {
+        setErrorMsg(t('errGoogleAccountExists'));
       } else if (backendDetail === 'Email already registered') {
         setErrorMsg(t('errEmailTaken'));
       } else {

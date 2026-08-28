@@ -77,6 +77,8 @@ export const Login: React.FC = () => {
     } catch (err: any) {
       if (err.response?.status === 403 && err.response?.data?.detail === 'EMAIL_NOT_VERIFIED') {
         setIsUnverified(true);
+      } else if (err.response?.data?.detail === 'ACCOUNT_USES_GOOGLE') {
+        setErrorMsg(t('errAccountUsesGoogle'));
       } else {
         setErrorMsg(t('errLoginFailed'));
       }

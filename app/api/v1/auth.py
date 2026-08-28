@@ -98,6 +98,11 @@ def register(
     ).first()
     if user_db:
         if user_db.email.lower() == user_in.email.strip().lower():
+            if getattr(user_db, "auth_provider", "local") == "google":
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="GOOGLE_ACCOUNT_EXISTS"
+                )
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Email already registered"
@@ -204,6 +209,11 @@ def login(
     ).first()
     
     if not user or not verify_password(form_data.password, user.hashed_password):
+        if user and getattr(user, "auth_provider", "local") == "google":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="ACCOUNT_USES_GOOGLE"
+            )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username/email or password",
@@ -381,7 +391,8 @@ def google_auth(
             username=chosen_username,
             email=email,
             hashed_password=get_password_hash(random_pwd),
-            is_verified=True
+            is_verified=True,
+            auth_provider="google"
         )
         db.add(user)
         db.commit()
@@ -455,6 +466,7 @@ def reset_password(
         )
         
     user.hashed_password = get_password_hash(payload.new_password)
+    user.auth_provider = "local"
     user.reset_token = None
     user.reset_token_expires = None
     user.refresh_token = None # Force re-login on all devices

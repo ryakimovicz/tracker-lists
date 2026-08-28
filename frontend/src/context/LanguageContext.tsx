@@ -80,6 +80,8 @@ const translations: Translations = {
   // Auth Errors & Alerts
   errUsernameTaken: { en: 'Username already registered', es: 'El nombre de usuario ya está registrado' },
   errEmailTaken: { en: 'Email already registered', es: 'El correo electrónico ya está registrado' },
+  errGoogleAccountExists: { en: 'This email is already registered with Google. Please use "Continue with Google" to log in.', es: 'Este correo ya está registrado con Google. Por favor usa "Continuar con Google" para iniciar sesión.' },
+  errAccountUsesGoogle: { en: 'This account was created with Google. Please click "Continue with Google" to log in, or use "Forgot password?" to set a password.', es: 'Esta cuenta fue creada con Google. Por favor pulsa "Continuar con Google" para entrar, o usa "¿Olvidaste tu contraseña?" para crear una.' },
   errRegistrationFailed: { en: 'Registration failed. Username or email might be already taken.', es: 'Error al registrarse. El nombre de usuario o correo podrían estar ya en uso.' },
   errLoginFailed: { en: 'Invalid username/email or password.', es: 'Usuario/correo o contraseña incorrectos.' },
   errPasswordLength: { en: 'Password must be at least 6 characters long.', es: 'La contraseña debe tener al menos 6 caracteres.' },
