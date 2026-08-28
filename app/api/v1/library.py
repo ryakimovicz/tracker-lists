@@ -189,6 +189,36 @@ def sync_show_episodes_and_get_last_seen(db: Session, user_id: int, tracking_lis
     completed_eps.sort(key=lambda x: (x[0], x[1]))
     return completed_eps[-1][2]
 
+@router.get("/{item_id}/consumption-history")
+def get_library_item_consumption_history(
+    item_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    from app.models.consumption import ConsumptionHistory
+    item = db.query(UserLibraryItem).filter(
+        UserLibraryItem.id == item_id,
+        UserLibraryItem.user_id == current_user.id
+    ).first()
+    
+    if not item:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Library item not found")
+        
+    history = db.query(ConsumptionHistory).filter(
+        ConsumptionHistory.user_id == current_user.id,
+        ConsumptionHistory.external_id == item.external_id
+    ).order_by(ConsumptionHistory.consumed_at.desc()).all()
+    
+    # Fallback if no history yet but completed_at exists
+    result_dates = [ch.consumed_at for ch in history]
+    if not result_dates and item.completed_at:
+        result_dates = [item.completed_at]
+        
+    return {
+        "count": len(result_dates),
+        "history": result_dates
+    }
+
 @router.post("/{item_id}/mark-consumed", response_model=LibraryItemResponse, status_code=status.HTTP_200_OK)
 def mark_library_item_consumed(
     item_id: int,
@@ -203,6 +233,20 @@ def mark_library_item_consumed(
     if not item:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Library item not found")
         
+    from app.models.consumption import ConsumptionHistory
+    
+    is_user_pro = bool(current_user.is_pro or current_user.is_vip or current_user.is_admin)
+    existing_count = db.query(ConsumptionHistory).filter(
+        ConsumptionHistory.user_id == current_user.id,
+        ConsumptionHistory.external_id == item.external_id
+    ).count()
+    
+    if not is_user_pro and existing_count >= 2:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Los usuarios gratuitos solo pueden registrar hasta 2 visualizaciones/lecturas. ¡Pásate a Premium para registros ilimitados e historial detallado!"
+        )
+        
     # Mark as completed (or read/played) and update date
     if item.item_type in ['book', 'comic', 'manga']:
         item.status = UserLibraryStatusEnum.READ
@@ -213,9 +257,6 @@ def mark_library_item_consumed(
         
     now_dt = datetime.now(timezone.utc)
     item.completed_at = now_dt
-    
-    # Import locally
-    from app.models.consumption import ConsumptionHistory
     
     ch = ConsumptionHistory(
         user_id=current_user.id,

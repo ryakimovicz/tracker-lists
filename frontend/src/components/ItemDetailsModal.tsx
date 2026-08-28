@@ -192,6 +192,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   const [openSeasonMenuId, setOpenSeasonMenuId] = useState<number | null>(null);
   const [showAllWatchedMenu, setShowAllWatchedMenu] = useState(false);
   const [showSingleWatchedMenu, setShowSingleWatchedMenu] = useState(false);
+  const [consumptionHistory, setConsumptionHistory] = useState<string[]>([]);
 
   const handleTranslateDescription = async (textToTranslate: string) => {
     if (!textToTranslate) return;
@@ -361,12 +362,28 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   const handleMarkConsumedAgain = async () => {
     if (!selectedItem || !selectedItem.id) return;
     setShowShelfMenu(false);
+    setShowSingleWatchedMenu(false);
     try {
       const res = await apiClient.post(`/library/${selectedItem.id}/mark-consumed`);
       setSelectedItem((prev: any) => prev ? { ...prev, ...res.data } : null);
+      
+      // Refresh history list
+      if (user?.is_pro) {
+        apiClient.get(`/library/${selectedItem.id}/consumption-history`)
+          .then(hRes => {
+            if (hRes.data && hRes.data.history) {
+              setConsumptionHistory(hRes.data.history);
+            }
+          })
+          .catch(console.error);
+      }
       onUpdate && onUpdate();
-    } catch (e) {
-      console.error(e);
+    } catch (e: any) {
+      if (e.response?.data?.detail) {
+        alert(e.response.data.detail);
+      } else {
+        console.error(e);
+      }
     }
   };
 
@@ -788,6 +805,19 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
         }
       } catch(e) {
         console.error(e);
+      }
+
+      // Fetch consumption history if user is Pro and item is in library
+      if (item.id && user?.is_pro) {
+        apiClient.get(`/library/${item.id}/consumption-history`)
+          .then(hRes => {
+            if (hRes.data && hRes.data.history) {
+              setConsumptionHistory(hRes.data.history);
+            }
+          })
+          .catch(console.error);
+      } else {
+        setConsumptionHistory([]);
       }
 
       const descCacheKey = `desc_${item.item_type}_${item.external_id}`;
@@ -2910,6 +2940,83 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                           </div>
                         </div>
                       )}
+                    </div>
+                  )}
+
+                  {/* PRO Consumption History (Visible for PRO users when re-consumed > 1) */}
+                  {user?.is_pro && consumptionHistory.length > 1 && (
+                    <div style={{
+                      marginTop: '0.85rem',
+                      padding: '0.65rem 0.85rem',
+                      background: 'rgba(124, 58, 237, 0.05)',
+                      border: '1px solid rgba(124, 58, 237, 0.2)',
+                      borderRadius: '8px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.4rem'
+                    }}>
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        fontSize: '0.78rem',
+                        fontWeight: 700,
+                        color: 'var(--accent-primary)',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                          <span>📅</span>
+                          <span>{language === 'es' ? 'Historial de Registros' : 'Consumption History'} ({consumptionHistory.length})</span>
+                        </div>
+                        <span style={{
+                          fontSize: '0.68rem',
+                          background: 'var(--accent-primary)',
+                          color: '#ffffff',
+                          padding: '0.15rem 0.4rem',
+                          borderRadius: '4px',
+                          fontWeight: 700
+                        }}>
+                          PRO
+                        </span>
+                      </div>
+                      <div style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.25rem',
+                        maxHeight: '110px',
+                        overflowY: 'auto',
+                        paddingRight: '0.25rem'
+                      }}>
+                        {consumptionHistory.map((dStr, idx) => {
+                          const dateObj = new Date(dStr);
+                          const dateFormatted = !isNaN(dateObj.getTime())
+                            ? dateObj.toLocaleDateString(language === 'es' ? 'es-ES' : 'en-US', {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })
+                            : dStr;
+                          return (
+                            <div key={idx} style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              fontSize: '0.78rem',
+                              color: 'var(--text-secondary)'
+                            }}>
+                              <span style={{ fontWeight: 500 }}>
+                                #{consumptionHistory.length - idx} {idx === 0 ? (language === 'es' ? '(Última vez)' : '(Latest)') : ''}
+                              </span>
+                              <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
+                                {dateFormatted}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
                 </div>
