@@ -59,12 +59,14 @@ Pathd cuenta con un sistema de roles y privilegios que personaliza la experienci
 
 ### 🌟 Pathd Gratuito (Free)
 - Seguimiento ilimitado de biblioteca personal en todas las categorías.
+- Registro de re-consumo (hasta 2 visualizaciones/lecturas/partidas por obra).
 - Hasta 7 obras destacadas en la estantería del perfil.
 - Creación de hasta 2 guías públicas activas.
 - Acceso a la comunidad, feed social, valoraciones y reseñas.
 
 ### 👑 Pathd Premium / VIP / Admin
 - **Experiencia 100% Libre de Publicidad (Ad-Free)**: Cero anuncios en todas las vistas de la aplicación.
+- **Re-consumo Ilimitado e Historial Detallado**: Registro ilimitado de visualizaciones/lecturas repetidas (*re-watch / re-read / re-play*) con panel cronológico de fechas.
 - **Personalización Completa del Perfil**: Subida de avatar, banner y fondo de pantalla personalizado, además de selección de color de acento propio.
 - **Hasta 70 Obras Destacadas**: Expansión del escaparate de favoritos en el perfil.
 - **Guías Privadas y No Listadas**: Creación de guías cronológicas secretas o accesibles solo mediante enlace directo.
@@ -207,7 +209,10 @@ Panel completo de gestión y moderación disponible exclusivamente para administ
 | POST | `/` | Añadir obra a la estantería personal |
 | GET | `/` | Obtener estantería del usuario autenticado |
 | PUT | `/{library_item_id}` | Actualizar estado, tiempo o páginas leídas de una obra |
-| DELETE | `/{library_item_id}` | Eliminar obra de la estantería |
+| DELETE | `/{library_item_id}` | Eliminar obra de la estantería preservando historial |
+| POST | `/{library_item_id}/mark-consumed` | Volver a marcar como visto/leído/jugado (Free max 2 / Premium ilimitado) |
+| GET | `/{library_item_id}/consumption-history` | Obtener historial cronológico de fechas de consumo |
+| DELETE | `/{library_item_id}/consumption-history/latest` | Desmarcar última visualización o volver al estado anterior |
 
 ### Social (`/api/v1/social`)
 | Método | Ruta | Descripción |
