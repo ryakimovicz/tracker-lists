@@ -265,7 +265,7 @@ class IGDBService:
             where id = {gid};'''
 
         # Query 2: Children/Members if this game is a bundle or has edition variants
-        body_children = f'''fields id, name, category, cover.image_id, first_release_date;
+        body_children = f'''fields id, name, category, cover.image_id, first_release_date, bundles, version_parent;
             where bundles = ({gid}) | version_parent = ({gid}); limit 50;'''
 
         relations = {
@@ -325,15 +325,21 @@ class IGDBService:
                     if not item or item["id"] == str(gid):
                         continue
                     cat = child.get("category", 0)
-                    # If this is an edition (GOTY, Special Edition, etc.)
-                    if cat in (8, 9, 10) or "version_parent" in child or "edition" in item["title"].lower():
+                    bundles_list = child.get("bundles", []) or []
+                    
+                    # If this item explicitly declares that it belongs to THIS bundle/collection:
+                    if gid in bundles_list or str(gid) in [str(x) for x in bundles_list]:
+                        if not any(b["id"] == item["id"] for b in relations["bundle_games"]):
+                            relations["bundle_games"].append(item)
+                    # If this is an alternative edition / version of the current game
+                    elif child.get("version_parent") == gid or cat in (8, 9, 10):
                         if not any(e["id"] == item["id"] for e in relations["editions"]):
                             relations["editions"].append(item)
                     # If this is a DLC or expansion
                     elif cat in (1, 2, 4, 13) or "dlc" in item["title"].lower() or "pack" in item["title"].lower():
                         if not any(d["id"] == item["id"] for d in relations["dlcs"]):
                             relations["dlcs"].append(item)
-                    # Otherwise it's a game in this bundle/collection
+                    # Otherwise fallback to bundle games
                     else:
                         if not any(b["id"] == item["id"] for b in relations["bundle_games"]):
                             relations["bundle_games"].append(item)
