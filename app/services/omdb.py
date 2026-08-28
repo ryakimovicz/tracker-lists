@@ -155,7 +155,24 @@ class OMDbService:
         imdb_id = external_id.replace("omdb_", "").strip()
         if not imdb_id or not cls.API_KEY:
             return None
-        return cls._fetch_movie_details({"imdbID": imdb_id})
+            
+        if imdb_id in cls._details_cache:
+            timestamp, cached_item = cls._details_cache[imdb_id]
+            if time.time() - timestamp < cls.CACHE_TTL_SECONDS:
+                return cached_item
+
+        url = f"http://www.omdbapi.com/?i={imdb_id}&plot=full&apikey={cls.API_KEY}"
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "TrackerLists/1.0"})
+            with urllib.request.urlopen(req, timeout=4) as res:
+                if res.status == 200:
+                    data = json.loads(res.read().decode())
+                    if data.get("Response") == "True":
+                        return cls._fetch_movie_details(data)
+        except Exception as e:
+            print(f"OMDb get_movie_detail error: {e}")
+            
+        return None
 
     @classmethod
     def search_movies(cls, query: str) -> List[SearchResultItem]:
