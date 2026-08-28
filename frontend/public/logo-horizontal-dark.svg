@@ -3,19 +3,19 @@
   <rect width="600" height="180" rx="24" fill="#090d16" />
 
   <!-- Isotipo P -->
-  <g transform="translate(16, 0)">
+  <g transform="translate(18, 0)">
     <!-- Tallo: Ámbar Solar -->
-    <rect x="24" y="24" width="26" height="132" rx="13" fill="#f59e0b" />
+    <rect x="24" y="24" width="28" height="132" rx="14" fill="#f59e0b" />
     <!-- Barra Superior: Películas -->
-    <rect x="62" y="24" width="70" height="26" rx="13" fill="#4ade80" />
+    <rect x="64" y="24" width="75" height="28" rx="14" fill="#4ade80" />
     <!-- Barra Media: Manga / Lectura -->
-    <rect x="62" y="59" width="95" height="26" rx="13" fill="#60a5fa" />
+    <rect x="64" y="60" width="98" height="28" rx="14" fill="#60a5fa" />
     <!-- Barra Inferior: Videojuegos -->
-    <rect x="62" y="94" width="60" height="26" rx="13" fill="#c084fc" />
+    <rect x="64" y="96" width="63" height="28" rx="14" fill="#c084fc" />
   </g>
 
   <!-- Tipografía Pathd -->
-  <text x="200" y="118" font-family="'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif" font-size="92" font-weight="800" letter-spacing="-2" fill="#f8fafc">
+  <text x="204" y="122" font-family="system-ui, -apple-system, 'Inter', 'Segoe UI', Roboto, sans-serif" font-size="94" font-weight="800" letter-spacing="-2" fill="#f8fafc">
     Path<tspan fill="#f59e0b">d</tspan>
   </text>
 </svg>
