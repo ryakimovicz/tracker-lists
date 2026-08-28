@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="100%" height="100%" fill="none">
-  <!-- Fondo Soft Slate Light -->
-  <rect width="500" height="500" rx="54" fill="#f1f5f9" stroke="#e2e8f0" stroke-width="2" />
+  <!-- Fondo Soft Slate Light Contenido -->
+  <rect x="2" y="2" width="496" height="496" rx="54" fill="#f1f5f9" />
 
   <!-- Isotipo P (Escala Uniforme Idéntica) -->
   <g transform="translate(85, 25) scale(1.65)">
@@ -11,7 +11,7 @@
   </g>
 
   <!-- Tipografía Pathd -->
-  <text x="250" y="415" text-anchor="middle" font-family="'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif" font-size="96" font-weight="800" letter-spacing="-2" fill="#0f172a">
+  <text x="250" y="415" text-anchor="middle" font-family="system-ui, -apple-system, 'Inter', 'Segoe UI', Roboto, sans-serif" font-size="96" font-weight="800" letter-spacing="-2" fill="#0f172a">
     Path<tspan fill="#f59e0b">d</tspan>
   </text>
 </svg>

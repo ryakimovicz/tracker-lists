@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%" fill="none">
-  <!-- Fondo Soft Slate Light (#f1f5f9) -->
-  <rect width="200" height="200" rx="46" fill="#f1f5f9" stroke="#e2e8f0" stroke-width="2" />
+  <!-- Fondo Soft Slate Light (#f1f5f9) Contenido -->
+  <rect x="1" y="1" width="198" height="198" rx="46" fill="#f1f5f9" />
 
   <!-- Tallo: Ámbar Solar (Identidad Pathd) -->
   <rect x="24" y="24" width="28" height="152" rx="14" fill="#f59e0b" />
