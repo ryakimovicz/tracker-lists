@@ -80,6 +80,11 @@ class AnilistService:
                         desc = item.get("description") or ""
                         import re
                         desc = re.sub('<[^<]+?>', '', desc)
+
+                        from app.core.sfw_filter import is_safe_media_item
+                        if not is_safe_media_item(title, desc):
+                            continue
+
                         results.append(
                             SearchResultItem(
                                 external_id=str(item.get("id")),

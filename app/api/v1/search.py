@@ -14,6 +14,7 @@ from app.services.googlebooks import GoogleBooksService
 from app.services.igdb import IGDBService
 from app.services.anilist import AnilistService
 from app.core.limiter import limiter
+from app.core.sfw_filter import is_safe_text, is_safe_media_item
 
 import re
 import concurrent.futures
@@ -44,6 +45,10 @@ def search_media(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_optional)
 ):
+    # Strict SFW query check
+    if not is_safe_text(q):
+        return []
+
     type_lower = type.lower()
     
     if type_lower not in ["comic", "book", "manga", "game", "movie", "anime", "series"]:
@@ -52,7 +57,10 @@ def search_media(
             detail="Invalid search type. Must be 'comic', 'book', 'manga', 'game', 'movie', 'anime' or 'series'."
         )
         
-    variations = get_query_variations(q)
+    variations = [v for v in get_query_variations(q) if is_safe_text(v)]
+    if not variations:
+        return []
+
     combined = []
     seen = set()
     
@@ -79,7 +87,7 @@ def search_media(
             try:
                 res = future.result()
                 for r in res:
-                    if r.external_id not in seen:
+                    if r.external_id not in seen and is_safe_media_item(r.title, r.description):
                         seen.add(r.external_id)
                         combined.append(r)
             except Exception as e:
@@ -437,12 +445,11 @@ def get_explore_recommendations(
             else:
                 results = []
                 
-                        # Agregamos los resultados asegurandonos de no duplicar
             existing_ids = set([str(i.external_id) for i in for_you])
             existing_titles = set([i.title.lower() for i in for_you])
             added_count = 0
             for res in results:
-                if str(res.external_id) not in existing_ids and res.title.lower() not in existing_titles:
+                if str(res.external_id) not in existing_ids and res.title.lower() not in existing_titles and is_safe_media_item(res.title, res.description):
                     for_you.append(res)
                     existing_ids.add(str(res.external_id))
                     existing_titles.add(res.title.lower())
@@ -452,16 +459,15 @@ def get_explore_recommendations(
         except Exception as e:
             print(f"Error en fallback de recomendaciones: {e}")
             
-    # Si sigue estando muy vacío, le sumamos las tendencias
     if len(for_you) < 5:
         for t in trending:
-            for_you.append(t)
+            if is_safe_media_item(t.title, t.description):
+                for_you.append(t)
             
-    # De-duplicar "Para ti"
     seen = set()
     final_for_you = []
     for item in for_you:
-        if item.external_id not in seen:
+        if item.external_id not in seen and is_safe_media_item(item.title, item.description):
             seen.add(item.external_id)
             final_for_you.append(item)
 
@@ -470,7 +476,6 @@ def get_explore_recommendations(
         trending=trending,
         featured_guides=featured_guides
     )
-
 
 class ExploreTabsResponse(BaseModel):
     agregado: List[SearchResultItem]
@@ -486,7 +491,6 @@ def get_explore_tabs(
 ):
     agregado = []
     nuevo = []
-    descubrir = []
     
     # 1. Agregado (UserLibraryItem filtered)
     if current_user:
@@ -494,7 +498,7 @@ def get_explore_tabs(
             UserLibraryItem.user_id == current_user.id
         ).order_by(UserLibraryItem.id.desc()).all()
         for item in user_items:
-            if not item.external_id.startswith("tvm-ep-"):
+            if not item.external_id.startswith("tvm-ep-") and is_safe_media_item(item.title):
                 agregado.append(SearchResultItem(
                     external_id=item.external_id,
                     title=item.title,
@@ -504,35 +508,34 @@ def get_explore_tabs(
                 ))
     
     # 2. Nuevo (APIs)
-    # We will run this concurrently
     import concurrent.futures
     
     def fetch_new_tv():
-        try: return TVMazeService.get_new_shows()
+        try: return [x for x in TVMazeService.get_new_shows() if is_safe_media_item(x.title, x.description)]
         except: return []
 
     def fetch_new_anime():
-        try: return TVMazeService.get_new_anime()
+        try: return [x for x in TVMazeService.get_new_anime() if is_safe_media_item(x.title, x.description)]
         except: return []
         
     def fetch_new_manga():
-        try: return AnilistService.get_new_manga()
+        try: return [x for x in AnilistService.get_new_manga() if is_safe_media_item(x.title, x.description)]
         except: return []
 
     def fetch_new_games():
-        try: return IGDBService.get_new_games()
+        try: return [x for x in IGDBService.get_new_games() if is_safe_media_item(x.title, x.description)]
         except: return []
 
     def fetch_new_movies():
-        try: return OMDbService.get_new_movies()
+        try: return [x for x in OMDbService.get_new_movies() if is_safe_media_item(x.title, x.description)]
         except: return []
 
     def fetch_new_books():
-        try: return GoogleBooksService.get_new_books()
+        try: return [x for x in GoogleBooksService.get_new_books() if is_safe_media_item(x.title, x.description)]
         except: return []
 
     def fetch_new_comics():
-        try: return ComicVineService.get_new_comics()
+        try: return [x for x in ComicVineService.get_new_comics() if is_safe_media_item(x.title, x.description)]
         except: return []
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=7) as executor:

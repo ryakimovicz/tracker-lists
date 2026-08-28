@@ -173,7 +173,9 @@ class OMDbService:
                     import concurrent.futures
                     with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
                         detailed_results = list(executor.map(cls._fetch_movie_details, search_items[:10]))
-                    results = detailed_results
+                    
+                    from app.core.sfw_filter import is_safe_media_item
+                    results = [m for m in detailed_results if is_safe_media_item(m.title, m.description)]
         except Exception as e:
             print(f"OMDb Search API Error: {e}")
 

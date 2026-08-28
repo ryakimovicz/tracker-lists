@@ -402,9 +402,17 @@ def search_characters(
     query: str = Query("", description="Search term for character name"),
     current_user: User = Depends(get_current_user)
 ):
+    from app.core.sfw_filter import is_safe_text
+    if not is_safe_text(query):
+        return []
     from app.services.characters import CharacterService
     results = CharacterService.search_all(query)
-    return results
+    clean_results = []
+    for c in results:
+        name = c.get("name") if isinstance(c, dict) else getattr(c, "name", "")
+        if is_safe_text(name):
+            clean_results.append(c)
+    return clean_results
 
 @router.put("/me/avatar", response_model=UserResponse)
 def update_avatar(
@@ -426,9 +434,17 @@ def search_banners(
     query: str = Query("", description="Search term for banner wallpaper"),
     current_user: User = Depends(get_current_user)
 ):
+    from app.core.sfw_filter import is_safe_text
+    if not is_safe_text(query):
+        return []
     from app.services.banners import BannerService
     results = BannerService.search_all(query)
-    return results
+    clean_results = []
+    for b in results:
+        title = b.get("title") if isinstance(b, dict) else getattr(b, "title", "")
+        if is_safe_text(title):
+            clean_results.append(b)
+    return clean_results
 
 @router.put("/me/banner", response_model=UserResponse)
 def update_banner(

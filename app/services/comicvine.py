@@ -5,6 +5,7 @@ import re
 from typing import List
 from app.core.config import settings
 from app.services.base import SearchResultItem
+from app.core.sfw_filter import is_safe_media_item
 
 class ComicVineService:
     @staticmethod
@@ -97,6 +98,11 @@ class ComicVineService:
                                         title_parts = f"{vol_name} #{issue_num}"
                                         if issue_name:
                                             title_parts += f" ({issue_name})"
+                                        desc = item.get("description") or ""
+
+                                        if not is_safe_media_item(title_parts, desc):
+                                            continue
+
                                         item_type_val = "comic"
 
                                         issue_results.append(
@@ -104,7 +110,7 @@ class ComicVineService:
                                                 external_id=str(item.get("id")),
                                                 title=title_parts,
                                                 image_url=image_url,
-                                                description=item.get("description") or "",
+                                                description=desc,
                                                 item_type=item_type_val,
                                                 release_date=item.get("cover_date") or (str(item.get("start_year")) if item.get("start_year") else None),
                                                 page_count=item.get("count_of_pages") or item.get("count_of_issues")
@@ -141,6 +147,11 @@ class ComicVineService:
                                 title = title_parts
                             else:
                                 title = item.get("name") or "Untitled Volume"
+
+                            desc = item.get("description") or ""
+                            if not is_safe_media_item(title, desc):
+                                continue
+
                             item_type_val = "comic"
 
                             global_results.append(
@@ -148,7 +159,7 @@ class ComicVineService:
                                     external_id=str(item.get("id")),
                                     title=title,
                                     image_url=image_url,
-                                    description=item.get("description") or "",
+                                    description=desc,
                                     item_type=item_type_val,
                                     release_date=item.get("cover_date") or (str(item.get("start_year")) if item.get("start_year") else None),
                                     page_count=item.get("count_of_pages") or item.get("count_of_issues")

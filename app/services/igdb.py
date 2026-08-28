@@ -158,10 +158,15 @@ class IGDBService:
                         themes = item.get("themes") or []
                         age_ratings = [ar.get("rating") for ar in item.get("age_ratings", []) if isinstance(ar, dict)]
                         is_mature_game = 42 in themes or 5 in age_ratings or 12 in age_ratings
+                        game_title = item.get("name") or "Untitled Game"
+
+                        from app.core.sfw_filter import is_safe_media_item
+                        if 42 in themes or not is_safe_media_item(game_title, desc):
+                            continue
 
                         # Determine game badge (Collection, DLC, Expansion, Edition, Remake, Remaster)
                         cat = item.get("category", 0)
-                        item_name_lower = (item.get("name") or "").lower()
+                        item_name_lower = game_title.lower()
                         has_parent = "parent_game" in item
                         is_real_bundle = any(re.search(rf"\b{kw}\b", item_name_lower) for kw in real_bundle_keywords)
                         is_dlc_like = (has_parent or cat in (1, 5, 14) or any(re.search(rf"\b{kw}\b", item_name_lower) for kw in dlc_keywords)) and not is_real_bundle
@@ -181,17 +186,16 @@ class IGDBService:
                         elif cat == 10 or "edition" in item_name_lower or "goty" in item_name_lower or "version" in item_name_lower:
                             badge = "edition"
 
-
                         results.append(
                             SearchResultItem(
                                 external_id=str(item.get("id")),
-                                title=item.get("name") or "Untitled Game",
+                                title=game_title,
                                 image_url=image_url,
                                 description=desc,
                                 item_type="game",
                                 release_date=release_date,
                                 popularity=pop_val,
-                                is_nsfw=is_mature_game,
+                                is_nsfw=False,
                                 badge=badge
                             )
                         )

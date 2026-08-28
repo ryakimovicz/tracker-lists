@@ -4,6 +4,7 @@ import urllib.parse
 from typing import List, Tuple, Set
 import concurrent.futures
 from app.services.base import SearchResultItem
+from app.core.sfw_filter import is_safe_media_item
 
 class GoogleBooksService:
     @staticmethod
@@ -34,6 +35,17 @@ class GoogleBooksService:
                     for item in data.get("items", []):
                         v_info = item.get("volumeInfo", {})
                         
+                        is_mature = (v_info.get("maturityRating") == "MATURE")
+                        title = v_info.get("title") or "Untitled Book"
+                        authors = v_info.get("authors", [])
+                        author_str = f"Author: {authors[0]}." if authors else ""
+                        pub_date = v_info.get("publishedDate") or ""
+                        pub_str = f" Published: {pub_date}." if pub_date else ""
+                        desc = v_info.get("description") or (author_str + pub_str)
+
+                        if is_mature or not is_safe_media_item(title, desc):
+                            continue
+
                         isbns = []
                         for ident in v_info.get("industryIdentifiers", []):
                             if ident.get("type") in ("ISBN_13", "ISBN_10"):
@@ -41,13 +53,6 @@ class GoogleBooksService:
                                 if val:
                                     isbns.append(val)
                                     
-                        title = v_info.get("title") or "Untitled Book"
-                        authors = v_info.get("authors", [])
-                        author_str = f"Author: {authors[0]}." if authors else ""
-                        pub_date = v_info.get("publishedDate") or ""
-                        pub_str = f" Published: {pub_date}." if pub_date else ""
-                        desc = v_info.get("description") or (author_str + pub_str)
-                        
                         img_links = v_info.get("imageLinks", {})
                         img_url = img_links.get("thumbnail") or img_links.get("smallThumbnail")
                         if img_url and img_url.startswith("http://"):
@@ -55,9 +60,6 @@ class GoogleBooksService:
                             
                         ext_id = f"googlebook-{item.get('id')}"
                         item_type = "book"
-                        is_mature = (v_info.get("maturityRating") == "MATURE")
-
-
 
                         search_item = SearchResultItem(
                             external_id=ext_id,
@@ -67,7 +69,7 @@ class GoogleBooksService:
                             item_type=item_type,
                             release_date=pub_date,
                             page_count=v_info.get("pageCount"),
-                            is_nsfw=is_mature
+                            is_nsfw=False
                         )
                         results.append((search_item, isbns))
                     return results
@@ -96,6 +98,16 @@ class GoogleBooksService:
                     data = json.loads(response.read().decode())
                     results = []
                     for item in data.get("docs", []):
+                        title = item.get("title") or "Untitled Book"
+                        author = item.get("author_name", ["Unknown Author"])[0]
+                        first_publish = item.get("first_publish_year")
+                        desc = f"Author: {author}."
+                        if first_publish:
+                            desc += f" First published in {first_publish}."
+                            
+                        if not is_safe_media_item(title, desc):
+                            continue
+
                         isbns = []
                         for isbn_raw in item.get("isbn", []):
                             val = isbn_raw.strip().replace("-", "").replace(" ", "").lower()
@@ -104,16 +116,8 @@ class GoogleBooksService:
                                 
                         cover_i = item.get("cover_i")
                         image_url = f"https://covers.openlibrary.org/b/id/{cover_i}-L.jpg" if cover_i else None
-                        
-                        author = item.get("author_name", ["Unknown Author"])[0]
-                        first_publish = item.get("first_publish_year")
-                        desc = f"Author: {author}."
-                        if first_publish:
-                            desc += f" First published in {first_publish}."
-                            
                         ext_id = f"openlibrary-{str(item.get('key', '')).replace('/works/', '')}"
                         
-                        title = item.get("title") or "Untitled Book"
                         item_type = "book"
 
                         search_item = SearchResultItem(

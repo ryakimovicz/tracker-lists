@@ -3,6 +3,7 @@ import urllib.parse
 import json
 from typing import List
 from app.services.base import SearchResultItem
+from app.core.sfw_filter import is_safe_media_item
 
 class TVMazeService:
     @staticmethod
@@ -26,6 +27,11 @@ class TVMazeService:
                     for item in data:
                         show = item.get("show", {})
                         
+                        show_name = show.get("name") or "Untitled Show"
+                        show_summary = show.get("summary") or ""
+                        if not is_safe_media_item(show_name, show_summary):
+                            continue
+
                         # TVMaze doesn't have a strict 'anime' genre flag that is 100% reliable,
                         # but we can filter by language (Japanese) or genres if the user explicitly searched for anime.
                         genres = show.get("genres", [])
@@ -55,9 +61,9 @@ class TVMazeService:
                         results.append(
                             SearchResultItem(
                                 external_id=f"tvm_{show.get('id')}",
-                                title=show.get("name"),
+                                title=show_name,
                                 image_url=image_url,
-                                description=show.get("summary", ""),
+                                description=show_summary,
                                 item_type="anime" if is_anime else "series",
                                 release_date=release_date,
                                 imdb_id=imdb_id
