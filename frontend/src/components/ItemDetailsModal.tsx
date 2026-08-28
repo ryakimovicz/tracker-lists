@@ -1733,17 +1733,17 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                     </div>
                   )}
 
-                  {/* Favorite button for Series/Anime or 3-dots for other items */}
+                  {/* Favorite button for all items */}
                   {user && selectedItem?.id && !isEpisode && (() => {
                     const isUnconsumed = ['plan_to_watch', 'plan_to_read', 'plan_to_play'].includes(selectedItem?.status);
-                    return (selectedItem?.item_type === 'series' || selectedItem?.item_type === 'anime') ? (
+                    return (
                       <button
                         type="button"
                         disabled={isUnconsumed && !isFavorite}
                         onClick={() => onToggleFavorite && onToggleFavorite(selectedItem.id, isFavorite)}
                         className="btn-secondary"
                         title={isUnconsumed && !isFavorite
-                          ? (language === 'es' ? 'Empieza a ver la serie para poder destacarla' : 'Start watching to feature this series')
+                          ? (language === 'es' ? 'Empieza a consumir la obra para poder destacarla' : 'Start consuming this item to feature it')
                           : isFavorite
                           ? (language === 'es' ? 'Quitar Destacado' : 'Remove Featured')
                           : (language === 'es' ? 'Destacar (Favorito)' : 'Feature (Favorite)')
@@ -1764,123 +1764,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                       >
                         <Heart size={18} fill={isFavorite ? 'var(--accent-primary)' : 'none'} />
                       </button>
-                    ) : (
-                      <div style={{ position: 'relative' }}>
-                        <button
-                          type="button"
-                          onClick={() => setShowMenu(!showMenu)}
-                          className="btn-secondary"
-                          title={language === 'es' ? 'Más opciones' : 'More options'}
-                          style={{
-                            padding: '0.4rem',
-                            borderRadius: '50%',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          <MoreVertical size={18} />
-                        </button>
-
-                        {showMenu && (
-                          <div
-                            className="glass-card"
-                            style={{
-                              position: 'absolute',
-                              top: '100%',
-                              right: 0,
-                              marginTop: '0.5rem',
-                              zIndex: 3000,
-                              padding: '0.5rem',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              gap: '0.4rem',
-                              minWidth: '170px',
-                              boxShadow: '0 10px 25px rgba(0,0,0,0.5)'
-                            }}
-                          >
-                            <button
-                              type="button"
-                              onClick={() => {
-                                  onToggleFavorite && onToggleFavorite(selectedItem.id, isFavorite);
-                                  setShowMenu(false);
-                              }}
-                              style={{
-                                background: 'transparent',
-                                border: 'none',
-                                color: isFavorite ? 'var(--accent-primary)' : 'var(--text-primary)',
-                                textAlign: 'left',
-                                padding: '0.4rem 0.6rem',
-                                cursor: 'pointer',
-                                fontSize: '0.85rem',
-                                borderRadius: '4px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '0.4rem'
-                              }}
-                            >
-                              <Heart size={14} fill={isFavorite ? 'var(--accent-primary)' : 'none'} />
-                              {isFavorite
-                                ? (language === 'es' ? 'Quitar Destacado' : 'Remove Featured')
-                                : (language === 'es' ? 'Destacar (Favorito)' : 'Feature (Favorite)')
-                              }
-                            </button>
-                            {selectedItem?.item_type !== 'movie' && (
-                              <button
-                                type="button"
-                                onClick={handleMarkDropped}
-                                style={{
-                                  background: 'transparent',
-                                  border: 'none',
-                                  color: selectedItem?.status === 'dropped' ? '#3b82f6' : '#f59e0b',
-                                  textAlign: 'left',
-                                  padding: '0.4rem 0.6rem',
-                                  cursor: 'pointer',
-                                  fontSize: '0.85rem',
-                                  borderRadius: '4px',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '0.4rem'
-                                }}
-                              >
-                                {selectedItem?.status === 'dropped' ? (
-                                  selectedItem?.item_type === 'game' 
-                                    ? (language === 'es' ? '▶️ Seguir jugando' : '▶️ Resume playing')
-                                    : ['book', 'comic', 'manga'].includes(selectedItem?.item_type)
-                                    ? (language === 'es' ? '▶️ Seguir leyendo' : '▶️ Resume reading')
-                                    : (language === 'es' ? '▶️ Seguir viendo' : '▶️ Resume watching')
-                                ) : (
-                                  `🚫 ${language === 'es' ? 'Marcar como abandonado' : 'Mark as dropped'}`
-                                )}
-                              </button>
-                            )}
-                            {selectedItem?.id && (
-                              <button
-                                type="button"
-                                onClick={handleRemoveFromShelf}
-                                style={{
-                                  background: 'transparent',
-                                  border: 'none',
-                                  color: '#ef4444',
-                                  textAlign: 'left',
-                                  padding: '0.4rem 0.6rem',
-                                  cursor: 'pointer',
-                                  fontSize: '0.85rem',
-                                  borderRadius: '4px',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '0.4rem'
-                                }}
-                              >
-                                <Trash2 size={14} />
-                                {language === 'es' ? 'Quitar de estantería' : 'Remove from shelf'}
-                              </button>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    )
+                    );
                   })()}
 
                   <button
