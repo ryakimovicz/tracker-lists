@@ -191,6 +191,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   const [openEpisodeMenuId, setOpenEpisodeMenuId] = useState<number | null>(null);
   const [openSeasonMenuId, setOpenSeasonMenuId] = useState<number | null>(null);
   const [showAllWatchedMenu, setShowAllWatchedMenu] = useState(false);
+  const [showSingleWatchedMenu, setShowSingleWatchedMenu] = useState(false);
 
   const handleTranslateDescription = async (textToTranslate: string) => {
     if (!textToTranslate) return;
@@ -1578,40 +1579,10 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                             display: 'flex',
                             flexDirection: 'column',
                             gap: '0.4rem',
-                            minWidth: '220px',
+                            minWidth: '180px',
                             boxShadow: '0 10px 25px rgba(0,0,0,0.5)'
                           }}
                         >
-                          {selectedItem.item_type !== 'series' && selectedItem.item_type !== 'anime' && ['completed', 'read'].includes(selectedItem?.status) && (
-                            <button
-                              type="button"
-                              onClick={handleMarkConsumedAgain}
-                              style={{
-                                background: 'transparent',
-                                border: 'none',
-                                color: 'var(--text-primary)',
-                                textAlign: 'left',
-                                padding: '0.4rem 0.6rem',
-                                cursor: 'pointer',
-                                fontSize: '0.85rem',
-                                borderRadius: '4px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '0.4rem'
-                              }}
-                            >
-                              <span>🔁</span>
-                              {selectedItem.item_type === 'movie' 
-                                ? (language === 'es' ? 'Volver a marcar como vista' : 'Mark as seen again')
-                                : selectedItem.item_type === 'game'
-                                ? (language === 'es' ? 'Volver a marcar como jugado' : 'Mark as played again')
-                                : ['book', 'comic', 'manga'].includes(selectedItem.item_type)
-                                ? (language === 'es' ? 'Volver a marcar como leído' : 'Mark as read again')
-                                : (language === 'es' ? 'Volver a marcar' : 'Mark again')
-                              }
-                            </button>
-                          )}
-                          
                           <button
                             type="button"
                             onClick={handleRemoveFromShelf}
@@ -2434,24 +2405,99 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                           >
                             {language === 'es' ? 'Jugando' : 'Playing'}
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => handleToggleStatus('completed')}
-                            style={{
-                              background: selectedItem?.status === 'completed' ? 'var(--color-game)' : 'var(--bg-tertiary)',
-                              border: selectedItem?.status === 'completed' ? 'none' : '1px solid var(--border-color)',
-                              borderRadius: '8px',
-                              padding: '0.5rem',
-                              textAlign: 'center',
-                              cursor: 'pointer',
-                              color: selectedItem?.status === 'completed' ? '#ffffff' : 'var(--text-primary)',
-                              fontSize: '0.75rem',
-                              fontWeight: 600,
-                              transition: 'all 0.2s ease'
-                            }}
-                          >
-                            {language === 'es' ? 'Completado' : 'Completed'}
-                          </button>
+                          <div style={{ position: 'relative' }}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (selectedItem?.status === 'completed') {
+                                  setShowSingleWatchedMenu(!showSingleWatchedMenu);
+                                } else {
+                                  handleToggleStatus('completed');
+                                }
+                              }}
+                              style={{
+                                width: '100%',
+                                background: selectedItem?.status === 'completed' ? 'var(--color-game)' : 'var(--bg-tertiary)',
+                                border: selectedItem?.status === 'completed' ? 'none' : '1px solid var(--border-color)',
+                                borderRadius: '8px',
+                                padding: '0.5rem',
+                                textAlign: 'center',
+                                cursor: 'pointer',
+                                color: selectedItem?.status === 'completed' ? '#ffffff' : 'var(--text-primary)',
+                                fontSize: '0.75rem',
+                                fontWeight: 600,
+                                transition: 'all 0.2s ease'
+                              }}
+                            >
+                              {language === 'es' ? 'Completado' : 'Completed'}
+                            </button>
+
+                            {showSingleWatchedMenu && selectedItem?.status === 'completed' && (
+                              <div
+                                className="glass-card"
+                                style={{
+                                  position: 'absolute',
+                                  top: '100%',
+                                  left: 0,
+                                  marginTop: '0.5rem',
+                                  zIndex: 3000,
+                                  padding: '0.5rem',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  gap: '0.4rem',
+                                  minWidth: '220px',
+                                  boxShadow: '0 10px 25px rgba(0,0,0,0.5)'
+                                }}
+                              >
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    setShowSingleWatchedMenu(false);
+                                    await handleMarkConsumedAgain();
+                                  }}
+                                  style={{
+                                    background: 'transparent',
+                                    border: 'none',
+                                    color: 'var(--text-primary)',
+                                    textAlign: 'left',
+                                    padding: '0.4rem 0.6rem',
+                                    cursor: 'pointer',
+                                    fontSize: '0.85rem',
+                                    borderRadius: '4px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.4rem'
+                                  }}
+                                >
+                                  <span>🔁</span>
+                                  {language === 'es' ? 'Volver a marcar como jugado' : 'Mark as played again'}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setShowSingleWatchedMenu(false);
+                                    handleToggleStatus('completed');
+                                  }}
+                                  style={{
+                                    background: 'transparent',
+                                    border: 'none',
+                                    color: '#ef4444',
+                                    textAlign: 'left',
+                                    padding: '0.4rem 0.6rem',
+                                    cursor: 'pointer',
+                                    fontSize: '0.85rem',
+                                    borderRadius: '4px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.4rem'
+                                  }}
+                                >
+                                  <Trash2 size={14} />
+                                  {language === 'es' ? 'Desmarcar / Quitar' : 'Unmark / Remove'}
+                                </button>
+                              </div>
+                            )}
+                          </div>
                           <button
                             type="button"
                             onClick={() => handleToggleStatus('endless')}
@@ -2605,11 +2651,16 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         </div>
                       ) : ['movie', 'book', 'comic', 'manga'].includes(selectedItem?.item_type) ? (
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const isCurrentlyActive = selectedItem.status === (['book', 'comic', 'manga'].includes(selectedItem.item_type) ? 'read' : 'completed');
-                              if (!isCurrentlyActive) {
+                          <div style={{ position: 'relative' }}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const isCurrentlyActive = selectedItem.status === (['book', 'comic', 'manga'].includes(selectedItem.item_type) ? 'read' : 'completed');
+                                if (isCurrentlyActive) {
+                                  setShowSingleWatchedMenu(!showSingleWatchedMenu);
+                                  return;
+                                }
+
                                 if (['book', 'comic', 'manga'].includes(selectedItem.item_type) && totalPagesVal !== '') {
                                   // Auto-fill pages_read to totalPagesVal
                                   setPagesReadVal(totalPagesVal);
@@ -2625,24 +2676,94 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                     }
                                   }
                                 }
-                              }
-                              handleToggleStatus(['book', 'comic', 'manga'].includes(selectedItem.item_type) ? 'read' : 'completed');
-                            }}
-                            style={{
-                              background: ['completed', 'read'].includes(selectedItem?.status) ? (selectedItem.item_type === 'movie' ? 'var(--color-movie)' : 'var(--color-book)') : 'var(--bg-tertiary)',
-                              border: ['completed', 'read'].includes(selectedItem?.status) ? 'none' : '1px solid var(--border-color)',
-                              borderRadius: '8px',
-                              padding: '0.5rem',
-                              textAlign: 'center',
-                              cursor: 'pointer',
-                              color: ['completed', 'read'].includes(selectedItem?.status) ? '#ffffff' : 'var(--text-primary)',
-                              fontSize: '0.85rem',
-                              fontWeight: 600,
-                              transition: 'all 0.2s ease'
-                            }}
-                          >
-                            {['book', 'comic', 'manga'].includes(selectedItem.item_type) ? (language === 'es' ? 'Leído' : 'Read') : (language === 'es' ? 'Visto' : 'Watched')}
-                          </button>
+                                handleToggleStatus(['book', 'comic', 'manga'].includes(selectedItem.item_type) ? 'read' : 'completed');
+                              }}
+                              style={{
+                                width: '100%',
+                                background: ['completed', 'read'].includes(selectedItem?.status) ? (selectedItem.item_type === 'movie' ? 'var(--color-movie)' : 'var(--color-book)') : 'var(--bg-tertiary)',
+                                border: ['completed', 'read'].includes(selectedItem?.status) ? 'none' : '1px solid var(--border-color)',
+                                borderRadius: '8px',
+                                padding: '0.5rem',
+                                textAlign: 'center',
+                                cursor: 'pointer',
+                                color: ['completed', 'read'].includes(selectedItem?.status) ? '#ffffff' : 'var(--text-primary)',
+                                fontSize: '0.85rem',
+                                fontWeight: 600,
+                                transition: 'all 0.2s ease'
+                              }}
+                            >
+                              {['book', 'comic', 'manga'].includes(selectedItem.item_type) ? (language === 'es' ? 'Leído' : 'Read') : (language === 'es' ? 'Visto' : 'Watched')}
+                            </button>
+
+                            {showSingleWatchedMenu && ['completed', 'read'].includes(selectedItem?.status) && (
+                              <div
+                                className="glass-card"
+                                style={{
+                                  position: 'absolute',
+                                  top: '100%',
+                                  left: 0,
+                                  marginTop: '0.5rem',
+                                  zIndex: 3000,
+                                  padding: '0.5rem',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  gap: '0.4rem',
+                                  minWidth: '220px',
+                                  boxShadow: '0 10px 25px rgba(0,0,0,0.5)'
+                                }}
+                              >
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    setShowSingleWatchedMenu(false);
+                                    await handleMarkConsumedAgain();
+                                  }}
+                                  style={{
+                                    background: 'transparent',
+                                    border: 'none',
+                                    color: 'var(--text-primary)',
+                                    textAlign: 'left',
+                                    padding: '0.4rem 0.6rem',
+                                    cursor: 'pointer',
+                                    fontSize: '0.85rem',
+                                    borderRadius: '4px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.4rem'
+                                  }}
+                                >
+                                  <span>🔁</span>
+                                  {selectedItem.item_type === 'movie' 
+                                    ? (language === 'es' ? 'Volver a marcar como vista' : 'Mark as seen again')
+                                    : (language === 'es' ? 'Volver a marcar como leído' : 'Mark as read again')
+                                  }
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setShowSingleWatchedMenu(false);
+                                    handleToggleStatus(['book', 'comic', 'manga'].includes(selectedItem.item_type) ? 'read' : 'completed');
+                                  }}
+                                  style={{
+                                    background: 'transparent',
+                                    border: 'none',
+                                    color: '#ef4444',
+                                    textAlign: 'left',
+                                    padding: '0.4rem 0.6rem',
+                                    cursor: 'pointer',
+                                    fontSize: '0.85rem',
+                                    borderRadius: '4px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.4rem'
+                                  }}
+                                >
+                                  <Trash2 size={14} />
+                                  {language === 'es' ? 'Desmarcar / Quitar' : 'Unmark / Remove'}
+                                </button>
+                              </div>
+                            )}
+                          </div>
                           <button
                             type="button"
                             onClick={() => handleToggleStatus(['book', 'comic', 'manga'].includes(selectedItem.item_type) ? 'reading' : 'watching')}
@@ -2682,33 +2803,111 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         </div>
                       ) : (
                         <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
-                          <button
-                            type="button"
-                            disabled={!isOwnProfile}
-                            onClick={handleMarkCompleted}
-                            style={{
-                              background: (selectedItem?.status === 'completed' || selectedItem?.status === 'read') ? `var(--color-${selectedItem.item_type || 'movie'})` : 'var(--bg-tertiary)',
-                              border: (selectedItem?.status === 'completed' || selectedItem?.status === 'read') ? 'none' : '1px solid var(--border-color)',
-                              borderRadius: '20px',
-                              padding: '0.45rem 1rem',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '0.5rem',
-                              cursor: isOwnProfile ? 'pointer' : 'default',
-                              color: (selectedItem?.status === 'completed' || selectedItem?.status === 'read') ? `var(--color-text-${selectedItem.item_type || 'movie'})` : 'var(--text-primary)',
-                              fontSize: '0.85rem',
-                              fontWeight: 600,
-                              transition: 'all 0.2s ease'
-                            }}
-                          >
-                            <Check size={16} strokeWidth={3} />
-                            <span>
-                              {(selectedItem?.status === 'completed' || selectedItem?.status === 'read')
-                                ? (selectedItem.item_type === 'game' ? (language === 'es' ? 'Jugado' : 'Played') : (language === 'es' ? 'Visto' : 'Watched'))
-                                : (selectedItem.item_type === 'game' ? (language === 'es' ? 'Marcar como jugado' : 'Mark as played') : (language === 'es' ? 'Marcar como visto' : 'Mark as seen'))
-                              }
-                            </span>
-                          </button>
+                          <div style={{ position: 'relative' }}>
+                            <button
+                              type="button"
+                              disabled={!isOwnProfile}
+                              onClick={() => {
+                                const isComp = (selectedItem?.status === 'completed' || selectedItem?.status === 'read');
+                                if (isComp) {
+                                  setShowSingleWatchedMenu(!showSingleWatchedMenu);
+                                } else {
+                                  handleMarkCompleted();
+                                }
+                              }}
+                              style={{
+                                background: (selectedItem?.status === 'completed' || selectedItem?.status === 'read') ? `var(--color-${selectedItem.item_type || 'movie'})` : 'var(--bg-tertiary)',
+                                border: (selectedItem?.status === 'completed' || selectedItem?.status === 'read') ? 'none' : '1px solid var(--border-color)',
+                                borderRadius: '20px',
+                                padding: '0.45rem 1rem',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.5rem',
+                                cursor: isOwnProfile ? 'pointer' : 'default',
+                                color: (selectedItem?.status === 'completed' || selectedItem?.status === 'read') ? `var(--color-text-${selectedItem.item_type || 'movie'})` : 'var(--text-primary)',
+                                fontSize: '0.85rem',
+                                fontWeight: 600,
+                                transition: 'all 0.2s ease'
+                              }}
+                            >
+                              <Check size={16} strokeWidth={3} />
+                              <span>
+                                {(selectedItem?.status === 'completed' || selectedItem?.status === 'read')
+                                  ? (selectedItem.item_type === 'game' ? (language === 'es' ? 'Jugado' : 'Played') : (language === 'es' ? 'Visto' : 'Watched'))
+                                  : (selectedItem.item_type === 'game' ? (language === 'es' ? 'Marcar como jugado' : 'Mark as played') : (language === 'es' ? 'Marcar como visto' : 'Mark as seen'))
+                                }
+                              </span>
+                            </button>
+
+                            {showSingleWatchedMenu && (selectedItem?.status === 'completed' || selectedItem?.status === 'read') && (
+                              <div
+                                className="glass-card"
+                                style={{
+                                  position: 'absolute',
+                                  top: '100%',
+                                  right: 0,
+                                  marginTop: '0.5rem',
+                                  zIndex: 3000,
+                                  padding: '0.5rem',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  gap: '0.4rem',
+                                  minWidth: '220px',
+                                  boxShadow: '0 10px 25px rgba(0,0,0,0.5)'
+                                }}
+                              >
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    setShowSingleWatchedMenu(false);
+                                    await handleMarkConsumedAgain();
+                                  }}
+                                  style={{
+                                    background: 'transparent',
+                                    border: 'none',
+                                    color: 'var(--text-primary)',
+                                    textAlign: 'left',
+                                    padding: '0.4rem 0.6rem',
+                                    cursor: 'pointer',
+                                    fontSize: '0.85rem',
+                                    borderRadius: '4px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.4rem'
+                                  }}
+                                >
+                                  <span>🔁</span>
+                                  {selectedItem.item_type === 'game' 
+                                    ? (language === 'es' ? 'Volver a marcar como jugado' : 'Mark as played again')
+                                    : (language === 'es' ? 'Volver a marcar como visto' : 'Mark as seen again')
+                                  }
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setShowSingleWatchedMenu(false);
+                                    handleToggleStatus(['book', 'comic', 'manga'].includes(selectedItem.item_type) ? 'read' : 'completed');
+                                  }}
+                                  style={{
+                                    background: 'transparent',
+                                    border: 'none',
+                                    color: '#ef4444',
+                                    textAlign: 'left',
+                                    padding: '0.4rem 0.6rem',
+                                    cursor: 'pointer',
+                                    fontSize: '0.85rem',
+                                    borderRadius: '4px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.4rem'
+                                  }}
+                                >
+                                  <Trash2 size={14} />
+                                  {language === 'es' ? 'Desmarcar / Quitar' : 'Unmark / Remove'}
+                                </button>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       )}
                     </div>
