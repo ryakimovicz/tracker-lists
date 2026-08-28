@@ -395,13 +395,8 @@ export const Profile: React.FC = () => {
   };
 
   const handleLastFmLogin = () => {
-    // Generate auth URL
-    // In a real app this should be fetched from the backend, but since it's just the API_KEY it's okay to construct or call endpoint.
-    // Actually, we can just redirect directly since the API_KEY is public. Wait, frontend doesn't have API_KEY.
-    // Let's call an endpoint to get the auth URL? No, we didn't add an endpoint for getting the auth URL.
-    // Let's hardcode the URL since the api key is known, or just prompt for username if we don't want strict oauth.
-    // The user requested Last.fm oauth flow, so we must redirect to lastfm.
-    window.location.href = `http://www.last.fm/api/auth/?api_key=de5acce61bdd8b3e4bd181ebce8a69e8&cb=${encodeURIComponent('http://localhost:5173/profile')}`;
+    const currentOrigin = window.location.origin;
+    window.location.href = `http://www.last.fm/api/auth/?api_key=de5acce61bdd8b3e4bd181ebce8a69e8&cb=${encodeURIComponent(`${currentOrigin}/profile`)}`;
   };
 
   const handleLastFmDisconnect = () => {
@@ -1155,7 +1150,7 @@ export const Profile: React.FC = () => {
               gap: '0.5rem'
             }}
           >
-            🎵 {language === 'es' ? 'Música' : 'Music'}
+            <Music size={18} /> {language === 'es' ? 'Música' : 'Music'}
           </button>
         )}
       </div>
