@@ -10,11 +10,30 @@ def normalize_text(text: str) -> str:
 
 # Whitelisted mainstream pop-culture titles containing ambiguous words
 SFW_WHITELIST = {
+    # Telenovelas and Series
+    "sin tetas no hay paraiso",
+    "sin senos no hay paraiso",
+    "sin senos si hay paraiso",
+    "sin tetas si hay paraiso",
     "sex and the city",
     "sex education",
     "the sex lives of college girls",
     "masters of sex",
-    "the sexy brutale"
+    "el sexo debil",
+    "the naked director",
+    "naked and afraid",
+    "supervivencia al desnudo",
+    
+    # Classic Movies & Literature
+    "moby dick",
+    "dick tracy",
+    "philip k. dick",
+    "philip k dick",
+    "the naked gun",
+    "sex, lies, and videotape",
+    "sexo, mentiras y video",
+    "the sexy brutale",
+    "dick figures"
 }
 
 ADULT_PATTERNS = [
