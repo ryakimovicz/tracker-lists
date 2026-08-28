@@ -1,12 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%" fill="none">
-  <!-- Fondo Squircle Dark Charcoal oficial (#090d16) -->
-  <rect width="512" height="512" rx="112" fill="#090d16" stroke="rgba(245, 158, 11, 0.25)" stroke-width="3" />
+  <!-- Fondo Squircle Dark Charcoal oficial (#090d16) con Borde Contenido 100% -->
+  <rect x="2" y="2" width="508" height="508" rx="110" fill="#090d16" stroke="rgba(245, 158, 11, 0.35)" stroke-width="3" />
 
-  <!-- Círculo Ámbar Translúcido Oficial de Pathd (Igual al Modal) -->
-  <circle cx="256" cy="180" r="96" fill="rgba(245, 158, 11, 0.15)" />
+  <!-- Círculo Ámbar Translúcido Oficial de Pathd -->
+  <circle cx="256" cy="176" r="76" fill="rgba(245, 158, 11, 0.15)" />
 
-  <!-- Corona Lineal Oficial de Lucide Crown (Escalada en Centro) -->
-  <g transform="translate(196, 120) scale(5)">
+  <!-- Corona Lineal Oficial de Lucide Crown Proporcionada y Equilibrada -->
+  <g transform="translate(206, 126) scale(4.16)">
     <path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z" 
           stroke="#f59e0b" 
           stroke-width="1.8" 
@@ -21,10 +21,10 @@
   </g>
 
   <!-- Tipografía Oficial: Pathd PREMIUM -->
-  <text x="256" y="360" text-anchor="middle" font-family="system-ui, -apple-system, 'Inter', 'Segoe UI', Roboto, sans-serif" font-size="56" font-weight="800" letter-spacing="-1.5" fill="#f8fafc">
+  <text x="256" y="348" text-anchor="middle" font-family="system-ui, -apple-system, 'Inter', 'Segoe UI', Roboto, sans-serif" font-size="64" font-weight="800" letter-spacing="-2" fill="#f8fafc">
     Path<tspan fill="#f59e0b">d</tspan>
   </text>
-  <text x="256" y="415" text-anchor="middle" font-family="system-ui, -apple-system, 'Inter', 'Segoe UI', Roboto, sans-serif" font-size="22" font-weight="700" letter-spacing="6" fill="#f59e0b">
+  <text x="256" y="408" text-anchor="middle" font-family="system-ui, -apple-system, 'Inter', 'Segoe UI', Roboto, sans-serif" font-size="24" font-weight="700" letter-spacing="8" fill="#f59e0b">
     PREMIUM
   </text>
 </svg>
