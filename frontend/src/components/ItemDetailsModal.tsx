@@ -387,6 +387,30 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     }
   };
 
+  const handleRemoveLatestConsumption = async () => {
+    if (!selectedItem || !selectedItem.id) return;
+    setShowSingleWatchedMenu(false);
+    setShowAllWatchedMenu(false);
+    try {
+      const res = await apiClient.delete(`/library/${selectedItem.id}/consumption-history/latest`);
+      setSelectedItem((prev: any) => prev ? { ...prev, ...res.data } : null);
+      
+      // Refresh history list
+      if (user?.is_pro) {
+        apiClient.get(`/library/${selectedItem.id}/consumption-history`)
+          .then(hRes => {
+            if (hRes.data && hRes.data.history) {
+              setConsumptionHistory(hRes.data.history);
+            }
+          })
+          .catch(console.error);
+      }
+      onUpdate && onUpdate();
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   const handleRemoveFromShelf = async () => {
     if (!selectedItem || !selectedItem.id) return;
     setShowMenu(false);
@@ -2504,10 +2528,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={() => {
-                                    setShowSingleWatchedMenu(false);
-                                    handleToggleStatus('completed');
-                                  }}
+                                  onClick={handleRemoveLatestConsumption}
                                   style={{
                                     background: 'transparent',
                                     border: 'none',
@@ -2770,10 +2791,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={() => {
-                                    setShowSingleWatchedMenu(false);
-                                    handleToggleStatus(['book', 'comic', 'manga'].includes(selectedItem.item_type) ? 'read' : 'completed');
-                                  }}
+                                  onClick={handleRemoveLatestConsumption}
                                   style={{
                                     background: 'transparent',
                                     border: 'none',
@@ -2914,10 +2932,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={() => {
-                                    setShowSingleWatchedMenu(false);
-                                    handleToggleStatus(['book', 'comic', 'manga'].includes(selectedItem.item_type) ? 'read' : 'completed');
-                                  }}
+                                  onClick={handleRemoveLatestConsumption}
                                   style={{
                                     background: 'transparent',
                                     border: 'none',

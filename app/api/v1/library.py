@@ -227,6 +227,58 @@ def get_library_item_consumption_history(
         "history": result_dates
     }
 
+@router.delete("/{item_id}/consumption-history/latest", response_model=LibraryItemResponse)
+def remove_latest_consumption(
+    item_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    from app.models.consumption import ConsumptionHistory
+    item = db.query(UserLibraryItem).filter(
+        UserLibraryItem.id == item_id,
+        UserLibraryItem.user_id == current_user.id
+    ).first()
+    
+    if not item:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Library item not found")
+        
+    history = db.query(ConsumptionHistory).filter(
+        ConsumptionHistory.user_id == current_user.id,
+        ConsumptionHistory.external_id == item.external_id
+    ).order_by(ConsumptionHistory.consumed_at.desc()).all()
+    
+    if history:
+        # Delete only the latest consumption record
+        latest_entry = history[0]
+        db.delete(latest_entry)
+        remaining = history[1:]
+        
+        if remaining:
+            # Still has prior consumptions! Keep status completed/read and update completed_at to the previous one
+            item.completed_at = remaining[0].consumed_at
+        else:
+            # No more consumptions left -> uncomplete
+            item.completed_at = None
+            if item.item_type in ['book', 'comic', 'manga']:
+                item.status = UserLibraryStatusEnum.PLAN_TO_READ
+            elif item.item_type == 'game':
+                item.status = UserLibraryStatusEnum.PLAN_TO_PLAY
+            else:
+                item.status = UserLibraryStatusEnum.PLAN_TO_WATCH
+    else:
+        # No history entries -> uncomplete
+        item.completed_at = None
+        if item.item_type in ['book', 'comic', 'manga']:
+            item.status = UserLibraryStatusEnum.PLAN_TO_READ
+        elif item.item_type == 'game':
+            item.status = UserLibraryStatusEnum.PLAN_TO_PLAY
+        else:
+            item.status = UserLibraryStatusEnum.PLAN_TO_WATCH
+            
+    db.commit()
+    db.refresh(item)
+    return item
+
 @router.post("/{item_id}/mark-consumed", response_model=LibraryItemResponse, status_code=status.HTTP_200_OK)
 def mark_library_item_consumed(
     item_id: int,
