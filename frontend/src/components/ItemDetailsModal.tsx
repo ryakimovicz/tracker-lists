@@ -1554,7 +1554,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                             boxShadow: '0 10px 25px rgba(0,0,0,0.5)'
                           }}
                         >
-                          {selectedItem.item_type !== 'series' && selectedItem.item_type !== 'anime' && (
+                          {selectedItem.item_type !== 'series' && selectedItem.item_type !== 'anime' && ['completed', 'read'].includes(selectedItem?.status) && (
                             <button
                               type="button"
                               onClick={handleMarkConsumedAgain}
