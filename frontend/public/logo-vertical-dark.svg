@@ -2,23 +2,23 @@
   <!-- Fondo Dark Charcoal -->
   <rect width="500" height="500" rx="54" fill="#090d16" />
 
-  <!-- Isotipo P Centrado -->
-  <g transform="translate(150, 60)">
+  <!-- Isotipo P Proporcionado -->
+  <g transform="translate(160, 44)">
     <!-- Tallo: Ámbar Solar -->
-    <rect x="6" y="6" width="38" height="188" rx="19" fill="#f59e0b" />
+    <rect x="0" y="0" width="34" height="206" rx="17" fill="#f59e0b" />
     <!-- Barra Superior: Películas -->
-    <rect x="56" y="6" width="102" height="38" rx="19" fill="#4ade80" />
+    <rect x="48" y="0" width="98" height="34" rx="17" fill="#4ade80" />
     <!-- Barra Media: Manga / Lectura -->
-    <rect x="56" y="56" width="138" height="38" rx="19" fill="#60a5fa" />
+    <rect x="48" y="48" width="132" height="34" rx="17" fill="#60a5fa" />
     <!-- Barra Inferior: Videojuegos -->
-    <rect x="56" y="106" width="88" height="38" rx="19" fill="#c084fc" />
+    <rect x="48" y="96" width="84" height="34" rx="17" fill="#c084fc" />
   </g>
 
   <!-- Tipografía Pathd Centrada -->
-  <text x="250" y="375" text-anchor="middle" font-family="'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif" font-size="88" font-weight="800" letter-spacing="-2" fill="#f8fafc">
+  <text x="250" y="372" text-anchor="middle" font-family="'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif" font-size="94" font-weight="800" letter-spacing="-2" fill="#f8fafc">
     Path<tspan fill="#f59e0b">d</tspan>
   </text>
-  <text x="250" y="425" text-anchor="middle" font-family="'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif" font-size="22" font-weight="500" letter-spacing="2" fill="#94a3b8">
+  <text x="250" y="424" text-anchor="middle" font-family="'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif" font-size="20" font-weight="600" letter-spacing="3" fill="#94a3b8">
     MEDIA TRACKER &amp; GUIDES
   </text>
 </svg>
