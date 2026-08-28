@@ -1881,7 +1881,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         )}
                       </div>
                     )
-                  )}
+                  })()}
 
                   <button
                     type="button"
