@@ -1,6 +1,5 @@
 import React, { useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useTranslation } from '../context/LanguageContext';
 
 interface AdBannerProps {
   slotId?: string;
@@ -16,22 +15,18 @@ export const AdBanner: React.FC<AdBannerProps> = ({
   className = ''
 }) => {
   const { user } = useAuth();
-  const { language } = useTranslation();
-  const isEs = language === 'es';
   const adRef = useRef<HTMLDivElement>(null);
   const isAdPushed = useRef<boolean>(false);
 
   const isLocalDev = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
-  // 1. Pro / VIP users enjoy an entirely ad-free experience (Key monetization incentive!)
-  // In localhost, allow preview unless explicitly wanting to test Pro hiding
+  // Pro / VIP users enjoy an entirely ad-free experience
   if (!isLocalDev && (user?.is_pro || user?.is_vip || user?.is_admin)) {
     return null;
   }
 
   useEffect(() => {
     if (isLocalDev) return;
-    // Only push once per mount to prevent AdSense duplicate push errors in React SPAs
     if (isAdPushed.current) return;
 
     try {
@@ -47,71 +42,42 @@ export const AdBanner: React.FC<AdBannerProps> = ({
 
   return (
     <div
-      className={`glass-card ${className}`}
+      className={className}
       style={{
-        margin: '2rem auto',
-        padding: '1rem',
-        borderRadius: '12px',
-        textAlign: 'center',
-        overflow: 'hidden',
-        maxWidth: '900px',
+        margin: '1.5rem auto',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
         width: '100%',
+        maxWidth: '728px',
+        minHeight: '90px',
+        overflow: 'hidden',
         boxSizing: 'border-box',
-        background: 'var(--bg-secondary)',
-        border: '1px solid var(--border-color)',
         ...style
       }}
       ref={adRef}
     >
-      <div
-        style={{
-          fontSize: '0.65rem',
-          textTransform: 'uppercase',
-          letterSpacing: '0.08em',
-          color: 'var(--text-muted)',
-          marginBottom: '0.5rem',
-          fontWeight: 600,
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          padding: '0 0.5rem'
-        }}
-      >
-        <span>{isEs ? 'Publicidad' : 'Advertisement'}</span>
-        {isLocalDev && (
-          <span style={{ color: 'var(--accent-primary)', fontSize: '0.6rem', background: 'rgba(245, 158, 11, 0.1)', padding: '2px 6px', borderRadius: '4px' }}>
-            {isEs ? 'Vista previa en Localhost' : 'Localhost Preview'}
-          </span>
-        )}
-      </div>
-
       {isLocalDev ? (
         <div
           style={{
+            width: '100%',
             height: '90px',
-            border: '2px dashed rgba(255, 255, 255, 0.15)',
-            borderRadius: '8px',
+            border: '1px dashed rgba(255, 255, 255, 0.18)',
+            borderRadius: '4px',
             display: 'flex',
-            flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: '0.25rem',
-            background: 'rgba(0, 0, 0, 0.2)',
             color: 'var(--text-muted)',
-            fontSize: '0.85rem'
+            fontSize: '0.8rem',
+            background: 'rgba(255, 255, 255, 0.02)'
           }}
         >
-          <div style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>
-            📢 {isEs ? 'Espacio Publicitario Google AdSense' : 'Google AdSense Ad Space'}
-          </div>
-          <div style={{ fontSize: '0.72rem', opacity: 0.8 }}>
-            {isEs ? 'Banner responsivo (728x90) • Se oculta automáticamente para usuarios Pro / VIP' : 'Responsive Leaderboard (728x90) • Automatically hidden for Pro / VIP users'}
-          </div>
+          <span>Espacio de Anuncio (728×90)</span>
         </div>
       ) : (
         <ins
           className="adsbygoogle"
-          style={{ display: 'block', minHeight: '90px' }}
+          style={{ display: 'block', width: '100%', minHeight: '90px' }}
           data-ad-client="ca-pub-7081495763188158"
           data-ad-slot={slotId || '7081495763188158'}
           data-ad-format={format}
