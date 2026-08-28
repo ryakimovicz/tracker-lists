@@ -347,15 +347,18 @@ export const Profile: React.FC = () => {
       setActivities(activityRes.data);
       
       // Fetch Last.fm data if applicable
-      const hasLastfm = Boolean(profileRes.data.lastfm_username);
-      if (hasLastfm) {
+      const targetLastfmUser = profileRes.data.lastfm_username;
+      const targetId = profileRes.data.id;
+      if (targetLastfmUser) {
         try {
-          const targetNpUrl = userIdParam ? `/users/${userIdParam}/music/now-playing` : '/users/me/music/now-playing';
-          const targetTaUrl = userIdParam ? `/users/${userIdParam}/music/top-albums` : '/users/me/music/top-albums';
-          const npRes = await apiClient.get(targetNpUrl);
-          setNowPlaying(npRes.data);
-          const taRes = await apiClient.get(targetTaUrl);
-          setTopAlbums(taRes.data);
+          const targetNpUrl = isOwnProfile ? '/users/me/music/now-playing' : `/users/${targetId}/music/now-playing`;
+          const targetTaUrl = isOwnProfile ? '/users/me/music/top-albums' : `/users/${targetId}/music/top-albums`;
+          const [npRes, taRes] = await Promise.allSettled([
+            apiClient.get(targetNpUrl),
+            apiClient.get(targetTaUrl)
+          ]);
+          setNowPlaying(npRes.status === 'fulfilled' ? npRes.value.data : null);
+          setTopAlbums(taRes.status === 'fulfilled' ? (taRes.value.data || []) : []);
         } catch(e) {
           setNowPlaying(null);
           setTopAlbums([]);
@@ -1133,7 +1136,7 @@ export const Profile: React.FC = () => {
           <Heart size={18} /> {language === 'es' ? 'Destacados' : 'Favorites'}
         </button>
 
-        {(profile?.lastfm_username || (!userIdParam && currentUser?.lastfm_username)) && (
+        {Boolean(profile?.lastfm_username) && (
           <button
             onClick={() => setActiveTab('music')}
             className="btn-secondary"
