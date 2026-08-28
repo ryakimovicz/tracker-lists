@@ -68,8 +68,11 @@ class LastFMService:
         
         url = f"{cls.BASE_URL}?{urllib.parse.urlencode(params)}"
         
+        headers = {"User-Agent": "PathdApp/1.0 (https://pathd.net)"}
+        req = urllib.request.Request(url, headers=headers)
+        
         try:
-            with urllib.request.urlopen(url, timeout=3) as response:
+            with urllib.request.urlopen(req, timeout=10) as response:
                 if response.status == 200:
                     data = json.loads(response.read().decode())
                     tracks = data.get("recenttracks", {}).get("track", [])
@@ -92,7 +95,7 @@ class LastFMService:
                             "url": track.get("url")
                         }
         except Exception as e:
-            print(f"LastFM NowPlaying Error: {e}")
+            print(f"LastFM NowPlaying Error for {username}: {e}")
         return None
 
     @classmethod
@@ -111,10 +114,12 @@ class LastFMService:
         }
         
         url = f"{cls.BASE_URL}?{urllib.parse.urlencode(params)}"
+        headers = {"User-Agent": "PathdApp/1.0 (https://pathd.net)"}
+        req = urllib.request.Request(url, headers=headers)
         
         albums = []
         try:
-            with urllib.request.urlopen(url, timeout=5) as response:
+            with urllib.request.urlopen(req, timeout=10) as response:
                 if response.status == 200:
                     data = json.loads(response.read().decode())
                     top_albums = data.get("topalbums", {}).get("album", [])
@@ -132,5 +137,5 @@ class LastFMService:
                             "url": album.get("url")
                         })
         except Exception as e:
-            print(f"LastFM TopAlbums Error: {e}")
+            print(f"LastFM TopAlbums Error for {username}: {e}")
         return albums
