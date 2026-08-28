@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { useTranslation } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
-import { Star, Check, X, Palette, Lock, Crown, Image as ImageIcon } from 'lucide-react';
+import { Star, Check, X, Palette, Lock, Crown, Image as ImageIcon, RotateCcw } from 'lucide-react';
 import { apiClient } from '../api/client';
 
 
@@ -197,6 +197,23 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
                 {isEs
                   ? 'Crea listas secretas solo para ti o enlaces no listados para compartir con quien elijas.'
                   : 'Create secret lists for yourself, or unlisted links to share with selected friends.'}
+              </p>
+            </div>
+          </div>
+
+          {/* Benefit 5: Unlimited Re-consumption & History */}
+          <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
+            <div style={{ background: 'rgba(245, 158, 11, 0.15)', padding: '0.5rem', borderRadius: '8px', color: '#f59e0b', flexShrink: 0 }}>
+              <RotateCcw size={20} />
+            </div>
+            <div>
+              <h4 style={{ margin: '0 0 0.25rem 0', fontSize: '1rem' }}>
+                {isEs ? 'Re-consumo Ilimitado e Historial' : 'Unlimited Re-consumption & History'}
+              </h4>
+              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                {isEs
+                  ? 'Vuelve a marcar obras completadas cuantas veces quieras y accede a tu lista cronológica de fechas de visualización, lectura y juego.'
+                  : 'Re-mark completed titles as many times as you want and access your full historical timeline of watches, reads, and plays.'}
               </p>
             </div>
           </div>
