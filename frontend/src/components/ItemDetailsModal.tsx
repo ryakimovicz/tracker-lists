@@ -1097,11 +1097,19 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   const handleSavePagesRead = async (val: number) => {
     if (!selectedItem) return;
     try {
-      const res = await apiClient.put(`/library/${selectedItem.id}`, {
-        pages_read: val
-      });
-      setSelectedItem((prev: any) => prev ? { ...prev, pages_read: res.data.pages_read, status: res.data.status } : null);
-      onUpdate();
+      let targetId = selectedItem.id;
+      if (!targetId) {
+        const defaultStatus = ['book', 'comic', 'manga'].includes(selectedItem.item_type) ? 'reading' : (selectedItem.item_type === 'game' ? 'playing' : 'watching');
+        const tracked = await ensureTracked(defaultStatus);
+        if (tracked) targetId = tracked.id;
+      }
+      if (targetId) {
+        const res = await apiClient.put(`/library/${targetId}`, {
+          pages_read: val
+        });
+        setSelectedItem((prev: any) => prev ? { ...prev, pages_read: res.data.pages_read, status: res.data.status } : null);
+        onUpdate && onUpdate();
+      }
     } catch (err) {
       console.error("Failed to update pages read", err);
     }
@@ -1540,7 +1548,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                   )}
 
                   {/* Completion Tick Button for Episodes (Top Right) */}
-                  {isOwnProfile && isEpisode && (
+                  {user && isEpisode && (
                     <div style={{ position: 'relative' }}>
                       <button
                         type="button"
@@ -2120,7 +2128,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                 type="number"
                                 min={0}
                                 max={maxPages > 0 ? maxPages : 99999}
-                                disabled={!isOwnProfile}
+                                disabled={!user}
                                 value={currentPages === 0 ? (pagesReadVal === '' ? '' : 0) : currentPages}
                                 placeholder="0"
                                 onFocus={() => {
@@ -2138,7 +2146,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                   if (pagesReadVal === '') handleUpdatePages(0);
                                 }}
                                 onWheel={(e) => {
-                                  if (isOwnProfile) {
+                                  if (user) {
                                     handleUpdatePages(currentPages + (e.deltaY < 0 ? 1 : -1));
                                   }
                                 }}
@@ -2173,7 +2181,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                 type="number"
                                 min={0}
                                 max={99999}
-                                disabled={!isOwnProfile}
+                                disabled={!user}
                                 value={totalPagesVal}
                                 placeholder={language === 'es' ? 'Total' : 'Total'}
                                 onFocus={() => {
@@ -2210,7 +2218,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         </div>
 
                         {/* Subtle Progress Slider when Total Pages is Known */}
-                        {isOwnProfile && maxPages > 0 && (
+                        {user && maxPages > 0 && (
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.1rem' }}>
                             <input
                               type="range"
@@ -2314,11 +2322,11 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                 type="number"
                                 min={0}
                                 max={999}
-                                disabled={!isOwnProfile}
+                                disabled={!user}
                                 value={currentHours}
                                 onChange={(e) => handleHoursChange(parseInt(e.target.value) || 0)}
                                 onWheel={(e) => {
-                                  if (isOwnProfile) {
+                                  if (user) {
                                     handleHoursChange(currentHours + (e.deltaY < 0 ? 1 : -1));
                                   }
                                 }}
@@ -2353,11 +2361,11 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                 type="number"
                                 min={0}
                                 max={59}
-                                disabled={!isOwnProfile}
+                                disabled={!user}
                                 value={String(currentMinutes).padStart(2, '0')}
                                 onChange={(e) => handleMinutesChange(parseInt(e.target.value) || 0)}
                                 onWheel={(e) => {
-                                  if (isOwnProfile) {
+                                  if (user) {
                                     handleMinutesChange(currentMinutes + (e.deltaY < 0 ? 1 : -1));
                                   }
                                 }}
@@ -2386,7 +2394,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         </div>
 
                         {/* Subtle Progress Slider for Movies */}
-                        {isOwnProfile && maxDurationMins > 0 && (
+                        {user && maxDurationMins > 0 && (
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.1rem' }}>
                             <input
                               type="range"
@@ -2413,7 +2421,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
 
                   {/* Completion / Status Buttons */}
-                  {isOwnProfile && !isEpisode && selectedItem?.item_type !== 'series' && selectedItem?.item_type !== 'anime' && (
+                  {user && !isEpisode && selectedItem?.item_type !== 'series' && selectedItem?.item_type !== 'anime' && (
                     <div style={{ marginTop: '0.75rem' }}>
                       {selectedItem?.item_type === 'game' ? (
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem' }}>
@@ -2762,7 +2770,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                         <div style={{ position: 'relative' }}>
                                           <button
                                             type="button"
-                                            disabled={!isOwnProfile}
+                                            disabled={!user}
                                             onClick={() => {
                                               const currentIsCompleted = !!globalProgress[`tvm-ep-${ep.id}`] || !!dbEp?.is_completed;
                                               if (currentIsCompleted) {
@@ -2781,7 +2789,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                               display: 'inline-flex',
                                               alignItems: 'center',
                                               justifyContent: 'center',
-                                              cursor: isOwnProfile ? 'pointer' : 'default',
+                                              cursor: user ? 'pointer' : 'default',
                                               color: isCompleted ? `var(--color-text-${selectedItem.item_type || 'movie'})` : 'var(--text-muted)',
                                               opacity: isCompleted ? 1 : 0.6,
                                               transition: 'all 0.2s ease',
