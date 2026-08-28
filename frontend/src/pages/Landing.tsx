@@ -88,8 +88,9 @@ export const Landing: React.FC = () => {
         fontSize: '0.85rem',
         color: 'var(--text-muted)'
       }}>
-        <div>
-          © {new Date().getFullYear()} Pathd (pathd.net). {isEs ? 'Todos los derechos reservados.' : 'All rights reserved.'}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+          <img src="/logo-transparent.svg" alt="Pathd" style={{ width: 22, height: 22 }} />
+          <span>© {new Date().getFullYear()} Pathd (pathd.net). {isEs ? 'Todos los derechos reservados.' : 'All rights reserved.'}</span>
         </div>
         <div style={{ display: 'flex', gap: '1.5rem' }}>
           <Link to="/terms" style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>
