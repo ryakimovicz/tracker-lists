@@ -47,8 +47,9 @@
 | [Last.fm](https://www.last.fm/api) | Música, álbumes destacados y scrobbling en tiempo real |
 | [Wikipedia API](https://www.mediawiki.org/wiki/API:Main_page) | Calendario de estrenos de cine y sinopsis abiertas (CC BY-SA) |
 | [Dodo Payments](https://dodopayments.com/) / [Stripe](https://stripe.com/) | Procesamiento de pagos seguros y gestión de suscripciones Premium |
+| [Google AdSense](https://adsense.google.com/) | Monetización de audiencia general con bloques responsivos, tarjetas integradas y archivo `ads.txt` oficial |
 | [deep-translator](https://github.com/nidhaloff/deep-translator) (Google) | Traducción dinámica de sinopsis con almacenamiento en caché |
-| [UptimeRobot](https://uptimerobot.com/) | Monitorización continua y mantenimiento activo 24/7 mediante `GET /health` |
+| [UptimeRobot](https://uptimerobot.com/) | Monitorización continua y mantenimiento activo 24/7 mediante `GET /health` y `HEAD /health` |
 
 ---
 
@@ -63,6 +64,7 @@ Pathd cuenta con un sistema de roles y privilegios que personaliza la experienci
 - Acceso a la comunidad, feed social, valoraciones y reseñas.
 
 ### 👑 Pathd Premium / VIP / Admin
+- **Experiencia 100% Libre de Publicidad (Ad-Free)**: Cero anuncios en todas las vistas de la aplicación.
 - **Personalización Completa del Perfil**: Subida de avatar, banner y fondo de pantalla personalizado, además de selección de color de acento propio.
 - **Hasta 70 Obras Destacadas**: Expansión del escaparate de favoritos en el perfil.
 - **Guías Privadas y No Listadas**: Creación de guías cronológicas secretas o accesibles solo mediante enlace directo.
@@ -131,7 +133,8 @@ Panel completo de gestión y moderación disponible exclusivamente para administ
 ### Health Check (`/health`)
 | Método | Ruta | Descripción |
 |---|---|---|
-| GET | `/health` | Endpoint de monitorización utilizado por UptimeRobot para mantener activo el servicio |
+| `GET`, `HEAD`, `POST`, `OPTIONS` | `/health` | Endpoint de monitorización utilizado por UptimeRobot para verificar estado 24/7 con código `200 OK` |
+| `GET`, `HEAD`, `POST`, `OPTIONS` | `/api/v1/health` | Alias del endpoint de salud bajo el prefijo general de la API |
 
 ### Autenticación (`/api/v1/auth`)
 | Método | Ruta | Descripción |
