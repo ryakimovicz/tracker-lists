@@ -38,8 +38,9 @@ const renderMap = [
   { svg: 'logo-vertical-light.svg', png: 'logo-vertical-tagline-light.png', width: 1000 },
   { svg: 'logo-vertical-transparent.svg', png: 'logo-vertical-tagline-transparent.png', width: 1000 },
 
-  // 6. Product Premium Badge
-  { svg: 'product-premium.svg', png: 'product-premium.png', width: 512 }
+  // 6. Product Premium Badge & Storefront Banner
+  { svg: 'product-premium.svg', png: 'product-premium.png', width: 512 },
+  { svg: 'storefront-banner.svg', png: 'storefront-banner.png', width: 1200 }
 ];
 
 console.log('Rendering 1:1 vector SVGs to high-res PNGs with Resvg Rust engine...');
