@@ -2977,7 +2977,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                           borderRadius: '4px',
                           fontWeight: 700
                         }}>
-                          PRO
+                          PREMIUM
                         </span>
                       </div>
                       <div style={{

@@ -209,11 +209,19 @@ def get_library_item_consumption_history(
         ConsumptionHistory.external_id == item.external_id
     ).order_by(ConsumptionHistory.consumed_at.desc()).all()
     
-    # Fallback if no history yet but completed_at exists
-    result_dates = [ch.consumed_at for ch in history]
-    if not result_dates and item.completed_at:
-        result_dates = [item.completed_at]
+    # If no history records yet, but item was completed, backfill the original completion date
+    if not history and item.completed_at:
+        ch = ConsumptionHistory(
+            user_id=current_user.id,
+            item_type=item.item_type.value if hasattr(item.item_type, 'value') else item.item_type,
+            external_id=item.external_id,
+            consumed_at=item.completed_at
+        )
+        db.add(ch)
+        db.commit()
+        history = [ch]
         
+    result_dates = [ch.consumed_at for ch in history]
     return {
         "count": len(result_dates),
         "history": result_dates
@@ -449,11 +457,27 @@ def update_library_item(
         
         # Set completed_at date
         if item_in.status in (UserLibraryStatusEnum.COMPLETED, UserLibraryStatusEnum.READ):
-            lib_item.completed_at = datetime.now(timezone.utc)
+            now_dt = datetime.now(timezone.utc)
+            lib_item.completed_at = now_dt
             if lib_item.item_type == "series" and lib_item.tracking_list_id:
                 last_title = bulk_complete_series_episodes(db, current_user.id, lib_item.tracking_list_id, lib_item.external_id, lib_item.title)
                 if last_title:
                     lib_item.last_seen_episode = last_title
+            
+            # Ensure at least initial consumption is recorded in ConsumptionHistory
+            from app.models.consumption import ConsumptionHistory
+            has_history = db.query(ConsumptionHistory).filter(
+                ConsumptionHistory.user_id == current_user.id,
+                ConsumptionHistory.external_id == lib_item.external_id
+            ).first()
+            if not has_history:
+                ch = ConsumptionHistory(
+                    user_id=current_user.id,
+                    item_type=lib_item.item_type.value if hasattr(lib_item.item_type, 'value') else lib_item.item_type,
+                    external_id=lib_item.external_id,
+                    consumed_at=now_dt
+                )
+                db.add(ch)
         else:
             lib_item.completed_at = None
             
