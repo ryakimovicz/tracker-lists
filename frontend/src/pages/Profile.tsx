@@ -465,6 +465,15 @@ export const Profile: React.FC = () => {
     if (!targetItem) return;
 
     if (!currentFav) {
+      const isUnconsumed = ['plan_to_watch', 'plan_to_read', 'plan_to_play'].includes(targetItem.status);
+      if (isUnconsumed) {
+        setErrorMsg(language === 'es' 
+          ? 'Solo puedes destacar elementos que hayas empezado a consumir o completado.' 
+          : 'You can only feature items that you have started or completed.');
+        setTimeout(() => setErrorMsg(''), 5000);
+        return;
+      }
+
       const isPro = Boolean(profile?.is_pro || currentUser?.is_pro);
       const sameCategoryFavs = displayedFavorites.filter(f => f.item_type === targetItem.item_type);
       const maxAllowed = isPro ? 10 : 1;
@@ -1277,6 +1286,7 @@ export const Profile: React.FC = () => {
                             
                             {(() => {
                               const isEffectiveFav = displayedFavorites.some(df => df.id === item.id);
+                              const isUnconsumed = ['plan_to_watch', 'plan_to_read', 'plan_to_play'].includes(item.status);
                               return (
                                 <button
                                   onClick={(e) => {
@@ -1295,11 +1305,17 @@ export const Profile: React.FC = () => {
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
-                                    cursor: 'pointer',
+                                    cursor: isUnconsumed && !isEffectiveFav ? 'not-allowed' : 'pointer',
+                                    opacity: isUnconsumed && !isEffectiveFav ? 0.35 : 1,
                                     color: isEffectiveFav ? 'var(--accent-primary)' : 'var(--text-secondary)',
                                     transition: 'transform 0.2s ease'
                                   }}
-                                  title={language === 'es' ? 'Destacar' : 'Favorite'}
+                                  title={isUnconsumed && !isEffectiveFav
+                                    ? (language === 'es' ? 'Empieza a consumir esta obra para poder destacarla' : 'Start consuming this item to feature it')
+                                    : (isEffectiveFav
+                                      ? (language === 'es' ? 'Quitar Destacado' : 'Remove Featured')
+                                      : (language === 'es' ? 'Destacar' : 'Favorite'))
+                                  }
                                 >
                                   <Heart size={16} fill={isEffectiveFav ? 'var(--accent-primary)' : 'none'} />
                                 </button>

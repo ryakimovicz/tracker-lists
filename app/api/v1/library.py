@@ -432,6 +432,13 @@ def update_library_item(
         
     if item_in.is_favorite is not None:
         if item_in.is_favorite and not lib_item.is_favorite:
+            # Cannot favorite unconsumed items (plan_to_watch, plan_to_read, plan_to_play)
+            if lib_item.status in (UserLibraryStatusEnum.PLAN_TO_WATCH, UserLibraryStatusEnum.PLAN_TO_READ, UserLibraryStatusEnum.PLAN_TO_PLAY):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Solo puedes destacar elementos que hayas empezado a consumir o completado."
+                )
+
             # Check limits per category: 1 for free, 10 for pro/admin/vip
             is_pro_user = bool(getattr(current_user, 'is_pro', False) or getattr(current_user, 'is_admin', False) or getattr(current_user, 'is_vip', False))
             existing_favs = db.query(UserLibraryItem).filter(

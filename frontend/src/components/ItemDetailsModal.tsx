@@ -1724,13 +1724,17 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                   )}
 
                   {/* Favorite button for Series/Anime or 3-dots for other items */}
-                  {user && selectedItem?.id && !isEpisode && (
-                    (selectedItem?.item_type === 'series' || selectedItem?.item_type === 'anime') ? (
+                  {user && selectedItem?.id && !isEpisode && (() => {
+                    const isUnconsumed = ['plan_to_watch', 'plan_to_read', 'plan_to_play'].includes(selectedItem?.status);
+                    return (selectedItem?.item_type === 'series' || selectedItem?.item_type === 'anime') ? (
                       <button
                         type="button"
+                        disabled={isUnconsumed && !isFavorite}
                         onClick={() => onToggleFavorite && onToggleFavorite(selectedItem.id, isFavorite)}
                         className="btn-secondary"
-                        title={isFavorite
+                        title={isUnconsumed && !isFavorite
+                          ? (language === 'es' ? 'Empieza a ver la serie para poder destacarla' : 'Start watching to feature this series')
+                          : isFavorite
                           ? (language === 'es' ? 'Quitar Destacado' : 'Remove Featured')
                           : (language === 'es' ? 'Destacar (Favorito)' : 'Feature (Favorite)')
                         }
@@ -1740,7 +1744,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          cursor: 'pointer',
+                          cursor: (isUnconsumed && !isFavorite) ? 'not-allowed' : 'pointer',
+                          opacity: (isUnconsumed && !isFavorite) ? 0.4 : 1,
                           color: isFavorite ? 'var(--accent-primary)' : 'var(--text-secondary)',
                           border: isFavorite ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)',
                           background: isFavorite ? 'rgba(124, 58, 237, 0.1)' : 'transparent',
