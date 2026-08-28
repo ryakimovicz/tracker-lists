@@ -839,6 +839,9 @@ export const Home: React.FC = () => {
       {/* Activity Feed (Only visible on 'Guías' tab) */}
       {activeTab === "guides" && (
         <>
+          {/* AdBanner before updates in followed guides */}
+          <AdBanner style={{ margin: "1rem auto 2rem auto" }} />
+
           <h3 style={{ fontSize: "1.2rem", marginBottom: "0.5rem", fontWeight: 600 }}>{language === 'es' ? 'Novedades en guías seguidas' : 'Updates in followed guides'}</h3>
           <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
             {guideUpdates.length > 0 ? guideUpdates.map(update => {

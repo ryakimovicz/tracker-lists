@@ -588,7 +588,14 @@ export const Search: React.FC = () => {
       {/* Search Results Display */}
       {filteredResults.length > 0 && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1.5rem' }}>
-          {filteredResults.map((item) => {
+          {filteredResults.map((item, index) => {
+            const shouldShowAdBefore = index === 4 || (index > 4 && (index - 4) % 8 === 0);
+            return (
+              <React.Fragment key={`${item.external_id}-${item.item_type}`}>
+                {shouldShowAdBefore && (
+                  <AdBanner variant="card" style={{ width: '100%', minWidth: 'unset', height: '100%' }} />
+                )}
+                {(() => {
             if (item.item_type === 'user') {
               const isFollowing = followingUsers.some(u => String(u.id) === item.external_id);
               const isMe = currentUser && String(currentUser.id) === item.external_id;
@@ -708,6 +715,9 @@ export const Search: React.FC = () => {
                   </div>
                 )}
               </div>
+            );
+            })()}
+            </React.Fragment>
             );
           })}
         </div>

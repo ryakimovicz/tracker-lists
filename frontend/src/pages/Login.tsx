@@ -6,6 +6,7 @@ import { apiClient } from '../api/client';
 import { Mail, Lock, AlertCircle, LogIn, Eye, EyeOff } from 'lucide-react';
 import { GoogleLogin, type CredentialResponse } from '@react-oauth/google';
 import { GoogleUsernameModal } from '../components/GoogleUsernameModal';
+import { AdBanner } from '../components/AdBanner';
 
 export const Login: React.FC = () => {
   const { login, isAuthenticated } = useAuth();
@@ -290,6 +291,9 @@ export const Login: React.FC = () => {
           </Link>
         </p>
       </form>
+
+      {/* Non-intrusive bottom sponsor / AdBanner */}
+      <AdBanner style={{ maxWidth: '440px', margin: '1.5rem auto 0 auto' }} />
 
       <GoogleUsernameModal
         isOpen={showGoogleModal}

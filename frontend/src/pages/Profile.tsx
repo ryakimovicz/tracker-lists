@@ -1672,6 +1672,9 @@ export const Profile: React.FC = () => {
         </div>
       )}
 
+      {/* AdBanner placed directly above Activity History */}
+      <AdBanner style={{ margin: '1.5rem auto 2.5rem auto' }} />
+
       {/* History log in footer */}
       <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '2rem', textAlign: 'left' }}>
         <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
@@ -2076,9 +2079,6 @@ export const Profile: React.FC = () => {
           </div>
         </div>
       )}
-
-      {/* Non-intrusive Profile Bottom AdBanner */}
-      <AdBanner />
 
       {/* Avatar Selector Modal */}
       <AvatarSelectorModal

@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from '../context/LanguageContext';
 import { Flame, Star, Compass, Layers } from 'lucide-react';
+import { AdBanner } from '../components/AdBanner';
 
 export const Landing: React.FC = () => {
   const { t, language } = useTranslation();
@@ -65,6 +66,9 @@ export const Landing: React.FC = () => {
         </div>
       </section>
 
+
+      {/* AdBanner Sponsor */}
+      <AdBanner style={{ margin: '2rem auto 0 auto' }} />
 
       {/* Footer */}
       <footer style={{

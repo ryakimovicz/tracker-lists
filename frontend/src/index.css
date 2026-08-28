@@ -158,6 +158,16 @@ body {
   padding: 2rem 1.5rem;
 }
 
+.right-ad-sidebar {
+  display: none !important;
+}
+
+@media (min-width: 1440px) {
+  .right-ad-sidebar {
+    display: flex !important;
+  }
+}
+
 /* Typography & Headers */
 h1, h2, h3, h4, h5, h6 {
   font-weight: 600;

@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { ProModal } from '../components/ProModal';
+import { AdBanner } from '../components/AdBanner';
 
 // ============================================================================
 // FEATURE FLAG: SECCIÓN EN DESARROLLO
@@ -1502,6 +1503,7 @@ export const CreateGuide: React.FC = () => {
           <button type="submit" disabled={isSubmitting} className="btn-primary" style={{ marginTop: '1rem' }}>
             {language === 'es' ? 'Crear Guía' : 'Create Guide'} <ArrowRight size={18} />
           </button>
+          <AdBanner style={{ marginTop: '2rem' }} />
         </form>
       ) : (
         /* STEP 2: RICH DOCUMENT-STYLE EDITOR CANVAS */

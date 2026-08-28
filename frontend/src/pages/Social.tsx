@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
 import { Link, useNavigate } from 'react-router-dom';
+import { AdBanner } from '../components/AdBanner';
 
 export const Social: React.FC = () => {
   const [feed, setFeed] = useState<any[]>([]);
@@ -149,6 +150,9 @@ export const Social: React.FC = () => {
           })
         )}
       </div>
+
+      {/* Non-intrusive bottom sponsor / AdBanner */}
+      <AdBanner />
     </div>
   );
 };

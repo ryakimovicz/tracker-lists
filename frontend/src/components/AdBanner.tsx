@@ -3,13 +3,15 @@ import { useAuth } from '../context/AuthContext';
 
 interface AdBannerProps {
   slotId?: string;
-  format?: 'auto' | 'fluid' | 'rectangle' | 'horizontal';
+  variant?: 'banner' | 'card' | 'skyscraper';
+  format?: 'auto' | 'fluid' | 'rectangle' | 'horizontal' | 'vertical';
   style?: React.CSSProperties;
   className?: string;
 }
 
 export const AdBanner: React.FC<AdBannerProps> = ({
   slotId,
+  variant = 'banner',
   format = 'auto',
   style = {},
   className = ''
@@ -36,10 +38,120 @@ export const AdBanner: React.FC<AdBannerProps> = ({
         isAdPushed.current = true;
       }
     } catch (err) {
-      // Ignore initial render or ad-blocker errors gracefully
+      // Ignore errors
     }
   }, [isLocalDev]);
 
+  // Dimensions based on variant
+  if (variant === 'card') {
+    return (
+      <div
+        className={`glass-card ${className}`}
+        style={{
+          padding: '1rem',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '0.75rem',
+          minWidth: '160px',
+          width: '160px',
+          height: '310px',
+          boxSizing: 'border-box',
+          overflow: 'hidden',
+          ...style
+        }}
+        ref={adRef}
+      >
+        {isLocalDev ? (
+          <div
+            style={{
+              width: '100%',
+              height: '100%',
+              border: '1px dashed rgba(255, 255, 255, 0.2)',
+              borderRadius: '8px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              textAlign: 'center',
+              padding: '0.5rem',
+              color: 'var(--text-muted)',
+              fontSize: '0.75rem',
+              background: 'rgba(255, 255, 255, 0.02)',
+              boxSizing: 'border-box'
+            }}
+          >
+            <div style={{ fontSize: '1.2rem', marginBottom: '0.25rem' }}>📢</div>
+            <div style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Anuncio</div>
+            <div style={{ fontSize: '0.65rem', opacity: 0.7, marginTop: '0.25rem' }}>Tarjeta patrocinada</div>
+          </div>
+        ) : (
+          <ins
+            className="adsbygoogle"
+            style={{ display: 'block', width: '100%', height: '100%' }}
+            data-ad-client="ca-pub-7081495763188158"
+            data-ad-slot={slotId || '7081495763188158'}
+            data-ad-format="rectangle"
+          />
+        )}
+      </div>
+    );
+  }
+
+  if (variant === 'skyscraper') {
+    return (
+      <div
+        className={className}
+        style={{
+          width: '160px',
+          minHeight: '600px',
+          overflow: 'hidden',
+          boxSizing: 'border-box',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          ...style
+        }}
+        ref={adRef}
+      >
+        {isLocalDev ? (
+          <div
+            style={{
+              width: '100%',
+              height: '600px',
+              border: '1px dashed rgba(255, 255, 255, 0.18)',
+              borderRadius: '4px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              textAlign: 'center',
+              padding: '1rem',
+              color: 'var(--text-muted)',
+              fontSize: '0.75rem',
+              background: 'rgba(255, 255, 255, 0.02)',
+              boxSizing: 'border-box'
+            }}
+          >
+            <div style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>📢</div>
+            <div style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Publicidad Lateral</div>
+            <div style={{ fontSize: '0.65rem', opacity: 0.7, marginTop: '0.25rem' }}>160×600</div>
+          </div>
+        ) : (
+          <ins
+            className="adsbygoogle"
+            style={{ display: 'block', width: '160px', height: '600px' }}
+            data-ad-client="ca-pub-7081495763188158"
+            data-ad-slot={slotId || '7081495763188158'}
+            data-ad-format="vertical"
+          />
+        )}
+      </div>
+    );
+  }
+
+  // Default: Banner horizontal
   return (
     <div
       className={className}

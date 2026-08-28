@@ -29,6 +29,7 @@ const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '831175761004-
 
 import { CookieBanner } from './components/CookieBanner';
 import { SuspendedAccountModal } from './components/SuspendedAccountModal';
+import { RightSidebarAd } from './components/RightSidebarAd';
 
 function AppRoutes() {
   const { isAuthenticated } = useAuth();
@@ -114,6 +115,7 @@ function AppRoutes() {
             />
           </Routes>
         </main>
+        <RightSidebarAd />
         <CookieBanner />
       </div>
     </Router>
