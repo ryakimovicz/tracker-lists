@@ -1048,7 +1048,7 @@ export const Home: React.FC = () => {
                   style={{ background: "var(--bg-secondary)", padding: "1rem", borderRadius: "8px", border: "1px solid var(--border-color)", display: "flex", alignItems: "center", gap: "1rem", cursor: "pointer", transition: "transform 0.2s ease, box-shadow 0.2s ease" }}
                 >
                   <div
-                    onClick={(e) => { e.stopPropagation(); navigate(`/profile?user_id=${update.user_id}`); }}
+                    onClick={(e) => { e.stopPropagation(); navigate(`/user/${encodeURIComponent(update.username)}`); }}
                     style={{ cursor: "pointer" }}
                     className="feed-update-user-link"
                   >
@@ -1062,7 +1062,7 @@ export const Home: React.FC = () => {
                     <div style={{ fontSize: "0.95rem" }}>
                       <span 
                         className="feed-update-user-link"
-                        onClick={(e) => { e.stopPropagation(); navigate(`/profile?user_id=${update.user_id}`); }}
+                        onClick={(e) => { e.stopPropagation(); navigate(`/user/${encodeURIComponent(update.username)}`); }}
                         style={{ fontWeight: 600, cursor: "pointer", transition: "color 0.2s ease" }}
                       >{update.username}</span> {text} <span className="feed-update-guide" style={{ fontStyle: "italic", transition: "color 0.2s ease" }}>{update.list_title}</span>
                     </div>

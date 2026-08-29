@@ -630,7 +630,7 @@ export const AdminPanel: React.FC = () => {
               </div>
 
               <a
-                href={`/profile?user_id=${selectedUser.id}`}
+                href={`/user/${encodeURIComponent(selectedUser.username)}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="btn-secondary"

@@ -680,13 +680,18 @@ def get_guides_updates(
                 pass
     return result
 
-@router.get("/profile/{user_id}", response_model=UserDashboardResponse)
+@router.get("/profile/{user_identifier}", response_model=UserDashboardResponse)
 def get_any_user_profile(
-    user_id: int,
+    user_identifier: str,
     current_user: Optional[User] = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
-    user = db.query(User).filter(User.id == user_id).first()
+    user = None
+    if user_identifier.isdigit():
+        user = db.query(User).filter(User.id == int(user_identifier)).first()
+    if not user:
+        user = db.query(User).filter(User.username.ilike(user_identifier)).first()
+        
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
         

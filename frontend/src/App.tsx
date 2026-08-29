@@ -72,6 +72,14 @@ function AppRoutes() {
               }
             />
             <Route
+              path="/user/:username"
+              element={
+                <RouteGuard>
+                  <Profile />
+                </RouteGuard>
+              }
+            />
+            <Route
               path="/guide/:id"
               element={
                 <RouteGuard>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, useParams, Link } from 'react-router-dom';
 import { useTranslation } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
@@ -114,8 +114,10 @@ export const Profile: React.FC = () => {
   const { theme } = useTheme();
   const { refreshProfile } = useAuth();
   const navigate = useNavigate();
+  const { username: usernameParam } = useParams<{ username?: string }>();
   const [searchParams] = useSearchParams();
   const userIdParam = searchParams.get('user_id');
+  const targetUserIdentifier = usernameParam || userIdParam;
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
 
   const isLight = theme === 'light';
@@ -137,8 +139,6 @@ export const Profile: React.FC = () => {
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
 
-
-
   const [libraryItems, setLibraryItems] = useState<LibraryItem[]>([]);
   const [activeTab, setActiveTab] = useState<'shelf' | 'guides' | 'favorites' | 'music'>('shelf');
   const [mediaFilter, setMediaFilter] = useState<'all' | 'movie' | 'series' | 'anime' | 'book' | 'comic' | 'manga' | 'game'>('all');
@@ -154,7 +154,7 @@ export const Profile: React.FC = () => {
     onConfirm: () => void;
   } | null>(null);
 
-  const isOwnProfile = !userIdParam || String(profile?.id) === String(currentUser?.id);
+  const isOwnProfile = Boolean(!targetUserIdentifier || String(profile?.id) === String(currentUser?.id) || (currentUser?.username && usernameParam?.toLowerCase() === currentUser.username.toLowerCase()));
 
   useEffect(() => {
     if (libraryItems.length > 0) {
@@ -325,7 +325,7 @@ export const Profile: React.FC = () => {
     return () => {
       window.removeEventListener('profile-updated', handleProfileUpdate);
     };
-  }, [userIdParam]);
+  }, [usernameParam, userIdParam]);
 
 
   const fetchProfileAndLibrary = async () => {
@@ -335,11 +335,12 @@ export const Profile: React.FC = () => {
       const meRes = await apiClient.get('/users/me');
       setCurrentUser(meRes.data);
 
-      const targetProfileUrl = userIdParam ? `/users/profile/${userIdParam}` : '/users/me';
+      const targetProfileUrl = targetUserIdentifier ? `/users/profile/${targetUserIdentifier}` : '/users/me';
       const profileRes = await apiClient.get(targetProfileUrl);
       setProfile(profileRes.data);
 
-      const targetLibraryUrl = userIdParam ? `/library/?user_id=${userIdParam}` : '/library/';
+      const targetId = profileRes.data.id;
+      const targetLibraryUrl = (targetUserIdentifier && targetId !== meRes.data.id) ? `/library/?user_id=${targetId}` : '/library/';
       const libraryRes = await apiClient.get(targetLibraryUrl);
       setLibraryItems(libraryRes.data);
 
@@ -348,13 +349,12 @@ export const Profile: React.FC = () => {
       setFavorites(favs);
 
       // Fetch user activities
-      const targetActivityUrl = userIdParam ? `/users/${userIdParam}/activity` : '/users/me/activity';
+      const targetActivityUrl = (targetUserIdentifier && targetId !== meRes.data.id) ? `/users/${targetId}/activity` : '/users/me/activity';
       const activityRes = await apiClient.get(targetActivityUrl);
       setActivities(activityRes.data);
       
       // Fetch Last.fm data if applicable
       const targetLastfmUser = profileRes.data.lastfm_username;
-      const targetId = profileRes.data.id;
       if (targetLastfmUser) {
         try {
           const targetNpUrl = `/users/${targetId}/music/now-playing`;
@@ -2090,7 +2090,7 @@ export const Profile: React.FC = () => {
                             <div 
                               onClick={() => {
                                 setShowFollowModal(false);
-                                navigate(`/profile?user_id=${u.id}`);
+                                navigate(`/user/${encodeURIComponent(u.username)}`);
                               }}
                               style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', cursor: 'pointer', flex: 1, minWidth: 0 }}
                               title={language === 'es' ? `Ver perfil de ${u.username}` : `View ${u.username}'s profile`}

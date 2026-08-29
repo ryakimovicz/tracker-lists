@@ -545,7 +545,10 @@ export const ViewGuide: React.FC = () => {
                 {language === 'es' ? 'Creada por' : 'Created by'}
               </span>
               <div
-                onClick={() => guide.creator_id && navigate(`/profile?user_id=${guide.creator_id}`)}
+                onClick={() => {
+                  const target = guide.creator_username || guide.creator_id;
+                  if (target) navigate(`/user/${encodeURIComponent(String(target))}`);
+                }}
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
