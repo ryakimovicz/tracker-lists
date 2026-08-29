@@ -357,8 +357,8 @@ export const Profile: React.FC = () => {
       const targetId = profileRes.data.id;
       if (targetLastfmUser) {
         try {
-          const targetNpUrl = isOwnProfile ? '/users/me/music/now-playing' : `/users/${targetId}/music/now-playing`;
-          const targetTaUrl = isOwnProfile ? '/users/me/music/top-albums' : `/users/${targetId}/music/top-albums`;
+          const targetNpUrl = `/users/${targetId}/music/now-playing`;
+          const targetTaUrl = `/users/${targetId}/music/top-albums`;
           const [npRes, taRes] = await Promise.allSettled([
             apiClient.get(targetNpUrl),
             apiClient.get(targetTaUrl)
