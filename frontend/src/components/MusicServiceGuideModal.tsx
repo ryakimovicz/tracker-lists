@@ -10,16 +10,15 @@ interface MusicServiceGuideModalProps {
 export const MusicServiceGuideModal: React.FC<MusicServiceGuideModalProps> = ({ isOpen, onClose }) => {
   const { language } = useTranslation();
   const isEs = language === 'es';
-  const [activeTab, setActiveTab] = useState<'spotify' | 'applemusic' | 'ytmusic' | 'deezer_tidal' | 'other'>('spotify');
+  const [activeTab, setActiveTab] = useState<'spotify' | 'applemusic' | 'ytmusic_other' | 'deezer_tidal'>('spotify');
 
   if (!isOpen) return null;
 
   const platforms = [
-    { id: 'spotify', name: 'Spotify', icon: '🟢' },
-    { id: 'applemusic', name: 'Apple Music', icon: '🍎' },
-    { id: 'ytmusic', name: 'YouTube Music', icon: '🔴' },
-    { id: 'deezer_tidal', name: 'Deezer / Tidal', icon: '🟣' },
-    { id: 'other', name: isEs ? 'Otros Reproductores' : 'Other Players', icon: '🎧' },
+    { id: 'spotify', name: 'Spotify' },
+    { id: 'applemusic', name: 'Apple Music' },
+    { id: 'ytmusic_other', name: isEs ? 'YT Music / Otros' : 'YT Music / Other' },
+    { id: 'deezer_tidal', name: 'Deezer / Tidal' },
   ];
 
   return (
@@ -41,7 +40,7 @@ export const MusicServiceGuideModal: React.FC<MusicServiceGuideModalProps> = ({ 
         className="glass-card"
         style={{
           width: '100%',
-          maxWidth: '620px',
+          maxWidth: '580px',
           maxHeight: '90vh',
           background: 'var(--bg-secondary)',
           borderRadius: '16px',
@@ -106,11 +105,11 @@ export const MusicServiceGuideModal: React.FC<MusicServiceGuideModalProps> = ({ 
           </button>
         </div>
 
-        {/* Platform Tabs */}
+        {/* Platform Tabs (4 Columns, No Emojis, Perfect Fit) */}
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(5, 1fr)',
+            gridTemplateColumns: 'repeat(4, 1fr)',
             gap: '0.35rem',
             padding: '0.65rem 1rem',
             borderBottom: '1px solid var(--border-color)',
@@ -128,21 +127,22 @@ export const MusicServiceGuideModal: React.FC<MusicServiceGuideModalProps> = ({ 
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: '0.3rem',
-                  padding: '0.5rem 0.25rem',
+                  padding: '0.55rem 0.35rem',
                   borderRadius: '8px',
                   border: isActive ? '1px solid var(--accent-primary)' : '1px solid transparent',
                   background: isActive ? 'var(--bg-secondary)' : 'transparent',
                   color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
                   fontWeight: isActive ? 600 : 500,
-                  fontSize: '0.78rem',
+                  fontSize: '0.8rem',
                   cursor: 'pointer',
                   textAlign: 'center',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
                   transition: 'all 0.15s ease',
                 }}
               >
-                <span style={{ fontSize: '0.9rem' }}>{p.icon}</span>
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</span>
+                {p.name}
               </button>
             );
           })}
@@ -164,48 +164,74 @@ export const MusicServiceGuideModal: React.FC<MusicServiceGuideModalProps> = ({ 
           {/* Spotify */}
           {activeTab === 'spotify' && (
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
-                <span style={{ fontSize: '1.3rem' }}>🟢</span>
-                <h4 style={{ margin: 0, fontSize: '1rem', color: 'var(--text-primary)', fontWeight: 700 }}>
-                  Spotify (Conexión Directa en la Nube)
-                </h4>
-              </div>
+              <h4 style={{ margin: '0 0 0.6rem 0', fontSize: '1rem', color: 'var(--text-primary)', fontWeight: 700 }}>
+                Spotify (Conexión Directa)
+              </h4>
               <p style={{ margin: '0 0 1rem 0' }}>
                 {isEs
-                  ? 'Spotify es el servicio más fácil de conectar porque se sincroniza directamente desde la nube de Last.fm sin necesidad de instalar extensiones ni aplicaciones adicionales.'
-                  : 'Spotify is the easiest service to connect as it syncs directly via Last.fm cloud without installing extensions or extra apps.'}
+                  ? 'Spotify se sincroniza directamente desde la nube de Last.fm sin necesidad de extensiones ni programas adicionales.'
+                  : 'Spotify syncs directly via Last.fm cloud without requiring extensions or extra apps.'}
               </p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', marginBottom: '1.25rem' }}>
                 <div style={{ display: 'flex', gap: '0.6rem' }}>
                   <span style={{ fontWeight: 700, color: 'var(--accent-primary)' }}>1.</span>
                   <span>
-                    {isEs ? 'Entra a ' : 'Go to '}
-                    <a
-                      href="https://www.last.fm/settings/applications"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{ color: 'var(--accent-primary)', textDecoration: 'underline', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}
-                    >
-                      last.fm/settings/applications <ExternalLink size={12} />
-                    </a>
+                    {isEs ? 'Accede a la sección de aplicaciones de Last.fm:' : 'Access the Last.fm applications settings:'}
                   </span>
                 </div>
+
+                <div style={{ paddingLeft: '1.25rem' }}>
+                  <a
+                    href="https://www.last.fm/settings/applications"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn-primary"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.45rem',
+                      fontSize: '0.85rem',
+                      padding: '0.55rem 1.1rem',
+                      background: '#d51007',
+                      color: '#fff',
+                      border: 'none',
+                      textDecoration: 'none',
+                      borderRadius: '8px'
+                    }}
+                  >
+                    <ExternalLink size={14} />
+                    {isEs ? 'Abrir Configuración de Last.fm' : 'Open Last.fm Settings'}
+                  </a>
+                </div>
+
                 <div style={{ display: 'flex', gap: '0.6rem' }}>
                   <span style={{ fontWeight: 700, color: 'var(--accent-primary)' }}>2.</span>
                   <span>
                     {isEs
-                      ? 'En la sección "Spotify Scrobbling", haz clic en el botón rojo "Connect" / "Conectar".'
-                      : 'Under the "Spotify Scrobbling" section, click the red "Connect" button.'}
+                      ? 'En la opción "Spotify Scrobbling" (Registro de reproducciones), haz clic en el botón "Connect" / "Conectar".'
+                      : 'In the "Spotify Scrobbling" option, click the "Connect" button.'}
                   </span>
                 </div>
+
                 <div style={{ display: 'flex', gap: '0.6rem' }}>
                   <span style={{ fontWeight: 700, color: 'var(--accent-primary)' }}>3.</span>
                   <span>
                     {isEs
-                      ? 'Inicia sesión con tu cuenta de Spotify y autoriza los permisos. ¡Listo! Cualquier canción que escuches en PC, celular o consola se reflejará en Pathd automáticamente.'
-                      : 'Log in with your Spotify account and authorize permissions. Done! Everything you play on PC, mobile, or console will sync to Pathd.'}
+                      ? 'Inicia sesión con tu cuenta de Spotify y autoriza los permisos. Toda tu música escuchada en PC, celular o consola se reflejará en Pathd automáticamente.'
+                      : 'Log in with your Spotify account and accept permissions. Everything you play on PC, mobile or console will sync to Pathd.'}
                   </span>
                 </div>
+              </div>
+
+              {/* Distinction note between Scrobbling and Playback */}
+              <div style={{ background: 'var(--bg-tertiary)', padding: '0.85rem 1rem', borderRadius: '10px', fontSize: '0.82rem', border: '1px solid var(--border-color)' }}>
+                <strong style={{ color: 'var(--text-primary)', display: 'block', marginBottom: '0.2rem' }}>
+                  {isEs ? 'Nota importante:' : 'Important note:'}
+                </strong>
+                {isEs
+                  ? 'Debes activar "Spotify Scrobbling" (que registra lo que escuchas). La opción "Spotify Playback" es solo para reproducir audio dentro de la propia web de Last.fm y no es necesaria para Pathd.'
+                  : 'Make sure to connect "Spotify Scrobbling" (which tracks your listening). "Spotify Playback" only plays audio on the Last.fm website itself and is not required for Pathd.'}
               </div>
             </div>
           )}
@@ -213,16 +239,13 @@ export const MusicServiceGuideModal: React.FC<MusicServiceGuideModalProps> = ({ 
           {/* Apple Music */}
           {activeTab === 'applemusic' && (
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
-                <span style={{ fontSize: '1.3rem' }}>🍎</span>
-                <h4 style={{ margin: 0, fontSize: '1rem', color: 'var(--text-primary)', fontWeight: 700 }}>
-                  Apple Music
-                </h4>
-              </div>
+              <h4 style={{ margin: '0 0 0.6rem 0', fontSize: '1rem', color: 'var(--text-primary)', fontWeight: 700 }}>
+                Apple Music
+              </h4>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 <div style={{ background: 'var(--bg-tertiary)', padding: '1rem', borderRadius: '10px' }}>
                   <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
-                    📱 {isEs ? 'En iPhone / iPad (iOS)' : 'On iPhone / iPad (iOS)'}
+                    {isEs ? 'En iPhone / iPad (iOS)' : 'On iPhone / iPad (iOS)'}
                   </div>
                   <ol style={{ margin: 0, paddingLeft: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                     <li>
@@ -234,42 +257,39 @@ export const MusicServiceGuideModal: React.FC<MusicServiceGuideModalProps> = ({ 
                       {isEs ? 'Inicia sesión con tu cuenta de Last.fm y dale permiso para acceder a tu biblioteca musical de Apple Music.' : 'Log in with your Last.fm account and grant access to your Apple Music library.'}
                     </li>
                     <li>
-                      {isEs ? 'Abre la app de Last.fm ocasionalmente para sincronizar los scrobbles acumulados.' : 'Open the Last.fm app periodically to submit your queued scrobbles.'}
+                      {isEs ? 'Abre la app de Last.fm periódicamente para sincronizar las canciones escuchadas.' : 'Open the Last.fm app periodically to submit your queued scrobbles.'}
                     </li>
                   </ol>
                 </div>
 
                 <div style={{ background: 'var(--bg-tertiary)', padding: '1rem', borderRadius: '10px' }}>
                   <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
-                    💻 {isEs ? 'En PC / Mac o Web' : 'On PC / Mac or Web'}
+                    {isEs ? 'En Navegador Web (music.apple.com)' : 'On Web Browser (music.apple.com)'}
                   </div>
                   <p style={{ margin: 0 }}>
                     {isEs
-                      ? 'Si escuchas Apple Music desde el navegador (music.apple.com), instala la extensión gratuita Web Scrobbler (disponible para Chrome, Brave, Firefox, Edge).'
-                      : 'If listening via the browser (music.apple.com), install the free Web Scrobbler extension (Chrome, Brave, Firefox, Edge).'}
+                      ? 'Si escuchas Apple Music desde el navegador, instala la extensión gratuita Web Scrobbler (disponible para Chrome, Brave, Firefox y Edge) y conéctala a tu cuenta de Last.fm.'
+                      : 'If listening via the browser, install the free Web Scrobbler extension (Chrome, Brave, Firefox, Edge) and connect it to your Last.fm account.'}
                   </p>
                 </div>
               </div>
             </div>
           )}
 
-          {/* YouTube Music */}
-          {activeTab === 'ytmusic' && (
+          {/* YouTube Music & Web Players */}
+          {activeTab === 'ytmusic_other' && (
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
-                <span style={{ fontSize: '1.3rem' }}>🔴</span>
-                <h4 style={{ margin: 0, fontSize: '1rem', color: 'var(--text-primary)', fontWeight: 700 }}>
-                  YouTube Music / YouTube
-                </h4>
-              </div>
+              <h4 style={{ margin: '0 0 0.6rem 0', fontSize: '1rem', color: 'var(--text-primary)', fontWeight: 700 }}>
+                YouTube Music, SoundCloud, Bandcamp y Web
+              </h4>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 <div style={{ background: 'var(--bg-tertiary)', padding: '1rem', borderRadius: '10px' }}>
                   <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
-                    💻 {isEs ? 'En Computadora (Navegador Web)' : 'On PC / Mac (Web Browser)'}
+                    {isEs ? 'En Computadora (Navegador Web)' : 'On PC / Mac (Web Browser)'}
                   </div>
                   <ol style={{ margin: 0, paddingLeft: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                     <li>
-                      {isEs ? 'Instala la extensión ' : 'Install the '}
+                      {isEs ? 'Instala la extensión oficial gratuita ' : 'Install the free official extension '}
                       <a
                         href="https://webscrobbler.com"
                         target="_blank"
@@ -278,53 +298,50 @@ export const MusicServiceGuideModal: React.FC<MusicServiceGuideModalProps> = ({ 
                       >
                         Web Scrobbler <ExternalLink size={11} />
                       </a>
-                      {isEs ? ' en tu navegador (Chrome, Firefox, Brave, Edge).' : ' extension in your browser.'}
+                      {isEs ? ' en tu navegador (Chrome, Firefox, Brave, Edge).' : ' in your browser.'}
                     </li>
                     <li>
                       {isEs
-                        ? 'Haz clic en el icono de la extensión y conéctala a tu cuenta de Last.fm.'
+                        ? 'Haz clic en el icono de la extensión y vincúlala con tu cuenta de Last.fm.'
                         : 'Click the extension icon and link it to your Last.fm account.'}
                     </li>
                     <li>
                       {isEs
-                        ? '¡Listo! Detectará automáticamente todo lo que escuches en YouTube Music y YouTube.'
-                        : 'Done! It will automatically detect anything you play on YouTube Music and YouTube.'}
+                        ? 'Detectará automáticamente todo lo que reproduzcas en YouTube Music, YouTube, SoundCloud, Bandcamp y más de 300 plataformas web.'
+                        : 'It will automatically detect anything you play on YouTube Music, YouTube, SoundCloud, Bandcamp, and 300+ web players.'}
                     </li>
                   </ol>
                 </div>
 
                 <div style={{ background: 'var(--bg-tertiary)', padding: '1rem', borderRadius: '10px' }}>
                   <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
-                    📱 {isEs ? 'En Teléfonos Android' : 'On Android Phones'}
+                    {isEs ? 'En Celulares Android' : 'On Android Phones'}
                   </div>
                   <p style={{ margin: 0 }}>
                     {isEs
-                      ? 'Instala la app Pano Scrobbler o la app oficial de Last.fm desde Google Play Store y activa el permiso de notificaciones multimedia.'
-                      : 'Install Pano Scrobbler or official Last.fm app from Google Play Store and enable media notification access.'}
+                      ? 'Instala la app Pano Scrobbler o la app oficial de Last.fm desde Google Play Store y activa el acceso a notificaciones multimedia para registrar YouTube Music o cualquier app de música del celular.'
+                      : 'Install Pano Scrobbler or the official Last.fm app from Google Play Store and enable media notification access to track YouTube Music or any music app on your phone.'}
                   </p>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Deezer / Tidal */}
+          {/* Deezer & Tidal */}
           {activeTab === 'deezer_tidal' && (
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
-                <span style={{ fontSize: '1.3rem' }}>🟣</span>
-                <h4 style={{ margin: 0, fontSize: '1rem', color: 'var(--text-primary)', fontWeight: 700 }}>
-                  Deezer & Tidal (Nativo)
-                </h4>
-              </div>
+              <h4 style={{ margin: '0 0 0.6rem 0', fontSize: '1rem', color: 'var(--text-primary)', fontWeight: 700 }}>
+                Deezer & Tidal
+              </h4>
               <p style={{ margin: '0 0 1rem 0' }}>
                 {isEs
-                  ? 'Tanto Deezer como Tidal cuentan con integración directa oficial con Last.fm construida dentro de sus propias aplicaciones.'
-                  : 'Both Deezer and Tidal feature built-in native Last.fm integration inside their own settings.'}
+                  ? 'Tanto Deezer como Tidal cuentan con integración nativa con Last.fm dentro de sus propias aplicaciones.'
+                  : 'Both Deezer and Tidal feature native Last.fm integration inside their own applications.'}
               </p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 <div style={{ background: 'var(--bg-tertiary)', padding: '1rem', borderRadius: '10px' }}>
                   <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
-                    🎵 Deezer
+                    Deezer
                   </div>
                   <span>
                     {isEs
@@ -334,7 +351,7 @@ export const MusicServiceGuideModal: React.FC<MusicServiceGuideModalProps> = ({ 
                 </div>
                 <div style={{ background: 'var(--bg-tertiary)', padding: '1rem', borderRadius: '10px' }}>
                   <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
-                    🌊 Tidal
+                    Tidal
                   </div>
                   <span>
                     {isEs
@@ -342,30 +359,6 @@ export const MusicServiceGuideModal: React.FC<MusicServiceGuideModalProps> = ({ 
                       : 'Open Tidal app -> Settings -> Account -> Connect Last.fm.'}
                   </span>
                 </div>
-              </div>
-            </div>
-          )}
-
-          {/* Other */}
-          {activeTab === 'other' && (
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
-                <span style={{ fontSize: '1.3rem' }}>🎧</span>
-                <h4 style={{ margin: 0, fontSize: '1rem', color: 'var(--text-primary)', fontWeight: 700 }}>
-                  {isEs ? 'SoundCloud, Bandcamp, Foobar2000, etc.' : 'SoundCloud, Bandcamp, Desktop Players, etc.'}
-                </h4>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                <p style={{ margin: 0 }}>
-                  {isEs
-                    ? 'Para reproductores web (SoundCloud, Bandcamp, Mixcloud, etc.), la extensión Web Scrobbler funciona con más de 300 plataformas musicales.'
-                    : 'For web players (SoundCloud, Bandcamp, Mixcloud, etc.), the Web Scrobbler extension supports over 300 platforms.'}
-                </p>
-                <p style={{ margin: 0 }}>
-                  {isEs
-                    ? 'Para reproductores de escritorio como Foobar2000, MusicBee o Winamp, puedes instalar sus complementos oficiales de Last.fm.'
-                    : 'For desktop players like Foobar2000, MusicBee, or Winamp, install their official Last.fm plugins.'}
-                </p>
               </div>
             </div>
           )}

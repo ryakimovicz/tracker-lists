@@ -728,39 +728,20 @@ export const SettingsPage: React.FC = () => {
             </button>
 
             {user?.lastfm_username ? (
-              <>
-                <a
-                  href="https://www.last.fm/settings/applications"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn-secondary"
-                  style={{
-                    padding: '0.55rem 1rem',
-                    fontSize: '0.85rem',
-                    textDecoration: 'none',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.4rem',
-                  }}
-                >
-                  <ExternalLink size={14} />
-                  {isEs ? 'Vincular servicios en Last.fm' : 'Link Services in Last.fm'}
-                </a>
-                <button
-                  type="button"
-                  onClick={handleLastFmDisconnect}
-                  disabled={isDisconnectingLastFm}
-                  className="btn-secondary"
-                  style={{
-                    padding: '0.55rem 1rem',
-                    fontSize: '0.85rem',
-                    borderColor: '#ef4444',
-                    color: '#ef4444',
-                  }}
-                >
-                  {isDisconnectingLastFm ? (isEs ? 'Desconectando...' : 'Disconnecting...') : isEs ? 'Desconectar' : 'Disconnect'}
-                </button>
-              </>
+              <button
+                type="button"
+                onClick={handleLastFmDisconnect}
+                disabled={isDisconnectingLastFm}
+                className="btn-secondary"
+                style={{
+                  padding: '0.55rem 1rem',
+                  fontSize: '0.85rem',
+                  borderColor: '#ef4444',
+                  color: '#ef4444',
+                }}
+              >
+                {isDisconnectingLastFm ? (isEs ? 'Desconectando...' : 'Disconnecting...') : isEs ? 'Desconectar' : 'Disconnect'}
+              </button>
             ) : (
               <button
                 type="button"

@@ -1716,27 +1716,6 @@ export const Profile: React.FC = () => {
                     <HelpCircle size={14} />
                     {language === 'es' ? '¿Cómo conectar mi música?' : 'How to connect my music?'}
                   </button>
-
-                  <a
-                    href="https://www.last.fm/settings/applications"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="btn-primary"
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.4rem',
-                      fontSize: '0.85rem',
-                      padding: '0.5rem 1rem',
-                      textDecoration: 'none',
-                      background: '#d51007',
-                      color: '#fff',
-                      border: 'none'
-                    }}
-                  >
-                    <ExternalLink size={14} />
-                    {language === 'es' ? 'Vincular servicios en Last.fm' : 'Link services in Last.fm'}
-                  </a>
                 </div>
               )}
             </div>
