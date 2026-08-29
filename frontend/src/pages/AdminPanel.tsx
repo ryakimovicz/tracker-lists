@@ -23,7 +23,8 @@ import {
   User as UserIcon,
   MessageSquare,
   FileText,
-  Sparkles
+  Sparkles,
+  ExternalLink
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { ConfirmModal } from '../components/ConfirmModal';
@@ -610,21 +611,42 @@ export const AdminPanel: React.FC = () => {
             </button>
 
             {/* Modal Header */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1.25rem' }}>
-              {selectedUser.photo_url ? (
-                <img src={selectedUser.photo_url} alt={selectedUser.username} style={{ width: 56, height: 56, borderRadius: '50%', objectFit: 'cover' }} />
-              ) : (
-                <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'var(--accent-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 700, fontSize: '1.4rem' }}>
-                  {selectedUser.username.charAt(0).toUpperCase()}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1.25rem', paddingRight: '2.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                {selectedUser.photo_url ? (
+                  <img src={selectedUser.photo_url} alt={selectedUser.username} style={{ width: 56, height: 56, borderRadius: '50%', objectFit: 'cover' }} />
+                ) : (
+                  <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'var(--accent-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 700, fontSize: '1.4rem' }}>
+                    {selectedUser.username.charAt(0).toUpperCase()}
+                  </div>
+                )}
+                <div>
+                  <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    {selectedUser.username}
+                    {selectedUser.is_admin && <span style={{ fontSize: '0.7rem', background: '#ef4444', color: 'white', padding: '0.1rem 0.4rem', borderRadius: 4 }}>ADMIN</span>}
+                  </h2>
+                  <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{selectedUser.email} • ID #{selectedUser.id}</div>
                 </div>
-              )}
-              <div>
-                <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  {selectedUser.username}
-                  {selectedUser.is_admin && <span style={{ fontSize: '0.7rem', background: '#ef4444', color: 'white', padding: '0.1rem 0.4rem', borderRadius: 4 }}>ADMIN</span>}
-                </h2>
-                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{selectedUser.email} • ID #{selectedUser.id}</div>
               </div>
+
+              <a
+                href={`/profile?user_id=${selectedUser.id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-secondary"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                  fontSize: '0.82rem',
+                  padding: '0.45rem 0.9rem',
+                  textDecoration: 'none',
+                  borderRadius: '8px'
+                }}
+              >
+                <ExternalLink size={14} />
+                {isEs ? 'Ver Perfil' : 'View Profile'}
+              </a>
             </div>
 
             {/* Feedback Alert */}
