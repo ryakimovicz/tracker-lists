@@ -13,6 +13,7 @@ interface UserProfile {
   is_pro?: boolean;
   is_pro_cancelled?: boolean;
   is_vip?: boolean;
+  has_active_subscription?: boolean;
   pro_expires_at?: string;
   is_suspended?: boolean;
   suspended_until?: string;

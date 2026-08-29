@@ -228,31 +228,63 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
 
         {/* Sticky Bottom Action */}
         <div style={{ flexShrink: 0 }}>
-          {!user?.is_pro ? (
-            <button 
-              className="btn-primary" 
-              style={{
-                width: '100%',
-                padding: '0.85rem',
-                fontSize: '1rem',
-                fontWeight: 700,
-                background: 'linear-gradient(135deg, #f59e0b, #d97706)',
-                border: 'none',
-                color: '#fff',
-                borderRadius: '10px',
-                boxShadow: '0 4px 15px rgba(245, 158, 11, 0.4)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '0.5rem',
-                cursor: loading ? 'not-allowed' : 'pointer',
-              }}
-              onClick={handleSubscribe}
-              disabled={loading}
-            >
-              <Crown size={18} />
-              {loading ? (isEs ? 'Preparando pago...' : 'Preparing checkout...') : (isEs ? 'Suscribirse a Premium ($2.99/mes)' : 'Subscribe to Premium ($2.99/mo)')}
-            </button>
+          {errorMsg && (
+            <p style={{ color: '#ef4444', fontSize: '0.85rem', textAlign: 'center', margin: '0 0 0.75rem 0' }}>
+              {errorMsg}
+            </p>
+          )}
+
+          {!user?.is_pro || (!user?.has_active_subscription && !user?.is_admin && !user?.is_vip) ? (
+            <div>
+              {user?.is_pro && user?.pro_expires_at && (
+                <div style={{
+                  background: 'rgba(245, 158, 11, 0.1)',
+                  border: '1px solid rgba(245, 158, 11, 0.3)',
+                  borderRadius: '10px',
+                  padding: '0.65rem 0.85rem',
+                  marginBottom: '0.75rem',
+                  fontSize: '0.8rem',
+                  color: 'var(--text-secondary)',
+                  textAlign: 'center'
+                }}>
+                  <strong style={{ color: '#f59e0b', display: 'block', marginBottom: '0.15rem' }}>
+                    {isEs ? 'Tienes acceso de regalo activo' : 'You have gifted access active'}
+                  </strong>
+                  {isEs
+                    ? `Tu regalo vence el ${new Date(user.pro_expires_at).toLocaleDateString()}. Si te suscribes hoy, no se te cobrará nada hasta esa fecha.`
+                    : `Your gift expires on ${new Date(user.pro_expires_at).toLocaleDateString()}. If you subscribe now, you will not be charged until then.`}
+                </div>
+              )}
+
+              <button 
+                className="btn-primary" 
+                style={{
+                  width: '100%',
+                  padding: '0.85rem',
+                  fontSize: '1rem',
+                  fontWeight: 700,
+                  background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                  border: 'none',
+                  color: '#fff',
+                  borderRadius: '10px',
+                  boxShadow: '0 4px 15px rgba(245, 158, 11, 0.4)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem',
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                }}
+                onClick={handleSubscribe}
+                disabled={loading}
+              >
+                <Crown size={18} />
+                {loading
+                  ? (isEs ? 'Preparando pago...' : 'Preparing checkout...')
+                  : user?.is_pro
+                  ? (isEs ? 'Mantener Premium al finalizar regalo ($2.99/mes)' : 'Keep Premium after gift ends ($2.99/mo)')
+                  : (isEs ? 'Suscribirse a Premium ($2.99/mes)' : 'Subscribe to Premium ($2.99/mo)')}
+              </button>
+            </div>
           ) : (
             <div style={{ textAlign: 'center', padding: '0.5rem 0' }}>
               <p style={{ color: '#10b981', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', margin: 0 }}>

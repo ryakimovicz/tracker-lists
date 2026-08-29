@@ -19,6 +19,7 @@ class UserResponse(UserBase):
     is_pro: bool = False
     is_pro_cancelled: bool = False
     is_vip: bool = False
+    has_active_subscription: bool = False
     pro_expires_at: datetime | None = None
     is_suspended: bool = False
     suspended_until: datetime | None = None
@@ -56,6 +57,7 @@ class UserDashboardResponse(BaseModel):
     is_pro: bool = False
     is_pro_cancelled: bool = False
     is_vip: bool = False
+    has_active_subscription: bool = False
     pro_expires_at: datetime | None = None
     is_suspended: bool = False
     suspended_until: datetime | None = None

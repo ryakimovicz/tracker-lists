@@ -28,7 +28,8 @@ import {
   Monitor,
   Palette,
   Music,
-  HelpCircle
+  HelpCircle,
+  Crown
 } from 'lucide-react';
 
 
@@ -1076,7 +1077,21 @@ export const SettingsPage: React.FC = () => {
                     <Star size={20} color="#f59e0b" fill="#f59e0b" />
                     {isEs ? 'Membresía Pathd Premium' : 'Pathd Premium Membership'}
                   </h2>
-                  {user?.is_pro_cancelled ? (
+                  {user?.has_active_subscription ? (
+                    <span
+                      style={{
+                        fontSize: '0.75rem',
+                        padding: '0.2rem 0.55rem',
+                        borderRadius: '6px',
+                        background: 'rgba(16, 185, 129, 0.15)',
+                        color: '#10b981',
+                        border: '1px solid rgba(16, 185, 129, 0.3)',
+                        fontWeight: 600
+                      }}
+                    >
+                      {isEs ? 'Activa' : 'Active'}
+                    </span>
+                  ) : user?.is_pro_cancelled ? (
                     <span
                       style={{
                         fontSize: '0.75rem',
@@ -1096,38 +1111,66 @@ export const SettingsPage: React.FC = () => {
                         fontSize: '0.75rem',
                         padding: '0.2rem 0.55rem',
                         borderRadius: '6px',
-                        background: 'rgba(16, 185, 129, 0.15)',
-                        color: '#10b981',
-                        border: '1px solid rgba(16, 185, 129, 0.3)',
+                        background: 'rgba(245, 158, 11, 0.15)',
+                        color: '#f59e0b',
+                        border: '1px solid rgba(245, 158, 11, 0.3)',
                         fontWeight: 600
                       }}
                     >
-                      {isEs ? 'Activa' : 'Active'}
+                      {isEs ? 'Acceso de Regalo' : 'Gifted Access'}
                     </span>
                   )}
                 </div>
                 <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: '0.4rem 0 0' }}>
-                  {user?.is_pro_cancelled
+                  {user?.has_active_subscription
                     ? (isEs
-                      ? 'La renovación automática está desactivada. Mantienes el acceso a todas las funciones Premium hasta que finalice el ciclo que ya pagaste y no se te cobrará ningún cargo futuro.'
-                      : 'Auto-renewal is turned off. You keep full Premium access until the end of your paid billing period and will not be charged again.')
+                      ? 'Tu suscripción recurrente está activa. Puedes cancelar la renovación automática en cualquier momento.'
+                      : 'Your recurring subscription is active. You can cancel auto-renewal at any time.')
+                    : user?.is_pro_cancelled
+                    ? (isEs
+                      ? 'La renovación automática está desactivada. Mantienes el acceso Premium hasta el final de tu período y no se te cobrará ningún cargo futuro.'
+                      : 'Auto-renewal is turned off. You keep full Premium access until the end of your billing period and will not be charged again.')
                     : (isEs
-                      ? 'Tu suscripción está activa. Puedes cancelar la renovación automática en cualquier momento.'
-                      : 'Your subscription is active. You can cancel auto-renewal at any time.')}
+                      ? `Tienes acceso de regalo activo hasta el ${user?.pro_expires_at ? new Date(user.pro_expires_at).toLocaleDateString() : 'fin del período'}. Puedes activar tu suscripción ahora y el primer cobro se realizará recién al vencer el regalo.`
+                      : `You have gifted access active until ${user?.pro_expires_at ? new Date(user.pro_expires_at).toLocaleDateString() : 'end of period'}. You can subscribe now and your first billing will occur only after the gift expires.`)}
                 </p>
               </div>
 
-              {!user?.is_pro_cancelled && (
-                <button
-                  type="button"
-                  disabled={cancelSubLoading}
-                  onClick={handleCancelSubscription}
-                  className="btn-secondary"
-                  style={{ color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.4)', fontSize: '0.85rem', padding: '0.55rem 1.1rem' }}
-                >
-                  {cancelSubLoading ? (isEs ? 'Cancelando...' : 'Cancelling...') : (isEs ? 'Cancelar Suscripción' : 'Cancel Subscription')}
-                </button>
-              )}
+              <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                {user?.has_active_subscription && !user?.is_pro_cancelled && (
+                  <button
+                    type="button"
+                    disabled={cancelSubLoading}
+                    onClick={handleCancelSubscription}
+                    className="btn-secondary"
+                    style={{ color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.4)', fontSize: '0.85rem', padding: '0.55rem 1.1rem' }}
+                  >
+                    {cancelSubLoading ? (isEs ? 'Cancelando...' : 'Cancelling...') : (isEs ? 'Cancelar Suscripción' : 'Cancel Subscription')}
+                  </button>
+                )}
+
+                {!user?.has_active_subscription && (
+                  <button
+                    type="button"
+                    onClick={() => setShowProModal(true)}
+                    className="btn-primary"
+                    style={{
+                      background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                      border: 'none',
+                      color: '#fff',
+                      fontSize: '0.85rem',
+                      padding: '0.55rem 1.1rem',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.4rem',
+                      boxShadow: '0 2px 10px rgba(245, 158, 11, 0.3)'
+                    }}
+                  >
+                    <Crown size={15} />
+                    {isEs ? 'Mantener suscripción ($2.99/mes)' : 'Keep subscription ($2.99/mo)'}
+                  </button>
+                )}
+              </div>
             </div>
 
             {cancelSubMsg && (

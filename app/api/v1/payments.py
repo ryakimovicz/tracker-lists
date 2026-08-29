@@ -51,21 +51,39 @@ async def create_checkout_session(
     origin = request.headers.get("origin") or "https://pathd.net"
     return_url = f"{origin}/profile?payment=success"
 
+    # Calculate trial period days if user has remaining gifted pro time
+    subscription_data = {}
+    if current_user.pro_expires_at and not current_user.dodo_subscription_id:
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc)
+        exp = current_user.pro_expires_at
+        if exp.tzinfo is None:
+            exp = exp.replace(tzinfo=timezone.utc)
+        if exp > now:
+            remaining_seconds = (exp - now).total_seconds()
+            trial_days = max(1, int(remaining_seconds // 86400))
+            subscription_data["trial_period_days"] = trial_days
+
+    checkout_payload: dict = {
+        "product_cart": [{
+            "product_id": product_id,
+            "quantity": 1
+        }],
+        "customer": {
+            "email": current_user.email
+        },
+        "metadata": {
+            "user_id": str(current_user.id),
+            "username": current_user.username
+        },
+        "return_url": return_url
+    }
+
+    if subscription_data:
+        checkout_payload["subscription_data"] = subscription_data
+
     try:
-        session = await client.checkout_sessions.create(
-            product_cart=[{
-                "product_id": product_id,
-                "quantity": 1
-            }],
-            customer={
-                "email": current_user.email
-            },
-            metadata={
-                "user_id": str(current_user.id),
-                "username": current_user.username
-            },
-            return_url=return_url
-        )
+        session = await client.checkout_sessions.create(**checkout_payload)
         return {
             "checkout_url": session.checkout_url,
             "session_id": session.session_id
