@@ -39,7 +39,9 @@ import {
   Monitor,
   Crown,
   AlertTriangle,
-  Lock
+  Lock,
+  Music,
+  ExternalLink
 } from 'lucide-react';
 
 
