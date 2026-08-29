@@ -41,8 +41,11 @@ import {
   AlertTriangle,
   Lock,
   Music,
-  ExternalLink
+  ExternalLink,
+  HelpCircle
 } from 'lucide-react';
+
+import { MusicServiceGuideModal } from '../components/MusicServiceGuideModal';
 
 
 
@@ -121,6 +124,7 @@ export const Profile: React.FC = () => {
   const [showBannerModal, setShowBannerModal] = useState(false);
   const [showBackgroundModal, setShowBackgroundModal] = useState(false);
   const [showProModal, setShowProModal] = useState(false);
+  const [showMusicGuideModal, setShowMusicGuideModal] = useState(false);
   const [replaceModalState, setReplaceModalState] = useState<{
     isOpen: boolean;
     newItem: LibraryItem | null;
@@ -1696,24 +1700,44 @@ export const Profile: React.FC = () => {
                     : 'This user has not played any music during this period.')}
               </p>
               {isOwnProfile && (
-                <a
-                  href="https://www.last.fm/settings/applications"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn-secondary"
-                  style={{
-                    marginTop: '0.5rem',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.4rem',
-                    fontSize: '0.85rem',
-                    padding: '0.5rem 1rem',
-                    textDecoration: 'none'
-                  }}
-                >
-                  <ExternalLink size={14} />
-                  {language === 'es' ? 'Vincular servicios de música en Last.fm' : 'Link music services in Last.fm'}
-                </a>
+                <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', justifyContent: 'center', marginTop: '0.5rem' }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowMusicGuideModal(true)}
+                    className="btn-secondary"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.4rem',
+                      fontSize: '0.85rem',
+                      padding: '0.5rem 1rem'
+                    }}
+                  >
+                    <HelpCircle size={14} />
+                    {language === 'es' ? '¿Cómo conectar mi música?' : 'How to connect my music?'}
+                  </button>
+
+                  <a
+                    href="https://www.last.fm/settings/applications"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn-primary"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.4rem',
+                      fontSize: '0.85rem',
+                      padding: '0.5rem 1rem',
+                      textDecoration: 'none',
+                      background: '#d51007',
+                      color: '#fff',
+                      border: 'none'
+                    }}
+                  >
+                    <ExternalLink size={14} />
+                    {language === 'es' ? 'Vincular servicios en Last.fm' : 'Link services in Last.fm'}
+                  </a>
+                </div>
               )}
             </div>
           ) : (
@@ -2220,6 +2244,12 @@ export const Profile: React.FC = () => {
           onClose={() => setConfirmDialog(null)}
         />
       )}
+
+      {/* Music Service Connection Guide Modal */}
+      <MusicServiceGuideModal
+        isOpen={showMusicGuideModal}
+        onClose={() => setShowMusicGuideModal(false)}
+      />
     </div>
   );
 };
