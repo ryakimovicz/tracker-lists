@@ -498,6 +498,8 @@ def admin_change_user_id(
         ("consumptions", "user_id"),
         ("user_activity_logs", "user_id"),
         ("list_additions", "user_id"),
+        ("addition_votes", "user_id"),
+        ("addition_comments", "user_id"),
         ("list_addition_votes", "user_id"),
         ("user_adopted_additions", "user_id"),
         ("list_addition_reports", "user_id"),
