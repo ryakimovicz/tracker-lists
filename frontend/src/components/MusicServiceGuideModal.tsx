@@ -109,12 +109,12 @@ export const MusicServiceGuideModal: React.FC<MusicServiceGuideModalProps> = ({ 
         {/* Platform Tabs */}
         <div
           style={{
-            display: 'flex',
+            display: 'grid',
+            gridTemplateColumns: 'repeat(5, 1fr)',
             gap: '0.35rem',
-            padding: '0.75rem 1.25rem',
+            padding: '0.65rem 1rem',
             borderBottom: '1px solid var(--border-color)',
             background: 'var(--bg-tertiary)',
-            overflowX: 'auto',
           }}
         >
           {platforms.map((p) => {
@@ -125,23 +125,24 @@ export const MusicServiceGuideModal: React.FC<MusicServiceGuideModalProps> = ({ 
                 type="button"
                 onClick={() => setActiveTab(p.id as any)}
                 style={{
-                  display: 'inline-flex',
+                  display: 'flex',
                   alignItems: 'center',
-                  gap: '0.4rem',
-                  padding: '0.45rem 0.85rem',
+                  justifyContent: 'center',
+                  gap: '0.3rem',
+                  padding: '0.5rem 0.25rem',
                   borderRadius: '8px',
                   border: isActive ? '1px solid var(--accent-primary)' : '1px solid transparent',
                   background: isActive ? 'var(--bg-secondary)' : 'transparent',
                   color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
                   fontWeight: isActive ? 600 : 500,
-                  fontSize: '0.82rem',
+                  fontSize: '0.78rem',
                   cursor: 'pointer',
-                  whiteSpace: 'nowrap',
+                  textAlign: 'center',
                   transition: 'all 0.15s ease',
                 }}
               >
-                <span>{p.icon}</span>
-                <span>{p.name}</span>
+                <span style={{ fontSize: '0.9rem' }}>{p.icon}</span>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</span>
               </button>
             );
           })}

@@ -645,35 +645,55 @@ export const SettingsPage: React.FC = () => {
         {/* Section 2: Last.fm (Mostrar música escuchada) */}
         <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.75rem' }}>
-            <h2 style={{ fontSize: '1.2rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
-              <Music size={20} color="#ef4444" />
-              {isEs ? 'Mostrar música escuchada (Last.fm)' : 'Show Currently Playing Music (Last.fm)'}
-            </h2>
-            {user?.lastfm_username && (
-              <span
-                style={{
-                  fontSize: '0.75rem',
-                  padding: '0.2rem 0.55rem',
-                  borderRadius: '6px',
-                  background: 'rgba(16, 185, 129, 0.15)',
-                  color: '#10b981',
-                  border: '1px solid rgba(16, 185, 129, 0.3)',
-                  fontWeight: 600,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.35rem'
-                }}
-              >
-                <CheckCircle size={12} />
-                {isEs ? 'Conectado' : 'Connected'}
-              </span>
-            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+              <h2 style={{ fontSize: '1.2rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0, color: 'var(--text-primary)' }}>
+                <Music size={20} color="#ef4444" />
+                {isEs ? 'Mostrar música escuchada (Last.fm)' : 'Show Currently Playing Music (Last.fm)'}
+              </h2>
+              {user?.lastfm_username ? (
+                <span
+                  style={{
+                    fontSize: '0.75rem',
+                    padding: '0.2rem 0.55rem',
+                    borderRadius: '6px',
+                    background: 'rgba(16, 185, 129, 0.15)',
+                    color: '#10b981',
+                    border: '1px solid rgba(16, 185, 129, 0.3)',
+                    fontWeight: 600,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.35rem'
+                  }}
+                >
+                  <CheckCircle size={12} />
+                  {isEs ? 'Conectado' : 'Connected'}
+                </span>
+              ) : (
+                <span
+                  style={{
+                    fontSize: '0.75rem',
+                    padding: '0.2rem 0.55rem',
+                    borderRadius: '6px',
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    color: 'var(--text-muted)',
+                    border: '1px solid var(--border-color)',
+                    fontWeight: 600
+                  }}
+                >
+                  {isEs ? 'No Conectado' : 'Not Connected'}
+                </span>
+              )}
+            </div>
           </div>
 
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1.25rem', lineHeight: '1.5' }}>
-            {isEs
-              ? 'Conecta tu cuenta de Last.fm para mostrar automáticamente la música que estás escuchando en tu perfil y generar tu Estantería Musical de los últimos 7 días.'
-              : 'Connect your Last.fm account to automatically display what music you are listening to on your profile and generate your 7-day Music Shelf.'}
+            {user?.lastfm_username
+              ? (isEs
+                ? `Vinculado como @${user.lastfm_username}. Muestra tu canción en vivo y álbumes semanales en tu perfil.`
+                : `Linked as @${user.lastfm_username}. Displays your live listening and top weekly albums on your profile.`)
+              : (isEs
+                ? 'Conecta tu cuenta de Last.fm para mostrar automáticamente la música que estás escuchando en tu perfil y generar tu Estantería Musical.'
+                : 'Connect your Last.fm account to automatically display what music you are listening to on your profile and generate your Music Shelf.')}
           </p>
 
           {lastfmMsg && (
@@ -696,103 +716,72 @@ export const SettingsPage: React.FC = () => {
             </div>
           )}
 
-          {user?.lastfm_username ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
-                <div style={{ fontSize: '0.95rem', color: 'var(--text-primary)' }}>
-                  {isEs ? 'Conectado como' : 'Connected as'} <strong style={{ color: '#ef4444' }}>@{user.lastfm_username}</strong>
-                </div>
-                <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-                  <a
-                    href="https://www.last.fm/settings/applications"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="btn-secondary"
-                    style={{
-                      padding: '0.45rem 0.9rem',
-                      fontSize: '0.85rem',
-                      textDecoration: 'none',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.4rem',
-                    }}
-                  >
-                    <ExternalLink size={14} />
-                    {isEs ? 'Vincular servicios de música' : 'Link Music Services'}
-                  </a>
-                  <button
-                    onClick={handleLastFmDisconnect}
-                    disabled={isDisconnectingLastFm}
-                    className="btn-secondary"
-                    style={{
-                      padding: '0.45rem 1rem',
-                      fontSize: '0.85rem',
-                      borderColor: '#ef4444',
-                      color: '#ef4444',
-                    }}
-                  >
-                    {isDisconnectingLastFm ? (isEs ? 'Desconectando...' : 'Disconnecting...') : isEs ? 'Desconectar' : 'Disconnect'}
-                  </button>
-                </div>
-              </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={() => setShowMusicGuideModal(true)}
+              className="btn-secondary"
+              style={{ fontSize: '0.85rem', padding: '0.55rem 1rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+            >
+              <HelpCircle size={16} />
+              {isEs ? '¿Cómo conectar mi reproductor?' : 'How to connect my player?'}
+            </button>
 
-              {/* Guía informativa de sincronización */}
-              <div style={{
-                background: 'rgba(255, 255, 255, 0.03)',
-                padding: '0.9rem 1rem',
-                borderRadius: '10px',
-                border: '1px solid var(--border-color)',
-                fontSize: '0.82rem',
-                color: 'var(--text-secondary)',
-                lineHeight: '1.45'
-              }}>
-                <strong style={{ color: 'var(--text-primary)', display: 'block', marginBottom: '0.25rem' }}>
-                  💡 {isEs ? '¿Cómo registrar la música que escuchas?' : 'How to track the music you listen to?'}
-                </strong>
-                {isEs
-                  ? 'Last.fm registra las canciones que escuchas en tus plataformas (Spotify, Apple Music, YouTube Music, Deezer, Tidal, SoundCloud, reproductores locales, etc.). Para conectarlas, pulsa en "Vincular servicios de música" y autoriza tu reproductor.'
-                  : 'Last.fm tracks the songs you listen to on your platforms (Spotify, Apple Music, YouTube Music, Deezer, Tidal, SoundCloud, desktop players, etc.). To connect them, click "Link Music Services" and authorize your player.'}
-              </div>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
-                <button
-                  onClick={handleLastFmLogin}
+            {user?.lastfm_username ? (
+              <>
+                <a
+                  href="https://www.last.fm/settings/applications"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="btn-secondary"
                   style={{
-                    display: 'flex',
+                    padding: '0.55rem 1rem',
+                    fontSize: '0.85rem',
+                    textDecoration: 'none',
+                    display: 'inline-flex',
                     alignItems: 'center',
-                    gap: '0.5rem',
-                    padding: '0.65rem 1.25rem',
-                    fontSize: '0.9rem',
-                    borderColor: 'rgba(239, 68, 68, 0.4)',
+                    gap: '0.4rem',
+                  }}
+                >
+                  <ExternalLink size={14} />
+                  {isEs ? 'Vincular servicios en Last.fm' : 'Link Services in Last.fm'}
+                </a>
+                <button
+                  type="button"
+                  onClick={handleLastFmDisconnect}
+                  disabled={isDisconnectingLastFm}
+                  className="btn-secondary"
+                  style={{
+                    padding: '0.55rem 1rem',
+                    fontSize: '0.85rem',
+                    borderColor: '#ef4444',
                     color: '#ef4444',
                   }}
                 >
-                  <Music size={16} />
-                  {isEs ? 'Conectar con Last.fm' : 'Connect with Last.fm'}
+                  {isDisconnectingLastFm ? (isEs ? 'Desconectando...' : 'Disconnecting...') : isEs ? 'Desconectar' : 'Disconnect'}
                 </button>
-              </div>
-
-              <div style={{
-                background: 'rgba(239, 68, 68, 0.04)',
-                padding: '0.9rem 1rem',
-                borderRadius: '10px',
-                border: '1px solid rgba(239, 68, 68, 0.2)',
-                fontSize: '0.82rem',
-                color: 'var(--text-secondary)',
-                lineHeight: '1.45'
-              }}>
-                <strong style={{ color: '#ef4444', display: 'block', marginBottom: '0.25rem' }}>
-                  ℹ️ {isEs ? '¿Cómo funciona?' : 'How does it work?'}
-                </strong>
-                {isEs
-                  ? '1. Conecta o crea tu cuenta de Last.fm aquí.\n2. En Last.fm, vincula tu servicio de música habitual (Spotify, Apple Music, YouTube Music, Deezer, Tidal, etc.).\n3. Lo que escuches se reflejará automáticamente en tu perfil de Pathd.'
-                  : '1. Connect or create your Last.fm account here.\n2. In Last.fm, link your preferred music service (Spotify, Apple Music, YouTube Music, Deezer, Tidal, etc.).\n3. What you listen to will automatically reflect on your Pathd profile.'}
-              </div>
-            </div>
-          )}
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={handleLastFmLogin}
+                className="btn-primary"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  padding: '0.55rem 1.25rem',
+                  fontSize: '0.85rem',
+                  background: '#d51007',
+                  border: 'none',
+                  color: '#fff',
+                }}
+              >
+                <Music size={16} />
+                {isEs ? 'Conectar con Last.fm' : 'Connect with Last.fm'}
+              </button>
+            )}
+          </div>
         </div>
 
 
@@ -1176,110 +1165,7 @@ export const SettingsPage: React.FC = () => {
           </div>
         )}
 
-        {/* Section 5: Connected Services (Last.fm) */}
-        <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', marginBottom: '1rem' }}>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                <h2 style={{ fontSize: '1.2rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0, color: 'var(--text-primary)' }}>
-                  <Music size={20} color="#ef4444" />
-                  {isEs ? 'Servicios de Música (Last.fm)' : 'Music Services (Last.fm)'}
-                </h2>
-                {user?.lastfm_username ? (
-                  <span
-                    style={{
-                      fontSize: '0.75rem',
-                      padding: '0.2rem 0.55rem',
-                      borderRadius: '6px',
-                      background: 'rgba(16, 185, 129, 0.15)',
-                      color: '#10b981',
-                      border: '1px solid rgba(16, 185, 129, 0.3)',
-                      fontWeight: 600
-                    }}
-                  >
-                    {isEs ? 'Conectado' : 'Connected'}
-                  </span>
-                ) : (
-                  <span
-                    style={{
-                      fontSize: '0.75rem',
-                      padding: '0.2rem 0.55rem',
-                      borderRadius: '6px',
-                      background: 'rgba(255, 255, 255, 0.05)',
-                      color: 'var(--text-muted)',
-                      border: '1px solid var(--border-color)',
-                      fontWeight: 600
-                    }}
-                  >
-                    {isEs ? 'No Conectado' : 'Not Connected'}
-                  </span>
-                )}
-              </div>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: '0.4rem 0 0' }}>
-                {user?.lastfm_username
-                  ? (isEs
-                    ? `Vinculado como @${user.lastfm_username}. Muestra tu canción en vivo y álbumes semanales en tu perfil.`
-                    : `Linked as @${user.lastfm_username}. Displays your live listening and top weekly albums on your profile.`)
-                  : (isEs
-                    ? 'Conecta Last.fm para scrobblear y mostrar tu música en vivo desde Spotify, Apple Music, YouTube Music, Deezer, etc.'
-                    : 'Connect Last.fm to scrobble and display your live listening activity from Spotify, Apple Music, YouTube Music, Deezer, etc.')}
-              </p>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
-              <button
-                type="button"
-                onClick={() => setShowMusicGuideModal(true)}
-                className="btn-secondary"
-                style={{ fontSize: '0.85rem', padding: '0.55rem 1rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
-              >
-                <HelpCircle size={16} />
-                {isEs ? '¿Cómo conectar mi reproductor?' : 'How to connect my player?'}
-              </button>
-
-              {user?.lastfm_username ? (
-                <button
-                  type="button"
-                  onClick={handleLastFmDisconnect}
-                  className="btn-secondary"
-                  style={{ color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.4)', fontSize: '0.85rem', padding: '0.55rem 1.1rem' }}
-                >
-                  {isEs ? 'Desconectar Last.fm' : 'Disconnect Last.fm'}
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={handleLastFmLogin}
-                  className="btn-primary"
-                  style={{ background: '#d51007', border: 'none', color: '#fff', fontSize: '0.85rem', padding: '0.55rem 1.1rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
-                >
-                  <Music size={16} />
-                  {isEs ? 'Conectar con Last.fm' : 'Connect with Last.fm'}
-                </button>
-              )}
-            </div>
-          </div>
-
-          {lastfmMsg && (
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              background: lastfmMsg.type === 'success' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-              color: lastfmMsg.type === 'success' ? '#10b981' : '#ef4444',
-              border: `1px solid ${lastfmMsg.type === 'success' ? '#10b981' : '#ef4444'}`,
-              padding: '0.75rem 1rem',
-              borderRadius: 10,
-              fontSize: '0.85rem',
-              marginTop: '0.75rem'
-            }}>
-              {lastfmMsg.type === 'success' ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
-              <span>{lastfmMsg.text}</span>
-            </div>
-          )}
-        </div>
-
-        {/* Section 6: Legal & Policies */}
+        {/* Section 5: Legal & Policies */}
         <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px' }}>
 
           <h2 style={{ fontSize: '1.2rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: 0 }}>
