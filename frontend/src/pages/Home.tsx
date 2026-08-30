@@ -299,16 +299,34 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
       // Check if next episode air date is in future
       if (!isAllDone) {
         const cacheKeyAll = `${item.external_id}_all_episodes`;
-        const allEps = getCachedSeries(cacheKeyAll);
-        if (allEps && Array.isArray(allEps)) {
-          const todayStr = new Date().toISOString().split('T')[0];
-          const uncompletedEps = allEps.filter(ep => !updatedList.some((tracked: any) => (tracked.external_id === `tvm-ep-${ep.id}` || tracked.id === ep.id) && tracked.is_completed));
-          if (uncompletedEps.length > 0) {
-            const nextEpToWatch = uncompletedEps[0];
-            const airDate = nextEpToWatch.airdate || nextEpToWatch.air_date;
-            if (airDate && airDate > todayStr) {
-              isAllDone = true;
-            }
+        let allEps = getCachedSeries(cacheKeyAll);
+        if (!allEps) {
+          try {
+            const res = await apiClient.get(`/search/series/${item.external_id}/episodes`);
+            allEps = res.data;
+            setCachedSeries(cacheKeyAll, allEps);
+          } catch (e) {
+            allEps = null;
+          }
+        }
+        if (allEps && Array.isArray(allEps) && allEps.length > 0) {
+          const now = new Date();
+          const year = now.getFullYear();
+          const month = String(now.getMonth() + 1).padStart(2, '0');
+          const day = String(now.getDate()).padStart(2, '0');
+          const todayStr = `${year}-${month}-${day}`;
+
+          const hasUnwatchedAired = allEps.some(ep => {
+            const airDate = ep.airdate || ep.air_date;
+            const isAired = !airDate || airDate <= todayStr;
+            const isWatched = updatedList.some((tracked: any) => 
+              (tracked.external_id === `tvm-ep-${ep.id}` || tracked.id === ep.id || (tracked.title && tracked.title.includes(`E${String(ep.episode_number).padStart(2, '0')}`))) && tracked.is_completed
+            );
+            return isAired && !isWatched;
+          });
+
+          if (!hasUnwatchedAired) {
+            isAllDone = true;
           }
         }
       }
@@ -712,7 +730,11 @@ export const Home: React.FC = () => {
       let currentLib = libRes.data || [];
 
       // Auto sync series/anime status between 'completed' and 'watching' based on aired episodes
-      const todayStr = new Date().toISOString().split('T')[0];
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      const todayStr = `${year}-${month}-${day}`;
       const trackingSeries = currentLib.filter((i: any) => (i.item_type === 'series' || i.item_type === 'anime') && i.tracking_list_id);
 
       for (const item of trackingSeries) {
@@ -741,7 +763,9 @@ export const Home: React.FC = () => {
           const hasUnwatchedAiredEpisode = allEps.some(ep => {
             const airDate = ep.airdate || ep.air_date;
             const isAired = !airDate || airDate <= todayStr;
-            const isWatched = trackedEps.some((t: any) => (t.external_id === `tvm-ep-${ep.id}` || t.id === ep.id) && t.is_completed);
+            const isWatched = trackedEps.some((t: any) => 
+              (t.external_id === `tvm-ep-${ep.id}` || t.id === ep.id || (t.title && t.title.includes(`E${String(ep.episode_number).padStart(2, '0')}`))) && t.is_completed
+            );
             return isAired && !isWatched;
           });
 

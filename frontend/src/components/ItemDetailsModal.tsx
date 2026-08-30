@@ -1177,18 +1177,36 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     // If not all episodes are completed, check if the user is "Up to Date" (all currently released episodes watched)
     if (!isAllDone) {
       const cacheKeyAll = `${selectedItem.external_id}_all_episodes`;
-      const allEps = getCachedSeries(cacheKeyAll);
-      if (allEps && Array.isArray(allEps)) {
-        const todayStr = new Date().toISOString().split('T')[0];
-        // Find the first uncompleted episode
-        const uncompletedEps = allEps.filter(ep => !currentEpisodes.some(tracked => (tracked.external_id === `tvm-ep-${ep.id}` || tracked.id === ep.id) && tracked.is_completed));
-        if (uncompletedEps.length > 0) {
-          const nextEpToWatch = uncompletedEps[0];
-          // If the next uncompleted episode's air date is in the future, the user is caught up!
-          const airDate = nextEpToWatch.airdate || nextEpToWatch.air_date;
-          if (airDate && airDate > todayStr) {
-            isAllDone = true;
-          }
+      let allEps = getCachedSeries(cacheKeyAll);
+      if (!allEps) {
+        try {
+          const epRes = await apiClient.get(`/search/series/${selectedItem.external_id}/episodes`);
+          allEps = epRes.data;
+          setCachedSeries(cacheKeyAll, allEps);
+        } catch (e) {
+          allEps = null;
+        }
+      }
+
+      if (allEps && Array.isArray(allEps) && allEps.length > 0) {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const todayStr = `${year}-${month}-${day}`;
+
+        // Find if there is any unwatched episode that has already aired (air_date <= today)
+        const hasUnwatchedAired = allEps.some(ep => {
+          const airDate = ep.airdate || ep.air_date;
+          const isAired = !airDate || airDate <= todayStr;
+          const isWatched = currentEpisodes.some((tracked: any) => 
+            (tracked.external_id === `tvm-ep-${ep.id}` || tracked.id === ep.id || (tracked.title && tracked.title.includes(`E${String(ep.episode_number).padStart(2, '0')}`))) && tracked.is_completed
+          );
+          return isAired && !isWatched;
+        });
+
+        if (!hasUnwatchedAired) {
+          isAllDone = true;
         }
       }
     }
