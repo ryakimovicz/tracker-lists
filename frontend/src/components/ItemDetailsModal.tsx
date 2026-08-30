@@ -2581,24 +2581,6 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem' }}>
                           <button
                             type="button"
-                            onClick={() => handleToggleStatus('playing')}
-                            style={{
-                              background: selectedItem?.status === 'playing' ? 'var(--color-game)' : 'var(--bg-tertiary)',
-                              border: selectedItem?.status === 'playing' ? 'none' : '1px solid var(--border-color)',
-                              borderRadius: '8px',
-                              padding: '0.5rem',
-                              textAlign: 'center',
-                              cursor: 'pointer',
-                              color: selectedItem?.status === 'playing' ? '#ffffff' : 'var(--text-primary)',
-                              fontSize: '0.75rem',
-                              fontWeight: 600,
-                              transition: 'all 0.2s ease'
-                            }}
-                          >
-                            {language === 'es' ? 'Jugando' : 'Playing'}
-                          </button>
-                          <button
-                            type="button"
                             onClick={() => {
                               if (selectedItem?.status === 'completed') {
                                 setShowReconsumedModal(true);
@@ -2621,6 +2603,24 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                             }}
                           >
                             {language === 'es' ? 'Completado' : 'Completed'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleStatus('playing')}
+                            style={{
+                              background: selectedItem?.status === 'playing' ? '#3b82f6' : 'var(--bg-tertiary)',
+                              border: selectedItem?.status === 'playing' ? 'none' : '1px solid var(--border-color)',
+                              borderRadius: '8px',
+                              padding: '0.5rem',
+                              textAlign: 'center',
+                              cursor: 'pointer',
+                              color: selectedItem?.status === 'playing' ? '#ffffff' : 'var(--text-primary)',
+                              fontSize: '0.75rem',
+                              fontWeight: 600,
+                              transition: 'all 0.2s ease'
+                            }}
+                          >
+                            {language === 'es' ? 'Jugando' : 'Playing'}
                           </button>
                           <button
                             type="button"
