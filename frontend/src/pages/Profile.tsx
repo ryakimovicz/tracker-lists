@@ -68,6 +68,7 @@ interface LibraryItem {
   completed_at?: string;
   updated_at?: string;
   last_seen_episode?: string;
+  badge?: string;
   custom_badge?: string;
   pages_read?: number;
   total_pages?: number;
@@ -723,7 +724,8 @@ export const Profile: React.FC = () => {
       const isLoose = isLooseEpisodeOrSeason(item);
       const isSeriesOrRegular = item.item_type !== 'episode' && item.item_type !== 'season' && !item.external_id?.startsWith('tvm-ep-');
       const isNotStartedSeries = (item.item_type === 'series' || item.item_type === 'anime') && !item.last_seen_episode;
-      const isPlanToStatus = ['plan_to_watch', 'plan_to_play', 'plan_to_read'].includes(item.status);
+      const isDlcOrExpansion = item.item_type === 'game' && ['dlc', 'expansion'].includes(item.badge || item.custom_badge || '');
+      const isPlanToStatus = !isDlcOrExpansion && ['plan_to_watch', 'plan_to_play', 'plan_to_read'].includes(item.status);
 
       return matchesMedia && matchesSearch && (isSeriesOrRegular || isLoose) && !isNotStartedSeries && !isPlanToStatus;
     })
@@ -740,7 +742,8 @@ export const Profile: React.FC = () => {
   );
 
   const visualLibraryItems = libraryItems.filter(item => {
-    const isPlanToStatus = ['plan_to_watch', 'plan_to_play', 'plan_to_read'].includes(item.status);
+    const isDlcOrExpansion = item.item_type === 'game' && ['dlc', 'expansion'].includes(item.badge || item.custom_badge || '');
+    const isPlanToStatus = !isDlcOrExpansion && ['plan_to_watch', 'plan_to_play', 'plan_to_read'].includes(item.status);
     if (isPlanToStatus) return false;
 
     const isNotStartedSeries = (item.item_type === 'series' || item.item_type === 'anime') && !item.last_seen_episode;
@@ -1361,7 +1364,8 @@ export const Profile: React.FC = () => {
                             
                             {(() => {
                               const isEffectiveFav = displayedFavorites.some(df => df.id === item.id);
-                              const isUnconsumed = ['plan_to_watch', 'plan_to_read', 'plan_to_play'].includes(item.status);
+                              const isDlcOrExpansion = item.item_type === 'game' && ['dlc', 'expansion'].includes(item.badge || item.custom_badge || '');
+                              const isUnconsumed = !isDlcOrExpansion && ['plan_to_watch', 'plan_to_read', 'plan_to_play'].includes(item.status);
                               return (
                                 <button
                                   onClick={(e) => {
