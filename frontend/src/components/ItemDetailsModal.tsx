@@ -231,40 +231,16 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     return 'completed';
   };
 
-  const isPack = selectedItem?.badge === 'pack' || (selectedItem?.item_type === 'game' && selectedItem?.title && /\b(pack|bundle|trilogy pack)\b/i.test(selectedItem.title) && gameRelations?.bundle_games && gameRelations.bundle_games.length > 0 && selectedItem?.badge !== 'collection');
-
   const handleAddToShelf = async () => {
     if (!selectedItem) return;
     if (selectedItem.id) {
       // Already in shelf, show menu
       setShowShelfMenu(!showShelfMenu);
     } else {
-      // If this is a commercial pack with bundle games:
-      if (isPack && gameRelations?.bundle_games && gameRelations.bundle_games.length > 0) {
-        try {
-          // Add all bundled individual games to shelf with default status
-          await Promise.all(gameRelations.bundle_games.map((g: any) => 
-            apiClient.post('/library/', {
-              external_id: String(g.external_id || g.id),
-              title: g.title,
-              image_url: g.image_url,
-              item_type: 'game',
-              status: 'plan_to_play'
-            }).catch(console.error)
-          ));
-          // Also mark pack as tracked or trigger update
-          const defaultStatus = getDefaultStatus(selectedItem.item_type);
-          await ensureTracked(defaultStatus);
-          onUpdate && onUpdate();
-        } catch (err) {
-          console.error("Failed to add bundle games", err);
-        }
-      } else {
-        const defaultStatus = getDefaultStatus(selectedItem.item_type);
-        const resId = await ensureTracked(defaultStatus);
-        if (resId) {
-          onUpdate && onUpdate();
-        }
+      const defaultStatus = getDefaultStatus(selectedItem.item_type);
+      const resId = await ensureTracked(defaultStatus);
+      if (resId) {
+        onUpdate && onUpdate();
       }
     }
   };
@@ -2422,7 +2398,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
 
                   {/* Clean & Comfortable Hours and Minutes Picker */}
-                  {!isEpisode && !isPack && selectedItem && ( 
+                  {!isEpisode && selectedItem && ( 
                     (selectedItem.item_type === 'game' && ['completed', 'playing', 'dropped', 'endless'].includes(selectedItem.status)) || 
                     (selectedItem.item_type === 'movie' && (['watching', 'dropped'].includes(selectedItem.status) || (hasInteractedWithTime && selectedItem.status === 'completed'))) 
                   ) && (() => {
@@ -2599,7 +2575,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
 
                   {/* Completion / Status Buttons */}
-                  {user && !isEpisode && !isPack && (
+                  {user && !isEpisode && (
                     <div style={{ marginTop: '0.75rem' }}>
                       {selectedItem?.item_type === 'game' ? (
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem' }}>
@@ -3426,11 +3402,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                   {gameRelations?.bundle_games && gameRelations.bundle_games.length > 0 && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                       <h5 style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 600 }}>
-                        <Package size={16} color={isPack ? "#38bdf8" : "#10b981"} />
-                        {isPack
-                          ? (language === 'es' ? 'Juegos y Contenido de este Pack' : 'Games in this Pack')
-                          : (language === 'es' ? 'Juegos y Contenido de esta Colección' : 'Games in this Collection')
-                        }
+                        <Package size={16} color="#10b981" />
+                        {language === 'es' ? 'Juegos y Contenido de esta Colección' : 'Games in this Collection'}
                         <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400 }}>({gameRelations.bundle_games.length})</span>
                       </h5>
                       <ModalScrollRow>
