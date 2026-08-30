@@ -66,6 +66,7 @@ interface LibraryItem {
   updated_at?: string;
   last_seen_episode?: string;
   pages_read?: number;
+  total_pages?: number;
   tracking_list_id?: number;
   is_nsfw?: boolean;
 }
@@ -1483,6 +1484,18 @@ export const Profile: React.FC = () => {
                                     formatted = language === 'es' ? `T${s} | E${e}` : `S${s} | E${e}`;
                                   }
                                   return `${language === 'es' ? 'Último: ' : 'Last: '}${formatted}`;
+                                })()}
+                              </span>
+                            )}
+
+                            {/* Movie Duration / Watched Time */}
+                            {item.item_type === 'movie' && (item.pages_read || item.total_pages || 0) > 0 && (
+                              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500, display: 'block', marginTop: '0.2rem' }}>
+                                ⏱️ {(() => {
+                                  const mins = item.pages_read || item.total_pages || 0;
+                                  const h = Math.floor(mins / 60);
+                                  const m = mins % 60;
+                                  return h > 0 ? `${h}h ${m > 0 ? `${String(m).padStart(2, '0')}m` : '00m'}` : `${m}m`;
                                 })()}
                               </span>
                             )}
