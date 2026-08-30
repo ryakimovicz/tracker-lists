@@ -40,6 +40,7 @@ class LibraryItemResponse(BaseModel):
     total_pages: Optional[int] = None
     tracking_list_id: Optional[int] = None
     is_nsfw: bool = False
+    times_completed: Optional[int] = 1
 
     class Config:
         from_attributes = True

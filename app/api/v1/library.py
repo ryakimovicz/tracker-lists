@@ -510,6 +510,7 @@ def get_library(
     db: Session = Depends(get_db)
 ):
     from sqlalchemy import desc, func
+    from app.models.consumption import ConsumptionHistory
     target_user_id = user_id if user_id is not None else current_user.id
     query = db.query(UserLibraryItem).filter(UserLibraryItem.user_id == target_user_id)
     if status:
@@ -518,7 +519,49 @@ def get_library(
     # Sort by completed_at or updated_at, whichever is newer
     query = query.order_by(desc(func.coalesce(UserLibraryItem.completed_at, UserLibraryItem.updated_at)))
     items = query.offset(skip).limit(limit).all()
-    return items
+
+    # Batch query consumption history counts for these items
+    ext_ids = [it.external_id for it in items if it.external_id]
+    counts_map = {}
+    if ext_ids:
+        counts = db.query(
+            ConsumptionHistory.external_id,
+            func.count(ConsumptionHistory.id)
+        ).filter(
+            ConsumptionHistory.user_id == target_user_id,
+            ConsumptionHistory.external_id.in_(ext_ids)
+        ).group_by(ConsumptionHistory.external_id).all()
+        for ext_id, c in counts:
+            counts_map[ext_id] = c
+
+    res = []
+    for it in items:
+        # Pydantic will convert from attributes/dict
+        c_val = counts_map.get(it.external_id, 0)
+        # If item has completed_at but no consumption history yet, treat as 1
+        times_c = max(c_val, 1 if it.completed_at else 0)
+        it_dict = {
+            "id": it.id,
+            "user_id": it.user_id,
+            "item_type": it.item_type.value if hasattr(it.item_type, 'value') else it.item_type,
+            "external_id": it.external_id,
+            "imdb_id": it.imdb_id,
+            "title": it.title,
+            "image_url": it.image_url,
+            "status": it.status,
+            "is_favorite": it.is_favorite,
+            "completed_at": it.completed_at,
+            "updated_at": it.updated_at,
+            "last_seen_episode": it.last_seen_episode,
+            "pages_read": it.pages_read or 0,
+            "total_pages": it.total_pages,
+            "tracking_list_id": it.tracking_list_id,
+            "is_nsfw": it.is_nsfw,
+            "times_completed": times_c
+        }
+        res.append(it_dict)
+
+    return res
 
 @router.put("/{library_item_id}", response_model=LibraryItemResponse)
 def update_library_item(

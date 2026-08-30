@@ -70,6 +70,7 @@ interface LibraryItem {
   total_pages?: number;
   tracking_list_id?: number;
   is_nsfw?: boolean;
+  times_completed?: number;
 }
 
 
@@ -1450,6 +1451,15 @@ export const Profile: React.FC = () => {
                               else if (['book', 'comic', 'manga'].includes(item.item_type)) {
                                 if (item.status === 'reading') badges.push({ text: language === 'es' ? 'Leyendo' : 'Reading', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' });
                                 else if (item.status === 'read' || item.status === 'completed') badges.push({ text: language === 'es' ? 'Leído' : 'Read', color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)' });
+                              }
+
+                              // Repeat count badge (e.g. x2, x3)
+                              if (item.times_completed && item.times_completed > 1) {
+                                badges.push({
+                                  text: `x${item.times_completed}`,
+                                  color: 'var(--accent-primary)',
+                                  bg: 'rgba(99, 102, 241, 0.15)'
+                                });
                               }
 
                               if (badges.length === 0) return null;
