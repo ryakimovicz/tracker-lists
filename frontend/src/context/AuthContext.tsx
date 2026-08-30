@@ -9,7 +9,6 @@ interface UserProfile {
   banner_url?: string;
   background_url?: string;
   is_admin: boolean;
-  show_nsfw: boolean;
   is_pro?: boolean;
   is_pro_cancelled?: boolean;
   is_vip?: boolean;

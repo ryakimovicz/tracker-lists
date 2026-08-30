@@ -195,7 +195,6 @@ class IGDBService:
                                 item_type="game",
                                 release_date=release_date,
                                 popularity=pop_val,
-                                is_nsfw=False,
                                 badge=badge
                             )
                         )

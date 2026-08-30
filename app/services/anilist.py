@@ -93,8 +93,7 @@ class AnilistService:
                                 description=desc,
                                 item_type="manga",
                                 release_date=release_date,
-                                popularity=float(item.get("averageScore") or 0),
-                                is_nsfw=False
+                                popularity=float(item.get("averageScore") or 0)
                             )
                         )
                     return results

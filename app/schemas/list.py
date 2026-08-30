@@ -27,7 +27,6 @@ class ListItemUpdate(BaseModel):
 class ListItemResponse(ListItemBase):
     id: int
     list_id: int
-    is_nsfw: bool = False
 
     class Config:
         from_attributes = True

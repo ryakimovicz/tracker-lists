@@ -66,7 +66,6 @@ const CustomCard = ({
   onCheck, 
   onClick, 
   onTitleClick,
-  isNsfw,
   language,
   themeColor,
   themeTextColor,
@@ -82,7 +81,6 @@ const CustomCard = ({
   onCheck?: (e: React.MouseEvent) => void;
   onClick?: () => void;
   onTitleClick?: (e: React.MouseEvent) => void;
-  isNsfw?: boolean;
   language?: string;
   themeColor?: string;
   themeTextColor?: string;
@@ -1101,7 +1099,6 @@ export const Home: React.FC = () => {
                   onCheck={(e) => handleMarkDone(e, g)}
                   onClick={() => setSelectedItem({ ...g, id: g.item_id })}
                   onTitleClick={(e) => { e.stopPropagation(); navigate(`/guide/${g.list_id}`); }}
-                  isNsfw={g.is_nsfw}
                   language={language}
                 />
               );
@@ -1202,7 +1199,6 @@ export const Home: React.FC = () => {
                         })()}
                         onCheck={!['completed', 'read', 'endless'].includes(item.status) ? (e) => handleMarkDone(e, item) : undefined}
                         onClick={() => setSelectedItem(item)}
-                        isNsfw={item.is_nsfw}
                         language={language}
                       />
                     );

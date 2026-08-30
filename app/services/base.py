@@ -11,7 +11,6 @@ class SearchResultItem(BaseModel):
     popularity: Optional[float] = 0.0
     imdb_id: Optional[str] = None
     status: Optional[str] = None
-    is_nsfw: bool = False
     page_count: Optional[int] = None
     latest_season: Optional[int] = None
     latest_episode: Optional[int] = None

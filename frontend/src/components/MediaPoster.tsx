@@ -9,8 +9,6 @@ interface MediaPosterProps {
   width?: string | number;
   aspectRatio?: string;
   borderRadius?: string | number;
-  isNsfw?: boolean;
-  showNsfw?: boolean;
   style?: React.CSSProperties;
 }
 
@@ -22,8 +20,6 @@ export const MediaPoster: React.FC<MediaPosterProps> = ({
   width = '100%',
   aspectRatio,
   borderRadius = '8px',
-  isNsfw = false,
-  showNsfw = true,
   style = {}
 }) => {
   const [imgError, setImgError] = useState(false);

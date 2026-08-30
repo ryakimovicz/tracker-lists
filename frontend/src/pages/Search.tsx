@@ -17,7 +17,6 @@ interface SearchResultItem {
   item_type: 'game' | 'movie' | 'series' | 'anime' | 'book' | 'user' | 'guide' | 'comic' | 'manga';
   release_date?: string;
   imdb_id?: string;
-  is_nsfw?: boolean;
   status?: string;
   badge?: string;
 }
@@ -129,8 +128,6 @@ const ExploreSection = React.memo<ExploreSectionProps>(({
                   height="100%"
                   width="100%"
                   borderRadius="8px"
-                  isNsfw={item.is_nsfw}
-                  showNsfw={currentUser?.show_nsfw}
                 />
 
                 {/* Game/Media Badge (Colección, DLC, etc.) */}
@@ -689,8 +686,6 @@ export const Search: React.FC = () => {
                     height="100%"
                     width="100%"
                     borderRadius="8px"
-                    isNsfw={item.is_nsfw}
-                    showNsfw={currentUser?.show_nsfw}
                   />
                   {renderMediaBadge(item.badge, language)}
                 </div>
@@ -792,7 +787,7 @@ export const Search: React.FC = () => {
           onClose={() => setSelectedItem(null)}
           onOpenItem={(item) => setSelectedItem(item)}
           onUpdate={(updatedItem) => {
-            if (updatedItem && updatedItem.is_nsfw !== undefined) {
+            if (updatedItem) {
               setResults(prev => prev.map(r => 
                 r.item_type === selectedItem.item_type && r.external_id === selectedItem.external_id 
                 ? { ...r, ...updatedItem } 

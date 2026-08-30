@@ -69,7 +69,6 @@ interface LibraryItem {
   pages_read?: number;
   total_pages?: number;
   tracking_list_id?: number;
-  is_nsfw?: boolean;
   times_completed?: number;
 }
 
@@ -83,7 +82,6 @@ interface UserProfile {
   banner_url?: string;
   background_url?: string;
   is_admin: boolean;
-  show_nsfw: boolean;
   created_at: string;
   created_lists: any[];
   saved_lists: any[];
@@ -1310,8 +1308,6 @@ export const Profile: React.FC = () => {
                               height="100%"
                               width="100%"
                               borderRadius="8px"
-                              isNsfw={item.is_nsfw}
-                              showNsfw={currentUser?.show_nsfw}
                             />
                             
                             {mediaFilter === 'all' && (
@@ -1739,7 +1735,6 @@ export const Profile: React.FC = () => {
                     height="240px"
                     width="100%"
                     borderRadius="8px"
-                    isNsfw={item.is_nsfw}
                   />
                   <h4 style={{ margin: '0.25rem 0 0', fontSize: '0.95rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.title}>
                     {item.title}

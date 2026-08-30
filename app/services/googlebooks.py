@@ -66,8 +66,7 @@ class GoogleBooksService:
                             description=desc,
                             item_type=item_type,
                             release_date=pub_date,
-                            page_count=v_info.get("pageCount"),
-                            is_nsfw=False
+                            page_count=v_info.get("pageCount")
                         )
                         results.append((search_item, isbns))
                     return results

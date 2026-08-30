@@ -9,7 +9,6 @@ interface LibraryItem {
   title: string;
   item_type: string;
   image_url?: string | null;
-  is_nsfw?: boolean;
 }
 
 

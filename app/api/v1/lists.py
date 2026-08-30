@@ -239,7 +239,6 @@ def get_list_details(
                         custom_notes=item.custom_notes,
                         section=item.section,
                         importance_rank=item.importance_rank,
-                        is_nsfw=getattr(item, 'is_nsfw', False),
                         is_completed=is_comp,
                         is_skipped=is_skip,
                         is_addition=True,
@@ -271,7 +270,6 @@ def get_list_details(
                 custom_notes=item.custom_notes,
                 section=item.section,
                 importance_rank=item.importance_rank,
-                is_nsfw=getattr(item, 'is_nsfw', False),
                 is_completed=is_comp,
                 is_skipped=is_skip,
                 is_addition=False
