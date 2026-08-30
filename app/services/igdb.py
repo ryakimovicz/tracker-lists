@@ -154,21 +154,25 @@ class IGDBService:
                         if 42 in themes or not is_safe_media_item(game_title, desc):
                             continue
 
-                        # Clean mapping using official IGDB game_type / category enum
+                        # Clean mapping using official IGDB game_type / category enum + version_parent
                         cat = item.get("game_type") if item.get("game_type") is not None else item.get("category", 0)
+                        has_version_parent = bool(item.get("version_parent"))
+                        
                         badge = None
                         if cat in (2, 4, 6):
                             badge = "expansion"
                         elif cat in (1, 5, 13, 14):
                             badge = "dlc"
-                        elif cat == 3:
+                        elif cat == 10 or (cat in (0, 3) and has_version_parent):
+                            # It's an edition of an existing parent game (GOTY, Deluxe, Premium Edition)
+                            badge = "edition"
+                        elif cat == 3 and not has_version_parent:
+                            # It's a genuine collection/bundle of multiple games
                             badge = "collection"
                         elif cat == 8:
                             badge = "remake"
                         elif cat == 9:
                             badge = "remaster"
-                        elif cat == 10:
-                            badge = "edition"
 
                         results.append(
                             SearchResultItem(
@@ -353,19 +357,20 @@ class IGDBService:
                         release_date = datetime.fromtimestamp(release_timestamp).strftime("%Y-%m-%d") if release_timestamp else None
 
                         cat = item.get("game_type") if item.get("game_type") is not None else item.get("category", 0)
+                        has_version_parent = bool(item.get("version_parent"))
                         badge = None
                         if cat in (2, 4, 6):
                             badge = "expansion"
                         elif cat in (1, 5, 13, 14):
                             badge = "dlc"
-                        elif cat == 3:
+                        elif cat == 10 or (cat in (0, 3) and has_version_parent):
+                            badge = "edition"
+                        elif cat == 3 and not has_version_parent:
                             badge = "collection"
                         elif cat == 8:
                             badge = "remake"
                         elif cat == 9:
                             badge = "remaster"
-                        elif cat == 10:
-                            badge = "edition"
 
                         results.append(SearchResultItem(
                             external_id=str(item.get("id")),
