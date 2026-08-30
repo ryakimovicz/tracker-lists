@@ -43,7 +43,8 @@ import {
   Lock,
   Music,
   ExternalLink,
-  HelpCircle
+  HelpCircle,
+  Clock
 } from 'lucide-react';
 
 import { MusicServiceGuideModal } from '../components/MusicServiceGuideModal';
@@ -1490,8 +1491,9 @@ export const Profile: React.FC = () => {
 
                             {/* Movie Duration / Watched Time */}
                             {item.item_type === 'movie' && (item.pages_read || item.total_pages || 0) > 0 && (
-                              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500, display: 'block', marginTop: '0.2rem' }}>
-                                ⏱️ {(() => {
+                              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '0.25rem', marginTop: '0.2rem' }}>
+                                <Clock size={12} />
+                                {(() => {
                                   const mins = item.pages_read || item.total_pages || 0;
                                   const h = Math.floor(mins / 60);
                                   const m = mins % 60;
@@ -1502,8 +1504,9 @@ export const Profile: React.FC = () => {
 
                             {/* Game Hours Played */}
                             {item.item_type === 'game' && (item.pages_read || 0) > 0 && (
-                              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500, display: 'block', marginTop: '0.2rem' }}>
-                                ⏱️ {Math.floor((item.pages_read || 0) / 60)}h {String((item.pages_read || 0) % 60).padStart(2, '0')}m
+                              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '0.25rem', marginTop: '0.2rem' }}>
+                                <Clock size={12} />
+                                {Math.floor((item.pages_read || 0) / 60)}h {String((item.pages_read || 0) % 60).padStart(2, '0')}m
                               </span>
                             )}
 

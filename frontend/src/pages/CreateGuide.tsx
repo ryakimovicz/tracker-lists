@@ -2016,8 +2016,9 @@ export const CreateGuide: React.FC = () => {
                               </div>
 
                               {isBlockCut && (
-                                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#f59e0b', background: 'rgba(245, 158, 11, 0.15)', padding: '0.15rem 0.5rem', borderRadius: '4px' }}>
-                                  {language === 'es' ? '✂ Bloque cortado' : '✂ Block cut'}
+                                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#f59e0b', background: 'rgba(245, 158, 11, 0.15)', padding: '0.15rem 0.5rem', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                                  <Scissors size={12} />
+                                  {language === 'es' ? 'Bloque cortado' : 'Block cut'}
                                 </span>
                               )}
                             </div>
@@ -2193,8 +2194,9 @@ export const CreateGuide: React.FC = () => {
                                           <Trash2 size={15} />
                                         </button>
                                         {isItemCut && (
-                                          <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#f59e0b', background: 'rgba(245, 158, 11, 0.15)', padding: '0.1rem 0.4rem', borderRadius: '4px' }}>
-                                            {language === 'es' ? '✂ Cortado' : '✂ Cut'}
+                                          <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#f59e0b', background: 'rgba(245, 158, 11, 0.15)', padding: '0.1rem 0.4rem', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
+                                            <Scissors size={11} />
+                                            {language === 'es' ? 'Cortado' : 'Cut'}
                                           </span>
                                         )}
                                       </div>
@@ -2440,8 +2442,9 @@ export const CreateGuide: React.FC = () => {
                                   </div>
 
                                   {isSubblockCut && (
-                                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#f59e0b', background: 'rgba(245, 158, 11, 0.15)', padding: '0.15rem 0.5rem', borderRadius: '4px' }}>
-                                      {language === 'es' ? '✂ Subbloque cortado' : '✂ Subblock cut'}
+                                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#f59e0b', background: 'rgba(245, 158, 11, 0.15)', padding: '0.15rem 0.5rem', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                                      <Scissors size={12} />
+                                      {language === 'es' ? 'Subbloque cortado' : 'Subblock cut'}
                                     </span>
                                   )}
                                 </div>
@@ -2583,8 +2586,9 @@ export const CreateGuide: React.FC = () => {
                                                 <Trash2 size={14} />
                                               </button>
                                               {isItemCut && (
-                                                <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#f59e0b', background: 'rgba(245, 158, 11, 0.15)', padding: '0.1rem 0.4rem', borderRadius: '4px' }}>
-                                                  {language === 'es' ? '✂ Cortado' : '✂ Cut'}
+                                                <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#f59e0b', background: 'rgba(245, 158, 11, 0.15)', padding: '0.1rem 0.4rem', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
+                                                  <Scissors size={11} />
+                                                  {language === 'es' ? 'Cortado' : 'Cut'}
                                                 </span>
                                               )}
                                             </div>

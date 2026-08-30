@@ -155,7 +155,7 @@ export const Register: React.FC = () => {
             <Mail size={38} color="var(--accent-primary)" />
           </div>
           <h2 style={{ margin: 0 }}>
-            {language === 'es' ? '¡Revisa tu correo electrónico! 🚀' : 'Check your email! 🚀'}
+            {language === 'es' ? '¡Revisa tu correo electrónico!' : 'Check your email!'}
           </h2>
           <p style={{ color: 'var(--text-secondary)', margin: 0, fontSize: '0.95rem', lineHeight: '1.5' }}>
             {language === 'es' 

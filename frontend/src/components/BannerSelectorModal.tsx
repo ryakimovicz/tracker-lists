@@ -341,7 +341,7 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
             </div>
             <span style={{ fontSize: '0.75rem', color: selectedUrl ? 'rgba(255,255,255,0.7)' : 'var(--text-muted)' }}>
               {selectedUrl
-                ? (isEs ? '✨ Vista previa de cómo se verá en tu perfil' : '✨ Live preview of your profile header')
+                ? (isEs ? 'Vista previa de cómo se verá en tu perfil' : 'Live preview of your profile header')
                 : (isEs ? 'Sin portada' : 'No banner')}
             </span>
           </div>

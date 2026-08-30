@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { Megaphone } from 'lucide-react';
 
 interface AdBannerProps {
   slotId?: string;
@@ -82,7 +83,7 @@ export const AdBanner: React.FC<AdBannerProps> = ({
               boxSizing: 'border-box'
             }}
           >
-            <div style={{ fontSize: '1.2rem', marginBottom: '0.25rem' }}>📢</div>
+            <Megaphone size={20} style={{ opacity: 0.6, marginBottom: '0.25rem' }} />
             <div style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Anuncio</div>
             <div style={{ fontSize: '0.65rem', opacity: 0.7, marginTop: '0.25rem' }}>Tarjeta patrocinada</div>
           </div>
@@ -134,7 +135,7 @@ export const AdBanner: React.FC<AdBannerProps> = ({
               boxSizing: 'border-box'
             }}
           >
-            <div style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>📢</div>
+            <Megaphone size={24} style={{ opacity: 0.6, marginBottom: '0.5rem' }} />
             <div style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Publicidad Lateral</div>
             <div style={{ fontSize: '0.65rem', opacity: 0.7, marginTop: '0.25rem' }}>160×600</div>
           </div>

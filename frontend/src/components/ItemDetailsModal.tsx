@@ -3,7 +3,7 @@ import { useTranslation } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
 import { getProfileTheme } from '../utils/profileThemes';
 import { apiClient } from '../api/client';
-import { Star, Heart, X, Flag, CheckCircle, Check, Plus, MoreVertical, Trash2, ArrowLeft, Clock, ChevronUp, ChevronDown, RotateCcw, BookOpen, Gamepad2, Package, Sparkles, Puzzle, Layers, ChevronLeft, ChevronRight, Calendar, RefreshCw, AlertCircle } from 'lucide-react';
+import { Star, Heart, X, Flag, CheckCircle, Check, Plus, MoreVertical, Trash2, ArrowLeft, Clock, ChevronUp, ChevronDown, RotateCcw, BookOpen, Gamepad2, Package, Sparkles, Puzzle, Layers, ChevronLeft, ChevronRight, Calendar, RefreshCw, AlertCircle, Globe, Repeat } from 'lucide-react';
 
 
 
@@ -1809,7 +1809,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                               gap: '0.4rem'
                             }}
                           >
-                            <span>🔁</span>
+                            <Repeat size={14} />
                             {language === 'es' ? 'Volver a marcar como visto' : 'Mark as seen again'}
                           </button>
                           
@@ -2045,7 +2045,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                   opacity: isTranslating ? 0.7 : 1
                                 }}
                               >
-                                🌐 {isTranslating 
+                                <Globe size={13} style={{ display: 'inline', marginRight: '4px' }} />
+                                {isTranslating 
                                   ? 'Traduciendo...' 
                                   : (showOriginalDesc ? 'Ver traducción' : 'Mostrar texto original')
                                 }
@@ -3096,7 +3097,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                         gap: '0.4rem'
                                       }}
                                     >
-                                      <span>🔁</span>
+                                      <Repeat size={14} />
                                       {language === 'es' ? 'Volver a marcar toda la temporada' : 'Mark entire season as watched again'}
                                     </button>
                                     <button
@@ -3264,7 +3265,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                                   gap: '0.4rem'
                                                 }}
                                               >
-                                                <span>🔁</span>
+                                                <Repeat size={14} />
                                                 {language === 'es' ? 'Volver a marcar como visto' : 'Mark as seen again'}
                                               </button>
                                               

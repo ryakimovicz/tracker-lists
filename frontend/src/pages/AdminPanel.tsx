@@ -937,7 +937,7 @@ export const AdminPanel: React.FC = () => {
                           <option value="weeks">{isEs ? 'Semana(s)' : 'Week(s)'}</option>
                           <option value="months">{isEs ? 'Mes(es)' : 'Month(s)'}</option>
                           <option value="years">{isEs ? 'Año(s)' : 'Year(s)'}</option>
-                          <option value="permanent">{isEs ? '⛔ Permanente (Indefinida)' : '⛔ Permanent (Indefinite)'}</option>
+                          <option value="permanent">{isEs ? 'Permanente (Indefinida)' : 'Permanent (Indefinite)'}</option>
                         </select>
                       </div>
 

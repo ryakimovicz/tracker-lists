@@ -36,7 +36,7 @@ export const Social: React.FC = () => {
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
         {feed.length === 0 ? (
           <div className="glass-card" style={{ padding: '4rem 2rem', textAlign: 'center' }}>
-            <h3 style={{ fontSize: '1.8rem', marginBottom: '1rem', color: 'var(--text-primary)' }}>No hay actividad reciente 😢</h3>
+            <h3 style={{ fontSize: '1.8rem', marginBottom: '1rem', color: 'var(--text-primary)' }}>No hay actividad reciente</h3>
             <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem', fontSize: '1.1rem' }}>Parece que las personas que sigues no han estado activas últimamente. ¡Encuentra nuevos usuarios para seguir!</p>
             <Link to="/explore" style={{ 
               background: 'var(--accent-primary)', 
@@ -62,15 +62,14 @@ export const Social: React.FC = () => {
             };
 
             let actionText = "realizó una acción en";
-            let icon = "📝";
             
             if (item.activity_type.startsWith("shelf_")) actionText = "actualizó su estantería con";
             if (item.activity_type === "shelf_add") actionText = "agregó a su biblioteca";
             if (item.activity_type === "shelf_favorite") actionText = "marcó como favorito a";
-            if (item.activity_type === "item_completed") { actionText = "marcó como completado"; icon = "✅"; }
-            if (item.activity_type === "guide_created") { actionText = "creó una nueva guía"; icon = "✨"; }
-            if (item.activity_type === "guide_followed") { actionText = "empezó a seguir la guía"; icon = "📌"; }
-            if (item.activity_type === "item_added") { actionText = "agregó un elemento a la guía"; icon = "➕"; }
+            if (item.activity_type === "item_completed") { actionText = "marcó como completado"; }
+            if (item.activity_type === "guide_created") { actionText = "creó una nueva guía"; }
+            if (item.activity_type === "guide_followed") { actionText = "empezó a seguir la guía"; }
+            if (item.activity_type === "item_added") { actionText = "agregó un elemento a la guía"; }
             
             return (
             <div 
@@ -107,7 +106,7 @@ export const Social: React.FC = () => {
               {/* Content */}
               <div style={{ flex: 1 }}>
                   <p style={{ margin: '0 0 0.5rem 0', fontSize: '1.05rem', lineHeight: 1.5, color: 'var(--text-primary)' }}>
-                    <span style={{ fontWeight: 700, color: 'var(--accent-primary)' }}>{item.username}</span> {actionText} <span style={{ fontWeight: 700 }}>{item.item_title}</span> {icon}
+                    <span style={{ fontWeight: 700, color: 'var(--accent-primary)' }}>{item.username}</span> {actionText} <span style={{ fontWeight: 700 }}>{item.item_title}</span>
                   </p>
                   
                   {/* Rich Content Box */}

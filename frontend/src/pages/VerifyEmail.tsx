@@ -98,7 +98,7 @@ export const VerifyEmail: React.FC = () => {
           }}>
             <CheckCircle size={42} color="#10b981" />
           </div>
-          <h2 style={{ margin: 0 }}>{isEs ? '¡Cuenta confirmada con éxito! 🎉' : 'Account verified successfully! 🎉'}</h2>
+          <h2 style={{ margin: 0 }}>{isEs ? '¡Cuenta confirmada con éxito!' : 'Account verified successfully!'}</h2>
           <p style={{ color: 'var(--text-secondary)', margin: 0, fontSize: '0.95rem' }}>
             {isEs 
               ? 'Tu correo electrónico ha sido verificado. Serás redirigido a tu perfil en unos segundos...'
