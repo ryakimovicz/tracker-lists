@@ -250,16 +250,25 @@ def get_library_item_consumption_history(
             user_id=current_user.id,
             item_type=item.item_type.value if hasattr(item.item_type, 'value') else item.item_type,
             external_id=item.external_id,
-            consumed_at=item.completed_at
+            consumed_at=item.completed_at,
+            is_hundred_percent=bool(item.is_hundred_percent)
         )
         db.add(ch)
         db.commit()
         history = [ch]
         
+    result_entries = [
+        {
+            "id": ch.id,
+            "consumed_at": ch.consumed_at,
+            "is_hundred_percent": bool(ch.is_hundred_percent)
+        } for ch in history
+    ]
     result_dates = [ch.consumed_at for ch in history]
     return {
-        "count": len(result_dates),
-        "history": result_dates
+        "count": len(result_entries),
+        "history": result_dates,
+        "entries": result_entries
     }
 
 @router.delete("/{item_id}/consumption-history/latest", response_model=LibraryItemResponse)
@@ -317,6 +326,7 @@ def remove_latest_consumption(
 @router.post("/{item_id}/mark-consumed", response_model=LibraryItemResponse, status_code=status.HTTP_200_OK)
 def mark_library_item_consumed(
     item_id: int,
+    is_hundred_percent: Optional[bool] = Query(False),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -352,12 +362,15 @@ def mark_library_item_consumed(
         
     now_dt = datetime.now(timezone.utc)
     item.completed_at = now_dt
+    if is_hundred_percent is not None:
+        item.is_hundred_percent = is_hundred_percent
     
     ch = ConsumptionHistory(
         user_id=current_user.id,
         item_type=item.item_type.value if hasattr(item.item_type, 'value') else item.item_type,
         external_id=item.external_id,
-        consumed_at=now_dt
+        consumed_at=now_dt,
+        is_hundred_percent=bool(is_hundred_percent)
     )
     db.add(ch)
     db.commit()
@@ -449,6 +462,8 @@ def add_to_library(
         existing.status = status_val
         if item_in.is_favorite is not None:
             existing.is_favorite = item_in.is_favorite
+        if item_in.is_hundred_percent is not None:
+            existing.is_hundred_percent = item_in.is_hundred_percent
         if item_in.custom_badge is not None:
             existing.custom_badge = item_in.custom_badge
         existing.completed_at = completed_at_val
@@ -467,6 +482,7 @@ def add_to_library(
             image_url=item_in.image_url,
             status=status_val,
             is_favorite=item_in.is_favorite if item_in.is_favorite is not None else False,
+            is_hundred_percent=item_in.is_hundred_percent if item_in.is_hundred_percent is not None else False,
             completed_at=completed_at_val,
             last_seen_episode=last_title,
             custom_badge=item_in.custom_badge,
@@ -553,6 +569,7 @@ def get_library(
             "image_url": it.image_url,
             "status": it.status,
             "is_favorite": it.is_favorite,
+            "is_hundred_percent": it.is_hundred_percent,
             "completed_at": it.completed_at,
             "updated_at": it.updated_at,
             "last_seen_episode": it.last_seen_episode,
@@ -604,21 +621,34 @@ def update_library_item(
                     ConsumptionHistory.external_id == lib_item.external_id
                 ).count()
                 
-                if not is_user_pro and existing_count >= 2:
-                    raise HTTPException(
-                        status_code=status.HTTP_403_FORBIDDEN,
-                        detail="Los usuarios gratuitos solo pueden registrar hasta 2 visualizaciones/lecturas. ¡Pásate a Premium para registros ilimitados e historial detallado!"
-                    )
-                    
-                ch = ConsumptionHistory(
-                    user_id=current_user.id,
-                    item_type=lib_item.item_type.value if hasattr(lib_item.item_type, 'value') else lib_item.item_type,
-                    external_id=lib_item.external_id,
-                    consumed_at=now_dt
-                )
-                db.add(ch)
+                # Check if this consumption was already recorded in the last 60 seconds
+                latest_c = db.query(ConsumptionHistory).filter(
+                    ConsumptionHistory.user_id == current_user.id,
+                    ConsumptionHistory.external_id == lib_item.external_id
+                ).order_by(ConsumptionHistory.consumed_at.desc()).first()
+                
+                should_record = True
+                if latest_c and latest_c.consumed_at:
+                    diff_seconds = (now_dt - latest_c.consumed_at.replace(tzinfo=timezone.utc) if latest_c.consumed_at.tzinfo is None else (now_dt - latest_c.consumed_at)).total_seconds()
+                    if diff_seconds < 60:
+                        should_record = False
+                        
+                if should_record:
+                    if not is_user_pro and existing_count >= 2:
+                        pass
+                    else:
+                        ch = ConsumptionHistory(
+                            user_id=current_user.id,
+                            item_type=lib_item.item_type.value if hasattr(lib_item.item_type, 'value') else lib_item.item_type,
+                            external_id=lib_item.external_id,
+                            consumed_at=now_dt,
+                            is_hundred_percent=bool(item_in.is_hundred_percent if item_in.is_hundred_percent is not None else lib_item.is_hundred_percent)
+                        )
+                        db.add(ch)
         else:
             lib_item.completed_at = None
+            if item_in.is_hundred_percent is None:
+                lib_item.is_hundred_percent = False
             
         lib_item.updated_at = datetime.now(timezone.utc)
         
@@ -633,6 +663,17 @@ def update_library_item(
             details=item_in.status.value if hasattr(item_in.status, "value") else str(item_in.status)
         )
         db.add(activity)
+
+    if item_in.is_hundred_percent is not None:
+        lib_item.is_hundred_percent = item_in.is_hundred_percent
+        # If toggled on/off, update the latest consumption history record if exists
+        from app.models.consumption import ConsumptionHistory
+        latest_ch = db.query(ConsumptionHistory).filter(
+            ConsumptionHistory.user_id == current_user.id,
+            ConsumptionHistory.external_id == lib_item.external_id
+        ).order_by(ConsumptionHistory.consumed_at.desc()).first()
+        if latest_ch:
+            latest_ch.is_hundred_percent = bool(item_in.is_hundred_percent)
         
     if item_in.is_favorite is not None:
         if item_in.is_favorite and not lib_item.is_favorite:

@@ -55,6 +55,7 @@ def auto_migrate_schema():
                 ("pages_read", "INTEGER DEFAULT 0"),
                 ("total_pages", "INTEGER"),
                 ("tracking_list_id", "INTEGER"),
+                ("is_hundred_percent", "BOOLEAN DEFAULT FALSE"),
             ]
             for col_name, col_type in lib_cols_to_add:
                 if col_name not in existing_lib_cols:
@@ -64,6 +65,16 @@ def auto_migrate_schema():
                         logger.info(f"Auto-migration: Added column '{col_name}' to user_library_items table.")
                     except Exception as e:
                         logger.warning(f"Auto-migration: Failed to add column '{col_name}' to user_library_items: {e}")
+
+        if "consumption_history" in inspector.get_table_names():
+            existing_cons_cols = {col["name"] for col in inspector.get_columns("consumption_history")}
+            if "is_hundred_percent" not in existing_cons_cols:
+                try:
+                    with engine.begin() as conn:
+                        conn.execute(text("ALTER TABLE consumption_history ADD COLUMN is_hundred_percent BOOLEAN DEFAULT FALSE;"))
+                    logger.info("Auto-migration: Added column 'is_hundred_percent' to consumption_history table.")
+                except Exception as e:
+                    logger.warning(f"Auto-migration: Failed to add column 'is_hundred_percent' to consumption_history: {e}")
     except Exception as e:
         logger.error(f"Error during schema inspection migration: {e}")
 

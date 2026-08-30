@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Boolean
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 
@@ -16,6 +16,7 @@ class ConsumptionHistory(Base):
     
     # When it was consumed
     consumed_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+    is_hundred_percent = Column(Boolean, default=False, nullable=False)
 
     # Relationships
     user = relationship("User", backref="consumptions")

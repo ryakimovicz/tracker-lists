@@ -44,7 +44,8 @@ import {
   Music,
   ExternalLink,
   HelpCircle,
-  Clock
+  Clock,
+  Trophy
 } from 'lucide-react';
 
 import { MusicServiceGuideModal } from '../components/MusicServiceGuideModal';
@@ -62,6 +63,7 @@ interface LibraryItem {
   imdb_id?: string;
   status: string;
   is_favorite: boolean;
+  is_hundred_percent?: boolean;
   created_at: string;
   completed_at?: string;
   updated_at?: string;
@@ -1453,7 +1455,13 @@ export const Profile: React.FC = () => {
                               // Games
                               else if (item.item_type === 'game') {
                                 if (item.status === 'playing') badges.push({ text: language === 'es' ? 'Jugando' : 'Playing', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' });
-                                else if (item.status === 'completed') badges.push({ text: language === 'es' ? 'Completado' : 'Completed', color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)' });
+                                else if (item.status === 'completed') {
+                                  if (item.is_hundred_percent) {
+                                    badges.push({ text: '100%', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.15)', isTrophy: true });
+                                  } else {
+                                    badges.push({ text: language === 'es' ? 'Completado' : 'Completed', color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)' });
+                                  }
+                                }
                               }
                               // Movies
                               else if (item.item_type === 'movie') {
@@ -1506,9 +1514,12 @@ export const Profile: React.FC = () => {
                                       padding: '0.15rem 0.4rem',
                                       borderRadius: '4px',
                                       fontWeight: 600,
-                                      display: 'inline-block'
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '0.25rem'
                                     }}>
-                                      {badge.text}
+                                      {badge.isTrophy && <Trophy size={11} />}
+                                      <span>{badge.text}</span>
                                     </span>
                                   ))}
                                 </div>

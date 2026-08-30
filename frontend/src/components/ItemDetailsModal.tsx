@@ -3,7 +3,7 @@ import { useTranslation } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
 import { getProfileTheme } from '../utils/profileThemes';
 import { apiClient } from '../api/client';
-import { Star, Heart, X, Flag, CheckCircle, Check, Plus, MoreVertical, Trash2, ArrowLeft, Clock, ChevronUp, ChevronDown, RotateCcw, BookOpen, Gamepad2, Package, Sparkles, Puzzle, Layers, ChevronLeft, ChevronRight, Calendar, RefreshCw, AlertCircle, Globe, Repeat } from 'lucide-react';
+import { Star, Heart, X, Flag, CheckCircle, Check, Plus, MoreVertical, Trash2, ArrowLeft, Clock, ChevronUp, ChevronDown, RotateCcw, BookOpen, Gamepad2, Package, Sparkles, Puzzle, Layers, ChevronLeft, ChevronRight, Calendar, RefreshCw, AlertCircle, Globe, Repeat, Trophy } from 'lucide-react';
 
 
 
@@ -193,9 +193,11 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   const [showAllWatchedMenu, setShowAllWatchedMenu] = useState(false);
   const [showSingleWatchedMenu, setShowSingleWatchedMenu] = useState(false);
   const [consumptionHistory, setConsumptionHistory] = useState<string[]>([]);
+  const [consumptionEntries, setConsumptionEntries] = useState<{ id?: number, consumed_at: string, is_hundred_percent: boolean }[]>([]);
   
   // Floating Dialogs (Modals)
   const [showReconsumedModal, setShowReconsumedModal] = useState(false);
+  const [showHundredPercentDecisionModal, setShowHundredPercentDecisionModal] = useState(false);
   const [showStatusChangeModal, setShowStatusChangeModal] = useState(false);
   const [pendingStatusChange, setPendingStatusChange] = useState<string | null>(null);
   const [showRemoveShelfModal, setShowRemoveShelfModal] = useState(false);
@@ -384,8 +386,9 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
         if (['completed', 'read'].includes(newStatus) && user?.is_pro) {
           apiClient.get(`/library/${selectedItem.id}/consumption-history`)
             .then(hRes => {
-              if (hRes.data && hRes.data.history) {
-                setConsumptionHistory(hRes.data.history);
+              if (hRes.data) {
+                if (hRes.data.history) setConsumptionHistory(hRes.data.history);
+                if (hRes.data.entries) setConsumptionEntries(hRes.data.entries);
               }
             })
             .catch(console.error);
@@ -416,8 +419,9 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
         if (user?.is_pro) {
           apiClient.get(`/library/${selectedItem.id}/consumption-history`)
             .then(hRes => {
-              if (hRes.data && hRes.data.history) {
-                setConsumptionHistory(hRes.data.history);
+              if (hRes.data) {
+                if (hRes.data.history) setConsumptionHistory(hRes.data.history);
+                if (hRes.data.entries) setConsumptionEntries(hRes.data.entries);
               }
             })
             .catch(console.error);
@@ -430,20 +434,22 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     await handleToggleStatus(nextStatus, true);
   };
 
-  const handleMarkConsumedAgain = async () => {
+  const handleMarkConsumedAgain = async (isHundred = false) => {
     if (!selectedItem || !selectedItem.id) return;
     setShowShelfMenu(false);
     setShowSingleWatchedMenu(false);
     try {
-      const res = await apiClient.post(`/library/${selectedItem.id}/mark-consumed`);
+      const url = isHundred ? `/library/${selectedItem.id}/mark-consumed?is_hundred_percent=true` : `/library/${selectedItem.id}/mark-consumed`;
+      const res = await apiClient.post(url);
       setSelectedItem((prev: any) => prev ? { ...prev, ...res.data } : null);
       
       // Refresh history list
       if (user?.is_pro) {
         apiClient.get(`/library/${selectedItem.id}/consumption-history`)
           .then(hRes => {
-            if (hRes.data && hRes.data.history) {
-              setConsumptionHistory(hRes.data.history);
+            if (hRes.data) {
+              if (hRes.data.history) setConsumptionHistory(hRes.data.history);
+              if (hRes.data.entries) setConsumptionEntries(hRes.data.entries);
             }
           })
           .catch(console.error);
@@ -456,6 +462,89 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
         console.error(e);
       }
     }
+  };
+
+  const handleToggleHundredPercent = async () => {
+    if (!selectedItem) return;
+
+    // If game is already completed:
+    if (selectedItem.status === 'completed') {
+      if (selectedItem.is_hundred_percent) {
+        // Already 100%: clicking 100% again opens re-consumption options modal
+        setShowReconsumedModal(true);
+      } else {
+        // Completed but not 100%: ask if they want to update current playthrough or log new 100% playthrough
+        setShowHundredPercentDecisionModal(true);
+      }
+      return;
+    }
+
+    // If game is not completed yet (e.g. playing, endless, dropped, plan_to_play, or untracked):
+    // Directly complete at 100%
+    if (selectedItem.id) {
+      try {
+        const res = await apiClient.put(`/library/${selectedItem.id}`, {
+          status: 'completed',
+          is_hundred_percent: true
+        });
+        setSelectedItem((prev: any) => prev ? { ...prev, status: 'completed', is_hundred_percent: true, ...res.data } : null);
+        if (user?.is_pro) {
+          apiClient.get(`/library/${selectedItem.id}/consumption-history`)
+            .then(hRes => {
+              if (hRes.data) {
+                if (hRes.data.history) setConsumptionHistory(hRes.data.history);
+                if (hRes.data.entries) setConsumptionEntries(hRes.data.entries);
+              }
+            })
+            .catch(console.error);
+        }
+        onUpdate && onUpdate();
+      } catch (e: any) {
+        console.error(e);
+      }
+    } else {
+      const tracked = await ensureTracked('completed');
+      if (tracked && tracked.id) {
+        try {
+          const res = await apiClient.put(`/library/${tracked.id}`, {
+            is_hundred_percent: true
+          });
+          setSelectedItem((prev: any) => prev ? { ...prev, is_hundred_percent: true, ...res.data } : null);
+          onUpdate && onUpdate();
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    }
+  };
+
+  const handleUpdateCurrentPlaythroughToHundred = async () => {
+    if (!selectedItem || !selectedItem.id) return;
+    setShowHundredPercentDecisionModal(false);
+    try {
+      const res = await apiClient.put(`/library/${selectedItem.id}`, {
+        is_hundred_percent: true
+      });
+      setSelectedItem((prev: any) => prev ? { ...prev, is_hundred_percent: true, ...res.data } : null);
+      if (user?.is_pro) {
+        apiClient.get(`/library/${selectedItem.id}/consumption-history`)
+          .then(hRes => {
+            if (hRes.data) {
+              if (hRes.data.history) setConsumptionHistory(hRes.data.history);
+              if (hRes.data.entries) setConsumptionEntries(hRes.data.entries);
+            }
+          })
+          .catch(console.error);
+      }
+      onUpdate && onUpdate();
+    } catch (e) {
+      console.error("Failed to update playthrough to 100%", e);
+    }
+  };
+
+  const handleLogNewPlaythroughHundred = async () => {
+    setShowHundredPercentDecisionModal(false);
+    await handleMarkConsumedAgain(true);
   };
 
   const handleRemoveLatestConsumption = async () => {
@@ -906,13 +995,15 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       if (item.id && user?.is_pro) {
         apiClient.get(`/library/${item.id}/consumption-history`)
           .then(hRes => {
-            if (hRes.data && hRes.data.history) {
-              setConsumptionHistory(hRes.data.history);
+            if (hRes.data) {
+              if (hRes.data.history) setConsumptionHistory(hRes.data.history);
+              if (hRes.data.entries) setConsumptionEntries(hRes.data.entries);
             }
           })
           .catch(console.error);
       } else {
         setConsumptionHistory([]);
+        setConsumptionEntries([]);
       }
 
       const descCacheKey = `desc_${item.item_type}_${item.external_id}`;
@@ -2580,25 +2671,61 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                   {user && !isEpisode && !isCosmeticDlc && (
                     <div style={{ marginTop: '0.75rem' }}>
                       {selectedItem?.item_type === 'game' ? (
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.4rem' }}>
+                          <button
+                            type="button"
+                            onClick={handleToggleHundredPercent}
+                            style={{
+                              width: '100%',
+                              background: (selectedItem?.status === 'completed' && selectedItem?.is_hundred_percent) ? '#f59e0b' : 'var(--bg-tertiary)',
+                              border: (selectedItem?.status === 'completed' && selectedItem?.is_hundred_percent) ? 'none' : '1px solid var(--border-color)',
+                              borderRadius: '8px',
+                              padding: '0.5rem 0.2rem',
+                              textAlign: 'center',
+                              cursor: 'pointer',
+                              color: (selectedItem?.status === 'completed' && selectedItem?.is_hundred_percent) ? '#ffffff' : 'var(--text-primary)',
+                              fontSize: '0.75rem',
+                              fontWeight: 600,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '0.25rem',
+                              transition: 'all 0.2s ease'
+                            }}
+                          >
+                            <Trophy size={13} strokeWidth={2.2} />
+                            <span>100%</span>
+                          </button>
                           <button
                             type="button"
                             onClick={() => {
-                              if (selectedItem?.status === 'completed') {
+                              if (selectedItem?.status === 'completed' && !selectedItem?.is_hundred_percent) {
                                 setShowReconsumedModal(true);
                               } else {
-                                handleToggleStatus('completed');
+                                if (selectedItem?.status === 'completed' && selectedItem?.is_hundred_percent) {
+                                  // Clicking completed while at 100% turns off 100% (sets normal completed)
+                                  if (selectedItem.id) {
+                                    apiClient.put(`/library/${selectedItem.id}`, { is_hundred_percent: false })
+                                      .then(res => {
+                                        setSelectedItem((prev: any) => prev ? { ...prev, is_hundred_percent: false, ...res.data } : null);
+                                        onUpdate && onUpdate();
+                                      })
+                                      .catch(console.error);
+                                  }
+                                } else {
+                                  handleToggleStatus('completed');
+                                }
                               }
                             }}
                             style={{
                               width: '100%',
-                              background: selectedItem?.status === 'completed' ? 'var(--color-game)' : 'var(--bg-tertiary)',
-                              border: selectedItem?.status === 'completed' ? 'none' : '1px solid var(--border-color)',
+                              background: (selectedItem?.status === 'completed' && !selectedItem?.is_hundred_percent) ? 'var(--color-game)' : 'var(--bg-tertiary)',
+                              border: (selectedItem?.status === 'completed' && !selectedItem?.is_hundred_percent) ? 'none' : '1px solid var(--border-color)',
                               borderRadius: '8px',
-                              padding: '0.5rem',
+                              padding: '0.5rem 0.2rem',
                               textAlign: 'center',
                               cursor: 'pointer',
-                              color: selectedItem?.status === 'completed' ? '#ffffff' : 'var(--text-primary)',
+                              color: (selectedItem?.status === 'completed' && !selectedItem?.is_hundred_percent) ? '#ffffff' : 'var(--text-primary)',
                               fontSize: '0.75rem',
                               fontWeight: 600,
                               transition: 'all 0.2s ease'
@@ -2885,6 +3012,11 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                 minute: '2-digit'
                               })
                             : dStr;
+                          
+                          const isEntryHundred = consumptionEntries && consumptionEntries[idx]
+                            ? consumptionEntries[idx].is_hundred_percent
+                            : (idx === 0 && selectedItem?.is_hundred_percent);
+
                           return (
                             <div key={idx} style={{
                               display: 'flex',
@@ -2893,9 +3025,28 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                               fontSize: '0.78rem',
                               color: 'var(--text-secondary)'
                             }}>
-                              <span style={{ fontWeight: 500 }}>
-                                #{consumptionHistory.length - idx} {idx === 0 ? (language === 'es' ? '(Última vez)' : '(Latest)') : ''}
-                              </span>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                <span style={{ fontWeight: 500 }}>
+                                  #{consumptionHistory.length - idx} {idx === 0 ? (language === 'es' ? '(Última vez)' : '(Latest)') : ''}
+                                </span>
+                                {isEntryHundred && (
+                                  <span style={{
+                                    fontSize: '0.68rem',
+                                    fontWeight: 700,
+                                    color: '#f59e0b',
+                                    background: 'rgba(245, 158, 11, 0.12)',
+                                    border: '1px solid rgba(245, 158, 11, 0.3)',
+                                    padding: '0.05rem 0.3rem',
+                                    borderRadius: '4px',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '0.2rem'
+                                  }}>
+                                    <Trophy size={10} />
+                                    <span>100%</span>
+                                  </span>
+                                )}
+                              </div>
                               <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
                                 {dateFormatted}
                               </span>
@@ -3860,6 +4011,35 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         </span>
                       </button>
 
+                      {selectedItem.item_type === 'game' && (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            setShowReconsumedModal(false);
+                            await handleMarkConsumedAgain(true);
+                          }}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.65rem',
+                            padding: '0.75rem 1rem',
+                            borderRadius: '8px',
+                            background: 'rgba(245, 158, 11, 0.08)',
+                            border: '1px solid rgba(245, 158, 11, 0.3)',
+                            color: '#f59e0b',
+                            fontWeight: 600,
+                            fontSize: '0.9rem',
+                            cursor: 'pointer',
+                            textAlign: 'left'
+                          }}
+                        >
+                          <Trophy size={16} style={{ flexShrink: 0 }} />
+                          <span>
+                            {language === 'es' ? 'Volver a marcar como jugado (100%)' : 'Mark as played again (100%)'}
+                          </span>
+                        </button>
+                      )}
+
                       <button
                         type="button"
                         onClick={async () => {
@@ -3895,6 +4075,132 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                     <button
                       type="button"
                       onClick={() => setShowReconsumedModal(false)}
+                      style={{
+                        padding: '0.55rem',
+                        borderRadius: '6px',
+                        background: 'transparent',
+                        border: 'none',
+                        color: 'var(--text-secondary)',
+                        fontSize: '0.85rem',
+                        cursor: 'pointer',
+                        fontWeight: 500
+                      }}
+                    >
+                      {language === 'es' ? 'Cancelar' : 'Cancel'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Floating Modal 1.5: 100% Completion Decision Dialog */}
+              {showHundredPercentDecisionModal && (
+                <div
+                  style={{
+                    position: 'fixed',
+                    inset: 0,
+                    zIndex: 9999,
+                    background: 'rgba(0, 0, 0, 0.65)',
+                    backdropFilter: 'blur(4px)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '1rem'
+                  }}
+                  onClick={() => setShowHundredPercentDecisionModal(false)}
+                >
+                  <div
+                    className="glass-card"
+                    style={{
+                      width: '100%',
+                      maxWidth: '430px',
+                      background: 'var(--bg-secondary)',
+                      borderRadius: '12px',
+                      padding: '1.25rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '1rem',
+                      boxShadow: '0 12px 30px rgba(0,0,0,0.4)',
+                      border: '1px solid var(--border-color)'
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div style={{ display: 'flex', gap: '0.65rem', alignItems: 'center' }}>
+                      <Trophy size={22} style={{ color: '#f59e0b', flexShrink: 0 }} />
+                      <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                        {language === 'es' ? 'Completado al 100%' : '100% Completion'}
+                      </h3>
+                    </div>
+
+                    <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+                      {language === 'es'
+                        ? 'Ya tienes una partida completada en tu historial. ¿Cómo deseas registrar este 100%?'
+                        : 'You already have a completed playthrough in your history. How would you like to log this 100%?'
+                      }
+                    </p>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                      <button
+                        type="button"
+                        onClick={handleUpdateCurrentPlaythroughToHundred}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.65rem',
+                          padding: '0.75rem 1rem',
+                          borderRadius: '8px',
+                          background: 'rgba(245, 158, 11, 0.1)',
+                          border: '1px solid rgba(245, 158, 11, 0.35)',
+                          color: 'var(--text-primary)',
+                          fontWeight: 600,
+                          fontSize: '0.88rem',
+                          cursor: 'pointer',
+                          textAlign: 'left'
+                        }}
+                      >
+                        <Trophy size={18} style={{ flexShrink: 0, color: '#f59e0b' }} />
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                          <span style={{ color: '#f59e0b', fontWeight: 700 }}>
+                            {language === 'es' ? 'Actualizar mi partida actual al 100%' : 'Update current playthrough to 100%'}
+                          </span>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 400 }}>
+                            {language === 'es' ? 'Indica que tu partida anterior completada alcanzó el 100%' : 'Mark your previous playthrough as having reached 100%'}
+                          </span>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleLogNewPlaythroughHundred}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.65rem',
+                          padding: '0.75rem 1rem',
+                          borderRadius: '8px',
+                          background: 'var(--bg-tertiary)',
+                          border: '1px solid var(--border-color)',
+                          color: 'var(--text-primary)',
+                          fontWeight: 600,
+                          fontSize: '0.88rem',
+                          cursor: 'pointer',
+                          textAlign: 'left'
+                        }}
+                      >
+                        <RotateCcw size={18} style={{ flexShrink: 0, color: 'var(--accent-primary)' }} />
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                          <span>
+                            {language === 'es' ? 'Registrar como una nueva partida al 100%' : 'Log as a new 100% playthrough'}
+                          </span>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 400 }}>
+                            {language === 'es' ? 'Guarda un nuevo registro en tu historial como segunda pasada' : 'Add a new entry to your history as a second playthrough'}
+                          </span>
+                        </div>
+                      </button>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowHundredPercentDecisionModal(false)}
                       style={{
                         padding: '0.55rem',
                         borderRadius: '6px',
