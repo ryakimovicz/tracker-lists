@@ -1016,7 +1016,12 @@ export const Home: React.FC = () => {
   if (activeTab === "watching") {
     filteredItems = libraryItems.filter(i => ["watching", "reading", "playing"].includes(i.status) && i.item_type !== "custom");
   } else if (activeTab === "plan_to_watch") {
-    filteredItems = libraryItems.filter(i => ["plan_to_watch", "plan_to_play", "plan_to_read"].includes(i.status) && i.item_type !== "custom");
+    filteredItems = libraryItems.filter(i => 
+      ["plan_to_watch", "plan_to_play", "plan_to_read"].includes(i.status) && 
+      i.item_type !== "custom" &&
+      i.badge !== "dlc" &&
+      i.custom_badge !== "dlc"
+    );
   } else if (activeTab === "completed") {
     filteredItems = libraryItems.filter(i => ["completed", "read", "endless"].includes(i.status) && i.item_type !== "custom");
   } else if (activeTab === "dropped") {
