@@ -110,40 +110,56 @@ def admin_ban_media(
     from app.models.list_item import ListItem
     from app.models.review import MediaReview
 
-    # Check if already blocked
-    existing = db.query(BlockedMediaItem).filter(BlockedMediaItem.external_id == body.external_id).first()
-    if not existing:
-        blocked = BlockedMediaItem(
-            item_type=body.item_type,
-            external_id=body.external_id,
-            title=body.title,
-            reason=body.reason or "Contenido inapropiado / explícito"
+    try:
+        # Check if already blocked
+        existing = db.query(BlockedMediaItem).filter(BlockedMediaItem.external_id == body.external_id).first()
+        if not existing:
+            blocked = BlockedMediaItem(
+                item_type=body.item_type,
+                external_id=body.external_id,
+                title=body.title,
+                reason=body.reason or "Contenido inapropiado / explícito"
+            )
+            db.add(blocked)
+
+        # Purge from all user libraries
+        try:
+            db.query(UserLibraryItem).filter(
+                UserLibraryItem.external_id == body.external_id
+            ).delete(synchronize_session=False)
+        except Exception as e:
+            print(f"Notice purging user_library_items: {e}")
+
+        # Purge from all lists
+        try:
+            db.query(ListItem).filter(
+                ListItem.external_id == body.external_id
+            ).delete(synchronize_session=False)
+        except Exception as e:
+            print(f"Notice purging list_items: {e}")
+
+        # Purge reviews
+        try:
+            db.query(MediaReview).filter(
+                MediaReview.external_id == body.external_id
+            ).delete(synchronize_session=False)
+        except Exception as e:
+            print(f"Notice purging media_reviews: {e}")
+
+        # Delete all reports for this media
+        try:
+            db.query(MediaItemReport).filter(MediaItemReport.external_id == body.external_id).delete(synchronize_session=False)
+        except Exception as e:
+            print(f"Notice purging media_item_reports: {e}")
+
+        db.commit()
+        return {"success": True, "message": f"La obra '{body.title or body.external_id}' fue bloqueada y eliminada de todo el sistema."}
+    except Exception as err:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al banear obra: {str(err)}"
         )
-        db.add(blocked)
-
-    # Purge from all user libraries
-    db.query(UserLibraryItem).filter(
-        UserLibraryItem.item_type == body.item_type,
-        UserLibraryItem.external_id == body.external_id
-    ).delete(synchronize_session=False)
-
-    # Purge from all lists
-    db.query(ListItem).filter(
-        ListItem.item_type == body.item_type,
-        ListItem.external_id == body.external_id
-    ).delete(synchronize_session=False)
-
-    # Purge reviews
-    db.query(MediaReview).filter(
-        MediaReview.item_type == body.item_type,
-        MediaReview.external_id == body.external_id
-    ).delete(synchronize_session=False)
-
-    # Delete all reports for this media
-    db.query(MediaItemReport).filter(MediaItemReport.external_id == body.external_id).delete(synchronize_session=False)
-
-    db.commit()
-    return {"success": True, "message": f"La obra '{body.title or body.external_id}' fue bloqueada y eliminada de todo el sistema."}
 
 @router.delete("/media/unban/{blocked_id}")
 def admin_unban_media(
