@@ -1473,18 +1473,31 @@ def check_series_completion(user_id: int, ep_external_id: str):
         req2 = urllib.request.Request(episodes_url, headers={"User-Agent": "TrackerLists/1.0"})
         with urllib.request.urlopen(req2, timeout=5) as response2:
             if response2.status == 200:
-                episodes = json.loads(response2.read().decode())
-                # Filter out episodes that haven't aired yet
-                import datetime
-                today = datetime.datetime.now().strftime("%Y-%m-%d")
-                aired_episodes = [ep for ep in episodes if ep.get("airdate") and ep.get("airdate") <= today]
+                from datetime import datetime, timezone
+                now_dt = datetime.now(timezone.utc)
+                now_iso = now_dt.isoformat()
+                now_date = now_dt.strftime("%Y-%m-%d")
+
+                def is_ep_aired(ep_dict):
+                    astamp = ep_dict.get("airstamp")
+                    if astamp:
+                        try:
+                            # Python 3.11+ fromisoformat handles +00:00 or Z
+                            ep_dt = datetime.fromisoformat(astamp.replace("Z", "+00:00"))
+                            return ep_dt <= now_dt
+                        except Exception:
+                            pass
+                    adate = ep_dict.get("airdate")
+                    return bool(adate and adate <= now_date)
+
+                aired_episodes = [ep for ep in episodes if is_ep_aired(ep)]
                 total_aired = len(aired_episodes)
                 
                 if total_aired == 0:
                     return
                 
                 # 3. Check user's progress
-                from app.models.consumption import ItemProgress
+                from app.models.item_progress import ItemProgress
                 from app.models.library import UserLibraryItem, UserLibraryStatusEnum
                 
                 aired_ep_ids = [f"tvm-ep-{ep['id']}" for ep in aired_episodes]
@@ -1500,15 +1513,13 @@ def check_series_completion(user_id: int, ep_external_id: str):
                     show_ext_id = f"tvm_{show_id}"
                     existing_series = db.query(UserLibraryItem).filter(
                         UserLibraryItem.user_id == user_id,
-                        UserLibraryItem.external_id == show_ext_id
+                        (UserLibraryItem.external_id == show_ext_id) | (UserLibraryItem.external_id == f"tvm-{show_id}")
                     ).first()
                     
                     if existing_series:
                         existing_series.status = UserLibraryStatusEnum.COMPLETED
-                        from datetime import timezone
-                        existing_series.completed_at = datetime.datetime.now(timezone.utc)
+                        existing_series.completed_at = now_dt
                     else:
-                        from datetime import timezone
                         new_series = UserLibraryItem(
                             user_id=user_id,
                             item_type="series",
@@ -1516,7 +1527,7 @@ def check_series_completion(user_id: int, ep_external_id: str):
                             title=show_name,
                             image_url=show_image,
                             status=UserLibraryStatusEnum.COMPLETED,
-                            completed_at=datetime.datetime.now(timezone.utc),
+                            completed_at=now_dt,
                             imdb_id=show_ext_id
                         )
                         db.add(new_series)
