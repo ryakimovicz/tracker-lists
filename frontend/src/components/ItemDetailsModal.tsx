@@ -1477,7 +1477,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   };
 
   const isEpisode = !!(String(selectedItem?.external_id || '').startsWith('tvm-ep-') || selectedItem?.item_type === 'episode' || selectedItem?.list_id);
-  const isCosmeticDlc = selectedItem?.item_type === 'game' && (selectedItem?.badge === 'dlc' || selectedItem?.custom_badge === 'dlc');
+  const isCosmeticDlc = false; // Allow full tracking (hours, 100%, statuses) for all games, mods, and expansions
   const ratings = (itemReviews || []).filter(r => r.rating !== null && r.rating !== 0).map(r => r.rating);
   const avgRating = ratings.length > 0 ? (ratings.reduce((a: number, b: number) => a + b, 0) / ratings.length).toFixed(1) : null;
 

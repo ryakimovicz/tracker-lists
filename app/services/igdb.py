@@ -168,7 +168,9 @@ class IGDBService:
                         badge = None
                         if cat in (2, 4, 6):
                             badge = "expansion"
-                        elif cat in (1, 5, 13, 14):
+                        elif cat == 5:
+                            badge = "mod"
+                        elif cat in (1, 13, 14):
                             badge = "dlc"
                         elif cat == 10 or (cat in (0, 3) and has_version_parent):
                             # It's an edition of an existing parent game (GOTY, Deluxe, Premium Edition)
@@ -368,7 +370,9 @@ class IGDBService:
                         badge = None
                         if cat in (2, 4, 6):
                             badge = "expansion"
-                        elif cat in (1, 5, 13, 14):
+                        elif cat == 5:
+                            badge = "mod"
+                        elif cat in (1, 13, 14):
                             badge = "dlc"
                         elif cat == 10 or (cat in (0, 3) and has_version_parent):
                             badge = "edition"
