@@ -2138,9 +2138,14 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                   {/* Favorite toggler moved to 3-dots menu */}
 
                   {/* Modern & Comfortable Pages Read Picker for books, comics and mangas */}
-                  {!isEpisode && selectedItem && ['book', 'comic', 'manga'].includes(selectedItem.item_type) && (
-                    ['reading', 'dropped'].includes(selectedItem.status) || (hasInteractedWithTime && selectedItem.status === 'read')
-                  ) && (() => {
+                  {!isEpisode && selectedItem && ['book', 'comic', 'manga'].includes(selectedItem.item_type) && (() => {
+                    const isRead = selectedItem.status === 'read';
+                    const isReadingOrDropped = ['reading', 'dropped'].includes(selectedItem.status);
+
+                    if (!isRead && !isReadingOrDropped) {
+                      return null;
+                    }
+
                     const currentPages = typeof pagesReadVal === 'number' ? pagesReadVal : 0;
                     const maxPages = (typeof totalPagesVal === 'number' && totalPagesVal > 0) ? totalPagesVal : 0;
                     const progressPercent = maxPages > 0 ? Math.min(100, Math.round((currentPages / maxPages) * 100)) : 0;
@@ -2172,6 +2177,76 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         });
                       }
                     };
+
+                    if (isRead) {
+                      // When completed / read: show dedicated Total Pages field with ability to input or edit
+                      return (
+                        <div style={{
+                          marginTop: '0.6rem',
+                          padding: '0.65rem 0.9rem',
+                          background: 'rgba(255, 255, 255, 0.03)',
+                          border: '1px solid var(--border-color)',
+                          borderRadius: '10px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          flexWrap: 'wrap',
+                          gap: '0.5rem'
+                        }}>
+                          <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                            <BookOpen size={15} color="var(--accent-primary)" />
+                            {language === 'es' ? 'Páginas totales:' : 'Total pages:'}
+                          </span>
+
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            background: 'var(--bg-secondary)',
+                            border: '1px solid var(--border-color)',
+                            borderRadius: '6px',
+                            padding: '0.2rem 0.4rem',
+                            gap: '0.2rem'
+                          }}>
+                            <input
+                              type="number"
+                              min={0}
+                              max={99999}
+                              disabled={!user}
+                              value={totalPagesVal}
+                              placeholder={language === 'es' ? 'Ej: 320' : 'Ex: 320'}
+                              onFocus={() => {
+                                if (totalPagesVal === 0) setTotalPagesVal('');
+                              }}
+                              onChange={(e) => {
+                                const val = e.target.value === '' ? '' : parseInt(e.target.value) || 0;
+                                setTotalPagesVal(val);
+                              }}
+                              onBlur={handleTotalPagesBlur}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  handleTotalPagesBlur();
+                                  (e.target as HTMLInputElement).blur();
+                                }
+                              }}
+                              style={{
+                                width: '55px',
+                                textAlign: 'center',
+                                background: 'transparent',
+                                border: 'none',
+                                color: totalPagesVal ? 'var(--text-primary)' : 'var(--text-muted)',
+                                fontWeight: 700,
+                                fontSize: '0.9rem',
+                                outline: 'none',
+                                padding: 0
+                              }}
+                            />
+                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                              {language === 'es' ? 'págs' : 'pages'}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    }
 
                     return (
                       <div style={{
