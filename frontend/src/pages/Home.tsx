@@ -1170,6 +1170,7 @@ export const Home: React.FC = () => {
                         themeTextColor={`var(--color-text-${item.item_type})`}
                         coverBottomText={undefined}
                         actionIcon={item.status === 'dropped' ? 'play' : 'check'}
+                        subtitle1={item.status === 'endless' ? (language === 'es' ? 'Infinito' : 'Endless') : undefined}
                         subtitle2={(() => {
                           const formatTime = (mins: number) => {
                             if (!mins) return '';
