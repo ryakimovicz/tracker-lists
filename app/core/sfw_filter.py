@@ -11,7 +11,7 @@ def normalize_text(text: str) -> str:
 # (Checked on Title, Description, and Categories)
 HARDCORE_EXPLICIT_PATTERNS = [
     # 1. Hardcore Acts & Explicit Tags
-    re.compile(r'\b(blowjob|blowjobs|handjob|handjobs|deepthroat|creampie|cumshot|cumshots|bukkake|gangbang)\b', re.IGNORECASE),
+    re.compile(r'(?<!magna\s)(?<!summa\s)\b(cum|cumming|cums|cumshot|cumshots|creampie|creampies|blowjob|blowjobs|handjob|handjobs|deepthroat|bukkake|gangbang)\b(?!\s*laude)', re.IGNORECASE),
     re.compile(r'\b(anal\s*sex|buttsex|interracial\s*porn|hardcore\s*porn)\b', re.IGNORECASE),
     re.compile(r'\b(uncensored\s*(hentai|porn|sex|patch|version)|waifu\s*sex|hentai\s*waifu)\b', re.IGNORECASE),
     
@@ -20,8 +20,8 @@ HARDCORE_EXPLICIT_PATTERNS = [
     re.compile(r'\b(porn\s*(video|movie|star|site|tube|hub|game)|porno\s*(video|film|game|estrella|sitio))\b', re.IGNORECASE),
     re.compile(r'\b(playboy\s*channel|playboy\s*tv|playboy\s*mansion|penthouse\s*magazine|penthouse\s*tv|hustler\s*club|hustler\s*tv)\b', re.IGNORECASE),
     
-    # 3. Adult Video Game / Manga Subgenres
-    re.compile(r'\b(hentai|eroge|doujinshi|ahegao|netorare|oppai)\b', re.IGNORECASE),
+    # 3. Adult Video Game / Manga Subgenres & Hentai Terms
+    re.compile(r'\b(hentai|eroge|eromanga|ero-manga|doujinshi|ahegao|netorare|oppai|nakadashi|fakku)\b', re.IGNORECASE),
     re.compile(r'\b(xxx|xxxx|x-rated|nsfw)\b', re.IGNORECASE),
 ]
 
