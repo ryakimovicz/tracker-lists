@@ -46,6 +46,24 @@ def auto_migrate_schema():
                         logger.info(f"Auto-migration: Added column '{col_name}' to users table.")
                     except Exception as e:
                         logger.warning(f"Auto-migration: Failed to add column '{col_name}': {e}")
+        
+        if "user_library_items" in inspector.get_table_names():
+            existing_lib_cols = {col["name"] for col in inspector.get_columns("user_library_items")}
+            lib_cols_to_add = [
+                ("custom_badge", "VARCHAR(50)"),
+                ("last_seen_episode", "VARCHAR(250)"),
+                ("pages_read", "INTEGER DEFAULT 0"),
+                ("total_pages", "INTEGER"),
+                ("tracking_list_id", "INTEGER"),
+            ]
+            for col_name, col_type in lib_cols_to_add:
+                if col_name not in existing_lib_cols:
+                    try:
+                        with engine.begin() as conn:
+                            conn.execute(text(f"ALTER TABLE user_library_items ADD COLUMN {col_name} {col_type};"))
+                        logger.info(f"Auto-migration: Added column '{col_name}' to user_library_items table.")
+                    except Exception as e:
+                        logger.warning(f"Auto-migration: Failed to add column '{col_name}' to user_library_items: {e}")
     except Exception as e:
         logger.error(f"Error during schema inspection migration: {e}")
 
