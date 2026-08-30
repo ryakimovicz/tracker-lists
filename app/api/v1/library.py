@@ -556,7 +556,7 @@ def get_library(
             "pages_read": it.pages_read or 0,
             "total_pages": it.total_pages,
             "tracking_list_id": it.tracking_list_id,
-            "is_nsfw": it.is_nsfw,
+            "is_nsfw": getattr(it, 'is_nsfw', False),
             "times_completed": times_c
         }
         res.append(it_dict)
