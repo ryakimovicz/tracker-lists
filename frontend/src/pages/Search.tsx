@@ -462,8 +462,24 @@ export const Search: React.FC = () => {
         return true;
       });
 
+  const handleToggleFavorite = async (itemId: number, currentFav: boolean) => {
+    try {
+      await apiClient.put(`/library/${itemId}`, { is_favorite: !currentFav });
+      setShelfItems(prev => prev.map(item => item.id === itemId ? { ...item, is_favorite: !currentFav } : item));
+      setSuccessMsg(!currentFav 
+        ? (language === 'es' ? 'Elemento añadido a destacados.' : 'Item added to favorites.')
+        : (language === 'es' ? 'Elemento quitado de destacados.' : 'Item removed from favorites.')
+      );
+      setTimeout(() => setSuccessMsg(''), 3000);
+    } catch (err: any) {
+      setErrorMsg(err.response?.data?.detail || 'Error updating favorite status');
+      setTimeout(() => setErrorMsg(''), 4000);
+    }
+  };
+
   const normType = selectedItem ? (selectedItem.item_type === 'anime' ? 'series' : selectedItem.item_type) : '';
   const currentShelfItem = selectedItem ? shelfItems.find(x => x.external_id === selectedItem.external_id && x.item_type === selectedItem.item_type) : null;
+  const isFavorite = Boolean(currentShelfItem?.is_favorite);
 
   return (
     <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '2rem 0', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
@@ -791,6 +807,8 @@ export const Search: React.FC = () => {
           profileId={currentUser?.id}
           onClose={() => setSelectedItem(null)}
           onOpenItem={(item) => setSelectedItem(item)}
+          isFavorite={isFavorite}
+          onToggleFavorite={handleToggleFavorite}
           onUpdate={(updatedItem) => {
             if (updatedItem) {
               setResults(prev => prev.map(r => 
@@ -802,7 +820,6 @@ export const Search: React.FC = () => {
             // Re-fetch shelf items to reflect status/favorite changes
             apiClient.get('/library/').then(res => setShelfItems(res.data));
           }}
-
         />
       )}
 

@@ -1307,15 +1307,34 @@ export const Home: React.FC = () => {
       {/* Non-intrusive bottom sponsor / AdBanner */}
       <AdBanner />
 
-      {selectedItem && (
-        <ItemDetailsModal
-          item={selectedItem}
-          isOwnProfile={true}
-          onClose={() => setSelectedItem(null)}
-          onUpdate={() => fetchDashboard(true)}
-          onOpenItem={(item) => setSelectedItem(item)}
-        />
-      )}
+      {selectedItem && (() => {
+        const currentLibItem = libraryItems.find(x => x.external_id === selectedItem.external_id && x.item_type === selectedItem.item_type) || selectedItem;
+        const isFav = Boolean(currentLibItem?.is_favorite);
+
+        const handleToggleFavorite = async (itemId: number, currentFav: boolean) => {
+          try {
+            await apiClient.put(`/library/${itemId}`, { is_favorite: !currentFav });
+            setLibraryItems(prev => prev.map(item => item.id === itemId ? { ...item, is_favorite: !currentFav } : item));
+            if (selectedItem && selectedItem.id === itemId) {
+              setSelectedItem((prev: any) => prev ? { ...prev, is_favorite: !currentFav } : null);
+            }
+          } catch (err) {
+            console.error("Failed to toggle favorite in Home", err);
+          }
+        };
+
+        return (
+          <ItemDetailsModal
+            item={currentLibItem}
+            isOwnProfile={true}
+            onClose={() => setSelectedItem(null)}
+            onUpdate={() => fetchDashboard(true)}
+            onOpenItem={(item) => setSelectedItem(item)}
+            isFavorite={isFav}
+            onToggleFavorite={handleToggleFavorite}
+          />
+        );
+      })()}
     </div>
   );
 };

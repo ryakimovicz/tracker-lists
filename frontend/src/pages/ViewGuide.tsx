@@ -75,6 +75,7 @@ export const ViewGuide: React.FC = () => {
 
   // Standalone details modal states
   const [selectedItem, setSelectedItem] = useState<any | null>(null);
+  const [libraryItems, setLibraryItems] = useState<any[]>([]);
   const [currentUser, setCurrentUser] = useState<any | null>(null);
   const [showProModal, setShowProModal] = useState(false);
   const [replaceGuideModal, setReplaceGuideModal] = useState<{
@@ -365,10 +366,14 @@ export const ViewGuide: React.FC = () => {
     fetchListDetails();
     fetchComments();
 
-    // Fetch user profile
+    // Fetch user profile and library
     apiClient.get('/users/me')
       .then(res => setCurrentUser(res.data))
       .catch(e => console.error(e));
+
+    apiClient.get('/library/')
+      .then(res => setLibraryItems(res.data || []))
+      .catch(() => {});
   }, [id, language]);
 
   useEffect(() => {
@@ -1608,15 +1613,37 @@ export const ViewGuide: React.FC = () => {
         )}
       </div>
 
-      {selectedItem && (
-        <ItemDetailsModal
-          item={selectedItem}
-          isOwnProfile={!!currentUser}
-          onClose={() => setSelectedItem(null)}
-          onUpdate={() => fetchListDetails()}
-          onOpenItem={(item) => setSelectedItem(item)}
-        />
-      )}
+      {selectedItem && (() => {
+        const currentLibItem = libraryItems.find((x: any) => x.external_id === selectedItem.external_id && x.item_type === selectedItem.item_type) || selectedItem;
+        const isFav = Boolean(currentLibItem?.is_favorite);
+
+        const handleToggleFavorite = async (itemId: number, currentFav: boolean) => {
+          try {
+            await apiClient.put(`/library/${itemId}`, { is_favorite: !currentFav });
+            setLibraryItems((prev: any[]) => prev.map(item => item.id === itemId ? { ...item, is_favorite: !currentFav } : item));
+            if (selectedItem && selectedItem.id === itemId) {
+              setSelectedItem((prev: any) => prev ? { ...prev, is_favorite: !currentFav } : null);
+            }
+          } catch (err) {
+            console.error("Failed to toggle favorite in ViewGuide", err);
+          }
+        };
+
+        return (
+          <ItemDetailsModal
+            item={currentLibItem}
+            isOwnProfile={!!currentUser}
+            onClose={() => setSelectedItem(null)}
+            onUpdate={() => {
+              fetchListDetails();
+              apiClient.get('/library/').then(res => setLibraryItems(res.data || [])).catch(() => {});
+            }}
+            onOpenItem={(item) => setSelectedItem(item)}
+            isFavorite={isFav}
+            onToggleFavorite={handleToggleFavorite}
+          />
+        );
+      })()}
 
       {zoomedImage && (
         <div
