@@ -2751,22 +2751,10 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                           <button
                             type="button"
                             onClick={() => {
-                              if (selectedItem?.status === 'completed' && !selectedItem?.is_hundred_percent) {
+                              if (selectedItem?.status === 'completed') {
                                 setShowReconsumedModal(true);
                               } else {
-                                if (selectedItem?.status === 'completed' && selectedItem?.is_hundred_percent) {
-                                  // Clicking completed while at 100% turns off 100% (sets normal completed)
-                                  if (selectedItem.id) {
-                                    apiClient.put(`/library/${selectedItem.id}`, { is_hundred_percent: false })
-                                      .then(res => {
-                                        setSelectedItem((prev: any) => prev ? { ...prev, is_hundred_percent: false, ...res.data } : null);
-                                        onUpdate && onUpdate();
-                                      })
-                                      .catch(console.error);
-                                  }
-                                } else {
-                                  handleToggleStatus('completed');
-                                }
+                                handleToggleStatus('completed');
                               }
                             }}
                             style={{
