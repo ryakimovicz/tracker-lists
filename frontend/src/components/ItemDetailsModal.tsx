@@ -1358,6 +1358,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   };
 
   const isEpisode = !!(String(selectedItem?.external_id || '').startsWith('tvm-ep-') || selectedItem?.item_type === 'episode' || selectedItem?.list_id);
+  const isCosmeticDlc = selectedItem?.item_type === 'game' && (selectedItem?.badge === 'dlc' || selectedItem?.custom_badge === 'dlc');
   const ratings = (itemReviews || []).filter(r => r.rating !== null && r.rating !== 0).map(r => r.rating);
   const avgRating = ratings.length > 0 ? (ratings.reduce((a: number, b: number) => a + b, 0) / ratings.length).toFixed(1) : null;
 
@@ -2399,7 +2400,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
 
                   {/* Clean & Comfortable Hours and Minutes Picker */}
-                  {!isEpisode && selectedItem && ( 
+                  {!isEpisode && !isCosmeticDlc && selectedItem && ( 
                     (selectedItem.item_type === 'game' && ['completed', 'playing', 'dropped', 'endless'].includes(selectedItem.status)) || 
                     (selectedItem.item_type === 'movie' && (['watching', 'dropped'].includes(selectedItem.status) || (hasInteractedWithTime && selectedItem.status === 'completed'))) 
                   ) && (() => {
@@ -2576,7 +2577,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
 
                   {/* Completion / Status Buttons */}
-                  {user && !isEpisode && (
+                  {user && !isEpisode && !isCosmeticDlc && (
                     <div style={{ marginTop: '0.75rem' }}>
                       {selectedItem?.item_type === 'game' ? (
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem' }}>
