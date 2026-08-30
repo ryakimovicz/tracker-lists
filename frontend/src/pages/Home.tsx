@@ -711,11 +711,11 @@ export const Home: React.FC = () => {
       const libRes = await apiClient.get('/library/');
       let currentLib = libRes.data || [];
 
-      // Auto-revert series/anime from 'completed' to 'watching' if a new episode has aired
+      // Auto sync series/anime status between 'completed' and 'watching' based on aired episodes
       const todayStr = new Date().toISOString().split('T')[0];
-      const completedSeries = currentLib.filter((i: any) => i.status === 'completed' && (i.item_type === 'series' || i.item_type === 'anime') && i.tracking_list_id);
+      const trackingSeries = currentLib.filter((i: any) => (i.item_type === 'series' || i.item_type === 'anime') && i.tracking_list_id);
 
-      for (const item of completedSeries) {
+      for (const item of trackingSeries) {
         const cacheKeyAll = `${item.external_id}_all_episodes`;
         let allEps = getCachedSeries(cacheKeyAll);
         if (!allEps) {
@@ -728,7 +728,7 @@ export const Home: React.FC = () => {
           }
         }
 
-        if (allEps && Array.isArray(allEps)) {
+        if (allEps && Array.isArray(allEps) && allEps.length > 0) {
           let trackedEps: any[] = [];
           try {
             const listRes = await apiClient.get(`/lists/${item.tracking_list_id}`);
@@ -737,20 +737,32 @@ export const Home: React.FC = () => {
             trackedEps = [];
           }
 
-          // Check if there is an uncompleted episode whose air date is today or earlier
-          const hasNewAiredEpisode = allEps.some(ep => {
+          // Check if there is any uncompleted episode whose air date has arrived (aired on or before today)
+          const hasUnwatchedAiredEpisode = allEps.some(ep => {
             const airDate = ep.airdate || ep.air_date;
-            const isAired = airDate && airDate <= todayStr;
+            const isAired = !airDate || airDate <= todayStr;
             const isWatched = trackedEps.some((t: any) => (t.external_id === `tvm-ep-${ep.id}` || t.id === ep.id) && t.is_completed);
             return isAired && !isWatched;
           });
 
-          if (hasNewAiredEpisode) {
+          // Check if user has watched at least one episode
+          const hasWatchedAny = trackedEps.some((t: any) => t.is_completed);
+
+          if (item.status === 'completed' && hasUnwatchedAiredEpisode) {
+            // New episode aired -> move back to watching / Continuar
             try {
               await apiClient.put(`/library/${item.id}`, { status: 'watching' });
               item.status = 'watching';
             } catch (e) {
               console.error("Failed to auto-resume series", e);
+            }
+          } else if (item.status === 'watching' && hasWatchedAny && !hasUnwatchedAiredEpisode) {
+            // All currently released episodes watched -> move to completed / Terminado
+            try {
+              await apiClient.put(`/library/${item.id}`, { status: 'completed' });
+              item.status = 'completed';
+            } catch (e) {
+              console.error("Failed to auto-complete series", e);
             }
           }
         }
