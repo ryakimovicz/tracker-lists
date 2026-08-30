@@ -27,7 +27,11 @@ export const renderMediaBadge = (badge?: string | null, language: string = 'es')
   let icon = null;
   let borderColor = 'rgba(255, 255, 255, 0.25)';
 
-  if (badge === 'collection') {
+  if (badge === 'pack') {
+    label = language === 'es' ? 'Pack' : 'Pack';
+    icon = <Package size={11} color="#38bdf8" />;
+    borderColor = 'rgba(56, 189, 248, 0.5)';
+  } else if (badge === 'collection') {
     label = language === 'es' ? 'Colección' : 'Collection';
     icon = <Package size={11} color="#10b981" />;
     borderColor = 'rgba(16, 185, 129, 0.5)';

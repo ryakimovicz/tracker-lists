@@ -173,12 +173,14 @@ class IGDBService:
                         is_expansion = cat in (2, 4)
 
                         badge = None
-                        if is_real_bundle or (cat == 3 and not is_dlc_like):
-                            badge = "collection"
-                        elif is_dlc_like:
+                        if is_dlc_like:
                             badge = "dlc"
                         elif is_expansion:
                             badge = "expansion"
+                        elif cat == 3 and not is_real_bundle:
+                            badge = "pack"
+                        elif is_real_bundle:
+                            badge = "collection"
                         elif cat == 8 or "remake" in item_name_lower:
                             badge = "remake"
                         elif cat == 9 or "remaster" in item_name_lower:
@@ -378,12 +380,14 @@ class IGDBService:
                         is_expansion = cat in (2, 4)
 
                         badge = None
-                        if is_real_bundle or (cat == 3 and not is_dlc_like):
-                            badge = "collection"
-                        elif is_dlc_like:
+                        if is_dlc_like:
                             badge = "dlc"
                         elif is_expansion:
                             badge = "expansion"
+                        elif cat == 3 and not is_real_bundle:
+                            badge = "pack"
+                        elif is_real_bundle:
+                            badge = "collection"
                         elif cat == 8 or "remake" in item_name_lower:
                             badge = "remake"
                         elif cat == 9 or "remaster" in item_name_lower:
