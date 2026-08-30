@@ -56,16 +56,32 @@ def bulk_complete_series_episodes(db: Session, user_id: int, tracking_list_id: i
         from app.models.item_progress import ItemProgress
         from datetime import datetime, timezone
         
+        now_dt = datetime.now(timezone.utc)
+        now_date = now_dt.strftime("%Y-%m-%d")
+
+        def is_ep_aired(ep_dict):
+            astamp = ep_dict.get("airstamp")
+            if astamp:
+                try:
+                    ep_dt = datetime.fromisoformat(astamp.replace("Z", "+00:00"))
+                    return ep_dt <= now_dt
+                except Exception:
+                    pass
+            adate = ep_dict.get("air_date") or ep_dict.get("airdate")
+            return bool(adate and adate <= now_date)
+
         # get series detail to know seasons
         series_detail = TVMazeService.get_series_detail(external_id)
-        # Note: tvmaze doesnt easily return number_of_seasons in the main show endpoint
-        # For simplicity, we just fetch a few seasons.
         s_count = series_detail.get('number_of_seasons', 1) if series_detail else 1
         
         last_completed_title = None
         for s_num in range(1, s_count + 1):
             episodes = TVMazeService.get_season_episodes(external_id, s_num)
             for ep in episodes:
+                # Do NOT mark unreleased episodes as completed!
+                if not is_ep_aired(ep):
+                    continue
+
                 ext_id = f"tvm-ep-{ep.get('id')}"
                 li = db.query(ListItem).filter(
                     ListItem.list_id == tracking_list_id,
@@ -95,7 +111,7 @@ def bulk_complete_series_episodes(db: Session, user_id: int, tracking_list_id: i
                 
                 if progress:
                     progress.is_completed = True
-                    progress.completed_at = datetime.now(timezone.utc)
+                    progress.completed_at = now_dt
                 else:
                     progress = ItemProgress(
                         user_id=user_id,
@@ -104,7 +120,7 @@ def bulk_complete_series_episodes(db: Session, user_id: int, tracking_list_id: i
                         list_item_id=li.id,
                         is_completed=True,
                         is_skipped=False,
-                        completed_at=datetime.now(timezone.utc)
+                        completed_at=now_dt
                     )
                     db.add(progress)
                 last_completed_title = li.title
@@ -530,32 +546,31 @@ def update_library_item(
         if item_in.status in (UserLibraryStatusEnum.COMPLETED, UserLibraryStatusEnum.READ):
             now_dt = datetime.now(timezone.utc)
             lib_item.completed_at = now_dt
-            if lib_item.item_type == "series" and lib_item.tracking_list_id:
-                last_title = bulk_complete_series_episodes(db, current_user.id, lib_item.tracking_list_id, lib_item.external_id, lib_item.title)
-                if last_title:
-                    lib_item.last_seen_episode = last_title
             
-            # If transitioning from a non-completed status into completed/read, add a consumption record
-            from app.models.consumption import ConsumptionHistory
-            is_user_pro = bool(current_user.is_pro or current_user.is_vip or current_user.is_admin)
-            existing_count = db.query(ConsumptionHistory).filter(
-                ConsumptionHistory.user_id == current_user.id,
-                ConsumptionHistory.external_id == lib_item.external_id
-            ).count()
-            
-            if not is_user_pro and existing_count >= 2:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Los usuarios gratuitos solo pueden registrar hasta 2 visualizaciones/lecturas. ¡Pásate a Premium para registros ilimitados e historial detallado!"
-                )
+            # For movies, books, games: record consumption history on manual complete
+            # For series/anime: individual episodes already record their own consumption history.
+            # Only record series consumption history if all aired episodes are genuinely completed
+            if lib_item.item_type not in ("series", "anime"):
+                from app.models.consumption import ConsumptionHistory
+                is_user_pro = bool(current_user.is_pro or current_user.is_vip or current_user.is_admin)
+                existing_count = db.query(ConsumptionHistory).filter(
+                    ConsumptionHistory.user_id == current_user.id,
+                    ConsumptionHistory.external_id == lib_item.external_id
+                ).count()
                 
-            ch = ConsumptionHistory(
-                user_id=current_user.id,
-                item_type=lib_item.item_type.value if hasattr(lib_item.item_type, 'value') else lib_item.item_type,
-                external_id=lib_item.external_id,
-                consumed_at=now_dt
-            )
-            db.add(ch)
+                if not is_user_pro and existing_count >= 2:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Los usuarios gratuitos solo pueden registrar hasta 2 visualizaciones/lecturas. ¡Pásate a Premium para registros ilimitados e historial detallado!"
+                    )
+                    
+                ch = ConsumptionHistory(
+                    user_id=current_user.id,
+                    item_type=lib_item.item_type.value if hasattr(lib_item.item_type, 'value') else lib_item.item_type,
+                    external_id=lib_item.external_id,
+                    consumed_at=now_dt
+                )
+                db.add(ch)
         else:
             lib_item.completed_at = None
             
