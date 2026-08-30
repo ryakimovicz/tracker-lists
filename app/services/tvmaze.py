@@ -123,6 +123,7 @@ class TVMazeService:
                     return {
                         "id": series_id,
                         "name": data.get("name"),
+                        "status": data.get("status"),
                         "number_of_seasons": len(seasons),
                         "seasons": seasons,
                         "overview": data.get("summary", ""),

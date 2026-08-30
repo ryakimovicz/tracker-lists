@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { getProfileTheme } from '../utils/profileThemes';
 
 import { apiClient } from '../api/client';
+import { getCachedSeries, setCachedSeries } from '../utils/seriesCache';
 import { ItemDetailsModal } from '../components/ItemDetailsModal';
 import { MediaPoster } from '../components/MediaPoster';
 import { AvatarSelectorModal } from '../components/AvatarSelectorModal';
@@ -1426,8 +1427,22 @@ export const Profile: React.FC = () => {
                               }
                               // Series / Anime
                               else if (item.item_type === 'series' || item.item_type === 'anime') {
-                                if (item.status === 'watching') badges.push({ text: language === 'es' ? 'Viendo' : 'Watching', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' });
-                                else if (item.status === 'completed') badges.push({ text: language === 'es' ? 'Terminada' : 'Completed', color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)' });
+                                if (item.status === 'watching') {
+                                  badges.push({ text: language === 'es' ? 'Viendo' : 'Watching', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' });
+                                } else if (item.status === 'completed') {
+                                  // Check if series is completely ended or just up to date with released episodes
+                                  const cacheKey = `series_${item.external_id}`;
+                                  const cached = item.external_id ? getCachedSeries(cacheKey) : null;
+                                  const anyItem = item as any;
+                                  const sStatus = cached?.status || anyItem.series_status;
+                                  const isEnded = sStatus === 'Ended' || anyItem.is_ended === true;
+
+                                  if (isEnded) {
+                                    badges.push({ text: language === 'es' ? 'Terminada' : 'Completed', color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)' });
+                                  } else {
+                                    badges.push({ text: language === 'es' ? 'Al día' : 'Up to date', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' });
+                                  }
+                                }
                               }
                               // Reading (Books, Comics, Manga)
                               else if (['book', 'comic', 'manga'].includes(item.item_type)) {
