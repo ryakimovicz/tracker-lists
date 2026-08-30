@@ -64,6 +64,6 @@ def is_safe_media_item(title: str = "", description: str = "", categories: list 
     if categories:
         for cat in categories:
             cat_lower = str(cat).lower()
-            if any(term in cat_lower for term in ("erotica", "erotic", "hentai", "porn", "adult")):
+            if any(term in cat_lower for term in ("hentai", "pornography", "hardcore", "doujinshi")):
                 return False
     return True

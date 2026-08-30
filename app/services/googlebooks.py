@@ -19,7 +19,7 @@ class GoogleBooksService:
             else:
                 search_term = query
             encoded_query = urllib.parse.quote(search_term)
-            url = f"https://www.googleapis.com/books/v1/volumes?q={encoded_query}&maxResults=15&maxAllowedMaturityRating=not-mature"
+            url = f"https://www.googleapis.com/books/v1/volumes?q={encoded_query}&maxResults=15"
             if order_by:
                 url += f"&orderBy={order_by}"
             if settings.GOOGLE_BOOKS_API_KEY:
