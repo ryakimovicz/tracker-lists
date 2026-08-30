@@ -525,7 +525,7 @@ def get_library(
     user_id: Optional[int] = Query(None, description="Get library of a specific user"),
     status: Optional[UserLibraryStatusEnum] = Query(None, description="Filter library by status"),
     skip: int = 0,
-    limit: int = 5000,
+    limit: Optional[int] = Query(None, description="Limit of items to return. If None, returns all."),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -538,7 +538,11 @@ def get_library(
     
     # Sort by completed_at or updated_at, whichever is newer
     query = query.order_by(desc(func.coalesce(UserLibraryItem.completed_at, UserLibraryItem.updated_at)))
-    items = query.offset(skip).limit(limit).all()
+    if skip:
+        query = query.offset(skip)
+    if limit is not None and limit > 0:
+        query = query.limit(limit)
+    items = query.all()
 
     # Batch query consumption history counts for these items
     ext_ids = [it.external_id for it in items if it.external_id]
