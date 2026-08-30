@@ -1446,7 +1446,7 @@ export const Profile: React.FC = () => {
                               
                               // Dropped (All)
                               if (item.status === 'dropped') {
-                                badges.push({ text: language === 'es' ? 'Abandonado' : 'Dropped', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.15)' });
+                                badges.push({ text: language === 'es' ? 'Abandonado' : 'Dropped', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.15)' });
                               }
                               // Endless (Games)
                               else if (item.status === 'endless') {

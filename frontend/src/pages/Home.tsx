@@ -1020,7 +1020,9 @@ export const Home: React.FC = () => {
       ["plan_to_watch", "plan_to_play", "plan_to_read"].includes(i.status) && 
       i.item_type !== "custom" &&
       i.badge !== "dlc" &&
-      i.custom_badge !== "dlc"
+      i.custom_badge !== "dlc" &&
+      i.badge !== "expansion" &&
+      i.custom_badge !== "expansion"
     );
   } else if (activeTab === "completed") {
     filteredItems = libraryItems.filter(i => ["completed", "read", "endless"].includes(i.status) && i.item_type !== "custom");
