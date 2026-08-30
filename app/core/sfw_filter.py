@@ -19,9 +19,10 @@ EXPLICIT_ADULT_PATTERNS = [
     re.compile(r'\b(hentai|eroge|ecchi|doujinshi|ahegao|netorare|oppai)\b', re.IGNORECASE),
     re.compile(r'\b(waifu\s*sex|hentai\s*waifu|erotic\s*manga|hentai\s*manga)\b', re.IGNORECASE),
     
-    # 3. Explicit Hardcore Acts & Products
+    # 3. Explicit Hardcore Acts & Commercial Adult Brands
     re.compile(r'\b(blowjob|blowjobs|handjob|handjobs|deepthroat|creampie|cumshot|cumshots|bukkake|gangbang)\b', re.IGNORECASE),
-    re.compile(r'\b(playboy|penthouse|hustler|onlyfans|fansly|striptease|camgirls?|sex\s*toy[s]?|sex\s*game[s]?|sex\s*simulator)\b', re.IGNORECASE),
+    re.compile(r'\b(onlyfans|fansly|striptease|camgirls?|sex\s*toy[s]?|sex\s*game[s]?|sex\s*simulator)\b', re.IGNORECASE),
+    re.compile(r'\b(playboy\s*channel|playboy\s*tv|playboy\s*mansion|penthouse\s*magazine|penthouse\s*tv|hustler\s*club|hustler\s*tv)\b', re.IGNORECASE),
     re.compile(r'\b(anal\s*sex|buttsex|interracial\s*porn)\b', re.IGNORECASE),
 ]
 

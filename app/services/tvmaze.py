@@ -57,6 +57,8 @@ class TVMazeService:
 
                         externals = show.get("externals", {})
                         imdb_id = externals.get("imdb")
+                        weight = show.get("weight")
+                        pop_score = float(weight) if weight is not None else None
 
                         results.append(
                             SearchResultItem(
@@ -66,7 +68,8 @@ class TVMazeService:
                                 description=show_summary,
                                 item_type="anime" if is_anime else "series",
                                 release_date=release_date,
-                                imdb_id=imdb_id
+                                imdb_id=imdb_id,
+                                popularity=pop_score
                             )
                         )
         except Exception as e:

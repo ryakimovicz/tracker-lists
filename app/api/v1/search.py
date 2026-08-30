@@ -201,31 +201,24 @@ def search_all_media(
         title_clean = item.title.lower().strip()
         score = 0.0
 
-        # Game hierarchy tier boost (Collections -> Editions -> Base Games / Remakes / Remasters -> Expansions -> DLCs)
-        if item.item_type == "game":
-            if item.badge == "collection":
-                score += 2000.0
-            elif item.badge == "edition":
-                score += 1500.0
-            elif item.badge in (None, "remake", "remaster"):
-                score += 1000.0
-            elif item.badge == "expansion":
-                score += 500.0
-            elif item.badge == "dlc":
-                score -= 2000.0
-
         if title_clean == query_clean:
-            score += 100.0
+            score += 1000.0
         elif title_clean.startswith(query_clean):
-            score += 50.0
+            score += 500.0
         elif query_clean in title_clean:
-            score += 30.0
+            score += 250.0
+
         title_words = set(title_clean.split())
         common_words = query_words.intersection(title_words)
-        score += len(common_words) * 15.0
+        score += len(common_words) * 100.0
         
+        # Prefer shorter titles on equal match (e.g. "Arrow" over "Arrow: Blood Rush" for query "Arrow")
         if len(item.title) > 0:
-            score += (1.0 / len(item.title)) * 10.0
+            score += (1.0 / len(item.title)) * 200.0
+
+        # Cosmetic DLCs get a small penalty so primary works appear first
+        if getattr(item, "badge", None) == "dlc":
+            score -= 300.0
             
         score += min(item.popularity or 0.0, 100.0)
         return score

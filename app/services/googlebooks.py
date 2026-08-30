@@ -40,6 +40,7 @@ class GoogleBooksService:
                         author_str = f"Author: {authors[0]}." if authors else ""
                         pub_date = v_info.get("publishedDate") or ""
                         pub_str = f" Published: {pub_date}." if pub_date else ""
+                        desc = f"{author_str}{pub_str}"
                         categories = v_info.get("categories") or []
                         if not is_safe_media_item(title, desc, categories=categories):
                             continue
