@@ -1190,6 +1190,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
       if (allEps && Array.isArray(allEps) && allEps.length > 0) {
         const nowMs = Date.now();
+        const pad = (n: number) => String(n).padStart(2, '0');
 
         // Find if there is any unwatched episode whose exact air timestamp has arrived
         const hasUnwatchedAired = allEps.some(ep => {
@@ -1202,7 +1203,11 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
             isAired = new Date(`${ad}T${at}:00Z`).getTime() <= nowMs;
           }
           const isWatched = currentEpisodes.some((tracked: any) => 
-            (tracked.external_id === `tvm-ep-${ep.id}` || tracked.id === ep.id || (tracked.title && tracked.title.includes(`E${String(ep.episode_number).padStart(2, '0')}`))) && tracked.is_completed
+            (tracked.external_id === `tvm-ep-${ep.id}` || 
+             tracked.id === ep.id || 
+             (tracked.title && tracked.title.includes(`S${pad(ep.season_number)}E${pad(ep.episode_number)}`)) ||
+             (tracked.title && tracked.title.includes(`E${pad(ep.episode_number)}`) && (tracked.section === `Season ${ep.season_number}` || tracked.title.includes(`S${ep.season_number}`)))
+            ) && tracked.is_completed
           );
           return isAired && !isWatched;
         });

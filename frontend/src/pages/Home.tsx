@@ -315,7 +315,6 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
         }
       }
 
-      // Check if next episode air date is in future
       if (!isAllDone) {
         const cacheKeyAll = `${item.external_id}_all_episodes`;
         let allEps = getCachedSeries(cacheKeyAll);
@@ -339,8 +338,12 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
               const at = ep.airtime || '00:00';
               isAired = new Date(`${ad}T${at}:00Z`).getTime() <= nowMs;
             }
-            const isWatched = updatedList.some((tracked: any) => 
-              (tracked.external_id === `tvm-ep-${ep.id}` || tracked.id === ep.id || (tracked.title && tracked.title.includes(`E${String(ep.episode_number).padStart(2, '0')}`))) && tracked.is_completed
+            const isWatched = updatedList.some((t: any) => 
+              (t.external_id === `tvm-ep-${ep.id}` || 
+               t.id === ep.id || 
+               (t.title && t.title.includes(`S${pad(ep.season_number)}E${pad(ep.episode_number)}`)) ||
+               (t.title && t.title.includes(`E${pad(ep.episode_number)}`) && (t.section === `Season ${ep.season_number}` || t.title.includes(`S${ep.season_number}`)))
+              ) && t.is_completed
             );
             return isAired && !isWatched;
           });
@@ -520,7 +523,11 @@ const CompletedSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColo
               isAired = new Date(`${ad}T${at}:00Z`).getTime() <= nowMs;
             }
             const isWatched = trackedEpisodes.some((t: any) => 
-              (t.external_id === `tvm-ep-${ep.id}` || t.id === ep.id || (t.title && t.title.includes(`E${String(ep.episode_number).padStart(2, '0')}`))) && t.is_completed
+              (t.external_id === `tvm-ep-${ep.id}` || 
+               t.id === ep.id || 
+               (t.title && t.title.includes(`S${pad(ep.season_number)}E${pad(ep.episode_number)}`)) ||
+               (t.title && t.title.includes(`E${pad(ep.episode_number)}`) && (t.section === `Season ${ep.season_number}` || t.title.includes(`S${ep.season_number}`)))
+              ) && t.is_completed
             );
             return !isAired && !isWatched;
           });
@@ -910,6 +917,7 @@ export const Home: React.FC = () => {
           }
 
           // Check if there is any uncompleted episode whose exact air timestamp has arrived
+          const pad = (n: number) => String(n).padStart(2, '0');
           const hasUnwatchedAiredEpisode = allEps.some(ep => {
             let isAired = true;
             if (ep.airstamp) {
@@ -920,7 +928,11 @@ export const Home: React.FC = () => {
               isAired = new Date(`${ad}T${at}:00Z`).getTime() <= nowMs;
             }
             const isWatched = trackedEps.some((t: any) => 
-              (t.external_id === `tvm-ep-${ep.id}` || t.id === ep.id || (t.title && t.title.includes(`E${String(ep.episode_number).padStart(2, '0')}`))) && t.is_completed
+              (t.external_id === `tvm-ep-${ep.id}` || 
+               t.id === ep.id || 
+               (t.title && t.title.includes(`S${pad(ep.season_number)}E${pad(ep.episode_number)}`)) ||
+               (t.title && t.title.includes(`E${pad(ep.episode_number)}`) && (t.section === `Season ${ep.season_number}` || t.title.includes(`S${ep.season_number}`)))
+              ) && t.is_completed
             );
             return isAired && !isWatched;
           });
