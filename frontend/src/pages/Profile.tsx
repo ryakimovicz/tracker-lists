@@ -724,8 +724,7 @@ export const Profile: React.FC = () => {
       const isLoose = isLooseEpisodeOrSeason(item);
       const isSeriesOrRegular = item.item_type !== 'episode' && item.item_type !== 'season' && !item.external_id?.startsWith('tvm-ep-');
       const isNotStartedSeries = (item.item_type === 'series' || item.item_type === 'anime') && !item.last_seen_episode;
-      const isDlcOrExpansion = item.item_type === 'game' && ['dlc', 'expansion'].includes(item.badge || item.custom_badge || '');
-      const isPlanToStatus = !isDlcOrExpansion && ['plan_to_watch', 'plan_to_play', 'plan_to_read'].includes(item.status);
+      const isPlanToStatus = ['plan_to_watch', 'plan_to_play', 'plan_to_read'].includes(item.status);
 
       return matchesMedia && matchesSearch && (isSeriesOrRegular || isLoose) && !isNotStartedSeries && !isPlanToStatus;
     })
@@ -742,8 +741,7 @@ export const Profile: React.FC = () => {
   );
 
   const visualLibraryItems = libraryItems.filter(item => {
-    const isDlcOrExpansion = item.item_type === 'game' && ['dlc', 'expansion'].includes(item.badge || item.custom_badge || '');
-    const isPlanToStatus = !isDlcOrExpansion && ['plan_to_watch', 'plan_to_play', 'plan_to_read'].includes(item.status);
+    const isPlanToStatus = ['plan_to_watch', 'plan_to_play', 'plan_to_read'].includes(item.status);
     if (isPlanToStatus) return false;
 
     const isNotStartedSeries = (item.item_type === 'series' || item.item_type === 'anime') && !item.last_seen_episode;

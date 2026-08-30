@@ -525,7 +525,7 @@ def get_library(
     user_id: Optional[int] = Query(None, description="Get library of a specific user"),
     status: Optional[UserLibraryStatusEnum] = Query(None, description="Filter library by status"),
     skip: int = 0,
-    limit: int = 50,
+    limit: int = 5000,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
