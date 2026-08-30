@@ -66,6 +66,7 @@ interface LibraryItem {
   completed_at?: string;
   updated_at?: string;
   last_seen_episode?: string;
+  custom_badge?: string;
   pages_read?: number;
   total_pages?: number;
   tracking_list_id?: number;
@@ -1310,16 +1311,51 @@ export const Profile: React.FC = () => {
                               borderRadius="8px"
                             />
                             
-                            {mediaFilter === 'all' && (
-                              <div className={getTagClass(item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tvm-ep-') ? 'series' : item.item_type)} style={{ position: "absolute", top: "0.5rem", left: "0.5rem", padding: "0.15rem 0.45rem", borderRadius: "4px", fontSize: "0.7rem", fontWeight: 600, opacity: 0.9, backdropFilter: 'blur(4px)', zIndex: 1 }}>
-                                {(item.item_type === 'episode' || item.external_id?.startsWith('tvm-ep-'))
+                            {/* Tag / Category Badge */}
+                            {(() => {
+                              const isGame = item.item_type === 'game';
+                              const rawBadge = (item.custom_badge || '').toLowerCase();
+                              
+                              const getGameBadgeLabel = (b: string) => {
+                                if (b === 'collection' || b === 'pack') return language === 'es' ? 'Colección' : 'Collection';
+                                if (b === 'expansion') return language === 'es' ? 'Expansión' : 'Expansion';
+                                if (b === 'dlc') return 'DLC';
+                                if (b === 'edition') return language === 'es' ? 'Edición' : 'Edition';
+                                if (b === 'remake') return 'Remake';
+                                if (b === 'remaster') return 'Remaster';
+                                return null;
+                              };
+
+                              const specialGameLabel = isGame ? getGameBadgeLabel(rawBadge) : null;
+
+                              // If filtering by "all":
+                              if (mediaFilter === 'all') {
+                                const label = isGame 
+                                  ? (specialGameLabel || (language === 'es' ? 'Juego' : 'Game'))
+                                  : (item.item_type === 'episode' || item.external_id?.startsWith('tvm-ep-'))
                                   ? (language === 'es' ? 'Serie' : 'Series')
                                   : item.item_type === 'season'
                                   ? (language === 'es' ? 'Temporada' : 'Season')
-                                  : item.item_type === 'comic' ? (language === 'es' ? 'Cómic' : 'Comic') : item.item_type === 'manga' ? 'Manga' : t('media' + item.item_type.charAt(0).toUpperCase() + item.item_type.slice(1))
-                                }
-                              </div>
-                            )}
+                                  : item.item_type === 'comic' ? (language === 'es' ? 'Cómic' : 'Comic') : item.item_type === 'manga' ? 'Manga' : t('media' + item.item_type.charAt(0).toUpperCase() + item.item_type.slice(1));
+
+                                return (
+                                  <div className={getTagClass(item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tvm-ep-') ? 'series' : item.item_type)} style={{ position: "absolute", top: "0.5rem", left: "0.5rem", padding: "0.15rem 0.45rem", borderRadius: "4px", fontSize: "0.7rem", fontWeight: 600, opacity: 0.9, backdropFilter: 'blur(4px)', zIndex: 1 }}>
+                                    {label}
+                                  </div>
+                                );
+                              }
+
+                              // If filtering by specific category (e.g. "game") and it has a special category badge (DLC, Expansión, etc.):
+                              if (isGame && specialGameLabel) {
+                                return (
+                                  <div className="tag-badge tag-game" style={{ position: "absolute", top: "0.5rem", left: "0.5rem", padding: "0.15rem 0.45rem", borderRadius: "4px", fontSize: "0.7rem", fontWeight: 600, opacity: 0.9, backdropFilter: 'blur(4px)', zIndex: 1 }}>
+                                    {specialGameLabel}
+                                  </div>
+                                );
+                              }
+
+                              return null;
+                            })()}
                             
                             {(() => {
                               const isEffectiveFav = displayedFavorites.some(df => df.id === item.id);

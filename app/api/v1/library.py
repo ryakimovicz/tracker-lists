@@ -449,6 +449,8 @@ def add_to_library(
         existing.status = status_val
         if item_in.is_favorite is not None:
             existing.is_favorite = item_in.is_favorite
+        if item_in.custom_badge is not None:
+            existing.custom_badge = item_in.custom_badge
         existing.completed_at = completed_at_val
         if last_title:
             existing.last_seen_episode = last_title
@@ -467,6 +469,7 @@ def add_to_library(
             is_favorite=item_in.is_favorite if item_in.is_favorite is not None else False,
             completed_at=completed_at_val,
             last_seen_episode=last_title,
+            custom_badge=item_in.custom_badge,
             pages_read=pages_val,
             total_pages=item_in.total_pages,
             tracking_list_id=tracking_list_id
@@ -553,6 +556,7 @@ def get_library(
             "completed_at": it.completed_at,
             "updated_at": it.updated_at,
             "last_seen_episode": it.last_seen_episode,
+            "custom_badge": it.custom_badge,
             "pages_read": it.pages_read or 0,
             "total_pages": it.total_pages,
             "tracking_list_id": it.tracking_list_id,
@@ -677,6 +681,8 @@ def update_library_item(
         db.add(activity)
 
 
+    if item_in.custom_badge is not None:
+        lib_item.custom_badge = item_in.custom_badge
     if item_in.pages_read is not None:
         lib_item.pages_read = item_in.pages_read
     if item_in.total_pages is not None:

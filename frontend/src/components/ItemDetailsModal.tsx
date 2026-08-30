@@ -1143,6 +1143,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
           description: selectedItem.description,
           item_type: selectedItem.item_type,
           release_date: selectedItem.release_date,
+          custom_badge: selectedItem.badge || selectedItem.custom_badge || null,
           total_pages: totalPagesVal !== '' ? totalPagesVal : (selectedItem.total_pages || selectedItem.page_count || null),
           pages_read: (status === 'read' && totalPagesVal !== '') ? totalPagesVal : (pagesReadVal !== '' ? pagesReadVal : 0),
           status: status
