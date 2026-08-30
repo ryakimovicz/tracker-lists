@@ -7,37 +7,48 @@ def normalize_text(text: str) -> str:
     normalized = unicodedata.normalize('NFKD', text)
     return "".join(c for c in normalized if not unicodedata.combining(c)).lower()
 
-# Industry-standard explicit genres, adult entertainment terms, and pornographic tags.
-# Common words (like 'dick', 'naked', 'sex', 'boob') are avoided so legitimate cultural works 
-# (e.g. 'Moby Dick', 'Sin tetas no hay paraiso', 'Sex Education') work naturally without manual whitelists.
-EXPLICIT_ADULT_PATTERNS = [
-    # 1. Commercial Pornography & Adult Media Tags
-    re.compile(r'\b(porn|porno|pornos|pornography|pornographic|xxx|xxxx|x-rated|nsfw|smut|lewd)\b', re.IGNORECASE),
-    re.compile(r'\b(adults?\s*only|\+18|18\+\s*(adult|only|content)|explicit\s*content|uncensored\s*(hentai|porn|sex|patch|version))\b', re.IGNORECASE),
-    
-    # 2. Anime / Manga Adult Sub-genres & Erotic Terms
-    re.compile(r'\b(hentai|eroge|ecchi|doujinshi|ahegao|netorare|oppai)\b', re.IGNORECASE),
-    re.compile(r'\b(waifu\s*sex|hentai\s*waifu|erotic\s*manga|hentai\s*manga)\b', re.IGNORECASE),
-    
-    # 3. Explicit Hardcore Acts & Commercial Adult Brands
+# Explicit Hardcore Acts, Commercial Adult Services & Pornographic Products.
+# (Checked on Title, Description, and Categories)
+HARDCORE_EXPLICIT_PATTERNS = [
+    # 1. Hardcore Acts & Explicit Tags
     re.compile(r'\b(blowjob|blowjobs|handjob|handjobs|deepthroat|creampie|cumshot|cumshots|bukkake|gangbang)\b', re.IGNORECASE),
-    re.compile(r'\b(onlyfans|fansly|striptease|camgirls?|sex\s*toy[s]?|sex\s*game[s]?|sex\s*simulator)\b', re.IGNORECASE),
+    re.compile(r'\b(anal\s*sex|buttsex|interracial\s*porn|hardcore\s*porn)\b', re.IGNORECASE),
+    re.compile(r'\b(uncensored\s*(hentai|porn|sex|patch|version)|waifu\s*sex|hentai\s*waifu)\b', re.IGNORECASE),
+    
+    # 2. Commercial Adult Platforms & Products
+    re.compile(r'\b(onlyfans|fansly|camgirls?|sex\s*toy[s]?|sex\s*game[s]?|sex\s*simulator)\b', re.IGNORECASE),
+    re.compile(r'\b(porn\s*(video|movie|star|site|tube|hub|game)|porno\s*(video|film|game|estrella|sitio))\b', re.IGNORECASE),
     re.compile(r'\b(playboy\s*channel|playboy\s*tv|playboy\s*mansion|penthouse\s*magazine|penthouse\s*tv|hustler\s*club|hustler\s*tv)\b', re.IGNORECASE),
-    re.compile(r'\b(anal\s*sex|buttsex|interracial\s*porn)\b', re.IGNORECASE),
+    
+    # 3. Adult Video Game / Manga Subgenres
+    re.compile(r'\b(hentai|eroge|doujinshi|ahegao|netorare|oppai)\b', re.IGNORECASE),
+    re.compile(r'\b(xxx|xxxx|x-rated|nsfw)\b', re.IGNORECASE),
 ]
 
-def is_safe_text(text: str) -> bool:
+# Strict Commercial Genre Markers (Applied to Titles / User Queries / Metadata Categories)
+STRICT_GENRE_PATTERNS = [
+    re.compile(r'\b(pornography|pornographic|smut|lewd)\b', re.IGNORECASE),
+    re.compile(r'\b(adults?\s*only|\+18|18\+\s*(adult|only|content)|explicit\s*content)\b', re.IGNORECASE),
+]
+
+def is_safe_text(text: str, is_description: bool = False) -> bool:
     """
-    Returns True if the text is free of explicit adult/pornographic genre markers.
-    False if it matches recognized commercial adult entertainment or pornography terms.
+    Returns True if the text is free of explicit adult/pornographic content.
+    If is_description is True, allows descriptive words (like mentioning 'pornography') 
+    while strictly filtering actual hardcore acts and adult products.
     """
     if not text:
         return True
     
     norm = normalize_text(text)
-    for pattern in EXPLICIT_ADULT_PATTERNS:
+    for pattern in HARDCORE_EXPLICIT_PATTERNS:
         if pattern.search(norm):
             return False
+            
+    if not is_description:
+        for pattern in STRICT_GENRE_PATTERNS:
+            if pattern.search(norm):
+                return False
             
     return True
 
@@ -46,9 +57,9 @@ def is_safe_media_item(title: str = "", description: str = "", categories: list 
     Structural verification for media items:
     Checks title, description, and API category metadata.
     """
-    if not is_safe_text(title):
+    if not is_safe_text(title, is_description=False):
         return False
-    if description and not is_safe_text(description):
+    if description and not is_safe_text(description, is_description=True):
         return False
     if categories:
         for cat in categories:
