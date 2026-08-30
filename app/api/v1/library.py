@@ -1,6 +1,7 @@
 from typing import List, Optional
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status, Query
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -791,3 +792,29 @@ def delete_from_library(
     db.delete(lib_item)
     db.commit()
     return None
+
+class ReportMediaRequest(BaseModel):
+    item_type: str
+    external_id: str
+    title: Optional[str] = None
+    image_url: Optional[str] = None
+    reason: str
+
+@router.post("/report-media")
+def report_media_item(
+    body: ReportMediaRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    from app.models.social import MediaItemReport
+    report = MediaItemReport(
+        user_id=current_user.id,
+        item_type=body.item_type,
+        external_id=body.external_id,
+        title=body.title,
+        image_url=body.image_url,
+        reason=body.reason
+    )
+    db.add(report)
+    db.commit()
+    return {"success": True, "message": "Reporte enviado para revisión por los administradores."}

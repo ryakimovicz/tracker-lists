@@ -365,6 +365,33 @@ export const AdminPanel: React.FC = () => {
     }
   };
 
+  const handleBanMedia = async (item_type: string, external_id: string, title?: string, reason?: string) => {
+    try {
+      await apiClient.post('/admin/media/ban', { item_type, external_id, title, reason });
+      fetchReports();
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleUnbanMedia = async (blocked_id: number) => {
+    try {
+      await apiClient.delete(`/admin/media/unban/${blocked_id}`);
+      fetchReports();
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleDismissMediaReport = async (report_id: number) => {
+    try {
+      await apiClient.delete(`/admin/reports/media/${report_id}`);
+      fetchReports();
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   return (
     <div style={{ maxWidth: 1100, margin: '2rem auto', padding: '0 1rem', textAlign: 'left' }}>
       {/* Header */}
@@ -537,12 +564,92 @@ export const AdminPanel: React.FC = () => {
             <ShieldAlert size={20} color="#ef4444" /> {isEs ? 'Reportes Pendientes de Moderación' : 'Pending Content Reports'}
           </h3>
 
-          {!reports || (!reports.lists?.length && !reports.comments?.length && !reports.reviews?.length) ? (
+          {!reports || (!reports.media?.length && !reports.blocked_media?.length && !reports.lists?.length && !reports.comments?.length && !reports.reviews?.length) ? (
             <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
               {isEs ? 'No hay reportes pendientes. ¡Todo en orden!' : 'No pending reports. Everything is clean!'}
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+              {/* Media Reports */}
+              {reports.media && reports.media.length > 0 && (
+                <div>
+                  <h4 style={{ margin: '0 0 0.85rem', color: '#ef4444', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <ShieldAlert size={16} /> {isEs ? 'Obras Reportadas' : 'Reported Media Works'} ({reports.media.length})
+                  </h4>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    {reports.media.map((r: any) => (
+                      <div key={r.report_id} style={{ background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: 8, border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+                          {r.image_url ? (
+                            <img src={r.image_url} alt={r.title} style={{ width: 44, height: 60, objectFit: 'cover', borderRadius: 4 }} />
+                          ) : (
+                            <div style={{ width: 44, height: 60, background: 'var(--bg-tertiary)', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <FileText size={18} color="var(--text-secondary)" />
+                            </div>
+                          )}
+                          <div>
+                            <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-primary)' }}>
+                              {r.title} <span style={{ fontSize: '0.75rem', color: 'var(--accent-primary)', textTransform: 'uppercase' }}>({r.item_type})</span>
+                            </div>
+                            <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
+                              <strong>{isEs ? 'Motivo:' : 'Reason:'}</strong> {r.reason}
+                            </div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.1rem' }}>
+                              ID: <code>{r.external_id}</code> • {isEs ? 'Por:' : 'By:'} @{r.reporter_username}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <button
+                            onClick={() => handleBanMedia(r.item_type, r.external_id, r.title, r.reason)}
+                            className="btn-primary"
+                            style={{ background: '#ef4444', borderColor: '#ef4444', color: '#fff', fontSize: '0.82rem', padding: '0.45rem 0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+                          >
+                            <Ban size={14} /> {isEs ? 'Banear y Purgar Obra' : 'Ban & Purge Media'}
+                          </button>
+                          <button
+                            onClick={() => handleDismissMediaReport(r.report_id)}
+                            className="btn-secondary"
+                            style={{ fontSize: '0.82rem', padding: '0.45rem 0.85rem' }}
+                          >
+                            {isEs ? 'Desestimar' : 'Dismiss'}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Blocked Media Items Blacklist */}
+              {reports.blocked_media && reports.blocked_media.length > 0 && (
+                <div>
+                  <h4 style={{ margin: '0 0 0.85rem', color: 'var(--text-secondary)', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <Ban size={15} /> {isEs ? 'Obras Bloqueadas Activas (Blacklist)' : 'Active Blocked Media (Blacklist)'} ({reports.blocked_media.length})
+                  </h4>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    {reports.blocked_media.map((b: any) => (
+                      <div key={b.id} style={{ background: 'rgba(239,68,68,0.04)', padding: '0.75rem 1rem', borderRadius: 8, border: '1px solid rgba(239,68,68,0.2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{b.title}</span>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginLeft: '0.5rem' }}>({b.item_type} • {b.external_id})</span>
+                          {b.reason && <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{b.reason}</div>}
+                        </div>
+                        <button
+                          onClick={() => handleUnbanMedia(b.id)}
+                          className="btn-secondary"
+                          style={{ fontSize: '0.75rem', padding: '0.3rem 0.6rem' }}
+                        >
+                          {isEs ? 'Desbloquear' : 'Unblock'}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Lists, Comments, Reviews Reports */}
               {reports.lists?.map((r: any) => (
                 <div key={r.report_id} style={{ background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: 8, border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>

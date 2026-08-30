@@ -11,7 +11,7 @@ def normalize_text(text: str) -> str:
 # (Checked on Title, Description, and Categories)
 HARDCORE_EXPLICIT_PATTERNS = [
     # 1. Hardcore Acts & Explicit Tags
-    re.compile(r'(?<!magna\s)(?<!summa\s)\b(cum|cumming|cums|cumshot|cumshots|creampie|creampies|blowjob|blowjobs|handjob|handjobs|deepthroat|bukkake|gangbang)\b(?!\s*laude)', re.IGNORECASE),
+    re.compile(r'\b(blowjob|blowjobs|handjob|handjobs|deepthroat|creampie|creampies|cumshot|cumshots|bukkake|gangbang)\b', re.IGNORECASE),
     re.compile(r'\b(anal\s*sex|buttsex|interracial\s*porn|hardcore\s*porn)\b', re.IGNORECASE),
     re.compile(r'\b(uncensored\s*(hentai|porn|sex|patch|version)|waifu\s*sex|hentai\s*waifu)\b', re.IGNORECASE),
     

@@ -20,13 +20,39 @@ def get_all_reports(
     db: Session = Depends(get_db)
 ):
     """
-    Returns lists of active reports grouped by type (lists, comments, reviews).
+    Returns lists of active reports grouped by type (media, lists, comments, reviews).
     """
-    list_reports = db.query(ListReport).all()
-    comment_reports = db.query(CommentReport).all()
-    review_reports = db.query(MediaReviewReport).all()
+    from app.models.social import MediaItemReport, BlockedMediaItem
+    media_reports = db.query(MediaItemReport).order_by(MediaItemReport.created_at.desc()).all()
+    list_reports = db.query(ListReport).order_by(ListReport.created_at.desc()).all()
+    comment_reports = db.query(CommentReport).order_by(CommentReport.created_at.desc()).all()
+    review_reports = db.query(MediaReviewReport).order_by(MediaReviewReport.created_at.desc()).all()
+    blocked_items = db.query(BlockedMediaItem).order_by(BlockedMediaItem.created_at.desc()).all()
     
-    # Format responses cleanly
+    formatted_media = []
+    for r in media_reports:
+        formatted_media.append({
+            "report_id": r.id,
+            "item_type": r.item_type,
+            "external_id": r.external_id,
+            "title": r.title or "Sin título",
+            "image_url": r.image_url,
+            "reporter_username": r.user.username if r.user else "Unknown",
+            "reason": r.reason,
+            "created_at": r.created_at
+        })
+
+    formatted_blocked = []
+    for b in blocked_items:
+        formatted_blocked.append({
+            "id": b.id,
+            "item_type": b.item_type,
+            "external_id": b.external_id,
+            "title": b.title or "Sin título",
+            "reason": b.reason,
+            "created_at": b.created_at
+        })
+        
     formatted_lists = []
     for r in list_reports:
         formatted_lists.append({
@@ -60,10 +86,92 @@ def get_all_reports(
         })
         
     return {
+        "media": formatted_media,
+        "blocked_media": formatted_blocked,
         "lists": formatted_lists,
         "comments": formatted_comments,
         "reviews": formatted_reviews
     }
+
+class BanMediaRequest(BaseModel):
+    item_type: str
+    external_id: str
+    title: str = None
+    reason: str = None
+
+@router.post("/media/ban")
+def admin_ban_media(
+    body: BanMediaRequest,
+    current_admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    from app.models.social import BlockedMediaItem, MediaItemReport
+    from app.models.library import UserLibraryItem
+    from app.models.list_item import ListItem
+    from app.models.review import MediaReview
+
+    # Check if already blocked
+    existing = db.query(BlockedMediaItem).filter(BlockedMediaItem.external_id == body.external_id).first()
+    if not existing:
+        blocked = BlockedMediaItem(
+            item_type=body.item_type,
+            external_id=body.external_id,
+            title=body.title,
+            reason=body.reason or "Contenido inapropiado / explícito"
+        )
+        db.add(blocked)
+
+    # Purge from all user libraries
+    db.query(UserLibraryItem).filter(
+        UserLibraryItem.item_type == body.item_type,
+        UserLibraryItem.external_id == body.external_id
+    ).delete(synchronize_session=False)
+
+    # Purge from all lists
+    db.query(ListItem).filter(
+        ListItem.item_type == body.item_type,
+        ListItem.external_id == body.external_id
+    ).delete(synchronize_session=False)
+
+    # Purge reviews
+    db.query(MediaReview).filter(
+        MediaReview.item_type == body.item_type,
+        MediaReview.external_id == body.external_id
+    ).delete(synchronize_session=False)
+
+    # Delete all reports for this media
+    db.query(MediaItemReport).filter(MediaItemReport.external_id == body.external_id).delete(synchronize_session=False)
+
+    db.commit()
+    return {"success": True, "message": f"La obra '{body.title or body.external_id}' fue bloqueada y eliminada de todo el sistema."}
+
+@router.delete("/media/unban/{blocked_id}")
+def admin_unban_media(
+    blocked_id: int,
+    current_admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    from app.models.social import BlockedMediaItem
+    blocked = db.query(BlockedMediaItem).filter(BlockedMediaItem.id == blocked_id).first()
+    if not blocked:
+        raise HTTPException(status_code=404, detail="Obra bloqueada no encontrada.")
+    db.delete(blocked)
+    db.commit()
+    return {"success": True, "message": "La obra fue desbloqueada del sistema."}
+
+@router.delete("/reports/media/{report_id}")
+def admin_dismiss_media_report(
+    report_id: int,
+    current_admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    from app.models.social import MediaItemReport
+    report = db.query(MediaItemReport).filter(MediaItemReport.id == report_id).first()
+    if not report:
+        raise HTTPException(status_code=404, detail="Reporte no encontrado.")
+    db.delete(report)
+    db.commit()
+    return {"success": True, "message": "Reporte desestimado."}
 
 @router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 def admin_delete_user(

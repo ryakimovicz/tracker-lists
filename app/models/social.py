@@ -78,3 +78,28 @@ class Follow(Base):
     __table_args__ = (
         UniqueConstraint("follower_id", "followed_id", name="uq_follower_followed"),
     )
+
+class MediaItemReport(Base):
+    __tablename__ = "media_item_reports"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    item_type = Column(String(50), nullable=False)  # movie, series, anime, book, comic, manga, game
+    external_id = Column(String(100), nullable=False)
+    title = Column(String(255), nullable=True)
+    image_url = Column(String(500), nullable=True)
+    reason = Column(String(500), nullable=False)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    # Relationships
+    user = relationship("User")
+
+class BlockedMediaItem(Base):
+    __tablename__ = "blocked_media_items"
+
+    id = Column(Integer, primary_key=True, index=True)
+    item_type = Column(String(50), nullable=False)  # movie, series, anime, book, comic, manga, game
+    external_id = Column(String(100), nullable=False, unique=True, index=True)
+    title = Column(String(255), nullable=True)
+    reason = Column(String(500), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)

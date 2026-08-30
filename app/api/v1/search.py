@@ -81,13 +81,16 @@ def search_media(
             return TVMazeService.search_shows(var, is_anime=False)
         return []
 
+    from app.models.social import BlockedMediaItem
+    blocked_ids = {b.external_id for b in db.query(BlockedMediaItem.external_id).all()}
+
     with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, len(variations))) as executor:
         future_to_var = {executor.submit(fetch_var, var): var for var in variations}
         for future in concurrent.futures.as_completed(future_to_var):
             try:
                 res = future.result()
                 for r in res:
-                    if r.external_id not in seen and is_safe_media_item(r.title, r.description):
+                    if r.external_id not in seen and r.external_id not in blocked_ids and is_safe_media_item(r.title, r.description):
                         seen.add(r.external_id)
                         combined.append(r)
             except Exception as e:
@@ -130,6 +133,9 @@ def search_all_media(
     combined = []
     seen = set()
 
+    from app.models.social import BlockedMediaItem
+    blocked_ids = {b.external_id for b in db.query(BlockedMediaItem.external_id).all()}
+
     with concurrent.futures.ThreadPoolExecutor(max_workers=max(7, len(variations) * 7)) as executor:
         futures = []
         for var in variations:
@@ -145,7 +151,7 @@ def search_all_media(
             try:
                 res = future.result()
                 for r in res:
-                    if r.external_id not in seen:
+                    if r.external_id not in seen and r.external_id not in blocked_ids:
                         seen.add(r.external_id)
                         combined.append(r)
             except Exception as e:

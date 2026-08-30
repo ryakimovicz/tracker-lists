@@ -3,7 +3,7 @@ import { useTranslation } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
 import { getProfileTheme } from '../utils/profileThemes';
 import { apiClient } from '../api/client';
-import { Star, Heart, X, Flag, CheckCircle, Check, Plus, MoreVertical, Trash2, ArrowLeft, Clock, ChevronUp, ChevronDown, RotateCcw, BookOpen, Gamepad2, Package, Sparkles, Puzzle, Layers, ChevronLeft, ChevronRight, Calendar, RefreshCw, AlertCircle, Globe, Repeat, Trophy } from 'lucide-react';
+import { Star, Heart, X, Flag, CheckCircle, Check, Plus, MoreVertical, Trash2, ArrowLeft, Clock, ChevronUp, ChevronDown, RotateCcw, BookOpen, Gamepad2, Package, Sparkles, Puzzle, Layers, ChevronLeft, ChevronRight, Calendar, RefreshCw, AlertCircle, Globe, Repeat, Trophy, ShieldAlert } from 'lucide-react';
 
 
 
@@ -201,6 +201,34 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   const [showStatusChangeModal, setShowStatusChangeModal] = useState(false);
   const [pendingStatusChange, setPendingStatusChange] = useState<string | null>(null);
   const [showRemoveShelfModal, setShowRemoveShelfModal] = useState(false);
+  const [showReportMediaModal, setShowReportMediaModal] = useState(false);
+  const [reportReason, setReportReason] = useState('Contenido para adultos / explícito');
+  const [reportFeedback, setReportFeedback] = useState<string | null>(null);
+  const [isSubmittingReport, setIsSubmittingReport] = useState(false);
+
+  const handleSendMediaReport = async () => {
+    if (!selectedItem) return;
+    setIsSubmittingReport(true);
+    setReportFeedback(null);
+    try {
+      await apiClient.post('/library/report-media', {
+        item_type: selectedItem.item_type,
+        external_id: String(selectedItem.external_id || selectedItem.id),
+        title: selectedItem.title,
+        image_url: selectedItem.image_url,
+        reason: reportReason
+      });
+      setReportFeedback(language === 'es' ? '¡Gracias! El reporte fue enviado a los administradores.' : 'Thank you! The report has been sent to admins.');
+      setTimeout(() => {
+        setShowReportMediaModal(false);
+        setReportFeedback(null);
+      }, 1800);
+    } catch (e: any) {
+      setReportFeedback(language === 'es' ? 'Error al enviar reporte.' : 'Error sending report.');
+    } finally {
+      setIsSubmittingReport(false);
+    }
+  };
 
   const handleTranslateDescription = async (textToTranslate: string) => {
     if (!textToTranslate) return;
@@ -1974,6 +2002,30 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                       </button>
                     );
                   })()}
+
+                  {/* Report Media Button */}
+                  {user && !isEpisode && (
+                    <button
+                      type="button"
+                      onClick={() => setShowReportMediaModal(true)}
+                      className="btn-secondary"
+                      title={language === 'es' ? 'Reportar obra' : 'Report media'}
+                      style={{
+                        padding: '0.45rem',
+                        borderRadius: '50%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        color: 'var(--text-secondary)',
+                        border: '1px solid var(--border-color)',
+                        background: 'transparent',
+                        transition: 'all 0.2s ease'
+                      }}
+                    >
+                      <ShieldAlert size={17} />
+                    </button>
+                  )}
 
                   <button
                     type="button"
@@ -4435,6 +4487,148 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                           color: 'var(--text-primary)',
                           fontWeight: 600,
                           fontSize: '0.88rem',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        {language === 'es' ? 'Cancelar' : 'Cancel'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Floating Modal 4: Report Media Dialog */}
+              {showReportMediaModal && (
+                <div
+                  style={{
+                    position: 'fixed',
+                    inset: 0,
+                    zIndex: 9999,
+                    background: 'rgba(0, 0, 0, 0.7)',
+                    backdropFilter: 'blur(4px)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '1rem'
+                  }}
+                  onClick={() => setShowReportMediaModal(false)}
+                >
+                  <div
+                    className="glass-card"
+                    style={{
+                      width: '100%',
+                      maxWidth: '420px',
+                      background: 'var(--bg-secondary)',
+                      borderRadius: '14px',
+                      padding: '1.5rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '1.1rem',
+                      boxShadow: '0 12px 35px rgba(0,0,0,0.5)',
+                      border: '1px solid var(--border-color)'
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <ShieldAlert size={20} color="#ef4444" />
+                        <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                          {language === 'es' ? 'Reportar obra' : 'Report Media Item'}
+                        </h3>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowReportMediaModal(false)}
+                        style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '0.2rem' }}
+                      >
+                        <X size={18} />
+                      </button>
+                    </div>
+
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: '0.92rem', color: 'var(--text-primary)' }}>
+                        {selectedItem.title}
+                      </div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                        {language === 'es' ? 'Tipo:' : 'Type:'} {selectedItem.item_type} • ID: <code>{selectedItem.external_id || selectedItem.id}</code>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                      <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                        {language === 'es' ? 'Motivo del reporte:' : 'Report reason:'}
+                      </label>
+                      <select
+                        value={reportReason}
+                        onChange={(e) => setReportReason(e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '0.65rem',
+                          borderRadius: '8px',
+                          background: 'var(--bg-tertiary)',
+                          border: '1px solid var(--border-color)',
+                          color: 'var(--text-primary)',
+                          fontSize: '0.88rem',
+                          outline: 'none'
+                        }}
+                      >
+                        <option value="Contenido para adultos / explícito">{language === 'es' ? 'Contenido para adultos / explícito (NSFW)' : 'Adult / Explicit Content (NSFW)'}</option>
+                        <option value="Portada inapropiada u ofensiva">{language === 'es' ? 'Portada inapropiada u ofensiva' : 'Inappropriate or offensive cover'}</option>
+                        <option value="Información o título erróneo">{language === 'es' ? 'Información o título erróneo' : 'Wrong title or metadata'}</option>
+                        <option value="Spam / Duplicado">{language === 'es' ? 'Spam o duplicado' : 'Spam or duplicate'}</option>
+                        <option value="Otro">{language === 'es' ? 'Otro motivo' : 'Other reason'}</option>
+                      </select>
+                    </div>
+
+                    {reportFeedback && (
+                      <div style={{
+                        padding: '0.6rem 0.85rem',
+                        borderRadius: '8px',
+                        fontSize: '0.85rem',
+                        fontWeight: 600,
+                        background: reportFeedback.includes('Error') ? 'rgba(239, 68, 68, 0.15)' : 'rgba(34, 197, 94, 0.15)',
+                        color: reportFeedback.includes('Error') ? '#ef4444' : '#22c55e',
+                        border: reportFeedback.includes('Error') ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(34, 197, 94, 0.3)'
+                      }}>
+                        {reportFeedback}
+                      </div>
+                    )}
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.25rem' }}>
+                      <button
+                        type="button"
+                        onClick={handleSendMediaReport}
+                        disabled={isSubmittingReport}
+                        style={{
+                          padding: '0.75rem 1rem',
+                          borderRadius: '8px',
+                          background: '#ef4444',
+                          border: 'none',
+                          color: '#ffffff',
+                          fontWeight: 700,
+                          fontSize: '0.9rem',
+                          cursor: isSubmittingReport ? 'wait' : 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '0.4rem',
+                          opacity: isSubmittingReport ? 0.7 : 1
+                        }}
+                      >
+                        <ShieldAlert size={16} />
+                        <span>{isSubmittingReport ? (language === 'es' ? 'Enviando...' : 'Sending...') : (language === 'es' ? 'Enviar Reporte' : 'Submit Report')}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setShowReportMediaModal(false)}
+                        style={{
+                          padding: '0.6rem 1rem',
+                          borderRadius: '8px',
+                          background: 'transparent',
+                          border: 'none',
+                          color: 'var(--text-secondary)',
+                          fontSize: '0.85rem',
                           cursor: 'pointer'
                         }}
                       >
