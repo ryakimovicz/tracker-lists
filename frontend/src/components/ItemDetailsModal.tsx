@@ -4546,11 +4546,11 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                     </div>
 
                     <div>
-                      <div style={{ fontWeight: 600, fontSize: '0.92rem', color: 'var(--text-primary)' }}>
+                      <div style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-primary)' }}>
                         {selectedItem.title}
                       </div>
-                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                        {language === 'es' ? 'Tipo:' : 'Type:'} {selectedItem.item_type} • ID: <code>{selectedItem.external_id || selectedItem.id}</code>
+                      <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', textTransform: 'capitalize', marginTop: '0.15rem' }}>
+                        {selectedItem.item_type}
                       </div>
                     </div>
 
