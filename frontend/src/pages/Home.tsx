@@ -217,42 +217,37 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
 
       if (filteredSeasons.length === 0) return;
 
+      const cacheKeyAll = `${item.external_id}_all_episodes`;
+      let allEps = getCachedSeries(cacheKeyAll);
+      if (!allEps || !Array.isArray(allEps) || allEps.length === 0) {
+        try {
+          const res = await apiClient.get(`/search/series/${item.external_id}/episodes`);
+          allEps = res.data;
+          setCachedSeries(cacheKeyAll, allEps);
+        } catch (e) {
+          allEps = [];
+        }
+      }
+
       const completed = trackedEpisodes
         .filter((e: any) => e.is_completed)
         .map((e: any) => ({ ...e, ...parseEpInfo(e) }))
         .sort((a: any, b: any) => a.season !== b.season ? a.season - b.season : a.episode - b.episode);
 
-      let nextSeasonNum = filteredSeasons[0].season_number;
-      let nextEpNum = 1;
-
-      const lastCompleted = completed[completed.length - 1];
-      if (lastCompleted) {
-        const { season: lastSeason, episode: lastEpisode } = lastCompleted;
-        const currSeason = filteredSeasons.find((s: any) => s.season_number === lastSeason);
-        if (currSeason && lastEpisode < currSeason.episode_count) {
-          nextSeasonNum = lastSeason;
-          nextEpNum = lastEpisode + 1;
-        } else {
-          const nextSeason = filteredSeasons.find((s: any) => s.season_number > lastSeason);
-          if (nextSeason) {
-            nextSeasonNum = nextSeason.season_number;
-            nextEpNum = 1;
-          } else {
-            setNextEp(null);
-            return;
-          }
-        }
-      }
-
-      const cacheKeyAll = `${item.external_id}_all_episodes`;
-      const cachedAll = getCachedSeries(cacheKeyAll);
+      // Find the first episode that is NOT completed
       let targetEp = null;
-      if (cachedAll && Array.isArray(cachedAll)) {
-        targetEp = cachedAll.find((e: any) => e.season_number === nextSeasonNum && e.episode_number === nextEpNum);
-      } else {
-        const res = await apiClient.get(`/search/series/${item.external_id}/episodes`);
-        setCachedSeries(cacheKeyAll, res.data);
-        targetEp = res.data.find((e: any) => e.season_number === nextSeasonNum && e.episode_number === nextEpNum);
+      if (allEps && Array.isArray(allEps) && allEps.length > 0) {
+        // Sort all episodes by season and episode number
+        const sortedAllEps = [...allEps].sort((a: any, b: any) => 
+          a.season_number !== b.season_number ? a.season_number - b.season_number : a.episode_number - b.episode_number
+        );
+
+        targetEp = sortedAllEps.find((ep: any) => {
+          const isWatched = trackedEpisodes.some((t: any) => 
+            (t.external_id === `tvm-ep-${ep.id}` || t.id === ep.id || (t.title && t.title.includes(`S${pad(ep.season_number)}E${pad(ep.episode_number)}`)) || (t.title && t.title.includes(`E${pad(ep.episode_number)}`) && (t.section === `Season ${ep.season_number}` || t.title.includes(`S${ep.season_number}`)))) && t.is_completed
+          );
+          return !isWatched;
+        });
       }
 
       // Check if targetEp has actually aired yet (using exact airstamp / airdate + airtime)
@@ -264,12 +259,11 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
           const ad = targetEp.airdate || targetEp.air_date;
           const at = targetEp.airtime || '00:00';
           const epAirTime = new Date(`${ad}T${at}:00Z`).getTime();
-          // If timezone offset or local time, check against current time
           isAired = epAirTime <= Date.now();
         }
 
         if (!isAired) {
-          // Episode has not aired yet! Series is caught up -> auto-complete and do not show unreleased episode
+          // The next unwatched episode has not aired yet! Series is caught up -> auto-complete to move to Terminado
           await apiClient.put(`/library/${item.id}`, { status: 'completed' });
           onUpdate();
           setNextEp(null);
@@ -277,6 +271,11 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
         }
 
         setNextEp(targetEp);
+      } else {
+        // No more episodes exist at all -> series completed
+        await apiClient.put(`/library/${item.id}`, { status: 'completed' });
+        onUpdate();
+        setNextEp(null);
       }
     } catch (e) {
       console.error("Failed to load next episode for card", e);
