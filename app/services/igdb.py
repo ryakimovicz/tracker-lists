@@ -80,21 +80,28 @@ class IGDBService:
                     if not data:
                         return []
 
-                    # Smart sorting: Collections first, then Main Games, then Expansions, then DLCs/Skins
+                    # Smart sorting: Collections -> Editions -> Base Games -> Expansions -> DLCs
                     def calculate_score(item):
                         name = item.get("name", "")
                         name_lower = name.lower().strip()
                         cat = item.get("game_type") if item.get("game_type") is not None else item.get("category", 0)
+                        has_version_parent = bool(item.get("version_parent"))
                         
-                        # Tier 0: Main Games, Collections/Bundles, Remakes, Remasters, Editions
-                        if cat in (0, 3, 8, 9, 10, None):
+                        # Tier 0: Collections (Compilations of multiple games)
+                        if cat == 3 and not has_version_parent:
                             tier = 0
-                        # Tier 1: Expansions / Episodes
-                        elif cat in (2, 4, 6):
+                        # Tier 1: Editions (GOTY, Deluxe, Premium Editions)
+                        elif cat == 10 or (cat in (0, 3) and has_version_parent):
                             tier = 1
-                        # Tier 2: DLCs / Mods / Addons / Packs
-                        else:
+                        # Tier 2: Base Games, Remakes, Remasters
+                        elif cat in (0, 8, 9, None):
                             tier = 2
+                        # Tier 3: Expansions / Episodes
+                        elif cat in (2, 4, 6):
+                            tier = 3
+                        # Tier 4: DLCs / Mods / Addons / Packs
+                        else:
+                            tier = 4
                             
                         rating_count = item.get("rating_count") or 0
                         hypes = item.get("hypes") or 0

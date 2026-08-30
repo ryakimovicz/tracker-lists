@@ -201,14 +201,14 @@ def search_all_media(
         title_clean = item.title.lower().strip()
         score = 0.0
 
-        # Game hierarchy tier boost (Collections -> Base Games -> Editions -> Expansions -> DLCs)
+        # Game hierarchy tier boost (Collections -> Editions -> Base Games / Remakes / Remasters -> Expansions -> DLCs)
         if item.item_type == "game":
             if item.badge == "collection":
                 score += 2000.0
-            elif item.badge is None:
+            elif item.badge == "edition":
+                score += 1500.0
+            elif item.badge in (None, "remake", "remaster"):
                 score += 1000.0
-            elif item.badge in ("edition", "remake", "remaster"):
-                score += 800.0
             elif item.badge == "expansion":
                 score += 500.0
             elif item.badge == "dlc":
