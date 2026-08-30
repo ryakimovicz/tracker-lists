@@ -823,7 +823,7 @@ const ActiveItemCard = ({ item, onUpdate, language, onOpenItem, themeColor, them
             if (item.status === 'completed' || item.status === 'read') {
                 if (['book', 'comic', 'manga'].includes(item.item_type)) return item.total_pages ? `${item.total_pages} ${language === 'es' ? 'páginas' : 'pages'}` : '\u00A0';
                 if (item.item_type === 'movie') return item.total_pages ? `${item.total_pages} min` : '\u00A0';
-                if (item.item_type === 'game') return item.pages_read > 0 ? `${Math.floor(item.pages_read / 60)}h ${String(item.pages_read % 60).padStart(2, '0')}m` : '\u00A0';
+                if (item.item_type === 'game') return item.pages_read > 0 ? `${Math.floor(item.pages_read / 60)}h ${String(item.pages_read % 60).padStart(2, '0')}m` : (language === 'es' ? 'Terminado' : 'Completed');
                 return language === 'es' ? 'Visto' : 'Watched';
             }
             if (['plan_to_watch', 'plan_to_read', 'plan_to_play'].includes(item.status)) {
@@ -837,7 +837,10 @@ const ActiveItemCard = ({ item, onUpdate, language, onOpenItem, themeColor, them
           })()}
           </span>
           {(() => {
-              if (item.pages_read > 0 && !['completed', 'read', 'plan_to_watch', 'plan_to_read', 'plan_to_play'].includes(item.status)) {
+              if (item.status === 'endless' && item.item_type === 'game' && item.pages_read > 0) {
+                  return <span style={{ fontSize: "0.75rem", fontWeight: 500, color: "var(--text-muted)" }}>{Math.floor(item.pages_read / 60)}h {String(item.pages_read % 60).padStart(2, '0')}m</span>;
+              }
+              if (item.pages_read > 0 && !['completed', 'read', 'endless', 'plan_to_watch', 'plan_to_read', 'plan_to_play'].includes(item.status)) {
                   if (item.item_type === 'game') {
                       return <span style={{ fontSize: "0.75rem", fontWeight: 500, color: "var(--text-muted)" }}>{Math.floor(item.pages_read / 60)}h {String(item.pages_read % 60).padStart(2, '0')}m</span>;
                   }
