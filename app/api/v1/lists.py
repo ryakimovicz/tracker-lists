@@ -1709,10 +1709,47 @@ def toggle_series_episode(
                 lib_item.last_seen_episode = ep_tuples[-1][2]
             else:
                 lib_item.last_seen_episode = completed_ep_titles[-1]
-            lib_item.status = UserLibraryStatusEnum.WATCHING
+
+            # Check if all currently aired episodes are completed
+            all_aired_completed = False
+            if lib_item.external_id:
+                try:
+                    all_episodes = TVMazeService.get_all_episodes(lib_item.external_id)
+                    now_dt = datetime.now(timezone.utc)
+                    now_date = now_dt.strftime("%Y-%m-%d")
+
+                    def is_ep_aired_check(ep_dict):
+                        astamp = ep_dict.get("airstamp")
+                        if astamp:
+                            try:
+                                ep_dt = datetime.fromisoformat(astamp.replace("Z", "+00:00"))
+                                return ep_dt <= now_dt
+                            except Exception:
+                                pass
+                        adate = ep_dict.get("airdate")
+                        return bool(adate and adate <= now_date)
+
+                    aired_eps = [ep for ep in all_episodes if is_ep_aired_check(ep)]
+                    if aired_eps:
+                        aired_ext_ids = {f"tvm-ep-{ep['id']}" for ep in aired_eps}
+                        watched_ext_ids = {
+                            p.external_id for p in completed_progs if p.external_id
+                        }
+                        if aired_ext_ids.issubset(watched_ext_ids):
+                            all_aired_completed = True
+                except Exception as e:
+                    print(f"Error checking all_aired_completed: {e}")
+
+            if all_aired_completed:
+                lib_item.status = UserLibraryStatusEnum.COMPLETED
+                lib_item.completed_at = datetime.now(timezone.utc)
+            else:
+                lib_item.status = UserLibraryStatusEnum.WATCHING
+                lib_item.completed_at = None
         else:
             lib_item.last_seen_episode = None
             lib_item.status = UserLibraryStatusEnum.PLAN_TO_WATCH
+            lib_item.completed_at = None
             
         lib_item.updated_at = datetime.now(timezone.utc)
         db.commit()

@@ -1,6 +1,6 @@
 export const getCachedSeries = (key: string) => {
   try {
-    const item = localStorage.getItem(`series_cache_${key}`);
+    const item = localStorage.getItem(`series_cache_v2_${key}`);
     if (item) {
       const parsed = JSON.parse(item);
       // Cache expires after 24h
@@ -16,7 +16,7 @@ export const getCachedSeries = (key: string) => {
 
 export const setCachedSeries = (key: string, data: any) => {
   try {
-    localStorage.setItem(`series_cache_${key}`, JSON.stringify({
+    localStorage.setItem(`series_cache_v2_${key}`, JSON.stringify({
       timestamp: Date.now(),
       data
     }));
