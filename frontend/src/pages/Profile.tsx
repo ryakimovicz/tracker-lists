@@ -403,6 +403,39 @@ export const Profile: React.FC = () => {
     }
   };
 
+  // Auto-refresh Now Playing track every 30 seconds (pauses when browser tab is inactive)
+  useEffect(() => {
+    if (!profile?.lastfm_username || !profile?.id) return;
+
+    const targetId = profile.id;
+    const targetNpUrl = `/users/${targetId}/music/now-playing`;
+
+    const pollNowPlaying = async () => {
+      if (document.hidden) return;
+      try {
+        const npRes = await apiClient.get(targetNpUrl);
+        setNowPlaying(npRes.data || null);
+      } catch (e) {
+        // Silently keep previous state or ignore network hiccups
+      }
+    };
+
+    const intervalId = setInterval(pollNowPlaying, 30000);
+
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        pollNowPlaying();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [profile?.lastfm_username, profile?.id]);
+
   const handleLastFmLogin = () => {
     const currentOrigin = window.location.origin;
     window.location.href = `http://www.last.fm/api/auth/?api_key=de5acce61bdd8b3e4bd181ebce8a69e8&cb=${encodeURIComponent(`${currentOrigin}/profile`)}`;
