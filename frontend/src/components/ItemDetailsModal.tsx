@@ -1971,7 +1971,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
                   {/* Favorite button for all items */}
                   {user && selectedItem?.id && !isEpisode && (() => {
-                    const isUnconsumed = ['plan_to_watch', 'plan_to_read', 'plan_to_play'].includes(selectedItem?.status);
+                    const isDlcOrExpansion = selectedItem?.item_type === 'game' && ['dlc', 'expansion'].includes(selectedItem?.badge || selectedItem?.custom_badge);
+                    const isUnconsumed = !isDlcOrExpansion && ['plan_to_watch', 'plan_to_read', 'plan_to_play'].includes(selectedItem?.status);
                     return (
                       <button
                         type="button"
