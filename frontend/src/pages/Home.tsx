@@ -478,6 +478,140 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
   );
 };
 
+const CompletedSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, themeTextColor }: { item: any, onUpdate: () => void, language: string, onOpenSeries: (item: any) => void, themeColor?: string, themeTextColor?: string }) => {
+  const [nextUpcomingEp, setNextUpcomingEp] = useState<any>(null);
+
+  const pad = (n: number) => n < 10 ? '0' + n : n;
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchUpcomingInfo = async () => {
+      if (!item.tracking_list_id) return;
+      try {
+        let trackedEpisodes: any[] = [];
+        try {
+          const listRes = await apiClient.get(`/lists/${item.tracking_list_id}`);
+          trackedEpisodes = listRes.data.items || [];
+        } catch (err) {
+          console.error("Failed to load tracking list for completed series card", err);
+        }
+
+        const cacheKeyAll = `${item.external_id}_all_episodes`;
+        let allEps = getCachedSeries(cacheKeyAll);
+        if (!allEps) {
+          try {
+            const epRes = await apiClient.get(`/search/series/${item.external_id}/episodes`);
+            allEps = epRes.data;
+            setCachedSeries(cacheKeyAll, allEps);
+          } catch (e) {
+            allEps = null;
+          }
+        }
+
+        if (allEps && Array.isArray(allEps) && allEps.length > 0) {
+          const nowMs = Date.now();
+          // Find first uncompleted episode that is in the future
+          const upcoming = allEps.find(ep => {
+            let isAired = true;
+            if (ep.airstamp) {
+              isAired = new Date(ep.airstamp).getTime() <= nowMs;
+            } else if (ep.airdate || ep.air_date) {
+              const ad = ep.airdate || ep.air_date;
+              const at = ep.airtime || '00:00';
+              isAired = new Date(`${ad}T${at}:00Z`).getTime() <= nowMs;
+            }
+            const isWatched = trackedEpisodes.some((t: any) => 
+              (t.external_id === `tvm-ep-${ep.id}` || t.id === ep.id || (t.title && t.title.includes(`E${String(ep.episode_number).padStart(2, '0')}`))) && t.is_completed
+            );
+            return !isAired && !isWatched;
+          });
+
+          if (isMounted) {
+            setNextUpcomingEp(upcoming || null);
+          }
+        }
+      } catch (e) {
+        console.error("Failed to load upcoming episode for completed card", e);
+      }
+    };
+    fetchUpcomingInfo();
+    return () => { isMounted = false; };
+  }, [item, language]);
+
+  const formatDate = (dateStr: string | null | undefined, airstamp?: string) => {
+    if (airstamp) {
+      const d = new Date(airstamp);
+      return d.toLocaleDateString(language === 'es' ? 'es-AR' : 'en-US', { day: 'numeric', month: 'short' });
+    }
+    if (!dateStr) return '';
+    const [y, m, d] = dateStr.split('-');
+    if (y && m && d) {
+      const dateObj = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
+      return dateObj.toLocaleDateString(language === 'es' ? 'es-AR' : 'en-US', { day: 'numeric', month: 'short' });
+    }
+    return dateStr;
+  };
+
+  let upcomingSubtitle1 = '';
+  let upcomingSubtitle2 = '';
+  if (nextUpcomingEp) {
+    const sStr = pad(nextUpcomingEp.season_number);
+    const eStr = pad(nextUpcomingEp.episode_number);
+    upcomingSubtitle1 = language === 'es' ? `T${sStr} | E${eStr}` : `S${sStr} | E${eStr}`;
+    const dateFormatted = formatDate(nextUpcomingEp.airdate || nextUpcomingEp.air_date, nextUpcomingEp.airstamp);
+    upcomingSubtitle2 = dateFormatted ? (language === 'es' ? `Estreno: ${dateFormatted}` : `Airs: ${dateFormatted}`) : (nextUpcomingEp.name || '');
+  }
+
+  return (
+    <div 
+      onClick={() => onOpenSeries(item)}
+      style={{ 
+        minWidth: "180px", maxWidth: "180px", background: "var(--bg-secondary)", 
+        border: `1px solid ${themeColor || "var(--border-color)"}`, borderRadius: "12px", 
+        overflow: "hidden", cursor: "pointer", position: "relative",
+        display: "flex", flexDirection: "column",
+        boxShadow: themeColor ? `0 0 10px ${themeColor}33` : "none",
+        "--title-hover-color": themeColor
+      } as React.CSSProperties}
+      className="activity-card"
+    >
+      <div 
+        onClick={(e) => { e.stopPropagation(); onOpenSeries(item); }}
+        className="card-series-title"
+        style={{ padding: "0.5rem 0.75rem", fontSize: "0.85rem", fontWeight: 600, borderBottom: "1px solid var(--border-color)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between" }}
+      >
+        <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{item.title}</span>
+        <ChevronRight size={14} style={{ flexShrink: 0, marginLeft: "0.25rem", opacity: 0.7 }} />
+      </div>
+
+      <div style={{ width: "100%", height: "240px", background: "var(--bg-tertiary)", position: "relative" }}>
+        {item.image_url ? (
+          <img src={item.image_url} alt={item.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        ) : (
+          <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: "2rem" }}>?</div>
+        )}
+      </div>
+      
+      <div style={{ padding: "0.75rem", display: "flex", flexDirection: "column", gap: "0.2rem", flex: 1, minHeight: "2.5rem" }}>
+        {nextUpcomingEp ? (
+          <>
+            <div style={{ fontSize: "0.88rem", color: "var(--text-primary)", fontWeight: 700 }}>
+              {upcomingSubtitle1}
+            </div>
+            <div style={{ fontSize: "0.78rem", color: themeColor || "var(--text-accent, #6366f1)", fontWeight: 600, display: "-webkit-box", WebkitLineClamp: 1, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+              {upcomingSubtitle2}
+            </div>
+          </>
+        ) : (
+          <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text-secondary)", marginTop: "auto", marginBottom: "auto" }}>
+            {language === 'es' ? 'Completado' : 'Completed'}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const DroppedSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, themeTextColor }: { item: any, onUpdate: () => void, language: string, onOpenSeries: (item: any) => void, themeColor?: string, themeTextColor?: string }) => {
   const [lastEpInfo, setLastEpInfo] = useState<{ seasonText: string; epName: string } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -974,6 +1108,20 @@ export const Home: React.FC = () => {
                     if ((activeTab === "watching" || activeTab === "plan_to_watch") && (item.item_type === "series" || item.item_type === "anime")) {
                       return (
                         <ActiveSeriesCard 
+                          key={item.id}
+                          item={item}
+                          language={language}
+                          onUpdate={() => fetchDashboard(true)}
+                          onOpenSeries={(seriesItem) => setSelectedItem(seriesItem)}
+                          themeColor={`var(--color-${item.item_type})`}
+                          themeTextColor={`var(--color-text-${item.item_type})`}
+                        />
+                      );
+                    }
+
+                    if (activeTab === "completed" && (item.item_type === "series" || item.item_type === "anime")) {
+                      return (
+                        <CompletedSeriesCard 
                           key={item.id}
                           item={item}
                           language={language}
