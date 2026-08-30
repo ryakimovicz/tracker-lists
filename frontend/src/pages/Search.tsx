@@ -375,6 +375,7 @@ export const Search: React.FC = () => {
         title: selectedItemForShelf.title,
         image_url: selectedItemForShelf.image_url,
         imdb_id: selectedItemForShelf.imdb_id,
+        custom_badge: selectedItemForShelf.badge || null,
         status: shelfStatus
       });
       setSuccessMsg(t('searchItemAdded'));

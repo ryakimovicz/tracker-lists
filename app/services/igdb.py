@@ -61,7 +61,7 @@ class IGDBService:
 
         # IGDB Apicalypse query with metadata for smart ranking
         safe_query = query.replace('"', '\\"')
-        body = f'search "{safe_query}"; fields id, name, category, parent_game, version_parent, cover.image_id, first_release_date, summary, total_rating, rating_count, hypes, follows, themes, age_ratings.rating; limit 100;'
+        body = f'search "{safe_query}"; fields id, name, category, game_type, parent_game, version_parent, cover.image_id, first_release_date, summary, total_rating, rating_count, hypes, follows, themes, age_ratings.rating; limit 100;'
         
         req = urllib.request.Request(
             "https://api.igdb.com/v4/games",
@@ -84,7 +84,7 @@ class IGDBService:
                     def calculate_score(item):
                         name = item.get("name", "")
                         name_lower = name.lower().strip()
-                        cat = item.get("category", 0)
+                        cat = item.get("game_type") if item.get("game_type") is not None else item.get("category", 0)
                         
                         # Tier 0: Main Games, Collections/Bundles, Remakes, Remasters, Editions
                         if cat in (0, 3, 8, 9, 10, None):
@@ -154,8 +154,8 @@ class IGDBService:
                         if 42 in themes or not is_safe_media_item(game_title, desc):
                             continue
 
-                        # Clean mapping using official IGDB category enum
-                        cat = item.get("category", 0)
+                        # Clean mapping using official IGDB game_type / category enum
+                        cat = item.get("game_type") if item.get("game_type") is not None else item.get("category", 0)
                         badge = None
                         if cat in (2, 4, 6):
                             badge = "expansion"
@@ -352,7 +352,7 @@ class IGDBService:
                         release_timestamp = item.get("first_release_date")
                         release_date = datetime.fromtimestamp(release_timestamp).strftime("%Y-%m-%d") if release_timestamp else None
 
-                        cat = item.get("category", 0)
+                        cat = item.get("game_type") if item.get("game_type") is not None else item.get("category", 0)
                         badge = None
                         if cat in (2, 4, 6):
                             badge = "expansion"
@@ -385,7 +385,7 @@ class IGDBService:
     def get_new_games(cls) -> List[SearchResultItem]:
         import time
         now = int(time.time())
-        body = f'fields id, name, category, parent_game, cover.image_id, first_release_date, summary; where first_release_date < {now} & cover != null & category = (0, 2, 3, 4, 8, 9, 10); sort first_release_date desc; limit 40;'
+        body = f'fields id, name, category, game_type, parent_game, cover.image_id, first_release_date, summary; where first_release_date < {now} & cover != null & (game_type = (0, 2, 3, 4, 8, 9, 10) | category = (0, 2, 3, 4, 8, 9, 10)); sort first_release_date desc; limit 40;'
         return cls._execute_query(body)
 
     @classmethod
@@ -393,7 +393,7 @@ class IGDBService:
         import time
         now = int(time.time())
         six_months_ago = now - (180 * 86400)
-        body = f'fields id, name, category, parent_game, cover.image_id, first_release_date, summary, total_rating; where first_release_date > {six_months_ago} & first_release_date < {now} & cover != null & total_rating != null; sort total_rating desc; limit 15;'
+        body = f'fields id, name, category, game_type, parent_game, cover.image_id, first_release_date, summary, total_rating; where first_release_date > {six_months_ago} & first_release_date < {now} & cover != null & total_rating != null; sort total_rating desc; limit 15;'
         return cls._execute_query(body)
 
 
