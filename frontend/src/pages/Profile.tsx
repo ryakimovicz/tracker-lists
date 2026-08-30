@@ -1516,6 +1516,26 @@ export const Profile: React.FC = () => {
                               </span>
                             )}
 
+                            {/* Book / Comic / Manga Pages Read */}
+                            {['book', 'comic', 'manga'].includes(item.item_type) && ((item.pages_read || 0) > 0 || (item.total_pages || 0) > 0) && (
+                              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '0.25rem', marginTop: '0.2rem' }}>
+                                <BookOpen size={12} />
+                                {(() => {
+                                  const read = item.pages_read || 0;
+                                  const total = item.total_pages || 0;
+                                  if (item.status === 'read' || item.status === 'completed') {
+                                    const count = total > 0 ? total : read;
+                                    return `${count} ${language === 'es' ? (count === 1 ? 'pág.' : 'págs.') : (count === 1 ? 'page' : 'pages')}`;
+                                  }
+                                  if (read > 0 && total > 0) {
+                                    return `${read} / ${total} ${language === 'es' ? 'págs.' : 'pages'}`;
+                                  }
+                                  const count = read > 0 ? read : total;
+                                  return `${count} ${language === 'es' ? (count === 1 ? 'pág.' : 'págs.') : (count === 1 ? 'page' : 'pages')}`;
+                                })()}
+                              </span>
+                            )}
+
                             {/* Formatted Date */}
                             {(item.completed_at || item.updated_at) && (
                               <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontStyle: 'italic', display: 'block', marginTop: '0.3rem' }}>
