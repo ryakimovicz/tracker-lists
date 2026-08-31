@@ -2121,13 +2121,41 @@ def bulk_toggle_all_seasons(
             if last_ep:
                 lib_item.last_seen_episode = last_ep.title
         else:
-            lib_item.status = UserLibraryStatusEnum.PLAN_TO_WATCH
-            lib_item.completed_at = None
-            lib_item.last_seen_episode = None
+            # Check if all episodes are still completed, or some, or none
+            total_eps_count = db.query(ListItem).filter(ListItem.list_id == list_id).count()
+            completed_eps_count = db.query(ItemProgress).join(ListItem).filter(
+                ItemProgress.user_id == current_user.id,
+                ListItem.list_id == list_id,
+                ItemProgress.is_completed == True
+            ).count()
+
+            if completed_eps_count >= total_eps_count and total_eps_count > 0:
+                # All episodes still have prior completed viewings! Keep completed
+                lib_item.status = UserLibraryStatusEnum.COMPLETED
+                last_completed = db.query(ItemProgress).join(ListItem).filter(
+                    ItemProgress.user_id == current_user.id,
+                    ListItem.list_id == list_id,
+                    ItemProgress.is_completed == True
+                ).order_by(ItemProgress.completed_at.desc()).first()
+                lib_item.completed_at = last_completed.completed_at if last_completed else datetime.now(timezone.utc)
+            elif completed_eps_count > 0:
+                lib_item.status = UserLibraryStatusEnum.WATCHING
+                lib_item.completed_at = None
+                last_completed = db.query(ListItem).join(ItemProgress).filter(
+                    ListItem.list_id == list_id,
+                    ItemProgress.user_id == current_user.id,
+                    ItemProgress.is_completed == True
+                ).order_by(ListItem.id.desc()).first()
+                if last_completed:
+                    lib_item.last_seen_episode = last_completed.title
+            else:
+                lib_item.status = UserLibraryStatusEnum.PLAN_TO_WATCH
+                lib_item.completed_at = None
+                lib_item.last_seen_episode = None
         lib_item.updated_at = datetime.now(timezone.utc)
 
     db.commit()
-    return {"message": "All seasons progress toggled successfully", "status": lib_item.status if lib_item else "completed"}
+    return {"message": "All seasons progress toggled successfully", "status": lib_item.status.value if (lib_item and hasattr(lib_item.status, 'value')) else (lib_item.status if lib_item else "completed")}
 
 
 

@@ -240,6 +240,44 @@ def get_library_item_consumption_history(
             "history": result_dates
         }
         
+    if item and item.item_type in ("series", "anime") and item.tracking_list_id:
+        list_items = db.query(ListItem).filter(ListItem.list_id == item.tracking_list_id).all()
+        ep_ext_ids = [it.external_id for it in list_items if it.external_id]
+        if ep_ext_ids:
+            # Group consumption history by episode
+            from collections import defaultdict
+            ep_consumptions = defaultdict(list)
+            all_ep_ch = db.query(ConsumptionHistory).filter(
+                ConsumptionHistory.user_id == current_user.id,
+                ConsumptionHistory.external_id.in_(ep_ext_ids)
+            ).order_by(ConsumptionHistory.consumed_at.asc()).all()
+            
+            for ch in all_ep_ch:
+                ep_consumptions[ch.external_id].append(ch)
+            
+            # The series is completed N times if all episodes have at least N consumptions
+            min_completed_times = min(len(ep_consumptions[eid]) for eid in ep_ext_ids) if len(ep_consumptions) == len(ep_ext_ids) else 0
+            
+            series_entries = []
+            for run_idx in range(min_completed_times):
+                # The timestamp for run_idx completion of the series is the latest timestamp among all episodes for that run
+                run_timestamps = [ep_consumptions[eid][run_idx].consumed_at for eid in ep_ext_ids]
+                completion_time = max(run_timestamps)
+                series_entries.append({
+                    "id": ep_consumptions[ep_ext_ids[0]][run_idx].id,
+                    "consumed_at": completion_time,
+                    "is_hundred_percent": False
+                })
+            
+            # Sort descending for display
+            series_entries.sort(key=lambda x: x["consumed_at"], reverse=True)
+            result_dates = [e["consumed_at"] for e in series_entries]
+            return {
+                "count": len(series_entries),
+                "history": result_dates,
+                "entries": series_entries
+            }
+
     history = db.query(ConsumptionHistory).filter(
         ConsumptionHistory.user_id == current_user.id,
         ConsumptionHistory.external_id == external_id

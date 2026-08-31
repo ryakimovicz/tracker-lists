@@ -332,7 +332,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     }
 
     try {
-      await apiClient.post(`/lists/${effectiveListId}/bulk-toggle-all-seasons`, {
+      const res = await apiClient.post(`/lists/${effectiveListId}/bulk-toggle-all-seasons`, {
         episodes: cachedAll || null,
         completed: targetCompleted
       });
@@ -347,12 +347,23 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
         setGlobalProgress(prev => ({ ...prev, ...progRes.data }));
       }
 
-      const nextStatus = targetCompleted ? 'completed' : 'plan_to_watch';
+      const nextStatus = res.data?.status || (targetCompleted ? 'completed' : 'plan_to_watch');
       setSelectedItem((prev: any) => prev ? {
         ...prev,
         status: nextStatus,
-        completed_at: targetCompleted ? new Date().toISOString() : null
+        completed_at: nextStatus === 'completed' ? (prev.completed_at || new Date().toISOString()) : null
       } : null);
+
+      if (selectedItem?.id && user?.is_pro) {
+        apiClient.get(`/library/${selectedItem.id}/consumption-history`)
+          .then(hRes => {
+            if (hRes.data) {
+              if (hRes.data.history) setConsumptionHistory(hRes.data.history);
+              if (hRes.data.entries) setConsumptionEntries(hRes.data.entries);
+            }
+          })
+          .catch(console.error);
+      }
 
       onUpdate && onUpdate();
     } catch (err) {
@@ -774,13 +785,12 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     const initModal = async (incomingItem: any) => {
       let item = incomingItem;
 
-      // If viewing another user's profile, decouple personal tracking and check the logged-in user's own library
-      const isOtherUserProfile = !isOwnProfile || (userIdParam && user?.id && String(userIdParam) !== String(user.id));
-      if (isOtherUserProfile && user && incomingItem.external_id) {
+      // Decouple personal tracking or refresh state from current user library
+      if (user && incomingItem.external_id) {
         try {
           const myLibRes = await apiClient.get('/library/');
           const myLib = myLibRes.data || [];
-          const myMatch = myLib.find((li: any) => li.external_id === incomingItem.external_id && li.item_type === incomingItem.item_type);
+          const myMatch = myLib.find((li: any) => li.external_id === incomingItem.external_id && (li.item_type === incomingItem.item_type || (['series', 'anime'].includes(li.item_type) && ['series', 'anime'].includes(incomingItem.item_type))));
           if (myMatch) {
             item = {
               ...incomingItem,
@@ -1476,6 +1486,17 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
       if (selectedItem && (selectedItem.external_id === `tvm-ep-${ep.id}` || selectedItem.id === ep.id || selectedItem.rawEpisodeId === ep.id)) {
         setSelectedItem((prev: any) => prev ? { ...prev, completed_at: res.data.completed_at, is_completed: res.data.is_completed } : null);
+        const targetFetchId = selectedItem.id || ep.id;
+        if (targetFetchId && user?.is_pro) {
+          apiClient.get(`/library/${targetFetchId}/consumption-history`)
+            .then(hRes => {
+              if (hRes.data) {
+                if (hRes.data.history) setConsumptionHistory(hRes.data.history);
+                if (hRes.data.entries) setConsumptionEntries(hRes.data.entries);
+              }
+            })
+            .catch(console.error);
+        }
       }
       
       await checkCompletionStatus(effectiveListId, updatedList);
