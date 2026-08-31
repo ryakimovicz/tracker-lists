@@ -16,6 +16,7 @@ from app.models.social import ListVote
 from app.services.tvmaze import TVMazeService
 from app.models.library import UserLibraryItem, UserLibraryStatusEnum
 from app.models.activity import UserActivityLog
+from app.models.consumption import ConsumptionHistory
 from app.api.v1.users import check_user_is_pro
 from app.schemas.list import (
     ReadingListCreate,
@@ -1616,20 +1617,48 @@ def toggle_series_episode(
             progress.completed_at = now_dt
             just_marked = True
         elif action == "remove":
-            progress.is_completed = False
-            progress.list_item_id = item.id
-            progress.completed_at = None
+            # Check if there is consumption history to remove latest
+            history = db.query(ConsumptionHistory).filter(
+                ConsumptionHistory.user_id == current_user.id,
+                ConsumptionHistory.external_id == ext_id
+            ).order_by(ConsumptionHistory.consumed_at.desc()).all()
             
-            # Remove from user library
-            db.query(UserLibraryItem).filter(
-                UserLibraryItem.user_id == current_user.id,
-                UserLibraryItem.external_id == ext_id
-            ).delete()
+            if history:
+                db.delete(history[0])
+                remaining = history[1:]
+                if remaining:
+                    # Still has prior viewings! Keep is_completed True and point to previous date
+                    progress.is_completed = True
+                    progress.completed_at = remaining[0].consumed_at
+                else:
+                    progress.is_completed = False
+                    progress.completed_at = None
+                    # Remove loose item from user library
+                    db.query(UserLibraryItem).filter(
+                        UserLibraryItem.user_id == current_user.id,
+                        UserLibraryItem.external_id == ext_id
+                    ).delete()
+            else:
+                progress.is_completed = False
+                progress.completed_at = None
+                # Remove loose item from user library
+                db.query(UserLibraryItem).filter(
+                    UserLibraryItem.user_id == current_user.id,
+                    UserLibraryItem.external_id == ext_id
+                ).delete()
         else:
             progress.is_completed = not progress.is_completed
             progress.list_item_id = item.id
             progress.completed_at = now_dt if progress.is_completed else None
             just_marked = progress.is_completed
+            if not progress.is_completed:
+                # Remove latest consumption history entry on unchecking
+                latest_ch = db.query(ConsumptionHistory).filter(
+                    ConsumptionHistory.user_id == current_user.id,
+                    ConsumptionHistory.external_id == ext_id
+                ).order_by(ConsumptionHistory.consumed_at.desc()).first()
+                if latest_ch:
+                    db.delete(latest_ch)
     else:
         if action == "remove":
             return {"is_completed": False, "completed_at": None}
@@ -1845,20 +1874,54 @@ def bulk_toggle_season(
             ItemProgress.external_id == ext_id
         ).first()
         
-        if progress:
-            progress.is_completed = req.completed
-            progress.completed_at = datetime.now(timezone.utc) if req.completed else None
-        else:
-            progress = ItemProgress(
+        now_dt = datetime.now(timezone.utc)
+        if req.completed:
+            # Mark completed and add consumption history record
+            if progress:
+                progress.is_completed = True
+                progress.completed_at = now_dt
+            else:
+                progress = ItemProgress(
+                    user_id=current_user.id,
+                    item_type=ItemTypeEnum.SERIES,
+                    external_id=ext_id,
+                    list_item_id=item.id,
+                    is_completed=True,
+                    is_skipped=False,
+                    completed_at=now_dt
+                )
+                db.add(progress)
+            
+            ch = ConsumptionHistory(
                 user_id=current_user.id,
-                item_type=ItemTypeEnum.SERIES,
+                item_type=item.item_type.value if hasattr(item.item_type, 'value') else item.item_type,
                 external_id=ext_id,
                 list_item_id=item.id,
-                is_completed=req.completed,
-                is_skipped=False,
-                completed_at=datetime.now(timezone.utc) if req.completed else None
+                consumed_at=now_dt
             )
-            db.add(progress)
+            db.add(ch)
+        else:
+            # Unwatch: remove latest consumption history entry
+            history = db.query(ConsumptionHistory).filter(
+                ConsumptionHistory.user_id == current_user.id,
+                ConsumptionHistory.external_id == ext_id
+            ).order_by(ConsumptionHistory.consumed_at.desc()).all()
+            
+            if history:
+                db.delete(history[0])
+                remaining = history[1:]
+                if remaining:
+                    if progress:
+                        progress.is_completed = True
+                        progress.completed_at = remaining[0].consumed_at
+                else:
+                    if progress:
+                        progress.is_completed = False
+                        progress.completed_at = None
+            else:
+                if progress:
+                    progress.is_completed = False
+                    progress.completed_at = None
             
     db.commit()
     
@@ -1959,7 +2022,7 @@ def bulk_toggle_all_seasons(
                 if clean_id.startswith('tvm_'):
                     clean_id = clean_id.replace('tvm_', '')
                 series_id = int(clean_id)
-                episodes_list = TVMazeService.get_all_series_episodes(series_id) or []
+                episodes_list = TVMazeService.get_all_episodes(str(series_id)) or []
             except Exception as e:
                 print(f"Failed to fetch all episodes for bulk toggle in backend: {e}")
                 episodes_list = []
@@ -1999,20 +2062,53 @@ def bulk_toggle_all_seasons(
             ItemProgress.external_id == ext_id
         ).first()
         
-        if progress:
-            progress.is_completed = req.completed
-            progress.completed_at = datetime.now(timezone.utc) if req.completed else None
-        else:
-            progress = ItemProgress(
+        now_dt = datetime.now(timezone.utc)
+        if req.completed:
+            if progress:
+                progress.is_completed = True
+                progress.completed_at = now_dt
+            else:
+                progress = ItemProgress(
+                    user_id=current_user.id,
+                    item_type=ItemTypeEnum.SERIES,
+                    external_id=ext_id,
+                    list_item_id=item.id,
+                    is_completed=True,
+                    is_skipped=False,
+                    completed_at=now_dt
+                )
+                db.add(progress)
+
+            ch = ConsumptionHistory(
                 user_id=current_user.id,
-                item_type=ItemTypeEnum.SERIES,
+                item_type=item.item_type.value if hasattr(item.item_type, 'value') else item.item_type,
                 external_id=ext_id,
                 list_item_id=item.id,
-                is_completed=req.completed,
-                is_skipped=False,
-                completed_at=datetime.now(timezone.utc) if req.completed else None
+                consumed_at=now_dt
             )
-            db.add(progress)
+            db.add(ch)
+        else:
+            # Unwatch: remove latest consumption history entry
+            history = db.query(ConsumptionHistory).filter(
+                ConsumptionHistory.user_id == current_user.id,
+                ConsumptionHistory.external_id == ext_id
+            ).order_by(ConsumptionHistory.consumed_at.desc()).all()
+            
+            if history:
+                db.delete(history[0])
+                remaining = history[1:]
+                if remaining:
+                    if progress:
+                        progress.is_completed = True
+                        progress.completed_at = remaining[0].consumed_at
+                else:
+                    if progress:
+                        progress.is_completed = False
+                        progress.completed_at = None
+            else:
+                if progress:
+                    progress.is_completed = False
+                    progress.completed_at = None
             
     if lib_item:
         if req.completed:

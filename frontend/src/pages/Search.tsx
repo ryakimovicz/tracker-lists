@@ -639,28 +639,38 @@ export const Search: React.FC = () => {
             { value: 'game', label: language === 'es' ? 'Juegos' : 'Games' },
             { value: 'user', label: language === 'es' ? 'Usuarios' : 'Users' },
             { value: 'guide', label: language === 'es' ? 'Guías' : 'Guides' }
-          ].map(tab => (
-            <button
-              key={tab.value}
-              type="button"
-              onClick={() => setActiveTab(tab.value as any)}
-              style={{
-                padding: '0.5rem 1.2rem',
-                borderRadius: '20px',
-                border: '1px solid',
-                borderColor: activeTab === tab.value ? 'var(--accent-primary)' : 'var(--border-color)',
-                background: activeTab === tab.value ? 'var(--accent-primary)' : 'transparent',
-                color: activeTab === tab.value ? '#ffffff' : 'var(--text-secondary)',
-                cursor: 'pointer',
-                fontWeight: 500,
-                fontSize: '0.85rem',
-                whiteSpace: 'nowrap',
-                transition: 'all 0.2s ease'
-              }}
-            >
-              {tab.label}
-            </button>
-          ))}
+          ].map(tab => {
+            const isSelected = activeTab === tab.value;
+            const tabColor = tab.value === 'all' 
+              ? 'var(--accent-primary)' 
+              : tab.value === 'user' 
+              ? 'var(--color-user, #ec4899)' 
+              : tab.value === 'guide' 
+              ? 'var(--color-guide, #06b6d4)' 
+              : `var(--color-${tab.value})`;
+            const tabTextColor = tab.value === 'all' 
+              ? '#ffffff' 
+              : tab.value === 'user' || tab.value === 'guide' 
+              ? '#ffffff' 
+              : `var(--color-text-${tab.value})`;
+
+            return (
+              <button
+                key={tab.value}
+                type="button"
+                onClick={() => setActiveTab(tab.value as any)}
+                className={`profile-category-tab ${isSelected ? 'selected' : ''}`}
+                style={{
+                  padding: '0.35rem 0.85rem',
+                  fontSize: '0.85rem',
+                  '--tab-color': tabColor,
+                  '--tab-text': tabTextColor
+                } as React.CSSProperties}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
         </div>
       )}
 

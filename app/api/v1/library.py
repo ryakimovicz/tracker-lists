@@ -785,9 +785,14 @@ def update_library_item(
 @router.delete("/{library_item_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_from_library(
     library_item_id: int,
+    delete_history: Optional[bool] = Query(False),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    from app.models.consumption import ConsumptionHistory
+    from app.models.item_progress import ItemProgress
+    from app.models.review import MediaReview
+
     lib_item = db.query(UserLibraryItem).filter(
         UserLibraryItem.id == library_item_id,
         UserLibraryItem.user_id == current_user.id
@@ -811,9 +816,51 @@ def delete_from_library(
     )
     db.add(activity)
 
+    ext_id = lib_item.external_id
+    tracking_list_id = lib_item.tracking_list_id
+
+    # If delete_history is requested, completely wipe progress, consumption history, and reviews
+    if delete_history:
+        # Delete consumption history for this item
+        if ext_id:
+            db.query(ConsumptionHistory).filter(
+                ConsumptionHistory.user_id == current_user.id,
+                ConsumptionHistory.external_id == ext_id
+            ).delete()
+            # Also delete reviews if any
+            db.query(MediaReview).filter(
+                MediaReview.user_id == current_user.id,
+                MediaReview.external_id == ext_id
+            ).delete()
+            # Delete direct ItemProgress
+            db.query(ItemProgress).filter(
+                ItemProgress.user_id == current_user.id,
+                ItemProgress.external_id == ext_id
+            ).delete()
+
+        # If it was a series/anime with a private tracking list, wipe all episode progress & history
+        if tracking_list_id:
+            list_items = db.query(ListItem).filter(ListItem.list_id == tracking_list_id).all()
+            ep_ext_ids = [it.external_id for it in list_items if it.external_id]
+            ep_item_ids = [it.id for it in list_items]
+            if ep_ext_ids:
+                db.query(ItemProgress).filter(
+                    ItemProgress.user_id == current_user.id,
+                    ItemProgress.external_id.in_(ep_ext_ids)
+                ).delete(synchronize_session=False)
+                db.query(ConsumptionHistory).filter(
+                    ConsumptionHistory.user_id == current_user.id,
+                    ConsumptionHistory.external_id.in_(ep_ext_ids)
+                ).delete(synchronize_session=False)
+            if ep_item_ids:
+                db.query(ItemProgress).filter(
+                    ItemProgress.user_id == current_user.id,
+                    ItemProgress.list_item_id.in_(ep_item_ids)
+                ).delete(synchronize_session=False)
+
     # If there is an associated private tracking list, delete it too
-    if lib_item.tracking_list_id:
-        private_list = db.query(ReadingList).filter(ReadingList.id == lib_item.tracking_list_id).first()
+    if tracking_list_id:
+        private_list = db.query(ReadingList).filter(ReadingList.id == tracking_list_id).first()
         if private_list:
             db.delete(private_list)
             

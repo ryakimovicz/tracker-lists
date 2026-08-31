@@ -190,6 +190,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   const [showEpisodeMenu, setShowEpisodeMenu] = useState(false);
   const [openEpisodeMenuId, setOpenEpisodeMenuId] = useState<number | null>(null);
   const [openSeasonMenuId, setOpenSeasonMenuId] = useState<number | null>(null);
+  const [episodeActionItem, setEpisodeActionItem] = useState<{ ep: any, listId: number } | null>(null);
+  const [seasonActionItem, setSeasonActionItem] = useState<any | null>(null);
   const [showAllWatchedMenu, setShowAllWatchedMenu] = useState(false);
   const [showSingleWatchedMenu, setShowSingleWatchedMenu] = useState(false);
   const [consumptionHistory, setConsumptionHistory] = useState<string[]>([]);
@@ -575,7 +577,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     await handleMarkConsumedAgain(true);
   };
 
-  const isAnySubModalOpen = showReconsumedModal || showHundredPercentDecisionModal || showStatusChangeModal || showRemoveShelfModal || showReportMediaModal;
+  const isAnySubModalOpen = showReconsumedModal || showHundredPercentDecisionModal || showStatusChangeModal || showRemoveShelfModal || showReportMediaModal || !!episodeActionItem || !!seasonActionItem;
 
   const handleRemoveLatestConsumption = async () => {
     if (!selectedItem || !selectedItem.id) return;
@@ -602,12 +604,13 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     }
   };
 
-  const handleRemoveFromShelf = async () => {
+  const handleRemoveFromShelf = async (deleteHistory = false) => {
     if (!selectedItem || !selectedItem.id) return;
     setShowMenu(false);
     setShowShelfMenu(false);
     try {
-      await apiClient.delete(`/library/${selectedItem.id}`);
+      const url = deleteHistory ? `/library/${selectedItem.id}?delete_history=true` : `/library/${selectedItem.id}`;
+      await apiClient.delete(url);
       setSelectedItem(null);
       onClose();
       onUpdate && onUpdate();
@@ -1183,7 +1186,9 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     initModal(initialItem);
   }, [initialItem?.external_id, initialItem?.id, profileId]);
 
-  const isItemTracked = Boolean(selectedItem?.id && selectedItem?.status);
+  const isEpisode = !!(String(selectedItem?.external_id || '').startsWith('tvm-ep-') || selectedItem?.item_type === 'episode' || selectedItem?.list_id);
+  const isEpisodeCompleted = Boolean(isEpisode && (selectedItem?.completed_at || selectedItem?.is_completed || (selectedItem?.id && globalProgress[`tvm-ep-${selectedItem.rawEpisodeId || selectedItem.id}`])));
+  const isItemTracked = isEpisode ? isEpisodeCompleted : Boolean(selectedItem?.id && selectedItem?.status);
 
   const handleSaveRating = async (ratingVal: number) => {
     if (!selectedItem || !selectedItem.external_id || !isItemTracked) return;
@@ -1342,21 +1347,43 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     }
 
     if (isAllDone) {
-      try {
-        let targetId = selectedItem.id;
-        if (!targetId) {
-          const libRes = await apiClient.get('/library/');
-          const match = (libRes.data || []).find((x: any) => x.external_id === selectedItem.external_id || (effectiveListId && x.tracking_list_id === effectiveListId));
-          if (match) {
-            targetId = match.id;
+      if (selectedItem.status !== 'completed') {
+        try {
+          let targetId = selectedItem.id;
+          if (!targetId) {
+            const libRes = await apiClient.get('/library/');
+            const match = (libRes.data || []).find((x: any) => x.external_id === selectedItem.external_id || (effectiveListId && x.tracking_list_id === effectiveListId));
+            if (match) {
+              targetId = match.id;
+            }
           }
+          if (targetId) {
+            await apiClient.put(`/library/${targetId}`, { status: 'completed' });
+            setSelectedItem((prev: any) => ({ ...prev, status: 'completed', id: targetId }));
+          }
+        } catch (e) {
+          console.error("Failed to auto-complete", e);
         }
-        if (targetId) {
-          await apiClient.put(`/library/${targetId}`, { status: 'completed' });
-          setSelectedItem((prev: any) => ({ ...prev, status: 'completed', id: targetId }));
+      }
+    } else {
+      if (selectedItem.status === 'completed') {
+        try {
+          let targetId = selectedItem.id;
+          if (!targetId) {
+            const libRes = await apiClient.get('/library/');
+            const match = (libRes.data || []).find((x: any) => x.external_id === selectedItem.external_id || (effectiveListId && x.tracking_list_id === effectiveListId));
+            if (match) {
+              targetId = match.id;
+            }
+          }
+          if (targetId) {
+            const fallbackStatus = completedEpisodes > 0 ? 'watching' : 'plan_to_watch';
+            await apiClient.put(`/library/${targetId}`, { status: fallbackStatus });
+            setSelectedItem((prev: any) => ({ ...prev, status: fallbackStatus, id: targetId }));
+          }
+        } catch (e) {
+          console.error("Failed to revert completion status", e);
         }
-      } catch (e) {
-        console.error("Failed to auto-complete", e);
       }
     }
   };
@@ -1479,7 +1506,6 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     }
   };
 
-  const isEpisode = !!(String(selectedItem?.external_id || '').startsWith('tvm-ep-') || selectedItem?.item_type === 'episode' || selectedItem?.list_id);
   const isCosmeticDlc = false; // Allow full tracking (hours, 100%, statuses) for all games, mods, and expansions
   const ratings = (itemReviews || []).filter(r => r.rating !== null && r.rating !== 0).map(r => r.rating);
   const avgRating = ratings.length > 0 ? (ratings.reduce((a: number, b: number) => a + b, 0) / ratings.length).toFixed(1) : null;
@@ -1830,7 +1856,10 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                           }
                         }}
                         className="btn-secondary"
-                        title={language === 'es' ? 'Seguir / Añadir' : 'Follow / Add'}
+                        title={selectedItem?.id 
+                          ? (language === 'es' ? 'Quitar' : 'Remove')
+                          : (language === 'es' ? 'Agregar' : 'Add')
+                        }
                         style={{
                           padding: '0.4rem',
                           borderRadius: '50%',
@@ -1855,17 +1884,19 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         type="button"
                         onClick={async () => {
                           const isComplete = !!(selectedItem.completed_at || selectedItem.is_completed);
+                          const epData = {
+                            id: selectedItem.rawEpisodeId || (selectedItem.external_id ? parseInt(selectedItem.external_id.replace('tvm-ep-', '')) : selectedItem.id),
+                            title: selectedItem.title,
+                            image_url: selectedItem.image_url,
+                            custom_notes: selectedItem.custom_notes,
+                            season_number: selectedItem.season_number,
+                            episode_number: selectedItem.episode_number
+                          };
+                          const listId = selectedItem.list_id || selectedItem.tracking_list_id;
                           if (isComplete) {
-                            setShowEpisodeMenu(!showEpisodeMenu);
+                            setEpisodeActionItem({ ep: epData, listId });
                           } else {
-                            await handleToggleEpisode(selectedItem.list_id || selectedItem.tracking_list_id, {
-                              id: selectedItem.rawEpisodeId || (selectedItem.external_id ? parseInt(selectedItem.external_id.replace('tvm-ep-', '')) : selectedItem.id),
-                              title: selectedItem.title,
-                              image_url: selectedItem.image_url,
-                              custom_notes: selectedItem.custom_notes,
-                              season_number: selectedItem.season_number,
-                              episode_number: selectedItem.episode_number
-                            });
+                            await handleToggleEpisode(listId, epData);
                           }
                         }}
                       title={language === 'es' ? 'Marcar como visto' : 'Mark as seen'}
@@ -1888,87 +1919,6 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                     >
                       <Check size={18} strokeWidth={3} />
                     </button>
-
-                    {showEpisodeMenu && (selectedItem.completed_at || selectedItem.is_completed) && (
-                        <div
-                          className="glass-card"
-                          style={{
-                            position: 'absolute',
-                            top: '100%',
-                            right: 0,
-                            marginTop: '0.5rem',
-                            zIndex: 3000,
-                            padding: '0.5rem',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '0.4rem',
-                            minWidth: '220px',
-                            boxShadow: '0 10px 25px rgba(0,0,0,0.5)'
-                          }}
-                        >
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              setShowEpisodeMenu(false);
-                              await handleToggleEpisode(selectedItem.list_id || selectedItem.tracking_list_id, {
-                                id: selectedItem.rawEpisodeId || (selectedItem.external_id ? parseInt(selectedItem.external_id.replace('tvm-ep-', '')) : selectedItem.id),
-                                title: selectedItem.title,
-                                image_url: selectedItem.image_url,
-                                custom_notes: selectedItem.custom_notes,
-                                season_number: selectedItem.season_number,
-                                episode_number: selectedItem.episode_number
-                              }, 'mark_again');
-                            }}
-                            style={{
-                              background: 'transparent',
-                              border: 'none',
-                              color: 'var(--text-primary)',
-                              textAlign: 'left',
-                              padding: '0.4rem 0.6rem',
-                              cursor: 'pointer',
-                              fontSize: '0.85rem',
-                              borderRadius: '4px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '0.4rem'
-                            }}
-                          >
-                            <Repeat size={14} />
-                            {language === 'es' ? 'Volver a marcar como visto' : 'Mark as seen again'}
-                          </button>
-                          
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              setShowEpisodeMenu(false);
-                              await handleToggleEpisode(selectedItem.list_id || selectedItem.tracking_list_id, {
-                                id: selectedItem.rawEpisodeId || (selectedItem.external_id ? parseInt(selectedItem.external_id.replace('tvm-ep-', '')) : selectedItem.id),
-                                title: selectedItem.title,
-                                image_url: selectedItem.image_url,
-                                custom_notes: selectedItem.custom_notes,
-                                season_number: selectedItem.season_number,
-                                episode_number: selectedItem.episode_number
-                              }, 'remove');
-                            }}
-                            style={{
-                              background: 'transparent',
-                              border: 'none',
-                              color: '#ef4444',
-                              textAlign: 'left',
-                              padding: '0.4rem 0.6rem',
-                              cursor: 'pointer',
-                              fontSize: '0.85rem',
-                              borderRadius: '4px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '0.4rem'
-                            }}
-                          >
-                            <Trash2 size={14} />
-                            {language === 'es' ? 'Desmarcar / Quitar' : 'Unwatch / Remove'}
-                          </button>
-                        </div>
-                      )}
                     </div>
                   )}
 
@@ -2239,7 +2189,9 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                           disabled={!user || !isItemTracked}
                           onClick={() => handleSaveRating(star)}
                           title={!isItemTracked 
-                            ? (language === 'es' ? 'Añade este elemento a tu estantería para calificarlo' : 'Add this item to your shelf to rate it')
+                            ? (isEpisode 
+                                ? (language === 'es' ? 'Marca este episodio como visto para calificarlo' : 'Mark this episode as watched to rate it')
+                                : (language === 'es' ? 'Añade este elemento a tu estantería para calificarlo' : 'Add this item to your shelf to rate it'))
                             : `${star} ${star === 1 ? 'estrella' : 'estrellas'}`
                           }
                           style={{
@@ -2278,9 +2230,14 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                     </div>
                     {!isItemTracked && user && (
                       <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic', display: 'block', marginTop: '0.25rem' }}>
-                        {language === 'es' 
-                          ? 'Añade este elemento a tu estantería para poder puntuarlo con estrellas.'
-                          : 'Add this item to your shelf to rate it with stars.'}
+                        {isEpisode
+                          ? (language === 'es'
+                              ? 'Marca este episodio como visto para poder puntuarlo con estrellas.'
+                              : 'Mark this episode as watched to rate it with stars.')
+                          : (language === 'es' 
+                              ? 'Añade este elemento a tu estantería para poder puntuarlo con estrellas.'
+                              : 'Add this item to your shelf to rate it with stars.')
+                        }
                       </span>
                     )}
                   </div>
@@ -3154,7 +3111,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                   onClick={async (e) => {
                                     e.stopPropagation();
                                     if (isSeasonDone) {
-                                      setOpenSeasonMenuId(openSeasonMenuId === s.season_number ? null : s.season_number);
+                                      setSeasonActionItem(s);
                                       return;
                                     }
 
@@ -3226,135 +3183,6 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                 >
                                   <Check size={12} strokeWidth={3} />
                                 </span>
-
-                                {openSeasonMenuId === s.season_number && isSeasonDone && (
-                                  <div
-                                    className="glass-card"
-                                    onClick={(e) => e.stopPropagation()}
-                                    style={{
-                                      position: 'absolute',
-                                      top: '100%',
-                                      left: 0,
-                                      marginTop: '0.5rem',
-                                      zIndex: 3000,
-                                      padding: '0.5rem',
-                                      display: 'flex',
-                                      flexDirection: 'column',
-                                      gap: '0.4rem',
-                                      minWidth: '260px',
-                                      boxShadow: '0 10px 25px rgba(0,0,0,0.5)'
-                                    }}
-                                  >
-                                    <button
-                                      type="button"
-                                      onClick={async () => {
-                                        setOpenSeasonMenuId(null);
-                                        let effectiveListId = selectedItem.tracking_list_id;
-                                        if (!effectiveListId) {
-                                          const tracked = await ensureTracked('watching');
-                                          if (!tracked) return;
-                                          effectiveListId = tracked.tracking_list_id || tracked;
-                                        }
-
-                                        let seriesEps = seasonEpisodes[s.season_number];
-                                        if (!seriesEps || seriesEps.length === 0) {
-                                          const cacheKeyAll = `${selectedItem.external_id}_all_episodes`;
-                                          const cachedAll = getCachedSeries(cacheKeyAll);
-                                          if (cachedAll && Array.isArray(cachedAll)) {
-                                            seriesEps = cachedAll.filter((ep: any) => ep.season_number === s.season_number);
-                                          }
-                                        }
-
-                                        try {
-                                          await apiClient.post(`/lists/${effectiveListId}/bulk-toggle-season`, {
-                                            season_number: s.season_number,
-                                            episodes: seriesEps || null,
-                                            completed: true
-                                          });
-                                          const listRes = await apiClient.get(`/lists/${effectiveListId}`);
-                                          const updatedList = listRes.data.items || [];
-                                          setEpisodes(updatedList);
-                                          await checkCompletionStatus(effectiveListId, updatedList);
-                                          onUpdate && onUpdate();
-                                        } catch (err) {
-                                          console.error("Mark season again failed", err);
-                                        }
-                                      }}
-                                      style={{
-                                        background: 'transparent',
-                                        border: 'none',
-                                        color: 'var(--text-primary)',
-                                        textAlign: 'left',
-                                        padding: '0.4rem 0.6rem',
-                                        cursor: 'pointer',
-                                        fontSize: '0.85rem',
-                                        borderRadius: '4px',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '0.4rem'
-                                      }}
-                                    >
-                                      <Repeat size={14} />
-                                      {language === 'es' ? 'Volver a marcar toda la temporada' : 'Mark entire season as watched again'}
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={async () => {
-                                        setOpenSeasonMenuId(null);
-                                        let effectiveListId = selectedItem.tracking_list_id;
-                                        if (!effectiveListId) return;
-
-                                        let seriesEps = seasonEpisodes[s.season_number];
-                                        if (!seriesEps || seriesEps.length === 0) {
-                                          const cacheKeyAll = `${selectedItem.external_id}_all_episodes`;
-                                          const cachedAll = getCachedSeries(cacheKeyAll);
-                                          if (cachedAll && Array.isArray(cachedAll)) {
-                                            seriesEps = cachedAll.filter((ep: any) => ep.season_number === s.season_number);
-                                          }
-                                        }
-
-                                        if (seriesEps && seriesEps.length > 0) {
-                                          const newProg: Record<string, boolean> = {};
-                                          seriesEps.forEach((ep: any) => {
-                                            newProg[`tvm-ep-${ep.id}`] = false;
-                                          });
-                                          setGlobalProgress(prev => ({ ...prev, ...newProg }));
-                                        }
-
-                                        try {
-                                          await apiClient.post(`/lists/${effectiveListId}/bulk-toggle-season`, {
-                                            season_number: s.season_number,
-                                            episodes: seriesEps || null,
-                                            completed: false
-                                          });
-                                          const listRes = await apiClient.get(`/lists/${effectiveListId}`);
-                                          const updatedList = listRes.data.items || [];
-                                          setEpisodes(updatedList);
-                                          await checkCompletionStatus(effectiveListId, updatedList);
-                                          onUpdate && onUpdate();
-                                        } catch (err) {
-                                          console.error("Remove season failed", err);
-                                        }
-                                      }}
-                                      style={{
-                                        background: 'transparent',
-                                        border: 'none',
-                                        color: '#ef4444',
-                                        textAlign: 'left',
-                                        padding: '0.4rem 0.6rem',
-                                        cursor: 'pointer',
-                                        fontSize: '0.85rem',
-                                        borderRadius: '4px',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '0.4rem'
-                                      }}
-                                    >
-                                      <Trash2 size={14} />
-                                      {language === 'es' ? 'Desmarcar / Quitar' : 'Unwatch / Remove'}
-                                    </button>
-                                  </div>
-                                )}
                               </span>
                               {language === 'es' ? `Temporada ${s.season_number}` : `Season ${s.season_number}`}
                               <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginLeft: '0.5rem', fontWeight: 400 }}>
@@ -3400,7 +3228,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                             onClick={() => {
                                               const currentIsCompleted = !!globalProgress[`tvm-ep-${ep.id}`] || !!dbEp?.is_completed;
                                               if (currentIsCompleted) {
-                                                setOpenEpisodeMenuId(openEpisodeMenuId === ep.id ? null : ep.id);
+                                                setEpisodeActionItem({ ep, listId: selectedItem.tracking_list_id });
                                               } else {
                                                 setGlobalProgress(prev => ({ ...prev, [`tvm-ep-${ep.id}`]: true }));
                                                 handleToggleEpisode(selectedItem.tracking_list_id, ep);
@@ -3424,74 +3252,6 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                           >
                                             <Check size={12} strokeWidth={3} />
                                           </button>
-
-                                          {openEpisodeMenuId === ep.id && isCompleted && (
-                                            <div
-                                              className="glass-card"
-                                              style={{
-                                                position: 'absolute',
-                                                top: '100%',
-                                                left: 0,
-                                                marginTop: '0.5rem',
-                                                zIndex: 3000,
-                                                padding: '0.5rem',
-                                                display: 'flex',
-                                                flexDirection: 'column',
-                                                gap: '0.4rem',
-                                                minWidth: '220px',
-                                                boxShadow: '0 10px 25px rgba(0,0,0,0.5)'
-                                              }}
-                                            >
-                                              <button
-                                                type="button"
-                                                onClick={async () => {
-                                                  setOpenEpisodeMenuId(null);
-                                                  await handleToggleEpisode(selectedItem.tracking_list_id, ep, 'mark_again');
-                                                }}
-                                                style={{
-                                                  background: 'transparent',
-                                                  border: 'none',
-                                                  color: 'var(--text-primary)',
-                                                  textAlign: 'left',
-                                                  padding: '0.4rem 0.6rem',
-                                                  cursor: 'pointer',
-                                                  fontSize: '0.85rem',
-                                                  borderRadius: '4px',
-                                                  display: 'flex',
-                                                  alignItems: 'center',
-                                                  gap: '0.4rem'
-                                                }}
-                                              >
-                                                <Repeat size={14} />
-                                                {language === 'es' ? 'Volver a marcar como visto' : 'Mark as seen again'}
-                                              </button>
-                                              
-                                              <button
-                                                type="button"
-                                                onClick={async () => {
-                                                  setOpenEpisodeMenuId(null);
-                                                  setGlobalProgress(prev => ({ ...prev, [`tvm-ep-${ep.id}`]: false }));
-                                                  await handleToggleEpisode(selectedItem.tracking_list_id, ep, 'remove');
-                                                }}
-                                                style={{
-                                                  background: 'transparent',
-                                                  border: 'none',
-                                                  color: '#ef4444',
-                                                  textAlign: 'left',
-                                                  padding: '0.4rem 0.6rem',
-                                                  cursor: 'pointer',
-                                                  fontSize: '0.85rem',
-                                                  borderRadius: '4px',
-                                                  display: 'flex',
-                                                  alignItems: 'center',
-                                                  gap: '0.4rem'
-                                                }}
-                                              >
-                                                <Trash2 size={14} />
-                                                {language === 'es' ? 'Desmarcar / Quitar' : 'Unwatch / Remove'}
-                                              </button>
-                                            </div>
-                                          )}
                                         </div>
                                         <span style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-primary)' }}>
                                           {ep.episode_number}. {ep.name || 'Untitled'}
@@ -3964,6 +3724,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                 )}
               </div>
 
+          </div>
               {/* Floating Modal 1: Re-consumption Options Dialog */}
               {showReconsumedModal && (
                 <div
@@ -4437,8 +4198,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
                     <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
                       {language === 'es'
-                        ? 'La obra se removerá de tu biblioteca actual, pero tu historial de visualizaciones y estadísticas se mantendrán a salvo.'
-                        : 'The item will be removed from your active shelf, but your completion history and stats will remain safe.'
+                        ? 'Elige cómo deseas remover esta obra de tu biblioteca:'
+                        : 'Choose how you would like to remove this item from your library:'
                       }
                     </p>
 
@@ -4447,44 +4208,85 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         type="button"
                         onClick={() => {
                           setShowRemoveShelfModal(false);
-                          handleRemoveFromShelf();
+                          handleRemoveFromShelf(false);
                         }}
                         style={{
                           display: 'flex',
                           alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '0.5rem',
+                          gap: '0.65rem',
                           padding: '0.75rem 1rem',
-                          borderRadius: '8px',
-                          background: '#ef4444',
-                          border: 'none',
-                          color: '#ffffff',
-                          fontWeight: 600,
-                          fontSize: '0.9rem',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        <Trash2 size={16} />
-                        <span>{language === 'es' ? 'Quitar de estantería' : 'Remove from shelf'}</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setShowRemoveShelfModal(false)}
-                        style={{
-                          padding: '0.65rem 1rem',
                           borderRadius: '8px',
                           background: 'var(--bg-tertiary)',
                           border: '1px solid var(--border-color)',
                           color: 'var(--text-primary)',
                           fontWeight: 600,
                           fontSize: '0.88rem',
-                          cursor: 'pointer'
+                          cursor: 'pointer',
+                          textAlign: 'left'
                         }}
                       >
-                        {language === 'es' ? 'Cancelar' : 'Cancel'}
+                        <Trash2 size={16} style={{ flexShrink: 0, color: 'var(--text-secondary)' }} />
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                          <span>{language === 'es' ? 'Quitar conservando historial' : 'Remove keeping history'}</span>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 400 }}>
+                            {language === 'es'
+                              ? 'Se quita de tu biblioteca pero se mantienen tus visualizaciones y estadísticas'
+                              : 'Removes from shelf but preserves your completions and statistics'
+                            }
+                          </span>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowRemoveShelfModal(false);
+                          handleRemoveFromShelf(true);
+                        }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.65rem',
+                          padding: '0.75rem 1rem',
+                          borderRadius: '8px',
+                          background: 'rgba(239, 68, 68, 0.08)',
+                          border: '1px solid rgba(239, 68, 68, 0.25)',
+                          color: '#ef4444',
+                          fontWeight: 600,
+                          fontSize: '0.88rem',
+                          cursor: 'pointer',
+                          textAlign: 'left'
+                        }}
+                      >
+                        <Trash2 size={16} style={{ flexShrink: 0 }} />
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                          <span>{language === 'es' ? 'Quitar eliminando todo' : 'Remove deleting everything'}</span>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 400 }}>
+                            {language === 'es'
+                              ? 'Borra todo el progreso, historial de visualizaciones y calificaciones'
+                              : 'Wipes all progress, completion history, and reviews'
+                            }
+                          </span>
+                        </div>
                       </button>
                     </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowRemoveShelfModal(false)}
+                      style={{
+                        padding: '0.55rem',
+                        borderRadius: '6px',
+                        background: 'transparent',
+                        border: 'none',
+                        color: 'var(--text-secondary)',
+                        fontSize: '0.85rem',
+                        cursor: 'pointer',
+                        fontWeight: 500
+                      }}
+                    >
+                      {language === 'es' ? 'Cancelar' : 'Cancel'}
+                    </button>
                   </div>
                 </div>
               )}
@@ -4630,7 +4432,320 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                   </div>
                 </div>
               )}
+
+              {/* Floating Modal 5: Episode Options Dialog */}
+              {episodeActionItem && (
+                <div
+                  style={{
+                    position: 'fixed',
+                    inset: 0,
+                    zIndex: 9999,
+                    background: 'rgba(0, 0, 0, 0.65)',
+                    backdropFilter: 'blur(4px)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '1rem'
+                  }}
+                  onClick={() => setEpisodeActionItem(null)}
+                >
+                  <div
+                    className="glass-card"
+                    style={{
+                      width: '100%',
+                      maxWidth: '380px',
+                      background: 'var(--bg-secondary)',
+                      borderRadius: '12px',
+                      padding: '1.25rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '1rem',
+                      boxShadow: '0 12px 30px rgba(0,0,0,0.4)',
+                      border: '1px solid var(--border-color)'
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                        {language === 'es' ? 'Opciones del episodio' : 'Episode options'}
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={() => setEpisodeActionItem(null)}
+                        style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '0.2rem' }}
+                      >
+                        <X size={18} />
+                      </button>
+                    </div>
+
+                    <div style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+                      <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+                        {episodeActionItem.ep.name || episodeActionItem.ep.title || (language === 'es' ? `Episodio ${episodeActionItem.ep.episode_number}` : `Episode ${episodeActionItem.ep.episode_number}`)}
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const item = episodeActionItem;
+                          setEpisodeActionItem(null);
+                          await handleToggleEpisode(item.listId, item.ep, 'mark_again');
+                        }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.65rem',
+                          padding: '0.75rem 1rem',
+                          borderRadius: '8px',
+                          background: 'var(--bg-tertiary)',
+                          border: '1px solid var(--border-color)',
+                          color: 'var(--text-primary)',
+                          fontWeight: 600,
+                          fontSize: '0.9rem',
+                          cursor: 'pointer',
+                          textAlign: 'left'
+                        }}
+                      >
+                        <RotateCcw size={16} style={{ flexShrink: 0, color: 'var(--accent-primary)' }} />
+                        <span>{language === 'es' ? 'Volver a marcar como visto' : 'Mark as seen again'}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const item = episodeActionItem;
+                          setEpisodeActionItem(null);
+                          setGlobalProgress(prev => ({ ...prev, [`tvm-ep-${item.ep.id}`]: false }));
+                          await handleToggleEpisode(item.listId, item.ep, 'remove');
+                        }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.65rem',
+                          padding: '0.75rem 1rem',
+                          borderRadius: '8px',
+                          background: 'rgba(239, 68, 68, 0.08)',
+                          border: '1px solid rgba(239, 68, 68, 0.25)',
+                          color: '#ef4444',
+                          fontWeight: 600,
+                          fontSize: '0.9rem',
+                          cursor: 'pointer',
+                          textAlign: 'left'
+                        }}
+                      >
+                        <Trash2 size={16} style={{ flexShrink: 0 }} />
+                        <span>{language === 'es' ? 'Desmarcar / Quitar' : 'Unwatch / Remove'}</span>
+                      </button>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setEpisodeActionItem(null)}
+                      style={{
+                        padding: '0.55rem',
+                        borderRadius: '6px',
+                        background: 'transparent',
+                        border: 'none',
+                        color: 'var(--text-secondary)',
+                        fontSize: '0.85rem',
+                        cursor: 'pointer',
+                        fontWeight: 500
+                      }}
+                    >
+                      {language === 'es' ? 'Cancelar' : 'Cancel'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Floating Modal 6: Season Options Dialog */}
+              {seasonActionItem && (
+                <div
+                  style={{
+                    position: 'fixed',
+                    inset: 0,
+                    zIndex: 9999,
+                    background: 'rgba(0, 0, 0, 0.65)',
+                    backdropFilter: 'blur(4px)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '1rem'
+                  }}
+                  onClick={() => setSeasonActionItem(null)}
+                >
+                  <div
+                    className="glass-card"
+                    style={{
+                      width: '100%',
+                      maxWidth: '380px',
+                      background: 'var(--bg-secondary)',
+                      borderRadius: '12px',
+                      padding: '1.25rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '1rem',
+                      boxShadow: '0 12px 30px rgba(0,0,0,0.4)',
+                      border: '1px solid var(--border-color)'
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                        {language === 'es' ? `Temporada ${seasonActionItem.season_number}` : `Season ${seasonActionItem.season_number}`}
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={() => setSeasonActionItem(null)}
+                        style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '0.2rem' }}
+                      >
+                        <X size={18} />
+                      </button>
+                    </div>
+
+                    <div style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+                      {language === 'es'
+                        ? `Opciones para toda la temporada ${seasonActionItem.season_number} (${seasonActionItem.episode_count || 0} capítulos)`
+                        : `Options for Season ${seasonActionItem.season_number} (${seasonActionItem.episode_count || 0} episodes)`
+                      }
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const s = seasonActionItem;
+                          setSeasonActionItem(null);
+                          let effectiveListId = selectedItem.tracking_list_id;
+                          if (!effectiveListId) {
+                            const tracked = await ensureTracked('watching');
+                            if (!tracked) return;
+                            effectiveListId = tracked.tracking_list_id || tracked;
+                          }
+
+                          let seriesEps = seasonEpisodes[s.season_number];
+                          if (!seriesEps || seriesEps.length === 0) {
+                            const cacheKeyAll = `${selectedItem.external_id}_all_episodes`;
+                            const cachedAll = getCachedSeries(cacheKeyAll);
+                            if (cachedAll && Array.isArray(cachedAll)) {
+                              seriesEps = cachedAll.filter((ep: any) => ep.season_number === s.season_number);
+                            }
+                          }
+
+                          try {
+                            await apiClient.post(`/lists/${effectiveListId}/bulk-toggle-season`, {
+                              season_number: s.season_number,
+                              episodes: seriesEps || null,
+                              completed: true
+                            });
+                            const listRes = await apiClient.get(`/lists/${effectiveListId}`);
+                            const updatedList = listRes.data.items || [];
+                            setEpisodes(updatedList);
+                            await checkCompletionStatus(effectiveListId, updatedList);
+                            onUpdate && onUpdate();
+                          } catch (err) {
+                            console.error("Mark season again failed", err);
+                          }
+                        }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.65rem',
+                          padding: '0.75rem 1rem',
+                          borderRadius: '8px',
+                          background: 'var(--bg-tertiary)',
+                          border: '1px solid var(--border-color)',
+                          color: 'var(--text-primary)',
+                          fontWeight: 600,
+                          fontSize: '0.9rem',
+                          cursor: 'pointer',
+                          textAlign: 'left'
+                        }}
+                      >
+                        <RotateCcw size={16} style={{ flexShrink: 0, color: 'var(--accent-primary)' }} />
+                        <span>{language === 'es' ? 'Volver a marcar toda la temporada' : 'Mark entire season as watched again'}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const s = seasonActionItem;
+                          setSeasonActionItem(null);
+                          let effectiveListId = selectedItem.tracking_list_id;
+                          if (!effectiveListId) return;
+
+                          let seriesEps = seasonEpisodes[s.season_number];
+                          if (!seriesEps || seriesEps.length === 0) {
+                            const cacheKeyAll = `${selectedItem.external_id}_all_episodes`;
+                            const cachedAll = getCachedSeries(cacheKeyAll);
+                            if (cachedAll && Array.isArray(cachedAll)) {
+                              seriesEps = cachedAll.filter((ep: any) => ep.season_number === s.season_number);
+                            }
+                          }
+
+                          if (seriesEps && seriesEps.length > 0) {
+                            const newProg: Record<string, boolean> = {};
+                            seriesEps.forEach((ep: any) => {
+                              newProg[`tvm-ep-${ep.id}`] = false;
+                            });
+                            setGlobalProgress(prev => ({ ...prev, ...newProg }));
+                          }
+
+                          try {
+                            await apiClient.post(`/lists/${effectiveListId}/bulk-toggle-season`, {
+                              season_number: s.season_number,
+                              episodes: seriesEps || null,
+                              completed: false
+                            });
+                            const listRes = await apiClient.get(`/lists/${effectiveListId}`);
+                            const updatedList = listRes.data.items || [];
+                            setEpisodes(updatedList);
+                            await checkCompletionStatus(effectiveListId, updatedList);
+                            onUpdate && onUpdate();
+                          } catch (err) {
+                            console.error("Remove season failed", err);
+                          }
+                        }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.65rem',
+                          padding: '0.75rem 1rem',
+                          borderRadius: '8px',
+                          background: 'rgba(239, 68, 68, 0.08)',
+                          border: '1px solid rgba(239, 68, 68, 0.25)',
+                          color: '#ef4444',
+                          fontWeight: 600,
+                          fontSize: '0.9rem',
+                          cursor: 'pointer',
+                          textAlign: 'left'
+                        }}
+                      >
+                        <Trash2 size={16} style={{ flexShrink: 0 }} />
+                        <span>{language === 'es' ? 'Desmarcar / Quitar' : 'Unwatch / Remove'}</span>
+                      </button>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setSeasonActionItem(null)}
+                      style={{
+                        padding: '0.55rem',
+                        borderRadius: '6px',
+                        background: 'transparent',
+                        border: 'none',
+                        color: 'var(--text-secondary)',
+                        fontSize: '0.85rem',
+                        cursor: 'pointer',
+                        fontWeight: 500
+                      }}
+                    >
+                      {language === 'es' ? 'Cancelar' : 'Cancel'}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
-          </div>
         );
 };
