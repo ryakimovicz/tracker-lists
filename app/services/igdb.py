@@ -260,9 +260,9 @@ class IGDBService:
             remasters.id, remasters.name, remasters.cover.image_id, remasters.first_release_date;
             where id = {gid};'''
 
-        # Query 2: Children/Members if this game is a bundle or has edition variants
-        body_children = f'''fields id, name, category, cover.image_id, first_release_date, bundles, version_parent;
-            where bundles = ({gid}) | version_parent = ({gid}); limit 50;'''
+        # Query 2: Children/Members if this game is a parent, bundle, or has edition variants
+        body_children = f'''fields id, name, category, game_type, cover.image_id, first_release_date, bundles, version_parent, parent_game;
+            where bundles = ({gid}) | version_parent = ({gid}) | parent_game = ({gid}); limit 50;'''
 
         relations = {
             "collections": [],
@@ -320,25 +320,25 @@ class IGDBService:
                     item = format_item(child)
                     if not item or item["id"] == str(gid):
                         continue
-                    cat = child.get("category", 0)
+                    cat = child.get("game_type") if child.get("game_type") is not None else child.get("category", 0)
                     bundles_list = child.get("bundles", []) or []
                     
+                    # If this is a DLC, expansion, or mod whose parent_game is THIS game:
+                    if child.get("parent_game") == gid or (isinstance(child.get("parent_game"), dict) and child.get("parent_game", {}).get("id") == gid) or cat in (1, 2, 4, 6, 13, 14):
+                        if not any(d["id"] == item["id"] for d in relations["dlcs"]):
+                            relations["dlcs"].append(item)
                     # If this item explicitly declares that it belongs to THIS bundle/collection:
-                    if gid in bundles_list or str(gid) in [str(x) for x in bundles_list]:
+                    elif gid in bundles_list or str(gid) in [str(x) for x in bundles_list]:
                         if not any(b["id"] == item["id"] for b in relations["bundle_games"]):
                             relations["bundle_games"].append(item)
                     # If this is an alternative edition / version of the current game
-                    elif child.get("version_parent") == gid or cat in (8, 9, 10):
+                    elif child.get("version_parent") == gid or (isinstance(child.get("version_parent"), dict) and child.get("version_parent", {}).get("id") == gid) or cat in (8, 9, 10):
                         if not any(e["id"] == item["id"] for e in relations["editions"]):
                             relations["editions"].append(item)
-                    # If this is a DLC or expansion
-                    elif cat in (1, 2, 4, 5, 6, 13, 14):
+                    # Otherwise fallback to dlcs if it's a child or bundle games
+                    else:
                         if not any(d["id"] == item["id"] for d in relations["dlcs"]):
                             relations["dlcs"].append(item)
-                    # Otherwise fallback to bundle games
-                    else:
-                        if not any(b["id"] == item["id"] for b in relations["bundle_games"]):
-                            relations["bundle_games"].append(item)
 
         except Exception as e:
             print(f"IGDB Relations Error: {e}")
