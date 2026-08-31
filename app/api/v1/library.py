@@ -299,11 +299,13 @@ def remove_latest_consumption(
         remaining = history[1:]
         
         if remaining:
-            # Still has prior consumptions! Keep status completed/read and update completed_at to the previous one
+            # Still has prior consumptions! Keep status completed/read and update completed_at and is_hundred_percent to the previous one
             item.completed_at = remaining[0].consumed_at
+            item.is_hundred_percent = bool(remaining[0].is_hundred_percent)
         else:
             # No more consumptions left -> uncomplete
             item.completed_at = None
+            item.is_hundred_percent = False
             if item.item_type in ['book', 'comic', 'manga']:
                 item.status = UserLibraryStatusEnum.PLAN_TO_READ
             elif item.item_type == 'game':
@@ -313,6 +315,7 @@ def remove_latest_consumption(
     else:
         # No history entries -> uncomplete
         item.completed_at = None
+        item.is_hundred_percent = False
         if item.item_type in ['book', 'comic', 'manga']:
             item.status = UserLibraryStatusEnum.PLAN_TO_READ
         elif item.item_type == 'game':
@@ -353,6 +356,18 @@ def mark_library_item_consumed(
             detail="Los usuarios gratuitos solo pueden registrar hasta 2 visualizaciones/lecturas. ¡Pásate a Premium para registros ilimitados e historial detallado!"
         )
         
+    # If item was already completed earlier and has completed_at, but no history record exists, backfill it first
+    if existing_count == 0 and item.completed_at:
+        ch_prev = ConsumptionHistory(
+            user_id=current_user.id,
+            item_type=item.item_type.value if hasattr(item.item_type, 'value') else item.item_type,
+            external_id=item.external_id,
+            consumed_at=item.completed_at,
+            is_hundred_percent=bool(item.is_hundred_percent)
+        )
+        db.add(ch_prev)
+        db.commit()
+
     # Mark as completed (or read/played) and update date
     if item.item_type in ['book', 'comic', 'manga']:
         item.status = UserLibraryStatusEnum.READ
@@ -671,7 +686,7 @@ def update_library_item(
 
     if item_in.is_hundred_percent is not None:
         lib_item.is_hundred_percent = item_in.is_hundred_percent
-        # If toggled on/off, update the latest consumption history record if exists
+        # If toggled on/off, update the latest consumption history record if exists, or backfill if completed
         from app.models.consumption import ConsumptionHistory
         latest_ch = db.query(ConsumptionHistory).filter(
             ConsumptionHistory.user_id == current_user.id,
@@ -679,6 +694,15 @@ def update_library_item(
         ).order_by(ConsumptionHistory.consumed_at.desc()).first()
         if latest_ch:
             latest_ch.is_hundred_percent = bool(item_in.is_hundred_percent)
+        elif lib_item.completed_at:
+            ch_init = ConsumptionHistory(
+                user_id=current_user.id,
+                item_type=lib_item.item_type.value if hasattr(lib_item.item_type, 'value') else lib_item.item_type,
+                external_id=lib_item.external_id,
+                consumed_at=lib_item.completed_at,
+                is_hundred_percent=bool(item_in.is_hundred_percent)
+            )
+            db.add(ch_init)
         
     if item_in.is_favorite is not None:
         if item_in.is_favorite and not lib_item.is_favorite:

@@ -575,6 +575,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     await handleMarkConsumedAgain(true);
   };
 
+  const isAnySubModalOpen = showReconsumedModal || showHundredPercentDecisionModal || showStatusChangeModal || showRemoveShelfModal || showReportMediaModal;
+
   const handleRemoveLatestConsumption = async () => {
     if (!selectedItem || !selectedItem.id) return;
     setShowSingleWatchedMenu(false);
@@ -583,12 +585,13 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       const res = await apiClient.delete(`/library/${selectedItem.id}/consumption-history/latest`);
       setSelectedItem((prev: any) => prev ? { ...prev, ...res.data } : null);
       
-      // Refresh history list
+      // Refresh history and entries
       if (user?.is_pro) {
         apiClient.get(`/library/${selectedItem.id}/consumption-history`)
           .then(hRes => {
-            if (hRes.data && hRes.data.history) {
-              setConsumptionHistory(hRes.data.history);
+            if (hRes.data) {
+              if (hRes.data.history) setConsumptionHistory(hRes.data.history);
+              if (hRes.data.entries) setConsumptionEntries(hRes.data.entries);
             }
           })
           .catch(console.error);
@@ -1640,7 +1643,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '1.5rem',
-                overflowY: 'auto',
+                overflowY: isAnySubModalOpen ? 'hidden' : 'auto',
                 textAlign: 'left',
                 ...modalTheme.modalStyles,
                 ...modalTheme.cssVariables
