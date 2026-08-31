@@ -2813,53 +2813,67 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                             {language === 'es' ? 'Abandonado' : 'Dropped'}
                           </button>
                         </div>
-                      ) : (selectedItem?.item_type === 'series' || selectedItem?.item_type === 'anime') ? (
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem' }}>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (selectedItem?.status === 'completed') {
-                                setShowReconsumedModal(true);
-                              } else {
-                                handleToggleAllEpisodes();
-                              }
-                            }}
-                            style={{
-                              width: '100%',
-                              background: selectedItem?.status === 'completed' ? `var(--color-${selectedItem.item_type || 'series'})` : 'var(--bg-tertiary)',
-                              border: selectedItem?.status === 'completed' ? 'none' : '1px solid var(--border-color)',
-                              borderRadius: '8px',
-                              padding: '0.5rem',
-                              textAlign: 'center',
-                              cursor: 'pointer',
-                              color: selectedItem?.status === 'completed' ? '#ffffff' : 'var(--text-primary)',
-                              fontSize: '0.85rem',
-                              fontWeight: 600,
-                              transition: 'all 0.2s ease'
-                            }}
-                          >
-                            {language === 'es' ? 'Todo visto' : 'All watched'}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleToggleStatus('dropped')}
-                            style={{
-                              background: selectedItem?.status === 'dropped' ? '#ef4444' : 'var(--bg-tertiary)',
-                              border: selectedItem?.status === 'dropped' ? 'none' : '1px solid var(--border-color)',
-                              borderRadius: '8px',
-                              padding: '0.5rem',
-                              textAlign: 'center',
-                              cursor: 'pointer',
-                              color: selectedItem?.status === 'dropped' ? '#ffffff' : 'var(--text-primary)',
-                              fontSize: '0.85rem',
-                              fontWeight: 600,
-                              transition: 'all 0.2s ease'
-                            }}
-                          >
-                            {language === 'es' ? 'Abandonado' : 'Dropped'}
-                          </button>
-                        </div>
-                      ) : ['movie', 'book', 'comic', 'manga'].includes(selectedItem?.item_type) ? (
+                      ) : (selectedItem?.item_type === 'series' || selectedItem?.item_type === 'anime') ? (() => {
+                        const isAllWatched = (() => {
+                          if (selectedItem?.status === 'completed') return true;
+                          if (seasons.length === 0) return false;
+                          return seasons.every((s: any) => {
+                            const listSeps = (episodes || []).filter(x => x.section === `Season ${s.season_number}`);
+                            const seriesEps = seasonEpisodes[s.season_number] || [];
+                            if (!Array.isArray(seriesEps)) return false;
+                            if (seriesEps.length === 0) return listSeps.length > 0 && listSeps.every(x => x.is_completed);
+                            return seriesEps.every((te: any) => globalProgress[`tvm-ep-${te.id}`] || (episodes || []).some(x => x.external_id === `tvm-ep-${te.id}` && x.is_completed));
+                          });
+                        })();
+
+                        return (
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem' }}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (isAllWatched) {
+                                  setShowReconsumedModal(true);
+                                } else {
+                                  handleToggleAllEpisodes();
+                                }
+                              }}
+                              style={{
+                                width: '100%',
+                                background: isAllWatched ? `var(--color-${selectedItem.item_type || 'series'})` : 'var(--bg-tertiary)',
+                                border: isAllWatched ? 'none' : '1px solid var(--border-color)',
+                                borderRadius: '8px',
+                                padding: '0.5rem',
+                                textAlign: 'center',
+                                cursor: 'pointer',
+                                color: isAllWatched ? '#ffffff' : 'var(--text-primary)',
+                                fontSize: '0.85rem',
+                                fontWeight: 600,
+                                transition: 'all 0.2s ease'
+                              }}
+                            >
+                              {language === 'es' ? 'Todo visto' : 'All watched'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleToggleStatus('dropped')}
+                              style={{
+                                background: selectedItem?.status === 'dropped' ? '#ef4444' : 'var(--bg-tertiary)',
+                                border: selectedItem?.status === 'dropped' ? 'none' : '1px solid var(--border-color)',
+                                borderRadius: '8px',
+                                padding: '0.5rem',
+                                textAlign: 'center',
+                                cursor: 'pointer',
+                                color: selectedItem?.status === 'dropped' ? '#ffffff' : 'var(--text-primary)',
+                                fontSize: '0.85rem',
+                                fontWeight: 600,
+                                transition: 'all 0.2s ease'
+                              }}
+                            >
+                              {language === 'es' ? 'Abandonado' : 'Dropped'}
+                            </button>
+                          </div>
+                        );
+                      })() : ['movie', 'book', 'comic', 'manga'].includes(selectedItem?.item_type) ? (
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
                           <button
                             type="button"
