@@ -208,6 +208,7 @@ export const Profile: React.FC = () => {
 
   // Overlay modal states for shelf items details
   const [selectedItem, setSelectedItem] = useState<any | null>(null);
+  const [seriesEndedMap, setSeriesEndedMap] = useState<Record<string, boolean>>({});
                         
   // Favorites state (local highlight mock for UX polish)
   const [favorites, setFavorites] = useState<LibraryItem[]>([]);
@@ -348,10 +349,54 @@ export const Profile: React.FC = () => {
       const targetId = profileRes.data.id;
       const targetLibraryUrl = (targetUserIdentifier && targetId !== meRes.data.id) ? `/library/?user_id=${targetId}` : '/library/';
       const libraryRes = await apiClient.get(targetLibraryUrl);
-      setLibraryItems(libraryRes.data);
+      const rawLibItems: LibraryItem[] = libraryRes.data || [];
+      setLibraryItems(rawLibItems);
+
+      // Preload / check 'Ended' status for completed series & anime
+      const endedMap: Record<string, boolean> = {};
+      const completedSeries = rawLibItems.filter(i => (i.item_type === 'series' || i.item_type === 'anime') && i.status === 'completed' && i.external_id);
+      
+      const missingSeriesIds: string[] = [];
+      completedSeries.forEach(s => {
+        const cacheKey = `series_${s.external_id}`;
+        const cached = getCachedSeries(cacheKey);
+        if (cached && (cached.status || cached.is_ended !== undefined)) {
+          endedMap[s.external_id] = cached.status === 'Ended' || cached.status === 'Finished' || cached.is_ended === true;
+        } else {
+          missingSeriesIds.push(s.external_id);
+        }
+      });
+      setSeriesEndedMap(prev => ({ ...prev, ...endedMap }));
+
+      if (missingSeriesIds.length > 0) {
+        // Fetch missing metadata in background
+        Promise.allSettled(
+          missingSeriesIds.map(async (extId) => {
+            try {
+              const res = await apiClient.get(`/search/series/${extId}`);
+              const sData = res.data;
+              const isEnded = sData.status === 'Ended' || sData.status === 'Finished' || sData.is_ended === true;
+              const cacheKey = `series_${extId}`;
+              const existingCached = getCachedSeries(cacheKey) || {};
+              setCachedSeries(cacheKey, { ...existingCached, ...sData, status: sData.status });
+              return { extId, isEnded };
+            } catch (e) {
+              return { extId, isEnded: false };
+            }
+          })
+        ).then(results => {
+          const newMap: Record<string, boolean> = {};
+          results.forEach(r => {
+            if (r.status === 'fulfilled' && r.value) {
+              newMap[r.value.extId] = r.value.isEnded;
+            }
+          });
+          setSeriesEndedMap(prev => ({ ...prev, ...newMap }));
+        });
+      }
 
       // Set favorites state from items explicitly marked as favorites
-      const favs = libraryRes.data.filter((item: LibraryItem) => item.is_favorite);
+      const favs = rawLibItems.filter((item: LibraryItem) => item.is_favorite);
       setFavorites(favs);
 
       // Fetch user activities
@@ -1480,7 +1525,7 @@ export const Profile: React.FC = () => {
                                   const cached = item.external_id ? getCachedSeries(cacheKey) : null;
                                   const anyItem = item as any;
                                   const sStatus = cached?.status || anyItem.series_status;
-                                  const isEnded = sStatus === 'Ended' || anyItem.is_ended === true;
+                                  const isEnded = seriesEndedMap[item.external_id] === true || sStatus === 'Ended' || sStatus === 'Finished' || anyItem.is_ended === true;
 
                                   if (isEnded) {
                                     badges.push({ text: language === 'es' ? 'Terminada' : 'Completed', color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)' });
