@@ -1036,10 +1036,11 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
         console.error(e);
       }
 
-      // Fetch consumption history if user is Pro and item is in library or is an episode
-      const historyTargetId = item.id || (isActualEpisode ? item.rawEpisodeId : null);
-      if (historyTargetId && user?.is_pro) {
-        apiClient.get(`/library/${historyTargetId}/consumption-history`)
+      // Fetch consumption history if user is Pro
+      const historyTargetKey = item.id || item.external_id || (isActualEpisode ? item.rawEpisodeId : null);
+      if (historyTargetKey && user?.is_pro) {
+        const itemTypeParam = item.item_type ? `?item_type=${item.item_type}` : '';
+        apiClient.get(`/library/${historyTargetKey}/consumption-history${itemTypeParam}`)
           .then(hRes => {
             if (hRes.data) {
               if (hRes.data.history) setConsumptionHistory(hRes.data.history);

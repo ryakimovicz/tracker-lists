@@ -208,40 +208,48 @@ def sync_show_episodes_and_get_last_seen(db: Session, user_id: int, tracking_lis
 
 @router.get("/{item_id}/consumption-history")
 def get_library_item_consumption_history(
-    item_id: int,
+    item_id: str,
+    item_type: Optional[str] = Query(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     from app.models.consumption import ConsumptionHistory
     from app.models.list_item import ListItem
+    from app.models.list import ReadingList
     
-    item = db.query(UserLibraryItem).filter(
-        UserLibraryItem.id == item_id,
-        UserLibraryItem.user_id == current_user.id
-    ).first()
+    item = None
+    if item_id.isdigit():
+        item = db.query(UserLibraryItem).filter(
+            UserLibraryItem.id == int(item_id),
+            UserLibraryItem.user_id == current_user.id
+        ).first()
     
     external_id = item.external_id if item else None
     
-    if not item:
+    if not item and item_id.isdigit():
         # Check if item_id corresponds to a ListItem (e.g. an episode)
-        list_item = db.query(ListItem).filter(ListItem.id == item_id).first()
+        list_item = db.query(ListItem).filter(ListItem.id == int(item_id)).first()
         if list_item:
             external_id = list_item.external_id
-            
-    if not external_id:
-        # Query by list_item_id in consumption history
-        history = db.query(ConsumptionHistory).filter(
-            ConsumptionHistory.user_id == current_user.id,
-            ConsumptionHistory.list_item_id == item_id
-        ).order_by(ConsumptionHistory.consumed_at.desc()).all()
-        result_dates = [ch.consumed_at for ch in history]
-        return {
-            "count": len(result_dates),
-            "history": result_dates
-        }
-        
-    if item and item.item_type in ("series", "anime") and item.tracking_list_id:
-        list_items = db.query(ListItem).filter(ListItem.list_id == item.tracking_list_id).all()
+    elif not item and not item_id.isdigit():
+        external_id = item_id
+
+    resolved_type = (item.item_type if item else item_type) or ""
+    tracking_list_id = item.tracking_list_id if item else None
+
+    # If item is not in library or tracking_list_id is missing, look up an existing tracking list for this series
+    if not tracking_list_id and resolved_type in ("series", "anime") and external_id:
+        series_clean = external_id.replace("tvm_", "").replace("tvm-", "")
+        # Find any list containing episodes for this series
+        found_li = db.query(ListItem).join(ReadingList).filter(
+            ReadingList.creator_id == current_user.id,
+            ListItem.item_type == ItemTypeEnum.SERIES
+        ).first()
+        if found_li:
+            tracking_list_id = found_li.list_id
+
+    if resolved_type in ("series", "anime") and tracking_list_id:
+        list_items = db.query(ListItem).filter(ListItem.list_id == tracking_list_id).all()
         ep_ext_ids = [it.external_id for it in list_items if it.external_id]
         if ep_ext_ids:
             # Group consumption history by episode
