@@ -5,6 +5,8 @@ import { useTranslation } from '../context/LanguageContext';
 import { getCachedSeries, setCachedSeries } from '../utils/seriesCache';
 import { ItemDetailsModal } from '../components/ItemDetailsModal';
 import { AdBanner } from '../components/AdBanner';
+import { ReplaceFavoriteModal } from '../components/ReplaceFavoriteModal';
+import { ProModal } from '../components/ProModal';
 import { ChevronLeft, ChevronRight, Check, Play } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -877,6 +879,7 @@ const ActiveItemCard = ({ item, onUpdate, language, onOpenItem, themeColor, them
 export const Home: React.FC = () => {
   const navigate = useNavigate();
   const { language } = useTranslation();
+  const { user: currentUser } = useAuth();
   const [activeTab, setActiveTab] = useState<"watching" | "guides" | "plan_to_watch" | "completed" | "dropped">("watching");
   
   const [libraryItems, setLibraryItems] = useState<any[]>([]);
@@ -884,6 +887,18 @@ export const Home: React.FC = () => {
   const [guideUpdates, setGuideUpdates] = useState<any[]>([]);
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+
+  // Replace Favorite Modal State & Pro Modal
+  const [replaceModalState, setReplaceModalState] = useState<{
+    isOpen: boolean;
+    newItem: any | null;
+    currentFavorites: any[];
+  }>({
+    isOpen: false,
+    newItem: null,
+    currentFavorites: []
+  });
+  const [showProModal, setShowProModal] = useState(false);
 
   const fetchDashboard = async (silent = false) => {
     try {
@@ -1312,6 +1327,28 @@ export const Home: React.FC = () => {
         const isFav = Boolean(currentLibItem?.is_favorite);
 
         const handleToggleFavorite = async (itemId: number, currentFav: boolean) => {
+          const targetItem = libraryItems.find(li => li.id === itemId) || currentLibItem;
+          if (!currentFav && targetItem) {
+            const isDlcOrExpansion = targetItem.item_type === 'game' && ['dlc', 'expansion'].includes(targetItem.badge || targetItem.custom_badge || '');
+            const isUnconsumed = !isDlcOrExpansion && ['plan_to_watch', 'plan_to_read', 'plan_to_play'].includes(targetItem.status);
+            if (isUnconsumed) {
+              return;
+            }
+
+            const isPro = Boolean(currentUser?.is_pro || currentUser?.is_admin || currentUser?.is_vip);
+            const sameCategoryFavs = libraryItems.filter(f => f.item_type === targetItem.item_type && f.is_favorite);
+            const maxAllowed = isPro ? 10 : 1;
+
+            if (sameCategoryFavs.length >= maxAllowed) {
+              setReplaceModalState({
+                isOpen: true,
+                newItem: targetItem,
+                currentFavorites: sameCategoryFavs
+              });
+              return;
+            }
+          }
+
           try {
             await apiClient.put(`/library/${itemId}`, { is_favorite: !currentFav });
             setLibraryItems(prev => prev.map(item => item.id === itemId ? { ...item, is_favorite: !currentFav } : item));
@@ -1335,6 +1372,34 @@ export const Home: React.FC = () => {
           />
         );
       })()}
+
+      {/* Pro / Premium Modal */}
+      {showProModal && (
+        <ProModal onClose={() => setShowProModal(false)} />
+      )}
+
+      {/* Replace Favorite Modal (Confirmation & 10/10 Selector) */}
+      <ReplaceFavoriteModal
+        isOpen={replaceModalState.isOpen}
+        onClose={() => setReplaceModalState({ isOpen: false, newItem: null, currentFavorites: [] })}
+        newItem={replaceModalState.newItem}
+        currentFavorites={replaceModalState.currentFavorites}
+        isPro={Boolean(currentUser?.is_pro || currentUser?.is_admin || currentUser?.is_vip)}
+        onConfirmReplace={async (itemToReplaceId: number, newItemId: number) => {
+          try {
+            await apiClient.put(`/library/${itemToReplaceId}`, { is_favorite: false });
+            await apiClient.put(`/library/${newItemId}`, { is_favorite: true });
+            setLibraryItems(prev => prev.map(item => {
+              if (item.id === itemToReplaceId) return { ...item, is_favorite: false };
+              if (item.id === newItemId) return { ...item, is_favorite: true };
+              return item;
+            }));
+          } catch (err) {
+            console.error("Failed to replace favorite", err);
+          }
+        }}
+        onOpenProModal={() => setShowProModal(true)}
+      />
     </div>
   );
 };

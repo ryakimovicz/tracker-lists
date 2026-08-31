@@ -6,6 +6,8 @@ import { apiClient } from '../api/client';
 import { ItemDetailsModal } from '../components/ItemDetailsModal';
 import { MediaPoster } from '../components/MediaPoster';
 import { AdBanner } from '../components/AdBanner';
+import { ReplaceFavoriteModal } from '../components/ReplaceFavoriteModal';
+import { ProModal } from '../components/ProModal';
 
 import { Search as SearchIcon, AlertCircle, CheckCircle, Plus, X, Heart, Star, Users, BookOpen, Package, Puzzle, Sparkles, Gamepad2 } from 'lucide-react';
 
@@ -241,7 +243,19 @@ export const Search: React.FC = () => {
 
   // Details Modal states
   const [selectedItem, setSelectedItem] = useState<SearchResultItem | null>(null);
-            const [zoomedImage, setZoomedImage] = useState<string | null>(null);
+  const [zoomedImage, setZoomedImage] = useState<string | null>(null);
+
+  // Replace Favorite Modal State & Pro Modal
+  const [replaceModalState, setReplaceModalState] = useState<{
+    isOpen: boolean;
+    newItem: any | null;
+    currentFavorites: any[];
+  }>({
+    isOpen: false,
+    newItem: null,
+    currentFavorites: []
+  });
+  const [showProModal, setShowProModal] = useState(false);
 
   // TV Tracking states inside details modal
           
@@ -463,6 +477,34 @@ export const Search: React.FC = () => {
       });
 
   const handleToggleFavorite = async (itemId: number, currentFav: boolean) => {
+    const targetItem = shelfItems.find(li => li.id === itemId);
+    if (!targetItem) return;
+
+    if (!currentFav) {
+      const isDlcOrExpansion = targetItem.item_type === 'game' && ['dlc', 'expansion'].includes(targetItem.badge || targetItem.custom_badge || '');
+      const isUnconsumed = !isDlcOrExpansion && ['plan_to_watch', 'plan_to_read', 'plan_to_play'].includes(targetItem.status);
+      if (isUnconsumed) {
+        setErrorMsg(language === 'es' 
+          ? 'Solo puedes destacar elementos que hayas empezado a consumir o completado.' 
+          : 'You can only feature items that you have started or completed.');
+        setTimeout(() => setErrorMsg(''), 5000);
+        return;
+      }
+
+      const isPro = Boolean(currentUser?.is_pro || currentUser?.is_admin || currentUser?.is_vip);
+      const sameCategoryFavs = shelfItems.filter(f => f.item_type === targetItem.item_type && f.is_favorite);
+      const maxAllowed = isPro ? 10 : 1;
+
+      if (sameCategoryFavs.length >= maxAllowed) {
+        setReplaceModalState({
+          isOpen: true,
+          newItem: targetItem,
+          currentFavorites: sameCategoryFavs
+        });
+        return;
+      }
+    }
+
     try {
       await apiClient.put(`/library/${itemId}`, { is_favorite: !currentFav });
       setShelfItems(prev => prev.map(item => item.id === itemId ? { ...item, is_favorite: !currentFav } : item));
@@ -473,6 +515,25 @@ export const Search: React.FC = () => {
       setTimeout(() => setSuccessMsg(''), 3000);
     } catch (err: any) {
       setErrorMsg(err.response?.data?.detail || 'Error updating favorite status');
+      setTimeout(() => setErrorMsg(''), 4000);
+    }
+  };
+
+  const handleConfirmReplace = async (itemToReplaceId: number, newItemId: number) => {
+    try {
+      await apiClient.put(`/library/${itemToReplaceId}`, { is_favorite: false });
+      await apiClient.put(`/library/${newItemId}`, { is_favorite: true });
+
+      setShelfItems(prev => prev.map(item => {
+        if (item.id === itemToReplaceId) return { ...item, is_favorite: false };
+        if (item.id === newItemId) return { ...item, is_favorite: true };
+        return item;
+      }));
+
+      setSuccessMsg(language === 'es' ? 'Obra destacada actualizada correctamente.' : 'Featured item updated successfully.');
+      setTimeout(() => setSuccessMsg(''), 4000);
+    } catch (err: any) {
+      setErrorMsg(err.response?.data?.detail || 'Error updating featured item');
       setTimeout(() => setErrorMsg(''), 4000);
     }
   };
@@ -822,6 +883,22 @@ export const Search: React.FC = () => {
           }}
         />
       )}
+
+      {/* Pro / Premium Modal */}
+      {showProModal && (
+        <ProModal onClose={() => setShowProModal(false)} />
+      )}
+
+      {/* Replace Favorite Modal (Confirmation & 10/10 Selector) */}
+      <ReplaceFavoriteModal
+        isOpen={replaceModalState.isOpen}
+        onClose={() => setReplaceModalState({ isOpen: false, newItem: null, currentFavorites: [] })}
+        newItem={replaceModalState.newItem}
+        currentFavorites={replaceModalState.currentFavorites}
+        isPro={Boolean(currentUser?.is_pro || currentUser?.is_admin || currentUser?.is_vip)}
+        onConfirmReplace={handleConfirmReplace}
+        onOpenProModal={() => setShowProModal(true)}
+      />
 
     </div>
   );
