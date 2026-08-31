@@ -44,7 +44,11 @@ export const ReplaceFavoriteModal: React.FC<ReplaceFavoriteModalProps> = ({
   const currentActive = currentFavorites[0];
 
   return (
-    <div className="content-modal-overlay" onClick={onClose}>
+    <div 
+      className="content-modal-overlay" 
+      style={{ position: 'fixed', inset: 0, zIndex: 3500 }} 
+      onClick={onClose}
+    >
       <div 
         className="modal-card" 
         style={{ 
