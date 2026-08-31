@@ -1489,9 +1489,9 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
       if (selectedItem && (selectedItem.external_id === `tvm-ep-${ep.id}` || selectedItem.id === ep.id || selectedItem.rawEpisodeId === ep.id)) {
         setSelectedItem((prev: any) => prev ? { ...prev, completed_at: res.data.completed_at, is_completed: res.data.is_completed } : null);
-        const targetFetchId = selectedItem.id || ep.id;
-        if (targetFetchId && user?.is_pro) {
-          apiClient.get(`/library/${targetFetchId}/consumption-history`)
+        const targetFetchKey = selectedItem.id || selectedItem.external_id || `tvm-ep-${ep.id}`;
+        if (targetFetchKey && user?.is_pro) {
+          apiClient.get(`/library/${targetFetchKey}/consumption-history?item_type=episode`)
             .then(hRes => {
               if (hRes.data) {
                 if (hRes.data.history) setConsumptionHistory(hRes.data.history);
