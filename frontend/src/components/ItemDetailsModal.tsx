@@ -803,10 +803,11 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
               is_favorite: myMatch.is_favorite
             };
           } else {
-            // Logged-in user does not have this item tracked
+            // Logged-in user does not have this parent item tracked
+            const isEp = incomingItem.item_type === 'episode' || (incomingItem.external_id && incomingItem.external_id.startsWith('tvm-ep-'));
             item = {
               ...incomingItem,
-              id: undefined,
+              id: isEp ? incomingItem.id : undefined,
               status: undefined,
               completed_at: null,
               pages_read: 0,
@@ -1035,9 +1036,10 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
         console.error(e);
       }
 
-      // Fetch consumption history if user is Pro and item is in library
-      if (item.id && user?.is_pro) {
-        apiClient.get(`/library/${item.id}/consumption-history`)
+      // Fetch consumption history if user is Pro and item is in library or is an episode
+      const historyTargetId = item.id || (isActualEpisode ? item.rawEpisodeId : null);
+      if (historyTargetId && user?.is_pro) {
+        apiClient.get(`/library/${historyTargetId}/consumption-history`)
           .then(hRes => {
             if (hRes.data) {
               if (hRes.data.history) setConsumptionHistory(hRes.data.history);
@@ -2978,8 +2980,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                     </div>
                   )}
 
-                  {/* PRO Consumption History (Visible for PRO users when re-consumed > 1) */}
-                  {user?.is_pro && consumptionHistory.length > 1 && (
+                  {/* PRO Consumption History (Visible for PRO users when re-consumed > 1, for non-series or episodes) */}
+                  {user?.is_pro && consumptionHistory.length > 1 && (isEpisode || !['series', 'anime'].includes(selectedItem?.item_type)) && (
                     <div style={{
                       marginTop: '0.85rem',
                       padding: '0.65rem 0.85rem',
@@ -3310,6 +3312,86 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                       );
                     })}
                   </div>
+
+                  {/* PRO Consumption History for Series (Rendered below seasons & episodes) */}
+                  {user?.is_pro && consumptionHistory.length > 1 && (
+                    <div style={{
+                      marginTop: '0.85rem',
+                      padding: '0.65rem 0.85rem',
+                      background: 'rgba(124, 58, 237, 0.05)',
+                      border: '1px solid rgba(124, 58, 237, 0.2)',
+                      borderRadius: '8px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.4rem'
+                    }}>
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        fontSize: '0.78rem',
+                        fontWeight: 700,
+                        color: 'var(--accent-primary)',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                          <Calendar size={13} />
+                          <span>{language === 'es' ? 'Historial de Registros (Serie Completa)' : 'Full Series Consumption History'} ({consumptionHistory.length})</span>
+                        </div>
+                        <span style={{
+                          fontSize: '0.68rem',
+                          background: 'var(--accent-primary)',
+                          color: '#ffffff',
+                          padding: '0.15rem 0.4rem',
+                          borderRadius: '4px',
+                          fontWeight: 700
+                        }}>
+                          PREMIUM
+                        </span>
+                      </div>
+                      <div style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.25rem',
+                        maxHeight: '130px',
+                        overflowY: 'auto',
+                        paddingRight: '0.25rem'
+                      }}>
+                        {consumptionHistory.map((dStr, idx) => {
+                          const dateObj = new Date(dStr);
+                          const dateFormatted = !isNaN(dateObj.getTime())
+                            ? dateObj.toLocaleDateString(language === 'es' ? 'es-ES' : 'en-US', {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })
+                            : dStr;
+
+                          return (
+                            <div key={idx} style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              fontSize: '0.78rem',
+                              color: 'var(--text-secondary)'
+                            }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                <span style={{ fontWeight: 500 }}>
+                                  #{consumptionHistory.length - idx} {idx === 0 ? (language === 'es' ? '(Última vez completada)' : '(Latest completed run)') : ''}
+                                </span>
+                              </div>
+                              <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
+                                {dateFormatted}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
