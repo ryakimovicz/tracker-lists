@@ -61,7 +61,8 @@ class IGDBService:
 
         # IGDB Apicalypse query with metadata for smart ranking
         safe_query = query.replace('"', '\\"')
-        body = f'search "{safe_query}"; fields id, name, category, game_type, parent_game, version_parent, cover.image_id, first_release_date, summary, total_rating, rating_count, hypes, follows, themes, age_ratings.rating; limit 100;'
+        fields_str = 'fields id, name, category, game_type, parent_game, version_parent, cover.image_id, first_release_date, summary, total_rating, rating_count, hypes, follows, themes, age_ratings.rating;'
+        body = f'search "{safe_query}"; {fields_str} limit 100;'
         
         req = urllib.request.Request(
             "https://api.igdb.com/v4/games",
@@ -74,128 +75,150 @@ class IGDBService:
         )
 
         try:
+            data = []
             with urllib.request.urlopen(req, timeout=8) as response:
                 if response.status == 200:
-                    data = json.loads(response.read().decode())
-                    if not data:
-                        return []
+                    data = json.loads(response.read().decode()) or []
 
-                    # Smart sorting: Collections -> Editions -> Base Games -> Expansions -> DLCs
-                    def calculate_score(item):
-                        name = item.get("name", "")
-                        name_lower = name.lower().strip()
-                        cat = item.get("game_type") if item.get("game_type") is not None else item.get("category", 0)
-                        has_version_parent = bool(item.get("version_parent"))
-                        
-                        # Tier 0: Collections (Compilations of multiple games)
-                        if cat == 3 and not has_version_parent:
-                            tier = 0
-                        # Tier 1: Editions (GOTY, Deluxe, Premium Editions)
-                        elif cat == 10 or (cat in (0, 3) and has_version_parent):
-                            tier = 1
-                        # Tier 2: Base Games, Remakes, Remasters
-                        elif cat in (0, 8, 9, None):
-                            tier = 2
-                        # Tier 3: Expansions / Episodes
-                        elif cat in (2, 4, 6):
-                            tier = 3
-                        # Tier 4: DLCs / Mods / Addons / Packs
-                        else:
-                            tier = 4
-                            
-                        rating_count = item.get("rating_count") or 0
-                        hypes = item.get("hypes") or 0
-                        follows = item.get("follows") or 0
-                        total_rating = item.get("total_rating") or 0
-                        
-                        # Exact or prefix match bonus
-                        q_lower = query.lower().strip()
-                        exact_boost = 500 if name_lower == q_lower else (150 if name_lower.startswith(q_lower) else 0)
-                        
-                        # Cover & release date bonus
-                        cover_boost = 100 if item.get("cover") else -200
-                        has_date_boost = 50 if item.get("first_release_date") else -50
-                        has_summary_boost = 30 if item.get("summary") else 0
-                        
-                        pop_score = (rating_count * 5) + (hypes * 3) + (follows * 3) + (total_rating / 5.0) + exact_boost + cover_boost + has_date_boost + has_summary_boost
-                        return (tier, -pop_score)
+            # If IGDB full-text search yielded 0 items (often happens when queries consist of common stopwords like "we were here"),
+            # fallback to wildcard name matching which ignores stopword indexing rules.
+            if not data:
+                body_where = f'where name ~ *"{safe_query}"*; {fields_str} limit 100;'
+                req_where = urllib.request.Request(
+                    "https://api.igdb.com/v4/games",
+                    data=body_where.encode("utf-8"),
+                    headers={
+                        "Client-ID": client_id,
+                        "Authorization": f"Bearer {token}",
+                        "Accept": "application/json"
+                    }
+                )
+                try:
+                    with urllib.request.urlopen(req_where, timeout=8) as response_where:
+                        if response_where.status == 200:
+                            data = json.loads(response_where.read().decode()) or []
+                except Exception as e_where:
+                    print(f"IGDB where fallback error: {e_where}")
 
-                    sorted_items = sorted(data, key=calculate_score)
+            if not data:
+                return []
 
-                    results = []
-                    for item in sorted_items:
-                        image_url = None
-                        cover = item.get("cover")
-                        if cover and cover.get("image_id"):
-                            image_url = f"https://images.igdb.com/igdb/image/upload/t_cover_big/{cover['image_id']}.jpg"
+            # Smart sorting: Collections -> Editions -> Base Games -> Expansions -> DLCs
+            def calculate_score(item):
+                name = item.get("name", "")
+                name_lower = name.lower().strip()
+                cat = item.get("game_type") if item.get("game_type") is not None else item.get("category", 0)
+                has_version_parent = bool(item.get("version_parent"))
+                
+                # Tier 0: Collections (Compilations of multiple games)
+                if cat == 3 and not has_version_parent:
+                    tier = 0
+                # Tier 1: Editions (GOTY, Deluxe, Premium Editions)
+                elif cat == 10 or (cat in (0, 3) and has_version_parent):
+                    tier = 1
+                # Tier 2: Base Games, Remakes, Remasters
+                elif cat in (0, 8, 9, None):
+                    tier = 2
+                # Tier 3: Expansions / Episodes
+                elif cat in (2, 4, 6):
+                    tier = 3
+                # Tier 4: DLCs / Mods / Addons / Packs
+                else:
+                    tier = 4
+                    
+                rating_count = item.get("rating_count") or 0
+                hypes = item.get("hypes") or 0
+                follows = item.get("follows") or 0
+                total_rating = item.get("total_rating") or 0
+                
+                # Exact or prefix match bonus
+                q_lower = query.lower().strip()
+                exact_boost = 500 if name_lower == q_lower else (150 if name_lower.startswith(q_lower) else 0)
+                
+                # Cover & release date bonus
+                cover_boost = 100 if item.get("cover") else -200
+                has_date_boost = 50 if item.get("first_release_date") else -50
+                has_summary_boost = 30 if item.get("summary") else 0
+                
+                pop_score = (rating_count * 5) + (hypes * 3) + (follows * 3) + (total_rating / 5.0) + exact_boost + cover_boost + has_date_boost + has_summary_boost
+                return (tier, -pop_score)
 
-                        release_date = None
-                        release_ts = item.get("first_release_date")
-                        if release_ts:
-                            try:
-                                release_date = datetime.fromtimestamp(release_ts).strftime("%Y-%m-%d")
-                            except Exception:
-                                pass
+            sorted_items = sorted(data, key=calculate_score)
 
-                        pop_val = None
-                        total_rating = item.get("total_rating")
-                        if total_rating:
-                            pop_val = round(total_rating / 20.0, 1)
+            results = []
+            for item in sorted_items:
+                image_url = None
+                cover = item.get("cover")
+                if cover and cover.get("image_id"):
+                    image_url = f"https://images.igdb.com/igdb/image/upload/t_cover_big/{cover['image_id']}.jpg"
 
-                        description_parts = []
-                        if pop_val:
-                            description_parts.append(f"Rating: {pop_val}/5")
-                        if release_date:
-                            description_parts.append(f"Released: {release_date}")
-                            
-                        desc = ". ".join(description_parts) + "."
-                        if item.get("summary"):
-                            desc += f" {item['summary'][:150]}..."
+                release_date = None
+                release_ts = item.get("first_release_date")
+                if release_ts:
+                    try:
+                        release_date = datetime.fromtimestamp(release_ts).strftime("%Y-%m-%d")
+                    except Exception:
+                        pass
 
-                        themes = item.get("themes") or []
-                        age_ratings = [ar.get("rating") for ar in item.get("age_ratings", []) if isinstance(ar, dict)]
-                        is_mature_game = 42 in themes or 5 in age_ratings or 12 in age_ratings
-                        game_title = item.get("name") or "Untitled Game"
+                pop_val = None
+                total_rating = item.get("total_rating")
+                if total_rating:
+                    pop_val = round(total_rating / 20.0, 1)
 
-                        from app.core.sfw_filter import is_safe_media_item
-                        if 42 in themes or not is_safe_media_item(game_title, desc):
-                            continue
+                description_parts = []
+                if pop_val:
+                    description_parts.append(f"Rating: {pop_val}/5")
+                if release_date:
+                    description_parts.append(f"Released: {release_date}")
+                    
+                desc = ". ".join(description_parts) + "."
+                if item.get("summary"):
+                    desc += f" {item['summary'][:150]}..."
 
-                        # Clean mapping using official IGDB game_type / category enum + version_parent
-                        cat = item.get("game_type") if item.get("game_type") is not None else item.get("category", 0)
-                        has_version_parent = bool(item.get("version_parent"))
-                        
-                        badge = None
-                        if cat in (2, 4, 6):
-                            badge = "expansion"
-                        elif cat == 5:
-                            badge = "mod"
-                        elif cat in (1, 13, 14):
-                            badge = "dlc"
-                        elif cat == 10 or (cat in (0, 3) and has_version_parent):
-                            # It's an edition of an existing parent game (GOTY, Deluxe, Premium Edition)
-                            badge = "edition"
-                        elif cat == 3 and not has_version_parent:
-                            # It's a genuine collection/bundle of multiple games
-                            badge = "collection"
-                        elif cat == 8:
-                            badge = "remake"
-                        elif cat == 9:
-                            badge = "remaster"
+                themes = item.get("themes") or []
+                age_ratings = [ar.get("rating") for ar in item.get("age_ratings", []) if isinstance(ar, dict)]
+                is_mature_game = 42 in themes or 5 in age_ratings or 12 in age_ratings
+                game_title = item.get("name") or "Untitled Game"
 
-                        results.append(
-                            SearchResultItem(
-                                external_id=str(item.get("id")),
-                                title=game_title,
-                                image_url=image_url,
-                                description=desc,
-                                item_type="game",
-                                release_date=release_date,
-                                popularity=pop_val,
-                                badge=badge
-                            )
-                        )
-                    return results
+                from app.core.sfw_filter import is_safe_media_item
+                if 42 in themes or not is_safe_media_item(game_title, desc):
+                    continue
+
+                # Clean mapping using official IGDB game_type / category enum + version_parent
+                cat = item.get("game_type") if item.get("game_type") is not None else item.get("category", 0)
+                has_version_parent = bool(item.get("version_parent"))
+                
+                badge = None
+                if cat in (2, 4, 6):
+                    badge = "expansion"
+                elif cat == 5:
+                    badge = "mod"
+                elif cat in (1, 13, 14):
+                    badge = "dlc"
+                elif cat == 10 or (cat in (0, 3) and has_version_parent):
+                    # It's an edition of an existing parent game (GOTY, Deluxe, Premium Edition)
+                    badge = "edition"
+                elif cat == 3 and not has_version_parent:
+                    # It's a genuine collection/bundle of multiple games
+                    badge = "collection"
+                elif cat == 8:
+                    badge = "remake"
+                elif cat == 9:
+                    badge = "remaster"
+
+                results.append(
+                    SearchResultItem(
+                        external_id=str(item.get("id")),
+                        title=game_title,
+                        image_url=image_url,
+                        description=desc,
+                        item_type="game",
+                        release_date=release_date,
+                        popularity=pop_val,
+                        badge=badge
+                    )
+                )
+            return results
 
 
         except Exception as e:
