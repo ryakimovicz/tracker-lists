@@ -22,12 +22,13 @@ def get_all_reports(
     """
     Returns lists of active reports grouped by type (media, lists, comments, reviews).
     """
-    from app.models.social import MediaItemReport, BlockedMediaItem
+    from app.models.social import MediaItemReport, BlockedMediaItem, BlockedFranchise
     media_reports = db.query(MediaItemReport).order_by(MediaItemReport.created_at.desc()).all()
     list_reports = db.query(ListReport).order_by(ListReport.created_at.desc()).all()
     comment_reports = db.query(CommentReport).order_by(CommentReport.created_at.desc()).all()
     review_reports = db.query(MediaReviewReport).order_by(MediaReviewReport.created_at.desc()).all()
     blocked_items = db.query(BlockedMediaItem).order_by(BlockedMediaItem.created_at.desc()).all()
+    blocked_franchises = db.query(BlockedFranchise).order_by(BlockedFranchise.created_at.desc()).all()
     
     formatted_media = []
     for r in media_reports:
@@ -51,6 +52,18 @@ def get_all_reports(
             "title": b.title or "Sin título",
             "reason": b.reason,
             "created_at": b.created_at
+        })
+
+    formatted_blocked_franchises = []
+    for bf in blocked_franchises:
+        formatted_blocked_franchises.append({
+            "id": bf.id,
+            "target_type": bf.target_type,
+            "target_id": bf.target_id,
+            "name": bf.name,
+            "item_type": bf.item_type,
+            "reason": bf.reason,
+            "created_at": bf.created_at
         })
         
     formatted_lists = []
@@ -88,6 +101,7 @@ def get_all_reports(
     return {
         "media": formatted_media,
         "blocked_media": formatted_blocked,
+        "blocked_franchises": formatted_blocked_franchises,
         "lists": formatted_lists,
         "comments": formatted_comments,
         "reviews": formatted_reviews
@@ -174,6 +188,123 @@ def admin_unban_media(
     db.delete(blocked)
     db.commit()
     return {"success": True, "message": "La obra fue desbloqueada del sistema."}
+
+@router.get("/franchises/search")
+def admin_search_franchises(
+    query: str,
+    item_type: str = "comic",
+    current_admin: User = Depends(get_current_admin)
+):
+    """
+    Searches sagas/volumes and publishers by name in external APIs (ComicVine)
+    to allow the admin to select and ban by ID.
+    """
+    import urllib.request, urllib.parse, json
+    from app.core.config import settings
+    
+    if not query or len(query.strip()) < 2:
+        return []
+
+    results = []
+    if item_type in ("comic", "manga"):
+        api_key = settings.COMIC_VINE_API_KEY
+        if api_key:
+            try:
+                encoded_q = urllib.parse.quote(query.strip())
+                url = f"https://comicvine.gamespot.com/api/search/?api_key={api_key}&format=json&resources=volume,publisher&query={encoded_q}&limit=12"
+                req = urllib.request.Request(url, headers={"User-Agent": "Pathd/1.0 (contact@pathd.app)"})
+                with urllib.request.urlopen(req, timeout=7) as response:
+                    if response.status == 200:
+                        data = json.loads(response.read().decode())
+                        for it in data.get("results", []):
+                            res_type = it.get("resource_type")  # 'volume' or 'publisher'
+                            img_obj = it.get("image", {})
+                            img_url = img_obj.get("thumb_url") or img_obj.get("small_url") or img_obj.get("medium_url")
+                            pub_name = it.get("publisher", {}).get("name") if res_type == "volume" and it.get("publisher") else None
+                            
+                            results.append({
+                                "target_type": res_type,  # 'volume' or 'publisher'
+                                "target_id": f"cv_{res_type}_{it.get('id')}",
+                                "raw_id": it.get("id"),
+                                "name": it.get("name") or "Sin nombre",
+                                "publisher": pub_name,
+                                "count_of_issues": it.get("count_of_issues") if res_type == "volume" else None,
+                                "start_year": it.get("start_year"),
+                                "image_url": img_url,
+                                "item_type": item_type
+                            })
+            except Exception as e:
+                print(f"Admin search franchises error: {e}")
+
+    return results
+
+class BanFranchiseRequest(BaseModel):
+    target_type: str  # 'volume', 'publisher', etc.
+    target_id: str    # e.g., 'cv_volume_88907'
+    name: str
+    item_type: str = "comic"
+    reason: str = None
+
+@router.post("/franchises/ban")
+def admin_ban_franchise(
+    body: BanFranchiseRequest,
+    current_admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    from app.models.social import BlockedFranchise
+    from app.models.library import UserLibraryItem
+    from app.models.list_item import ListItem
+    from app.models.review import MediaReview
+
+    try:
+        existing = db.query(BlockedFranchise).filter(
+            BlockedFranchise.target_id == body.target_id
+        ).first()
+
+        if not existing:
+            blocked = BlockedFranchise(
+                target_type=body.target_type,
+                target_id=body.target_id,
+                name=body.name,
+                item_type=body.item_type,
+                reason=body.reason or f"Bloqueo de {body.target_type} explícito/no deseado"
+            )
+            db.add(blocked)
+
+        # Purge items matching this name from library and lists if any
+        if body.name and len(body.name.strip()) >= 3:
+            name_pattern = f"%{body.name.strip()}%"
+            try:
+                db.query(UserLibraryItem).filter(UserLibraryItem.title.ilike(name_pattern)).delete(synchronize_session=False)
+                db.query(ListItem).filter(ListItem.title.ilike(name_pattern)).delete(synchronize_session=False)
+            except Exception as e:
+                print(f"Notice purging matching franchise titles: {e}")
+
+        db.commit()
+        return {
+            "success": True,
+            "message": f"La {body.target_type} '{body.name}' ({body.target_id}) fue bloqueada. Todos sus números y entregas fueron filtrados."
+        }
+    except Exception as err:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al banear saga/editorial: {str(err)}"
+        )
+
+@router.delete("/franchises/unban/{blocked_id}")
+def admin_unban_franchise(
+    blocked_id: int,
+    current_admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    from app.models.social import BlockedFranchise
+    blocked = db.query(BlockedFranchise).filter(BlockedFranchise.id == blocked_id).first()
+    if not blocked:
+        raise HTTPException(status_code=404, detail="Saga/editorial bloqueada no encontrada.")
+    db.delete(blocked)
+    db.commit()
+    return {"success": True, "message": f"'{blocked.name}' fue desbloqueada exitosamente."}
 
 @router.delete("/reports/media/{report_id}")
 def admin_dismiss_media_report(

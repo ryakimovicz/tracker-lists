@@ -383,6 +383,55 @@ export const AdminPanel: React.FC = () => {
     }
   };
 
+  // Franchise/Sagas Ban Handlers
+  const [franchiseQuery, setFranchiseQuery] = useState('');
+  const [franchiseResults, setFranchiseResults] = useState<any[]>([]);
+  const [isSearchingFranchise, setIsSearchingFranchise] = useState(false);
+  const [franchiseSearchFeedback, setFranchiseSearchFeedback] = useState<string | null>(null);
+
+  const handleSearchFranchises = async () => {
+    if (!franchiseQuery || franchiseQuery.trim().length < 2) return;
+    setIsSearchingFranchise(true);
+    setFranchiseSearchFeedback(null);
+    try {
+      const res = await apiClient.get(`/admin/franchises/search?query=${encodeURIComponent(franchiseQuery.trim())}`);
+      setFranchiseResults(res.data || []);
+      if (!res.data || res.data.length === 0) {
+        setFranchiseSearchFeedback(isEs ? 'No se encontraron sagas ni editoriales con ese nombre.' : 'No sagas or publishers found with that name.');
+      }
+    } catch (err: any) {
+      setFranchiseSearchFeedback(isEs ? 'Error buscando sagas.' : 'Error searching sagas.');
+    } finally {
+      setIsSearchingFranchise(false);
+    }
+  };
+
+  const handleBanFranchise = async (target_type: string, target_id: string, name: string) => {
+    try {
+      await apiClient.post('/admin/franchises/ban', {
+        target_type,
+        target_id,
+        name,
+        item_type: 'comic',
+        reason: 'Bloqueado por moderación de admin'
+      });
+      fetchReports();
+      setFranchiseResults(prev => prev.filter(r => r.target_id !== target_id));
+      setFranchiseSearchFeedback(isEs ? `¡'${name}' fue bloqueada con éxito!` : `Successfully blocked '${name}'!`);
+    } catch (err: any) {
+      console.error(err);
+    }
+  };
+
+  const handleUnbanFranchise = async (blocked_id: number) => {
+    try {
+      await apiClient.delete(`/admin/franchises/unban/${blocked_id}`);
+      fetchReports();
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   const handleDismissMediaReport = async (report_id: number) => {
     try {
       await apiClient.delete(`/admin/reports/media/${report_id}`);
@@ -616,6 +665,112 @@ export const AdminPanel: React.FC = () => {
                             {isEs ? 'Desestimar' : 'Dismiss'}
                           </button>
                         </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Search & Ban Sagas / Volumes / Publishers Section */}
+              <div style={{ background: 'rgba(255,255,255,0.02)', padding: '1.25rem', borderRadius: 12, border: '1px solid var(--border-color)' }}>
+                <h4 style={{ margin: '0 0 0.5rem', color: 'var(--text-primary)', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <Ban size={16} color="var(--accent-primary)" /> {isEs ? 'Buscar y Bloquear Sagas / Revistas / Editoriales' : 'Search & Ban Sagas / Magazines / Publishers'}
+                </h4>
+                <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: '0 0 1rem' }}>
+                  {isEs
+                    ? 'Busca por nombre (ej: "Comic Bavel", "Kairakuten", "Bunendo") para banear el ID de la saga o editorial completa y purgar todas sus entregas.'
+                    : 'Search by name (e.g. "Comic Bavel", "Kairakuten", "Bunendo") to ban the entire saga or publisher ID and purge all its issues.'}
+                </p>
+
+                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+                  <input
+                    type="text"
+                    placeholder={isEs ? 'Escribe el nombre de la saga, revista o editorial...' : 'Type saga, magazine or publisher name...'}
+                    value={franchiseQuery}
+                    onChange={(e) => setFranchiseQuery(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSearchFranchises()}
+                    className="form-control"
+                    style={{ flex: 1, padding: '0.55rem 0.85rem', fontSize: '0.88rem' }}
+                  />
+                  <button
+                    onClick={handleSearchFranchises}
+                    disabled={isSearchingFranchise || franchiseQuery.trim().length < 2}
+                    className="btn-primary"
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.55rem 1.1rem', fontSize: '0.88rem' }}
+                  >
+                    {isSearchingFranchise ? <RefreshCw size={14} className="spin" /> : <Search size={14} />}
+                    {isEs ? 'Buscar' : 'Search'}
+                  </button>
+                </div>
+
+                {franchiseSearchFeedback && (
+                  <div style={{ fontSize: '0.82rem', color: franchiseSearchFeedback.includes('éxito') || franchiseSearchFeedback.includes('Successfully') ? '#10b981' : '#f59e0b', marginBottom: '0.75rem' }}>
+                    {franchiseSearchFeedback}
+                  </div>
+                )}
+
+                {/* Franchise Search Results */}
+                {franchiseResults.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.75rem', maxHeight: 280, overflowY: 'auto' }}>
+                    {franchiseResults.map((fr: any) => (
+                      <div key={fr.target_id} style={{ background: 'rgba(0,0,0,0.2)', padding: '0.65rem 0.85rem', borderRadius: 8, border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                          {fr.image_url ? (
+                            <img src={fr.image_url} alt={fr.name} style={{ width: 32, height: 44, objectFit: 'cover', borderRadius: 4 }} />
+                          ) : (
+                            <div style={{ width: 32, height: 44, background: 'var(--bg-tertiary)', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <FileText size={14} color="var(--text-muted)" />
+                            </div>
+                          )}
+                          <div>
+                            <div style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--text-primary)' }}>
+                              {fr.name}
+                              <span style={{ fontSize: '0.72rem', background: fr.target_type === 'publisher' ? 'rgba(59,130,246,0.15)' : 'rgba(124,58,237,0.15)', color: fr.target_type === 'publisher' ? '#60a5fa' : 'var(--accent-primary)', padding: '0.1rem 0.35rem', borderRadius: 4, marginLeft: '0.4rem', textTransform: 'uppercase' }}>
+                                {fr.target_type === 'volume' ? (isEs ? 'Saga / Revista' : 'Saga / Volume') : (isEs ? 'Editorial' : 'Publisher')}
+                              </span>
+                            </div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.1rem' }}>
+                              ID: <code>{fr.target_id}</code> {fr.publisher ? `• Editorial: ${fr.publisher}` : ''} {fr.count_of_issues ? `• ${fr.count_of_issues} números` : ''}
+                            </div>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() => handleBanFranchise(fr.target_type, fr.target_id, fr.name)}
+                          className="btn-primary"
+                          style={{ background: '#ef4444', borderColor: '#ef4444', color: '#fff', fontSize: '0.75rem', padding: '0.35rem 0.65rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+                        >
+                          <Ban size={12} /> {isEs ? 'Bloquear Todo' : 'Block All'}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Blocked Franchises / Sagas Blacklist */}
+              {reports.blocked_franchises && reports.blocked_franchises.length > 0 && (
+                <div>
+                  <h4 style={{ margin: '0 0 0.85rem', color: 'var(--text-secondary)', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <Ban size={15} color="var(--accent-primary)" /> {isEs ? 'Sagas y Editoriales Bloqueadas (Blacklist)' : 'Blocked Sagas & Publishers (Blacklist)'} ({reports.blocked_franchises.length})
+                  </h4>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    {reports.blocked_franchises.map((bf: any) => (
+                      <div key={bf.id} style={{ background: 'rgba(124,58,237,0.04)', padding: '0.75rem 1rem', borderRadius: 8, border: '1px solid rgba(124,58,237,0.2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{bf.name}</span>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--accent-primary)', marginLeft: '0.5rem' }}>
+                            ({bf.target_type === 'volume' ? (isEs ? 'Saga' : 'Saga') : (isEs ? 'Editorial' : 'Publisher')} • {bf.target_id})
+                          </span>
+                          {bf.reason && <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{bf.reason}</div>}
+                        </div>
+                        <button
+                          onClick={() => handleUnbanFranchise(bf.id)}
+                          className="btn-secondary"
+                          style={{ fontSize: '0.75rem', padding: '0.3rem 0.6rem' }}
+                        >
+                          {isEs ? 'Desbloquear' : 'Unblock'}
+                        </button>
                       </div>
                     ))}
                   </div>

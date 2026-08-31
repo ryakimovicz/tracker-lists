@@ -103,3 +103,18 @@ class BlockedMediaItem(Base):
     title = Column(String(255), nullable=True)
     reason = Column(String(500), nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+
+class BlockedFranchise(Base):
+    """
+    Stores blocked sagas, magazines, volumes or publishers (by ID and name)
+    to filter out entire series across search and new releases.
+    """
+    __tablename__ = "blocked_franchises"
+
+    id = Column(Integer, primary_key=True, index=True)
+    target_type = Column(String(50), nullable=False)  # 'volume' (saga/revista), 'publisher' (editorial), 'author', 'franchise'
+    target_id = Column(String(100), nullable=False, index=True)  # e.g., 'cv_vol_88907', 'cv_pub_7358'
+    name = Column(String(255), nullable=False)
+    item_type = Column(String(50), default="comic", nullable=False)  # comic, manga, anime, etc.
+    reason = Column(String(500), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)

@@ -233,13 +233,39 @@ class ComicVineService:
                         "young jump", "weekly shonen", "monthly shonen", "tankobon", "jump giga"
                     ]
 
+                    # Query blocked franchises/volumes from DB
+                    blocked_vol_ids = set()
+                    try:
+                        from app.core.database import SessionLocal
+                        from app.models.social import BlockedFranchise
+                        with SessionLocal() as db:
+                            bfs = db.query(BlockedFranchise).all()
+                            for bf in bfs:
+                                # extract numeric raw id e.g. cv_volume_88907 -> 88907
+                                raw_id = bf.target_id.replace("cv_volume_", "").replace("cv_publisher_", "").replace("cv_", "")
+                                if raw_id.isdigit():
+                                    blocked_vol_ids.add(int(raw_id))
+                                if bf.name:
+                                    manga_keywords.append(bf.name.lower())
+                    except Exception as e:
+                        print(f"Notice loading blocked franchises: {e}")
+
                     for item in data.get("results", []):
-                        vol_name = (item.get("volume", {}).get("name") or "").strip()
+                        vol_obj = item.get("volume") or {}
+                        vol_id = vol_obj.get("id")
+                        vol_name = (vol_obj.get("name") or "").strip()
+                        
+                        if vol_id and vol_id in blocked_vol_ids:
+                            continue
+
                         issue_num = item.get("issue_number")
                         raw_title = item.get("name") or ""
                         
                         full_name_check = f"{vol_name} {raw_title}".lower()
                         if any(k in full_name_check for k in manga_keywords):
+                            continue
+
+                        if not is_safe_media_item(f"{vol_name} #{issue_num} {raw_title}", item.get("deck") or item.get("description") or ""):
                             continue
 
                         image_obj = item.get("image", {})
