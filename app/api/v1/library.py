@@ -896,8 +896,8 @@ def delete_from_library(
                     ItemProgress.list_item_id.in_(ep_item_ids)
                 ).delete(synchronize_session=False)
 
-    # If there is an associated private tracking list, delete it too
-    if tracking_list_id:
+    # Only delete the associated tracking list if delete_history is True
+    if delete_history and tracking_list_id:
         private_list = db.query(ReadingList).filter(ReadingList.id == tracking_list_id).first()
         if private_list:
             db.delete(private_list)
