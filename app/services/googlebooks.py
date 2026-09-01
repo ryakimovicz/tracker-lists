@@ -45,18 +45,6 @@ class GoogleBooksService:
                         if not is_safe_media_item(title, desc, categories=categories):
                             continue
 
-                        # Check blocked franchise names
-                        try:
-                            from app.core.database import SessionLocal
-                            from app.models.social import BlockedFranchise
-                            with SessionLocal() as db_session:
-                                if db_session.query(BlockedFranchise).filter(
-                                    BlockedFranchise.name.ilike(f"%{title}%")
-                                ).first():
-                                    continue
-                        except Exception:
-                            pass
-
                         isbns = []
                         for ident in v_info.get("industryIdentifiers", []):
                             if ident.get("type") in ("ISBN_13", "ISBN_10"):
