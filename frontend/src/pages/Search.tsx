@@ -293,10 +293,24 @@ export const Search: React.FC = () => {
   useEffect(() => {
     if (submittedQuery === '') {
       const fetchExplore = async () => {
-        try {
+        // 1. Instant cache check from sessionStorage
+        const cachedRaw = sessionStorage.getItem('pathd_explore_cache');
+        if (cachedRaw) {
+          try {
+            const cachedParsed = JSON.parse(cachedRaw);
+            if (cachedParsed?.nuevo?.length > 0) {
+              setExploreData(cachedParsed);
+            }
+          } catch (e) {}
+        } else {
           setLoadingExplore(true);
+        }
+
+        // 2. Fetch fresh data from backend
+        try {
           const res = await apiClient.get('/search/explore/tabs');
           setExploreData(res.data);
+          sessionStorage.setItem('pathd_explore_cache', JSON.stringify(res.data));
         } catch (err) {
           console.error("Failed to load recommendations", err);
         } finally {

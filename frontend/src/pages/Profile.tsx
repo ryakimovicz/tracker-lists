@@ -339,20 +339,38 @@ export const Profile: React.FC = () => {
     setLoading(true);
     setErrorMsg('');
     try {
-      const meRes = await apiClient.get('/users/me');
-      setCurrentUser(meRes.data);
-
+      // 1. Parallelize current user and target profile requests
       const targetProfileUrl = targetUserIdentifier ? `/users/profile/${targetUserIdentifier}` : '/users/me';
-      const profileRes = await apiClient.get(targetProfileUrl);
+      const [meRes, profileRes] = await Promise.all([
+        apiClient.get('/users/me'),
+        apiClient.get(targetProfileUrl)
+      ]);
+
+      setCurrentUser(meRes.data);
       setProfile(profileRes.data);
 
       const targetId = profileRes.data.id;
       const targetLibraryUrl = (targetUserIdentifier && targetId !== meRes.data.id) ? `/library/?user_id=${targetId}` : '/library/';
-      const libraryRes = await apiClient.get(targetLibraryUrl);
+      const targetActivityUrl = (targetUserIdentifier && targetId !== meRes.data.id) ? `/users/${targetId}/activity` : '/users/me/activity';
+
+      // 2. Fetch library and activities in parallel
+      const [libraryRes, activityRes] = await Promise.all([
+        apiClient.get(targetLibraryUrl),
+        apiClient.get(targetActivityUrl)
+      ]);
+
       const rawLibItems: LibraryItem[] = libraryRes.data || [];
       setLibraryItems(rawLibItems);
+      setActivities(activityRes.data || []);
 
-      // Preload / check 'Ended' status for completed series & anime
+      // Set favorites state from items explicitly marked as favorites
+      const favs = rawLibItems.filter((item: LibraryItem) => item.is_favorite);
+      setFavorites(favs);
+
+      // Render profile immediately!
+      setLoading(false);
+
+      // 3. Preload / check 'Ended' status in background
       const endedMap: Record<string, boolean> = {};
       const completedSeries = rawLibItems.filter(i => (i.item_type === 'series' || i.item_type === 'anime') && i.status === 'completed' && i.external_id);
       
@@ -369,7 +387,6 @@ export const Profile: React.FC = () => {
       setSeriesEndedMap(prev => ({ ...prev, ...endedMap }));
 
       if (missingSeriesIds.length > 0) {
-        // Fetch missing metadata in background
         Promise.allSettled(
           missingSeriesIds.map(async (extId) => {
             try {
@@ -395,31 +412,21 @@ export const Profile: React.FC = () => {
         });
       }
 
-      // Set favorites state from items explicitly marked as favorites
-      const favs = rawLibItems.filter((item: LibraryItem) => item.is_favorite);
-      setFavorites(favs);
-
-      // Fetch user activities
-      const targetActivityUrl = (targetUserIdentifier && targetId !== meRes.data.id) ? `/users/${targetId}/activity` : '/users/me/activity';
-      const activityRes = await apiClient.get(targetActivityUrl);
-      setActivities(activityRes.data);
-      
-      // Fetch Last.fm data if applicable
+      // 4. Fetch Last.fm data in background if connected
       const targetLastfmUser = profileRes.data.lastfm_username;
       if (targetLastfmUser) {
-        try {
-          const targetNpUrl = `/users/${targetId}/music/now-playing`;
-          const targetTaUrl = `/users/${targetId}/music/top-albums`;
-          const [npRes, taRes] = await Promise.allSettled([
-            apiClient.get(targetNpUrl),
-            apiClient.get(targetTaUrl)
-          ]);
+        const targetNpUrl = `/users/${targetId}/music/now-playing`;
+        const targetTaUrl = `/users/${targetId}/music/top-albums`;
+        Promise.allSettled([
+          apiClient.get(targetNpUrl),
+          apiClient.get(targetTaUrl)
+        ]).then(([npRes, taRes]) => {
           setNowPlaying(npRes.status === 'fulfilled' ? npRes.value.data : null);
           setTopAlbums(taRes.status === 'fulfilled' ? (taRes.value.data || []) : []);
-        } catch(e) {
+        }).catch(() => {
           setNowPlaying(null);
           setTopAlbums([]);
-        }
+        });
       } else {
         setNowPlaying(null);
         setTopAlbums([]);

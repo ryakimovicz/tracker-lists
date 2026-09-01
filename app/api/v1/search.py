@@ -501,15 +501,19 @@ class ExploreTabsResponse(BaseModel):
     nuevo: List[SearchResultItem]
     descubrir: List[SearchResultItem]
 
+# In-memory TTL cache for explore new items
+_EXPLORE_NUEVO_CACHE: Dict[str, Tuple[float, List[SearchResultItem]]] = {}
+_EXPLORE_CACHE_TTL = 4 * 3600  # 4 hours
+
 @router.get("/explore/tabs", response_model=ExploreTabsResponse)
-@limiter.limit("30/minute")
+@limiter.limit("60/minute")
 def get_explore_tabs(
     request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_optional)
 ):
+    import time
     agregado = []
-    nuevo = []
     
     # 1. Agregado (UserLibraryItem filtered)
     if current_user:
@@ -526,7 +530,19 @@ def get_explore_tabs(
                     status=item.status
                 ))
     
-    # 2. Nuevo (APIs)
+    # 2. Nuevo (APIs with 4-hour in-memory cache)
+    now_ts = time.time()
+    cache_key = "explore_nuevo_global"
+    if cache_key in _EXPLORE_NUEVO_CACHE:
+        cache_time, cached_items = _EXPLORE_NUEVO_CACHE[cache_key]
+        if now_ts - cache_time < _EXPLORE_CACHE_TTL and len(cached_items) > 0:
+            return ExploreTabsResponse(
+                agregado=agregado,
+                nuevo=cached_items,
+                descubrir=[]
+            )
+
+    nuevo = []
     import concurrent.futures
     
     def fetch_new_tv():
@@ -573,6 +589,9 @@ def get_explore_tabs(
         nuevo.extend(f_ncm.result())
         nuevo.extend(f_nmg.result())
         nuevo.extend(f_ngm.result())
+
+    if len(nuevo) > 0:
+        _EXPLORE_NUEVO_CACHE[cache_key] = (now_ts, nuevo)
 
     return ExploreTabsResponse(
         agregado=agregado,

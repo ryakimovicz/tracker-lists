@@ -903,89 +903,102 @@ export const Home: React.FC = () => {
   const fetchDashboard = async (silent = false) => {
     try {
       if (!silent) setLoading(true);
-      const libRes = await apiClient.get('/library/');
-      let currentLib = libRes.data || [];
+      
+      // 1. Fetch library items and secondary feeds in parallel for maximum speed
+      const [libRes, upNextRes, updatesRes] = await Promise.allSettled([
+        apiClient.get('/library/'),
+        apiClient.get('/users/me/up-next'),
+        apiClient.get('/users/me/feed/guides-updates')
+      ]);
 
-      // Auto sync series/anime status between 'completed' and 'watching' based on aired episodes
+      let currentLib = libRes.status === 'fulfilled' ? (libRes.value.data || []) : [];
+      
+      // Render the dashboard immediately (under 100ms)
+      setLibraryItems(currentLib);
+
+      if (upNextRes.status === 'fulfilled' && upNextRes.value.data?.guides) {
+        setUpNextGuides(upNextRes.value.data.guides);
+      }
+
+      if (updatesRes.status === 'fulfilled' && updatesRes.value.data) {
+        setGuideUpdates(updatesRes.value.data);
+      }
+
+      if (!silent) setLoading(false);
+
+      // 2. Non-blocking background auto-sync of series/anime in parallel
       const nowMs = Date.now();
       const trackingSeries = currentLib.filter((i: any) => (i.item_type === 'series' || i.item_type === 'anime') && i.tracking_list_id);
 
-      for (const item of trackingSeries) {
-        const cacheKeyAll = `${item.external_id}_all_episodes`;
-        let allEps = getCachedSeries(cacheKeyAll);
-        if (!allEps) {
-          try {
-            const epRes = await apiClient.get(`/search/series/${item.external_id}/episodes`);
-            allEps = epRes.data;
-            setCachedSeries(cacheKeyAll, allEps);
-          } catch (e) {
-            allEps = null;
-          }
-        }
-
-        if (allEps && Array.isArray(allEps) && allEps.length > 0) {
-          let trackedEps: any[] = [];
-          try {
-            const listRes = await apiClient.get(`/lists/${item.tracking_list_id}`);
-            trackedEps = listRes.data.items || [];
-          } catch (e) {
-            trackedEps = [];
-          }
-
-          // Check if there is any uncompleted episode whose exact air timestamp has arrived
-          const pad = (n: number) => String(n).padStart(2, '0');
-          const hasUnwatchedAiredEpisode = allEps.some(ep => {
-            let isAired = true;
-            if (ep.airstamp) {
-              isAired = new Date(ep.airstamp).getTime() <= nowMs;
-            } else if (ep.airdate || ep.air_date) {
-              const ad = ep.airdate || ep.air_date;
-              const at = ep.airtime || '00:00';
-              isAired = new Date(`${ad}T${at}:00Z`).getTime() <= nowMs;
+      if (trackingSeries.length > 0) {
+        Promise.allSettled(
+          trackingSeries.map(async (item: any) => {
+            const cacheKeyAll = `${item.external_id}_all_episodes`;
+            let allEps = getCachedSeries(cacheKeyAll);
+            if (!allEps) {
+              try {
+                const epRes = await apiClient.get(`/search/series/${item.external_id}/episodes`);
+                allEps = epRes.data;
+                setCachedSeries(cacheKeyAll, allEps);
+              } catch (e) {
+                allEps = null;
+              }
             }
-            const isWatched = trackedEps.some((t: any) => 
-              (t.external_id === `tvm-ep-${ep.id}` || 
-               t.id === ep.id || 
-               (t.title && t.title.includes(`S${pad(ep.season_number)}E${pad(ep.episode_number)}`)) ||
-               (t.title && t.title.includes(`E${pad(ep.episode_number)}`) && (t.section === `Season ${ep.season_number}` || t.title.includes(`S${ep.season_number}`)))
-              ) && t.is_completed
-            );
-            return isAired && !isWatched;
-          });
 
-          // Check if user has watched at least one episode
-          const hasWatchedAny = trackedEps.some((t: any) => t.is_completed);
+            if (allEps && Array.isArray(allEps) && allEps.length > 0) {
+              let trackedEps: any[] = [];
+              try {
+                const listRes = await apiClient.get(`/lists/${item.tracking_list_id}`);
+                trackedEps = listRes.data.items || [];
+              } catch (e) {
+                trackedEps = [];
+              }
 
-          if (item.status === 'completed' && hasUnwatchedAiredEpisode) {
-            // New episode aired -> move back to watching / Continuar
-            try {
-              await apiClient.put(`/library/${item.id}`, { status: 'watching' });
-              item.status = 'watching';
-            } catch (e) {
-              console.error("Failed to auto-resume series", e);
+              const pad = (n: number) => String(n).padStart(2, '0');
+              const hasUnwatchedAiredEpisode = allEps.some(ep => {
+                let isAired = true;
+                if (ep.airstamp) {
+                  isAired = new Date(ep.airstamp).getTime() <= nowMs;
+                } else if (ep.airdate || ep.air_date) {
+                  const ad = ep.airdate || ep.air_date;
+                  const at = ep.airtime || '00:00';
+                  isAired = new Date(`${ad}T${at}:00Z`).getTime() <= nowMs;
+                }
+                const isWatched = trackedEps.some((t: any) => 
+                  (t.external_id === `tvm-ep-${ep.id}` || 
+                   t.id === ep.id || 
+                   (t.title && t.title.includes(`S${pad(ep.season_number)}E${pad(ep.episode_number)}`)) ||
+                   (t.title && t.title.includes(`E${pad(ep.episode_number)}`) && (t.section === `Season ${ep.season_number}` || t.title.includes(`S${ep.season_number}`)))
+                  ) && t.is_completed
+                );
+                return isAired && !isWatched;
+              });
+
+              const hasWatchedAny = trackedEps.some((t: any) => t.is_completed);
+
+              if (item.status === 'completed' && hasUnwatchedAiredEpisode) {
+                try {
+                  await apiClient.put(`/library/${item.id}`, { status: 'watching' });
+                  item.status = 'watching';
+                  return { id: item.id, status: 'watching' };
+                } catch (e) {}
+              } else if (item.status === 'watching' && hasWatchedAny && !hasUnwatchedAiredEpisode) {
+                try {
+                  await apiClient.put(`/library/${item.id}`, { status: 'completed' });
+                  item.status = 'completed';
+                  return { id: item.id, status: 'completed' };
+                } catch (e) {}
+              }
             }
-          } else if (item.status === 'watching' && hasWatchedAny && !hasUnwatchedAiredEpisode) {
-            // All currently released episodes watched -> move to completed / Terminado
-            try {
-              await apiClient.put(`/library/${item.id}`, { status: 'completed' });
-              item.status = 'completed';
-            } catch (e) {
-              console.error("Failed to auto-complete series", e);
-            }
+            return null;
+          })
+        ).then(results => {
+          // If any series changed state, update state smoothly
+          const changed = results.filter(r => r.status === 'fulfilled' && r.value !== null);
+          if (changed.length > 0) {
+            setLibraryItems([...currentLib]);
           }
-        }
-      }
-
-      setLibraryItems(currentLib);
-
-      const upNextRes = await apiClient.get('/users/me/up-next');
-      if (upNextRes.data && upNextRes.data.guides) {
-        setUpNextGuides(upNextRes.data.guides);
-      }
-
-      const updatesRes = await apiClient.get('/users/me/feed/guides-updates');
-      if (updatesRes.data) {
-        setGuideUpdates(updatesRes.data);
+        });
       }
 
     } catch (err) {
