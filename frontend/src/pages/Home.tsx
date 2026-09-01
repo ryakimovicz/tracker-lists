@@ -297,93 +297,52 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
     // ⚡ INSTANT OPTIMISTIC UI: Compute and transition to the next episode in 0ms
     const cacheKeyAll = `${item.external_id}_all_episodes`;
     const allEps = getCachedSeries(cacheKeyAll);
+    let nextCandidate: any = null;
+
     if (allEps && Array.isArray(allEps)) {
       const sortedAllEps = [...allEps].sort((a: any, b: any) => 
         a.season_number !== b.season_number ? a.season_number - b.season_number : a.episode_number - b.episode_number
       );
       const currentIndex = sortedAllEps.findIndex((ep: any) => ep.id === currentEpToMark.id);
       if (currentIndex !== -1 && currentIndex + 1 < sortedAllEps.length) {
-        const nextCandidate = sortedAllEps[currentIndex + 1];
+        const candidate = sortedAllEps[currentIndex + 1];
         let isAired = true;
-        if (nextCandidate.airstamp) {
-          isAired = new Date(nextCandidate.airstamp).getTime() <= Date.now();
-        } else if (nextCandidate.airdate || nextCandidate.air_date) {
-          const ad = nextCandidate.airdate || nextCandidate.air_date;
-          const at = nextCandidate.airtime || '00:00';
+        if (candidate.airstamp) {
+          isAired = new Date(candidate.airstamp).getTime() <= Date.now();
+        } else if (candidate.airdate || candidate.air_date) {
+          const ad = candidate.airdate || candidate.air_date;
+          const at = candidate.airtime || '00:00';
           isAired = new Date(`${ad}T${at}:00Z`).getTime() <= Date.now();
         }
         if (isAired) {
-          setNextEp(nextCandidate);
-        } else {
-          setNextEp(null);
+          nextCandidate = candidate;
         }
-      } else {
-        setNextEp(null);
       }
     }
 
-    setIsLoading(true);
-    try {
-      await apiClient.post(`/lists/${item.tracking_list_id}/toggle-series-episode`, {
-        episode_id: currentEpToMark.id,
-        title: currentEpToMark.title || `${item.title} - S${pad(currentEpToMark.season_number)}E${pad(currentEpToMark.episode_number)} - ${currentEpToMark.name || 'Untitled'}`,
-        image_url: currentEpToMark.still_path || null,
-        overview: currentEpToMark.overview,
-        season_number: currentEpToMark.season_number,
-        episode_number: currentEpToMark.episode_number
-      });
+    // Immediately show next episode so user can keep clicking without any delay
+    setNextEp(nextCandidate);
 
-      const listRes = await apiClient.get(`/lists/${item.tracking_list_id}`);
-      const updatedList = listRes.data.items || [];
-      const cacheKey = `series_${item.external_id}`;
-      const cached = getCachedSeries(cacheKey);
-      
-      let isAllDone = false;
-      if (cached && cached.seasons) {
-        const totalEps = cached.seasons.reduce((acc: number, s: any) => acc + (s.episode_count || 0), 0);
-        const completed = updatedList.filter((ep: any) => ep.is_completed).length;
-        if (totalEps > 0 && completed >= totalEps) {
-          isAllDone = true;
-        }
+    // Non-blocking background sync
+    apiClient.post(`/lists/${item.tracking_list_id}/toggle-series-episode`, {
+      episode_id: currentEpToMark.id,
+      title: currentEpToMark.title || `${item.title} - S${pad(currentEpToMark.season_number)}E${pad(currentEpToMark.episode_number)} - ${currentEpToMark.name || 'Untitled'}`,
+      image_url: currentEpToMark.still_path || null,
+      overview: currentEpToMark.overview,
+      season_number: currentEpToMark.season_number,
+      episode_number: currentEpToMark.episode_number
+    }).then(async () => {
+      // If there are no more episodes, mark series as completed
+      if (!nextCandidate) {
+        try {
+          await apiClient.put(`/library/${item.id}`, { status: 'completed' });
+          onUpdate();
+        } catch (e) {}
       }
-
-      if (!isAllDone && allEps && Array.isArray(allEps) && allEps.length > 0) {
-        const nowMs = Date.now();
-        const hasUnwatchedAired = allEps.some(ep => {
-          let isAired = true;
-          if (ep.airstamp) {
-            isAired = new Date(ep.airstamp).getTime() <= nowMs;
-          } else if (ep.airdate || ep.air_date) {
-            const ad = ep.airdate || ep.air_date;
-            const at = ep.airtime || '00:00';
-            isAired = new Date(`${ad}T${at}:00Z`).getTime() <= nowMs;
-          }
-          const isWatched = updatedList.some((t: any) => 
-            (t.external_id === `tvm-ep-${ep.id}` || 
-             t.id === ep.id || 
-             (t.title && t.title.includes(`S${pad(ep.season_number)}E${pad(ep.episode_number)}`)) ||
-             (t.title && t.title.includes(`E${pad(ep.episode_number)}`) && (t.section === `Season ${ep.season_number}` || t.title.includes(`S${ep.season_number}`)))
-            ) && t.is_completed
-          );
-          return isAired && !isWatched;
-        });
-
-        if (!hasUnwatchedAired) {
-          isAllDone = true;
-        }
-      }
-
-      if (isAllDone) {
-        await apiClient.put(`/library/${item.id}`, { status: 'completed' });
-        onUpdate();
-        setNextEp(null);
-      }
-    } catch (err) {
-      console.error(err);
+    }).catch(err => {
+      console.error("Failed to mark episode in background", err);
       fetchNextEpisode();
-    } finally {
-      setIsLoading(false);
-    }
+    });
   };
 
   const handleCardClick = () => {
