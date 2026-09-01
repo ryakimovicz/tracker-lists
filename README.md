@@ -1,10 +1,16 @@
-# Pathd 🌌
-> **The Ultimate Multi-Media Universe & Personal Library Tracker**
+<div align="center">
+  <a href="https://pathd.net">
+    <img src="frontend/public/logo-horizontal-tagline-transparent.png" alt="Pathd Logo" width="340" />
+  </a>
+  <p><strong>The Ultimate Multi-Media Universe & Personal Library Tracker</strong></p>
 
-[![Production Status](https://img.shields.io/badge/Production-Online-10b981?style=for-the-badge&logo=cloudflare)](https://pathd.net)
-[![React](https://img.shields.io/badge/Frontend-React_19_+_TypeScript-61dafb?style=for-the-badge&logo=react)](https://react.dev/)
-[![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688?style=for-the-badge&logo=fastapi)](https://fastapi.tiangolo.com/)
-[![PostgreSQL](https://img.shields.io/badge/Database-PostgreSQL_Serverless-4169e1?style=for-the-badge&logo=postgresql)](https://neon.tech/)
+  <p>
+    <a href="https://pathd.net"><img src="https://img.shields.io/badge/Production-Online-10b981?style=for-the-badge&logo=cloudflare" alt="Production Status" /></a>
+    <a href="https://react.dev/"><img src="https://img.shields.io/badge/Frontend-React_19_+_TypeScript-61dafb?style=for-the-badge&logo=react" alt="React" /></a>
+    <a href="https://fastapi.tiangolo.com/"><img src="https://img.shields.io/badge/Backend-FastAPI-009688?style=for-the-badge&logo=fastapi" alt="FastAPI" /></a>
+    <a href="https://neon.tech/"><img src="https://img.shields.io/badge/Database-PostgreSQL_Serverless-4169e1?style=for-the-badge&logo=postgresql" alt="PostgreSQL" /></a>
+  </p>
+</div>
 
 **Pathd** (`pathd.net`) es una plataforma web premium y unificada diseñada para indexar, organizar y hacer seguimiento de tu consumo cultural y entretenimiento en un único lugar: **Películas, Series, Anime, Libros, Cómics, Mangas, Música y Videojuegos**.
 
