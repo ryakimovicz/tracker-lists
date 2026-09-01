@@ -185,8 +185,8 @@ export const TermsOfService: React.FC = () => {
             </li>
             <li>
               {isEs
-                ? 'Las cuentas que publiquen de manera reiterada contenido prohibido o generen reportes abusivos podrán ser suspendidas o canceladas de acuerdo con los criterios del equipo de moderación.'
-                : 'Accounts that repeatedly share prohibited content or submit abusive reports may be suspended or permanently terminated at the discretion of the moderation team.'}
+                ? 'Las cuentas que de manera reiterada creen guías, comentarios, reseñas o elementos personalizados con contenido explícito o prohibido, o que generen reportes falsos o abusivos, podrán ser suspendidas o canceladas por el equipo de moderación.'
+                : 'Accounts that repeatedly create guides, comments, reviews, or custom items containing explicit or prohibited content, or that submit false or abusive reports, may be suspended or permanently terminated by the moderation team.'}
             </li>
           </ul>
         </section>
