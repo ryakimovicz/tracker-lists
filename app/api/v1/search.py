@@ -551,15 +551,32 @@ def get_explore_tabs(
                     status=item.status
                 ))
     
-    # 2. Nuevo (APIs with 4-hour in-memory cache)
+    # Query current blocked items & franchises from DB for real-time instant filtering
+    from app.models.social import BlockedMediaItem, BlockedFranchise
+    blocked_media_ids = {b.external_id for b in db.query(BlockedMediaItem.external_id).all()}
+    blocked_franchises = db.query(BlockedFranchise).all()
+    blocked_franchise_names = [bf.name.lower().strip() for bf in blocked_franchises if bf.name]
+
+    def is_item_allowed(item: SearchResultItem) -> bool:
+        if item.external_id in blocked_media_ids:
+            return False
+        if not is_safe_media_item(item.title, item.description):
+            return False
+        title_lower = (item.title or "").lower()
+        if any(bf_name in title_lower for bf_name in blocked_franchise_names if len(bf_name) >= 3):
+            return False
+        return True
+
+    # 2. Nuevo (APIs with 4-hour in-memory cache + real-time blacklist dynamic filtering)
     now_ts = time.time()
     cache_key = "explore_nuevo_global"
     if cache_key in _EXPLORE_NUEVO_CACHE:
         cache_time, cached_items = _EXPLORE_NUEVO_CACHE[cache_key]
         if now_ts - cache_time < _EXPLORE_CACHE_TTL and len(cached_items) > 0:
+            filtered_cached = [x for x in cached_items if is_item_allowed(x)]
             return ExploreTabsResponse(
                 agregado=agregado,
-                nuevo=cached_items,
+                nuevo=filtered_cached,
                 descubrir=[]
             )
 

@@ -368,6 +368,7 @@ export const AdminPanel: React.FC = () => {
   const handleBanMedia = async (item_type: string, external_id: string, title?: string, reason?: string) => {
     try {
       await apiClient.post('/admin/media/ban', { item_type, external_id, title, reason });
+      try { sessionStorage.removeItem('pathd_explore_cache'); } catch (e) {}
       fetchReports();
     } catch (e) {
       console.error(e);
@@ -377,6 +378,7 @@ export const AdminPanel: React.FC = () => {
   const handleUnbanMedia = async (blocked_id: number) => {
     try {
       await apiClient.delete(`/admin/media/unban/${blocked_id}`);
+      try { sessionStorage.removeItem('pathd_explore_cache'); } catch (e) {}
       fetchReports();
     } catch (e) {
       console.error(e);
@@ -415,6 +417,7 @@ export const AdminPanel: React.FC = () => {
         item_type: 'comic',
         reason: 'Bloqueado por moderación de admin'
       });
+      try { sessionStorage.removeItem('pathd_explore_cache'); } catch (e) {}
       fetchReports();
       setFranchiseResults(prev => prev.filter(r => r.target_id !== target_id));
       setFranchiseSearchFeedback(isEs ? `¡'${name}' fue bloqueada con éxito!` : `Successfully blocked '${name}'!`);
@@ -449,6 +452,11 @@ export const AdminPanel: React.FC = () => {
         item_type: report.item_type || 'comic',
         reason: `Bloqueo de saga/revista tras reporte: ${report.reason || 'Contenido explícito'}`
       });
+
+      // Clear local explore cache so the admin immediately sees updated results
+      try {
+        sessionStorage.removeItem('pathd_explore_cache');
+      } catch (e) {}
 
       // 2. Also ensure this specific media item is deleted / reported items refreshed
       try {
