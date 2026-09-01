@@ -126,7 +126,8 @@ Constructor interactivo de listas cronológicas con flujo documental estilo proc
 Panel completo de gestión y moderación disponible exclusivamente para administradores:
 - **Reasignación Atómica de ID de Usuario**: Modificación segura del ID numérico del usuario actualizando automáticamente todas las tablas relacionales.
 - **Gestión de Roles y Membresías**: Asignación/revocación de Estatus VIP, regalo de meses de suscripción Premium y cancelación de suscripciones.
-- **Moderación de Usuarios y Contenido**: Suspensión temporal/permanente de cuentas, advertencias administrativas, eliminación de cuentas y resolución de reportes sobre guías, comentarios y reseñas.
+- **Moderación de Obras y Sagas**: Búsqueda, bloqueo y purga de obras individuales, sagas completas, revistas o editoriales por ID en cascada.
+- **Moderación Comunitaria**: Suspensión temporal/permanente de cuentas, advertencias administrativas, eliminación de cuentas y resolución de reportes sobre obras, guías, comentarios y reseñas.
 
 ---
 
@@ -209,7 +210,7 @@ Panel completo de gestión y moderación disponible exclusivamente para administ
 | POST | `/` | Añadir obra a la estantería personal |
 | GET | `/` | Obtener estantería del usuario autenticado |
 | PUT | `/{library_item_id}` | Actualizar estado, tiempo o páginas leídas de una obra |
-| DELETE | `/{library_item_id}` | Eliminar obra de la estantería preservando historial |
+| DELETE | `/{library_item_id}` | Eliminar obra de la estantería (con opción de conservar o purgar historial) |
 | POST | `/{library_item_id}/mark-consumed` | Volver a marcar como visto/leído/jugado (Free max 2 / Premium ilimitado) |
 | GET | `/{library_item_id}/consumption-history` | Obtener historial cronológico de fechas de consumo |
 | DELETE | `/{library_item_id}/consumption-history/latest` | Desmarcar última visualización o volver al estado anterior |
@@ -229,6 +230,7 @@ Panel completo de gestión y moderación disponible exclusivamente para administ
 | DELETE | `/lists/{list_id}/comments/{comment_id}` | Eliminar comentario |
 | POST | `/lists/{list_id}/comments/{comment_id}/vote` | Votar un comentario |
 | POST | `/lists/{list_id}/comments/{comment_id}/report` | Reportar un comentario |
+| POST | `/media/report` | Reportar una obra del catálogo por contenido indebido |
 
 ### Reseñas (`/api/v1/reviews`)
 | Método | Ruta | Descripción |
@@ -272,7 +274,14 @@ Panel completo de gestión y moderación disponible exclusivamente para administ
 | POST | `/users/{user_id}/warn` | Enviar advertencia administrativa directa |
 | POST | `/users/{user_id}/clear-warning` | Limpiar advertencia administrativa |
 | DELETE | `/users/{user_id}` | Banear y eliminar cuenta de usuario |
-| GET | `/reports` | Consultar reportes activos de la comunidad |
+| GET | `/reports` | Consultar reportes activos de obras, guías, comentarios y reseñas |
+| POST | `/media/ban` | Banear y purgar una obra específica de todo el sistema |
+| DELETE | `/media/unban/{blocked_id}` | Desbloquear una obra de la blacklist |
+| GET | `/franchises/search` | Buscar sagas, revistas o editoriales externas por nombre |
+| GET | `/franchises/resolve-from-media` | Resolver saga o volumen matriz desde una obra reportada |
+| POST | `/franchises/ban` | Banear y purgar saga o editorial por ID estructural |
+| DELETE | `/franchises/unban/{blocked_id}` | Desbloquear saga o editorial de la blacklist |
+| DELETE | `/reports/media/{report_id}` | Desestimar reporte de obra |
 | DELETE | `/lists/{list_id}` | Eliminar guía por moderación |
 | DELETE | `/comments/{comment_id}` | Eliminar comentario por moderación |
 | DELETE | `/reviews/{review_id}` | Eliminar reseña por moderación |
