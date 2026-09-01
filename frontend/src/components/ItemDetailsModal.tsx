@@ -797,6 +797,39 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
       const isActualEpisode = item.external_id && item.external_id.startsWith('tvm-ep-');
 
+      const processAllEps = (allEps: any[]) => {
+        const extIds = allEps.map(e => `tvm-ep-${e.id}`);
+        if (extIds.length > 0) {
+          apiClient.post('/users/me/progress/bulk-check', { external_ids: extIds })
+            .then(progRes => {
+              setGlobalProgress(prev => ({ ...prev, ...progRes.data }));
+            })
+            .catch(e => console.error("Failed to fetch global progress", e));
+        }
+
+        const grouped: Record<number, any[]> = {};
+        allEps.forEach(ep => {
+          if (!grouped[ep.season_number]) grouped[ep.season_number] = [];
+          grouped[ep.season_number].push(ep);
+        });
+        setSeasonEpisodes(prev => ({ ...prev, ...grouped }));
+
+        setSeasons(prevSeasons => {
+          if (!prevSeasons || prevSeasons.length === 0) return prevSeasons;
+          const validSeasons = prevSeasons.filter(s => {
+            const countInEps = (grouped[s.season_number] || []).length;
+            return countInEps > 0 || (s.episode_count && s.episode_count < 900);
+          }).map(s => {
+            const countInEps = (grouped[s.season_number] || []).length;
+            return {
+              ...s,
+              episode_count: countInEps > 0 ? countInEps : s.episode_count
+            };
+          });
+          return validSeasons.length > 0 ? validSeasons : prevSeasons;
+        });
+      };
+
       // 2. If it's a series, immediately load and render from memory cache if available (0 ms)
       if ((item.item_type === 'series' || item.item_type === 'anime') && !isActualEpisode && item.external_id) {
         const seriesId = item.external_id;
@@ -804,39 +837,6 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
         const cacheKeyAll = `${seriesId}_all_episodes`;
         const cachedMeta = getCachedSeries(cacheKeyMeta);
         const cachedAll = getCachedSeries(cacheKeyAll);
-
-        const processAllEps = (allEps: any[]) => {
-          const extIds = allEps.map(e => `tvm-ep-${e.id}`);
-          if (extIds.length > 0) {
-            apiClient.post('/users/me/progress/bulk-check', { external_ids: extIds })
-              .then(progRes => {
-                setGlobalProgress(prev => ({ ...prev, ...progRes.data }));
-              })
-              .catch(e => console.error("Failed to fetch global progress", e));
-          }
-
-          const grouped: Record<number, any[]> = {};
-          allEps.forEach(ep => {
-            if (!grouped[ep.season_number]) grouped[ep.season_number] = [];
-            grouped[ep.season_number].push(ep);
-          });
-          setSeasonEpisodes(prev => ({ ...prev, ...grouped }));
-
-          setSeasons(prevSeasons => {
-            if (!prevSeasons || prevSeasons.length === 0) return prevSeasons;
-            const validSeasons = prevSeasons.filter(s => {
-              const countInEps = (grouped[s.season_number] || []).length;
-              return countInEps > 0 || (s.episode_count && s.episode_count < 900);
-            }).map(s => {
-              const countInEps = (grouped[s.season_number] || []).length;
-              return {
-                ...s,
-                episode_count: countInEps > 0 ? countInEps : s.episode_count
-              };
-            });
-            return validSeasons.length > 0 ? validSeasons : prevSeasons;
-          });
-        };
 
         if (cachedMeta && cachedMeta.seasons) {
           setSeasons(cachedMeta.seasons);
@@ -897,24 +897,16 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
           }).catch(console.error);
         }
 
+        // Background network sync: always fetch latest episodes in background so newly released episodes appear seamlessly
+        apiClient.get(`/search/series/${seriesId}/episodes`).then(res => {
+          if (Array.isArray(res.data) && res.data.length > 0) {
+            setCachedSeries(cacheKeyAll, res.data);
+            processAllEps(res.data);
+          }
+        }).catch(() => {}).finally(() => setIsLoadingSeasonEpisodes(false));
+
         if (!cachedAll || !Array.isArray(cachedAll) || cachedAll.length === 0) {
           setIsLoadingSeasonEpisodes(true);
-          apiClient.get(`/search/series/${seriesId}/episodes`).then(res => {
-            setCachedSeries(cacheKeyAll, res.data);
-            const allEps = res.data || [];
-            const extIds = allEps.map((e: any) => `tvm-ep-${e.id}`);
-            if (extIds.length > 0) {
-              apiClient.post('/users/me/progress/bulk-check', { external_ids: extIds })
-                .then(progRes => setGlobalProgress(prev => ({ ...prev, ...progRes.data })))
-                .catch(console.error);
-            }
-            const grouped: Record<number, any[]> = {};
-            allEps.forEach((ep: any) => {
-              if (!grouped[ep.season_number]) grouped[ep.season_number] = [];
-              grouped[ep.season_number].push(ep);
-            });
-            setSeasonEpisodes(prev => ({ ...prev, ...grouped }));
-          }).catch(console.error).finally(() => setIsLoadingSeasonEpisodes(false));
         }
       }
 
