@@ -1,8 +1,8 @@
 <div align="center">
   <a href="https://pathd.net">
-    <img src="frontend/public/logo-horizontal-tagline-transparent.png" alt="Pathd Logo" width="340" />
+    <img src="frontend/public/logo-horizontal-transparent.png" alt="Pathd Logo" width="300" />
   </a>
-  <p><strong>The Ultimate Multi-Media Universe & Personal Library Tracker</strong></p>
+  <p><strong>La plataforma definitiva para el seguimiento de tu universo multimedia y biblioteca personal</strong></p>
 
   <p>
     <a href="https://pathd.net"><img src="https://img.shields.io/badge/Production-Online-10b981?style=for-the-badge&logo=cloudflare" alt="Production Status" /></a>
