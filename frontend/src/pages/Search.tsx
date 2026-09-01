@@ -333,7 +333,25 @@ export const Search: React.FC = () => {
     setSubmittedQuery(cleanQuery);
     setIsSearching(true);
     setErrorMsg('');
+
     try {
+      // 1. If currently in a specific category tab (e.g. game, movie, book), search it first for ultra-fast instant response!
+      if (activeTab !== 'all' && ['comic', 'book', 'manga', 'game', 'movie', 'anime', 'series'].includes(activeTab)) {
+        apiClient.get('/search/', {
+          params: { q: cleanQuery, type: activeTab }
+        }).then(fastRes => {
+          if (Array.isArray(fastRes.data) && fastRes.data.length > 0) {
+            setResults(prev => {
+              // Merge without duplicates if /search/all hasn't finished yet
+              const existingIds = new Set(prev.map(p => p.external_id));
+              const newItems = fastRes.data.filter((item: SearchResultItem) => !existingIds.has(item.external_id));
+              return [...prev, ...newItems];
+            });
+          }
+        }).catch(() => {});
+      }
+
+      // 2. Fetch full global results across all providers in parallel
       const response = await apiClient.get('/search/all', {
         params: { q: cleanQuery }
       });
@@ -344,7 +362,6 @@ export const Search: React.FC = () => {
       } else {
         setErrorMsg(t('errSearchFailed'));
       }
-      setResults([]);
     } finally {
       setIsSearching(false);
     }

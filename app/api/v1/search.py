@@ -36,8 +36,12 @@ def get_query_variations(q: str) -> List[str]:
             vars_set.append(v)
     return vars_set
 
+# In-memory search query cache with 15-minute TTL
+_SEARCH_QUERY_CACHE: Dict[str, Tuple[float, List[SearchResultItem]]] = {}
+_SEARCH_CACHE_TTL = 15 * 60  # 15 minutes
+
 @router.get("/", response_model=List[SearchResultItem])
-@limiter.limit("30/minute")
+@limiter.limit("60/minute")
 def search_media(
     request: Request,
     q: str = Query(..., min_length=1, description="The search query term"),
@@ -57,6 +61,14 @@ def search_media(
             detail="Invalid search type. Must be 'comic', 'book', 'manga', 'game', 'movie', 'anime' or 'series'."
         )
         
+    import time
+    now_ts = time.time()
+    cache_key = f"search_single_{type_lower}_{q.strip().lower()}"
+    if cache_key in _SEARCH_QUERY_CACHE:
+        cache_time, cached_items = _SEARCH_QUERY_CACHE[cache_key]
+        if now_ts - cache_time < _SEARCH_CACHE_TTL:
+            return cached_items
+
     variations = [v for v in get_query_variations(q) if is_safe_text(v)]
     if not variations:
         return []
@@ -119,16 +131,24 @@ def search_media(
             return score
         combined.sort(key=calculate_score, reverse=True)
         
+    _SEARCH_QUERY_CACHE[cache_key] = (now_ts, combined)
     return combined
 
 @router.get("/all", response_model=List[SearchResultItem])
-@limiter.limit("20/minute")
+@limiter.limit("60/minute")
 def search_all_media(
     request: Request,
     q: str = Query(..., min_length=1, description="The search query term"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_optional)
 ):
+    import time
+    now_ts = time.time()
+    cache_key = f"search_all_{q.strip().lower()}"
+    if cache_key in _SEARCH_QUERY_CACHE:
+        cache_time, cached_items = _SEARCH_QUERY_CACHE[cache_key]
+        if now_ts - cache_time < _SEARCH_CACHE_TTL:
+            return cached_items
     variations = get_query_variations(q)
     combined = []
     seen = set()
@@ -230,6 +250,7 @@ def search_all_media(
         return score
 
     combined.sort(key=calculate_score, reverse=True)
+    _SEARCH_QUERY_CACHE[cache_key] = (now_ts, combined)
     return combined
 
 
