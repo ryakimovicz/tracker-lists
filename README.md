@@ -21,15 +21,10 @@ Complementada con un potente constructor de **Guías Cronológicas interactivas*
   - *Libros, Cómics y Mangas*: Contador interactivo de páginas leídas con porcentaje visual en tiempo real.
   - *Juegos y Películas*: Registro dinámico de tiempo dedicado (*horas y minutos*).
 
-### 🎮 Explorador de Videojuegos & Jerarquías (IGDB)
-- **Ranking Inteligente por Tiers**: Priorización clara en búsquedas para evitar confusiones entre colecciones y expansiones:
-  $$\text{Colecciones / Trilogías} \longrightarrow \text{Juegos Base} \longrightarrow \text{Ediciones Especiales} \longrightarrow \text{Expansiones} \longrightarrow \text{DLCs}$$
-- **Navegación Bidireccional en Modal**: Explora de forma fluida entre una saga, sus entregas principales, sus remasterizaciones y sus contenidos descargables con historial de navegación integrado.
-
 ### ✏️ Creador de Guías Cronológicas & Modificaciones (Mods)
 - **Constructor Multinivel**: Crea el orden perfecto para sagas complejas con secciones, bloques de importancia (1 a 5 estrellas: *Opcional, Recomendado, Obligatorio*) y notas personalizadas.
 - **Arrastrar y Soltar (*Drag & Drop*)**: Reordena temporadas, películas y tomos con fluidez.
-- **Sistema de Adiciones Comunitarias**: Los usuarios pueden crear "sub-guías" o expansiones sobre guías públicas y adoptarlas con un solo clic.
+- **Sistema de Adiciones Comunitarias**: Los usuarios pueden crear expansiones o listas complementarias sobre guías públicas y adoptarlas con un solo clic.
 
 ### 👥 Comunidad & Social
 - **Feed de Actividad en Tiempo Real**: Descubre qué están viendo, leyendo o jugando las personas que sigues.
@@ -38,7 +33,7 @@ Complementada con un potente constructor de **Guías Cronológicas interactivas*
 
 ### ⚡ Rendimiento Ultrarrápido (0 ms)
 - **Motor de Prefetching Inteligente**: Calentamiento silencioso en segundo plano (*Idle Warmup*) y precarga anticipada al pasar el cursor sobre los enlaces (*Hover Prefetching*).
-- **Caché Multicapa**: Respuestas inmediatas y búsqueda progresiva con priorización en la categoría activa.
+- **Búsqueda Multicapa con Caché**: Respuestas inmediatas y búsqueda progresiva con priorización en la categoría activa.
 
 ---
 
@@ -82,6 +77,6 @@ Si eres desarrollador, buscas auditar la infraestructura o colaborar en el proye
 ---
 
 <div align="center">
-  <sub>Desarrollado con ❤️ para amantes del cine, las series, la literatura, el cómic, la música y los videojuegos.</sub><br>
+  <sub>Desarrollado con ❤️ para amantes del cine, las series, la literatura, los videojuegos y la música.</sub><br>
   <sub>© 2026 Pathd (pathd.net). Todos los derechos reservados.</sub>
 </div>
