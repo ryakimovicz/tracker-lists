@@ -1,32 +1,54 @@
-# React + TypeScript + Vite
+# Pathd - Frontend SPA 🌌
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Frontend oficial de **Pathd**, desarrollado como una Single Page Application (SPA) moderna, responsiva y de alto rendimiento construida con **React 19, TypeScript y Vite**.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## 🛠️ Stack Tecnológico
 
-## React Compiler
+- **Core**: React 19, TypeScript 5, Vite
+- **Iconografía**: [lucide-react](https://lucide.dev/)
+- **Cliente HTTP**: Axios con interceptores automáticos de autenticación JWT y bilingüismo (`Accept-Language`).
+- **Diseño & Estilos**: Vanilla CSS con sistema de diseño basado en variables CSS personalizadas (**Solar Amber `#f59e0b`** y **Deep Cinema Charcoal `#090d16`**), efectos *Glassmorphism* y tipografía Inter.
+- **Rendimiento & Precarga**:
+  - **Idle Warmup**: Calentamiento automático de datos en segundo plano durante períodos de inactividad de CPU.
+  - **Hover & Touch Prefetching**: Anticipación al clic en elementos de navegación del Sidebar.
+  - **Multi-tier Cache**: Caché en memoria y `sessionStorage` para aperturas de pantalla en 0 ms.
+- **Monetización**: Google AdSense con bloques responsivos integrados y soporte nativo para cuentas Premium sin anuncios.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+---
 
-## Expanding the Oxlint configuration
+## 🚀 Comandos Disponibles
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
+En el directorio `frontend/`:
 
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+# Instalar dependencias
+npm install
+
+# Iniciar servidor de desarrollo (HMR)
+npm run dev
+
+# Compilar bundle de producción optimizado
+npm run build
+
+# Previsualizar el build de producción localmente
+npm run preview
+
+# Ejecutar linter
+npm run lint
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+---
+
+## 🗂️ Estructura del Frontend
+
+```
+frontend/src/
+├── api/          # Cliente Axios centralizado e interceptores de red
+├── components/   # Componentes modulares reutilizables (Sidebar, Modales, MediaCards, Ads, etc.)
+├── context/      # Contextos globales de estado (AuthContext, LanguageContext, ThemeContext)
+├── hooks/        # Custom hooks de React (useScrollLock, etc.)
+├── pages/        # Vistas y pantallas principales (Home, Search, Social, CreateGuide, Profile, etc.)
+└── utils/        # Utilidades de caché, formateo y motor de prefetching inteligente
+```

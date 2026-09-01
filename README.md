@@ -98,7 +98,9 @@ Centro de control personal del usuario dividido en 5 pestañas:
 - **Bloqueo de Scroll en Fondo (`useScrollLock`)**: Bloqueo automático del scroll de la página de fondo al abrir cualquier modal de la aplicación.
 
 ### 🔍 Explorar y Búsqueda Global
-- **Novedades y Tendencias**: Lanzamientos recientes y destacados organizados por categorías multimedia.
+- **Novedades y Tendencias**: Lanzamientos recientes y destacados organizados por categorías multimedia con almacenamiento en memoria y sesión de respuesta inmediata.
+- **Búsqueda Progresiva y Multicapa**: Búsqueda inmediata prioritaria en la categoría activa con resolución global en paralelo y caché de consultas de 15 minutos.
+- **Motor de Prefetching Inteligente**: Calentamiento silencioso en períodos inactivos (*Idle Warmup*) y anticipación por contacto (*Hover & Touch Prefetching*) para transiciones en tiempo real.
 - **Portadas Cinematográficas de Respaldo**: Detección de pósters genéricos con fondo fotográfico cinematográfico y tipografía del título destacada en la parte central superior.
 - **Auto-Sincronización de Metadatos**: Enriquecimiento y actualización automática de portadas oficiales en la estantería del usuario cuando las APIs externas se recuperan.
 
