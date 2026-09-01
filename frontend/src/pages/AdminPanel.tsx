@@ -697,17 +697,15 @@ export const AdminPanel: React.FC = () => {
                           >
                             <Ban size={14} /> {isEs ? 'Banear Obra' : 'Ban Media'}
                           </button>
-                          {(r.item_type === 'comic' || r.item_type === 'manga') && (
-                            <button
-                              onClick={() => handleBanFranchiseFromReport(r)}
-                              disabled={banningReportFranchiseId === r.report_id}
-                              className="btn-primary"
-                              style={{ background: 'var(--accent-primary)', borderColor: 'var(--accent-primary)', color: '#fff', fontSize: '0.82rem', padding: '0.45rem 0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
-                            >
-                              {banningReportFranchiseId === r.report_id ? <RefreshCw size={14} className="spin" /> : <Ban size={14} />}
-                              {isEs ? 'Banear Saga Completa' : 'Ban Entire Saga'}
-                            </button>
-                          )}
+                          <button
+                            onClick={() => handleBanFranchiseFromReport(r)}
+                            disabled={banningReportFranchiseId === r.report_id}
+                            className="btn-primary"
+                            style={{ background: 'var(--accent-primary)', borderColor: 'var(--accent-primary)', color: '#fff', fontSize: '0.82rem', padding: '0.45rem 0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+                          >
+                            {banningReportFranchiseId === r.report_id ? <RefreshCw size={14} className="spin" /> : <Ban size={14} />}
+                            {isEs ? 'Banear Saga Completa' : 'Ban Entire Saga'}
+                          </button>
                           <button
                             onClick={() => handleDismissMediaReport(r.report_id)}
                             className="btn-secondary"
