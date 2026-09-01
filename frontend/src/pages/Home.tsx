@@ -182,10 +182,14 @@ const CustomCard = ({
 const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, themeTextColor }: { item: any, onUpdate: () => void, language: string, onOpenSeries: (item: any) => void, themeColor?: string, themeTextColor?: string }) => {
   const [nextEp, setNextEp] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+
+  const pad = (n: number) => n < 10 ? '0' + n : n;
 
   const fetchNextEpisode = async () => {
     if (!item.tracking_list_id) {
       setIsLoading(false);
+      setIsInitialLoad(false);
       return;
     }
     setIsLoading(true);
@@ -215,7 +219,10 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
         setCachedSeries(cacheKey, { ...seriesRes.data, seasons: filteredSeasons });
       }
 
-      if (filteredSeasons.length === 0) return;
+      if (filteredSeasons.length === 0) {
+        setIsInitialLoad(false);
+        return;
+      }
 
       const cacheKeyAll = `${item.external_id}_all_episodes`;
       let allEps = getCachedSeries(cacheKeyAll);
@@ -229,15 +236,9 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
         }
       }
 
-      const completed = trackedEpisodes
-        .filter((e: any) => e.is_completed)
-        .map((e: any) => ({ ...e, ...parseEpInfo(e) }))
-        .sort((a: any, b: any) => a.season !== b.season ? a.season - b.season : a.episode - b.episode);
-
       // Find the first episode that is NOT completed
       let targetEp = null;
       if (allEps && Array.isArray(allEps) && allEps.length > 0) {
-        // Sort all episodes by season and episode number
         const sortedAllEps = [...allEps].sort((a: any, b: any) => 
           a.season_number !== b.season_number ? a.season_number - b.season_number : a.episode_number - b.episode_number
         );
@@ -250,7 +251,7 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
         });
       }
 
-      // Check if targetEp has actually aired yet (using exact airstamp / airdate + airtime)
+      // Check if targetEp has actually aired yet
       if (targetEp) {
         let isAired = true;
         if (targetEp.airstamp) {
@@ -263,7 +264,6 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
         }
 
         if (!isAired) {
-          // The next unwatched episode has not aired yet! Series is caught up -> auto-complete to move to Terminado
           await apiClient.put(`/library/${item.id}`, { status: 'completed' });
           onUpdate();
           setNextEp(null);
@@ -272,7 +272,6 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
 
         setNextEp(targetEp);
       } else {
-        // No more episodes exist at all -> series completed
         await apiClient.put(`/library/${item.id}`, { status: 'completed' });
         onUpdate();
         setNextEp(null);
@@ -281,6 +280,7 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
       console.error("Failed to load next episode for card", e);
     } finally {
       setIsLoading(false);
+      setIsInitialLoad(false);
     }
   };
 
@@ -291,16 +291,48 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
   const handleMarkSeen = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!nextEp) return;
+
+    const currentEpToMark = nextEp;
+
+    // ⚡ INSTANT OPTIMISTIC UI: Compute and transition to the next episode in 0ms
+    const cacheKeyAll = `${item.external_id}_all_episodes`;
+    const allEps = getCachedSeries(cacheKeyAll);
+    if (allEps && Array.isArray(allEps)) {
+      const sortedAllEps = [...allEps].sort((a: any, b: any) => 
+        a.season_number !== b.season_number ? a.season_number - b.season_number : a.episode_number - b.episode_number
+      );
+      const currentIndex = sortedAllEps.findIndex((ep: any) => ep.id === currentEpToMark.id);
+      if (currentIndex !== -1 && currentIndex + 1 < sortedAllEps.length) {
+        const nextCandidate = sortedAllEps[currentIndex + 1];
+        let isAired = true;
+        if (nextCandidate.airstamp) {
+          isAired = new Date(nextCandidate.airstamp).getTime() <= Date.now();
+        } else if (nextCandidate.airdate || nextCandidate.air_date) {
+          const ad = nextCandidate.airdate || nextCandidate.air_date;
+          const at = nextCandidate.airtime || '00:00';
+          isAired = new Date(`${ad}T${at}:00Z`).getTime() <= Date.now();
+        }
+        if (isAired) {
+          setNextEp(nextCandidate);
+        } else {
+          setNextEp(null);
+        }
+      } else {
+        setNextEp(null);
+      }
+    }
+
     setIsLoading(true);
     try {
       await apiClient.post(`/lists/${item.tracking_list_id}/toggle-series-episode`, {
-        episode_id: nextEp.id,
-        title: nextEp.title || `${item.title} - S${pad(nextEp.season_number)}E${pad(nextEp.episode_number)} - ${nextEp.name || 'Untitled'}`,
-        image_url: nextEp.still_path || null,
-        overview: nextEp.overview,
-        season_number: nextEp.season_number,
-        episode_number: nextEp.episode_number
+        episode_id: currentEpToMark.id,
+        title: currentEpToMark.title || `${item.title} - S${pad(currentEpToMark.season_number)}E${pad(currentEpToMark.episode_number)} - ${currentEpToMark.name || 'Untitled'}`,
+        image_url: currentEpToMark.still_path || null,
+        overview: currentEpToMark.overview,
+        season_number: currentEpToMark.season_number,
+        episode_number: currentEpToMark.episode_number
       });
+
       const listRes = await apiClient.get(`/lists/${item.tracking_list_id}`);
       const updatedList = listRes.data.items || [];
       const cacheKey = `series_${item.external_id}`;
@@ -315,60 +347,45 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
         }
       }
 
-      if (!isAllDone) {
-        const cacheKeyAll = `${item.external_id}_all_episodes`;
-        let allEps = getCachedSeries(cacheKeyAll);
-        if (!allEps) {
-          try {
-            const res = await apiClient.get(`/search/series/${item.external_id}/episodes`);
-            allEps = res.data;
-            setCachedSeries(cacheKeyAll, allEps);
-          } catch (e) {
-            allEps = null;
+      if (!isAllDone && allEps && Array.isArray(allEps) && allEps.length > 0) {
+        const nowMs = Date.now();
+        const hasUnwatchedAired = allEps.some(ep => {
+          let isAired = true;
+          if (ep.airstamp) {
+            isAired = new Date(ep.airstamp).getTime() <= nowMs;
+          } else if (ep.airdate || ep.air_date) {
+            const ad = ep.airdate || ep.air_date;
+            const at = ep.airtime || '00:00';
+            isAired = new Date(`${ad}T${at}:00Z`).getTime() <= nowMs;
           }
-        }
-        if (allEps && Array.isArray(allEps) && allEps.length > 0) {
-          const nowMs = Date.now();
-          const hasUnwatchedAired = allEps.some(ep => {
-            let isAired = true;
-            if (ep.airstamp) {
-              isAired = new Date(ep.airstamp).getTime() <= nowMs;
-            } else if (ep.airdate || ep.air_date) {
-              const ad = ep.airdate || ep.air_date;
-              const at = ep.airtime || '00:00';
-              isAired = new Date(`${ad}T${at}:00Z`).getTime() <= nowMs;
-            }
-            const isWatched = updatedList.some((t: any) => 
-              (t.external_id === `tvm-ep-${ep.id}` || 
-               t.id === ep.id || 
-               (t.title && t.title.includes(`S${pad(ep.season_number)}E${pad(ep.episode_number)}`)) ||
-               (t.title && t.title.includes(`E${pad(ep.episode_number)}`) && (t.section === `Season ${ep.season_number}` || t.title.includes(`S${ep.season_number}`)))
-              ) && t.is_completed
-            );
-            return isAired && !isWatched;
-          });
+          const isWatched = updatedList.some((t: any) => 
+            (t.external_id === `tvm-ep-${ep.id}` || 
+             t.id === ep.id || 
+             (t.title && t.title.includes(`S${pad(ep.season_number)}E${pad(ep.episode_number)}`)) ||
+             (t.title && t.title.includes(`E${pad(ep.episode_number)}`) && (t.section === `Season ${ep.season_number}` || t.title.includes(`S${ep.season_number}`)))
+            ) && t.is_completed
+          );
+          return isAired && !isWatched;
+        });
 
-          if (!hasUnwatchedAired) {
-            isAllDone = true;
-          }
+        if (!hasUnwatchedAired) {
+          isAllDone = true;
         }
       }
 
       if (isAllDone) {
         await apiClient.put(`/library/${item.id}`, { status: 'completed' });
+        onUpdate();
+        setNextEp(null);
       }
-
-      onUpdate();
-      await fetchNextEpisode();
     } catch (err) {
       console.error(err);
+      fetchNextEpisode();
     } finally {
       setIsLoading(false);
     }
   };
 
-  const pad = (n: number) => n < 10 ? '0' + n : n;
-  
   const handleCardClick = () => {
     if (nextEp) {
       onOpenSeries({
@@ -391,7 +408,6 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
     } else {
       onOpenSeries(item);
     }
-
   };
 
   const getCoverUrl = () => {
@@ -402,7 +418,6 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
   };
   const coverUrl = getCoverUrl();
 
-  
   let seasonText = '';
   let epName = '';
   if (nextEp) {
@@ -441,22 +456,27 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
           ) : (
             <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: "2rem" }}>?</div>
           )}
-          
-
         </div>
         
         <div style={{ padding: "0.75rem", display: "flex", flexDirection: "column", gap: "0.25rem", flex: 1 }}>
-          {seasonText ? (
+          {isInitialLoad ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem", marginTop: "auto", marginBottom: "auto" }}>
+              <div style={{ width: "65px", height: "14px", borderRadius: "4px", background: "var(--bg-tertiary)", animation: "pulse 1.5s infinite" }} />
+              <div style={{ width: "110px", height: "11px", borderRadius: "4px", background: "var(--bg-tertiary)", opacity: 0.6, animation: "pulse 1.5s infinite" }} />
+            </div>
+          ) : seasonText ? (
             <>
               <div style={{ fontSize: "0.9rem", color: "var(--text-primary)", fontWeight: 700 }}>{seasonText}</div>
               <div style={{ fontSize: "0.8rem", color: "var(--text-secondary)", fontWeight: 500, lineHeight: 1.2, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", paddingRight: "36px" }}>{epName}</div>
             </>
           ) : (
-            <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text-secondary)", marginTop: "auto", marginBottom: "auto" }}>Completado</div>
+            <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text-secondary)", marginTop: "auto", marginBottom: "auto" }}>
+              {language === 'es' ? 'Completado' : 'Completed'}
+            </div>
           )}
         </div>
         
-        {nextEp && (
+        {nextEp && !isInitialLoad && (
           <button 
             onClick={handleMarkSeen}
             disabled={isLoading}
@@ -467,7 +487,7 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
               background: "var(--bg-tertiary)", border: `2px solid ${themeColor || "var(--text-muted)"}`,
               display: "flex", alignItems: "center", justifyContent: "center",
               cursor: isLoading ? "wait" : "pointer", color: themeColor || "var(--text-primary)",
-              opacity: isLoading ? 0.5 : 1,
+              opacity: isLoading ? 0.6 : 1,
               "--btn-hover-bg": themeColor,
               "--btn-hover-text": themeTextColor
             } as React.CSSProperties}

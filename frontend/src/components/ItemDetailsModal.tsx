@@ -4653,7 +4653,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         }}
                       >
                         <Trash2 size={16} style={{ flexShrink: 0 }} />
-                        <span>{language === 'es' ? 'Desmarcar / Quitar' : 'Unwatch / Remove'}</span>
+                        <span>{language === 'es' ? 'Quitar' : 'Remove'}</span>
                       </button>
                     </div>
 
@@ -4841,7 +4841,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         }}
                       >
                         <Trash2 size={16} style={{ flexShrink: 0 }} />
-                        <span>{language === 'es' ? 'Desmarcar / Quitar' : 'Unwatch / Remove'}</span>
+                        <span>{language === 'es' ? 'Quitar' : 'Remove'}</span>
                       </button>
                     </div>
 
