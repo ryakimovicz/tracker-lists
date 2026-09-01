@@ -32,6 +32,23 @@ class ComicVineService:
         issue_results = []
         global_results = []
 
+        # Load blocked franchises/volumes from DB
+        blocked_vol_ids = set()
+        blocked_names = []
+        try:
+            from app.core.database import SessionLocal
+            from app.models.social import BlockedFranchise
+            with SessionLocal() as db:
+                bfs = db.query(BlockedFranchise).all()
+                for bf in bfs:
+                    raw_id = bf.target_id.replace("cv_volume_", "").replace("cv_publisher_", "").replace("cv_", "")
+                    if raw_id.isdigit():
+                        blocked_vol_ids.add(int(raw_id))
+                    if bf.name:
+                        blocked_names.append(bf.name.lower())
+        except Exception as e:
+            print(f"Notice loading blocked franchises: {e}")
+
         try:
             # 1. Detect if the query ends with an issue number (e.g. "The New Teen Titans 39" or "Justice League of America 9")
             issue_number_match = re.search(r'^(.*?)\s*#?\s*(\d+)$', cleaned_query)
@@ -55,7 +72,7 @@ class ComicVineService:
                                 v_data = json.loads(response.read().decode())
                                 for v_item in v_data.get("results", []):
                                     v_id = v_item.get("id")
-                                    if v_id:
+                                    if v_id and v_id not in blocked_vol_ids:
                                         matching_volume_ids.append(v_id)
                     except Exception as e:
                         print(f"Comic Vine Volume Filter Error: {e}")
@@ -73,7 +90,7 @@ class ComicVineService:
                                     v_data = json.loads(response.read().decode())
                                     for v_item in v_data.get("results", [])[:5]:
                                         v_id = v_item.get("id")
-                                        if v_id and v_id not in matching_volume_ids:
+                                        if v_id and v_id not in blocked_vol_ids and v_id not in matching_volume_ids:
                                             matching_volume_ids.append(v_id)
                         except Exception as e:
                             print(f"Comic Vine Volume Search Fallback Error: {e}")
@@ -90,15 +107,22 @@ class ComicVineService:
                                 if response.status == 200:
                                     data = json.loads(response.read().decode())
                                     for item in data.get("results", []):
+                                        vol_data = item.get("volume", {})
+                                        if vol_data.get("id") and vol_data.get("id") in blocked_vol_ids:
+                                            continue
+
                                         image_data = item.get("image", {})
                                         image_url = image_data.get("super_url") or image_data.get("medium_url") or image_data.get("thumb_url")
-                                        vol_name = item.get("volume", {}).get("name") or "Unknown Volume"
+                                        vol_name = vol_data.get("name") or "Unknown Volume"
                                         issue_num = item.get("issue_number") or ""
                                         issue_name = item.get("name")
                                         title_parts = f"{vol_name} #{issue_num}"
                                         if issue_name:
                                             title_parts += f" ({issue_name})"
                                         desc = item.get("description") or ""
+
+                                        if any(bn in title_parts.lower() for bn in blocked_names):
+                                            continue
 
                                         if not is_safe_media_item(title_parts, desc):
                                             continue
@@ -133,10 +157,16 @@ class ComicVineService:
                     if response.status == 200:
                         data = json.loads(response.read().decode())
                         for item in data.get("results", []):
+                            resource_type = item.get("resource_type")
+                            vol_data = item.get("volume", {}) if resource_type == "issue" else item
+                            vol_id = vol_data.get("id") if resource_type == "issue" else item.get("id")
+                            
+                            if vol_id and vol_id in blocked_vol_ids:
+                                continue
+
                             image_data = item.get("image", {})
                             image_url = image_data.get("super_url") or image_data.get("medium_url") or image_data.get("thumb_url")
                             
-                            resource_type = item.get("resource_type")
                             if resource_type == "issue":
                                 vol_name = item.get("volume", {}).get("name") or "Unknown Volume"
                                 issue_num = item.get("issue_number") or ""
@@ -147,6 +177,9 @@ class ComicVineService:
                                 title = title_parts
                             else:
                                 title = item.get("name") or "Untitled Volume"
+
+                            if any(bn in title.lower() for bn in blocked_names):
+                                continue
 
                             desc = item.get("description") or ""
                             if not is_safe_media_item(title, desc):

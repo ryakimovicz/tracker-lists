@@ -423,6 +423,46 @@ export const AdminPanel: React.FC = () => {
     }
   };
 
+  const [banningReportFranchiseId, setBanningReportFranchiseId] = useState<number | null>(null);
+
+  const handleBanFranchiseFromReport = async (report: any) => {
+    setBanningReportFranchiseId(report.report_id);
+    try {
+      // 1. Resolve parent franchise from reported media
+      const res = await apiClient.get(`/admin/franchises/resolve-from-media?external_id=${encodeURIComponent(report.external_id)}&item_type=${encodeURIComponent(report.item_type || 'comic')}&title=${encodeURIComponent(report.title || '')}`);
+      const candidates = res.data || [];
+      
+      let target_type = 'volume';
+      let target_id = `cv_volume_${report.external_id.replace('cv_issue_', '').replace('cv_', '')}`;
+      let name = report.title;
+
+      if (candidates.length > 0) {
+        target_type = candidates[0].target_type;
+        target_id = candidates[0].target_id;
+        name = candidates[0].name;
+      }
+
+      await apiClient.post('/admin/franchises/ban', {
+        target_type,
+        target_id,
+        name,
+        item_type: report.item_type || 'comic',
+        reason: `Bloqueo de saga/revista tras reporte: ${report.reason || 'Contenido explícito'}`
+      });
+
+      // 2. Also ensure this specific media item is deleted / reported items refreshed
+      try {
+        await apiClient.delete(`/admin/reports/media/${report.report_id}`);
+      } catch (e) {}
+
+      fetchReports();
+    } catch (err: any) {
+      console.error("Error banning franchise from report:", err);
+    } finally {
+      setBanningReportFranchiseId(null);
+    }
+  };
+
   const handleUnbanFranchise = async (blocked_id: number) => {
     try {
       await apiClient.delete(`/admin/franchises/unban/${blocked_id}`);
@@ -649,14 +689,25 @@ export const AdminPanel: React.FC = () => {
                           </div>
                         </div>
 
-                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                           <button
                             onClick={() => handleBanMedia(r.item_type, r.external_id, r.title, r.reason)}
                             className="btn-primary"
                             style={{ background: '#ef4444', borderColor: '#ef4444', color: '#fff', fontSize: '0.82rem', padding: '0.45rem 0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
                           >
-                            <Ban size={14} /> {isEs ? 'Banear y Purgar Obra' : 'Ban & Purge Media'}
+                            <Ban size={14} /> {isEs ? 'Banear Obra' : 'Ban Media'}
                           </button>
+                          {(r.item_type === 'comic' || r.item_type === 'manga') && (
+                            <button
+                              onClick={() => handleBanFranchiseFromReport(r)}
+                              disabled={banningReportFranchiseId === r.report_id}
+                              className="btn-primary"
+                              style={{ background: 'var(--accent-primary)', borderColor: 'var(--accent-primary)', color: '#fff', fontSize: '0.82rem', padding: '0.45rem 0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+                            >
+                              {banningReportFranchiseId === r.report_id ? <RefreshCw size={14} className="spin" /> : <Ban size={14} />}
+                              {isEs ? 'Banear Saga Completa' : 'Ban Entire Saga'}
+                            </button>
+                          )}
                           <button
                             onClick={() => handleDismissMediaReport(r.report_id)}
                             className="btn-secondary"

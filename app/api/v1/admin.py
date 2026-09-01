@@ -238,6 +238,98 @@ def admin_search_franchises(
 
     return results
 
+@router.get("/franchises/resolve-from-media")
+def admin_resolve_franchise_from_media(
+    external_id: str,
+    item_type: str = "comic",
+    title: str = None,
+    current_admin: User = Depends(get_current_admin)
+):
+    """
+    Given a reported media item's external_id and title, resolves its parent Saga / Volume / Publisher
+    so the admin can ban the entire franchise with one click.
+    """
+    import urllib.request, urllib.parse, re, json
+    from app.core.config import settings
+
+    def clean_saga_name(t: str) -> str:
+        if not t:
+            return ""
+        clean = re.sub(r'\s*#\s*\d+.*$', '', t)
+        clean = re.sub(r'\s*No\.\s*\d+.*$', '', clean, flags=re.IGNORECASE)
+        clean = re.sub(r'\s*\(.*?\)', '', clean)
+        clean = re.sub(r'\s*Vol(ume|\.|\s*)\s*\d+.*$', '', clean, flags=re.IGNORECASE)
+        return clean.strip()
+
+    resolved_candidates = []
+
+    if item_type in ("comic", "manga"):
+        api_key = settings.COMIC_VINE_API_KEY
+        raw_issue_id = external_id.replace("cv_issue_", "").replace("cv_", "")
+        
+        # 1. If we have a comic issue ID, fetch the volume directly from Comic Vine API
+        if api_key and raw_issue_id.isdigit():
+            try:
+                url = f"https://comicvine.gamespot.com/api/issue/4000-{raw_issue_id}/?api_key={api_key}&format=json"
+                req = urllib.request.Request(url, headers={"User-Agent": "Pathd/1.0 (contact@pathd.app)"})
+                with urllib.request.urlopen(req, timeout=6) as response:
+                    if response.status == 200:
+                        data = json.loads(response.read().decode())
+                        res = data.get("results", {})
+                        vol = res.get("volume")
+                        if vol and vol.get("id"):
+                            vol_img = vol.get("image", {})
+                            resolved_candidates.append({
+                                "target_type": "volume",
+                                "target_id": f"cv_volume_{vol.get('id')}",
+                                "name": vol.get("name") or title,
+                                "publisher": None,
+                                "image_url": vol_img.get("thumb_url") or vol_img.get("small_url"),
+                                "item_type": item_type
+                            })
+            except Exception as e:
+                print(f"Error fetching issue volume directly: {e}")
+
+        # 2. Fallback / supplementary: search by extracted saga name if needed
+        if not resolved_candidates and title:
+            extracted_name = clean_saga_name(title)
+            if extracted_name and len(extracted_name) >= 2 and api_key:
+                try:
+                    encoded_q = urllib.parse.quote(extracted_name)
+                    url = f"https://comicvine.gamespot.com/api/search/?api_key={api_key}&format=json&resources=volume,publisher&query={encoded_q}&limit=5"
+                    req = urllib.request.Request(url, headers={"User-Agent": "Pathd/1.0 (contact@pathd.app)"})
+                    with urllib.request.urlopen(req, timeout=6) as response:
+                        if response.status == 200:
+                            data = json.loads(response.read().decode())
+                            for it in data.get("results", []):
+                                res_type = it.get("resource_type")
+                                img_obj = it.get("image", {})
+                                resolved_candidates.append({
+                                    "target_type": res_type,
+                                    "target_id": f"cv_{res_type}_{it.get('id')}",
+                                    "name": it.get("name") or extracted_name,
+                                    "publisher": it.get("publisher", {}).get("name") if res_type == "volume" and it.get("publisher") else None,
+                                    "image_url": img_obj.get("thumb_url") or img_obj.get("small_url"),
+                                    "item_type": item_type
+                                })
+                except Exception as e:
+                    print(f"Error resolving saga name: {e}")
+
+    # Fallback default candidate if external API returned nothing
+    if not resolved_candidates and title:
+        extracted_name = clean_saga_name(title)
+        if extracted_name:
+            resolved_candidates.append({
+                "target_type": "volume",
+                "target_id": f"franchise_{external_id}",
+                "name": extracted_name,
+                "publisher": None,
+                "image_url": None,
+                "item_type": item_type
+            })
+
+    return resolved_candidates
+
 class BanFranchiseRequest(BaseModel):
     target_type: str  # 'volume', 'publisher', etc.
     target_id: str    # e.g., 'cv_volume_88907'
@@ -251,7 +343,7 @@ def admin_ban_franchise(
     current_admin: User = Depends(get_current_admin),
     db: Session = Depends(get_db)
 ):
-    from app.models.social import BlockedFranchise
+    from app.models.social import BlockedFranchise, MediaItemReport
     from app.models.library import UserLibraryItem
     from app.models.list_item import ListItem
     from app.models.review import MediaReview
@@ -271,19 +363,22 @@ def admin_ban_franchise(
             )
             db.add(blocked)
 
-        # Purge items matching this name from library and lists if any
+        # Purge items matching this name from library, lists, reviews and active reports
         if body.name and len(body.name.strip()) >= 3:
             name_pattern = f"%{body.name.strip()}%"
             try:
                 db.query(UserLibraryItem).filter(UserLibraryItem.title.ilike(name_pattern)).delete(synchronize_session=False)
                 db.query(ListItem).filter(ListItem.title.ilike(name_pattern)).delete(synchronize_session=False)
+                db.query(MediaReview).filter(MediaReview.title.ilike(name_pattern)).delete(synchronize_session=False)
+                # Purge all matching active media reports in one go
+                db.query(MediaItemReport).filter(MediaItemReport.title.ilike(name_pattern)).delete(synchronize_session=False)
             except Exception as e:
                 print(f"Notice purging matching franchise titles: {e}")
 
         db.commit()
         return {
             "success": True,
-            "message": f"La {body.target_type} '{body.name}' ({body.target_id}) fue bloqueada. Todos sus números y entregas fueron filtrados."
+            "message": f"La {body.target_type} '{body.name}' ({body.target_id}) fue bloqueada. Todos sus números, entregas y reportes fueron eliminados."
         }
     except Exception as err:
         db.rollback()
