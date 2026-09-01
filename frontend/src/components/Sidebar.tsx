@@ -5,6 +5,7 @@ import { useTranslation } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
 import type { Theme } from '../context/ThemeContext';
 import { LogOut, Shield, Globe, Sun, Moon, Monitor, Home, Users, PlusCircle, Compass, User, Star } from 'lucide-react';
+import { prefetchRoute } from '../utils/prefetch';
 
 import { ProModal } from './ProModal';
 import { BrandLogo } from './BrandLogo';
@@ -53,6 +54,8 @@ export const Sidebar: React.FC = () => {
     return (
       <Link
         to={to}
+        onMouseEnter={() => prefetchRoute(to)}
+        onTouchStart={() => prefetchRoute(to)}
         style={{
           display: 'flex',
           alignItems: 'center',

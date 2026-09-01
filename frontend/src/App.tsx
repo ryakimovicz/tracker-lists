@@ -31,8 +31,17 @@ import { CookieBanner } from './components/CookieBanner';
 import { SuspendedAccountModal } from './components/SuspendedAccountModal';
 import { RightSidebarAd } from './components/RightSidebarAd';
 
+import { initGlobalPrefetch } from './utils/prefetch';
+import React, { useEffect } from 'react';
+
 function AppRoutes() {
   const { isAuthenticated } = useAuth();
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      initGlobalPrefetch();
+    }
+  }, [isAuthenticated]);
 
   return (
     <Router>

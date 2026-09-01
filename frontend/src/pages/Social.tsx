@@ -10,11 +10,26 @@ export const Social: React.FC = () => {
 
   useEffect(() => {
     const fetchSocial = async () => {
-      try {
+      // 1. Instant cache check from sessionStorage
+      const cached = sessionStorage.getItem('pathd_social_cache');
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed)) {
+            setFeed(parsed);
+            setLoading(false);
+          }
+        } catch (e) {}
+      } else {
         setLoading(true);
+      }
+
+      // 2. Fetch fresh data from API
+      try {
         const activityRes = await apiClient.get('/social/users/feed/activity');
         if (activityRes.data) {
           setFeed(activityRes.data);
+          sessionStorage.setItem('pathd_social_cache', JSON.stringify(activityRes.data));
         }
       } catch (err) {
         console.error('Failed to fetch social feed', err);
