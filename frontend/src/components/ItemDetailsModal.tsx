@@ -785,41 +785,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     const initModal = async (incomingItem: any) => {
       let item = incomingItem;
 
-      // Decouple personal tracking or refresh state from current user library
-      if (user && incomingItem.external_id) {
-        try {
-          const myLibRes = await apiClient.get('/library/');
-          const myLib = myLibRes.data || [];
-          const myMatch = myLib.find((li: any) => li.external_id === incomingItem.external_id && (li.item_type === incomingItem.item_type || (['series', 'anime'].includes(li.item_type) && ['series', 'anime'].includes(incomingItem.item_type))));
-          if (myMatch) {
-            item = {
-              ...incomingItem,
-              id: myMatch.id,
-              status: myMatch.status,
-              completed_at: myMatch.completed_at,
-              pages_read: myMatch.pages_read,
-              total_pages: myMatch.total_pages || incomingItem.total_pages,
-              tracking_list_id: myMatch.tracking_list_id,
-              is_favorite: myMatch.is_favorite
-            };
-          } else {
-            // Logged-in user does not have this parent item tracked
-            const isEp = incomingItem.item_type === 'episode' || (incomingItem.external_id && incomingItem.external_id.startsWith('tvm-ep-'));
-            item = {
-              ...incomingItem,
-              id: isEp ? incomingItem.id : undefined,
-              status: undefined,
-              completed_at: null,
-              pages_read: 0,
-              tracking_list_id: undefined,
-              is_favorite: false
-            };
-          }
-        } catch (err) {
-          console.error("Failed to check personal library state", err);
-        }
-      }
-
+      // 1. Render item immediately with whatever data we already have
       setSelectedItem(item);
       setUserRating(0);
       setUserComment('');
@@ -829,108 +795,127 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       setItemReviews([]);
       setDescExpanded(false);
 
-
       const isActualEpisode = item.external_id && item.external_id.startsWith('tvm-ep-');
-      if ((item.item_type === 'series' || item.item_type === 'anime') && !isActualEpisode) {
-        try {
-          let itemsList: any[] = [];
-          if (item.tracking_list_id) {
-            try {
-              const listRes = await apiClient.get(`/lists/${item.tracking_list_id}`);
-              itemsList = listRes.data.items || [];
-              setEpisodes(itemsList);
-            } catch (err) {
-              console.error("Failed to fetch tracking list", err);
-            }
+
+      // 2. If it's a series, immediately load and render from memory cache if available (0 ms)
+      if ((item.item_type === 'series' || item.item_type === 'anime') && !isActualEpisode && item.external_id) {
+        const seriesId = item.external_id;
+        const cacheKeyMeta = `${seriesId}_metadata`;
+        const cacheKeyAll = `${seriesId}_all_episodes`;
+        const cachedMeta = getCachedSeries(cacheKeyMeta);
+        const cachedAll = getCachedSeries(cacheKeyAll);
+
+        const processAllEps = (allEps: any[]) => {
+          const extIds = allEps.map(e => `tvm-ep-${e.id}`);
+          if (extIds.length > 0) {
+            apiClient.post('/users/me/progress/bulk-check', { external_ids: extIds })
+              .then(progRes => {
+                setGlobalProgress(prev => ({ ...prev, ...progRes.data }));
+              })
+              .catch(e => console.error("Failed to fetch global progress", e));
           }
 
-          const seriesId = item.external_id;
-          const cacheKey = `${seriesId}_metadata`;
-          const cached = getCachedSeries(cacheKey);
-          let seriesData: any = null;
-          let filteredSeasons: any[] = [];
-          
-          if (cached && cached.seasons && cached.image_url !== undefined) {
-            seriesData = cached;
-            filteredSeasons = cached.seasons;
-          } else {
-            const seriesRes = await apiClient.get(`/search/series/${item.external_id}`);
-            seriesData = seriesRes.data || {};
-            filteredSeasons = (seriesData?.seasons || []).filter((s: any) => s.season_number > 0);
-            if (filteredSeasons.length === 0 && (item.item_type === 'series' || item.item_type === 'anime')) {
-              filteredSeasons = [{ id: 1, season_number: 1, episode_count: item.latest_episode || 12 }];
-            }
-            setCachedSeries(cacheKey, { ...seriesData, seasons: filteredSeasons });
-          }
-          
-          if (seriesData && (!item.description || !item.release_date || !item.image_url)) {
+          const grouped: Record<number, any[]> = {};
+          allEps.forEach(ep => {
+            if (!grouped[ep.season_number]) grouped[ep.season_number] = [];
+            grouped[ep.season_number].push(ep);
+          });
+          setSeasonEpisodes(prev => ({ ...prev, ...grouped }));
+
+          setSeasons(prevSeasons => {
+            if (!prevSeasons || prevSeasons.length === 0) return prevSeasons;
+            const validSeasons = prevSeasons.filter(s => {
+              const countInEps = (grouped[s.season_number] || []).length;
+              return countInEps > 0 || (s.episode_count && s.episode_count < 900);
+            }).map(s => {
+              const countInEps = (grouped[s.season_number] || []).length;
+              return {
+                ...s,
+                episode_count: countInEps > 0 ? countInEps : s.episode_count
+              };
+            });
+            return validSeasons.length > 0 ? validSeasons : prevSeasons;
+          });
+        };
+
+        if (cachedMeta && cachedMeta.seasons) {
+          setSeasons(cachedMeta.seasons);
+          setActiveSeason(cachedMeta.seasons[0]?.season_number || 1);
+        }
+
+        if (cachedAll && Array.isArray(cachedAll) && cachedAll.length > 0) {
+          processAllEps(cachedAll);
+        }
+      }
+
+      // 3. Asynchronously fetch personal library state and freshest series metadata in parallel
+      if (user && incomingItem.external_id) {
+        apiClient.get('/library/').then(myLibRes => {
+          const myLib = myLibRes.data || [];
+          const myMatch = myLib.find((li: any) => li.external_id === incomingItem.external_id && (li.item_type === incomingItem.item_type || (['series', 'anime'].includes(li.item_type) && ['series', 'anime'].includes(incomingItem.item_type))));
+          if (myMatch) {
             setSelectedItem((prev: any) => prev ? {
               ...prev,
-              description: prev.description || seriesData.overview || '',
-              release_date: prev.release_date || seriesData.first_air_date || '',
-              image_url: prev.image_url || seriesData.image_url || null
+              id: myMatch.id,
+              status: myMatch.status,
+              completed_at: myMatch.completed_at,
+              pages_read: myMatch.pages_read,
+              total_pages: myMatch.total_pages || incomingItem.total_pages,
+              tracking_list_id: myMatch.tracking_list_id,
+              is_favorite: myMatch.is_favorite
             } : null);
+
+            if (myMatch.tracking_list_id) {
+              apiClient.get(`/lists/${myMatch.tracking_list_id}`).then(listRes => {
+                const itemsList = listRes.data.items || [];
+                setEpisodes(itemsList);
+              }).catch(() => {});
+            }
           }
-          setSeasons(filteredSeasons);
+        }).catch(err => {
+          console.error("Failed to check personal library state", err);
+        });
+      }
 
-          const nextSeason = item.tracking_list_id ? findNextSeasonToSee(itemsList, filteredSeasons) : (filteredSeasons.length > 0 ? filteredSeasons[0].season_number : 1);
-          setActiveSeason(nextSeason);
+      if ((item.item_type === 'series' || item.item_type === 'anime') && !isActualEpisode && item.external_id) {
+        const seriesId = item.external_id;
+        const cacheKeyMeta = `${seriesId}_metadata`;
+        const cacheKeyAll = `${seriesId}_all_episodes`;
+        const cachedMeta = getCachedSeries(cacheKeyMeta);
+        const cachedAll = getCachedSeries(cacheKeyAll);
 
-          const cacheKeyAll = `${item.external_id}_all_episodes`;
-          const cachedAll = getCachedSeries(cacheKeyAll);
-          
-          const processAllEps = (allEps: any[]) => {
-            const extIds = allEps.map(e => `tvm-ep-${e.id}`);
+        if (!cachedMeta || !cachedMeta.seasons) {
+          apiClient.get(`/search/series/${seriesId}`).then(seriesRes => {
+            const seriesData = seriesRes.data || {};
+            let filteredSeasons = (seriesData?.seasons || []).filter((s: any) => s.season_number > 0);
+            if (filteredSeasons.length === 0) {
+              filteredSeasons = [{ id: 1, season_number: 1, episode_count: item.latest_episode || 12 }];
+            }
+            setCachedSeries(cacheKeyMeta, { ...seriesData, seasons: filteredSeasons });
+            setSeasons(filteredSeasons);
+            setActiveSeason(filteredSeasons[0]?.season_number || 1);
+          }).catch(console.error);
+        }
+
+        if (!cachedAll || !Array.isArray(cachedAll) || cachedAll.length === 0) {
+          setIsLoadingSeasonEpisodes(true);
+          apiClient.get(`/search/series/${seriesId}/episodes`).then(res => {
+            setCachedSeries(cacheKeyAll, res.data);
+            const allEps = res.data || [];
+            const extIds = allEps.map((e: any) => `tvm-ep-${e.id}`);
             if (extIds.length > 0) {
               apiClient.post('/users/me/progress/bulk-check', { external_ids: extIds })
-                .then(progRes => {
-                  setGlobalProgress(prev => ({ ...prev, ...progRes.data }));
-                })
-                .catch(e => console.error("Failed to fetch global progress", e));
+                .then(progRes => setGlobalProgress(prev => ({ ...prev, ...progRes.data })))
+                .catch(console.error);
             }
-
             const grouped: Record<number, any[]> = {};
-            allEps.forEach(ep => {
+            allEps.forEach((ep: any) => {
               if (!grouped[ep.season_number]) grouped[ep.season_number] = [];
               grouped[ep.season_number].push(ep);
             });
             setSeasonEpisodes(prev => ({ ...prev, ...grouped }));
-
-            // Clean seasons list to only include seasons with actual episodes or valid counts
-            setSeasons(prevSeasons => {
-              if (!prevSeasons || prevSeasons.length === 0) return prevSeasons;
-              const validSeasons = prevSeasons.filter(s => {
-                const countInEps = (grouped[s.season_number] || []).length;
-                return countInEps > 0 || (s.episode_count && s.episode_count < 900);
-              }).map(s => {
-                const countInEps = (grouped[s.season_number] || []).length;
-                return {
-                  ...s,
-                  episode_count: countInEps > 0 ? countInEps : s.episode_count
-                };
-              });
-              return validSeasons.length > 0 ? validSeasons : prevSeasons;
-            });
-          };
-
-          if (cachedAll && Array.isArray(cachedAll)) {
-            processAllEps(cachedAll);
-          } else {
-            setIsLoadingSeasonEpisodes(true);
-            apiClient.get(`/search/series/${item.external_id}/episodes`)
-              .then(res => {
-                setCachedSeries(cacheKeyAll, res.data);
-                processAllEps(res.data || []);
-              })
-              .catch(e => console.error(e))
-              .finally(() => setIsLoadingSeasonEpisodes(false));
-          }
-        } catch (err) {
-          console.error("Failed to fetch episodes", err);
+          }).catch(console.error).finally(() => setIsLoadingSeasonEpisodes(false));
         }
-      } else {
-        setEpisodes([]);
-        setSeasons([]);
       }
 
       // Fetch game relations (collections, DLCs, editions, base game)
