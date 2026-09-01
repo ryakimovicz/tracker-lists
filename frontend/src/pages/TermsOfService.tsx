@@ -1,6 +1,6 @@
 import React from 'react';
 import { useTranslation } from '../context/LanguageContext';
-import { FileText, CheckCircle, AlertTriangle, HelpCircle, ArrowLeft, ExternalLink } from 'lucide-react';
+import { FileText, CheckCircle, AlertTriangle, HelpCircle, ArrowLeft, ExternalLink, ShieldAlert } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export const TermsOfService: React.FC = () => {
@@ -21,7 +21,7 @@ export const TermsOfService: React.FC = () => {
           </h1>
         </div>
         <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '2rem' }}>
-          {isEs ? 'Última actualización: 27 de agosto de 2026' : 'Last updated: August 27, 2026'}
+          {isEs ? 'Última actualización: 1 de septiembre de 2026' : 'Last updated: September 1, 2026'}
         </p>
 
         <section style={{ marginBottom: '2rem' }}>
@@ -163,9 +163,37 @@ export const TermsOfService: React.FC = () => {
           </div>
         </section>
 
+        <section style={{ marginBottom: '2rem' }}>
+          <h2 style={{ fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)' }}>
+            <ShieldAlert size={20} color="#ef4444" /> {isEs ? '4. Moderación de Contenido, Reportes y Purga de Catálogo' : '4. Content Moderation, Reporting & Catalog Purges'}
+          </h2>
+          <p style={{ color: 'var(--text-secondary)' }}>
+            {isEs
+              ? 'Dado que el catálogo de Pathd indexa dinámicamente metadatos y portadas de APIs externas públicas, la plataforma cuenta con un sistema de moderación activa y comunitaria:'
+              : 'Since Pathd dynamically indexes metadata and cover art from public third-party APIs, the platform employs active automated and community moderation:'}
+          </p>
+          <ul style={{ color: 'var(--text-secondary)', paddingLeft: '1.5rem', marginTop: '0.5rem' }}>
+            <li>
+              {isEs
+                ? 'Los usuarios registrados pueden reportar cualquier obra, tomo, comentario o reseña que contenga material explícito, pornográfico, indebido o que infrinja los estándares SFW mediante el botón de reporte.'
+                : 'Registered users can report any work, volume, comment, or review containing explicit, pornographic, or inappropriate material that violates our SFW standards using the built-in report tool.'}
+            </li>
+            <li>
+              {isEs
+                ? 'El equipo de administración se reserva el derecho de banear, purgar y desindexar de forma inmediata obras, sagas, revistas o editoriales completas del sistema, removiéndolas automáticamente de listas, bibliotecas y resultados de búsqueda sin previo aviso.'
+                : 'The administration team reserves the right to immediately ban, purge, and de-index specific works, sagas, magazines, or entire publishers, automatically removing them from lists, user libraries, and search results without prior notice.'}
+            </li>
+            <li>
+              {isEs
+                ? 'Las cuentas que publiquen de manera reiterada contenido prohibido o generen reportes abusivos podrán ser suspendidas o canceladas de acuerdo con los criterios del equipo de moderación.'
+                : 'Accounts that repeatedly share prohibited content or submit abusive reports may be suspended or permanently terminated at the discretion of the moderation team.'}
+            </li>
+          </ul>
+        </section>
+
         <section>
           <h2 style={{ fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)' }}>
-            {isEs ? '4. Limitación de Responsabilidad' : '4. Disclaimer of Warranties'}
+            <HelpCircle size={20} /> {isEs ? '5. Limitación de Responsabilidad' : '5. Disclaimer of Warranties'}
           </h2>
           <p style={{ color: 'var(--text-secondary)' }}>
             {isEs
