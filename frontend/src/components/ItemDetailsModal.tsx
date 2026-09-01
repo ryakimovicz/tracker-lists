@@ -197,7 +197,6 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   const [consumptionHistory, setConsumptionHistory] = useState<string[]>([]);
   const [consumptionEntries, setConsumptionEntries] = useState<{ id?: number, consumed_at: string, is_hundred_percent: boolean }[]>([]);
   
-  // Floating Dialogs (Modals)
   const [showReconsumedModal, setShowReconsumedModal] = useState(false);
   const [showHundredPercentDecisionModal, setShowHundredPercentDecisionModal] = useState(false);
   const [showStatusChangeModal, setShowStatusChangeModal] = useState(false);
@@ -207,6 +206,57 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   const [reportReason, setReportReason] = useState('Contenido para adultos / explícito');
   const [reportFeedback, setReportFeedback] = useState<string | null>(null);
   const [isSubmittingReport, setIsSubmittingReport] = useState(false);
+
+  // Dialog for prompt to mark previous missing episodes
+  const [pendingPreviousPrompt, setPendingPreviousPrompt] = useState<{
+    type: 'episode' | 'season';
+    targetEp?: any;
+    targetSeason?: any;
+    missingEpisodes: any[];
+  } | null>(null);
+
+  const getMissingPreviousEpisodesForEp = (ep: any) => {
+    const cacheKeyAll = `${selectedItem.external_id}_all_episodes`;
+    let allEps = getCachedSeries(cacheKeyAll);
+    if (!allEps || !Array.isArray(allEps)) return [];
+
+    const sortedAllEps = [...allEps].sort((a: any, b: any) => 
+      a.season_number !== b.season_number ? a.season_number - b.season_number : a.episode_number - b.episode_number
+    );
+
+    const targetSeason = ep.season_number;
+    const targetEpNum = ep.episode_number;
+
+    return sortedAllEps.filter((itemEp: any) => {
+      const isBefore = itemEp.season_number < targetSeason || (itemEp.season_number === targetSeason && itemEp.episode_number < targetEpNum);
+      if (!isBefore) return false;
+
+      const dbEp = (episodes || []).find(x => x.external_id === `tvm-ep-${itemEp.id}` || x.id === itemEp.id);
+      const isCompleted = !!globalProgress[`tvm-ep-${itemEp.id}`] || !!dbEp?.is_completed;
+      return !isCompleted;
+    });
+  };
+
+  const getMissingPreviousEpisodesForSeason = (s: any) => {
+    const cacheKeyAll = `${selectedItem.external_id}_all_episodes`;
+    let allEps = getCachedSeries(cacheKeyAll);
+    if (!allEps || !Array.isArray(allEps)) return [];
+
+    const sortedAllEps = [...allEps].sort((a: any, b: any) => 
+      a.season_number !== b.season_number ? a.season_number - b.season_number : a.episode_number - b.episode_number
+    );
+
+    const targetSeason = s.season_number;
+
+    return sortedAllEps.filter((itemEp: any) => {
+      const isBeforeSeason = itemEp.season_number < targetSeason;
+      if (!isBeforeSeason) return false;
+
+      const dbEp = (episodes || []).find(x => x.external_id === `tvm-ep-${itemEp.id}` || x.id === itemEp.id);
+      const isCompleted = !!globalProgress[`tvm-ep-${itemEp.id}`] || !!dbEp?.is_completed;
+      return !isCompleted;
+    });
+  };
 
   const handleSendMediaReport = async () => {
     if (!selectedItem) return;
@@ -588,7 +638,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     await handleMarkConsumedAgain(true);
   };
 
-  const isAnySubModalOpen = showReconsumedModal || showHundredPercentDecisionModal || showStatusChangeModal || showRemoveShelfModal || showReportMediaModal || !!episodeActionItem || !!seasonActionItem;
+  const isAnySubModalOpen = showReconsumedModal || showHundredPercentDecisionModal || showStatusChangeModal || showRemoveShelfModal || showReportMediaModal || !!episodeActionItem || !!seasonActionItem || !!pendingPreviousPrompt;
 
   const handleRemoveLatestConsumption = async () => {
     if (!selectedItem || !selectedItem.id) return;
@@ -1402,6 +1452,55 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       } else {
         setSelectedItem(prevItem);
       }
+    }
+  };
+
+  const handleExecuteBulkToggle = async (episodesToMark: any[]) => {
+    if (!episodesToMark || episodesToMark.length === 0) return;
+
+    let effectiveListId = selectedItem.tracking_list_id;
+    if (!effectiveListId) {
+      const tracked = await ensureTracked('watching');
+      if (!tracked) return;
+      effectiveListId = tracked.tracking_list_id || tracked;
+    }
+
+    // 1. Optimistic global progress update for all target episodes
+    const newProg: Record<string, boolean> = {};
+    episodesToMark.forEach(ep => {
+      newProg[`tvm-ep-${ep.id}`] = true;
+    });
+    setGlobalProgress(prev => ({ ...prev, ...newProg }));
+
+    // 2. Dispatch network requests in parallel
+    try {
+      await Promise.allSettled(
+        episodesToMark.map(ep => 
+          apiClient.post(`/lists/${effectiveListId}/toggle-series-episode`, {
+            episode_id: ep.id,
+            title: ep.title || `${selectedItem.title} - S${ep.season_number < 10 ? '0' + ep.season_number : ep.season_number}E${ep.episode_number < 10 ? '0' + ep.episode_number : ep.episode_number} - ${ep.name || 'Untitled Episode'}`,
+            image_url: ep.image_url || ep.image?.original || ep.image?.medium || ep.still_path || selectedItem.image_url,
+            overview: ep.custom_notes || ep.overview,
+            season_number: ep.season_number,
+            episode_number: ep.episode_number
+          })
+        )
+      );
+
+      const listRes = await apiClient.get(`/lists/${effectiveListId}`);
+      const updatedList = listRes.data.items || [];
+      setEpisodes(updatedList);
+
+      const extIds = updatedList.map((x: any) => x.external_id).filter(Boolean);
+      if (extIds.length > 0) {
+        const progRes = await apiClient.post('/users/me/progress/bulk-check', { external_ids: extIds });
+        setGlobalProgress(prev => ({ ...prev, ...progRes.data }));
+      }
+
+      await checkCompletionStatus(effectiveListId, updatedList);
+      onUpdate();
+    } catch (err) {
+      console.error("Bulk episodes mark failed", err);
     }
   };
 
@@ -3130,6 +3229,16 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                       return;
                                     }
 
+                                    const missing = getMissingPreviousEpisodesForSeason(s);
+                                    if (missing.length > 0) {
+                                      setPendingPreviousPrompt({
+                                        type: 'season',
+                                        targetSeason: s,
+                                        missingEpisodes: missing
+                                      });
+                                      return;
+                                    }
+
                                     let effectiveListId = selectedItem.tracking_list_id;
                                     if (!effectiveListId) {
                                       const tracked = await ensureTracked('watching');
@@ -3245,6 +3354,15 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                               if (currentIsCompleted) {
                                                 setEpisodeActionItem({ ep, listId: selectedItem.tracking_list_id });
                                               } else {
+                                                const missing = getMissingPreviousEpisodesForEp(ep);
+                                                if (missing.length > 0) {
+                                                  setPendingPreviousPrompt({
+                                                    type: 'episode',
+                                                    targetEp: ep,
+                                                    missingEpisodes: missing
+                                                  });
+                                                  return;
+                                                }
                                                 setGlobalProgress(prev => ({ ...prev, [`tvm-ep-${ep.id}`]: true }));
                                                 handleToggleEpisode(selectedItem.tracking_list_id, ep);
                                               }
@@ -4825,6 +4943,204 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                     <button
                       type="button"
                       onClick={() => setSeasonActionItem(null)}
+                      style={{
+                        padding: '0.55rem',
+                        borderRadius: '6px',
+                        background: 'transparent',
+                        border: 'none',
+                        color: 'var(--text-secondary)',
+                        fontSize: '0.85rem',
+                        cursor: 'pointer',
+                        fontWeight: 500
+                      }}
+                    >
+                      {language === 'es' ? 'Cancelar' : 'Cancel'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Floating Modal 6: Prompt to mark previous missing episodes */}
+              {pendingPreviousPrompt && (
+                <div
+                  style={{
+                    position: 'fixed',
+                    inset: 0,
+                    zIndex: 9999,
+                    background: 'rgba(0, 0, 0, 0.65)',
+                    backdropFilter: 'blur(4px)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '1rem'
+                  }}
+                  onClick={() => setPendingPreviousPrompt(null)}
+                >
+                  <div
+                    className="glass-card"
+                    style={{
+                      width: '100%',
+                      maxWidth: '420px',
+                      background: 'var(--bg-secondary)',
+                      borderRadius: '12px',
+                      padding: '1.25rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '1rem',
+                      boxShadow: '0 12px 30px rgba(0,0,0,0.4)',
+                      border: '1px solid var(--border-color)'
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                        {language === 'es' ? '¿Marcar episodios anteriores?' : 'Mark previous episodes?'}
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={() => setPendingPreviousPrompt(null)}
+                        style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '0.2rem' }}
+                      >
+                        <X size={18} />
+                      </button>
+                    </div>
+
+                    <div style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+                      {pendingPreviousPrompt.type === 'episode' ? (
+                        language === 'es'
+                          ? `Tienes ${pendingPreviousPrompt.missingEpisodes.length} episodio${pendingPreviousPrompt.missingEpisodes.length > 1 ? 's anteriores sin marcar' : ' anterior sin marcar'}. ¿Deseas marcar también los faltantes o solo este episodio?`
+                          : `You have ${pendingPreviousPrompt.missingEpisodes.length} missing previous episode${pendingPreviousPrompt.missingEpisodes.length > 1 ? 's' : ''}. Do you want to mark all previous missing episodes as watched too?`
+                      ) : (
+                        language === 'es'
+                          ? `Tienes ${pendingPreviousPrompt.missingEpisodes.length} episodio${pendingPreviousPrompt.missingEpisodes.length > 1 ? 's de temporadas anteriores sin marcar' : ' de temporadas anteriores sin marcar'}. ¿Deseas marcar también los faltantes o solo esta temporada?`
+                          : `You have ${pendingPreviousPrompt.missingEpisodes.length} missing episode${pendingPreviousPrompt.missingEpisodes.length > 1 ? 's' : ''} from previous seasons. Do you want to mark all previous missing episodes too?`
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                      {/* Option 1: Mark all previous missing + this episode/season */}
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const prompt = pendingPreviousPrompt;
+                          setPendingPreviousPrompt(null);
+                          if (prompt.type === 'episode') {
+                            const toMark = [...prompt.missingEpisodes, prompt.targetEp];
+                            await handleExecuteBulkToggle(toMark);
+                          } else if (prompt.type === 'season') {
+                            const s = prompt.targetSeason;
+                            let seriesEps = seasonEpisodes[s.season_number];
+                            if (!seriesEps || seriesEps.length === 0) {
+                              const cacheKeyAll = `${selectedItem.external_id}_all_episodes`;
+                              const cachedAll = getCachedSeries(cacheKeyAll);
+                              if (cachedAll && Array.isArray(cachedAll)) {
+                                seriesEps = cachedAll.filter((ep: any) => ep.season_number === s.season_number);
+                              }
+                            }
+                            const toMark = [...prompt.missingEpisodes, ...(seriesEps || [])];
+                            await handleExecuteBulkToggle(toMark);
+                          }
+                        }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.65rem',
+                          padding: '0.75rem 1rem',
+                          borderRadius: '8px',
+                          background: `var(--color-${selectedItem.item_type || 'movie'})`,
+                          border: 'none',
+                          color: `var(--color-text-${selectedItem.item_type || 'movie'})`,
+                          fontWeight: 700,
+                          fontSize: '0.9rem',
+                          cursor: 'pointer',
+                          textAlign: 'left'
+                        }}
+                      >
+                        <Check size={16} strokeWidth={3} style={{ flexShrink: 0 }} />
+                        <span>
+                          {language === 'es'
+                            ? `Marcar este y todos los anteriores faltantes (${pendingPreviousPrompt.missingEpisodes.length})`
+                            : `Mark this and all missing previous (${pendingPreviousPrompt.missingEpisodes.length})`
+                          }
+                        </span>
+                      </button>
+
+                      {/* Option 2: Mark only this episode or season */}
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const prompt = pendingPreviousPrompt;
+                          setPendingPreviousPrompt(null);
+                          if (prompt.type === 'episode') {
+                            setGlobalProgress(prev => ({ ...prev, [`tvm-ep-${prompt.targetEp.id}`]: true }));
+                            await handleToggleEpisode(selectedItem.tracking_list_id, prompt.targetEp);
+                          } else if (prompt.type === 'season') {
+                            const s = prompt.targetSeason;
+                            let effectiveListId = selectedItem.tracking_list_id;
+                            if (!effectiveListId) {
+                              const tracked = await ensureTracked('watching');
+                              if (!tracked) return;
+                              effectiveListId = tracked.tracking_list_id || tracked;
+                            }
+                            let seriesEps = seasonEpisodes[s.season_number];
+                            if (!seriesEps || seriesEps.length === 0) {
+                              const cacheKeyAll = `${selectedItem.external_id}_all_episodes`;
+                              const cachedAll = getCachedSeries(cacheKeyAll);
+                              if (cachedAll && Array.isArray(cachedAll)) {
+                                seriesEps = cachedAll.filter((ep: any) => ep.season_number === s.season_number);
+                              }
+                            }
+                            if (seriesEps && seriesEps.length > 0) {
+                              const newProg: Record<string, boolean> = {};
+                              seriesEps.forEach((ep: any) => {
+                                newProg[`tvm-ep-${ep.id}`] = true;
+                              });
+                              setGlobalProgress(prev => ({ ...prev, ...newProg }));
+                            }
+                            try {
+                              await apiClient.post(`/lists/${effectiveListId}/bulk-toggle-season`, {
+                                season_number: s.season_number,
+                                episodes: seriesEps || null,
+                                completed: true
+                              });
+                              const listRes = await apiClient.get(`/lists/${effectiveListId}`);
+                              const updatedList = listRes.data.items || [];
+                              setEpisodes(updatedList);
+                              await checkCompletionStatus(effectiveListId, updatedList);
+                              onUpdate && onUpdate();
+                            } catch (err) {
+                              console.error("Bulk toggle failed", err);
+                            }
+                          }
+                        }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.65rem',
+                          padding: '0.75rem 1rem',
+                          borderRadius: '8px',
+                          background: 'var(--bg-tertiary)',
+                          border: '1px solid var(--border-color)',
+                          color: 'var(--text-primary)',
+                          fontWeight: 600,
+                          fontSize: '0.9rem',
+                          cursor: 'pointer',
+                          textAlign: 'left'
+                        }}
+                      >
+                        <Check size={16} style={{ flexShrink: 0, color: 'var(--accent-primary)' }} />
+                        <span>
+                          {pendingPreviousPrompt.type === 'season'
+                            ? (language === 'es' ? 'Marcar únicamente esta temporada' : 'Mark only this season')
+                            : (language === 'es' ? 'Marcar únicamente este episodio' : 'Mark only this episode')
+                          }
+                        </span>
+                      </button>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setPendingPreviousPrompt(null)}
                       style={{
                         padding: '0.55rem',
                         borderRadius: '6px',
