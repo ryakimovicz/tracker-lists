@@ -74,6 +74,7 @@ interface LibraryItem {
   total_pages?: number;
   tracking_list_id?: number;
   times_completed?: number;
+  last_seen_episode_count?: number;
 }
 
 
@@ -1494,9 +1495,8 @@ export const Profile: React.FC = () => {
                             {/* Unified Badges System (under title) */}
                             {(() => {
                               const isUnitEpisode = item.item_type === 'episode' || item.external_id?.startsWith('tvm-ep-') || !!(item.title || '').match(/^(.*?)\s*-\s*S(\d+)E(\d+)(.*)$/i);
-                              if (isUnitEpisode) return null;
-
-                              const badges = [];
+                                                      const badges = [];
+                              const hasEverCompleted = (item.times_completed && item.times_completed > 0) || !!item.completed_at;
                               
                               // Dropped (All)
                               if (item.status === 'dropped') {
@@ -1508,25 +1508,27 @@ export const Profile: React.FC = () => {
                               }
                               // Games
                               else if (item.item_type === 'game') {
-                                if (item.status === 'playing') badges.push({ text: language === 'es' ? 'Jugando' : 'Playing', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' });
-                                else if (item.status === 'completed') {
+                                if (hasEverCompleted) {
                                   if (item.is_hundred_percent) {
                                     badges.push({ text: '100%', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.15)', isTrophy: true });
                                   } else {
                                     badges.push({ text: language === 'es' ? 'Completado' : 'Completed', color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)' });
                                   }
+                                } else if (item.status === 'playing') {
+                                  badges.push({ text: language === 'es' ? 'Jugando' : 'Playing', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' });
                                 }
                               }
                               // Movies
                               else if (item.item_type === 'movie') {
-                                if (item.status === 'watching') badges.push({ text: language === 'es' ? 'Pausa' : 'Paused', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' });
-                                else if (item.status === 'completed') badges.push({ text: language === 'es' ? 'Visto' : 'Watched', color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)' });
+                                if (hasEverCompleted) {
+                                  badges.push({ text: language === 'es' ? 'Visto' : 'Watched', color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)' });
+                                } else if (item.status === 'watching') {
+                                  badges.push({ text: language === 'es' ? 'Pausa' : 'Paused', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' });
+                                }
                               }
                               // Series / Anime
                               else if (item.item_type === 'series' || item.item_type === 'anime') {
-                                if (item.status === 'watching') {
-                                  badges.push({ text: language === 'es' ? 'Viendo' : 'Watching', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' });
-                                } else if (item.status === 'completed') {
+                                if (hasEverCompleted) {
                                   // Check if series is completely ended or just up to date with released episodes
                                   const cacheKey = `series_${item.external_id}`;
                                   const cached = item.external_id ? getCachedSeries(cacheKey) : null;
@@ -1539,15 +1541,20 @@ export const Profile: React.FC = () => {
                                   } else {
                                     badges.push({ text: language === 'es' ? 'Al día' : 'Up to date', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' });
                                   }
+                                } else if (item.status === 'watching') {
+                                  badges.push({ text: language === 'es' ? 'Viendo' : 'Watching', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' });
                                 }
                               }
                               // Reading (Books, Comics, Manga)
                               else if (['book', 'comic', 'manga'].includes(item.item_type)) {
-                                if (item.status === 'reading') badges.push({ text: language === 'es' ? 'Leyendo' : 'Reading', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' });
-                                else if (item.status === 'read' || item.status === 'completed') badges.push({ text: language === 'es' ? 'Leído' : 'Read', color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)' });
+                                if (hasEverCompleted) {
+                                  badges.push({ text: language === 'es' ? 'Leído' : 'Read', color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)' });
+                                } else if (item.status === 'reading') {
+                                  badges.push({ text: language === 'es' ? 'Leyendo' : 'Reading', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' });
+                                }
                               }
 
-                              // Repeat count badge (e.g. x2, x3)
+                              // Repeat count badge (e.g. x2, x3) for full completed runs
                               if (item.times_completed && item.times_completed > 1) {
                                 badges.push({
                                   text: `x${item.times_completed}`,
@@ -1582,7 +1589,7 @@ export const Profile: React.FC = () => {
 
                             {/* Followed series last completed episode */}
                             {(item.item_type === 'series' || item.item_type === 'anime') && item.last_seen_episode && (
-                              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500, display: 'block', marginTop: '0.35rem' }}>
+                              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.3rem', marginTop: '0.35rem' }}>
                                 {(() => {
                                   const match = item.last_seen_episode.match(/S(\d+)E(\d+)/i);
                                   let formatted = item.last_seen_episode;
@@ -1591,7 +1598,28 @@ export const Profile: React.FC = () => {
                                     const e = String(match[2]).padStart(2, '0');
                                     formatted = language === 'es' ? `T${s} | E${e}` : `S${s} | E${e}`;
                                   }
-                                  return `${language === 'es' ? 'Último: ' : 'Last: '}${formatted}`;
+
+                                  const seriesRuns = item.times_completed || (item.completed_at ? 1 : 0);
+                                  const epRuns = item.last_seen_episode_count || 1;
+                                  const showEpBadge = epRuns > 1 && epRuns !== seriesRuns;
+
+                                  return (
+                                    <>
+                                      <span>{`${language === 'es' ? 'Último: ' : 'Last: '}${formatted}`}</span>
+                                      {showEpBadge && (
+                                        <span style={{
+                                          fontSize: '0.7rem',
+                                          fontWeight: 700,
+                                          color: 'var(--accent-primary)',
+                                          background: 'rgba(99, 102, 241, 0.15)',
+                                          padding: '0.05rem 0.35rem',
+                                          borderRadius: '4px'
+                                        }}>
+                                          {`x${epRuns}`}
+                                        </span>
+                                      )}
+                                    </>
+                                  );
                                 })()}
                               </span>
                             )}

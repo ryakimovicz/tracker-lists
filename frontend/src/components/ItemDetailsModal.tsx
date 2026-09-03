@@ -1389,29 +1389,33 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     if (isAllDone) {
       if (selectedItem.status !== 'completed') {
         try {
-          let targetId = selectedItem.id;
+          let targetId = selectedItem.item_type === 'episode' ? (selectedItem.parent_series?.id || null) : selectedItem.id;
+          const targetExtId = selectedItem.parent_series?.external_id || (selectedItem.item_type !== 'episode' ? selectedItem.external_id : null);
           if (!targetId) {
             const libRes = await apiClient.get('/library/');
-            const match = (libRes.data || []).find((x: any) => x.external_id === selectedItem.external_id || (effectiveListId && x.tracking_list_id === effectiveListId));
+            const match = (libRes.data || []).find((x: any) => (targetExtId && x.external_id === targetExtId) || (effectiveListId && x.tracking_list_id === effectiveListId));
             if (match) {
               targetId = match.id;
             }
           }
           if (targetId) {
             await apiClient.put(`/library/${targetId}`, { status: 'completed' });
-            setSelectedItem((prev: any) => ({ ...prev, status: 'completed', id: targetId }));
+            if (selectedItem.item_type !== 'episode') {
+              setSelectedItem((prev: any) => ({ ...prev, status: 'completed', id: targetId }));
+            }
           }
         } catch (e) {
           console.error("Failed to auto-complete", e);
         }
       }
     } else {
-      if (selectedItem.status === 'completed') {
+      if (selectedItem.status === 'completed' || selectedItem.item_type === 'episode') {
         try {
-          let targetId = selectedItem.id;
+          let targetId = selectedItem.item_type === 'episode' ? (selectedItem.parent_series?.id || null) : selectedItem.id;
+          const targetExtId = selectedItem.parent_series?.external_id || (selectedItem.item_type !== 'episode' ? selectedItem.external_id : null);
           if (!targetId) {
             const libRes = await apiClient.get('/library/');
-            const match = (libRes.data || []).find((x: any) => x.external_id === selectedItem.external_id || (effectiveListId && x.tracking_list_id === effectiveListId));
+            const match = (libRes.data || []).find((x: any) => (targetExtId && x.external_id === targetExtId) || (effectiveListId && x.tracking_list_id === effectiveListId));
             if (match) {
               targetId = match.id;
             }
@@ -1419,7 +1423,9 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
           if (targetId) {
             const fallbackStatus = completedEpisodes > 0 ? 'watching' : 'plan_to_watch';
             await apiClient.put(`/library/${targetId}`, { status: fallbackStatus });
-            setSelectedItem((prev: any) => ({ ...prev, status: fallbackStatus, id: targetId }));
+            if (selectedItem.item_type !== 'episode') {
+              setSelectedItem((prev: any) => ({ ...prev, status: fallbackStatus, id: targetId }));
+            }
           }
         } catch (e) {
           console.error("Failed to revert completion status", e);

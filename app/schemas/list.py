@@ -38,6 +38,7 @@ class ListItemProgressResponse(ListItemResponse):
     addition_id: Optional[int] = None
     addition_item_id: Optional[int] = None
     inherited_importance_rank: Optional[int] = None
+    consumption_count: Optional[int] = 0
 
 # Reading List schemas
 class ReadingListBase(BaseModel):

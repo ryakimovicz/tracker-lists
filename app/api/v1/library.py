@@ -620,12 +620,59 @@ def get_library(
         for ext_id, c in counts:
             counts_map[ext_id] = c
 
+    # For series and anime, query episode consumption counts if tracked to get accurate series completions and last seen episode count
+    series_items = [it for it in items if it.item_type in ("series", "anime") and it.tracking_list_id]
+    series_times_map = {}
+    series_last_ep_count_map = {}
+    if series_items:
+        from app.models.list_item import ListItem
+        for s_it in series_items:
+            list_eps = db.query(ListItem.id, ListItem.title, ListItem.external_id).filter(
+                ListItem.list_id == s_it.tracking_list_id,
+                ListItem.external_id.isnot(None)
+            ).all()
+            ep_eids = [le.external_id for le in list_eps if le.external_id]
+            if ep_eids:
+                from collections import defaultdict
+                ep_c = db.query(
+                    ConsumptionHistory.external_id,
+                    func.count(ConsumptionHistory.id)
+                ).filter(
+                    ConsumptionHistory.user_id == target_user_id,
+                    ConsumptionHistory.external_id.in_(ep_eids)
+                ).group_by(ConsumptionHistory.external_id).all()
+                ep_c_dict = dict(ep_c)
+                min_c = min(ep_c_dict.get(eid, 0) for eid in ep_eids)
+                if min_c > 0:
+                    series_times_map[s_it.external_id] = min_c
+
+                if s_it.last_seen_episode:
+                    # Find matching episode item by title
+                    import re
+                    m_last = re.search(r'S(\d+)E(\d+)', s_it.last_seen_episode, re.IGNORECASE)
+                    matched_eid = None
+                    for le in list_eps:
+                        if m_last and re.search(r'S0?' + str(int(m_last.group(1))) + r'E0?' + str(int(m_last.group(2))) + r'\b', le.title or '', re.IGNORECASE):
+                            matched_eid = le.external_id
+                            break
+                        elif le.title == s_it.last_seen_episode:
+                            matched_eid = le.external_id
+                            break
+                    if matched_eid:
+                        series_last_ep_count_map[s_it.id] = max(ep_c_dict.get(matched_eid, 1), 1)
+
     res = []
     for it in items:
         # Pydantic will convert from attributes/dict
         c_val = counts_map.get(it.external_id, 0)
-        # If item has completed_at but no consumption history yet, treat as 1
-        times_c = max(c_val, 1 if it.completed_at else 0)
+        if it.item_type in ("series", "anime") and it.external_id in series_times_map:
+            times_c = max(series_times_map[it.external_id], 1 if it.completed_at else 0)
+        else:
+            # If item has completed_at but no consumption history yet, treat as 1
+            times_c = max(c_val, 1 if it.completed_at else 0)
+
+        last_ep_cnt = series_last_ep_count_map.get(it.id, 1) if it.item_type in ("series", "anime") else 1
+
         it_dict = {
             "id": it.id,
             "user_id": it.user_id,
@@ -644,7 +691,8 @@ def get_library(
             "pages_read": it.pages_read or 0,
             "total_pages": it.total_pages,
             "tracking_list_id": it.tracking_list_id,
-            "times_completed": times_c
+            "times_completed": times_c,
+            "last_seen_episode_count": last_ep_cnt
         }
         res.append(it_dict)
 

@@ -46,6 +46,7 @@ class LibraryItemResponse(BaseModel):
     total_pages: Optional[int] = None
     tracking_list_id: Optional[int] = None
     times_completed: Optional[int] = 1
+    last_seen_episode_count: Optional[int] = 1
 
     class Config:
         from_attributes = True

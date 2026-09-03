@@ -201,6 +201,22 @@ def get_list_details(
             for p in progress_records if p.addition_item_id and not p.external_id
         }
 
+        # Query consumption history counts for this user and items in this list
+        from app.models.consumption import ConsumptionHistory
+        from sqlalchemy import func
+        all_ext_ids = [it.external_id for it in items if it.external_id]
+        consumption_counts_map = {}
+        if all_ext_ids:
+            c_counts = db.query(
+                ConsumptionHistory.external_id,
+                func.count(ConsumptionHistory.id)
+            ).filter(
+                ConsumptionHistory.user_id == current_user.id,
+                ConsumptionHistory.external_id.in_(all_ext_ids)
+            ).group_by(ConsumptionHistory.external_id).all()
+            for eid, cnt in c_counts:
+                consumption_counts_map[eid] = cnt
+
     # Fetch active additions for the current user
     addition_items = []
     if current_user:
@@ -246,7 +262,8 @@ def get_list_details(
                         is_addition=True,
                         addition_id=add.id,
                         addition_item_id=item.id,
-                        inherited_importance_rank=inherited_rank
+                        inherited_importance_rank=inherited_rank,
+                        consumption_count=consumption_counts_map.get(item.external_id, 1 if is_comp else 0)
                     )
                 )
 
@@ -259,6 +276,10 @@ def get_list_details(
             is_comp, is_skip = external_progress_map.get(key, (False, False))
         else:
             is_comp, is_skip = custom_progress_map.get(item.id, (False, False))
+
+        c_cnt = consumption_counts_map.get(item.external_id, 0) if item.external_id else 0
+        if is_comp and c_cnt == 0:
+            c_cnt = 1
 
         formatted_base_items.append(
             ListItemProgressResponse(
@@ -274,7 +295,8 @@ def get_list_details(
                 importance_rank=item.importance_rank,
                 is_completed=is_comp,
                 is_skipped=is_skip,
-                is_addition=False
+                is_addition=False,
+                consumption_count=c_cnt
             )
         )
 
@@ -1473,6 +1495,7 @@ def check_series_completion(user_id: int, ep_external_id: str):
         req2 = urllib.request.Request(episodes_url, headers={"User-Agent": "TrackerLists/1.0"})
         with urllib.request.urlopen(req2, timeout=5) as response2:
             if response2.status == 200:
+                episodes = json.loads(response2.read().decode())
                 from datetime import datetime, timezone
                 now_dt = datetime.now(timezone.utc)
                 now_iso = now_dt.isoformat()
@@ -1725,7 +1748,19 @@ def toggle_series_episode(
             if li:
                 completed_ep_titles.append(li.title)
                 
-        if completed_ep_titles:
+        # Update last_seen_episode based on the most recently consumed episode for this series
+        latest_consumed = db.query(ConsumptionHistory, ListItem.title).join(
+            ListItem, ListItem.external_id == ConsumptionHistory.external_id
+        ).filter(
+            ConsumptionHistory.user_id == current_user.id,
+            ListItem.list_id == list_id
+        ).order_by(ConsumptionHistory.consumed_at.desc()).first()
+
+        if latest_consumed and latest_consumed[1]:
+            lib_item.last_seen_episode = latest_consumed[1]
+        elif just_marked:
+            lib_item.last_seen_episode = item.title
+        elif completed_ep_titles:
             import re
             ep_tuples = []
             for t in completed_ep_titles:
