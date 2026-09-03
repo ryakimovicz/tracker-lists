@@ -179,7 +179,7 @@ const CustomCard = ({
   );
 };
 
-const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, themeTextColor }: { item: any, onUpdate: () => void, language: string, onOpenSeries: (item: any) => void, themeColor?: string, themeTextColor?: string }) => {
+const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, themeTextColor, actionIcon = 'check' }: { item: any, onUpdate: () => void, language: string, onOpenSeries: (item: any) => void, themeColor?: string, themeTextColor?: string, actionIcon?: 'check' | 'play' }) => {
   const [nextEp, setNextEp] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
@@ -332,6 +332,14 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
       season_number: currentEpToMark.season_number,
       episode_number: currentEpToMark.episode_number
     }).then(async () => {
+      // If the series was in 'plan_to_watch', move it to 'watching'
+      if (item.status === 'plan_to_watch') {
+        try {
+          await apiClient.put(`/library/${item.id}`, { status: 'watching' });
+          onUpdate();
+        } catch (e) {}
+      }
+
       // If there are no more episodes, mark series as completed
       if (!nextCandidate) {
         try {
@@ -451,7 +459,7 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
               "--btn-hover-text": themeTextColor
             } as React.CSSProperties}
           >
-            <Check size={16} />
+            {actionIcon === 'play' ? <Play size={15} style={{ marginLeft: '2px' }} /> : <Check size={16} />}
           </button>
         )}
       </div>
@@ -999,7 +1007,7 @@ export const Home: React.FC = () => {
       } else if (item.item_id) {
         await apiClient.post(`/lists/items/${item.item_id}/toggle`);
       } else {
-        if (item.status === 'dropped') {
+        if (["plan_to_watch", "plan_to_play", "plan_to_read", "dropped"].includes(item.status)) {
           let targetStatus = 'watching';
           if (item.item_type === 'game') targetStatus = 'playing';
           else if (['book', 'comic', 'manga'].includes(item.item_type)) targetStatus = 'reading';
@@ -1136,6 +1144,7 @@ export const Home: React.FC = () => {
                           key={item.id}
                           item={item}
                           language={language}
+                          actionIcon={activeTab === "plan_to_watch" ? "play" : "check"}
                           onUpdate={() => fetchDashboard(true)}
                           onOpenSeries={(seriesItem) => setSelectedItem(seriesItem)}
                           themeColor={`var(--color-${item.item_type})`}
@@ -1180,7 +1189,7 @@ export const Home: React.FC = () => {
                         themeColor={`var(--color-${item.item_type})`}
                         themeTextColor={`var(--color-text-${item.item_type})`}
                         coverBottomText={undefined}
-                        actionIcon={item.status === 'dropped' ? 'play' : 'check'}
+                        actionIcon={activeTab === 'plan_to_watch' || item.status === 'dropped' ? 'play' : 'check'}
                         subtitle1={item.status === 'endless' ? (language === 'es' ? 'Infinito' : 'Endless') : undefined}
                         subtitle2={(() => {
                           const formatTime = (mins: number) => {
