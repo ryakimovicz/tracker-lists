@@ -2158,6 +2158,159 @@ def bulk_toggle_all_seasons(
     return {"message": "All seasons progress toggled successfully", "status": lib_item.status.value if (lib_item and hasattr(lib_item.status, 'value')) else (lib_item.status if lib_item else "completed")}
 
 
+class BulkToggleEpisodesRequest(BaseModel):
+    episodes: List[Dict[str, Any]]
+    completed: bool = True
+
+@router.post("/{list_id}/bulk-toggle-episodes", status_code=status.HTTP_200_OK)
+def bulk_toggle_episodes(
+    list_id: int,
+    req: BulkToggleEpisodesRequest,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    reading_list = db.query(ReadingList).filter(ReadingList.id == list_id).first()
+    if not reading_list:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="List not found")
+    
+    has_access = (reading_list.creator_id == current_user.id or getattr(current_user, 'is_admin', False))
+    if not has_access:
+        tracking_lib_item = db.query(UserLibraryItem).filter(
+            UserLibraryItem.user_id == current_user.id,
+            UserLibraryItem.tracking_list_id == list_id
+        ).first()
+        if tracking_lib_item:
+            has_access = True
+            if reading_list.creator_id != current_user.id:
+                reading_list.creator_id = current_user.id
+                db.commit()
+                
+    if not has_access:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+
+    lib_item = db.query(UserLibraryItem).filter(
+        UserLibraryItem.user_id == current_user.id,
+        UserLibraryItem.tracking_list_id == list_id
+    ).first()
+    
+    series_title = lib_item.title if lib_item else "Series"
+    episodes_list = req.episodes or []
+    item_count = db.query(ListItem).filter(ListItem.list_id == list_id).count()
+    now_dt = datetime.now(timezone.utc)
+
+    for ep in episodes_list:
+        ep_id = ep.get('id')
+        if not ep_id:
+            continue
+        ext_id = f"tvm-ep-{ep_id}"
+        item = db.query(ListItem).filter(
+            ListItem.list_id == list_id,
+            ListItem.external_id == ext_id
+        ).first()
+
+        season_num = ep.get('season_number', 1)
+        ep_num = ep.get('episode_number', 1)
+
+        if not item:
+            item_count += 1
+            item = ListItem(
+                list_id=list_id,
+                order_index=item_count,
+                item_type=ItemTypeEnum.SERIES,
+                external_id=ext_id,
+                title=ep.get('title') or f"{series_title} - S{season_num:02d}E{ep_num:02d} - {ep.get('name', 'Untitled')}",
+                image_url=ep.get('still_path') or ep.get('image_url') or None,
+                custom_notes=json.dumps({"description": ep.get('overview') or ep.get('custom_notes') or "", "release_date": ep.get('air_date') or None}),
+                section=f"Season {season_num}"
+            )
+            db.add(item)
+            db.flush()
+
+        progress = db.query(ItemProgress).filter(
+            ItemProgress.user_id == current_user.id,
+            ItemProgress.external_id == ext_id
+        ).first()
+
+        if req.completed:
+            if progress:
+                progress.is_completed = True
+                progress.completed_at = now_dt
+            else:
+                progress = ItemProgress(
+                    user_id=current_user.id,
+                    item_type=ItemTypeEnum.SERIES,
+                    external_id=ext_id,
+                    list_item_id=item.id,
+                    is_completed=True,
+                    is_skipped=False,
+                    completed_at=now_dt
+                )
+                db.add(progress)
+
+            ch = ConsumptionHistory(
+                user_id=current_user.id,
+                item_type=item.item_type.value if hasattr(item.item_type, 'value') else item.item_type,
+                external_id=ext_id,
+                list_item_id=item.id,
+                consumed_at=now_dt
+            )
+            db.add(ch)
+
+    if lib_item:
+        if req.completed:
+            # Check if all aired episodes are completed
+            all_aired_completed = False
+            if lib_item.external_id:
+                try:
+                    all_episodes = TVMazeService.get_all_episodes(lib_item.external_id)
+                    now_date = now_dt.strftime("%Y-%m-%d")
+
+                    def is_ep_aired_check(ep_dict):
+                        astamp = ep_dict.get("airstamp")
+                        if astamp:
+                            try:
+                                ep_dt = datetime.fromisoformat(astamp.replace("Z", "+00:00"))
+                                return ep_dt <= now_dt
+                            except Exception:
+                                pass
+                        adate = ep_dict.get("airdate")
+                        return bool(adate and adate <= now_date)
+
+                    aired_eps = [e for e in all_episodes if is_ep_aired_check(e)]
+                    if aired_eps:
+                        aired_ext_ids = {f"tvm-ep-{e['id']}" for e in aired_eps}
+                        completed_progs = db.query(ItemProgress.external_id).filter(
+                            ItemProgress.user_id == current_user.id,
+                            ItemProgress.is_completed == True
+                        ).all()
+                        watched_ext_ids = {p[0] for p in completed_progs if p[0]}
+                        if aired_ext_ids.issubset(watched_ext_ids):
+                            all_aired_completed = True
+                except Exception as e:
+                    print(f"Error checking all_aired_completed: {e}")
+
+            if all_aired_completed:
+                lib_item.status = UserLibraryStatusEnum.COMPLETED
+                lib_item.completed_at = now_dt
+            else:
+                lib_item.status = UserLibraryStatusEnum.WATCHING
+                lib_item.completed_at = None
+
+            # Update last seen episode
+            last_ep = db.query(ListItem).filter(
+                ListItem.list_id == list_id
+            ).order_by(ListItem.id.desc()).first()
+            if last_ep:
+                lib_item.last_seen_episode = last_ep.title
+
+        lib_item.updated_at = now_dt
+
+    db.commit()
+    return {"message": f"{len(episodes_list)} episodes progress toggled successfully", "status": lib_item.status.value if (lib_item and hasattr(lib_item.status, 'value')) else (lib_item.status if lib_item else "watching")}
+
+
+
 
 
 

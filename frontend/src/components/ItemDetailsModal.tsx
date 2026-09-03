@@ -1465,27 +1465,37 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       effectiveListId = tracked.tracking_list_id || tracked;
     }
 
-    // 1. Optimistic global progress update for all target episodes
+    // 1. Optimistic global progress update for all target episodes in 0ms
     const newProg: Record<string, boolean> = {};
     episodesToMark.forEach(ep => {
       newProg[`tvm-ep-${ep.id}`] = true;
     });
     setGlobalProgress(prev => ({ ...prev, ...newProg }));
 
-    // 2. Dispatch network requests in parallel
+    // 2. Single atomic bulk request to the server
     try {
-      await Promise.allSettled(
-        episodesToMark.map(ep => 
-          apiClient.post(`/lists/${effectiveListId}/toggle-series-episode`, {
-            episode_id: ep.id,
-            title: ep.title || `${selectedItem.title} - S${ep.season_number < 10 ? '0' + ep.season_number : ep.season_number}E${ep.episode_number < 10 ? '0' + ep.episode_number : ep.episode_number} - ${ep.name || 'Untitled Episode'}`,
-            image_url: ep.image_url || ep.image?.original || ep.image?.medium || ep.still_path || selectedItem.image_url,
-            overview: ep.custom_notes || ep.overview,
-            season_number: ep.season_number,
-            episode_number: ep.episode_number
-          })
-        )
-      );
+      const payload = episodesToMark.map(ep => ({
+        id: ep.id,
+        title: ep.title || `${selectedItem.title} - S${ep.season_number < 10 ? '0' + ep.season_number : ep.season_number}E${ep.episode_number < 10 ? '0' + ep.episode_number : ep.episode_number} - ${ep.name || 'Untitled Episode'}`,
+        image_url: ep.image_url || ep.image?.original || ep.image?.medium || ep.still_path || selectedItem.image_url,
+        overview: ep.custom_notes || ep.overview,
+        season_number: ep.season_number,
+        episode_number: ep.episode_number,
+        air_date: ep.air_date || ep.airdate || null
+      }));
+
+      const res = await apiClient.post(`/lists/${effectiveListId}/bulk-toggle-episodes`, {
+        episodes: payload,
+        completed: true
+      });
+
+      if (res.data?.status) {
+        setSelectedItem((prev: any) => prev ? {
+          ...prev,
+          status: res.data.status,
+          completed_at: res.data.status === 'completed' ? new Date().toISOString() : null
+        } : null);
+      }
 
       const listRes = await apiClient.get(`/lists/${effectiveListId}`);
       const updatedList = listRes.data.items || [];
