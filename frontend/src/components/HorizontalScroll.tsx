@@ -36,35 +36,90 @@ export const HorizontalScroll: React.FC<HorizontalScrollProps> = ({ children, ti
         </div>
       )}
       
-      <button 
-        onClick={() => scroll("left")}
-        style={{ position: "absolute", left: "10px", top: "50%", transform: "translateY(-50%)", zIndex: 10, background: "var(--bg-tertiary)", border: "1px solid var(--border-color)", borderRadius: "50%", width: "40px", height: "40px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", boxShadow: "0 4px 6px rgba(0,0,0,0.3)" }}
-      >
-        <ChevronLeft size={20} color="var(--text-primary)" />
-      </button>
-      
-      <div 
-        ref={scrollRef} 
-        style={{ 
-          display: "flex", 
-          gap: "1.25rem", 
-          overflowX: "auto", 
-          scrollbarWidth: "none", 
-          msOverflowStyle: "none", 
-          paddingBottom: "1.5rem", 
-          paddingLeft: "60px", 
-          paddingRight: "60px" 
-        }}
-      >
-        {children}
-      </div>
+      {(() => {
+        const catColor = outlineColor || "var(--accent-primary)";
+        const buttonBaseStyle: React.CSSProperties = {
+          position: "absolute",
+          top: "50%",
+          transform: "translateY(-50%)",
+          zIndex: 10,
+          background: "var(--bg-tertiary)",
+          border: "1.5px solid var(--border-color)",
+          borderRadius: "50%",
+          width: "40px",
+          height: "40px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          cursor: "pointer",
+          boxShadow: "0 4px 6px rgba(0,0,0,0.3)",
+          color: "var(--text-primary)",
+          transition: "border-color 0.15s ease, background 0.1s ease, color 0.1s ease, transform 0.1s ease"
+        };
 
-      <button 
-        onClick={() => scroll("right")}
-        style={{ position: "absolute", right: "10px", top: "50%", transform: "translateY(-50%)", zIndex: 10, background: "var(--bg-tertiary)", border: "1px solid var(--border-color)", borderRadius: "50%", width: "40px", height: "40px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", boxShadow: "0 4px 6px rgba(0,0,0,0.3)" }}
-      >
-        <ChevronRight size={20} color="var(--text-primary)" />
-      </button>
+        const handleMouseEnter = (e: React.MouseEvent<HTMLButtonElement>) => {
+          e.currentTarget.style.borderColor = catColor;
+        };
+        const handleMouseLeave = (e: React.MouseEvent<HTMLButtonElement>) => {
+          e.currentTarget.style.borderColor = "var(--border-color)";
+          e.currentTarget.style.background = "var(--bg-tertiary)";
+          e.currentTarget.style.color = "var(--text-primary)";
+        };
+        const handleMouseDown = (e: React.MouseEvent<HTMLButtonElement>) => {
+          e.currentTarget.style.background = catColor;
+          e.currentTarget.style.borderColor = catColor;
+          e.currentTarget.style.color = "var(--bg-primary)";
+        };
+        const handleMouseUp = (e: React.MouseEvent<HTMLButtonElement>) => {
+          e.currentTarget.style.background = "var(--bg-tertiary)";
+          e.currentTarget.style.borderColor = catColor;
+          e.currentTarget.style.color = "var(--text-primary)";
+        };
+
+        return (
+          <>
+            <button 
+              onClick={() => scroll("left")}
+              onMouseEnter={handleMouseEnter}
+              onMouseLeave={handleMouseLeave}
+              onMouseDown={handleMouseDown}
+              onMouseUp={handleMouseUp}
+              style={{ ...buttonBaseStyle, left: "10px" }}
+              aria-label="Scroll left"
+            >
+              <ChevronLeft size={20} color="currentColor" />
+            </button>
+            
+            <div 
+              ref={scrollRef} 
+              style={{ 
+                display: "flex", 
+                gap: "1.25rem", 
+                overflowX: "auto", 
+                scrollbarWidth: "none", 
+                msOverflowStyle: "none", 
+                paddingBottom: "1.5rem", 
+                paddingLeft: "60px", 
+                paddingRight: "60px" 
+              }}
+            >
+              {children}
+            </div>
+
+            <button 
+              onClick={() => scroll("right")}
+              onMouseEnter={handleMouseEnter}
+              onMouseLeave={handleMouseLeave}
+              onMouseDown={handleMouseDown}
+              onMouseUp={handleMouseUp}
+              style={{ ...buttonBaseStyle, right: "10px" }}
+              aria-label="Scroll right"
+            >
+              <ChevronRight size={20} color="currentColor" />
+            </button>
+          </>
+        );
+      })()}
     </div>
   );
 };
