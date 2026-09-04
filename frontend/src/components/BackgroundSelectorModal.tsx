@@ -432,7 +432,7 @@ export const BackgroundSelectorModal: React.FC<BackgroundSelectorModalProps> = (
                   switch (cat) {
                     case 'all': return isEs ? 'Todo' : 'All';
                     case 'movie': return isEs ? 'Películas' : 'Movies';
-                    case 'series': return isEs ? 'Series' : 'Series';
+                    case 'series': return isEs ? 'Series' : 'Shows';
                     case 'anime': return 'Anime';
                     case 'book': return isEs ? 'Libros' : 'Books';
                     case 'comic': return isEs ? 'Cómics' : 'Comics';
@@ -588,7 +588,7 @@ export const BackgroundSelectorModal: React.FC<BackgroundSelectorModalProps> = (
                           textTransform: 'uppercase',
                         }}
                       >
-                        {b.category === 'game' ? (isEs ? 'Juego' : 'Game') : b.category === 'anime' ? 'Anime' : b.category === 'movie' ? (isEs ? 'Película' : 'Movie') : (isEs ? 'Serie' : 'Series')}
+                        {b.category === 'game' ? (isEs ? 'Juego' : 'Game') : b.category === 'anime' ? 'Anime' : b.category === 'movie' ? (isEs ? 'Película' : 'Movie') : (isEs ? 'Serie' : 'Show')}
                       </span>
                     )}
                   </div>

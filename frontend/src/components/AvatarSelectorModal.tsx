@@ -301,7 +301,7 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
                   switch (cat) {
                     case 'all': return isEs ? 'Todo' : 'All';
                     case 'movie': return isEs ? 'Películas' : 'Movies';
-                    case 'series': return isEs ? 'Series' : 'Series';
+                    case 'series': return isEs ? 'Series' : 'Shows';
                     case 'anime': return 'Anime';
                     case 'book': return isEs ? 'Libros' : 'Books';
                     case 'comic': return isEs ? 'Cómics' : 'Comics';
@@ -490,14 +490,14 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
                 {selectedCategory === 'all' && (() => {
                   const getCategoryLabel = () => {
                     switch (ch.category) {
-                      case 'series': return isEs ? 'Serie' : 'Series';
+                      case 'series': return isEs ? 'Serie' : 'Show';
                       case 'movie': return isEs ? 'Película' : 'Movie';
                       case 'anime': return 'Anime';
                       case 'comic': return isEs ? 'Cómic' : 'Comic';
                       case 'manga': return 'Manga';
                       case 'book': return isEs ? 'Libro' : 'Book';
                       case 'game': return isEs ? 'Juego' : 'Game';
-                      default: return isEs ? 'Serie' : 'Series';
+                      default: return isEs ? 'Serie' : 'Show';
                     }
                   };
                   return (

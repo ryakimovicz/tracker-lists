@@ -955,7 +955,7 @@ export const CustomizePage: React.FC = () => {
               const getCategoryLabel = () => {
                 switch (cat) {
                   case 'movie': return isEs ? 'Películas' : 'Movies';
-                  case 'series': return 'Series';
+                  case 'series': return isEs ? 'Series' : 'Shows';
                   case 'anime': return isEs ? 'Animes' : 'Anime';
                   case 'book': return isEs ? 'Libros' : 'Books';
                   case 'comic': return isEs ? 'Cómics' : 'Comics';

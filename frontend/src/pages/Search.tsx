@@ -229,7 +229,7 @@ export const Search: React.FC = () => {
     return categoryOrder.map(type => ({
       type,
       title: type === 'movie' ? (language === 'es' ? 'Películas' : 'Movies') :
-             type === 'series' ? 'Series' :
+             type === 'series' ? (language === 'es' ? 'Series' : 'Shows') :
              type === 'anime' ? 'Anime' :
              type === 'book' ? (language === 'es' ? 'Libros' : 'Books') :
              type === 'comic' ? (language === 'es' ? 'Cómics' : 'Comics') : 
@@ -665,7 +665,7 @@ export const Search: React.FC = () => {
           {sortFilterTabs([
             { value: 'all', label: language === 'es' ? 'Todo' : 'All' },
             { value: 'movie', label: language === 'es' ? 'Películas' : 'Movies' },
-            { value: 'series', label: language === 'es' ? 'Series' : 'Series' },
+            { value: 'series', label: language === 'es' ? 'Series' : 'Shows' },
             { value: 'anime', label: 'Anime' },
             { value: 'book', label: language === 'es' ? 'Libros' : 'Books' },
             { value: 'comic', label: language === 'es' ? 'Cómics' : 'Comics' },

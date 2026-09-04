@@ -1293,7 +1293,7 @@ export const Profile: React.FC = () => {
                     >
                       {type === 'all' ? (language === 'es' ? 'Todo' : 'All') :
                        type === 'movie' ? (language === 'es' ? 'Películas' : 'Movies') :
-                       type === 'series' ? (language === 'es' ? 'Series' : 'Series') :
+                       type === 'series' ? (language === 'es' ? 'Series' : 'Shows') :
                        type === 'anime' ? 'Anime' :
                        type === 'book' ? (language === 'es' ? 'Libros' : 'Books') :
                        type === 'comic' ? (language === 'es' ? 'Cómics' : 'Comics') :
@@ -1392,7 +1392,7 @@ export const Profile: React.FC = () => {
                                 const label = isGame 
                                   ? (specialGameLabel || (language === 'es' ? 'Juego' : 'Game'))
                                   : (item.item_type === 'episode' || item.external_id?.startsWith('tvm-ep-'))
-                                  ? (language === 'es' ? 'Serie' : 'Series')
+                                  ? (language === 'es' ? 'Serie' : 'Show')
                                   : item.item_type === 'season'
                                   ? (language === 'es' ? 'Temporada' : 'Season')
                                   : item.item_type === 'comic' ? (language === 'es' ? 'Cómic' : 'Comic') : item.item_type === 'manga' ? 'Manga' : t('media' + item.item_type.charAt(0).toUpperCase() + item.item_type.slice(1));

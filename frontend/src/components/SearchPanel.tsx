@@ -180,7 +180,7 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
               {sortFilterTabs([
                 { value: 'all', label: language === 'es' ? 'Todo' : 'All' },
                 { value: 'movie', label: language === 'es' ? 'Películas' : 'Movies' },
-                { value: 'series', label: language === 'es' ? 'Series' : 'Series' },
+                { value: 'series', label: language === 'es' ? 'Series' : 'Shows' },
                 { value: 'anime', label: 'Anime' },
                 { value: 'book', label: language === 'es' ? 'Libros' : 'Books' },
                 { value: 'comic', label: language === 'es' ? 'Cómics' : 'Comics' },
