@@ -519,7 +519,7 @@ export const BackgroundSelectorModal: React.FC<BackgroundSelectorModalProps> = (
                       ? 'No se encontraron fondos con ese nombre.'
                       : 'No backgrounds found with that name.'
                     : isEs
-                    ? 'Escribe para buscar fondos 1080p de Videojuegos, Anime, Películas y Series.'
+                    ? 'Escribe para buscar fondos 1080p de Juegos, Anime, Películas y Series.'
                     : 'Type to search 1080p backgrounds from Games, Anime, Movies, and Shows.'}
                 </div>
               );

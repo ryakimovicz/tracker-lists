@@ -116,3 +116,39 @@ export function sortFilterTabs<T extends { value?: string; key?: string; type?: 
     return idxA - idxB;
   });
 }
+
+/**
+ * Returns the human-readable category name based on current language.
+ * Default is English (e.g. Movies, Series), translated to Spanish (Películas, Series) when isEs is true.
+ */
+export function getCategoryLabel(type: string, isEs: boolean, plural: boolean = true): string {
+  const clean = type.toLowerCase().trim();
+  if (isEs) {
+    switch (clean) {
+      case 'movie': return plural ? 'Películas' : 'Película';
+      case 'series': return plural ? 'Series' : 'Serie';
+      case 'anime': return plural ? 'Animes' : 'Anime';
+      case 'book': return plural ? 'Libros' : 'Libro';
+      case 'comic': return plural ? 'Cómics' : 'Cómic';
+      case 'manga': return plural ? 'Mangas' : 'Manga';
+      case 'game': return plural ? 'Juegos' : 'Juego';
+      case 'guide': return plural ? 'Guías' : 'Guía';
+      case 'user': return plural ? 'Usuarios' : 'Usuario';
+      default: return type;
+    }
+  }
+
+  // English (Default)
+  switch (clean) {
+    case 'movie': return plural ? 'Movies' : 'Movie';
+    case 'series': return plural ? 'Series' : 'Series';
+    case 'anime': return 'Anime';
+    case 'book': return plural ? 'Books' : 'Book';
+    case 'comic': return plural ? 'Comics' : 'Comic';
+    case 'manga': return 'Manga';
+    case 'game': return plural ? 'Games' : 'Game';
+    case 'guide': return plural ? 'Guides' : 'Guide';
+    case 'user': return plural ? 'Users' : 'User';
+    default: return type;
+  }
+}

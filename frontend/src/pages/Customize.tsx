@@ -956,11 +956,11 @@ export const CustomizePage: React.FC = () => {
                 switch (cat) {
                   case 'movie': return isEs ? 'Películas' : 'Movies';
                   case 'series': return 'Series';
-                  case 'anime': return 'Anime';
+                  case 'anime': return isEs ? 'Animes' : 'Anime';
                   case 'book': return isEs ? 'Libros' : 'Books';
                   case 'comic': return isEs ? 'Cómics' : 'Comics';
-                  case 'manga': return 'Mangas';
-                  case 'game': return isEs ? 'Videojuegos' : 'Games';
+                  case 'manga': return isEs ? 'Mangas' : 'Manga';
+                  case 'game': return isEs ? 'Juegos' : 'Games';
                   default: return cat;
                 }
               };

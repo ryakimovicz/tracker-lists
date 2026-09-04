@@ -31,13 +31,13 @@ const translations: Translations = {
   // Landing Page
   heroTitleLine1: { en: 'Guides for everything you love', es: 'Guías de todo lo que amas' },
   heroTitleLine2: { en: 'in a single place', es: 'en un único sitio' },
-  heroSubtitle: { en: 'Movies, series, anime, books, comics, manga, and video games. Create complete guides, track your progress, and discover your next obsession together with the community.', es: 'Películas, series, animes, libros, comics, mangas y videojuegos. Crea las guías completas, haz un seguimiento de tu progreso y descubre tu próxima obsesión junto a la comunidad.' },
+  heroSubtitle: { en: 'Movies, series, anime, books, comics, manga, and games. Create complete guides, track your progress, and discover your next obsession together with the community.', es: 'Películas, series, animes, libros, comics, mangas y juegos. Crea las guías completas, haz un seguimiento de tu progreso y descubre tu próxima obsesión junto a la comunidad.' },
   btnStartCollection: { en: 'Start My Collection', es: 'Empezar mi colección' },
   btnExploreGuides: { en: 'Explore Guides', es: 'Explorar Guías' },
   
   // Features
   featTrackerTitle: { en: 'All-in-One Tracker', es: 'Tracker Todo en Uno' },
-  featTrackerDesc: { en: 'Track movies, TV shows, anime, books, comics, manga, and video games. Log your activity, rate, and visualize your stats in a single unified profile.', es: 'Lleva el control de películas, series, anime, libros, cómics, mangas y videojuegos. Registra tu consumo, puntúa y visualiza estadísticas en un solo perfil unificado.' },
+  featTrackerDesc: { en: 'Track movies, TV shows, anime, books, comics, manga, and games. Log your activity, rate, and visualize your stats in a single unified profile.', es: 'Lleva el control de películas, series, anime, libros, cómics, mangas y juegos. Registra tu consumo, puntúa y visualiza estadísticas en un solo perfil unificado.' },
 
   
   featSearchTitle: { en: 'Guides & Endless Universes', es: 'Guías y Universos Sin Fronteras' },

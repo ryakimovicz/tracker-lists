@@ -391,7 +391,7 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
                       ? 'No se encontraron resultados con ese nombre.'
                       : 'No results found with that name.'
                     : isEs
-                    ? 'Escribe para buscar personajes y portadas de Películas, Series, Videojuegos, Anime, Libros y Cómics.'
+                    ? 'Escribe para buscar personajes y portadas de Películas, Series, Juegos, Anime, Libros y Cómics.'
                     : 'Type to search characters and covers across Movies, Shows, Games, Anime, Books, and Comics.'}
                 </div>
               );

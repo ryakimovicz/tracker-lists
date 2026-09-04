@@ -9,7 +9,7 @@ import { ReplaceFavoriteModal } from '../components/ReplaceFavoriteModal';
 import { ProModal } from '../components/ProModal';
 import { ChevronLeft, ChevronRight, ChevronDown, ChevronsDown, Check, Play } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { getOrderedCategories } from '../utils/categoryOrder';
+import { getOrderedCategories, getCategoryLabel } from '../utils/categoryOrder';
 
 export const getTagClass = (type: string) => {
   switch (type) {
@@ -428,7 +428,7 @@ const CustomCard = ({
           <div className={getTagClass(coverBottomText.toLowerCase())} style={{ position: "absolute", bottom: "0.25rem", left: "0.5rem", padding: "0.1rem 0.4rem", borderRadius: "4px", fontSize: "0.7rem", fontWeight: 600, opacity: 0.85, backdropFilter: 'blur(4px)' }}>
             {(() => {
               if (language === 'es') {
-                const map: any = { "movie": "Película", "series": "Serie", "anime": "Anime", "game": "Videojuego", "book": "Libro", "comic": "Cómic", "manga": "Manga", "guide": "Guía", "user": "Usuario" };
+                const map: any = { "movie": "Película", "series": "Serie", "anime": "Anime", "game": "Juego", "book": "Libro", "comic": "Cómic", "manga": "Manga", "guide": "Guía", "user": "Usuario" };
                 return map[coverBottomText.toLowerCase()] || coverBottomText;
               } else {
                 const map: any = { "movie": "Movie", "series": "Series", "anime": "Anime", "game": "Game", "book": "Book", "comic": "Comic", "manga": "Manga", "guide": "Guide", "user": "User" };
@@ -1143,7 +1143,7 @@ const ActiveItemCard = ({ item, onUpdate, language, onOpenItem, themeColor, them
         <div className={getTagClass(item.item_type)} style={{ position: "absolute", bottom: "0.25rem", left: "0.5rem", padding: "0.1rem 0.4rem", borderRadius: "4px", fontSize: "0.7rem", fontWeight: 600, opacity: 0.85, backdropFilter: 'blur(4px)' }}>
           {(() => {
             if (language === 'es') {
-              const map: any = { "movie": "Película", "series": "Serie", "anime": "Anime", "game": "Videojuego", "book": "Libro", "comic": "Cómic", "manga": "Manga", "guide": "Guía", "user": "Usuario" };
+              const map: any = { "movie": "Película", "series": "Serie", "anime": "Anime", "game": "Juego", "book": "Libro", "comic": "Cómic", "manga": "Manga", "guide": "Guía", "user": "Usuario" };
               return map[item.item_type.toLowerCase()] || item.item_type;
             } else {
               const map: any = { "movie": "Movie", "series": "Series", "anime": "Anime", "game": "Game", "book": "Book", "comic": "Comic", "manga": "Manga", "guide": "Guide", "user": "User" };
@@ -1671,9 +1671,8 @@ export const Home: React.FC = () => {
     tbaAllItems.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
   }
 
-  const getTypeCat = (type: string) => {
-    const map: any = { "movie": "Pelicula", "series": "Serie", "anime": "Anime", "game": "Videojuego", "book": "Libro", "comic": "Comic", "manga": "Manga" };
-    return map[type] || type;
+  const getTypeCat = (type: string, plural: boolean = false) => {
+    return getCategoryLabel(type, language === 'es', plural);
   };
 
   const formatUpcomingDate = (dateStr: string | null | undefined, airstamp?: string) => {
@@ -2144,7 +2143,7 @@ export const Home: React.FC = () => {
               return (
                 <ScrollRow 
                   key={`${activeTab}_${category}`} 
-                  title={getTypeCat(category)} 
+                  title={getTypeCat(category, true)} 
                   outlineColor={`var(--color-${category})`} 
                   headerExtra={headerExtra} 
                   itemCount={catItems.length}

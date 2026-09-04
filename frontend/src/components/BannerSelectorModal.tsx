@@ -502,7 +502,7 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
                       ? 'No se encontraron portadas con ese nombre.'
                       : 'No banners found with that name.'
                     : isEs
-                    ? 'Escribe para buscar fondos y portadas de Videojuegos, Anime, Películas y Series.'
+                    ? 'Escribe para buscar fondos y portadas de Juegos, Anime, Películas y Series.'
                     : 'Type to search panoramic banners from Games, Anime, Movies, and Shows.'}
                 </div>
               );
