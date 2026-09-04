@@ -1695,8 +1695,16 @@ export const Home: React.FC = () => {
       
       {/* Tabs */}
       <div style={{ 
-        display: "flex", gap: "2rem", borderBottom: "1px solid var(--border-color)", paddingBottom: "0.5rem", 
-        position: "sticky", top: 0, zIndex: 20, background: "var(--bg-primary)", paddingTop: "1rem" 
+        display: "flex", 
+        gap: "1.75rem", 
+        borderBottom: "1px solid var(--border-color)", 
+        paddingBottom: "0.5rem", 
+        position: "sticky", 
+        top: 0, 
+        zIndex: 20, 
+        background: "var(--bg-primary)", 
+        marginTop: "-2rem",
+        paddingTop: "0.85rem" 
       }}>
         {["watching", "guides", "plan_to_watch", "completed", "dropped", "upcoming"].map((tab) => {
           const labels: any = language === 'es'
@@ -1708,9 +1716,9 @@ export const Home: React.FC = () => {
               key={tab}
               onClick={() => setActiveTab(tab as any)}
               style={{
-                fontSize: "1.1rem", fontWeight: isActive ? 600 : 500,
+                fontSize: "1.05rem", fontWeight: isActive ? 600 : 500,
                 color: isActive ? "var(--text-primary)" : "var(--text-secondary)",
-                cursor: "pointer", padding: "0.5rem 0", position: "relative"
+                cursor: "pointer", padding: "0.25rem 0", position: "relative"
               }}
             >
               {labels[tab]}
