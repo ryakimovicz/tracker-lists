@@ -629,7 +629,8 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
         const showStatus = (seriesData?.status || '').toLowerCase();
         const isEnded = showStatus === 'ended' || showStatus === 'finished' || showStatus === 'canceled';
 
-        if (hasWatchedAny && (isEnded || !seriesData)) {
+        if (item.status !== 'completed' && hasWatchedAny && (isEnded || !seriesData)) {
+          item.status = 'completed';
           await apiClient.put(`/library/${item.id}`, { status: 'completed' });
           onUpdate();
         }
@@ -1272,14 +1273,16 @@ export const Home: React.FC = () => {
       const trackingSeries = currentLib.filter((i: any) => (i.item_type === 'series' || i.item_type === 'anime') && i.tracking_list_id);
       const standaloneItems = currentLib.filter((i: any) => i.item_type !== 'series' && i.item_type !== 'anime');
 
-      // Fetch release dates / metadata for standalone works if missing
-      standaloneItems.forEach(async (item: any) => {
-        if (!item.release_date) {
+      // Fetch release dates / metadata for standalone works with missing dates (cached or throttled)
+      (async () => {
+        let hasUpdatedStandalone = false;
+        const missingItems = standaloneItems.filter((i: any) => !i.release_date).slice(0, 5); // Limit max 5 per load
+        for (const item of missingItems) {
           const descCacheKey = `desc_${item.item_type}_${item.external_id}`;
           const cachedDesc = getCachedSeries(descCacheKey);
           if (cachedDesc && cachedDesc.release_date) {
             item.release_date = cachedDesc.release_date;
-            setLibraryItems([...currentLib]);
+            hasUpdatedStandalone = true;
           } else {
             try {
               if (item.item_type === 'movie' && item.external_id && item.external_id.startsWith('omdb_')) {
@@ -1287,21 +1290,24 @@ export const Home: React.FC = () => {
                 if (mRes.data && mRes.data.release_date) {
                   item.release_date = mRes.data.release_date;
                   setCachedSeries(descCacheKey, { description: mRes.data.description, release_date: mRes.data.release_date });
-                  setLibraryItems([...currentLib]);
+                  hasUpdatedStandalone = true;
                 }
-              } else {
+              } else if (item.external_id) {
                 const sRes = await apiClient.get('/search/', { params: { q: item.title, type: item.item_type } });
                 const match = (sRes.data || []).find((x: any) => x.external_id === item.external_id) || (sRes.data || [])[0];
                 if (match && match.release_date) {
                   item.release_date = match.release_date;
                   setCachedSeries(descCacheKey, { description: match.description, release_date: match.release_date });
-                  setLibraryItems([...currentLib]);
+                  hasUpdatedStandalone = true;
                 }
               }
             } catch (e) {}
           }
         }
-      });
+        if (hasUpdatedStandalone) {
+          setLibraryItems([...currentLib]);
+        }
+      })();
 
       if (trackingSeries.length > 0) {
         Promise.allSettled(
