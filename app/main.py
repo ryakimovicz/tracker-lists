@@ -37,6 +37,7 @@ def auto_migrate_schema():
                 ("dodo_customer_id", "VARCHAR(100)"),
                 ("is_pro_cancelled", "BOOLEAN DEFAULT FALSE"),
                 ("auth_provider", "VARCHAR(20) DEFAULT 'local'"),
+                ("category_order", "VARCHAR(200)"),
             ]
             for col_name, col_type in columns_to_add:
                 if col_name not in existing_cols:
