@@ -146,14 +146,37 @@ export const Profile: React.FC = () => {
     currentFavorites: []
   });
 
-  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(() => {
+    if (!targetUserIdentifier) {
+      try {
+        const cached = sessionStorage.getItem('pathd_me_cache');
+        return cached ? JSON.parse(cached) : null;
+      } catch { return null; }
+    }
+    return null;
+  });
 
-  const [libraryItems, setLibraryItems] = useState<LibraryItem[]>([]);
+  const [libraryItems, setLibraryItems] = useState<LibraryItem[]>(() => {
+    if (!targetUserIdentifier) {
+      try {
+        const cached = sessionStorage.getItem('pathd_lib_cache');
+        return cached ? JSON.parse(cached) : [];
+      } catch { return []; }
+    }
+    return [];
+  });
   const [activeTab, setActiveTab] = useState<'shelf' | 'guides' | 'favorites' | 'music'>('shelf');
   const [mediaFilter, setMediaFilter] = useState<'all' | 'movie' | 'series' | 'anime' | 'book' | 'comic' | 'manga' | 'game'>('all');
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => {
+    if (!targetUserIdentifier) {
+      try {
+        return !sessionStorage.getItem('pathd_me_cache');
+      } catch { return true; }
+    }
+    return true;
+  });
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
     title: string;
@@ -332,14 +355,19 @@ export const Profile: React.FC = () => {
     };
 
     window.addEventListener('profile-updated', handleProfileUpdate);
+    window.addEventListener('library-updated', handleProfileUpdate);
     return () => {
       window.removeEventListener('profile-updated', handleProfileUpdate);
+      window.removeEventListener('library-updated', handleProfileUpdate);
     };
   }, [usernameParam, userIdParam]);
 
 
   const fetchProfileAndLibrary = async () => {
-    setLoading(true);
+    // Only show full loading spinner if we don't have any cached data
+    if (!profile && libraryItems.length === 0) {
+      setLoading(true);
+    }
     setErrorMsg('');
     try {
       // 1. Parallelize current user and target profile requests
@@ -351,6 +379,11 @@ export const Profile: React.FC = () => {
 
       setCurrentUser(meRes.data);
       setProfile(profileRes.data);
+      if (!targetUserIdentifier) {
+        try {
+          sessionStorage.setItem('pathd_me_cache', JSON.stringify(profileRes.data));
+        } catch (e) {}
+      }
 
       const targetId = profileRes.data.id;
       const targetLibraryUrl = (targetUserIdentifier && targetId !== meRes.data.id) ? `/library/?user_id=${targetId}` : '/library/';
@@ -365,6 +398,12 @@ export const Profile: React.FC = () => {
       const rawLibItems: LibraryItem[] = libraryRes.data || [];
       setLibraryItems(rawLibItems);
       setActivities(activityRes.data || []);
+      if (!targetUserIdentifier) {
+        try {
+          sessionStorage.setItem('pathd_lib_cache', JSON.stringify(rawLibItems));
+          sessionStorage.setItem('pathd_act_cache', JSON.stringify(activityRes.data || []));
+        } catch (e) {}
+      }
 
       // Set favorites state from items explicitly marked as favorites
       const favs = rawLibItems.filter((item: LibraryItem) => item.is_favorite);
@@ -549,6 +588,7 @@ export const Profile: React.FC = () => {
       setLibraryItems(prev => prev.map(item => item.id === itemId ? { ...item, status: newStatus } : item));
       setSuccessMsg(language === 'es' ? 'Estado actualizado con éxito.' : 'Status updated successfully.');
       setTimeout(() => setSuccessMsg(''), 3000);
+      window.dispatchEvent(new Event('library-updated'));
       
       // Refresh activities
       const targetActivityUrl = userIdParam ? `/users/${userIdParam}/activity` : '/users/me/activity';
@@ -598,6 +638,7 @@ export const Profile: React.FC = () => {
           return prev.filter(li => li.id !== itemId);
         }
       });
+      window.dispatchEvent(new Event('library-updated'));
 
       // Refresh activities
       const targetActivityUrl = userIdParam ? `/users/${userIdParam}/activity` : '/users/me/activity';

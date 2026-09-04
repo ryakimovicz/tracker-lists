@@ -140,12 +140,16 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   profileId,
   profileColor,
   onClose,
-  onUpdate,
+  onUpdate: rawOnUpdate,
   onOpenItem,
   isFavorite = false,
   onToggleFavorite,
   onStatusChange
 }) => {
+  const onUpdate = React.useCallback((updatedItem?: any) => {
+    if (rawOnUpdate) rawOnUpdate(updatedItem);
+    window.dispatchEvent(new Event('library-updated'));
+  }, [rawOnUpdate]);
   const { t, language } = useTranslation();
   const { theme } = useTheme();
   const { user } = useAuth();

@@ -465,12 +465,55 @@ const CustomCard = ({
 };
 
 const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, themeTextColor, actionIcon = 'check' }: { item: any, onUpdate: () => void, language: string, onOpenSeries: (item: any) => void, themeColor?: string, themeTextColor?: string, actionIcon?: 'check' | 'play' }) => {
-  const [nextEp, setNextEp] = useState<any>(null);
+  const pad = (n: number) => n < 10 ? '0' + n : n;
+
+  // Synchronously determine if next episode is cached or if already caught up
+  const [initialData] = useState(() => {
+    if (!item.tracking_list_id) return { nextEp: null, isCaughtUp: false, initialLoad: false };
+    const allEps = getCachedSeries(`${item.external_id}_all_episodes`);
+    const cachedList = getCachedSeries(`list_${item.tracking_list_id}`);
+    if (allEps && Array.isArray(allEps) && allEps.length > 0 && cachedList && Array.isArray(cachedList)) {
+      const now = Date.now();
+      const aired = allEps.filter((ep: any) => {
+        if (ep.airstamp) return new Date(ep.airstamp).getTime() <= now;
+        if (ep.airdate || ep.air_date) {
+          const ad = ep.airdate || ep.air_date;
+          const at = ep.airtime || '00:00';
+          return new Date(`${ad}T${at}:00Z`).getTime() <= now;
+        }
+        return true;
+      });
+      if (aired.length > 0) {
+        const getTracked = (ep: any) => cachedList.find((t: any) =>
+          t.external_id === `tvm-ep-${ep.id}` || t.id === ep.id || (t.title && t.title.includes(`S${pad(ep.season_number)}E${pad(ep.episode_number)}`))
+        );
+        const airedCounts = aired.map((ep: any) => {
+          const t = getTracked(ep);
+          return (t?.consumption_count !== undefined) ? t.consumption_count : (t?.is_completed ? 1 : 0);
+        });
+        const minSeen = Math.min(...airedCounts);
+        const maxSeen = Math.max(...airedCounts);
+        if (minSeen === maxSeen && minSeen > 0) {
+          // Fully caught up with all aired episodes!
+          return { nextEp: null, isCaughtUp: true, initialLoad: false };
+        }
+        const candidate = aired.find((ep: any) => {
+          const t = getTracked(ep);
+          const count = (t?.consumption_count !== undefined) ? t.consumption_count : (t?.is_completed ? 1 : 0);
+          return count < minSeen + 1;
+        });
+        if (candidate) {
+          return { nextEp: candidate, isCaughtUp: false, initialLoad: false };
+        }
+      }
+    }
+    return { nextEp: null, isCaughtUp: false, initialLoad: true };
+  });
+
+  const [nextEp, setNextEp] = useState<any>(initialData.nextEp);
   const [trackedEpisodes, setTrackedEpisodes] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
-
-  const pad = (n: number) => n < 10 ? '0' + n : n;
+  const [isInitialLoad, setIsInitialLoad] = useState(initialData.initialLoad);
 
   const fetchNextEpisode = async () => {
     if (!item.tracking_list_id) {
@@ -568,11 +611,7 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
             // The user is fully caught up with the series so it shouldn't show in Continuar.
             targetEp = null;
           } else {
-            // If the user has started a new viewing run (maxAiredSeen > minAiredSeen and maxAiredSeen > 1),
-            // find the last episode watched in this current highest cycle (e.g. S01E03 [x2]),
-            // and propose the next aired episode immediately following it (S01E04)!
             if (maxAiredSeen > minAiredSeen && maxAiredSeen > 1) {
-              // Find index of the highest episode with count === maxAiredSeen
               let highestIdx = -1;
               for (let idx = airedEps.length - 1; idx >= 0; idx--) {
                 if (airedCounts[idx] === maxAiredSeen) {
@@ -583,13 +622,11 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
               if (highestIdx !== -1 && highestIdx + 1 < airedEps.length) {
                 targetEp = airedEps[highestIdx + 1];
               } else if (highestIdx !== -1 && highestIdx + 1 >= airedEps.length) {
-                // Completed the run up to current aired
                 targetEp = null;
               }
             }
 
             if (!targetEp) {
-              // Standard progression: find first episode with count < maxAiredSeen (or minAiredSeen + 1)
               targetCycle = minAiredSeen + 1;
               targetEp = airedEps.find((ep: any) => {
                 const t = getTracked(ep);
@@ -614,16 +651,12 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
         }
 
         if (!isAired) {
-          // Series is up to date with currently aired episodes (not ended)
-          // Keep in watching / continue tab, do not mark as completed
           setNextEp(null);
           return;
         }
 
         setNextEp(targetEp);
       } else {
-        // No uncompleted episodes found in the entire episode list for this cycle.
-        // Check if show status is ended/finished before marking completed
         const hasWatchedAny = currentTracked.some((t: any) => t.is_completed);
         const seriesData = getCachedSeries(`series_${item.external_id}`);
         const showStatus = (seriesData?.status || '').toLowerCase();
@@ -709,6 +742,7 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
         try {
           await apiClient.put(`/library/${item.id}`, { status: 'watching' });
           onUpdate();
+          window.dispatchEvent(new Event('library-updated'));
         } catch (e) {}
       }
 
@@ -717,7 +751,10 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
         try {
           await apiClient.put(`/library/${item.id}`, { status: 'completed' });
           onUpdate();
+          window.dispatchEvent(new Event('library-updated'));
         } catch (e) {}
+      } else {
+        window.dispatchEvent(new Event('library-updated'));
       }
     }).catch(err => {
       console.error("Failed to mark episode in background", err);
@@ -764,6 +801,10 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
     const eStr = pad(nextEp.episode_number);
     seasonText = language === 'es' ? `T${sStr} | E${eStr}` : `S${sStr} | E${eStr}`;
     epName = nextEp.name || (language === 'es' ? 'Episodio' : 'Episode');
+  }
+
+  if (initialData.isCaughtUp) {
+    return null;
   }
 
   if (!isInitialLoad && !nextEp) {
@@ -1221,12 +1262,31 @@ export const Home: React.FC = () => {
   const { user: currentUser } = useAuth();
   const [activeTab, setActiveTab] = useState<"watching" | "guides" | "plan_to_watch" | "completed" | "dropped" | "upcoming">("watching");
   
-  const [libraryItems, setLibraryItems] = useState<any[]>([]);
-  const [upNextGuides, setUpNextGuides] = useState<any[]>([]);
-  const [guideUpdates, setGuideUpdates] = useState<any[]>([]);
+  const [libraryItems, setLibraryItems] = useState<any[]>(() => {
+    try {
+      const cached = sessionStorage.getItem('pathd_lib_cache');
+      return cached ? JSON.parse(cached) : [];
+    } catch { return []; }
+  });
+  const [upNextGuides, setUpNextGuides] = useState<any[]>(() => {
+    try {
+      const cached = sessionStorage.getItem('pathd_upnext_cache');
+      return cached ? JSON.parse(cached)?.guides || [] : [];
+    } catch { return []; }
+  });
+  const [guideUpdates, setGuideUpdates] = useState<any[]>(() => {
+    try {
+      const cached = sessionStorage.getItem('pathd_updates_cache');
+      return cached ? JSON.parse(cached) : [];
+    } catch { return []; }
+  });
   const [upcomingEpisodes, setUpcomingEpisodes] = useState<any[]>([]);
   const [selectedItem, setSelectedItem] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => {
+    try {
+      return !sessionStorage.getItem('pathd_lib_cache');
+    } catch { return true; }
+  });
   const [gameFilter, setGameFilter] = useState<"playing" | "endless">("playing");
   const [upcomingFilter, setUpcomingFilter] = useState<"calendar" | "tba">("calendar");
 
@@ -1244,7 +1304,8 @@ export const Home: React.FC = () => {
 
   const fetchDashboard = async (silent = false) => {
     try {
-      if (!silent) setLoading(true);
+      // If we already have items rendered from cache, keep loading false
+      if (!silent && libraryItems.length === 0) setLoading(true);
       
       // 1. Fetch library items and secondary feeds in parallel for maximum speed
       const [libRes, upNextRes, updatesRes] = await Promise.allSettled([
@@ -1255,15 +1316,24 @@ export const Home: React.FC = () => {
 
       let currentLib = libRes.status === 'fulfilled' ? (libRes.value.data || []) : [];
       
-      // Render the dashboard immediately (under 100ms)
+      // Render the dashboard immediately and cache in sessionStorage
       setLibraryItems(currentLib);
+      try {
+        sessionStorage.setItem('pathd_lib_cache', JSON.stringify(currentLib));
+      } catch (e) {}
 
       if (upNextRes.status === 'fulfilled' && upNextRes.value.data?.guides) {
         setUpNextGuides(upNextRes.value.data.guides);
+        try {
+          sessionStorage.setItem('pathd_upnext_cache', JSON.stringify(upNextRes.value.data));
+        } catch (e) {}
       }
 
       if (updatesRes.status === 'fulfilled' && updatesRes.value.data) {
         setGuideUpdates(updatesRes.value.data);
+        try {
+          sessionStorage.setItem('pathd_updates_cache', JSON.stringify(updatesRes.value.data));
+        } catch (e) {}
       }
 
       if (!silent) setLoading(false);
@@ -1445,6 +1515,9 @@ export const Home: React.FC = () => {
           setUpcomingEpisodes(allCollectedFutureEps);
           if (changed.length > 0) {
             setLibraryItems([...currentLib]);
+            try {
+              sessionStorage.setItem('pathd_lib_cache', JSON.stringify(currentLib));
+            } catch (e) {}
           }
         });
       }
@@ -1457,7 +1530,15 @@ export const Home: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchDashboard();
+    fetchDashboard(libraryItems.length > 0);
+
+    const handleLibraryUpdate = () => {
+      fetchDashboard(true);
+    };
+    window.addEventListener('library-updated', handleLibraryUpdate);
+    return () => {
+      window.removeEventListener('library-updated', handleLibraryUpdate);
+    };
   }, []);
 
   const handleMarkDone = async (e: React.MouseEvent, item: any) => {
@@ -1479,6 +1560,7 @@ export const Home: React.FC = () => {
         }
       }
       fetchDashboard(true);
+      window.dispatchEvent(new Event('library-updated'));
     } catch (err) {
       console.error(err);
     }
