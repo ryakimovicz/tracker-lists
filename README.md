@@ -12,7 +12,7 @@
   </p>
 </div>
 
-**Pathd** (`pathd.net`) es una plataforma web premium y unificada diseñada para indexar, organizar y hacer seguimiento de tu consumo cultural y entretenimiento en un único lugar: **Películas, Series, Anime, Libros, Cómics, Mangas, Música y Videojuegos**.
+**Pathd** (`pathd.net`) es una plataforma web premium y unificada diseñada para indexar, organizar y hacer seguimiento de tu consumo cultural y entretenimiento en un único lugar: **Películas, Series, Anime, Libros, Cómics, Mangas, Música y Juegos**.
 
 Complementada con un potente constructor de **Guías Cronológicas interactivas**, modificaciones de la comunidad (*Mods*), un **Feed Social en tiempo real**, **Sincronización Musical con Last.fm**, y un sistema de diseño inmersivo con estética *Glassmorphism*.
 
@@ -21,7 +21,7 @@ Complementada con un potente constructor de **Guías Cronológicas interactivas*
 ## ✨ Características Principales
 
 ### 🎯 Todo tu Entretenimiento en un Solo Lugar
-- **Seguimiento Unificado**: Olvídate de usar una app distinta para películas, otra para libros y otra para videojuegos. Todo tu historial, pendientes y calificaciones conviven en tu estantería personal.
+- **Seguimiento Unificado**: Olvídate de usar una app distinta para películas, otra para libros y otra para juegos. Todo tu historial, pendientes y calificaciones conviven en tu estantería personal.
 - **Selectores de Progreso Inteligentes**:
   - *Series y Anime*: Detección automática del siguiente episodio por ver, calendario de estrenos y botón de marcado rápido.
   - *Libros, Cómics y Mangas*: Contador interactivo de páginas leídas con porcentaje visual en tiempo real.
@@ -52,7 +52,7 @@ Complementada con un potente constructor de **Guías Cronológicas interactivas*
 | **Historial Detallado de Re-consumo** | Hasta 2 por obra | ✅ Ilimitado con Fechas |
 | **Obras Destacadas en el Perfil** | Hasta 7 obras | ✅ Hasta 70 obras |
 | **Creación de Guías Cronológicas** | Hasta 2 públicas | ✅ Ilimitadas (Públicas, Privadas y No Listadas) |
-| **Personalización de Perfil** | Básico | ✅ Color de acento, avatar, fondo y banner personalizado |
+| **Personalización** | Básico | ✅ Color de acento, avatar, fondo, banner y orden de categorías personalizado |
 | **Insignia Distintiva en la Comunidad** | — | ⭐ Insignia Dorada Premium / VIP |
 
 ---

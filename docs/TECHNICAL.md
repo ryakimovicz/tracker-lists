@@ -64,7 +64,11 @@ Documento de referencia para desarrolladores, arquitectura del sistema y catálo
 | GET | `/me` | Perfil del usuario autenticado y auto-reparación de listas |
 | PUT | `/me/username` | Cambiar nombre de usuario |
 | PUT | `/me/password` | Cambiar contraseña |
-| PUT | `/me/profile-customization` | Actualizar color de acento, avatar, fondo y banner |
+| PUT | `/me/avatar` | Actualizar imagen de perfil / avatar |
+| PUT | `/me/banner` | Actualizar imagen de portada / banner (Premium) |
+| PUT | `/me/background` | Actualizar fondo de pantalla de perfil (Premium) |
+| PUT | `/me/color` | Actualizar color temático de perfil (Premium) |
+| PUT | `/me/category-order` | Guardar orden personalizado de categorías (Premium) |
 | DELETE | `/me` | Eliminar cuenta definitivamente |
 | GET | `/me/activity` | Historial de actividad personal |
 | GET | `/me/up-next` | Próximos ítems pendientes en guías seguidas y listas |

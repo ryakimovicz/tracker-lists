@@ -49,6 +49,6 @@ frontend/src/
 ├── components/   # Componentes modulares reutilizables (Sidebar, Modales, MediaCards, Ads, etc.)
 ├── context/      # Contextos globales de estado (AuthContext, LanguageContext, ThemeContext)
 ├── hooks/        # Custom hooks de React (useScrollLock, etc.)
-├── pages/        # Vistas y pantallas principales (Home, Search, Social, CreateGuide, Profile, etc.)
+├── pages/        # Vistas y pantallas principales (Home, Search, Social, CreateGuide, Profile, Customize, Settings, etc.)
 └── utils/        # Utilidades de caché, formateo y motor de prefetching inteligente
 ```
