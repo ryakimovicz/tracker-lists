@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface HorizontalScrollProps {
@@ -10,6 +10,41 @@ interface HorizontalScrollProps {
 
 export const HorizontalScroll: React.FC<HorizontalScrollProps> = ({ children, title, outlineColor, className = "" }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const updateScrollState = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const { scrollLeft, scrollWidth, clientWidth } = el;
+    setCanScrollLeft(scrollLeft > 4);
+    setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 4);
+  }, []);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    updateScrollState();
+    const timer = setTimeout(updateScrollState, 50);
+    el.addEventListener('scroll', updateScrollState, { passive: true });
+    window.addEventListener('resize', updateScrollState);
+    return () => {
+      clearTimeout(timer);
+      el.removeEventListener('scroll', updateScrollState);
+      window.removeEventListener('resize', updateScrollState);
+    };
+  }, [updateScrollState, children]);
+
+  const getMaskImage = () => {
+    if (canScrollLeft && canScrollRight) {
+      return 'linear-gradient(to right, transparent 0px, transparent 55px, black 110px, black calc(100% - 110px), transparent calc(100% - 55px), transparent 100%)';
+    } else if (canScrollLeft) {
+      return 'linear-gradient(to right, transparent 0px, transparent 55px, black 110px, black 100%)';
+    } else if (canScrollRight) {
+      return 'linear-gradient(to right, black 0px, black calc(100% - 110px), transparent calc(100% - 55px), transparent 100%)';
+    }
+    return 'none';
+  };
 
   const scroll = (direction: "left" | "right") => {
     if (scrollRef.current) {
@@ -54,7 +89,7 @@ export const HorizontalScroll: React.FC<HorizontalScrollProps> = ({ children, ti
           cursor: "pointer",
           boxShadow: "0 4px 6px rgba(0,0,0,0.3)",
           color: "var(--text-primary)",
-          transition: "border-color 0.15s ease, background 0.1s ease, color 0.1s ease, transform 0.1s ease"
+          transition: "border-color 0.15s ease, background 0.1s ease, color 0.1s ease, transform 0.1s ease, opacity 0.2s ease, visibility 0.2s ease"
         };
 
         const handleMouseEnter = (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -84,7 +119,13 @@ export const HorizontalScroll: React.FC<HorizontalScrollProps> = ({ children, ti
               onMouseLeave={handleMouseLeave}
               onMouseDown={handleMouseDown}
               onMouseUp={handleMouseUp}
-              style={{ ...buttonBaseStyle, left: "10px" }}
+              style={{ 
+                ...buttonBaseStyle, 
+                left: "10px",
+                opacity: canScrollLeft ? 1 : 0,
+                visibility: canScrollLeft ? "visible" : "hidden",
+                pointerEvents: canScrollLeft ? "auto" : "none"
+              }}
               aria-label="Scroll left"
             >
               <ChevronLeft size={20} color="currentColor" />
@@ -98,9 +139,12 @@ export const HorizontalScroll: React.FC<HorizontalScrollProps> = ({ children, ti
                 overflowX: "auto", 
                 scrollbarWidth: "none", 
                 msOverflowStyle: "none", 
+                paddingTop: "8px",
                 paddingBottom: "1.5rem", 
                 paddingLeft: "60px", 
-                paddingRight: "60px" 
+                paddingRight: "60px",
+                WebkitMaskImage: getMaskImage(),
+                maskImage: getMaskImage()
               }}
             >
               {children}
@@ -112,7 +156,13 @@ export const HorizontalScroll: React.FC<HorizontalScrollProps> = ({ children, ti
               onMouseLeave={handleMouseLeave}
               onMouseDown={handleMouseDown}
               onMouseUp={handleMouseUp}
-              style={{ ...buttonBaseStyle, right: "10px" }}
+              style={{ 
+                ...buttonBaseStyle, 
+                right: "10px",
+                opacity: canScrollRight ? 1 : 0,
+                visibility: canScrollRight ? "visible" : "hidden",
+                pointerEvents: canScrollRight ? "auto" : "none"
+              }}
               aria-label="Scroll right"
             >
               <ChevronRight size={20} color="currentColor" />

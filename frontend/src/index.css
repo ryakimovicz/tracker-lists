@@ -304,7 +304,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .activity-card:hover {
-  transform: translateX(4px);
+  transform: translateY(-4px);
   box-shadow: 0 4px 20px rgba(245, 158, 11, 0.15);
 }
 

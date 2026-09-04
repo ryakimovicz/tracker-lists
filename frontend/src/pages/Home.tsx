@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import { useTranslation } from '../context/LanguageContext';
@@ -7,7 +7,7 @@ import { ItemDetailsModal } from '../components/ItemDetailsModal';
 import { AdBanner } from '../components/AdBanner';
 import { ReplaceFavoriteModal } from '../components/ReplaceFavoriteModal';
 import { ProModal } from '../components/ProModal';
-import { ChevronLeft, ChevronRight, Check, Play } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronDown, ChevronsDown, Check, Play } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export const getTagClass = (type: string) => {
@@ -27,104 +27,316 @@ export const getTagClass = (type: string) => {
 
 // --- Helper Components ---
 
-const ScrollRow = ({ children, title, outlineColor, headerExtra }: { children: React.ReactNode, title?: string, outlineColor?: string, headerExtra?: React.ReactNode }) => {
+const getSavedMode = (key?: string): 'one-row' | 'two-rows' | 'collapsed' => {
+  if (!key || typeof window === 'undefined') return 'one-row';
+  try {
+    const saved = localStorage.getItem(`home_scroll_mode_${key}`);
+    if (saved === 'one-row' || saved === 'two-rows' || saved === 'collapsed') {
+      return saved;
+    }
+  } catch (e) {
+    // ignore
+  }
+  return 'one-row';
+};
+
+const saveMode = (key?: string, mode?: string) => {
+  if (!key || !mode || typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(`home_scroll_mode_${key}`, mode);
+  } catch (e) {
+    // ignore
+  }
+};
+
+const ScrollRow = ({ 
+  children, 
+  title, 
+  outlineColor, 
+  headerExtra,
+  itemCount,
+  storageKey
+}: { 
+  children: React.ReactNode, 
+  title?: string, 
+  outlineColor?: string, 
+  headerExtra?: React.ReactNode,
+  itemCount?: number,
+  storageKey?: string
+}) => {
+  const containerRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [rowMode, setRowMode] = useState<'one-row' | 'two-rows' | 'collapsed'>(() => getSavedMode(storageKey));
+
+  useEffect(() => {
+    setRowMode(getSavedMode(storageKey));
+  }, [storageKey]);
+
+  const [containerWidth, setContainerWidth] = useState<number>(() => {
+    return typeof window !== 'undefined' ? window.innerWidth : 1200;
+  });
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const updateWidth = () => {
+      if (containerRef.current) {
+        setContainerWidth(containerRef.current.clientWidth);
+      }
+    };
+    updateWidth();
+
+    if (typeof ResizeObserver !== 'undefined') {
+      const ro = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          if (entry.contentRect.width > 0) {
+            setContainerWidth(entry.contentRect.width);
+          }
+        }
+      });
+      ro.observe(containerRef.current);
+      return () => ro.disconnect();
+    } else {
+      window.addEventListener('resize', updateWidth);
+      return () => window.removeEventListener('resize', updateWidth);
+    }
+  }, []);
+
+  const actualItemCount = itemCount !== undefined ? itemCount : React.Children.count(children);
+  // Available width accounting for 45px padding on each side (90px total)
+  // Each card is 180px wide with a 16px (1rem) gap
+  const availableWidth = Math.max(0, containerWidth - 90);
+  const maxVisibleInOneRow = Math.max(1, Math.floor((availableWidth + 16) / 196));
+  const canExpandMore = actualItemCount > maxVisibleInOneRow;
+
+  // Use effectiveRowMode so loading states or temporary resize don't destroy user preference
+  const effectiveRowMode = (rowMode === 'two-rows' && !canExpandMore) ? 'one-row' : rowMode;
+
+  const isTwoRows = effectiveRowMode === 'two-rows';
+  const isTwoRowsByColumn = isTwoRows && actualItemCount > 2 * maxVisibleInOneRow;
+  const isTwoRowsByRow = isTwoRows && actualItemCount <= 2 * maxVisibleInOneRow;
+
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const updateScrollState = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const { scrollLeft, scrollWidth, clientWidth } = el;
+    setCanScrollLeft(scrollLeft > 4);
+    setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 4);
+  }, []);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    updateScrollState();
+    const timer = setTimeout(updateScrollState, 50);
+    el.addEventListener('scroll', updateScrollState, { passive: true });
+    window.addEventListener('resize', updateScrollState);
+    return () => {
+      clearTimeout(timer);
+      el.removeEventListener('scroll', updateScrollState);
+      window.removeEventListener('resize', updateScrollState);
+    };
+  }, [updateScrollState, effectiveRowMode, children]);
+
+  const getMaskImage = () => {
+    if (canScrollLeft && canScrollRight) {
+      return 'linear-gradient(to right, transparent 0px, transparent 45px, black 95px, black calc(100% - 95px), transparent calc(100% - 45px), transparent 100%)';
+    } else if (canScrollLeft) {
+      return 'linear-gradient(to right, transparent 0px, transparent 45px, black 95px, black 100%)';
+    } else if (canScrollRight) {
+      return 'linear-gradient(to right, black 0px, black calc(100% - 95px), transparent calc(100% - 45px), transparent 100%)';
+    }
+    return 'none';
+  };
+
+  const handleToggle = () => {
+    setRowMode(current => {
+      let next: 'one-row' | 'two-rows' | 'collapsed';
+      if (current === 'one-row') {
+        next = canExpandMore ? 'two-rows' : 'collapsed';
+      } else if (current === 'two-rows') {
+        next = 'collapsed';
+      } else {
+        next = 'one-row';
+      }
+      saveMode(storageKey, next);
+      return next;
+    });
+  };
+
+  const getTooltip = () => {
+    if (effectiveRowMode === 'one-row') {
+      return canExpandMore ? 'Expandir a 2 filas' : 'Ocultar categoría';
+    } else if (effectiveRowMode === 'two-rows') {
+      return 'Ocultar categoría';
+    } else {
+      return 'Mostrar categoría';
+    }
+  };
 
   const scroll = (direction: "left" | "right") => {
     if (scrollRef.current) {
-      const scrollAmount = 300;
+      const scrollAmount = effectiveRowMode === 'two-rows' ? 360 : 300;
       scrollRef.current.scrollBy({ left: direction === "left" ? -scrollAmount : scrollAmount, behavior: "smooth" });
     }
   };
 
+  const catColor = outlineColor || "var(--accent-primary)";
+  const buttonBaseStyle: React.CSSProperties = {
+    position: "absolute",
+    top: "50%",
+    transform: "translateY(-50%)",
+    zIndex: 10,
+    background: "var(--bg-tertiary)",
+    border: "1.5px solid var(--border-color)",
+    borderRadius: "50%",
+    width: "40px",
+    height: "40px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    cursor: "pointer",
+    boxShadow: "0 4px 6px rgba(0,0,0,0.3)",
+    color: "var(--text-primary)",
+    transition: "border-color 0.15s ease, background 0.1s ease, color 0.1s ease, transform 0.1s ease, opacity 0.2s ease, visibility 0.2s ease"
+  };
+
+  const handleMouseEnter = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.currentTarget.style.borderColor = catColor;
+  };
+  const handleMouseLeave = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.currentTarget.style.borderColor = "var(--border-color)";
+    e.currentTarget.style.background = "var(--bg-tertiary)";
+    e.currentTarget.style.color = "var(--text-primary)";
+  };
+  const handleMouseDown = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.currentTarget.style.background = catColor;
+    e.currentTarget.style.borderColor = catColor;
+    e.currentTarget.style.color = "var(--bg-primary)";
+  };
+  const handleMouseUp = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.currentTarget.style.background = "var(--bg-tertiary)";
+    e.currentTarget.style.borderColor = catColor;
+    e.currentTarget.style.color = "var(--text-primary)";
+  };
+
   return (
-    <div style={{ position: "relative" }}>
+    <div ref={containerRef} style={{ position: "relative" }}>
       {title && (
-        <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", paddingLeft: "45px", paddingRight: "45px", marginBottom: "1rem" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", paddingLeft: "45px", paddingRight: "45px", marginBottom: effectiveRowMode === 'collapsed' ? "0.5rem" : "1rem" }}>
           <div style={{ display: "flex", alignItems: "center" }}>
-            <h3 style={{ fontSize: "1.2rem", fontWeight: 600, color: "var(--text-primary)", border: `2px solid ${outlineColor || "var(--border-color)"}`, borderRadius: "8px", padding: "0.2rem 0.75rem", background: "var(--bg-secondary)", margin: 0 }}>
-              {title}
-            </h3>
+            <button
+              type="button"
+              onClick={handleToggle}
+              title={getTooltip()}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.5rem",
+                fontSize: "1.2rem",
+                fontWeight: 600,
+                color: "var(--text-primary)",
+                border: `2px solid ${outlineColor || "var(--border-color)"}`,
+                borderRadius: "8px",
+                padding: "0.2rem 0.75rem",
+                background: "var(--bg-secondary)",
+                margin: 0,
+                cursor: "pointer",
+                transition: "border-color 0.15s ease, transform 0.15s ease",
+                outline: "none"
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = "translateY(-1px)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "none";
+              }}
+            >
+              <span>{title}</span>
+              <span style={{ display: "inline-flex", alignItems: "center", color: outlineColor || "var(--accent-primary)" }}>
+                {effectiveRowMode === 'collapsed' ? (
+                  <ChevronRight size={18} />
+                ) : effectiveRowMode === 'two-rows' ? (
+                  <ChevronsDown size={18} />
+                ) : (
+                  <ChevronDown size={18} />
+                )}
+              </span>
+            </button>
           </div>
-          {headerExtra && (
+          {headerExtra && effectiveRowMode !== 'collapsed' && (
             <div style={{ display: "flex", alignItems: "center" }}>
               {headerExtra}
             </div>
           )}
         </div>
       )}
-      {(() => {
-        const catColor = outlineColor || "var(--accent-primary)";
-        const buttonBaseStyle: React.CSSProperties = {
-          position: "absolute",
-          top: "50%",
-          transform: "translateY(-50%)",
-          zIndex: 10,
-          background: "var(--bg-tertiary)",
-          border: "1.5px solid var(--border-color)",
-          borderRadius: "50%",
-          width: "40px",
-          height: "40px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          cursor: "pointer",
-          boxShadow: "0 4px 6px rgba(0,0,0,0.3)",
-          color: "var(--text-primary)",
-          transition: "border-color 0.15s ease, background 0.1s ease, color 0.1s ease, transform 0.1s ease"
-        };
+      {effectiveRowMode !== 'collapsed' && (
+        <div style={{ position: "relative" }}>
+          <button 
+            onClick={() => scroll("left")}
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
+            onMouseDown={handleMouseDown}
+            onMouseUp={handleMouseUp}
+            style={{ 
+              ...buttonBaseStyle, 
+              left: "0px",
+              opacity: canScrollLeft ? 1 : 0,
+              visibility: canScrollLeft ? "visible" : "hidden",
+              pointerEvents: canScrollLeft ? "auto" : "none"
+            }}
+            aria-label="Scroll left"
+          >
+            <ChevronLeft size={20} color="currentColor" />
+          </button>
+          
+          <div 
+            ref={scrollRef} 
+            style={{ 
+              display: isTwoRows ? "grid" : "flex",
+              gridTemplateColumns: isTwoRowsByRow ? `repeat(${maxVisibleInOneRow}, max-content)` : undefined,
+              gridTemplateRows: isTwoRows ? "repeat(2, auto)" : undefined,
+              gridAutoFlow: isTwoRows ? (isTwoRowsByColumn ? "column" : "row") : undefined,
+              gridAutoColumns: isTwoRowsByColumn ? "max-content" : undefined,
+              justifyContent: "start",
+              alignContent: "start",
+              gap: "1rem", 
+              overflowX: "auto", 
+              scrollbarWidth: "none", 
+              msOverflowStyle: "none", 
+              paddingTop: "8px", 
+              paddingBottom: "1rem", 
+              paddingLeft: "45px", 
+              paddingRight: "45px",
+              WebkitMaskImage: getMaskImage(),
+              maskImage: getMaskImage()
+            }}
+          >
+            {children}
+          </div>
 
-        const handleMouseEnter = (e: React.MouseEvent<HTMLButtonElement>) => {
-          e.currentTarget.style.borderColor = catColor;
-        };
-        const handleMouseLeave = (e: React.MouseEvent<HTMLButtonElement>) => {
-          e.currentTarget.style.borderColor = "var(--border-color)";
-          e.currentTarget.style.background = "var(--bg-tertiary)";
-          e.currentTarget.style.color = "var(--text-primary)";
-        };
-        const handleMouseDown = (e: React.MouseEvent<HTMLButtonElement>) => {
-          e.currentTarget.style.background = catColor;
-          e.currentTarget.style.borderColor = catColor;
-          e.currentTarget.style.color = "var(--bg-primary)";
-        };
-        const handleMouseUp = (e: React.MouseEvent<HTMLButtonElement>) => {
-          e.currentTarget.style.background = "var(--bg-tertiary)";
-          e.currentTarget.style.borderColor = catColor;
-          e.currentTarget.style.color = "var(--text-primary)";
-        };
-
-        return (
-          <>
-            <button 
-              onClick={() => scroll("left")}
-              onMouseEnter={handleMouseEnter}
-              onMouseLeave={handleMouseLeave}
-              onMouseDown={handleMouseDown}
-              onMouseUp={handleMouseUp}
-              style={{ ...buttonBaseStyle, left: "0px" }}
-              aria-label="Scroll left"
-            >
-              <ChevronLeft size={20} color="currentColor" />
-            </button>
-            
-            <div ref={scrollRef} style={{ display: "flex", gap: "1rem", overflowX: "auto", scrollbarWidth: "none", msOverflowStyle: "none", paddingBottom: "1rem", paddingLeft: "45px", paddingRight: "45px" }}>
-              {children}
-            </div>
-
-            <button 
-              onClick={() => scroll("right")}
-              onMouseEnter={handleMouseEnter}
-              onMouseLeave={handleMouseLeave}
-              onMouseDown={handleMouseDown}
-              onMouseUp={handleMouseUp}
-              style={{ ...buttonBaseStyle, right: "0px" }}
-              aria-label="Scroll right"
-            >
-              <ChevronRight size={20} color="currentColor" />
-            </button>
-          </>
-        );
-      })()}
+          <button 
+            onClick={() => scroll("right")}
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
+            onMouseDown={handleMouseDown}
+            onMouseUp={handleMouseUp}
+            style={{ 
+              ...buttonBaseStyle, 
+              right: "0px",
+              opacity: canScrollRight ? 1 : 0,
+              visibility: canScrollRight ? "visible" : "hidden",
+              pointerEvents: canScrollRight ? "auto" : "none"
+            }}
+            aria-label="Scroll right"
+          >
+            <ChevronRight size={20} color="currentColor" />
+          </button>
+        </div>
+      )}
     </div>
   );
 };
@@ -1822,7 +2034,13 @@ export const Home: React.FC = () => {
         </div>
       ) : activeTab === "guides" ? (
         upNextGuides.length > 0 ? (
-          <ScrollRow>
+          <ScrollRow 
+            key="guides_row"
+            title={language === 'es' ? "Guías" : "Guides"} 
+            outlineColor="var(--color-guide)"
+            itemCount={upNextGuides.length}
+            storageKey="guides_guides"
+          >
             {upNextGuides.map(g => {
               let insideTop = g.title;
               let bottomText1 = '';
@@ -1915,7 +2133,14 @@ export const Home: React.FC = () => {
               ) : undefined;
 
               return (
-                <ScrollRow key={category} title={getTypeCat(category)} outlineColor={`var(--color-${category})`} headerExtra={headerExtra}>
+                <ScrollRow 
+                  key={`${activeTab}_${category}`} 
+                  title={getTypeCat(category)} 
+                  outlineColor={`var(--color-${category})`} 
+                  headerExtra={headerExtra} 
+                  itemCount={catItems.length}
+                  storageKey={`${activeTab}_${category}`}
+                >
                   {catItems.length === 0 ? (
                     <div style={{ padding: "1rem 0", color: "var(--text-secondary)", fontSize: "0.9rem" }}>
                       {language === "es" 
