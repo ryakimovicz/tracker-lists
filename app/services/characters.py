@@ -88,6 +88,24 @@ class CharacterService:
         elif "hollow" in q_lower and "knight" in q_lower:
             variants.extend(["hollow knight", "silksong", "hollow knight silksong"])
 
+        # Smart prefix expansion
+        q_raw = query.strip()
+        if len(q_raw) >= 2:
+            try:
+                url = f'https://suggestqueries.google.com/complete/search?client=firefox&q={urllib.parse.quote(q_raw)}'
+                req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
+                with urllib.request.urlopen(req, timeout=1.2) as res:
+                    data = json.loads(res.read().decode())
+                    if len(data) > 1 and isinstance(data[1], list):
+                        for sug in data[1]:
+                            sug_clean = re.sub(r'\s+(reparto|cast|pelicula|trailer|personajes|serie|libros|sin relleno|online|ver|completa|estreno|wallpaper|fondo|portada)$', '', sug.strip(), flags=re.IGNORECASE).strip()
+                            if sug_clean and len(sug_clean) >= 2 and sug_clean.lower() not in [x.lower() for x in variants]:
+                                variants.append(sug_clean)
+                                if len(variants) >= 6:
+                                    break
+            except Exception:
+                pass
+
         return list(dict.fromkeys([v for v in variants if len(v.strip()) >= 2]))
 
 

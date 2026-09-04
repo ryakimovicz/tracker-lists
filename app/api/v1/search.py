@@ -19,22 +19,107 @@ from app.core.sfw_filter import is_safe_text, is_safe_media_item
 import re
 import concurrent.futures
 
+import urllib.request
+import urllib.parse
+import json
+
 router = APIRouter()
 
 def get_query_variations(q: str) -> List[str]:
-    pattern = r'\b(y|and)\b|\s+&\s+'
-    if not re.search(pattern, q, re.IGNORECASE):
-        return [q.strip()]
-    v1 = re.sub(pattern, ' y ', q, flags=re.IGNORECASE).strip()
-    v2 = re.sub(pattern, ' and ', q, flags=re.IGNORECASE).strip()
-    v3 = re.sub(pattern, ' & ', q, flags=re.IGNORECASE).strip()
+    clean_q = q.strip()
+    if not clean_q:
+        return []
     
-    vars_set = []
-    for v in [q.strip(), v1, v2, v3]:
-        v = re.sub(r'\s+', ' ', v).strip()
-        if v and v not in vars_set:
-            vars_set.append(v)
-    return vars_set
+    variations = [clean_q]
+    
+    # 1. Grammar variations (y / and / &)
+    pattern = r'\b(y|and)\b|\s+&\s+'
+    if re.search(pattern, clean_q, re.IGNORECASE):
+        v1 = re.sub(pattern, ' y ', clean_q, flags=re.IGNORECASE).strip()
+        v2 = re.sub(pattern, ' and ', clean_q, flags=re.IGNORECASE).strip()
+        v3 = re.sub(pattern, ' & ', clean_q, flags=re.IGNORECASE).strip()
+        for v in [v1, v2, v3]:
+            v_norm = re.sub(r'\s+', ' ', v).strip()
+            if v_norm and v_norm.lower() not in [x.lower() for x in variations]:
+                variations.append(v_norm)
+
+    # 2. Smart auto-completion / prefix expansion
+    if len(clean_q) >= 2:
+        try:
+            url = f'https://suggestqueries.google.com/complete/search?client=firefox&q={urllib.parse.quote(clean_q)}'
+            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
+            with urllib.request.urlopen(req, timeout=1.5) as res:
+                data = json.loads(res.read().decode())
+                if len(data) > 1 and isinstance(data[1], list):
+                    for sug in data[1]:
+                        sug_clean = re.sub(r'\s+(reparto|cast|pelicula|trailer|personajes|serie|libros|sin relleno|online|ver|completa|estreno)$', '', sug.strip(), flags=re.IGNORECASE).strip()
+                        if sug_clean and len(sug_clean) >= 2 and sug_clean.lower() not in [x.lower() for x in variations]:
+                            variations.append(sug_clean)
+                            if len(variations) >= 5:
+                                break
+        except Exception:
+            pass
+
+    return variations
+
+def rank_search_results(items: List[SearchResultItem], query: str, variations: List[str]) -> List[SearchResultItem]:
+    query_clean = query.lower().strip()
+    query_words = [w for w in query_clean.split() if w]
+    var_terms = [v.lower().strip() for v in variations if v.lower().strip() != query_clean]
+
+    def calculate_score(item: SearchResultItem):
+        title_clean = item.title.lower().strip()
+        score = 0.0
+
+        # Exact match with user's original query
+        if title_clean == query_clean:
+            score += 1500.0
+        elif title_clean.startswith(query_clean):
+            score += 800.0
+        elif query_clean in title_clean:
+            score += 400.0
+
+        # Exact or prefix match with expanded variations (e.g. "batman" for query "batm")
+        for idx, var in enumerate(var_terms):
+            var_weight = max(1.0, 4.0 - idx)
+            if title_clean == var:
+                score += 1200.0 * var_weight / 4.0
+            elif title_clean.startswith(var):
+                score += 700.0 * var_weight / 4.0
+            elif var in title_clean:
+                score += 350.0 * var_weight / 4.0
+
+        # Word boundary and prefix matches
+        title_words = title_clean.split()
+        for tw in title_words:
+            if tw == query_clean:
+                score += 300.0
+            elif tw.startswith(query_clean):
+                score += 180.0
+            for var in var_terms:
+                if tw == var:
+                    score += 200.0
+                elif tw.startswith(var):
+                    score += 120.0
+
+        # Overlapping words
+        common_words = set(query_words).intersection(set(title_words))
+        score += len(common_words) * 100.0
+
+        # Prefer concise/shorter titles on equivalent matches
+        if len(item.title) > 0:
+            score += (1.0 / len(item.title)) * 150.0
+
+        # Cosmetic DLC penalty
+        if getattr(item, "badge", None) == "dlc":
+            score -= 300.0
+
+        # Popularity bonus (scaled 0-100)
+        score += min(item.popularity or 0.0, 100.0)
+        return score
+
+    items.sort(key=calculate_score, reverse=True)
+    return items
 
 # In-memory search query cache with 15-minute TTL
 _SEARCH_QUERY_CACHE: Dict[str, Tuple[float, List[SearchResultItem]]] = {}
@@ -108,29 +193,7 @@ def search_media(
             except Exception as e:
                 print(f"Error fetching var {future_to_var[future]}: {e}")
 
-    if type_lower == "series":
-        query_clean = q.lower().strip()
-        query_words = set(query_clean.split())
-        def calculate_score(item: SearchResultItem):
-            title_clean = item.title.lower().strip()
-            score = 0.0
-            if title_clean == query_clean:
-                score += 100.0
-            elif title_clean.startswith(query_clean):
-                score += 50.0
-            elif query_clean in title_clean:
-                score += 30.0
-            title_words = set(title_clean.split())
-            common_words = query_words.intersection(title_words)
-            score += len(common_words) * 15.0
-            
-            if len(item.title) > 0:
-                score += (1.0 / len(item.title)) * 10.0
-                
-            score += min(item.popularity or 0.0, 100.0)
-            return score
-        combined.sort(key=calculate_score, reverse=True)
-        
+    combined = rank_search_results(combined, q, variations)
     _SEARCH_QUERY_CACHE[cache_key] = (now_ts, combined)
     return combined
 
@@ -220,36 +283,7 @@ def search_all_media(
                         popularity=10.0
                     ))
 
-    query_clean = q.lower().strip()
-    query_words = set(query_clean.split())
-
-    def calculate_score(item: SearchResultItem):
-        title_clean = item.title.lower().strip()
-        score = 0.0
-
-        if title_clean == query_clean:
-            score += 1000.0
-        elif title_clean.startswith(query_clean):
-            score += 500.0
-        elif query_clean in title_clean:
-            score += 250.0
-
-        title_words = set(title_clean.split())
-        common_words = query_words.intersection(title_words)
-        score += len(common_words) * 100.0
-        
-        # Prefer shorter titles on equal match (e.g. "Arrow" over "Arrow: Blood Rush" for query "Arrow")
-        if len(item.title) > 0:
-            score += (1.0 / len(item.title)) * 200.0
-
-        # Cosmetic DLCs get a small penalty so primary works appear first
-        if getattr(item, "badge", None) == "dlc":
-            score -= 300.0
-            
-        score += min(item.popularity or 0.0, 100.0)
-        return score
-
-    combined.sort(key=calculate_score, reverse=True)
+    combined = rank_search_results(combined, q, variations)
     _SEARCH_QUERY_CACHE[cache_key] = (now_ts, combined)
     return combined
 

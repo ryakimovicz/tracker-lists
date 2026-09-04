@@ -33,6 +33,7 @@ export const BackgroundSelectorModal: React.FC<BackgroundSelectorModalProps> = (
   const [selectedCategory, setSelectedCategory] = useState<'all' | 'movie' | 'series' | 'anime' | 'book' | 'comic' | 'manga' | 'game'>('all');
 
   const [results, setResults] = useState<BackgroundItem[]>([]);
+  const [visibleCount, setVisibleCount] = useState<number>(24);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedUrl, setSelectedUrl] = useState<string | null>(currentBackgroundUrl || null);
   const [isSaving, setIsSaving] = useState(false);
@@ -55,12 +56,13 @@ export const BackgroundSelectorModal: React.FC<BackgroundSelectorModalProps> = (
     setErrorMsg('');
     try {
       const res = await apiClient.get('/users/banners/search', {
-        params: { query: searchTerm.trim() },
+        params: { query: searchTerm.trim(), type: 'background' },
         signal: controller.signal,
       });
 
       if (currentRequestId === activeRequestIdRef.current) {
         setResults(res.data || []);
+        setVisibleCount(24);
         setIsLoading(false);
       }
     } catch (err: any) {
@@ -108,12 +110,6 @@ export const BackgroundSelectorModal: React.FC<BackgroundSelectorModalProps> = (
     return () => clearTimeout(timer);
   }, [query, isOpen]);
 
-  // Reset category filter if it has no results in new search
-  useEffect(() => {
-    if (selectedCategory !== 'all' && !results.some(r => r.category === selectedCategory)) {
-      setSelectedCategory('all');
-    }
-  }, [results, selectedCategory]);
 
   const handleSaveBackground = async () => {
     setIsSaving(true);
@@ -411,19 +407,14 @@ export const BackgroundSelectorModal: React.FC<BackgroundSelectorModalProps> = (
           )}
         </div>
 
-        {/* Category Filters (Canonical Order, only showing available categories) */}
+        {/* Category Filters (Canonical Order) */}
         {(() => {
           const ordered = getOrderedCategories(user?.category_order);
           const allCategories = ['all', ...ordered] as const;
-          const availableCategories = allCategories.filter(cat => cat === 'all' || results.some(r => r.category === cat));
-
-          if (results.length === 0 || availableCategories.length <= 1) {
-            return null;
-          }
 
           return (
             <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap', alignItems: 'center' }}>
-              {availableCategories.map(cat => {
+              {allCategories.map(cat => {
                 const isSelected = selectedCategory === cat;
                 const catColor = cat === 'all' ? '#10b981' : `var(--color-${cat})`;
                 const catTextColor = cat === 'all' ? '#ffffff' : `var(--color-text-${cat})`;
@@ -512,20 +503,20 @@ export const BackgroundSelectorModal: React.FC<BackgroundSelectorModalProps> = (
                 >
                   {results.length > 0
                     ? isEs
-                      ? 'No hay fondos en esta categoría.'
-                      : 'No backgrounds found in this category.'
+                      ? 'No se encontraron resultados para la búsqueda en esta categoría.'
+                      : 'No results found for your search in this category.'
                     : query.trim().length >= 2
                     ? isEs
-                      ? 'No se encontraron fondos con ese nombre.'
-                      : 'No backgrounds found with that name.'
+                      ? 'No se encontraron resultados para la búsqueda.'
+                      : 'No results found for your search.'
                     : isEs
-                    ? 'Escribe para buscar fondos 1080p de Juegos, Anime, Películas y Series.'
-                    : 'Type to search 1080p backgrounds from Games, Anime, Movies, and Shows.'}
+                    ? 'Escribe para buscar fondos 1080p de Películas, Series, Anime, Libros, Cómics, Manga y Juegos.'
+                    : 'Type to search 1080p backgrounds from Movies, Shows, Anime, Books, Comics, Manga, and Games.'}
                 </div>
               );
             }
 
-            return filteredResults.map((b, idx) => {
+            const itemsToDisplay = filteredResults.slice(0, visibleCount).map((b, idx) => {
               const isSelected = selectedUrl === b.image_url;
               return (
                 <div
@@ -588,7 +579,12 @@ export const BackgroundSelectorModal: React.FC<BackgroundSelectorModalProps> = (
                           textTransform: 'uppercase',
                         }}
                       >
-                        {b.category === 'game' ? (isEs ? 'Juego' : 'Game') : b.category === 'anime' ? 'Anime' : b.category === 'movie' ? (isEs ? 'Película' : 'Movie') : (isEs ? 'Serie' : 'Show')}
+                        {b.category === 'game' ? (isEs ? 'Juego' : 'Game') :
+                         b.category === 'anime' ? 'Anime' :
+                         b.category === 'manga' ? 'Manga' :
+                         b.category === 'comic' ? (isEs ? 'Cómic' : 'Comic') :
+                         b.category === 'book' ? (isEs ? 'Libro' : 'Book') :
+                         b.category === 'movie' ? (isEs ? 'Película' : 'Movie') : (isEs ? 'Serie' : 'Show')}
                       </span>
                     )}
                   </div>
@@ -627,6 +623,35 @@ export const BackgroundSelectorModal: React.FC<BackgroundSelectorModalProps> = (
                 </div>
               );
             });
+
+            const hasMore = filteredResults.length > visibleCount;
+
+            return (
+              <>
+                {itemsToDisplay}
+                {hasMore && (
+                  <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'center', padding: '1rem 0' }}>
+                    <button
+                      type="button"
+                      onClick={() => setVisibleCount(prev => prev + 24)}
+                      className="secondary-button"
+                      style={{
+                        padding: '0.6rem 1.5rem',
+                        borderRadius: '10px',
+                        fontSize: '0.85rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        border: '1px solid var(--border-color)',
+                        background: 'var(--bg-secondary)',
+                        color: 'var(--text-primary)',
+                      }}
+                    >
+                      {isEs ? 'Mostrar más fondos' : 'Load more backgrounds'} ({filteredResults.length - visibleCount} {isEs ? 'más' : 'more'})
+                    </button>
+                  </div>
+                )}
+              </>
+            );
           })()}
         </div>
 

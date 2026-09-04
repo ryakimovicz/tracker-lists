@@ -196,6 +196,18 @@ class OMDbService:
                     data = json.loads(response.read().decode())
                     search_items = data.get("Search", [])
                     
+                    # If exact query yielded nothing and query does not contain '*', try wildcard search *query* or query*
+                    if not search_items and '*' not in query:
+                        try:
+                            url_wildcard = f"http://www.omdbapi.com/?s={urllib.parse.quote('*' + query + '*')}&type=movie&apikey={cls.API_KEY}"
+                            req_w = urllib.request.Request(url_wildcard, headers={"User-Agent": "TrackerLists/1.0"})
+                            with urllib.request.urlopen(req_w, timeout=4) as resp_w:
+                                if resp_w.status == 200:
+                                    data_w = json.loads(resp_w.read().decode())
+                                    search_items = data_w.get("Search", [])
+                        except Exception:
+                            pass
+
                     import concurrent.futures
                     with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
                         detailed_results = list(executor.map(cls._fetch_movie_details, search_items[:10]))

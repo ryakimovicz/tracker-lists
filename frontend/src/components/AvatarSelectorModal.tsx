@@ -33,6 +33,7 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
   const [query, setQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<'all' | 'movie' | 'series' | 'anime' | 'comic' | 'manga' | 'book' | 'game'>('all');
   const [results, setResults] = useState<Character[]>([]);
+  const [visibleCount, setVisibleCount] = useState<number>(24);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedUrl, setSelectedUrl] = useState<string | null>(currentPhotoUrl || null);
   const [isSaving, setIsSaving] = useState(false);
@@ -64,6 +65,7 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
       // Only update state if this is still the latest active request
       if (currentRequestId === activeRequestIdRef.current) {
         setResults(res.data || []);
+        setVisibleCount(24);
         setIsLoading(false);
       }
     } catch (err: any) {
@@ -115,12 +117,6 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
     return () => clearTimeout(timer);
   }, [query, isOpen]);
 
-  // Reset category filter if it has no results in new search
-  useEffect(() => {
-    if (selectedCategory !== 'all' && !results.some(r => r.category === selectedCategory)) {
-      setSelectedCategory('all');
-    }
-  }, [results, selectedCategory]);
 
 
   const handleSaveAvatar = async () => {
@@ -280,19 +276,14 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
           )}
         </div>
 
-        {/* Category Filters (Only show categories with results) */}
+        {/* Category Filters */}
         {(() => {
           const ordered = getOrderedCategories(user?.category_order);
           const allCategories = ['all', ...ordered] as const;
-          const availableCategories = allCategories.filter(cat => cat === 'all' || results.some(r => r.category === cat));
-
-          if (results.length === 0 || availableCategories.length <= 1) {
-            return null;
-          }
 
           return (
             <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap', alignItems: 'center' }}>
-              {availableCategories.map(cat => {
+              {allCategories.map(cat => {
                 const isSelected = selectedCategory === cat;
                 const catColor = cat === 'all' ? 'var(--accent-primary)' : `var(--color-${cat})`;
                 const catTextColor = cat === 'all' ? '#ffffff' : `var(--color-text-${cat})`;
@@ -310,7 +301,6 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
                     default: return cat;
                   }
                 };
-
 
                 return (
                   <button
@@ -337,7 +327,6 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
             </div>
           );
         })()}
-
 
         {errorMsg && (
           <div
@@ -367,7 +356,6 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
             padding: '0.5rem 0.25rem',
           }}
         >
-
           {(() => {
             const filteredResults = results.filter(ch => selectedCategory === 'all' || ch.category === selectedCategory);
 
@@ -384,20 +372,20 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
                 >
                   {results.length > 0
                     ? isEs
-                      ? 'No hay resultados en esta categoría.'
-                      : 'No results found in this category.'
+                      ? 'No se encontraron resultados para la búsqueda en esta categoría.'
+                      : 'No results found for your search in this category.'
                     : query.trim().length >= 2
                     ? isEs
-                      ? 'No se encontraron resultados con ese nombre.'
-                      : 'No results found with that name.'
+                      ? 'No se encontraron resultados para la búsqueda.'
+                      : 'No results found for your search.'
                     : isEs
-                    ? 'Escribe para buscar personajes y portadas de Películas, Series, Juegos, Anime, Libros y Cómics.'
-                    : 'Type to search characters and covers across Movies, Shows, Games, Anime, Books, and Comics.'}
+                    ? 'Escribe para buscar personajes y portadas de Películas, Series, Anime, Libros, Cómics, Manga y Juegos.'
+                    : 'Type to search characters and covers across Movies, Shows, Anime, Books, Comics, Manga, and Games.'}
                 </div>
               );
             }
 
-            return filteredResults.map((ch, idx) => {
+            const itemsToDisplay = filteredResults.slice(0, visibleCount).map((ch, idx) => {
               const isSelected = selectedUrl === ch.image_url;
               return (
                 <div
@@ -519,6 +507,35 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
               </div>
             );
           });
+
+          const hasMore = filteredResults.length > visibleCount;
+
+          return (
+            <>
+              {itemsToDisplay}
+              {hasMore && (
+                <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'center', padding: '1rem 0' }}>
+                  <button
+                    type="button"
+                    onClick={() => setVisibleCount(prev => prev + 24)}
+                    className="secondary-button"
+                    style={{
+                      padding: '0.6rem 1.5rem',
+                      borderRadius: '10px',
+                      fontSize: '0.85rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      border: '1px solid var(--border-color)',
+                      background: 'var(--bg-secondary)',
+                      color: 'var(--text-primary)',
+                    }}
+                  >
+                    {isEs ? 'Mostrar más avatares' : 'Load more avatars'} ({filteredResults.length - visibleCount} {isEs ? 'más' : 'more'})
+                  </button>
+                </div>
+              )}
+            </>
+          );
         })()}
         </div>
 

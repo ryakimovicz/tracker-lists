@@ -44,18 +44,35 @@ class BannerService:
         if cleaned != q_raw:
             variants.append(cleaned)
 
-        # Singular / Plural logic
-        q_lower = q_raw.lower()
-        if q_lower.endswith('s') and len(q_lower) > 3:
-            variants.append(q_raw[:-1])
-        elif not q_lower.endswith('s') and len(q_lower) >= 3:
-            variants.append(q_raw + 's')
+        # Smart prefix expansion (placed high in priority for instant prefix resolution)
+        if len(q_raw) >= 2:
+            try:
+                url = f'https://suggestqueries.google.com/complete/search?client=firefox&q={urllib.parse.quote(q_raw)}'
+                req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
+                with urllib.request.urlopen(req, timeout=1.2) as res:
+                    data = json.loads(res.read().decode())
+                    if len(data) > 1 and isinstance(data[1], list):
+                        for sug in data[1]:
+                            sug_clean = re.sub(r'\s+(reparto|cast|pelicula|trailer|personajes|serie|libros|sin relleno|online|ver|completa|estreno|wallpaper|fondo|portada)$', '', sug.strip(), flags=re.IGNORECASE).strip()
+                            if sug_clean and len(sug_clean) >= 2 and sug_clean.lower() not in [x.lower() for x in variants]:
+                                variants.append(sug_clean)
+                                if len(variants) >= 6:
+                                    break
+            except Exception:
+                pass
 
         # Hyphens / Spaces
         if "-" in q_raw:
             variants.append(q_raw.replace("-", " "))
         if " " in q_raw:
             variants.append(q_raw.replace(" ", "-"))
+
+        # Singular / Plural logic
+        q_lower = q_raw.lower()
+        if q_lower.endswith('s') and len(q_lower) > 3:
+            variants.append(q_raw[:-1])
+        elif not q_lower.endswith('s') and len(q_lower) >= 3:
+            variants.append(q_raw + 's')
 
         # Gaming franchise common expansions
         if q_lower == "half":
@@ -319,7 +336,65 @@ class BannerService:
         return results
 
     @classmethod
-    def _calculate_relevance(cls, item: BannerSearchResult, clean_query: str, raw_query: str) -> int:
+    def _search_comicvine(cls, query: str) -> List[BannerSearchResult]:
+        if not query or not settings.COMIC_VINE_API_KEY:
+            return []
+        
+        results = []
+        seen_images = set()
+        variants = cls._generate_query_variants(query)[:2]
+
+        for term in variants:
+            encoded = urllib.parse.quote(term)
+            url = f"https://comicvine.gamespot.com/api/search/?api_key={settings.COMIC_VINE_API_KEY}&format=json&resources=volume&query={encoded}&limit=8&field_list=id,name,image"
+            req = urllib.request.Request(url, headers={"User-Agent": "Pathd/1.0 (contact@pathd.app)"})
+            try:
+                with urllib.request.urlopen(req, timeout=5) as resp:
+                    if resp.status == 200:
+                        data = json.loads(resp.read().decode())
+                        for v in data.get("results", []):
+                            vname = v.get("name") or "Comic"
+                            img_obj = v.get("image") or {}
+                            img_url = img_obj.get("super_url") or img_obj.get("medium_url") or img_obj.get("original_url")
+                            if img_url and img_url not in seen_images:
+                                seen_images.add(img_url)
+                                results.append(BannerSearchResult(
+                                    title=f"{vname} (Comic)",
+                                    image_url=img_url,
+                                    category="comic",
+                                    origin=vname
+                                ))
+            except Exception as e:
+                print(f"ComicVine Banner Search Error: {e}")
+
+        return results
+
+    @classmethod
+    def _search_books(cls, query: str) -> List[BannerSearchResult]:
+        if not query:
+            return []
+        
+        results = []
+        seen_images = set()
+        try:
+            from app.services.googlebooks import GoogleBooksService
+            books_data = GoogleBooksService.fetch_google_books(query)
+            for b, _ in books_data[:8]:
+                if b.image_url and b.image_url not in seen_images:
+                    seen_images.add(b.image_url)
+                    results.append(BannerSearchResult(
+                        title=f"{b.title} (Book)",
+                        image_url=b.image_url,
+                        category="book",
+                        origin=b.title
+                    ))
+        except Exception as e:
+            print(f"Google Books Banner Search Error: {e}")
+
+        return results
+
+    @classmethod
+    def _calculate_relevance(cls, item: BannerSearchResult, clean_query: str, raw_query: str, target_type: str = "banner") -> int:
         score = 0
         name_norm = cls._normalize_text(item.title)
         origin_norm = cls._normalize_text(item.origin)
@@ -329,29 +404,36 @@ class BannerService:
 
         # Level 1: Absolute exact match on origin or title (e.g. searched 'half' and origin is 'Half')
         if origin_norm == query_norm_raw or origin_norm == query_norm_clean:
-            return 10000 + max(0, 50 - len(origin_norm))
-        if name_norm == query_norm_raw or name_norm == query_norm_clean:
-            return 9500 + max(0, 50 - len(name_norm))
+            score += 10000 + max(0, 50 - len(origin_norm))
+        elif name_norm == query_norm_raw or name_norm == query_norm_clean:
+            score += 9500 + max(0, 50 - len(name_norm))
 
         # Level 2: Starts with exact word/prefix (e.g. searched 'half' and origin is 'Half-Life')
-        if origin_norm.startswith(query_norm_raw) or origin_norm.startswith(query_norm_clean):
-            return 7500 + max(0, 50 - len(origin_norm))
-        if name_norm.startswith(query_norm_raw) or name_norm.startswith(query_norm_clean):
-            return 7000 + max(0, 50 - len(name_norm))
+        elif origin_norm.startswith(query_norm_raw) or origin_norm.startswith(query_norm_clean):
+            score += 7500 + max(0, 50 - len(origin_norm))
+        elif name_norm.startswith(query_norm_raw) or name_norm.startswith(query_norm_clean):
+            score += 7000 + max(0, 50 - len(name_norm))
 
         # Level 3: Singular / Plural match
-        variants = [cls._normalize_text(v) for v in cls._generate_query_variants(raw_query)]
-        for v in variants:
-            if v == origin_norm:
-                return 6500
-            if origin_norm.startswith(v):
-                return 6000
+        else:
+            variants = [cls._normalize_text(v) for v in cls._generate_query_variants(raw_query)]
+            matched_var = False
+            for v in variants:
+                if v == origin_norm:
+                    score += 6500
+                    matched_var = True
+                    break
+                if origin_norm.startswith(v):
+                    score += 6000
+                    matched_var = True
+                    break
 
-        # Level 4: Contains query phrase anywhere inside
-        if query_norm_raw in origin_norm or query_norm_clean in origin_norm:
-            return 4500 + max(0, 30 - len(origin_norm))
-        if query_norm_raw in name_norm or query_norm_clean in name_norm:
-            return 4000 + max(0, 30 - len(name_norm))
+            # Level 4: Contains query phrase anywhere inside
+            if not matched_var:
+                if query_norm_raw in origin_norm or query_norm_clean in origin_norm:
+                    score += 4500 + max(0, 30 - len(origin_norm))
+                elif query_norm_raw in name_norm or query_norm_clean in name_norm:
+                    score += 4000 + max(0, 30 - len(name_norm))
 
         # Level 5: Token overlaps
         tokens = [cls._normalize_text(w) for w in f"{clean_query} {raw_query}".split() if len(w) >= 2]
@@ -361,7 +443,21 @@ class BannerService:
                 matches += 1
 
         if matches > 0:
-            score += 2000 + (matches * 300)
+            score += (matches * 300)
+
+        # Contextual boost: Banner vs Background priority
+        title_lower = item.title.lower()
+        if target_type == "background":
+            if "(wallpaper)" in title_lower or "(background)" in title_lower or "(screenshot)" in title_lower:
+                score += 800
+            elif "(artwork)" in title_lower:
+                score += 400
+        else:
+            # Banner mode
+            if "(banner)" in title_lower or "(header)" in title_lower:
+                score += 800
+            elif "(artwork)" in title_lower or "(wallpaper)" in title_lower:
+                score += 400
             
         return score
 
@@ -414,7 +510,7 @@ class BannerService:
         return deduped[:50]
 
     @classmethod
-    def search_all(cls, query: str) -> List[Dict[str, Any]]:
+    def search_all(cls, query: str, target_type: str = "banner") -> List[Dict[str, Any]]:
         if not query or len(query.strip()) < 2:
             return cls.get_popular_suggestions()
 
@@ -423,13 +519,15 @@ class BannerService:
         search_term = clean_query if len(clean_query) >= 2 else raw_query
 
         all_results = []
-        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
             f_igdb = executor.submit(cls._search_igdb, search_term)
             f_ani = executor.submit(cls._search_anilist, search_term)
             f_movies = executor.submit(cls._search_fanart_movies, search_term)
             f_tv = executor.submit(cls._search_tvmaze, clean_query, raw_query)
+            f_comic = executor.submit(cls._search_comicvine, search_term)
+            f_books = executor.submit(cls._search_books, search_term)
 
-            for future in (f_igdb, f_ani, f_movies, f_tv):
+            for future in (f_igdb, f_ani, f_movies, f_tv, f_comic, f_books):
                 try:
                     res = future.result()
                     all_results.extend(res)
@@ -438,7 +536,7 @@ class BannerService:
 
         # Compute relevance scores
         for item in all_results:
-            item.score = cls._calculate_relevance(item, clean_query, raw_query)
+            item.score = cls._calculate_relevance(item, clean_query, raw_query, target_type=target_type)
 
         # Sort by relevance score descending
         all_results.sort(key=lambda x: x.score, reverse=True)

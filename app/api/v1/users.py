@@ -449,13 +449,14 @@ class BannerUpdateRequest(BaseModel):
 @router.get("/banners/search")
 def search_banners(
     query: str = Query("", description="Search term for banner wallpaper"),
+    type: str = Query("banner", description="Target type: 'banner' or 'background'"),
     current_user: User = Depends(get_current_user)
 ):
     from app.core.sfw_filter import is_safe_text
     if not is_safe_text(query):
         return []
     from app.services.banners import BannerService
-    results = BannerService.search_all(query)
+    results = BannerService.search_all(query, target_type=type)
     clean_results = []
     for b in results:
         title = b.get("title") if isinstance(b, dict) else getattr(b, "title", "")
