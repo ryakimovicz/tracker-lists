@@ -174,19 +174,19 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
             </div>
           </div>
 
-          {/* Benefit 2: Custom Accent Color */}
+          {/* Benefit 2: Customization (Color & Category Order) */}
           <div style={{ display: 'flex', gap: '0.85rem', alignItems: 'flex-start' }}>
             <div style={{ background: 'rgba(245, 158, 11, 0.15)', padding: '0.45rem', borderRadius: '8px', color: '#f59e0b', flexShrink: 0 }}>
               <Palette size={18} />
             </div>
             <div>
               <h4 style={{ margin: '0 0 0.15rem 0', fontSize: '0.92rem', fontWeight: 600 }}>
-                {isEs ? 'Personalización de Color de Perfil' : 'Custom Profile Accent Color'}
+                {isEs ? 'Personalización' : 'Customization'}
               </h4>
               <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.35 }}>
                 {isEs
-                  ? 'Elige tu propio color distintivo que se aplicará en todo tu perfil y guías públicas.'
-                  : 'Choose a distinctive accent color that reflects across your profile and public guides.'}
+                  ? 'Elige tu propio color temático distintivo y reorganiza libremente el orden de las categorías en toda la plataforma.'
+                  : 'Choose your distinctive theme color and freely reorder categories across the entire platform.'}
               </p>
             </div>
           </div>
