@@ -825,9 +825,11 @@ export const Search: React.FC = () => {
                       {formatReleaseDate(item.release_date)}
                     </div>
                   )}
-                  <span className={getTagClass(item.item_type)} style={{ marginBottom: '0.5rem', alignSelf: 'flex-start' }}>
-                    {item.item_type === 'comic' ? (language === 'es' ? 'Cómic' : 'Comic') : item.item_type === 'manga' ? 'Manga' : t('media' + item.item_type.charAt(0).toUpperCase() + item.item_type.slice(1))}
-                  </span>
+                  {activeTab === 'all' && (
+                    <span className={getTagClass(item.item_type)} style={{ marginBottom: '0.5rem', alignSelf: 'flex-start' }}>
+                      {item.item_type === 'comic' ? (language === 'es' ? 'Cómic' : 'Comic') : item.item_type === 'manga' ? 'Manga' : t('media' + item.item_type.charAt(0).toUpperCase() + item.item_type.slice(1))}
+                    </span>
+                  )}
                 </div>
 
                 {onShelf && (
