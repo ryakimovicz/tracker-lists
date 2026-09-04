@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
 import type { Theme } from '../context/ThemeContext';
-import { LogOut, Shield, Globe, Sun, Moon, Monitor, Home, Users, PlusCircle, Compass, User, Star } from 'lucide-react';
+import { LogOut, Shield, Globe, Sun, Moon, Monitor, Home, Users, PlusCircle, Compass, User, Star, Settings } from 'lucide-react';
 import { prefetchRoute } from '../utils/prefetch';
 
 import { ProModal } from './ProModal';
@@ -92,25 +92,34 @@ export const Sidebar: React.FC = () => {
             <NavItem to="/create" icon={PlusCircle} label={t('navCreate') || 'Crear'} />
             <NavItem to="/search" icon={Compass} label={t('navExplore') || 'Explorar'} />
             <NavItem to="/profile" icon={User} label={t('navProfile') || 'Perfil'} />
-            {user?.is_admin && (
-              <NavItem to="/admin" icon={Shield} label={t('navAdmin') || 'Admin'} />
-            )}
           </>
         )}
       </div>
 
       {/* Bottom Area */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: 'auto', paddingTop: '1.5rem', borderTop: '1px solid var(--border-color)' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: 'auto', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
         
-        {/* Toggles */}
-        <div style={{ display: 'flex', gap: '0.5rem', padding: '0 0.5rem' }}>
-          <button onClick={toggleLanguage} className="btn-secondary" style={{ padding: '0.4rem 0.6rem', flex: 1 }}>
-            <Globe size={16} /> {language.toUpperCase()}
-          </button>
-          <button onClick={cycleTheme} className="btn-secondary" style={{ padding: '0.4rem 0.6rem', flex: 1 }} title="Theme">
-            {getThemeIcon()}
-          </button>
-        </div>
+        {/* Toggles (hidden when on /settings) - below separator, above Admin / Settings */}
+        {location.pathname !== '/settings' && (
+          <div style={{ display: 'flex', gap: '0.5rem', padding: '0 0.5rem' }}>
+            <button onClick={toggleLanguage} className="btn-secondary" style={{ padding: '0.4rem 0.6rem', flex: 1 }}>
+              <Globe size={16} /> {language.toUpperCase()}
+            </button>
+            <button onClick={cycleTheme} className="btn-secondary" style={{ padding: '0.4rem 0.6rem', flex: 1 }} title="Theme">
+              {getThemeIcon()}
+            </button>
+          </div>
+        )}
+
+        {/* Settings & Admin in Bottom Area */}
+        {isUserLoggedIn && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+            {user?.is_admin && (
+              <NavItem to="/admin" icon={Shield} label={t('navAdmin') || 'Admin'} />
+            )}
+            <NavItem to="/settings" icon={Settings} label={language === 'es' ? 'Ajustes' : 'Settings'} />
+          </div>
+        )}
 
         {isUserLoggedIn ? (
 

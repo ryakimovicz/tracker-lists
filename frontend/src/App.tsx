@@ -18,6 +18,7 @@ import { Social } from './pages/Social';
 import { CreateGuide } from './pages/CreateGuide';
 import { ViewGuide } from './pages/ViewGuide';
 import { SettingsPage } from './pages/Settings';
+import CustomizePage from './pages/Customize';
 import { PrivacyPolicy } from './pages/PrivacyPolicy';
 import { TermsOfService } from './pages/TermsOfService';
 
@@ -69,6 +70,14 @@ function AppRoutes() {
               element={
                 <RouteGuard>
                   <SettingsPage />
+                </RouteGuard>
+              }
+            />
+            <Route
+              path="/customize"
+              element={
+                <RouteGuard>
+                  <CustomizePage />
                 </RouteGuard>
               }
             />

@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
 import { apiClient } from '../api/client';
-import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 
 import { 
   Settings as SettingsIcon, 
@@ -15,72 +15,35 @@ import {
   AlertCircle, 
   FileText, 
   Shield, 
-  ExternalLink,
-  Trash2,
-  X,
-  EyeOff,
-  Star,
-  Globe,
-  Sun,
-  Moon,
-  Pencil,
-  Image as ImageIcon,
-  Monitor,
-  Palette,
-  Music,
-  HelpCircle,
-  Crown,
-  ArrowUp,
-  ArrowDown,
-  RotateCcw,
-  Sliders,
-  Film,
-  Tv,
-  Sparkles,
-  Book,
-  Gamepad2,
-  GripVertical
+  Trash2, 
+  X, 
+  EyeOff, 
+  Star, 
+  Globe, 
+  Sun, 
+  Moon, 
+  Monitor, 
+  Crown 
 } from 'lucide-react';
 
-
-import { PROFILE_THEME_COLORS, getProfileTheme } from '../utils/profileThemes';
-import { DEFAULT_CATEGORY_ORDER, getOrderedCategories } from '../utils/categoryOrder';
-
-
-import { AvatarSelectorModal } from '../components/AvatarSelectorModal';
-import { BannerSelectorModal } from '../components/BannerSelectorModal';
-import { BackgroundSelectorModal } from '../components/BackgroundSelectorModal';
 import { ProModal } from '../components/ProModal';
 import { ConfirmModal } from '../components/ConfirmModal';
-import { MusicServiceGuideModal } from '../components/MusicServiceGuideModal';
-
 
 export const SettingsPage: React.FC = () => {
   const { user, refreshProfile, logout } = useAuth();
   const { language, setLanguage, t } = useTranslation();
   const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const tokenProcessed = useRef(false);
   const isEs = language === 'es';
 
-
   // Modal states
-  const [showAvatarModal, setShowAvatarModal] = useState(false);
-  const [showBannerModal, setShowBannerModal] = useState(false);
-  const [showBackgroundModal, setShowBackgroundModal] = useState(false);
   const [showProModal, setShowProModal] = useState(false);
-  const [selectedProfileColor, setSelectedProfileColor] = useState(user?.profile_color || 'amber');
-  const [colorMsg, setColorMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [isUpdatingColor, setIsUpdatingColor] = useState(false);
 
   // Subscription management
   const [cancelSubLoading, setCancelSubLoading] = useState(false);
   const [cancelSubMsg, setCancelSubMsg] = useState<string | null>(null);
   const [cancelSubError, setCancelSubError] = useState<string | null>(null);
   const [showCancelSubModal, setShowCancelSubModal] = useState(false);
-  const [showDisconnectLastFmModal, setShowDisconnectLastFmModal] = useState(false);
-  const [showMusicGuideModal, setShowMusicGuideModal] = useState(false);
 
   const executeCancelSubscription = async () => {
     setCancelSubLoading(true);
@@ -102,248 +65,10 @@ export const SettingsPage: React.FC = () => {
     setShowCancelSubModal(true);
   };
 
-
-
-  useEffect(() => {
-    if (user?.profile_color) {
-      setSelectedProfileColor(user.profile_color);
-    }
-  }, [user?.profile_color]);
-
-  const activeProfileTheme = getProfileTheme(selectedProfileColor, theme === 'light');
-
-  const handleSelectProfileColor = async (colorId: string) => {
-    if (!user?.is_pro) {
-      setShowProModal(true);
-      return;
-    }
-    setSelectedProfileColor(colorId);
-    setIsUpdatingColor(true);
-    setColorMsg(null);
-    try {
-      await apiClient.put('/users/me/color', { profile_color: colorId });
-      await refreshProfile();
-      setColorMsg({
-        type: 'success',
-        text: isEs ? 'Color de perfil y modales actualizado con éxito.' : 'Profile and modal theme color updated.',
-      });
-      setTimeout(() => setColorMsg(null), 3000);
-    } catch (err: any) {
-      setColorMsg({
-        type: 'error',
-        text: err.response?.data?.detail || (isEs ? 'Error al actualizar color.' : 'Error updating color.'),
-      });
-    } finally {
-      setIsUpdatingColor(false);
-    }
-  };
-
-  // Category Order State
-  const [localCategoryOrder, setLocalCategoryOrder] = useState<string[]>(() => 
-    getOrderedCategories(user?.category_order)
-  );
-  const [isSavingCategoryOrder, setIsSavingCategoryOrder] = useState(false);
-  const [categoryOrderMsg, setCategoryOrderMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-
-  useEffect(() => {
-    setLocalCategoryOrder(getOrderedCategories(user?.category_order));
-  }, [user?.category_order]);
-
-  // Pointer-based Drag & Drop matching CreateGuide insertion behavior
-  const [pointerDrag, setPointerDrag] = useState<{
-    cat: string;
-    sourceIndex: number;
-    currentY: number;
-  } | null>(null);
-  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
-
-  const pointerDragRef = useRef<typeof pointerDrag>(null);
-  const dragOverIndexRef = useRef<typeof dragOverIndex>(null);
-
-  useEffect(() => {
-    pointerDragRef.current = pointerDrag;
-  }, [pointerDrag]);
-
-  useEffect(() => {
-    dragOverIndexRef.current = dragOverIndex;
-  }, [dragOverIndex]);
-
-  useEffect(() => {
-    if (!pointerDrag) return;
-
-    document.body.style.userSelect = 'none';
-    document.body.style.cursor = 'grabbing';
-
-    const handlePointerMove = (e: PointerEvent) => {
-      const currentDrag = pointerDragRef.current;
-      if (!currentDrag) return;
-
-      const elements = document.elementsFromPoint(e.clientX, e.clientY);
-      const rowEl = elements.map(el => el.closest('[data-category-row-index]')).find(Boolean) as HTMLElement | undefined;
-
-      if (rowEl) {
-        const cIdx = parseInt(rowEl.getAttribute('data-category-row-index') || '0', 10);
-        const rect = rowEl.getBoundingClientRect();
-        const isAfter = e.clientY > rect.top + rect.height / 2;
-        const targetIdx = isAfter ? cIdx + 1 : cIdx;
-
-        setDragOverIndex(prev => (prev === targetIdx ? prev : targetIdx));
-      }
-    };
-
-    const handlePointerUp = () => {
-      const currentDrag = pointerDragRef.current;
-      const targetIdx = dragOverIndexRef.current;
-
-      if (currentDrag && targetIdx !== null && targetIdx !== undefined) {
-        setLocalCategoryOrder(prev => {
-          const newOrder = [...prev];
-          const [moved] = newOrder.splice(currentDrag.sourceIndex, 1);
-          let insertionIdx = targetIdx;
-          if (currentDrag.sourceIndex < targetIdx) {
-            insertionIdx = targetIdx - 1;
-          }
-          newOrder.splice(Math.min(Math.max(0, insertionIdx), newOrder.length), 0, moved);
-          return newOrder;
-        });
-      }
-
-      setPointerDrag(null);
-      setDragOverIndex(null);
-      document.body.style.userSelect = '';
-      document.body.style.cursor = '';
-    };
-
-    window.addEventListener('pointermove', handlePointerMove);
-    window.addEventListener('pointerup', handlePointerUp);
-
-    return () => {
-      window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('pointerup', handlePointerUp);
-      document.body.style.userSelect = '';
-      document.body.style.cursor = '';
-    };
-  }, [pointerDrag]);
-
-  const handleMoveCategory = (index: number, direction: 'up' | 'down') => {
-    if (!user?.is_pro) {
-      setShowProModal(true);
-      return;
-    }
-    const targetIndex = direction === 'up' ? index - 1 : index + 1;
-    if (targetIndex < 0 || targetIndex >= localCategoryOrder.length) return;
-
-    const newOrder = [...localCategoryOrder];
-    const [moved] = newOrder.splice(index, 1);
-    newOrder.splice(targetIndex, 0, moved);
-    setLocalCategoryOrder(newOrder);
-  };
-
-  const handleResetCategoryOrder = () => {
-    if (!user?.is_pro) {
-      setShowProModal(true);
-      return;
-    }
-    setLocalCategoryOrder([...DEFAULT_CATEGORY_ORDER]);
-  };
-
-  const handleSaveCategoryOrder = async (orderToSave?: string[]) => {
-    if (!user?.is_pro) {
-      setShowProModal(true);
-      return;
-    }
-    const order = orderToSave || localCategoryOrder;
-    setIsSavingCategoryOrder(true);
-    setCategoryOrderMsg(null);
-    try {
-      await apiClient.put('/users/me/category-order', {
-        category_order: JSON.stringify(order)
-      });
-      await refreshProfile();
-      setCategoryOrderMsg({
-        type: 'success',
-        text: isEs ? 'Orden de categorías guardado con éxito.' : 'Category order saved successfully.'
-      });
-      setTimeout(() => setCategoryOrderMsg(null), 3000);
-    } catch (err: any) {
-      setCategoryOrderMsg({
-        type: 'error',
-        text: err.response?.data?.detail || (isEs ? 'Error al guardar el orden.' : 'Error saving order.')
-      });
-    } finally {
-      setIsSavingCategoryOrder(false);
-    }
-  };
-
-
-  // Last.fm state
-  const [lastfmMsg, setLastfmMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [isDisconnectingLastFm, setIsDisconnectingLastFm] = useState(false);
-
-  useEffect(() => {
-    const token = searchParams.get('token');
-    if (token && !tokenProcessed.current) {
-      tokenProcessed.current = true;
-      connectLastFm(token);
-    }
-  }, [searchParams]);
-
-  const connectLastFm = async (token: string) => {
-    try {
-      await apiClient.post(`/users/me/lastfm/connect?token=${token}`);
-      await refreshProfile();
-      setLastfmMsg({
-        type: 'success',
-        text: isEs ? 'Cuenta de Last.fm conectada exitosamente.' : 'Last.fm account connected successfully.',
-      });
-      navigate('/settings', { replace: true });
-      setTimeout(() => setLastfmMsg(null), 4000);
-    } catch (err: any) {
-      setLastfmMsg({
-        type: 'error',
-        text: err.response?.data?.detail || (isEs ? 'Error al conectar con Last.fm.' : 'Error connecting to Last.fm.'),
-      });
-    }
-  };
-
-  const handleLastFmLogin = () => {
-    const currentOrigin = window.location.origin;
-    window.location.href = `http://www.last.fm/api/auth/?api_key=de5acce61bdd8b3e4bd181ebce8a69e8&cb=${encodeURIComponent(`${currentOrigin}/settings`)}`;
-  };
-
-  const handleLastFmDisconnect = () => {
-    setShowDisconnectLastFmModal(true);
-  };
-
-  const executeDisconnectLastFm = async () => {
-    setIsDisconnectingLastFm(true);
-    setLastfmMsg(null);
-    try {
-      await apiClient.delete('/users/me/lastfm/disconnect');
-      await refreshProfile();
-      setLastfmMsg({
-        type: 'success',
-        text: isEs ? 'Cuenta de Last.fm desconectada.' : 'Last.fm account disconnected.',
-      });
-      setShowDisconnectLastFmModal(false);
-      setTimeout(() => setLastfmMsg(null), 3000);
-    } catch (err: any) {
-      setLastfmMsg({
-        type: 'error',
-        text: isEs ? 'Error al desconectar la cuenta.' : 'Error disconnecting account.',
-      });
-      setShowDisconnectLastFmModal(false);
-    } finally {
-      setIsDisconnectingLastFm(false);
-    }
-  };
-
   // Username form state
   const [username, setUsername] = useState(user?.username || '');
   const [usernameMsg, setUsernameMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isUpdatingUsername, setIsUpdatingUsername] = useState(false);
-
-
 
   // Password form state
   const [currentPassword, setCurrentPassword] = useState('');
@@ -354,9 +79,6 @@ export const SettingsPage: React.FC = () => {
   const [showConfirmPass, setShowConfirmPass] = useState(false);
   const [passwordMsg, setPasswordMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
-
-
-
 
   // Delete account modal state
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -427,8 +149,6 @@ export const SettingsPage: React.FC = () => {
     }
   };
 
-
-
   const handleDeleteAccount = async () => {
     if (deleteConfirmText !== user?.username) {
       setDeleteError(
@@ -458,759 +178,12 @@ export const SettingsPage: React.FC = () => {
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '2rem' }}>
         <SettingsIcon size={28} color="var(--accent-primary)" />
         <h1 style={{ margin: 0, fontSize: '1.85rem', fontWeight: 700 }}>
-          {isEs ? 'Ajustes de la Cuenta' : 'Account Settings'}
+          {isEs ? 'Ajustes' : 'Settings'}
         </h1>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-        {/* Section 1: Customize Profile */}
-        <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px' }}>
-
-          <div style={{ marginBottom: '1.5rem' }}>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
-              <User size={20} color="var(--accent-primary)" />
-              {isEs ? 'Personalizar Perfil' : 'Customize Profile'}
-            </h2>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: '0.35rem 0 0' }}>
-              {isEs
-                ? 'Modifica las imágenes y el color temático de tu perfil.'
-                : 'Customize your profile images and theme color.'}
-            </p>
-          </div>
-
-          {/* 3 Action Buttons: Avatar, Banner, Background */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
-            {/* 1. Imagen de Perfil (Free) */}
-            <button
-              type="button"
-              onClick={() => setShowAvatarModal(true)}
-              className="glass-card"
-              style={{
-                padding: '1.15rem 1rem',
-                borderRadius: '12px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: '0.75rem',
-                cursor: 'pointer',
-                border: '1px solid var(--border-color)',
-                background: 'var(--bg-secondary)',
-                transition: 'all 0.2s ease',
-                textAlign: 'left',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = 'var(--accent-primary)';
-                e.currentTarget.style.transform = 'translateY(-2px)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = 'var(--border-color)';
-                e.currentTarget.style.transform = 'translateY(0)';
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <div
-                  style={{
-                    width: '36px',
-                    height: '36px',
-                    borderRadius: '50%',
-                    background: 'var(--border-glow)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: 'var(--accent-primary)',
-                    flexShrink: 0,
-                  }}
-                >
-                  <User size={18} />
-                </div>
-                <span style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-primary)' }}>
-                  {isEs ? 'Imagen de perfil' : 'Profile Picture'}
-                </span>
-              </div>
-              <Pencil size={15} color="var(--text-muted)" />
-            </button>
-
-            {/* 2. Imagen de Portada (Premium) */}
-            <button
-              type="button"
-              onClick={() => {
-                if (user?.is_pro) {
-                  setShowBannerModal(true);
-                } else {
-                  setShowProModal(true);
-                }
-              }}
-              className="glass-card"
-              style={{
-                padding: '1.15rem 1rem',
-                borderRadius: '12px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: '0.75rem',
-                cursor: 'pointer',
-                border: '1px solid var(--border-color)',
-                background: 'var(--bg-secondary)',
-                transition: 'all 0.2s ease',
-                textAlign: 'left',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = '#8b5cf6';
-                e.currentTarget.style.transform = 'translateY(-2px)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = 'var(--border-color)';
-                e.currentTarget.style.transform = 'translateY(0)';
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <div
-                  style={{
-                    width: '36px',
-                    height: '36px',
-                    borderRadius: '50%',
-                    background: 'rgba(139, 92, 246, 0.15)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#8b5cf6',
-                    flexShrink: 0,
-                  }}
-                >
-                  <ImageIcon size={18} />
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-                  <span style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-primary)' }}>
-                    {isEs ? 'Imagen de portada' : 'Banner Image'}
-                  </span>
-                  <span
-                    style={{
-                      fontSize: '0.65rem',
-                      background: 'rgba(245, 158, 11, 0.15)',
-                      color: '#f59e0b',
-                      padding: '0.1rem 0.35rem',
-                      borderRadius: '4px',
-                      fontWeight: 700,
-                      alignSelf: 'flex-start',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.25rem',
-                    }}
-                  >
-                    <Star size={10} fill="#f59e0b" />
-                    PREMIUM
-                  </span>
-                </div>
-              </div>
-              <Pencil size={15} color="var(--text-muted)" />
-            </button>
-
-
-            {/* 3. Imagen de Fondo (Premium) */}
-            <button
-              type="button"
-              onClick={() => {
-                if (user?.is_pro) {
-                  setShowBackgroundModal(true);
-                } else {
-                  setShowProModal(true);
-                }
-              }}
-              className="glass-card"
-              style={{
-                padding: '1.15rem 1rem',
-                borderRadius: '12px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: '0.75rem',
-                cursor: 'pointer',
-                border: '1px solid var(--border-color)',
-                background: 'var(--bg-secondary)',
-                transition: 'all 0.2s ease',
-                textAlign: 'left',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = '#10b981';
-                e.currentTarget.style.transform = 'translateY(-2px)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = 'var(--border-color)';
-                e.currentTarget.style.transform = 'translateY(0)';
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <div
-                  style={{
-                    width: '36px',
-                    height: '36px',
-                    borderRadius: '50%',
-                    background: 'rgba(16, 185, 129, 0.15)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#10b981',
-                    flexShrink: 0,
-                  }}
-                >
-                  <Monitor size={18} />
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-                  <span style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-primary)' }}>
-                    {isEs ? 'Imagen de fondo' : 'Background Image'}
-                  </span>
-                  <span
-                    style={{
-                      fontSize: '0.65rem',
-                      background: 'rgba(245, 158, 11, 0.15)',
-                      color: '#f59e0b',
-                      padding: '0.1rem 0.35rem',
-                      borderRadius: '4px',
-                      fontWeight: 700,
-                      alignSelf: 'flex-start',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.25rem',
-                    }}
-                  >
-                    <Star size={10} fill="#f59e0b" />
-                    PREMIUM
-                  </span>
-                </div>
-              </div>
-              <Pencil size={15} color="var(--text-muted)" />
-            </button>
-          </div>
-
-          {/* Color de Perfil Subheader */}
-          <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
-            <div>
-              <h3 style={{ fontSize: '1.05rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.45rem', margin: 0 }}>
-                <Palette size={18} color="var(--accent-primary)" />
-                {isEs ? 'Color de perfil' : 'Profile Color'}
-                <span
-                  style={{
-                    fontSize: '0.65rem',
-                    background: 'rgba(245, 158, 11, 0.15)',
-                    color: '#f59e0b',
-                    padding: '0.1rem 0.35rem',
-                    borderRadius: '4px',
-                    fontWeight: 700,
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.25rem',
-                  }}
-                >
-                  <Star size={10} fill="#f59e0b" />
-                  PREMIUM
-                </span>
-              </h3>
-
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: '0.25rem 0 0' }}>
-                {isEs
-                  ? 'Elige el color de acento y resplandor para tu perfil.'
-                  : 'Choose the accent and glow color for your profile.'}
-              </p>
-            </div>
-          </div>
-
-
-          {colorMsg && (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                padding: '0.75rem 1rem',
-                borderRadius: '8px',
-                marginBottom: '1.25rem',
-                fontSize: '0.85rem',
-                background: colorMsg.type === 'success' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                color: colorMsg.type === 'success' ? '#10b981' : '#ef4444',
-                border: `1px solid ${colorMsg.type === 'success' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`,
-              }}
-            >
-              {colorMsg.type === 'success' ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
-              <span>{colorMsg.text}</span>
-            </div>
-          )}
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '0.85rem' }}>
-            {PROFILE_THEME_COLORS.map((col) => {
-              const activeColor = theme === 'light' ? col.light.accent : col.dark.accent;
-              const isSelected = selectedProfileColor === col.id || selectedProfileColor === col.dark.accent || selectedProfileColor === col.light.accent;
-
-              return (
-                <button
-                  key={col.id}
-                  type="button"
-                  onClick={() => handleSelectProfileColor(col.id)}
-                  disabled={isUpdatingColor}
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: '0.6rem',
-                    padding: '0.9rem 0.75rem',
-                    borderRadius: '12px',
-                    border: isSelected ? `2px solid ${activeColor}` : '1px solid var(--border-color)',
-                    background: isSelected ? (theme === 'light' ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.06)') : 'var(--bg-secondary)',
-                    cursor: user?.is_pro ? 'pointer' : 'default',
-                    transition: 'all 0.2s ease',
-                    boxShadow: isSelected ? `0 0 14px ${activeColor}40` : 'none',
-                    transform: isSelected ? 'scale(1.03)' : 'scale(1)',
-                  }}
-                >
-                  <div
-                    style={{
-                      width: '32px',
-                      height: '32px',
-                      borderRadius: '50%',
-                      background: activeColor,
-                      boxShadow: `0 2px 8px ${activeColor}60`,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    {isSelected && <CheckCircle size={16} color="#ffffff" />}
-                  </div>
-                  <span
-                    style={{
-                      fontSize: '0.8rem',
-                      fontWeight: isSelected ? 700 : 500,
-                      color: isSelected ? activeColor : 'var(--text-primary)',
-                      textAlign: 'center',
-                    }}
-                  >
-                    {isEs ? col.name.es : col.name.en}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Section 1.5: Orden de Categorías (PRO) */}
-        <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.5rem' }}>
-            <h2 style={{ fontSize: '1.2rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0, color: 'var(--text-primary)' }}>
-              <Sliders size={20} color="var(--accent-primary)" />
-              {isEs ? 'Orden de categorías' : 'Category Order'}
-            </h2>
-            <span
-              style={{
-                fontSize: '0.65rem',
-                background: 'rgba(245, 158, 11, 0.15)',
-                color: '#f59e0b',
-                padding: '0.1rem 0.35rem',
-                borderRadius: '4px',
-                fontWeight: 700,
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.25rem',
-              }}
-            >
-              <Star size={10} fill="#f59e0b" />
-              PREMIUM
-            </span>
-          </div>
-
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', margin: '0 0 1.25rem 0', lineHeight: 1.5 }}>
-            {isEs
-              ? 'Arrastra las categorías con el mouse o usa las flechas para personalizar su orden en el Inicio, Estantería, Explorar, Guías y modales.'
-              : 'Drag categories with your mouse or use the arrows to customize their order across Home, Shelf, Explore, Guides, and modals.'}
-          </p>
-
-          {categoryOrderMsg && (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                padding: '0.65rem 1rem',
-                borderRadius: '8px',
-                fontSize: '0.85rem',
-                marginBottom: '1rem',
-                background: categoryOrderMsg.type === 'success' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                color: categoryOrderMsg.type === 'success' ? '#10b981' : '#ef4444',
-                border: `1px solid ${categoryOrderMsg.type === 'success' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`,
-              }}
-            >
-              {categoryOrderMsg.type === 'success' ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
-              <span>{categoryOrderMsg.text}</span>
-            </div>
-          )}
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxWidth: '480px' }}>
-            {localCategoryOrder.map((cat, idx) => {
-              const catColor = `var(--color-${cat})`;
-              const catTextColor = `var(--color-text-${cat})`;
-              const isFirst = idx === 0;
-              const isLast = idx === localCategoryOrder.length - 1;
-
-              const getCategoryIcon = () => {
-                switch (cat) {
-                  case 'movie': return <Film size={17} color={catTextColor} />;
-                  case 'series': return <Tv size={17} color={catTextColor} />;
-                  case 'anime': return <Sparkles size={17} color={catTextColor} />;
-                  case 'book': return <Book size={17} color={catTextColor} />;
-                  case 'comic': return <Book size={17} color={catTextColor} />;
-                  case 'manga': return <Book size={17} color={catTextColor} />;
-                  case 'game': return <Gamepad2 size={17} color={catTextColor} />;
-                  default: return <Film size={17} color={catTextColor} />;
-                }
-              };
-
-              const getCategoryLabel = () => {
-                switch (cat) {
-                  case 'movie': return isEs ? 'Películas' : 'Movies';
-                  case 'series': return 'Series';
-                  case 'anime': return 'Anime';
-                  case 'book': return isEs ? 'Libros' : 'Books';
-                  case 'comic': return isEs ? 'Cómics' : 'Comics';
-                  case 'manga': return 'Mangas';
-                  case 'game': return isEs ? 'Videojuegos' : 'Games';
-                  default: return cat;
-                }
-              };
-
-              const isRowBeingDragged = pointerDrag?.cat === cat;
-              const isDropTargetTop = dragOverIndex === idx && !isRowBeingDragged;
-
-              return (
-                <React.Fragment key={cat}>
-                  {/* Animated Drop Slot before this category */}
-                  {isDropTargetTop && (
-                    <div
-                      style={{
-                        height: '42px',
-                        borderRadius: '8px',
-                        border: '2px dashed var(--accent-primary)',
-                        background: 'rgba(129, 140, 248, 0.15)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: 'var(--accent-primary)',
-                        fontSize: '0.85rem',
-                        fontWeight: 600,
-                        margin: '0.15rem 0',
-                        transition: 'all 0.15s ease'
-                      }}
-                    >
-                      <span>{isEs ? '⬇ Soltar aquí' : '⬇ Drop here'}</span>
-                    </div>
-                  )}
-
-                  <div
-                    data-category-row-index={idx}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '0.65rem 0.85rem',
-                      borderRadius: '10px',
-                      background: isRowBeingDragged ? 'rgba(30, 41, 59, 0.4)' : 'var(--bg-secondary)',
-                      borderTop: isRowBeingDragged ? '1px dashed var(--accent-primary)' : '1px solid var(--border-color)',
-                      borderRight: isRowBeingDragged ? '1px dashed var(--accent-primary)' : '1px solid var(--border-color)',
-                      borderBottom: isRowBeingDragged ? '1px dashed var(--accent-primary)' : '1px solid var(--border-color)',
-                      borderLeft: `4px solid ${catColor}`,
-                      transition: 'all 0.15s ease',
-                      opacity: isRowBeingDragged ? 0.45 : 1,
-                      transform: isRowBeingDragged ? 'scale(0.98)' : 'none',
-                      userSelect: 'none'
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                      <div
-                        onPointerDown={(e) => {
-                          if (e.button !== 0) return;
-                          if (!user?.is_pro) {
-                            setShowProModal(true);
-                            return;
-                          }
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setPointerDrag({
-                            cat,
-                            sourceIndex: idx,
-                            currentY: e.clientY
-                          });
-                        }}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          color: user?.is_pro ? 'var(--text-muted)' : 'rgba(255, 255, 255, 0.2)',
-                          cursor: user?.is_pro ? 'grab' : 'not-allowed',
-                          padding: '0.2rem 0.15rem',
-                          borderRadius: '4px'
-                        }}
-                        title={isEs ? 'Arrastrar para reordenar' : 'Drag to reorder'}
-                      >
-                        <GripVertical size={16} />
-                      </div>
-
-                      <span style={{
-                        fontSize: '0.8rem',
-                        fontWeight: 700,
-                        color: 'var(--text-muted)',
-                        minWidth: '18px'
-                      }}>
-                        #{idx + 1}
-                      </span>
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        width: '30px',
-                        height: '30px',
-                        borderRadius: '8px',
-                        background: catColor,
-                        boxShadow: `0 2px 6px ${catColor}40`
-                      }}>
-                        {getCategoryIcon()}
-                      </div>
-                      <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                        {getCategoryLabel()}
-                      </span>
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                      <button
-                        type="button"
-                        onClick={() => handleMoveCategory(idx, 'up')}
-                        disabled={isFirst}
-                        title={isEs ? 'Mover arriba' : 'Move up'}
-                        style={{
-                          padding: '0.35rem',
-                          borderRadius: '6px',
-                          border: '1px solid var(--border-color)',
-                          background: isFirst ? 'transparent' : 'rgba(255, 255, 255, 0.05)',
-                          color: isFirst ? 'var(--text-muted)' : 'var(--text-primary)',
-                          cursor: isFirst ? 'not-allowed' : 'pointer',
-                          opacity: isFirst ? 0.35 : 1,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        }}
-                      >
-                        <ArrowUp size={15} />
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => handleMoveCategory(idx, 'down')}
-                        disabled={isLast}
-                        title={isEs ? 'Mover abajo' : 'Move down'}
-                        style={{
-                          padding: '0.35rem',
-                          borderRadius: '6px',
-                          border: '1px solid var(--border-color)',
-                          background: isLast ? 'transparent' : 'rgba(255, 255, 255, 0.05)',
-                          color: isLast ? 'var(--text-muted)' : 'var(--text-primary)',
-                          cursor: isLast ? 'not-allowed' : 'pointer',
-                          opacity: isLast ? 0.35 : 1,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        }}
-                      >
-                        <ArrowDown size={15} />
-                      </button>
-                    </div>
-                  </div>
-                </React.Fragment>
-              );
-            })}
-
-            {/* Animated Drop Slot at bottom of category list */}
-            {pointerDrag && dragOverIndex === localCategoryOrder.length && (
-              <div
-                style={{
-                  height: '42px',
-                  borderRadius: '8px',
-                  border: '2px dashed var(--accent-primary)',
-                  background: 'rgba(129, 140, 248, 0.15)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: 'var(--accent-primary)',
-                  fontSize: '0.85rem',
-                  fontWeight: 600,
-                  margin: '0.15rem 0',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                <span>{isEs ? '⬇ Soltar aquí' : '⬇ Drop here'}</span>
-              </div>
-            )}
-          </div>
-
-          {/* Botones de acción abajo */}
-          <div style={{ display: 'flex', gap: '0.65rem', marginTop: '1.25rem', maxWidth: '480px', flexWrap: 'wrap' }}>
-            <button
-              type="button"
-              onClick={handleResetCategoryOrder}
-              className="btn-secondary"
-              style={{
-                padding: '0.5rem 0.9rem',
-                fontSize: '0.85rem',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.45rem',
-                borderRadius: '8px'
-              }}
-            >
-              <RotateCcw size={15} />
-              {isEs ? 'Restablecer por defecto' : 'Reset to Default'}
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleSaveCategoryOrder()}
-              disabled={isSavingCategoryOrder}
-              className="btn-primary"
-              style={{
-                padding: '0.5rem 1.15rem',
-                fontSize: '0.85rem',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.45rem',
-                borderRadius: '8px'
-              }}
-            >
-              <CheckCircle size={15} />
-              {isSavingCategoryOrder ? (isEs ? 'Guardando...' : 'Saving...') : (isEs ? 'Guardar orden' : 'Save Order')}
-            </button>
-          </div>
-        </div>
-
-        {/* Section 2: Last.fm (Mostrar música escuchada) */}
-        <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.75rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-              <h2 style={{ fontSize: '1.2rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0, color: 'var(--text-primary)' }}>
-                <Music size={20} color="#ef4444" />
-                {isEs ? 'Mostrar música escuchada (Last.fm)' : 'Show Currently Playing Music (Last.fm)'}
-              </h2>
-              {user?.lastfm_username ? (
-                <span
-                  style={{
-                    fontSize: '0.75rem',
-                    padding: '0.2rem 0.55rem',
-                    borderRadius: '6px',
-                    background: 'rgba(16, 185, 129, 0.15)',
-                    color: '#10b981',
-                    border: '1px solid rgba(16, 185, 129, 0.3)',
-                    fontWeight: 600,
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.35rem'
-                  }}
-                >
-                  <CheckCircle size={12} />
-                  {isEs ? 'Conectado' : 'Connected'}
-                </span>
-              ) : (
-                <span
-                  style={{
-                    fontSize: '0.75rem',
-                    padding: '0.2rem 0.55rem',
-                    borderRadius: '6px',
-                    background: 'rgba(255, 255, 255, 0.05)',
-                    color: 'var(--text-muted)',
-                    border: '1px solid var(--border-color)',
-                    fontWeight: 600
-                  }}
-                >
-                  {isEs ? 'No Conectado' : 'Not Connected'}
-                </span>
-              )}
-            </div>
-          </div>
-
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1.25rem', lineHeight: '1.5' }}>
-            {user?.lastfm_username
-              ? (isEs
-                ? `Vinculado como @${user.lastfm_username}. Muestra tu canción en vivo y álbumes semanales en tu perfil.`
-                : `Linked as @${user.lastfm_username}. Displays your live listening and top weekly albums on your profile.`)
-              : (isEs
-                ? 'Conecta tu cuenta de Last.fm para mostrar automáticamente la música que estás escuchando en tu perfil y generar tu Estantería Musical.'
-                : 'Connect your Last.fm account to automatically display what music you are listening to on your profile and generate your Music Shelf.')}
-          </p>
-
-          {lastfmMsg && (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                padding: '0.75rem 1rem',
-                borderRadius: '8px',
-                marginBottom: '1rem',
-                fontSize: '0.85rem',
-                background: lastfmMsg.type === 'success' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                color: lastfmMsg.type === 'success' ? '#10b981' : '#ef4444',
-                border: `1px solid ${lastfmMsg.type === 'success' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`,
-              }}
-            >
-              {lastfmMsg.type === 'success' ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
-              <span>{lastfmMsg.text}</span>
-            </div>
-          )}
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-            <button
-              type="button"
-              onClick={() => setShowMusicGuideModal(true)}
-              className="btn-secondary"
-              style={{ fontSize: '0.85rem', padding: '0.55rem 1rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
-            >
-              <HelpCircle size={16} />
-              {isEs ? '¿Cómo conectar mi reproductor?' : 'How to connect my player?'}
-            </button>
-
-            {user?.lastfm_username ? (
-              <button
-                type="button"
-                onClick={handleLastFmDisconnect}
-                disabled={isDisconnectingLastFm}
-                className="btn-secondary"
-                style={{
-                  padding: '0.55rem 1rem',
-                  fontSize: '0.85rem',
-                  borderColor: '#ef4444',
-                  color: '#ef4444',
-                }}
-              >
-                {isDisconnectingLastFm ? (isEs ? 'Desconectando...' : 'Disconnecting...') : isEs ? 'Desconectar' : 'Disconnect'}
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={handleLastFmLogin}
-                className="btn-primary"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  padding: '0.55rem 1.25rem',
-                  fontSize: '0.85rem',
-                  background: '#d51007',
-                  border: 'none',
-                  color: '#fff',
-                }}
-              >
-                <Music size={16} />
-                {isEs ? 'Conectar con Last.fm' : 'Connect with Last.fm'}
-              </button>
-            )}
-          </div>
-        </div>
-
-
-
-        {/* Section 4: Theme */}
+        {/* Section 1: Theme */}
         <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px' }}>
           <h2 style={{ fontSize: '1.2rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: 0 }}>
             <Sun size={20} color="var(--accent-primary)" />
@@ -1258,7 +231,7 @@ export const SettingsPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Section 4: Language */}
+        {/* Section 2: Language */}
         <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px' }}>
           <h2 style={{ fontSize: '1.2rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: 0 }}>
             <Globe size={20} color="var(--accent-primary)" />
@@ -1302,9 +275,7 @@ export const SettingsPage: React.FC = () => {
           </div>
         </div>
 
-
-
-        {/* Section 5: Username */}
+        {/* Section 3: Username */}
         <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px' }}>
           <h2 style={{ fontSize: '1.2rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: 0 }}>
             <User size={20} color="var(--accent-primary)" />
@@ -1363,7 +334,6 @@ export const SettingsPage: React.FC = () => {
             <Lock size={20} color="var(--accent-primary)" />
             {isEs ? 'Cambiar Contraseña' : 'Change Password'}
           </h2>
-
 
           {passwordMsg && (
             <div
@@ -1497,7 +467,6 @@ export const SettingsPage: React.FC = () => {
               </div>
             </div>
 
-
             <button
               type="submit"
               disabled={isUpdatingPassword || !currentPassword || !newPassword}
@@ -1509,7 +478,7 @@ export const SettingsPage: React.FC = () => {
           </form>
         </div>
 
-        {/* Section 4: Membership & Subscription Management */}
+        {/* Section 5: Membership & Subscription Management */}
         {user?.is_pro && !user?.is_admin && !user?.is_vip && (
           <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', marginBottom: '1rem' }}>
@@ -1631,9 +600,8 @@ export const SettingsPage: React.FC = () => {
           </div>
         )}
 
-        {/* Section 5: Legal & Policies */}
+        {/* Section 6: Legal & Policies */}
         <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px' }}>
-
           <h2 style={{ fontSize: '1.2rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: 0 }}>
             <FileText size={20} color="var(--accent-primary)" />
             {isEs ? 'Legal y Términos' : 'Legal & Policies'}
@@ -1659,7 +627,7 @@ export const SettingsPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Section 5: Danger Zone (Delete Account) */}
+        {/* Section 7: Danger Zone (Delete Account) */}
         <div
           className="glass-card"
           style={{
@@ -1728,7 +696,6 @@ export const SettingsPage: React.FC = () => {
       </div>
 
       {/* Delete Confirmation Modal */}
-
       {showDeleteModal && (
         <div
           style={{
@@ -1862,37 +829,6 @@ export const SettingsPage: React.FC = () => {
         </div>
       )}
 
-      {/* Avatar Selector Modal */}
-      <AvatarSelectorModal
-        isOpen={showAvatarModal}
-        onClose={() => setShowAvatarModal(false)}
-        currentPhotoUrl={user?.photo_url}
-        isPro={user?.is_pro}
-        onAvatarUpdated={async () => {
-          await refreshProfile();
-        }}
-      />
-
-      {/* Banner Selector Modal (Premium) */}
-      <BannerSelectorModal
-        isOpen={showBannerModal}
-        onClose={() => setShowBannerModal(false)}
-        currentBannerUrl={user?.banner_url}
-        onBannerUpdated={async () => {
-          await refreshProfile();
-        }}
-      />
-
-      {/* Background Selector Modal (Premium) */}
-      <BackgroundSelectorModal
-        isOpen={showBackgroundModal}
-        onClose={() => setShowBackgroundModal(false)}
-        currentBackgroundUrl={user?.background_url}
-        onBackgroundUpdated={async () => {
-          await refreshProfile();
-        }}
-      />
-
       {/* Pro / Premium Modal */}
       {showProModal && (
         <ProModal onClose={() => setShowProModal(false)} />
@@ -1914,35 +850,8 @@ export const SettingsPage: React.FC = () => {
         onConfirm={executeCancelSubscription}
         onClose={() => setShowCancelSubModal(false)}
       />
-
-      {/* Disconnect Last.fm Modal */}
-      <ConfirmModal
-        isOpen={showDisconnectLastFmModal}
-        title={isEs ? '¿Desconectar Last.fm?' : 'Disconnect Last.fm?'}
-        message={
-          isEs
-            ? 'Tu cuenta de Last.fm se desvinculará de Pathd. Podrás volver a conectarla cuando quieras.'
-            : 'Your Last.fm account will be unlinked from Pathd. You can reconnect it anytime.'
-        }
-        confirmText={isEs ? 'Desconectar' : 'Disconnect'}
-        cancelText={isEs ? 'Cancelar' : 'Cancel'}
-        type="danger"
-        isLoading={isDisconnectingLastFm}
-        onConfirm={executeDisconnectLastFm}
-        onClose={() => setShowDisconnectLastFmModal(false)}
-      />
-
-      {/* Music Service Connection Guide Modal */}
-      <MusicServiceGuideModal
-        isOpen={showMusicGuideModal}
-        onClose={() => setShowMusicGuideModal(false)}
-      />
-
-
     </div>
   );
 };
+
 export default SettingsPage;
-
-
-

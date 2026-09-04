@@ -904,10 +904,10 @@ export const Profile: React.FC = () => {
             </>
           )}
 
-          {/* Header Settings Button */}
+          {/* Header Customize Profile Button */}
           {isOwnProfile && (
             <button
-              onClick={() => navigate('/settings')}
+              onClick={() => navigate('/customize')}
               className="btn-secondary"
               style={{
                 position: 'absolute',
@@ -927,9 +927,9 @@ export const Profile: React.FC = () => {
                 boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
                 transition: 'all 0.2s ease',
               }}
-              title={language === 'es' ? 'Ajustes de Perfil y Cuenta' : 'Profile & Account Settings'}
+              title={language === 'es' ? 'Personalizar perfil' : 'Customize profile'}
             >
-              <Settings size={20} />
+              <Pencil size={19} />
             </button>
           )}
 
