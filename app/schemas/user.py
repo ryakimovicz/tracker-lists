@@ -26,6 +26,7 @@ class UserResponse(UserBase):
     suspension_reason: str | None = None
     admin_warning: str | None = None
     profile_color: str | None = None
+    category_order: str | None = None
     lastfm_username: str | None = None
     followers_count: int = 0
     following_count: int = 0
@@ -64,6 +65,7 @@ class UserDashboardResponse(BaseModel):
     suspension_reason: str | None = None
     admin_warning: str | None = None
     profile_color: str | None = None
+    category_order: str | None = None
     lastfm_username: str | None = None
     followers_count: int = 0
     following_count: int = 0

@@ -9,6 +9,7 @@ import { ReplaceFavoriteModal } from '../components/ReplaceFavoriteModal';
 import { ProModal } from '../components/ProModal';
 import { ChevronLeft, ChevronRight, ChevronDown, ChevronsDown, Check, Play } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { getOrderedCategories } from '../utils/categoryOrder';
 
 export const getTagClass = (type: string) => {
   switch (type) {
@@ -2089,7 +2090,7 @@ export const Home: React.FC = () => {
       ) : (
         filteredItems.length > 0 ? (
           <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-            {["movie", "series", "anime", "book", "comic", "manga", "game"].map(category => {
+            {getOrderedCategories(currentUser?.category_order).map(category => {
               let catItems = filteredItems.filter(i => i.item_type === category);
               if (catItems.length === 0 && (category !== "game" || activeTab !== "watching")) return null;
 

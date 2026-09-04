@@ -16,6 +16,7 @@ import { ProModal } from '../components/ProModal';
 import { ReplaceFavoriteModal } from '../components/ReplaceFavoriteModal';
 import { AdBanner } from '../components/AdBanner';
 import { ConfirmModal } from '../components/ConfirmModal';
+import { getOrderedCategories } from '../utils/categoryOrder';
 
 
 import {
@@ -98,6 +99,7 @@ interface UserProfile {
   followers_count?: number;
   following_count?: number;
   is_following?: boolean;
+  category_order?: string;
 }
 
 
@@ -1263,7 +1265,8 @@ export const Profile: React.FC = () => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'flex-start' }}>
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
               {(() => {
-                const baseTypes = ['all', 'movie', 'series', 'anime', 'book', 'comic', 'manga', 'game'] as const;
+                const orderedMedia = getOrderedCategories(profile?.category_order || currentUser?.category_order);
+                const baseTypes = ['all', ...orderedMedia] as const;
                 const allowedTypes = baseTypes.filter(type => {
                   if (type === 'all') return true;
                   if (type === 'series') return libraryItems.some(item => item.item_type === 'series' || item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tvm-ep-'));
@@ -1278,7 +1281,7 @@ export const Profile: React.FC = () => {
                   return (
                     <button
                       key={type}
-                      onClick={() => setMediaFilter(type)}
+                      onClick={() => setMediaFilter(type as any)}
                       className={`profile-category-tab ${isSelected ? 'selected' : ''}`}
                       style={{
                         padding: '0.35rem 0.85rem',

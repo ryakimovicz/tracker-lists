@@ -124,6 +124,7 @@ def get_user_dashboard(
         suspension_reason=current_user.suspension_reason,
         admin_warning=current_user.admin_warning,
         profile_color=current_user.profile_color,
+        category_order=current_user.category_order,
         lastfm_username=current_user.lastfm_username,
         followers_count=followers_count,
         following_count=following_count,
@@ -508,6 +509,22 @@ def update_profile_color(
     db.refresh(current_user)
     return current_user
 
+class CategoryOrderUpdateRequest(BaseModel):
+    category_order: str | None = None
+
+@router.put("/me/category-order", response_model=UserResponse)
+def update_category_order(
+    req: CategoryOrderUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if not (current_user.is_pro or current_user.is_admin or current_user.is_vip):
+        raise HTTPException(status_code=403, detail="Personalizar el orden de las categorías es una función Pro")
+    current_user.category_order = req.category_order
+    db.commit()
+    db.refresh(current_user)
+    return current_user
+
 
 
 class UserSettingsUpdate(BaseModel):
@@ -766,6 +783,7 @@ def get_any_user_profile(
         suspension_reason=user.suspension_reason,
         admin_warning=user.admin_warning if (current_user and (current_user.id == user.id or current_user.is_admin)) else None,
         profile_color=user.profile_color,
+        category_order=user.category_order,
         lastfm_username=user.lastfm_username,
         followers_count=followers_count,
         following_count=following_count,

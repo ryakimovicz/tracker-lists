@@ -34,6 +34,7 @@ class User(Base):
     dodo_subscription_id = Column(String(100), nullable=True)
     dodo_customer_id = Column(String(100), nullable=True)
     profile_color = Column(String(20), nullable=True)
+    category_order = Column(String(200), nullable=True)
     custom_photo_url = Column(String(500), nullable=True)
 
     custom_banner_url = Column(String(500), nullable=True)

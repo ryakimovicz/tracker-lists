@@ -2,12 +2,14 @@ import { HorizontalScroll } from '../components/HorizontalScroll';
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from '../context/LanguageContext';
+import { useAuth } from '../context/AuthContext';
 import { apiClient } from '../api/client';
 import { ItemDetailsModal } from '../components/ItemDetailsModal';
 import { MediaPoster } from '../components/MediaPoster';
 import { AdBanner } from '../components/AdBanner';
 import { ReplaceFavoriteModal } from '../components/ReplaceFavoriteModal';
 import { ProModal } from '../components/ProModal';
+import { getOrderedCategories, sortFilterTabs } from '../utils/categoryOrder';
 
 import { Search as SearchIcon, AlertCircle, CheckCircle, Plus, X, Heart, Star, Users, BookOpen, Package, Puzzle, Sparkles, Gamepad2 } from 'lucide-react';
 
@@ -175,6 +177,7 @@ const ExploreSection = React.memo<ExploreSectionProps>(({
 });
 
 export const Search: React.FC = () => {
+  const { user } = useAuth();
   const { t, language } = useTranslation();
   const navigate = useNavigate();
 
@@ -222,7 +225,7 @@ export const Search: React.FC = () => {
       });
     });
 
-    const categoryOrder = ['movie', 'series', 'anime', 'book', 'comic', 'manga', 'game'];
+    const categoryOrder = getOrderedCategories(user?.category_order);
     return categoryOrder.map(type => ({
       type,
       title: type === 'movie' ? (language === 'es' ? 'Películas' : 'Movies') :
@@ -234,7 +237,7 @@ export const Search: React.FC = () => {
              type === 'game' ? (language === 'es' ? 'Juegos' : 'Games') : type,
       items: grouped[type] || []
     })).filter(g => g.items.length > 0);
-  }, [exploreData, language]);
+  }, [exploreData, language, user?.category_order]);
 
   // Shelf tracking states
   const [shelfItems, setShelfItems] = useState<any[]>([]);
@@ -659,7 +662,7 @@ export const Search: React.FC = () => {
           borderBottom: '1px solid var(--border-color)',
           WebkitOverflowScrolling: 'touch'
         }}>
-          {[
+          {sortFilterTabs([
             { value: 'all', label: language === 'es' ? 'Todo' : 'All' },
             { value: 'movie', label: language === 'es' ? 'Películas' : 'Movies' },
             { value: 'series', label: language === 'es' ? 'Series' : 'Series' },
@@ -670,7 +673,7 @@ export const Search: React.FC = () => {
             { value: 'game', label: language === 'es' ? 'Juegos' : 'Games' },
             { value: 'user', label: language === 'es' ? 'Usuarios' : 'Users' },
             { value: 'guide', label: language === 'es' ? 'Guías' : 'Guides' }
-          ].map(tab => {
+          ], user?.category_order).map(tab => {
             const isSelected = activeTab === tab.value;
             const tabColor = tab.value === 'all' 
               ? 'var(--accent-primary)' 

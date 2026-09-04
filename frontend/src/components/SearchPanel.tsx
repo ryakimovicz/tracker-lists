@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Search as SearchIcon, Plus } from 'lucide-react';
 import { apiClient } from '../api/client';
+import { useAuth } from '../context/AuthContext';
+import { sortFilterTabs } from '../utils/categoryOrder';
 
 interface SearchPanelProps {
   id: string;
@@ -22,6 +24,7 @@ const stripHtml = (html: string) => {
 export const SearchPanel: React.FC<SearchPanelProps> = ({
   id, onRemove, canRemove, language, t, addedIds, onSelectItem, setZoomedImage
 }) => {
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -174,7 +177,7 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
           {/* Category Tabs */}
           {searchResults.length > 0 && (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', borderBottom: '1px solid var(--border-color)', marginBottom: '0.5rem', paddingBottom: '0.5rem' }}>
-              {[
+              {sortFilterTabs([
                 { value: 'all', label: language === 'es' ? 'Todo' : 'All' },
                 { value: 'movie', label: language === 'es' ? 'Películas' : 'Movies' },
                 { value: 'series', label: language === 'es' ? 'Series' : 'Series' },
@@ -183,7 +186,7 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
                 { value: 'comic', label: language === 'es' ? 'Cómics' : 'Comics' },
                 { value: 'manga', label: 'Mangas' },
                 { value: 'game', label: language === 'es' ? 'Juegos' : 'Games' }
-              ].map(tab => (
+              ], user?.category_order).map(tab => (
                 <button
                   key={tab.value}
                   type="button"

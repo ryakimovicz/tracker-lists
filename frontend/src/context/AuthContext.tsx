@@ -19,6 +19,7 @@ interface UserProfile {
   suspension_reason?: string;
   admin_warning?: string;
   profile_color?: string;
+  category_order?: string;
   lastfm_username?: string;
 }
 

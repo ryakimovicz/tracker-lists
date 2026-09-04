@@ -3,6 +3,7 @@ import { useTranslation } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { apiClient } from '../api/client';
 import { Search, X, Check, Loader2, User as UserIcon } from 'lucide-react';
+import { getOrderedCategories } from '../utils/categoryOrder';
 
 interface Character {
   name: string;
@@ -26,7 +27,7 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
   onAvatarUpdated,
 }) => {
   const { language } = useTranslation();
-  const { refreshProfile } = useAuth();
+  const { user, refreshProfile } = useAuth();
   const isEs = language === 'es';
 
   const [query, setQuery] = useState('');
@@ -281,7 +282,8 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
 
         {/* Category Filters (Only show categories with results) */}
         {(() => {
-          const allCategories = ['all', 'movie', 'series', 'anime', 'book', 'comic', 'manga', 'game'] as const;
+          const ordered = getOrderedCategories(user?.category_order);
+          const allCategories = ['all', ...ordered] as const;
           const availableCategories = allCategories.filter(cat => cat === 'all' || results.some(r => r.category === cat));
 
           if (results.length === 0 || availableCategories.length <= 1) {
@@ -314,7 +316,7 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
                   <button
                     key={cat}
                     type="button"
-                    onClick={() => setSelectedCategory(cat)}
+                    onClick={() => setSelectedCategory(cat as any)}
                     style={{
                       padding: '0.3rem 0.75rem',
                       fontSize: '0.8rem',
