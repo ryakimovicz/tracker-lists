@@ -5,6 +5,7 @@ interface MediaPosterProps {
   src?: string | null;
   title: string;
   itemType?: string;
+  isUpcomingMovie?: boolean;
   height?: string | number;
   width?: string | number;
   aspectRatio?: string;
@@ -16,6 +17,7 @@ export const MediaPoster: React.FC<MediaPosterProps> = ({
   src,
   title,
   itemType = 'movie',
+  isUpcomingMovie = false,
   height = '100%',
   width = '100%',
   aspectRatio,
@@ -100,15 +102,17 @@ export const MediaPoster: React.FC<MediaPosterProps> = ({
   };
 
   const isCinemaPlaceholder = Boolean(
-    src && (
+    (isUpcomingMovie && normType === 'movie') ||
+    (src && (
       src.includes('photo-1489599849927-2ee91cede3ba') ||
       src.includes('photo-1489599849927')
-    )
+    ))
   );
 
   const isGenericImage = Boolean(
     src && (
-      isCinemaPlaceholder ||
+      src.includes('photo-1489599849927-2ee91cede3ba') ||
+      src.includes('photo-1489599849927') ||
       src.includes('photo-1543002588-bfa74002ed7e') ||
       src.includes('images.unsplash.com/photo-')
     )
@@ -138,7 +142,7 @@ export const MediaPoster: React.FC<MediaPosterProps> = ({
   }
 
   const config = getPlaceholderConfig();
-  const backgroundStyle = isCinemaPlaceholder
+  const backgroundStyle = (isCinemaPlaceholder && normType === 'movie')
     ? `linear-gradient(180deg, rgba(0, 0, 0, 0.88) 0%, rgba(15, 23, 42, 0.45) 45%, rgba(0, 0, 0, 0.92) 100%), url("https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=500") center/cover no-repeat`
     : config.bg;
 

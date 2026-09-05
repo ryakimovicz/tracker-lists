@@ -130,7 +130,7 @@ class OMDbService:
             if cls._is_valid_poster(omdb_poster):
                 poster = omdb_poster
             else:
-                poster = "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=300"
+                poster = None
             
         result = SearchResultItem(
             external_id=f"omdb_{imdb_id}",
@@ -224,7 +224,7 @@ class OMDbService:
 
     @classmethod
     def get_new_movies(cls) -> List[SearchResultItem]:
-        cache_key = "_explore_new_movies_v8"
+        cache_key = "_explore_new_movies_v9"
         if cache_key in cls._search_cache:
             timestamp, cached_results = cls._search_cache[cache_key]
             if time.time() - timestamp < 3600 * 6: # 6 hours shared cache for all users
@@ -274,11 +274,18 @@ class OMDbService:
                         pass
 
             if matched_item:
-                matched_item.release_date = rel_date or matched_item.release_date
-                # If poster is invalid or headshot, ensure stylized placeholder is used
-                if not cls._is_valid_poster(matched_item.image_url):
-                    matched_item.image_url = "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=300"
-                return matched_item
+                # Clone item so we do not mutate global details cache
+                final_item = SearchResultItem(
+                    external_id=matched_item.external_id,
+                    title=matched_item.title,
+                    image_url=matched_item.image_url if cls._is_valid_poster(matched_item.image_url) else "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=300",
+                    description=matched_item.description,
+                    item_type="movie",
+                    release_date=rel_date or matched_item.release_date,
+                    imdb_id=matched_item.imdb_id,
+                    page_count=matched_item.page_count
+                )
+                return final_item
             else:
                 # Fetch Wikipedia summary / article extract (Text only, 100% legal CC0)
                 wiki_plot = ""

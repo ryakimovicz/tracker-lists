@@ -133,6 +133,7 @@ const ExploreSection = React.memo<ExploreSectionProps>(({
                   src={item.image_url}
                   title={item.title}
                   itemType={item.item_type}
+                  isUpcomingMovie={item.item_type === 'movie'}
                   height="100%"
                   width="100%"
                   borderRadius="8px"

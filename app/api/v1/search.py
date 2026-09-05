@@ -603,7 +603,7 @@ def get_explore_tabs(
 
     # 2. Nuevo (APIs with 4-hour in-memory cache + real-time blacklist dynamic filtering)
     now_ts = time.time()
-    cache_key = "explore_nuevo_global"
+    cache_key = "explore_nuevo_global_v2"
     if cache_key in _EXPLORE_NUEVO_CACHE:
         cache_time, cached_items = _EXPLORE_NUEVO_CACHE[cache_key]
         if now_ts - cache_time < _EXPLORE_CACHE_TTL and len(cached_items) > 0:
