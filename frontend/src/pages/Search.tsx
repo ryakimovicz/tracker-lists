@@ -200,10 +200,16 @@ export const Search: React.FC = () => {
   const [query, setQuery] = useState('');
   const [submittedQuery, setSubmittedQuery] = useState('');
   const [results, setResults] = useState<SearchResultItem[]>([]);
+  const [visibleCount, setVisibleCount] = useState<number>(24);
   const [activeTab, setActiveTab] = useState<'all' | 'movie' | 'series' | 'anime' | 'book' | 'game' | 'user' | 'guide' | 'comic' | 'manga'>('all');
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [isSearching, setIsSearching] = useState(false);
+
+  // Reset visibleCount on tab change or new search query
+  useEffect(() => {
+    setVisibleCount(24);
+  }, [activeTab, submittedQuery]);
 
   const [exploreData, setExploreData] = useState<any>(null);
   const [loadingExplore, setLoadingExplore] = useState(false);
@@ -711,139 +717,166 @@ export const Search: React.FC = () => {
 
       {/* Search Results Display */}
       {filteredResults.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1.5rem' }}>
-          {filteredResults.map((item, index) => {
-            const shouldShowAdBefore = index === 4 || (index > 4 && (index - 4) % 8 === 0);
-            return (
-              <React.Fragment key={`${item.external_id}-${item.item_type}`}>
-                {shouldShowAdBefore && (
-                  <AdBanner variant="card" style={{ width: '100%', minWidth: 'unset', height: '100%' }} />
-                )}
-                {(() => {
-            if (item.item_type === 'user') {
-              const isFollowing = followingUsers.some(u => String(u.id) === item.external_id);
-              const isMe = currentUser && String(currentUser.id) === item.external_id;
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1.5rem' }}>
+            {filteredResults.slice(0, visibleCount).map((item, index) => {
+              const shouldShowAdBefore = index === 4 || (index > 4 && (index - 4) % 8 === 0);
               return (
-                <div key={`${item.external_id}-${item.item_type}`} className="glass-card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', textAlign: 'center', cursor: 'pointer' }} onClick={() => navigate(`/user/${encodeURIComponent(item.title || item.external_id)}`)}>
-                  <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'var(--bg-secondary)', border: '2px solid var(--accent-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-                    {item.image_url ? (
-                      <img src={item.image_url} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { e.currentTarget.style.display = 'none'; }} />
-                    ) : (
-                      <Users size={40} color="var(--accent-primary)" />
+                <React.Fragment key={`${item.external_id}-${item.item_type}`}>
+                  {shouldShowAdBefore && (
+                    <AdBanner variant="card" style={{ width: '100%', minWidth: 'unset', height: '100%' }} />
+                  )}
+                  {(() => {
+              if (item.item_type === 'user') {
+                const isFollowing = followingUsers.some(u => String(u.id) === item.external_id);
+                const isMe = currentUser && String(currentUser.id) === item.external_id;
+                return (
+                  <div key={`${item.external_id}-${item.item_type}`} className="glass-card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', textAlign: 'center', cursor: 'pointer' }} onClick={() => navigate(`/user/${encodeURIComponent(item.title || item.external_id)}`)}>
+                    <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'var(--bg-secondary)', border: '2px solid var(--accent-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                      {item.image_url ? (
+                        <img src={item.image_url} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                      ) : (
+                        <Users size={40} color="var(--accent-primary)" />
+                      )}
+                    </div>
+                    <div>
+                      <h4 style={{ margin: '0 0 0.25rem 0', fontSize: '1.1rem', fontWeight: 600 }}>{item.title}</h4>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 600 }}>
+                        {language === 'es' ? 'Usuario' : 'User'}
+                      </span>
+                    </div>
+                    {!isMe && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleToggleFollowUser(parseInt(item.external_id));
+                        }}
+                        className={isFollowing ? "btn-secondary" : "btn-primary"}
+                        style={{ width: '100%', fontSize: '0.85rem', padding: '0.4rem' }}
+                      >
+                        {isFollowing 
+                          ? (language === 'es' ? 'Siguiendo (Dejar)' : 'Following (Unfollow)') 
+                          : (language === 'es' ? 'Seguir' : 'Follow')
+                        }
+                      </button>
                     )}
                   </div>
-                  <div>
-                    <h4 style={{ margin: '0 0 0.25rem 0', fontSize: '1.1rem', fontWeight: 600 }}>{item.title}</h4>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 600 }}>
-                      {language === 'es' ? 'Usuario' : 'User'}
-                    </span>
-                  </div>
-                  {!isMe && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleToggleFollowUser(parseInt(item.external_id));
-                      }}
-                      className={isFollowing ? "btn-secondary" : "btn-primary"}
-                      style={{ width: '100%', fontSize: '0.85rem', padding: '0.4rem' }}
-                    >
-                      {isFollowing 
-                        ? (language === 'es' ? 'Siguiendo (Dejar)' : 'Following (Unfollow)') 
-                        : (language === 'es' ? 'Seguir' : 'Follow')
-                      }
-                    </button>
-                  )}
-                </div>
-              );
-            }
+                );
+              }
 
-            if (item.item_type === 'guide') {
-              const isSaved = savedGuides.some(g => String(g.id) === item.external_id);
-              return (
-                <div key={`${item.external_id}-${item.item_type}`} className="glass-card" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', textAlign: 'left' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <BookOpen size={18} color="var(--accent-primary)" />
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 600 }}>
-                      {language === 'es' ? 'Guía Pública' : 'Public Guide'}
-                    </span>
+              if (item.item_type === 'guide') {
+                const isSaved = savedGuides.some(g => String(g.id) === item.external_id);
+                return (
+                  <div key={`${item.external_id}-${item.item_type}`} className="glass-card" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', textAlign: 'left' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <BookOpen size={18} color="var(--accent-primary)" />
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 600 }}>
+                        {language === 'es' ? 'Guía Pública' : 'Public Guide'}
+                      </span>
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <h4 style={{ margin: '0 0 0.4rem 0', fontSize: '1.05rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                        {item.title}
+                      </h4>
+                      <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' }}>
+                        {item.description}
+                      </p>
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                      <button
+                        onClick={() => navigate(`/guide/${item.external_id}`)}
+                        className="btn-primary"
+                        style={{ flex: 1, fontSize: '0.82rem', padding: '0.4rem' }}
+                      >
+                        {language === 'es' ? 'Ver' : 'View'}
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleToggleSaveGuide(parseInt(item.external_id), isSaved);
+                        }}
+                        className="btn-secondary"
+                        style={{ flex: 1, fontSize: '0.82rem', padding: '0.4rem', color: isSaved ? 'var(--accent-primary)' : 'var(--text-primary)', borderColor: isSaved ? 'var(--accent-primary)' : 'var(--border-color)', background: isSaved ? 'rgba(124, 58, 237, 0.1)' : 'transparent' }}
+                      >
+                        {isSaved 
+                          ? (language === 'es' ? 'Siguiendo' : 'Following') 
+                          : (language === 'es' ? 'Seguir' : 'Follow')
+                        }
+                      </button>
+                    </div>
                   </div>
-                  <div style={{ flex: 1 }}>
-                    <h4 style={{ margin: '0 0 0.4rem 0', fontSize: '1.05rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                );
+              }
+
+              const onShelf = shelfItems.some(x => x.external_id === item.external_id && x.item_type === item.item_type);
+              return (
+                <div key={`${item.external_id}-${item.item_type}`} className="glass-card" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', cursor: 'pointer', position: 'relative' }} onClick={() => handleOpenItemDetails(item)}>
+
+                  <div style={{ position: 'relative', width: '100%', height: '260px', borderRadius: '8px', overflow: 'hidden' }}>
+                    <MediaPoster
+                      src={item.image_url}
+                      title={item.title}
+                      itemType={item.item_type}
+                      height="100%"
+                      width="100%"
+                      borderRadius="8px"
+                    />
+                    {renderMediaBadge(item.badge, language)}
+                  </div>
+
+                  <div style={{ flex: 1, textAlign: 'left' }}>
+                    <h4 style={{ margin: '0 0 0.15rem 0', fontSize: '1rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.title}>
                       {item.title}
                     </h4>
-                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' }}>
-                      {item.description}
-                    </p>
+                    {item.release_date && (
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
+                        {formatReleaseDate(item.release_date)}
+                      </div>
+                    )}
+                    {activeTab === 'all' && (
+                      <span className={getTagClass(item.item_type)} style={{ marginBottom: '0.5rem', alignSelf: 'flex-start' }}>
+                        {item.item_type === 'comic' ? (language === 'es' ? 'Cómic' : 'Comic') : item.item_type === 'manga' ? 'Manga' : t('media' + item.item_type.charAt(0).toUpperCase() + item.item_type.slice(1))}
+                      </span>
+                    )}
                   </div>
-                  <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                    <button
-                      onClick={() => navigate(`/guide/${item.external_id}`)}
-                      className="btn-primary"
-                      style={{ flex: 1, fontSize: '0.82rem', padding: '0.4rem' }}
-                    >
-                      {language === 'es' ? 'Ver' : 'View'}
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleToggleSaveGuide(parseInt(item.external_id), isSaved);
-                      }}
-                      className="btn-secondary"
-                      style={{ flex: 1, fontSize: '0.82rem', padding: '0.4rem', color: isSaved ? 'var(--accent-primary)' : 'var(--text-primary)', borderColor: isSaved ? 'var(--accent-primary)' : 'var(--border-color)', background: isSaved ? 'rgba(124, 58, 237, 0.1)' : 'transparent' }}
-                    >
-                      {isSaved 
-                        ? (language === 'es' ? 'Siguiendo' : 'Following') 
-                        : (language === 'es' ? 'Seguir' : 'Follow')
-                      }
-                    </button>
-                  </div>
-                </div>
-              );
-            }
 
-            const onShelf = shelfItems.some(x => x.external_id === item.external_id && x.item_type === item.item_type);
-            return (
-              <div key={`${item.external_id}-${item.item_type}`} className="glass-card" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', cursor: 'pointer', position: 'relative' }} onClick={() => handleOpenItemDetails(item)}>
-
-                <div style={{ position: 'relative', width: '100%', height: '260px', borderRadius: '8px', overflow: 'hidden' }}>
-                  <MediaPoster
-                    src={item.image_url}
-                    title={item.title}
-                    itemType={item.item_type}
-                    height="100%"
-                    width="100%"
-                    borderRadius="8px"
-                  />
-                  {renderMediaBadge(item.badge, language)}
-                </div>
-
-                <div style={{ flex: 1, textAlign: 'left' }}>
-                  <h4 style={{ margin: '0 0 0.15rem 0', fontSize: '1rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.title}>
-                    {item.title}
-                  </h4>
-                  {item.release_date && (
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
-                      {formatReleaseDate(item.release_date)}
+                  {onShelf && (
+                    <div style={{ fontSize: '0.82rem', color: '#10b981', textAlign: 'center', padding: '0.4rem', fontWeight: 500 }}>
+                      {language === 'es' ? '✓ En estantería' : '✓ On shelf'}
                     </div>
                   )}
-                  {activeTab === 'all' && (
-                    <span className={getTagClass(item.item_type)} style={{ marginBottom: '0.5rem', alignSelf: 'flex-start' }}>
-                      {item.item_type === 'comic' ? (language === 'es' ? 'Cómic' : 'Comic') : item.item_type === 'manga' ? 'Manga' : t('media' + item.item_type.charAt(0).toUpperCase() + item.item_type.slice(1))}
-                    </span>
-                  )}
                 </div>
+              );
+              })()}
+              </React.Fragment>
+              );
+            })}
+          </div>
 
-                {onShelf && (
-                  <div style={{ fontSize: '0.82rem', color: '#10b981', textAlign: 'center', padding: '0.4rem', fontWeight: 500 }}>
-                    {language === 'es' ? '✓ En estantería' : '✓ On shelf'}
-                  </div>
-                )}
-              </div>
-            );
-            })()}
-            </React.Fragment>
-            );
-          })}
+          {/* Load More Centered Button */}
+          {visibleCount < filteredResults.length && (
+            <div style={{ display: 'flex', justifyContent: 'center', marginTop: '0.5rem', marginBottom: '1rem' }}>
+              <button
+                type="button"
+                onClick={() => setVisibleCount(prev => prev + 24)}
+                className="btn-secondary"
+                style={{
+                  padding: '0.65rem 2rem',
+                  fontSize: '0.9rem',
+                  fontWeight: 600,
+                  borderRadius: '24px',
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid var(--border-color)',
+                  color: 'var(--text-primary)',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
+                }}
+              >
+                {t('loadMoreResults')}
+              </button>
+            </div>
+          )}
         </div>
       )}
 

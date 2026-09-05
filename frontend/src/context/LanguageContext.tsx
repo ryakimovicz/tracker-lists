@@ -106,6 +106,7 @@ const translations: Translations = {
   searchPlaceholder: { en: 'Search games, movies, series, books, anime, manga...', es: 'Buscar juegos, películas, series, libros, anime, manga...' },
   searchButton: { en: 'Search', es: 'Buscar' },
   searchNoResults: { en: 'No results found.', es: 'No se encontraron resultados.' },
+  loadMoreResults: { en: 'Load more results', es: 'Mostrar más resultados' },
   searchAddShelf: { en: 'Add to Shelf', es: 'Añadir a Estantería' },
   searchSelectStatus: { en: 'Select Status', es: 'Seleccionar Estado' },
   searchItemAdded: { en: 'Item added to your shelf!', es: '¡Elemento añadido a tu estantería!' },

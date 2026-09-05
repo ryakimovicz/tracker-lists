@@ -186,34 +186,47 @@ class OMDbService:
                 return cached_results
             
         encoded_query = urllib.parse.quote(query)
-        url = f"http://www.omdbapi.com/?s={encoded_query}&type=movie&apikey={cls.API_KEY}"
+        url_p1 = f"http://www.omdbapi.com/?s={encoded_query}&type=movie&page=1&apikey={cls.API_KEY}"
+        url_p2 = f"http://www.omdbapi.com/?s={encoded_query}&type=movie&page=2&apikey={cls.API_KEY}"
         
         results = []
         try:
-            req = urllib.request.Request(url, headers={"User-Agent": "TrackerLists/1.0"})
-            with urllib.request.urlopen(req, timeout=4) as response:
-                if response.status == 200:
-                    data = json.loads(response.read().decode())
-                    search_items = data.get("Search", [])
-                    
-                    # If exact query yielded nothing and query does not contain '*', try wildcard search *query* or query*
-                    if not search_items and '*' not in query:
-                        try:
-                            url_wildcard = f"http://www.omdbapi.com/?s={urllib.parse.quote('*' + query + '*')}&type=movie&apikey={cls.API_KEY}"
-                            req_w = urllib.request.Request(url_wildcard, headers={"User-Agent": "TrackerLists/1.0"})
-                            with urllib.request.urlopen(req_w, timeout=4) as resp_w:
-                                if resp_w.status == 200:
-                                    data_w = json.loads(resp_w.read().decode())
-                                    search_items = data_w.get("Search", [])
-                        except Exception:
-                            pass
+            search_items = []
+            
+            def fetch_omdb_page(page_url):
+                try:
+                    req = urllib.request.Request(page_url, headers={"User-Agent": "TrackerLists/1.0"})
+                    with urllib.request.urlopen(req, timeout=4) as response:
+                        if response.status == 200:
+                            data = json.loads(response.read().decode())
+                            return data.get("Search", [])
+                except Exception:
+                    pass
+                return []
 
-                    import concurrent.futures
-                    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-                        detailed_results = list(executor.map(cls._fetch_movie_details, search_items[:10]))
-                    
-                    from app.core.sfw_filter import is_safe_media_item
-                    results = [m for m in detailed_results if is_safe_media_item(m.title, m.description)]
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor(max_workers=2) as page_executor:
+                p1_items, p2_items = page_executor.map(fetch_omdb_page, [url_p1, url_p2])
+                search_items.extend(p1_items or [])
+                search_items.extend(p2_items or [])
+            
+            # If exact query yielded nothing and query does not contain '*', try wildcard search *query* or query*
+            if not search_items and '*' not in query:
+                try:
+                    url_wildcard = f"http://www.omdbapi.com/?s={urllib.parse.quote('*' + query + '*')}&type=movie&apikey={cls.API_KEY}"
+                    req_w = urllib.request.Request(url_wildcard, headers={"User-Agent": "TrackerLists/1.0"})
+                    with urllib.request.urlopen(req_w, timeout=4) as resp_w:
+                        if resp_w.status == 200:
+                            data_w = json.loads(resp_w.read().decode())
+                            search_items = data_w.get("Search", [])
+                except Exception:
+                    pass
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+                detailed_results = list(executor.map(cls._fetch_movie_details, search_items[:24]))
+            
+            from app.core.sfw_filter import is_safe_media_item
+            results = [m for m in detailed_results if is_safe_media_item(m.title, m.description)]
         except Exception as e:
             print(f"OMDb Search API Error: {e}")
 
