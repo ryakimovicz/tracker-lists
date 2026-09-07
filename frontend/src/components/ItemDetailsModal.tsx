@@ -3001,12 +3001,16 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                           return true;
                         })();
 
+                        const hasAnyWatched = selectedItem?.status === 'completed' ||
+                          (episodes || []).some(x => globalProgress[x.external_id] ?? x.is_completed) ||
+                          Object.entries(globalProgress).some(([k, v]) => v && k.startsWith('tvm-ep-'));
+
                         return (
                           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem' }}>
                             <button
                               type="button"
                               onClick={() => {
-                                if (isAllWatched) {
+                                if (isAllWatched || hasAnyWatched) {
                                   setShowReconsumedModal(true);
                                 } else {
                                   setPendingSeriesScopeAction('mark_all');
@@ -5320,7 +5324,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         }}
                       >
                         <Trash2 size={16} style={{ flexShrink: 0 }} />
-                        <span>{language === 'es' ? 'Quitar' : 'Remove'}</span>
+                        <span>{language === 'es' ? 'Desmarcar' : 'Unmark'}</span>
                       </button>
                     </div>
 
@@ -5508,7 +5512,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         }}
                       >
                         <Trash2 size={16} style={{ flexShrink: 0 }} />
-                        <span>{language === 'es' ? 'Quitar' : 'Remove'}</span>
+                        <span>{language === 'es' ? 'Desmarcar' : 'Unmark'}</span>
                       </button>
                     </div>
 
