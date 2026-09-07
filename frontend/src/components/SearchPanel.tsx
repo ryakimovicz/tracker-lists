@@ -326,14 +326,20 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
                           <>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>Temp:</span>
+                                <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>{language === 'es' ? 'Temp / Cat:' : 'Season:'}</span>
                                 <select
                                   value={selectedSeason}
                                   onChange={(e) => setSelectedSeason(parseInt(e.target.value))}
                                   style={{ padding: '0.1rem 0.3rem', fontSize: '0.75rem', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', borderRadius: '4px' }}
                                 >
-                                  {Array.from(new Set(expandedEpisodes.map(ep => ep.season_number))).sort((a: any, b: any) => a - b).map(season => (
-                                    <option key={season as number} value={season as number}>{season as number}</option>
+                                  {Array.from(new Set(expandedEpisodes.map(ep => ep.season_number))).sort((a: any, b: any) => {
+                                    if (a === 0) return 1;
+                                    if (b === 0) return -1;
+                                    return a - b;
+                                  }).map(season => (
+                                    <option key={season as number} value={season as number}>
+                                      {season === 0 ? (language === 'es' ? 'Extras' : 'Extras') : `${language === 'es' ? 'Temporada' : 'Season'} ${season}`}
+                                    </option>
                                   ))}
                                 </select>
                               </div>
@@ -341,8 +347,9 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
                               {(() => {
                                 const seasonEps = expandedEpisodes.filter(ep => ep.season_number === selectedSeason);
                                 const seasonIds = seasonEps.map(ep => `tvm-ep-${ep.id}`);
-                                const seasonExtId = `season-${media.external_id}-${selectedSeason}`;
+                                const seasonExtId = selectedSeason === 0 ? `extras-${media.external_id}` : `season-${media.external_id}-${selectedSeason}`;
                                 const isSeasonAdded = addedIds.includes(seasonExtId) || (seasonIds.length > 0 && seasonIds.every(id => addedIds.includes(id)));
+                                const seasonLabel = selectedSeason === 0 ? (language === 'es' ? 'Extras' : 'Extras') : `${language === 'es' ? 'Temporada' : 'Season'} ${selectedSeason}`;
                                 
                                 return (
                                   <button
@@ -350,10 +357,10 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
                                     onClick={() => {
                                       onSelectItem({
                                         item_type: media.item_type,
-                                        external_id: `season-${media.external_id}-${selectedSeason}`,
-                                        title: `${media.title} - ${language === 'es' ? 'Temporada' : 'Season'} ${selectedSeason}`,
+                                        external_id: seasonExtId,
+                                        title: `${media.title} - ${seasonLabel}`,
                                         image_url: media.image_url,
-                                        description: `${language === 'es' ? 'Temporada completa' : 'Full season'}`,
+                                        description: selectedSeason === 0 ? (language === 'es' ? 'Extras y especiales no canónicos' : 'Extras') : `${language === 'es' ? 'Temporada completa' : 'Full season'}`,
                                         season_episodes: seasonEps,
                                         series_title: media.title,
                                         series_image: media.image_url
@@ -366,7 +373,7 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
                                       border: isSeasonAdded ? '1px solid #10b981' : 'none'
                                     }}
                                   >
-                                    {!isSeasonAdded && <Plus size={12} />} {isSeasonAdded ? (language === 'es' ? 'Añadida' : 'Added') : (language === 'es' ? 'Añadir Temp.' : 'Add Season')}
+                                    {!isSeasonAdded && <Plus size={12} />} {isSeasonAdded ? (language === 'es' ? 'Añadida' : 'Added') : (selectedSeason === 0 ? (language === 'es' ? 'Añadir Extras' : 'Add Extras') : (language === 'es' ? 'Añadir Temp.' : 'Add Season'))}
                                   </button>
                                 );
                               })()}
@@ -375,8 +382,11 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
                             {expandedEpisodes.filter(ep => ep.season_number === selectedSeason).map((ep) => {
                               const ep_num = ep.episode_number;
                               const ep_name = ep.name || "Untitled Episode";
+                              const isSpecial = ep.ep_type === 'significant_special' || ep.is_special;
+                              const isExtra = ep.ep_type === 'insignificant_special' || ep.is_extra || ep.season_number === 0;
                               const seasonStr = selectedSeason < 10 ? '0' + selectedSeason : selectedSeason;
-                              const fullTitle = `${media.title} - S${seasonStr}E${ep_num < 10 ? '0' + ep_num : ep_num} - ${ep_name}`;
+                              const epPrefix = isExtra ? `Extra ${ep_num}` : isSpecial ? `[Especial] S${seasonStr}E${ep_num < 10 ? '0' + ep_num : ep_num}` : `S${seasonStr}E${ep_num < 10 ? '0' + ep_num : ep_num}`;
+                              const fullTitle = `${media.title} - ${epPrefix} - ${ep_name}`;
                               const still = ep.still_path;
                               const image_url = still ? still : media.image_url;
                               
@@ -386,9 +396,21 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
                               return (
                                 <div key={ep.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.25rem' }}>
                                   <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-                                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={ep_name}>
-                                      {ep_num}. {ep_name}
-                                    </span>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', overflow: 'hidden' }}>
+                                      {isSpecial && (
+                                        <span style={{ fontSize: '0.6rem', padding: '0.05rem 0.3rem', borderRadius: '4px', background: 'rgba(234, 179, 8, 0.2)', color: '#eab308', fontWeight: 700 }}>
+                                          {language === 'es' ? 'Especial' : 'Special'}
+                                        </span>
+                                      )}
+                                      {isExtra && (
+                                        <span style={{ fontSize: '0.6rem', padding: '0.05rem 0.3rem', borderRadius: '4px', background: 'rgba(156, 163, 175, 0.2)', color: '#9ca3af', fontWeight: 700 }}>
+                                          Extra
+                                        </span>
+                                      )}
+                                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={ep_name}>
+                                        {ep_num}. {ep_name}
+                                      </span>
+                                    </div>
                                     {ep.air_date && (
                                       <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>
                                         {formatReleaseDate(ep.air_date)}

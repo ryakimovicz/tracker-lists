@@ -249,6 +249,7 @@ export const Search: React.FC = () => {
   // Shelf tracking states
   const [shelfItems, setShelfItems] = useState<any[]>([]);
   const [selectedItemForShelf, setSelectedItemForShelf] = useState<SearchResultItem | null>(null);
+  const [itemToRemoveFromShelf, setItemToRemoveFromShelf] = useState<any | null>(null);
   const [shelfStatus, setShelfStatus] = useState('');
 
   // Details Modal states
@@ -444,6 +445,20 @@ export const Search: React.FC = () => {
       setTimeout(() => setSuccessMsg(''), 4000);
     } catch (err: any) {
       setErrorMsg(err.response?.data?.detail || 'Failed to add item to your library shelf.');
+    }
+  };
+
+  const handleConfirmRemoveFromShelf = async () => {
+    if (!itemToRemoveFromShelf || !itemToRemoveFromShelf.id) return;
+    try {
+      await apiClient.delete(`/library/${itemToRemoveFromShelf.id}`);
+      setSuccessMsg(language === 'es' ? 'Elemento eliminado de tu estantería.' : 'Item removed from your shelf.');
+      setItemToRemoveFromShelf(null);
+      await loadShelfItems();
+      setTimeout(() => setSuccessMsg(''), 3000);
+    } catch (err: any) {
+      setErrorMsg(err.response?.data?.detail || 'Failed to remove item.');
+      setTimeout(() => setErrorMsg(''), 4000);
     }
   };
 
@@ -808,7 +823,11 @@ export const Search: React.FC = () => {
                 );
               }
 
-              const onShelf = shelfItems.some(x => x.external_id === item.external_id && x.item_type === item.item_type);
+              const shelfItem = shelfItems.find(x => x.external_id === item.external_id && x.item_type === item.item_type);
+              const onShelf = Boolean(shelfItem);
+              const itemTypeColor = `var(--color-${item.item_type || 'movie'})`;
+              const itemTypeTextColor = `var(--color-text-${item.item_type || 'movie'})`;
+
               return (
                 <div key={`${item.external_id}-${item.item_type}`} className="glass-card" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', cursor: 'pointer', position: 'relative' }} onClick={() => handleOpenItemDetails(item)}>
 
@@ -824,27 +843,48 @@ export const Search: React.FC = () => {
                     {renderMediaBadge(item.badge, language)}
                   </div>
 
-                  <div style={{ flex: 1, textAlign: 'left' }}>
-                    <h4 style={{ margin: '0 0 0.15rem 0', fontSize: '1rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.title}>
-                      {item.title}
-                    </h4>
-                    {item.release_date && (
-                      <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
-                        {formatReleaseDate(item.release_date)}
-                      </div>
-                    )}
-                    {activeTab === 'all' && (
-                      <span className={getTagClass(item.item_type)} style={{ marginBottom: '0.5rem', alignSelf: 'flex-start' }}>
-                        {item.item_type === 'comic' ? (language === 'es' ? 'Cómic' : 'Comic') : item.item_type === 'manga' ? 'Manga' : t('media' + item.item_type.charAt(0).toUpperCase() + item.item_type.slice(1))}
-                      </span>
+                  <div style={{ flex: 1, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.5rem' }}>
+                    <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+                      <h4 style={{ margin: '0 0 0.15rem 0', fontSize: '1rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.title}>
+                        {item.title}
+                      </h4>
+                      {item.release_date && (
+                        <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
+                          {formatReleaseDate(item.release_date)}
+                        </div>
+                      )}
+                      {activeTab === 'all' && (
+                        <span className={getTagClass(item.item_type)} style={{ alignSelf: 'flex-start' }}>
+                          {item.item_type === 'comic' ? (language === 'es' ? 'Cómic' : 'Comic') : item.item_type === 'manga' ? 'Manga' : t('media' + item.item_type.charAt(0).toUpperCase() + item.item_type.slice(1))}
+                        </span>
+                      )}
+                    </div>
+
+                    {user && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (shelfItem) {
+                            setItemToRemoveFromShelf(shelfItem);
+                          } else {
+                            handleOpenAddShelf(item, e);
+                          }
+                        }}
+                        className={`btn-card-add-shelf ${onShelf ? 'on-shelf' : ''}`}
+                        title={onShelf 
+                          ? (language === 'es' ? 'Quitar de estantería' : 'Remove from shelf')
+                          : (language === 'es' ? 'Agregar a estantería' : 'Add to shelf')
+                        }
+                        style={{
+                          '--category-color': itemTypeColor,
+                          '--category-text-color': itemTypeTextColor,
+                        } as React.CSSProperties}
+                      >
+                        <Plus size={18} />
+                      </button>
                     )}
                   </div>
-
-                  {onShelf && (
-                    <div style={{ fontSize: '0.82rem', color: '#10b981', textAlign: 'center', padding: '0.4rem', fontWeight: 500 }}>
-                      {language === 'es' ? '✓ En estantería' : '✓ On shelf'}
-                    </div>
-                  )}
                 </div>
               );
               })()}
@@ -892,6 +932,79 @@ export const Search: React.FC = () => {
         </div>
       )}
       </>
+      )}
+
+      {/* Remove From Shelf Confirmation Modal */}
+      {itemToRemoveFromShelf && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 2200,
+            background: 'rgba(0, 0, 0, 0.65)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1rem'
+          }}
+          onClick={() => setItemToRemoveFromShelf(null)}
+        >
+          <div
+            className="glass-card"
+            style={{
+              width: '100%',
+              maxWidth: '380px',
+              background: 'var(--bg-secondary)',
+              borderRadius: '12px',
+              padding: '1.25rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '1rem',
+              boxShadow: '0 12px 30px rgba(0,0,0,0.4)',
+              border: '1px solid var(--border-color)'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                {language === 'es' ? '¿Quitar de la estantería?' : 'Remove from shelf?'}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setItemToRemoveFromShelf(null)}
+                style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '0.2rem' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+              {language === 'es'
+                ? `¿Estás seguro de que deseas quitar "${itemToRemoveFromShelf.title}" de tu estantería? Se perderá el seguimiento de su progreso.`
+                : `Are you sure you want to remove "${itemToRemoveFromShelf.title}" from your shelf? Progress tracking will be removed.`}
+            </p>
+
+            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => setItemToRemoveFromShelf(null)}
+                style={{ fontSize: '0.85rem', padding: '0.4rem 1rem' }}
+              >
+                {language === 'es' ? 'Cancelar' : 'Cancel'}
+              </button>
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={handleConfirmRemoveFromShelf}
+                style={{ fontSize: '0.85rem', padding: '0.4rem 1rem', background: '#ef4444', borderColor: '#ef4444', color: '#ffffff' }}
+              >
+                {language === 'es' ? 'Quitar' : 'Remove'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Add To Shelf Overlay Modal */}

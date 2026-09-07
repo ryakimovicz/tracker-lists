@@ -1477,8 +1477,10 @@ export const Home: React.FC = () => {
               const showStatus = (seriesData?.status || '').toLowerCase();
               const isEnded = showStatus === 'ended' || showStatus === 'finished' || showStatus === 'canceled';
 
-              // Check if all episodes of the entire series (not just aired) have been watched for the current cycle
-              const allEpCycles = allEps.map((ep: any) => {
+              // Check if all canonical episodes (regular seasons + significant specials, excluding extras) have been watched for the current cycle
+              const canonicalAllEps = allEps.filter((ep: any) => !ep.is_extra && ep.ep_type !== 'insignificant_special' && ep.season_number !== 0);
+              const epsToCheck = canonicalAllEps.length > 0 ? canonicalAllEps : allEps;
+              const allEpCycles = epsToCheck.map((ep: any) => {
                 const t = getEpTracked(ep);
                 return (t?.consumption_count !== undefined) ? t.consumption_count : (t?.is_completed ? 1 : 0);
               });
