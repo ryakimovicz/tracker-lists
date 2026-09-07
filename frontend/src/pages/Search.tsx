@@ -102,10 +102,7 @@ interface ExploreSectionProps {
   categories: Array<{ type: string; title: string; items: any[] }>;
   language: string;
   currentUser: any;
-  shelfItems: any[];
   onOpenItem: (item: any) => void;
-  onOpenAddShelf: (item: any, e: React.MouseEvent) => void;
-  onRemoveFromShelf: (shelfItem: any) => void;
   getTagClass: (type: string) => string;
 }
 
@@ -114,10 +111,7 @@ const ExploreSection = React.memo<ExploreSectionProps>(({
   categories,
   language,
   currentUser,
-  shelfItems,
   onOpenItem,
-  onOpenAddShelf,
-  onRemoveFromShelf,
   getTagClass
 }) => {
   if (loading) {
@@ -132,87 +126,50 @@ const ExploreSection = React.memo<ExploreSectionProps>(({
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
       {categories.map(({ type, title, items }) => (
         <HorizontalScroll key={type} title={title} outlineColor={`var(--color-${type})`}>
-          {items.map((item: any, idx: number) => {
-            const shelfItem = shelfItems.find((x: any) => x.external_id === item.external_id && x.item_type === item.item_type);
-            const onShelf = Boolean(shelfItem);
-            const itemTypeColor = `var(--color-${item.item_type || 'movie'})`;
-            const itemTypeTextColor = `var(--color-text-${item.item_type || 'movie'})`;
+          {items.map((item: any, idx: number) => (
+            <div key={idx} className="glass-card" style={{ minWidth: '200px', width: '200px', padding: '1rem', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '0.75rem' }} onClick={() => onOpenItem(item)}>
+              <div style={{ position: 'relative', width: '100%', height: '280px', overflow: 'hidden', borderRadius: '8px' }}>
+                <MediaPoster
+                  src={item.image_url}
+                  title={item.title}
+                  itemType={item.item_type}
+                  isUpcomingMovie={item.item_type === 'movie'}
+                  height="100%"
+                  width="100%"
+                  borderRadius="8px"
+                />
 
-            return (
-              <div key={idx} className="glass-card" style={{ minWidth: '200px', width: '200px', padding: '1rem', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '0.75rem', position: 'relative' }} onClick={() => onOpenItem(item)}>
-                <div style={{ position: 'relative', width: '100%', height: '280px', overflow: 'hidden', borderRadius: '8px' }}>
-                  <MediaPoster
-                    src={item.image_url}
-                    title={item.title}
-                    itemType={item.item_type}
-                    isUpcomingMovie={item.item_type === 'movie'}
-                    height="100%"
-                    width="100%"
-                    borderRadius="8px"
-                  />
+                {/* Game/Media Badge (Colección, DLC, etc.) */}
+                {renderMediaBadge(item.badge, language)}
 
-                  {/* Game/Media Badge (Colección, DLC, etc.) */}
-                  {renderMediaBadge(item.badge, language)}
-
-                  {/* Status Badge */}
-                  {item.status && ['completed', 'watching', 'dropped', 'read', 'reading'].includes(item.status) && (
-                    <div style={{ 
-                      position: 'absolute', top: '0.5rem', right: '0.5rem', 
-                      padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600,
-                      background: (item.status === 'completed' || item.status === 'read') ? 'var(--color-movie)' : (item.status === 'watching' || item.status === 'reading') ? '#3b82f6' : '#ef4444',
-                      color: (item.status === 'completed' || item.status === 'read') ? 'var(--color-text-movie)' : '#ffffff',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.5)'
-                    }}>
-                      {(item.status === 'completed' || item.status === 'read') ? (item.item_type === 'series' || item.item_type === 'anime' ? (language === 'es' ? 'Terminado' : 'Completed') : ['book', 'comic', 'manga'].includes(item.item_type) ? (language === 'es' ? 'Leído' : 'Read') : (language === 'es' ? 'Visto' : 'Watched')) : (item.status === 'watching' || item.status === 'reading') ? (item.item_type === 'movie' ? (language === 'es' ? 'En pausa' : 'Paused') : ['book', 'comic', 'manga'].includes(item.item_type) ? (language === 'es' ? 'Leyendo' : 'Reading') : (language === 'es' ? 'Viendo' : 'Watching')) : (language === 'es' ? 'Abandonado' : 'Dropped')}
-                    </div>
-                  )}
-                </div>
-                <div style={{ paddingRight: currentUser ? '36px' : 0, textAlign: 'left' }}>
-                  <h4 style={{ margin: '0 0 0.25rem 0', fontSize: '1rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.title}>{item.title}</h4>
-                  {(item.item_type === 'series' || item.item_type === 'anime') && item.latest_episode != null ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
-                      <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--accent-primary)' }}>
-                        {language === 'es' ? 'T' : 'S'}{String(item.latest_season || 1).padStart(2, '0')} | E{String(item.latest_episode).padStart(2, '0')}
-                      </span>
-                      {item.release_date && <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{item.release_date}</span>}
-                    </div>
-                  ) : (
-                    item.release_date && <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{item.release_date}</span>
-                  )}
-                </div>
-
-                {currentUser && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (shelfItem) {
-                        onRemoveFromShelf(shelfItem);
-                      } else {
-                        onOpenAddShelf(item, e);
-                      }
-                    }}
-                    className={`btn-card-add-shelf ${onShelf ? 'on-shelf' : ''}`}
-                    title={onShelf 
-                      ? (language === 'es' ? 'Quitar de estantería' : 'Remove from shelf')
-                      : (language === 'es' ? 'Agregar a estantería' : 'Add to shelf')
-                    }
-                    style={{
-                      position: 'absolute',
-                      bottom: '0.75rem',
-                      right: '0.75rem',
-                      width: '32px',
-                      height: '32px',
-                      '--category-color': itemTypeColor,
-                      '--category-text-color': itemTypeTextColor,
-                    } as React.CSSProperties}
-                  >
-                    <Plus size={18} />
-                  </button>
+                {/* Status Badge */}
+                {item.status && ['completed', 'watching', 'dropped', 'read', 'reading'].includes(item.status) && (
+                  <div style={{ 
+                    position: 'absolute', top: '0.5rem', right: '0.5rem', 
+                    padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600,
+                    background: (item.status === 'completed' || item.status === 'read') ? 'var(--color-movie)' : (item.status === 'watching' || item.status === 'reading') ? '#3b82f6' : '#ef4444',
+                    color: (item.status === 'completed' || item.status === 'read') ? 'var(--color-text-movie)' : '#ffffff',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.5)'
+                  }}>
+                    {(item.status === 'completed' || item.status === 'read') ? (item.item_type === 'series' || item.item_type === 'anime' ? (language === 'es' ? 'Terminado' : 'Completed') : ['book', 'comic', 'manga'].includes(item.item_type) ? (language === 'es' ? 'Leído' : 'Read') : (language === 'es' ? 'Visto' : 'Watched')) : (item.status === 'watching' || item.status === 'reading') ? (item.item_type === 'movie' ? (language === 'es' ? 'En pausa' : 'Paused') : ['book', 'comic', 'manga'].includes(item.item_type) ? (language === 'es' ? 'Leyendo' : 'Reading') : (language === 'es' ? 'Viendo' : 'Watching')) : (language === 'es' ? 'Abandonado' : 'Dropped')}
+                  </div>
                 )}
               </div>
-            );
-          })}
+              <div>
+                <h4 style={{ margin: '0 0 0.25rem 0', fontSize: '1rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.title}>{item.title}</h4>
+                {(item.item_type === 'series' || item.item_type === 'anime') && item.latest_episode != null ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--accent-primary)' }}>
+                      {language === 'es' ? 'T' : 'S'}{String(item.latest_season || 1).padStart(2, '0')} | E{String(item.latest_episode).padStart(2, '0')}
+                    </span>
+                    {item.release_date && <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{item.release_date}</span>}
+                  </div>
+                ) : (
+                  item.release_date && <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{item.release_date}</span>
+                )}
+              </div>
+            </div>
+          ))}
         </HorizontalScroll>
       ))}
     </div>
@@ -699,10 +656,7 @@ export const Search: React.FC = () => {
             categories={exploreCategories}
             language={language}
             currentUser={currentUser}
-            shelfItems={shelfItems}
             onOpenItem={handleOpenItemDetails}
-            onOpenAddShelf={handleOpenAddShelf}
-            onRemoveFromShelf={(shelfItem) => setItemToRemoveFromShelf(shelfItem)}
             getTagClass={getTagClass}
           />
         </div>
