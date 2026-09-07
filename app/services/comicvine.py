@@ -445,11 +445,22 @@ class ComicVineService:
 
                     parent_series = None
                     if vol_id:
-                        parent_series = {
-                            "external_id": f"cv_vol_{vol_id}",
-                            "title": vol_name,
-                            "item_type": "comic"
-                        }
+                        vol_detail_obj = ComicVineService.get_comic_volume_detail(f"cv_vol_{vol_id}")
+                        if vol_detail_obj:
+                            parent_series = {
+                                "external_id": f"cv_vol_{vol_id}",
+                                "title": vol_detail_obj.get("name") or vol_name,
+                                "image_url": vol_detail_obj.get("image_url"),
+                                "description": vol_detail_obj.get("overview") or "",
+                                "release_date": vol_detail_obj.get("first_air_date"),
+                                "item_type": "comic"
+                            }
+                        else:
+                            parent_series = {
+                                "external_id": f"cv_vol_{vol_id}",
+                                "title": vol_name,
+                                "item_type": "comic"
+                            }
 
                     return {
                         "id": f"cv_issue_{raw_id}",

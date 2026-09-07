@@ -1053,10 +1053,24 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
               setCachedSeries(cacheKeyMeta, { ...volData, seasons: rawSeasons });
               setSeasons(rawSeasons);
               setActiveSeason(1);
+              setSelectedItem((prev: any) => prev ? {
+                ...prev,
+                title: prev.title || volData.name || volData.volume_name,
+                image_url: prev.image_url || volData.image_url,
+                description: prev.description || volData.overview,
+                release_date: prev.release_date || volData.first_air_date
+              } : null);
             }).catch(console.error);
           } else {
             setSeasons(cachedMeta.seasons);
             setActiveSeason(1);
+            setSelectedItem((prev: any) => prev ? {
+              ...prev,
+              title: prev.title || cachedMeta.name || cachedMeta.volume_name,
+              image_url: prev.image_url || cachedMeta.image_url,
+              description: prev.description || cachedMeta.overview,
+              release_date: prev.release_date || cachedMeta.first_air_date
+            } : null);
           }
 
           apiClient.get(`/search/comic/volume/${volId}/issues`).then(res => {
