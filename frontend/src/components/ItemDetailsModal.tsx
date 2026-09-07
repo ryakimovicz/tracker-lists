@@ -3426,7 +3426,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                     </div>
                   )}
                        {/* TV Series Season / Comic Volume Accordion Tracking */}
-              {(selectedItem.item_type === 'series' || selectedItem.item_type === 'anime' || selectedItem.item_type === 'comic') && seasons.length > 0 && !isEpisode && (
+{(selectedItem.item_type === 'series' || selectedItem.item_type === 'anime' || selectedItem.item_type === 'comic') && seasons.length > 0 && !isEpisode && (
                 <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                   <h4 style={{ margin: 0, fontSize: '1.1rem' }}>
                     {selectedItem.item_type === 'comic' 
@@ -3434,551 +3434,641 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                       : (language === 'es' ? 'Seguimiento de Temporadas' : 'Season Tracking')}
                   </h4>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    {(() => {
-                      // 1. Calculate air date range for each regular season
-                      const seasonDateRanges: Record<number, { start?: string, end?: string }> = {};
-                      seasons.forEach((s: any) => {
-                        if (s.season_number === 0 || s.is_extras) return;
-                        const sEps = (seasonEpisodes[s.season_number] || []).filter((e: any) => e.air_date);
-                        if (sEps.length > 0) {
-                          const sortedDates = sEps.map((e: any) => e.air_date).sort();
-                          seasonDateRanges[s.season_number] = {
-                            start: sortedDates[0],
-                            end: sortedDates[sortedDates.length - 1]
-                          };
-                        }
-                      });
+                    {selectedItem.item_type === 'comic' ? (
+                      (() => {
+                        const cacheKeyAll = `${selectedItem.external_id}_all_episodes`;
+                        const cachedAll = getCachedSeries(cacheKeyAll);
+                        const displayedIssues = (seasonEpisodes[1] && seasonEpisodes[1].length > 0)
+                          ? seasonEpisodes[1]
+                          : (Array.isArray(cachedAll) ? cachedAll : []);
 
-                      // 2. Extract standalone specials from cached all episodes
-                      const cacheKeyAll = `${selectedItem.external_id}_all_episodes`;
-                      const cachedAll = getCachedSeries(cacheKeyAll);
-                      const standaloneSpecials: any[] = [];
-                      if (cachedAll && Array.isArray(cachedAll)) {
-                        cachedAll.forEach((ep: any) => {
-                          const isSig = ep.is_significant_special || ep.ep_type === 'significant_special';
-                          const isExt = ep.is_extra || ep.ep_type === 'insignificant_special' || ep.season_number === 0;
-                          if (isSig && !isExt) {
-                            const parentSeason = ep.season_number;
-                            const parentRange = parentSeason ? seasonDateRanges[parentSeason] : null;
-                            const epDate = ep.air_date;
-                            // If ep date is strictly inside parent season's date range, keep inside season. Otherwise, standalone between seasons.
-                            const isInsideParentSeason = parentRange && parentRange.start && parentRange.end && epDate && epDate >= parentRange.start && epDate <= parentRange.end;
-                            if (!isInsideParentSeason) {
-                              standaloneSpecials.push(ep);
-                            }
-                          }
-                        });
-                      }
-
-                      // Sort standalone specials by air date
-                      standaloneSpecials.sort((a, b) => {
-                        if (a.air_date && b.air_date) return new Date(a.air_date).getTime() - new Date(b.air_date).getTime();
-                        return 0;
-                      });
-
-                      // 3. Build chronological timeline items
-                      type TimelineItem = 
-                        | { type: 'season'; season: any }
-                        | { type: 'standalone_special'; episode: any };
-
-                      const timeline: TimelineItem[] = [];
-                      const regularSeasons = seasons.filter((s: any) => s.season_number > 0 && !s.is_extras).sort((a: any, b: any) => a.season_number - b.season_number);
-                      let unplacedSpecials = [...standaloneSpecials];
-
-                      regularSeasons.forEach((s: any) => {
-                        const sRange = seasonDateRanges[s.season_number];
-                        const sStart = sRange?.start;
-
-                        // Place any specials that aired before this season starts
-                        const beforeThisSeason: any[] = [];
-                        const remaining: any[] = [];
-                        unplacedSpecials.forEach((sp: any) => {
-                          if (sStart && sp.air_date && sp.air_date < sStart) {
-                            beforeThisSeason.push(sp);
-                          } else {
-                            remaining.push(sp);
-                          }
-                        });
-                        unplacedSpecials = remaining;
-
-                        beforeThisSeason.forEach(sp => {
-                          timeline.push({ type: 'standalone_special', episode: sp });
-                        });
-
-                        timeline.push({ type: 'season', season: s });
-                      });
-
-                      // Any remaining unplaced specials go after the last regular season
-                      unplacedSpecials.forEach(sp => {
-                        timeline.push({ type: 'standalone_special', episode: sp });
-                      });
-
-                      // Finally append Extras (season 0) if it exists
-                      const extrasSeason = seasons.find((s: any) => s.season_number === 0 || s.is_extras);
-                      if (extrasSeason) {
-                        timeline.push({ type: 'season', season: extrasSeason });
-                      }
-
-                      return timeline.map((item) => {
-                        if (item.type === 'standalone_special') {
-                          const ep = item.episode;
-                          const dbEp = (episodes || []).find(x => x.external_id === `tvm-ep-${ep.id}` || x.external_id === `cv_issue_${ep.id}`);
-                          const isCompleted = !!globalProgress[`tvm-ep-${ep.id}`] || !!globalProgress[`cv_issue_${ep.id}`] || !!dbEp?.is_completed;
-
+                        if (isLoadingSeasonEpisodes && displayedIssues.length === 0) {
                           return (
-                            <div
-                              key={`standalone-special-${ep.id}`}
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                padding: '0.65rem 0.9rem',
-                                background: 'rgba(245, 158, 11, 0.04)',
-                                border: '1px solid rgba(245, 158, 11, 0.25)',
-                                borderRadius: '6px',
-                                gap: '1rem'
-                              }}
-                            >
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', minWidth: 0 }}>
-                                <div style={{ position: 'relative', flexShrink: 0 }}>
-                                  <button
-                                    type="button"
-                                    disabled={!user}
-                                    onClick={() => {
-                                      const currentIsCompleted = !!globalProgress[`tvm-ep-${ep.id}`] || !!globalProgress[`cv_issue_${ep.id}`] || !!dbEp?.is_completed;
-                                      if (currentIsCompleted) {
-                                        setEpisodeActionItem({ ep, listId: selectedItem.tracking_list_id });
-                                      } else {
-                                        const missing = getMissingPreviousEpisodesForEp(ep);
-                                        if (missing.length > 0) {
-                                          setPendingPreviousPrompt({
-                                            type: 'episode',
-                                            targetEp: ep,
-                                            missingEpisodes: missing
-                                          });
-                                          return;
-                                        }
-                                        const progressKey = String(ep.id).startsWith('cv_') ? ep.id : `tvm-ep-${ep.id}`;
-                                        setGlobalProgress(prev => ({ ...prev, [progressKey]: true }));
-                                        handleToggleEpisode(selectedItem.tracking_list_id, ep);
-                                      }
-                                    }}
-                                    style={{
-                                      background: isCompleted ? `var(--color-${selectedItem.item_type || 'movie'})` : 'transparent',
-                                      border: isCompleted ? 'none' : '1px solid var(--border-color)',
-                                      borderRadius: '50%',
-                                      width: '20px',
-                                      height: '20px',
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      cursor: user ? 'pointer' : 'default',
-                                      color: isCompleted ? `var(--color-text-${selectedItem.item_type || 'movie'})` : 'var(--text-muted)',
-                                      opacity: isCompleted ? 1 : 0.6,
-                                      transition: 'all 0.2s ease',
-                                      padding: 0
-                                    }}
-                                  >
-                                    <Check size={12} strokeWidth={3} />
-                                  </button>
-                                </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', minWidth: 0, overflow: 'hidden' }}>
-                                  <span style={{
-                                    fontSize: '0.68rem',
-                                    fontWeight: 700,
-                                    textTransform: 'uppercase',
-                                    background: 'rgba(245, 158, 11, 0.15)',
-                                    color: '#f59e0b',
-                                    border: '1px solid rgba(245, 158, 11, 0.35)',
-                                    padding: '0.1rem 0.35rem',
-                                    borderRadius: '4px',
-                                    flexShrink: 0
-                                  }}>
-                                    {language === 'es' ? 'Especial' : 'Special'}
-                                  </span>
-                                  <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={ep.name || 'Untitled'}>
-                                    {ep.name || 'Untitled'}
-                                  </span>
-                                  {ep.air_date && (
-                                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', flexShrink: 0 }}>
-                                      ({formatReleaseDate(ep.air_date)})
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                              <button
-                                onClick={() => {
-                                  setHistoryStack(prev => [...prev, selectedItem]);
-                                  onOpenItem && onOpenItem({
-                                    id: dbEp ? dbEp.id : ep.id,
-                                    list_id: selectedItem.tracking_list_id,
-                                    item_type: selectedItem.item_type === 'comic' ? 'comic' : 'episode',
-                                    external_id: String(ep.id).startsWith('cv_') ? ep.id : `tvm-ep-${ep.id}`,
-                                    title: `${selectedItem.title} - ${language === 'es' ? 'Especial' : 'Special'} • ${ep.name || 'Untitled'}`,
-                                    image_url: ep.image_url || ep.image?.original || ep.image?.medium || ep.still_path || selectedItem.image_url,
-                                    custom_notes: JSON.stringify({ description: ep.overview || '', release_date: ep.air_date || null }),
-                                    completed_at: dbEp?.completed_at,
-                                    is_completed: isCompleted,
-                                    season_number: ep.season_number,
-                                    episode_number: ep.episode_number,
-                                    rawEpisodeId: ep.id,
-                                    release_date: ep.air_date,
-                                    parent_series: selectedItem
-                                  });
-                                }}
-                                className="btn-secondary"
-                                style={{ padding: '0.2rem 0.4rem', fontSize: '0.74rem', flexShrink: 0 }}
-                              >
-                                {language === 'es' ? 'Ver Info' : 'View Info'}
-                              </button>
+                            <div style={{ padding: '1rem', textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                              {language === 'es' ? 'Cargando números...' : 'Loading issues...'}
                             </div>
                           );
                         }
 
-                        const s = item.season;
-                        const isSeasonActive = activeSeason === s.season_number;
-                        const { isSeasonDone, isSeasonPartial } = (() => {
-                          const cacheKeyAll = `${selectedItem.external_id}_all_episodes`;
-                          const cachedAll = getCachedSeries(cacheKeyAll) || [];
-
-                          const isEpWatched = (epId: any, seasonNum?: number, epNum?: number) => {
-                            if (!epId) return false;
-                            const extId = typeof epId === 'string' && (epId.startsWith('tvm-ep-') || epId.startsWith('cv_issue_')) ? epId : (selectedItem.item_type === 'comic' ? `cv_issue_${epId}` : `tvm-ep-${epId}`);
-                            if (globalProgress[extId] !== undefined) return !!globalProgress[extId];
-                            const found = (episodes || []).find(x => 
-                              x.external_id === extId || 
-                              x.id === epId ||
-                              (seasonNum !== undefined && epNum !== undefined && x.season_number === seasonNum && x.episode_number === epNum)
-                            );
-                            if (found) {
-                              return globalProgress[found.external_id] !== undefined ? !!globalProgress[found.external_id] : !!found.is_completed;
-                            }
-                            return false;
-                          };
-
-                          let sEps = seasonEpisodes[s.season_number];
-                          if (!Array.isArray(sEps) || sEps.length === 0) {
-                            sEps = cachedAll.filter((ep: any) => ep.season_number === s.season_number);
-                          }
-
-                          if (!Array.isArray(sEps) || sEps.length === 0) {
-                            const listSeps = (episodes || []).filter(x => x.season_number === s.season_number || x.section === `Season ${s.season_number}` || x.section === 'Volumen');
-                            const done = listSeps.length > 0 && listSeps.every(x => globalProgress[x.external_id] !== undefined ? !!globalProgress[x.external_id] : !!x.is_completed);
-                            return { isSeasonDone: done, isSeasonPartial: false };
-                          }
-
-                          const regularEps = sEps.filter((te: any) => !te.is_extra && te.ep_type !== 'insignificant_special' && te.ep_type !== 'significant_special' && !te.is_significant_special);
-                          const specialEps = sEps.filter((te: any) => te.is_significant_special || te.ep_type === 'significant_special');
-
-                          const allDone = sEps.every((te: any) => isEpWatched(te.id, s.season_number, te.episode_number ?? te.number));
-                          if (allDone) {
-                            return { isSeasonDone: true, isSeasonPartial: false };
-                          }
-
-                          const regularDone = regularEps.length > 0 && regularEps.every((te: any) => isEpWatched(te.id, s.season_number, te.episode_number ?? te.number));
-                          const hasSpecialsUnwatched = specialEps.length > 0 && specialEps.some((te: any) => !isEpWatched(te.id, s.season_number, te.episode_number ?? te.number));
-
-                          if (regularDone && hasSpecialsUnwatched) {
-                            return { isSeasonDone: false, isSeasonPartial: true };
-                          }
-
-                          return { isSeasonDone: false, isSeasonPartial: false };
-                        })();
-
-                        // In the season accordion, filter out standalone specials that are rendered between seasons
-                        const rawSeasonEps = Array.isArray(seasonEpisodes[s.season_number]) ? seasonEpisodes[s.season_number] : [];
-                        const displayedSeasonEps = rawSeasonEps.filter((ep: any) => {
-                          return !standaloneSpecials.some((sp: any) => sp.id === ep.id);
-                        });
-
-                        const seasonLabel = selectedItem.item_type === 'comic'
-                          ? (s.name || (language === 'es' ? `Volumen ${s.season_number}` : `Volume ${s.season_number}`))
-                          : s.is_extras || s.season_number === 0
-                          ? (language === 'es' ? 'Extras' : 'Extras')
-                          : (language === 'es' ? `Temporada ${s.season_number}` : `Season ${s.season_number}`);
-
-                        const countUnitLabel = selectedItem.item_type === 'comic'
-                          ? (language === 'es' ? 'números' : 'issues')
-                          : (language === 'es' ? 'capítulos' : 'episodes');
+                        if (displayedIssues.length === 0) {
+                          return (
+                            <div style={{ padding: '1rem', textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                              {language === 'es' ? 'No se encontraron números.' : 'No issues found.'}
+                            </div>
+                          );
+                        }
 
                         return (
-                          <div key={s.id || s.season_number} style={{ border: '1px solid var(--border-color)', borderRadius: '6px', overflow: 'hidden' }}>
-                            <div
-                              role="button"
-                              tabIndex={0}
-                              onClick={() => {
-                                if (isSeasonActive) {
-                                  setActiveSeason(null);
-                                } else {
-                                  setActiveSeason(s.season_number);
-                                  handleLoadSeasonEpisodes(selectedItem.external_id, s.season_number);
-                                }
-                              }}
-                              style={{
-                                width: '100%',
-                                padding: '0.75rem 1rem',
-                                background: 'var(--bg-secondary)',
-                                border: 'none',
-                                color: 'var(--text-primary)',
-                                fontWeight: 600,
-                                textAlign: 'left',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center'
-                              }}
-                            >
-                              <span>
-                                <span style={{ position: 'relative', display: 'inline-flex', verticalAlign: 'middle' }}>
-                                  <span
-                                    role="button"
-                                    tabIndex={0}
-                                    onClick={async (e) => {
-                                      e.stopPropagation();
-                                      if (isSeasonDone || isSeasonPartial) {
-                                        setSeasonActionItem(s);
-                                        return;
-                                      }
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '380px', overflowY: 'auto', paddingRight: '0.25rem' }}>
+                            {displayedIssues.map((ep: any) => {
+                              const extIdKey = `cv_issue_${ep.id}`;
+                              const dbEp = (episodes || []).find(x => x.external_id === extIdKey || x.id === ep.id);
+                              const isCompleted = !!globalProgress[extIdKey] || !!dbEp?.is_completed;
 
-                                      const missing = getMissingPreviousEpisodesForSeason(s);
-                                      if (missing.length > 0) {
-                                        setPendingPreviousPrompt({
-                                          type: 'season',
-                                          targetSeason: s,
-                                          missingEpisodes: missing
-                                        });
-                                        return;
-                                      }
-
-                                      let effectiveListId = selectedItem.tracking_list_id;
-                                      if (!effectiveListId) {
-                                        const defaultStatus = selectedItem.item_type === 'comic' ? 'reading' : 'watching';
-                                        const tracked = await ensureTracked(defaultStatus);
-                                        if (!tracked) return;
-                                        effectiveListId = tracked.tracking_list_id || tracked;
-                                      }
-                                      
-                                      let seriesEps = seasonEpisodes[s.season_number];
-                                      if (!seriesEps || seriesEps.length === 0) {
-                                        const cacheKeyAll = `${selectedItem.external_id}_all_episodes`;
-                                        const cachedAll = getCachedSeries(cacheKeyAll);
-                                        if (cachedAll && Array.isArray(cachedAll)) {
-                                          seriesEps = cachedAll.filter((ep: any) => ep.season_number === s.season_number);
-                                        }
-                                      }
-                                      
-                                      // Update global progress optimistically
-                                      if (seriesEps && seriesEps.length > 0) {
-                                        const newProg: Record<string, boolean> = {};
-                                        seriesEps.forEach((ep: any) => {
-                                          const key = selectedItem.item_type === 'comic' ? `cv_issue_${ep.id}` : `tvm-ep-${ep.id}`;
-                                          newProg[key] = true;
-                                        });
-                                        setGlobalProgress(prev => ({ ...prev, ...newProg }));
-                                      }
-
-                                      try {
-                                        await apiClient.post(`/lists/${effectiveListId}/bulk-toggle-season`, {
-                                          season_number: s.season_number,
-                                          episodes: seriesEps || null,
-                                          completed: true
-                                        });
-                                        
-                                        const listRes = await apiClient.get(`/lists/${effectiveListId}`);
-                                        const updatedList = listRes.data.items || [];
-                                        setEpisodes(updatedList);
-                                        
-                                        // Also sync global progress in case backend populated new episodes
-                                        const extIds = updatedList.map((x: any) => x.external_id).filter(Boolean);
-                                        if (extIds.length > 0) {
-                                          const progRes = await apiClient.post('/users/me/progress/bulk-check', { external_ids: extIds });
-                                          setGlobalProgress(prev => ({ ...prev, ...progRes.data }));
-                                        }
-
-                                        await checkCompletionStatus(effectiveListId, updatedList);
-                                        onUpdate && onUpdate();
-                                      } catch (err) {
-                                        console.error("Bulk toggle failed", err);
-                                      }
+                              return (
+                                <div
+                                  key={ep.id}
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    padding: '0.45rem 0.65rem',
+                                    background: 'var(--bg-secondary)',
+                                    border: '1px solid var(--border-color)',
+                                    borderRadius: '6px',
+                                    gap: '1rem'
+                                  }}
+                                >
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', minWidth: 0 }}>
+                                    <div style={{ position: 'relative', flexShrink: 0 }}>
+                                      <button
+                                        type="button"
+                                        disabled={!user}
+                                        onClick={() => {
+                                          const currentIsCompleted = !!globalProgress[extIdKey] || !!dbEp?.is_completed;
+                                          if (currentIsCompleted) {
+                                            setEpisodeActionItem({ ep, listId: selectedItem.tracking_list_id });
+                                          } else {
+                                            setGlobalProgress(prev => ({ ...prev, [extIdKey]: true }));
+                                            handleToggleEpisode(selectedItem.tracking_list_id, ep);
+                                          }
+                                        }}
+                                        style={{
+                                          background: isCompleted ? `var(--color-${selectedItem.item_type || 'movie'})` : 'transparent',
+                                          border: isCompleted ? 'none' : '1px solid var(--border-color)',
+                                          borderRadius: '50%',
+                                          width: '20px',
+                                          height: '20px',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          cursor: user ? 'pointer' : 'default',
+                                          color: isCompleted ? `var(--color-text-${selectedItem.item_type || 'movie'})` : 'var(--text-muted)',
+                                          opacity: isCompleted ? 1 : 0.6,
+                                          transition: 'all 0.2s ease',
+                                          padding: 0
+                                        }}
+                                      >
+                                        <Check size={12} strokeWidth={3} />
+                                      </button>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', minWidth: 0, overflow: 'hidden' }}>
+                                      <span style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={ep.name || 'Untitled'}>
+                                        {ep.name || 'Untitled'}
+                                      </span>
+                                      {ep.air_date && (
+                                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', flexShrink: 0 }}>
+                                          ({formatReleaseDate(ep.air_date)})
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <button
+                                    onClick={() => {
+                                      setHistoryStack(prev => [...prev, selectedItem]);
+                                      onOpenItem && onOpenItem({
+                                        id: dbEp ? dbEp.id : ep.id,
+                                        list_id: selectedItem.tracking_list_id,
+                                        item_type: 'comic',
+                                        external_id: `cv_issue_${ep.id}`,
+                                        title: `${selectedItem.title} ${ep.name}`,
+                                        image_url: ep.image_url || ep.image?.original || ep.image?.medium || ep.still_path || selectedItem.image_url,
+                                        custom_notes: JSON.stringify({ description: ep.overview || '', release_date: ep.air_date || null }),
+                                        completed_at: dbEp?.completed_at,
+                                        is_completed: isCompleted,
+                                        season_number: ep.season_number,
+                                        episode_number: ep.episode_number,
+                                        rawEpisodeId: ep.id,
+                                        release_date: ep.air_date,
+                                        parent_series: selectedItem
+                                      });
                                     }}
-                                    style={{
-                                      background: isSeasonDone 
-                                        ? `var(--color-${selectedItem.item_type || 'movie'})` 
-                                        : isSeasonPartial 
-                                        ? `linear-gradient(90deg, var(--color-${selectedItem.item_type || 'movie'}) 50%, rgba(255,255,255,0.06) 50%)`
-                                        : 'transparent',
-                                      border: isSeasonDone ? 'none' : isSeasonPartial ? `1px solid var(--color-${selectedItem.item_type || 'movie'})` : '1px solid var(--border-color)',
-                                      borderRadius: '50%',
-                                      width: '20px',
-                                      height: '20px',
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      cursor: 'pointer',
-                                      marginRight: '0.6rem',
-                                      color: isSeasonDone || isSeasonPartial ? `var(--color-text-${selectedItem.item_type || 'movie'})` : 'var(--text-muted)',
-                                      opacity: isSeasonDone || isSeasonPartial ? 1 : 0.6,
-                                      padding: 0,
-                                      transition: 'all 0.2s ease'
-                                    }}
-                                    title={isSeasonDone ? (language === 'es' ? 'Volumen completo' : 'Completed') : isSeasonPartial ? (language === 'es' ? 'Regular completo (pendientes especiales)' : 'Regular completed') : ''}
+                                    className="btn-secondary"
+                                    style={{ padding: '0.2rem 0.4rem', fontSize: '0.74rem', flexShrink: 0 }}
                                   >
-                                    <Check size={12} strokeWidth={3} />
-                                  </span>
-                                </span>
-                                  {seasonLabel}
-                                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginLeft: '0.5rem', fontWeight: 400 }}>
-                                    ({displayedSeasonEps.length > 0 ? displayedSeasonEps.length : s.episode_count} {countUnitLabel})
-                                  </span>
-                                </span>
-                                <span>{isSeasonActive ? '▼' : '►'}</span>
-                              </div>
-
-                              {isSeasonActive && (
-                                <div style={{ padding: '0.5rem', background: 'var(--bg-primary)', display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '220px', overflowY: 'auto' }}>
-                                  {isLoadingSeasonEpisodes ? (
-                                    <div style={{ padding: '1rem', textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                                      {language === 'es' ? 'Cargando contenido...' : 'Loading...'}
-                                    </div>
-                                  ) : displayedSeasonEps.length === 0 ? (
-                                    <div style={{ padding: '1rem', textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                                      {language === 'es' ? 'No se encontraron números.' : 'No items found.'}
-                                    </div>
-                                  ) : (
-                                    displayedSeasonEps.map((ep: any) => {
-                                      const extIdKey = selectedItem.item_type === 'comic' ? `cv_issue_${ep.id}` : `tvm-ep-${ep.id}`;
-                                      const dbEp = (episodes || []).find(x => x.external_id === extIdKey || x.id === ep.id);
-                                      const isCompleted = !!globalProgress[extIdKey] || !!dbEp?.is_completed;
-                                      const isSpecial = ep.is_significant_special || ep.ep_type === 'significant_special' || (ep.episode_number == null && !ep.is_extra && ep.season_number > 0);
-                                      const isExtra = ep.is_extra || ep.ep_type === 'insignificant_special' || ep.season_number === 0;
-
-                                      return (
-                                        <div
-                                          key={ep.id}
-                                          style={{
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'space-between',
-                                            padding: '0.4rem 0.6rem',
-                                            background: 'var(--bg-secondary)',
-                                            border: '1px solid var(--border-color)',
-                                            borderRadius: '4px',
-                                            gap: '1rem'
-                                          }}
-                                        >
-                                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', minWidth: 0 }}>
-                                            <div style={{ position: 'relative', flexShrink: 0 }}>
-                                              <button
-                                                type="button"
-                                                disabled={!user}
-                                                onClick={() => {
-                                                  const currentIsCompleted = !!globalProgress[extIdKey] || !!dbEp?.is_completed;
-                                                  if (currentIsCompleted) {
-                                                    setEpisodeActionItem({ ep, listId: selectedItem.tracking_list_id });
-                                                  } else {
-                                                    const missing = getMissingPreviousEpisodesForEp(ep);
-                                                    if (missing.length > 0) {
-                                                      setPendingPreviousPrompt({
-                                                        type: 'episode',
-                                                        targetEp: ep,
-                                                        missingEpisodes: missing
-                                                      });
-                                                      return;
-                                                    }
-                                                    setGlobalProgress(prev => ({ ...prev, [extIdKey]: true }));
-                                                    handleToggleEpisode(selectedItem.tracking_list_id, ep);
-                                                  }
-                                                }}
-                                                style={{
-                                                  background: isCompleted ? `var(--color-${selectedItem.item_type || 'movie'})` : 'transparent',
-                                                  border: isCompleted ? 'none' : '1px solid var(--border-color)',
-                                                  borderRadius: '50%',
-                                                  width: '20px',
-                                                  height: '20px',
-                                                  display: 'inline-flex',
-                                                  alignItems: 'center',
-                                                  justifyContent: 'center',
-                                                  cursor: user ? 'pointer' : 'default',
-                                                  color: isCompleted ? `var(--color-text-${selectedItem.item_type || 'movie'})` : 'var(--text-muted)',
-                                                  opacity: isCompleted ? 1 : 0.6,
-                                                  transition: 'all 0.2s ease',
-                                                  padding: 0
-                                                }}
-                                              >
-                                                <Check size={12} strokeWidth={3} />
-                                              </button>
-                                            </div>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', minWidth: 0, overflow: 'hidden' }}>
-                                              {isSpecial && (
-                                                <span style={{
-                                                  fontSize: '0.68rem',
-                                                  fontWeight: 700,
-                                                  textTransform: 'uppercase',
-                                                  background: 'rgba(245, 158, 11, 0.15)',
-                                                  color: '#f59e0b',
-                                                  border: '1px solid rgba(245, 158, 11, 0.35)',
-                                                  padding: '0.1rem 0.35rem',
-                                                  borderRadius: '4px',
-                                                  flexShrink: 0
-                                                }}>
-                                                  {language === 'es' ? 'Especial' : 'Special'}
-                                                </span>
-                                              )}
-                                              {isExtra && (
-                                                <span style={{
-                                                  fontSize: '0.68rem',
-                                                  fontWeight: 700,
-                                                  textTransform: 'uppercase',
-                                                  background: 'rgba(148, 163, 184, 0.15)',
-                                                  color: 'var(--text-muted)',
-                                                  border: '1px solid var(--border-color)',
-                                                  padding: '0.1rem 0.35rem',
-                                                  borderRadius: '4px',
-                                                  flexShrink: 0
-                                                }}>
-                                                  {language === 'es' ? 'Extra' : 'Extra'}
-                                                </span>
-                                              )}
-                                              <span style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={ep.name || 'Untitled'}>
-                                                {selectedItem.item_type === 'comic' ? ep.name : (ep.episode_number ? `${ep.episode_number}. ` : '') + (ep.name || 'Untitled')}
-                                              </span>
-                                            </div>
-                                          </div>
-                                          <button
-                                            onClick={() => {
-                                              setHistoryStack(prev => [...prev, selectedItem]);
-                                              onOpenItem && onOpenItem({
-                                                id: dbEp ? dbEp.id : ep.id,
-                                                list_id: selectedItem.tracking_list_id,
-                                                item_type: selectedItem.item_type === 'comic' ? 'comic' : 'episode',
-                                                external_id: selectedItem.item_type === 'comic' ? `cv_issue_${ep.id}` : `tvm-ep-${ep.id}`,
-                                                title: selectedItem.item_type === 'comic' ? `${selectedItem.title} ${ep.name}` : `${selectedItem.title} - ${ep.season_number > 0 ? (ep.season_number < 10 ? 'S0' + ep.season_number : 'S' + ep.season_number) : (language === 'es' ? 'Extras' : 'Extras')}${ep.episode_number != null ? (ep.episode_number < 10 ? 'E0' + ep.episode_number : 'E' + ep.episode_number) : (isSpecial ? ' • ' + (language === 'es' ? 'Especial' : 'Special') : '')} - ${ep.name || 'Untitled'}`,
-                                                image_url: ep.image_url || ep.image?.original || ep.image?.medium || ep.still_path || selectedItem.image_url,
-                                                custom_notes: JSON.stringify({ description: ep.overview || '', release_date: ep.air_date || null }),
-                                                completed_at: dbEp?.completed_at,
-                                                is_completed: isCompleted,
-                                                season_number: ep.season_number,
-                                                episode_number: ep.episode_number,
-                                                rawEpisodeId: ep.id,
-                                                release_date: ep.air_date,
-                                                parent_series: selectedItem
-                                              });
-                                            }}
-                                            className="btn-secondary"
-                                            style={{ padding: '0.2rem 0.4rem', fontSize: '0.74rem', flexShrink: 0 }}
-                                          >
-                                            {language === 'es' ? 'Ver Info' : 'View Info'}
-                                          </button>
-                                        </div>
-                                      );
-                                    })
-                                  )}
+                                    {language === 'es' ? 'Ver Info' : 'View Info'}
+                                  </button>
                                 </div>
-                              )}
+                              );
+                            })}
                           </div>
                         );
-                      });
-                    })()}
+                      })()
+                    ) : (
+                      (() => {
+                        // 1. Calculate air date range for each regular season
+                        const seasonDateRanges: Record<number, { start?: string, end?: string }> = {};
+                        seasons.forEach((s: any) => {
+                          if (s.season_number === 0 || s.is_extras) return;
+                          const sEps = (seasonEpisodes[s.season_number] || []).filter((e: any) => e.air_date);
+                          if (sEps.length > 0) {
+                            const sortedDates = sEps.map((e: any) => e.air_date).sort();
+                            seasonDateRanges[s.season_number] = {
+                              start: sortedDates[0],
+                              end: sortedDates[sortedDates.length - 1]
+                            };
+                          }
+                        });
+
+                        // 2. Extract standalone specials from cached all episodes
+                        const cacheKeyAll = `${selectedItem.external_id}_all_episodes`;
+                        const cachedAll = getCachedSeries(cacheKeyAll);
+                        const standaloneSpecials: any[] = [];
+                        if (cachedAll && Array.isArray(cachedAll)) {
+                          cachedAll.forEach((ep: any) => {
+                            const isSig = ep.is_significant_special || ep.ep_type === 'significant_special';
+                            const isExt = ep.is_extra || ep.ep_type === 'insignificant_special' || ep.season_number === 0;
+                            if (isSig && !isExt) {
+                              const parentSeason = ep.season_number;
+                              const parentRange = parentSeason ? seasonDateRanges[parentSeason] : null;
+                              const epDate = ep.air_date;
+                              const isInsideParentSeason = parentRange && parentRange.start && parentRange.end && epDate && epDate >= parentRange.start && epDate <= parentRange.end;
+                              if (!isInsideParentSeason) {
+                                standaloneSpecials.push(ep);
+                              }
+                            }
+                          });
+                        }
+
+                        standaloneSpecials.sort((a, b) => {
+                          if (a.air_date && b.air_date) return new Date(a.air_date).getTime() - new Date(b.air_date).getTime();
+                          return 0;
+                        });
+
+                        type TimelineItem = 
+                          | { type: 'season'; season: any }
+                          | { type: 'standalone_special'; episode: any };
+
+                        const timeline: TimelineItem[] = [];
+                        const regularSeasons = seasons.filter((s: any) => s.season_number > 0 && !s.is_extras).sort((a: any, b: any) => a.season_number - b.season_number);
+                        let unplacedSpecials = [...standaloneSpecials];
+
+                        regularSeasons.forEach((s: any) => {
+                          const sRange = seasonDateRanges[s.season_number];
+                          const sStart = sRange?.start;
+
+                          if (sStart) {
+                            const before = unplacedSpecials.filter(ep => ep.air_date && ep.air_date < sStart);
+                            before.forEach(ep => timeline.push({ type: 'standalone_special', episode: ep }));
+                            unplacedSpecials = unplacedSpecials.filter(ep => !ep.air_date || ep.air_date >= sStart);
+                          }
+
+                          timeline.push({ type: 'season', season: s });
+                        });
+
+                        unplacedSpecials.forEach(ep => timeline.push({ type: 'standalone_special', episode: ep }));
+
+                        const extrasSeason = seasons.find((s: any) => s.season_number === 0 || s.is_extras);
+                        if (extrasSeason) {
+                          timeline.push({ type: 'season', season: extrasSeason });
+                        }
+
+                        return timeline.map((item) => {
+                          if (item.type === 'standalone_special') {
+                            const ep = item.episode;
+                            const extIdKey = `tvm-ep-${ep.id}`;
+                            const dbEp = (episodes || []).find(x => x.external_id === extIdKey || x.id === ep.id);
+                            const isCompleted = !!globalProgress[extIdKey] || !!dbEp?.is_completed;
+
+                            return (
+                              <div
+                                key={`standalone-${ep.id}`}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  padding: '0.45rem 0.65rem',
+                                  background: 'rgba(245, 158, 11, 0.05)',
+                                  border: '1px dashed rgba(245, 158, 11, 0.35)',
+                                  borderRadius: '6px',
+                                  gap: '1rem'
+                                }}
+                              >
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', minWidth: 0 }}>
+                                  <div style={{ position: 'relative', flexShrink: 0 }}>
+                                    <button
+                                      type="button"
+                                      disabled={!user}
+                                      onClick={() => {
+                                        const currentIsCompleted = !!globalProgress[extIdKey] || !!dbEp?.is_completed;
+                                        if (currentIsCompleted) {
+                                          setEpisodeActionItem({ ep, listId: selectedItem.tracking_list_id });
+                                        } else {
+                                          const missing = getMissingPreviousEpisodesForEp(ep);
+                                          if (missing.length > 0) {
+                                            setPendingPreviousPrompt({
+                                              type: 'episode',
+                                              targetEp: ep,
+                                              missingEpisodes: missing
+                                            });
+                                            return;
+                                          }
+                                          setGlobalProgress(prev => ({ ...prev, [extIdKey]: true }));
+                                          handleToggleEpisode(selectedItem.tracking_list_id, ep);
+                                        }
+                                      }}
+                                      style={{
+                                        background: isCompleted ? `var(--color-${selectedItem.item_type || 'movie'})` : 'transparent',
+                                        border: isCompleted ? 'none' : '1px solid var(--border-color)',
+                                        borderRadius: '50%',
+                                        width: '20px',
+                                        height: '20px',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        cursor: user ? 'pointer' : 'default',
+                                        color: isCompleted ? `var(--color-text-${selectedItem.item_type || 'movie'})` : 'var(--text-muted)',
+                                        opacity: isCompleted ? 1 : 0.6,
+                                        transition: 'all 0.2s ease',
+                                        padding: 0
+                                      }}
+                                    >
+                                      <Check size={12} strokeWidth={3} />
+                                    </button>
+                                  </div>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', minWidth: 0, overflow: 'hidden' }}>
+                                    <span style={{
+                                      fontSize: '0.68rem',
+                                      fontWeight: 700,
+                                      textTransform: 'uppercase',
+                                      background: 'rgba(245, 158, 11, 0.15)',
+                                      color: '#f59e0b',
+                                      border: '1px solid rgba(245, 158, 11, 0.35)',
+                                      padding: '0.1rem 0.35rem',
+                                      borderRadius: '4px',
+                                      flexShrink: 0
+                                    }}>
+                                      {language === 'es' ? 'Especial' : 'Special'}
+                                    </span>
+                                    <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={ep.name || 'Untitled'}>
+                                      {ep.name || 'Untitled'}
+                                    </span>
+                                    {ep.air_date && (
+                                      <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', flexShrink: 0 }}>
+                                        ({formatReleaseDate(ep.air_date)})
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                <button
+                                  onClick={() => {
+                                    setHistoryStack(prev => [...prev, selectedItem]);
+                                    onOpenItem && onOpenItem({
+                                      id: dbEp ? dbEp.id : ep.id,
+                                      list_id: selectedItem.tracking_list_id,
+                                      item_type: 'episode',
+                                      external_id: `tvm-ep-${ep.id}`,
+                                      title: `${selectedItem.title} - ${language === 'es' ? 'Especial' : 'Special'} • ${ep.name || 'Untitled'}`,
+                                      image_url: ep.image_url || ep.image?.original || ep.image?.medium || ep.still_path || selectedItem.image_url,
+                                      custom_notes: JSON.stringify({ description: ep.overview || '', release_date: ep.air_date || null }),
+                                      completed_at: dbEp?.completed_at,
+                                      is_completed: isCompleted,
+                                      season_number: ep.season_number,
+                                      episode_number: ep.episode_number,
+                                      rawEpisodeId: ep.id,
+                                      release_date: ep.air_date,
+                                      parent_series: selectedItem
+                                    });
+                                  }}
+                                  className="btn-secondary"
+                                  style={{ padding: '0.2rem 0.4rem', fontSize: '0.74rem', flexShrink: 0 }}
+                                >
+                                  {language === 'es' ? 'Ver Info' : 'View Info'}
+                                </button>
+                              </div>
+                            );
+                          }
+
+                          const s = item.season;
+                          const isSeasonActive = activeSeason === s.season_number;
+                          const { isSeasonDone, isSeasonPartial } = (() => {
+                            const cacheKeyAll = `${selectedItem.external_id}_all_episodes`;
+                            const cachedAll = getCachedSeries(cacheKeyAll) || [];
+
+                            const isEpWatched = (epId: any, seasonNum?: number, epNum?: number) => {
+                              if (!epId) return false;
+                              const extId = typeof epId === 'string' && epId.startsWith('tvm-ep-') ? epId : `tvm-ep-${epId}`;
+                              if (globalProgress[extId] !== undefined) return !!globalProgress[extId];
+                              const found = (episodes || []).find(x => 
+                                x.external_id === extId || 
+                                x.id === epId ||
+                                (x.season_number === seasonNum && x.episode_number === epNum)
+                              );
+                              return !!found?.is_completed;
+                            };
+
+                            let seasonEps = seasonEpisodes[s.season_number];
+                            if (!seasonEps || seasonEps.length === 0) {
+                              seasonEps = cachedAll.filter((e: any) => e.season_number === s.season_number);
+                            }
+
+                            if (!seasonEps || seasonEps.length === 0) return { isSeasonDone: false, isSeasonPartial: false };
+
+                            const regularEps = seasonEps.filter((e: any) => !e.is_extra && e.ep_type !== 'insignificant_special' && !e.is_significant_special && e.ep_type !== 'significant_special');
+                            const sigSpecials = seasonEps.filter((e: any) => e.is_significant_special || e.ep_type === 'significant_special');
+
+                            const regularAllDone = regularEps.length > 0 && regularEps.every((e: any) => isEpWatched(e.id, e.season_number, e.episode_number));
+                            const sigAllDone = sigSpecials.length === 0 || sigSpecials.every((e: any) => isEpWatched(e.id, e.season_number, e.episode_number));
+
+                            return {
+                              isSeasonDone: regularAllDone && sigAllDone,
+                              isSeasonPartial: regularAllDone && !sigAllDone
+                            };
+                          })();
+
+                          const seasonLabel = s.season_number > 0 
+                            ? `${language === 'es' ? 'Temporada' : 'Season'} ${s.season_number}` 
+                            : (language === 'es' ? 'Extras' : 'Extras');
+
+                          const displayedSeasonEps = (seasonEpisodes[s.season_number] && seasonEpisodes[s.season_number].length > 0)
+                            ? seasonEpisodes[s.season_number]
+                            : ((getCachedSeries(`${selectedItem.external_id}_all_episodes`) || []).filter((e: any) => e.season_number === s.season_number));
+
+                          const countUnitLabel = language === 'es' ? 'capítulos' : 'episodes';
+
+                          return (
+                            <div key={s.id || s.season_number} style={{ border: '1px solid var(--border-color)', borderRadius: '6px', overflow: 'hidden' }}>
+                              <div
+                                role="button"
+                                tabIndex={0}
+                                onClick={() => {
+                                  if (isSeasonActive) {
+                                    setActiveSeason(null);
+                                  } else {
+                                    setActiveSeason(s.season_number);
+                                    handleLoadSeasonEpisodes(selectedItem.external_id, s.season_number);
+                                  }
+                                }}
+                                style={{
+                                  width: '100%',
+                                  padding: '0.75rem 1rem',
+                                  background: 'var(--bg-secondary)',
+                                  border: 'none',
+                                  color: 'var(--text-primary)',
+                                  fontWeight: 600,
+                                  textAlign: 'left',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  justifyContent: 'space-between',
+                                  alignItems: 'center'
+                                }}
+                              >
+                                <span>
+                                  <span style={{ position: 'relative', display: 'inline-flex', verticalAlign: 'middle' }}>
+                                    <span
+                                      role="button"
+                                      tabIndex={0}
+                                      onClick={async (e) => {
+                                        e.stopPropagation();
+                                        if (isSeasonDone || isSeasonPartial) {
+                                          setSeasonActionItem(s);
+                                          return;
+                                        }
+
+                                        const missing = getMissingPreviousEpisodesForSeason(s);
+                                        if (missing.length > 0) {
+                                          setPendingPreviousPrompt({
+                                            type: 'season',
+                                            targetSeason: s,
+                                            missingEpisodes: missing
+                                          });
+                                          return;
+                                        }
+
+                                        let effectiveListId = selectedItem.tracking_list_id;
+                                        if (!effectiveListId) {
+                                          const defaultStatus = 'watching';
+                                          const tracked = await ensureTracked(defaultStatus);
+                                          if (!tracked) return;
+                                          effectiveListId = tracked.tracking_list_id || tracked;
+                                        }
+                                        
+                                        const cacheKeyAll = `${selectedItem.external_id}_all_episodes`;
+                                        let allEps = getCachedSeries(cacheKeyAll) || [];
+                                        let seasonEps = seasonEpisodes[s.season_number];
+                                        if (!seasonEps || seasonEps.length === 0) {
+                                          seasonEps = allEps.filter((e: any) => e.season_number === s.season_number);
+                                        }
+
+                                        const newProgress: Record<string, boolean> = {};
+                                        seasonEps.forEach((e: any) => {
+                                          if (!e.is_extra && e.ep_type !== 'insignificant_special') {
+                                            newProgress[`tvm-ep-${e.id}`] = true;
+                                          }
+                                        });
+                                        setGlobalProgress(prev => ({ ...prev, ...newProgress }));
+
+                                        try {
+                                          await apiClient.post(`/lists/${effectiveListId}/bulk-episodes`, {
+                                            season_number: s.season_number,
+                                            episodes: seasonEps.map((e: any) => ({
+                                              external_id: `tvm-ep-${e.id}`,
+                                              title: `${selectedItem.title} - ${s.season_number > 0 ? (s.season_number < 10 ? 'S0' + s.season_number : 'S' + s.season_number) : (language === 'es' ? 'Extras' : 'Extras')}${e.episode_number != null ? (e.episode_number < 10 ? 'E0' + e.episode_number : 'E' + e.episode_number) : (e.is_significant_special ? ' • ' + (language === 'es' ? 'Especial' : 'Special') : '')} - ${e.name || 'Untitled'}`,
+                                              image_url: e.image_url || e.image?.original || e.image?.medium || e.still_path || selectedItem.image_url,
+                                              custom_notes: JSON.stringify({ description: e.overview || '', release_date: e.air_date || null }),
+                                              season_number: e.season_number,
+                                              episode_number: e.episode_number,
+                                              release_date: e.air_date,
+                                              is_completed: true,
+                                              is_significant_special: e.is_significant_special || e.ep_type === 'significant_special',
+                                              is_extra: e.is_extra || e.ep_type === 'insignificant_special' || e.season_number === 0
+                                            }))
+                                          });
+
+                                          const updatedList = await apiClient.get(`/lists/${effectiveListId}`);
+                                          setEpisodes(updatedList.data.items || []);
+                                          onUpdate && onUpdate();
+                                        } catch (err) {
+                                          console.error("Failed to mark season as completed", err);
+                                        }
+                                      }}
+                                      style={{
+                                        background: isSeasonDone 
+                                          ? `var(--color-${selectedItem.item_type || 'movie'})` 
+                                          : isSeasonPartial 
+                                            ? 'transparent' 
+                                            : 'transparent',
+                                        border: isSeasonDone 
+                                          ? 'none' 
+                                          : isSeasonPartial 
+                                            ? `2px dashed var(--color-${selectedItem.item_type || 'movie'})` 
+                                            : '1px solid var(--border-color)',
+                                        borderRadius: '50%',
+                                        width: '20px',
+                                        height: '20px',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        cursor: user ? 'pointer' : 'default',
+                                        color: isSeasonDone 
+                                          ? `var(--color-text-${selectedItem.item_type || 'movie'})` 
+                                          : isSeasonPartial 
+                                            ? `var(--color-${selectedItem.item_type || 'movie'})` 
+                                            : 'var(--text-muted)',
+                                        marginRight: '0.65rem',
+                                        opacity: isSeasonDone || isSeasonPartial ? 1 : 0.6,
+                                        padding: 0,
+                                        transition: 'all 0.2s ease'
+                                      }}
+                                      title={isSeasonDone ? (language === 'es' ? 'Temporada completa' : 'Completed') : isSeasonPartial ? (language === 'es' ? 'Regular completo (pendientes especiales)' : 'Regular completed') : ''}
+                                    >
+                                      <Check size={12} strokeWidth={3} />
+                                    </span>
+                                  </span>
+                                    {seasonLabel}
+                                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginLeft: '0.5rem', fontWeight: 400 }}>
+                                      ({displayedSeasonEps.length > 0 ? displayedSeasonEps.length : s.episode_count} {countUnitLabel})
+                                    </span>
+                                  </span>
+                                  <span>{isSeasonActive ? '▼' : '►'}</span>
+                                </div>
+
+                                {isSeasonActive && (
+                                  <div style={{ padding: '0.5rem', background: 'var(--bg-primary)', display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '220px', overflowY: 'auto' }}>
+                                    {isLoadingSeasonEpisodes ? (
+                                      <div style={{ padding: '1rem', textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                                        {language === 'es' ? 'Cargando contenido...' : 'Loading...'}
+                                      </div>
+                                    ) : displayedSeasonEps.length === 0 ? (
+                                      <div style={{ padding: '1rem', textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                                        {language === 'es' ? 'No se encontraron capítulos.' : 'No episodes found.'}
+                                      </div>
+                                    ) : (
+                                      displayedSeasonEps.map((ep: any) => {
+                                        const extIdKey = `tvm-ep-${ep.id}`;
+                                        const dbEp = (episodes || []).find(x => x.external_id === extIdKey || x.id === ep.id);
+                                        const isCompleted = !!globalProgress[extIdKey] || !!dbEp?.is_completed;
+                                        const isSpecial = ep.is_significant_special || ep.ep_type === 'significant_special' || (ep.episode_number == null && !ep.is_extra && ep.season_number > 0);
+                                        const isExtra = ep.is_extra || ep.ep_type === 'insignificant_special' || ep.season_number === 0;
+
+                                        return (
+                                          <div
+                                            key={ep.id}
+                                            style={{
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              justifyContent: 'space-between',
+                                              padding: '0.4rem 0.6rem',
+                                              background: 'var(--bg-secondary)',
+                                              border: '1px solid var(--border-color)',
+                                              borderRadius: '4px',
+                                              gap: '1rem'
+                                            }}
+                                          >
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', minWidth: 0 }}>
+                                              <div style={{ position: 'relative', flexShrink: 0 }}>
+                                                <button
+                                                  type="button"
+                                                  disabled={!user}
+                                                  onClick={() => {
+                                                    const currentIsCompleted = !!globalProgress[extIdKey] || !!dbEp?.is_completed;
+                                                    if (currentIsCompleted) {
+                                                      setEpisodeActionItem({ ep, listId: selectedItem.tracking_list_id });
+                                                    } else {
+                                                      const missing = getMissingPreviousEpisodesForEp(ep);
+                                                      if (missing.length > 0) {
+                                                        setPendingPreviousPrompt({
+                                                          type: 'episode',
+                                                          targetEp: ep,
+                                                          missingEpisodes: missing
+                                                        });
+                                                        return;
+                                                      }
+                                                      setGlobalProgress(prev => ({ ...prev, [extIdKey]: true }));
+                                                      handleToggleEpisode(selectedItem.tracking_list_id, ep);
+                                                    }
+                                                  }}
+                                                  style={{
+                                                    background: isCompleted ? `var(--color-${selectedItem.item_type || 'movie'})` : 'transparent',
+                                                    border: isCompleted ? 'none' : '1px solid var(--border-color)',
+                                                    borderRadius: '50%',
+                                                    width: '20px',
+                                                    height: '20px',
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    cursor: user ? 'pointer' : 'default',
+                                                    color: isCompleted ? `var(--color-text-${selectedItem.item_type || 'movie'})` : 'var(--text-muted)',
+                                                    opacity: isCompleted ? 1 : 0.6,
+                                                    transition: 'all 0.2s ease',
+                                                    padding: 0
+                                                  }}
+                                                >
+                                                  <Check size={12} strokeWidth={3} />
+                                                </button>
+                                              </div>
+                                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', minWidth: 0, overflow: 'hidden' }}>
+                                                {isSpecial && (
+                                                  <span style={{
+                                                    fontSize: '0.68rem',
+                                                    fontWeight: 700,
+                                                    textTransform: 'uppercase',
+                                                    background: 'rgba(245, 158, 11, 0.15)',
+                                                    color: '#f59e0b',
+                                                    border: '1px solid rgba(245, 158, 11, 0.35)',
+                                                    padding: '0.1rem 0.35rem',
+                                                    borderRadius: '4px',
+                                                    flexShrink: 0
+                                                  }}>
+                                                    {language === 'es' ? 'Especial' : 'Special'}
+                                                  </span>
+                                                )}
+                                                {isExtra && (
+                                                  <span style={{
+                                                    fontSize: '0.68rem',
+                                                    fontWeight: 700,
+                                                    textTransform: 'uppercase',
+                                                    background: 'rgba(148, 163, 184, 0.15)',
+                                                    color: 'var(--text-muted)',
+                                                    border: '1px solid var(--border-color)',
+                                                    padding: '0.1rem 0.35rem',
+                                                    borderRadius: '4px',
+                                                    flexShrink: 0
+                                                  }}>
+                                                    {language === 'es' ? 'Extra' : 'Extra'}
+                                                  </span>
+                                                )}
+                                                <span style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={ep.name || 'Untitled'}>
+                                                  {(ep.episode_number ? `${ep.episode_number}. ` : '') + (ep.name || 'Untitled')}
+                                                </span>
+                                              </div>
+                                            </div>
+                                            <button
+                                              onClick={() => {
+                                                setHistoryStack(prev => [...prev, selectedItem]);
+                                                onOpenItem && onOpenItem({
+                                                  id: dbEp ? dbEp.id : ep.id,
+                                                  list_id: selectedItem.tracking_list_id,
+                                                  item_type: 'episode',
+                                                  external_id: `tvm-ep-${ep.id}`,
+                                                  title: `${selectedItem.title} - ${ep.season_number > 0 ? (ep.season_number < 10 ? 'S0' + ep.season_number : 'S' + ep.season_number) : (language === 'es' ? 'Extras' : 'Extras')}${ep.episode_number != null ? (ep.episode_number < 10 ? 'E0' + ep.episode_number : 'E' + ep.episode_number) : (isSpecial ? ' • ' + (language === 'es' ? 'Especial' : 'Special') : '')} - ${ep.name || 'Untitled'}`,
+                                                  image_url: ep.image_url || ep.image?.original || ep.image?.medium || ep.still_path || selectedItem.image_url,
+                                                  custom_notes: JSON.stringify({ description: ep.overview || '', release_date: ep.air_date || null }),
+                                                  completed_at: dbEp?.completed_at,
+                                                  is_completed: isCompleted,
+                                                  season_number: ep.season_number,
+                                                  episode_number: ep.episode_number,
+                                                  rawEpisodeId: ep.id,
+                                                  release_date: ep.air_date,
+                                                  parent_series: selectedItem
+                                                });
+                                              }}
+                                              className="btn-secondary"
+                                              style={{ padding: '0.2rem 0.4rem', fontSize: '0.74rem', flexShrink: 0 }}
+                                            >
+                                              {language === 'es' ? 'Ver Info' : 'View Info'}
+                                            </button>
+                                          </div>
+                                        );
+                                      })
+                                    )}
+                                  </div>
+                                )}
+                            </div>
+                          );
+                        });
+                      })()
+                    )}
                   </div>
 
                   {/* PRO Consumption History for Series (Rendered below seasons & episodes) */}

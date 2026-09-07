@@ -352,59 +352,71 @@ class ComicVineService:
         if not raw_id.isdigit():
             return []
 
-        # Query all issues for this volume, sorted by issue_number ascending
-        url = f"https://comicvine.gamespot.com/api/issues/?api_key={api_key}&format=json&filter=volume:{raw_id}&sort=cover_date:asc&limit=100"
-        req = urllib.request.Request(url, headers={"User-Agent": "Pathd/1.0 (contact@pathd.app)"})
+        # Query all issues for this volume with pagination, sorted by issue_number ascending
         try:
-            with urllib.request.urlopen(req, timeout=10) as response:
-                if response.status == 200:
-                    data = json.loads(response.read().decode())
-                    raw_issues = data.get("results", [])
-                    episodes = []
-                    
-                    # Sort numerically by issue_number where possible
-                    def parse_issue_num(num_val):
-                        if num_val is None:
-                            return 999999
-                        try:
-                            return float(str(num_val).strip())
-                        except Exception:
-                            # Extract first number
-                            import re
-                            m = re.search(r'\d+', str(num_val))
-                            return float(m.group(0)) if m else 999999
+            raw_issues = []
+            offset = 0
+            limit = 100
+            while True:
+                url = f"https://comicvine.gamespot.com/api/issues/?api_key={api_key}&format=json&filter=volume:{raw_id}&sort=cover_date:asc&limit={limit}&offset={offset}"
+                req = urllib.request.Request(url, headers={"User-Agent": "Pathd/1.0 (contact@pathd.app)"})
+                with urllib.request.urlopen(req, timeout=12) as response:
+                    if response.status == 200:
+                        data = json.loads(response.read().decode())
+                        results = data.get("results", [])
+                        raw_issues.extend(results)
+                        total_results = data.get("number_of_total_results", 0)
+                        if len(raw_issues) >= total_results or not results or len(raw_issues) >= 1500:
+                            break
+                        offset += len(results)
+                    else:
+                        break
 
-                    sorted_issues = sorted(raw_issues, key=lambda x: parse_issue_num(x.get("issue_number")))
+            episodes = []
+            
+            # Sort numerically by issue_number where possible
+            def parse_issue_num(num_val):
+                if num_val is None:
+                    return 999999
+                try:
+                    return float(str(num_val).strip())
+                except Exception:
+                    # Extract first number
+                    import re
+                    m = re.search(r'\d+', str(num_val))
+                    return float(m.group(0)) if m else 999999
 
-                    for idx, itm in enumerate(sorted_issues, start=1):
-                        i_id = str(itm.get("id"))
-                        issue_num_str = itm.get("issue_number") or str(idx)
-                        i_name = itm.get("name")
-                        title_str = f"#{issue_num_str}"
-                        if i_name:
-                            title_str += f" - {i_name}"
-                        
-                        img_data = itm.get("image", {})
-                        img_url = img_data.get("super_url") or img_data.get("medium_url") or img_data.get("thumb_url")
-                        
-                        desc = itm.get("description") or itm.get("deck") or ""
-                        import re
-                        desc = re.sub('<[^<]+?>', '', desc)
+            sorted_issues = sorted(raw_issues, key=lambda x: parse_issue_num(x.get("issue_number")))
 
-                        episodes.append({
-                            "id": i_id,
-                            "name": title_str,
-                            "episode_number": int(parse_issue_num(issue_num_str)) if parse_issue_num(issue_num_str) < 999999 else idx,
-                            "season_number": 1,
-                            "still_path": img_url,
-                            "image_url": img_url,
-                            "overview": desc,
-                            "air_date": itm.get("cover_date") or itm.get("store_date")
-                        })
-                    return episodes
+            for idx, itm in enumerate(sorted_issues, start=1):
+                i_id = str(itm.get("id"))
+                issue_num_str = itm.get("issue_number") or str(idx)
+                i_name = itm.get("name")
+                title_str = f"#{issue_num_str}"
+                if i_name:
+                    title_str += f" - {i_name}"
+                
+                img_data = itm.get("image", {})
+                img_url = img_data.get("super_url") or img_data.get("medium_url") or img_data.get("thumb_url")
+                
+                desc = itm.get("description") or itm.get("deck") or ""
+                import re
+                desc = re.sub('<[^<]+?>', '', desc)
+
+                episodes.append({
+                    "id": i_id,
+                    "name": title_str,
+                    "episode_number": int(parse_issue_num(issue_num_str)) if parse_issue_num(issue_num_str) < 999999 else idx,
+                    "season_number": 1,
+                    "still_path": img_url,
+                    "image_url": img_url,
+                    "overview": desc,
+                    "air_date": itm.get("cover_date") or itm.get("store_date")
+                })
+            return episodes
         except Exception as e:
             print(f"Comic Vine get_comic_volume_issues error: {e}")
-        return []
+            return []
 
     @staticmethod
     def get_comic_issue_detail(issue_id: str) -> dict:
