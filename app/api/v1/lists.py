@@ -1927,10 +1927,11 @@ def bulk_toggle_season(
         
         now_dt = datetime.now(timezone.utc)
         if req.completed:
-            # Mark completed and add consumption history record
+            was_already_completed = progress.is_completed if progress else False
             if progress:
                 progress.is_completed = True
-                progress.completed_at = now_dt
+                if not was_already_completed or req.mark_again:
+                    progress.completed_at = now_dt
             else:
                 progress = ItemProgress(
                     user_id=current_user.id,
@@ -1943,14 +1944,16 @@ def bulk_toggle_season(
                 )
                 db.add(progress)
             
-            ch = ConsumptionHistory(
-                user_id=current_user.id,
-                item_type=item.item_type.value if hasattr(item.item_type, 'value') else item.item_type,
-                external_id=ext_id,
-                list_item_id=item.id,
-                consumed_at=now_dt
-            )
-            db.add(ch)
+            # Record ConsumptionHistory only if not previously completed or if explicitly doing mark_again
+            if not was_already_completed or req.mark_again:
+                ch = ConsumptionHistory(
+                    user_id=current_user.id,
+                    item_type=item.item_type.value if hasattr(item.item_type, 'value') else item.item_type,
+                    external_id=ext_id,
+                    list_item_id=item.id,
+                    consumed_at=now_dt
+                )
+                db.add(ch)
         else:
             # Unwatch: remove latest consumption history entry
             history = db.query(ConsumptionHistory).filter(
@@ -2128,9 +2131,11 @@ def bulk_toggle_all_seasons(
         
         now_dt = datetime.now(timezone.utc)
         if req.completed:
+            was_already_completed = progress.is_completed if progress else False
             if progress:
                 progress.is_completed = True
-                progress.completed_at = now_dt
+                if not was_already_completed or req.mark_again:
+                    progress.completed_at = now_dt
             else:
                 progress = ItemProgress(
                     user_id=current_user.id,
@@ -2143,14 +2148,16 @@ def bulk_toggle_all_seasons(
                 )
                 db.add(progress)
 
-            ch = ConsumptionHistory(
-                user_id=current_user.id,
-                item_type=item.item_type.value if hasattr(item.item_type, 'value') else item.item_type,
-                external_id=ext_id,
-                list_item_id=item.id,
-                consumed_at=now_dt
-            )
-            db.add(ch)
+            # Record ConsumptionHistory only if not previously completed or if explicitly doing mark_again
+            if not was_already_completed or req.mark_again:
+                ch = ConsumptionHistory(
+                    user_id=current_user.id,
+                    item_type=item.item_type.value if hasattr(item.item_type, 'value') else item.item_type,
+                    external_id=ext_id,
+                    list_item_id=item.id,
+                    consumed_at=now_dt
+                )
+                db.add(ch)
         else:
             # Unwatch: remove latest consumption history entry
             history = db.query(ConsumptionHistory).filter(

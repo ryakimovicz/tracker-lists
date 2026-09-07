@@ -203,7 +203,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   
   const [showReconsumedModal, setShowReconsumedModal] = useState(false);
   const [showSeriesScopeModal, setShowSeriesScopeModal] = useState(false);
-  const [pendingSeriesScopeAction, setPendingSeriesScopeAction] = useState<'mark_all' | 'remove' | 'toggle'>('toggle');
+  const [pendingSeriesScopeAction, setPendingSeriesScopeAction] = useState<'mark_all' | 'mark_again' | 'remove' | 'toggle'>('toggle');
   const [showHundredPercentDecisionModal, setShowHundredPercentDecisionModal] = useState(false);
   const [showStatusChangeModal, setShowStatusChangeModal] = useState(false);
   const [pendingStatusChange, setPendingStatusChange] = useState<string | null>(null);
@@ -368,7 +368,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     }
   };
 
-  const handleToggleAllEpisodes = async (action?: 'mark_all' | 'remove', scope: 'seasons_only' | 'seasons_and_specials' | 'all' = 'seasons_and_specials') => {
+  const handleToggleAllEpisodes = async (action?: 'mark_all' | 'mark_again' | 'remove' | 'toggle', scope: 'seasons_only' | 'seasons_and_specials' | 'all' = 'seasons_and_specials') => {
     if (!selectedItem) return;
     let effectiveListId = selectedItem.tracking_list_id;
     if (!effectiveListId) {
@@ -378,7 +378,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     }
 
     const isAllCompleted = selectedItem.status === 'completed';
-    const targetCompleted = action === 'mark_all' ? true : action === 'remove' ? false : !isAllCompleted;
+    const isMarkAgain = action === 'mark_again';
+    const targetCompleted = (action === 'mark_all' || isMarkAgain) ? true : action === 'remove' ? false : !isAllCompleted;
 
     const cacheKeyAll = `${selectedItem.external_id}_all_episodes`;
     let cachedAll = getCachedSeries(cacheKeyAll);
@@ -405,7 +406,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     try {
       const res = await apiClient.post(`/lists/${effectiveListId}/bulk-toggle-all-seasons`, {
         episodes: targetEps.length > 0 ? targetEps : (cachedAll || null),
-        completed: targetCompleted
+        completed: targetCompleted,
+        mark_again: isMarkAgain
       });
 
       const listRes = await apiClient.get(`/lists/${effectiveListId}`);
@@ -4339,7 +4341,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         onClick={async () => {
                           setShowReconsumedModal(false);
                           if (selectedItem.item_type === 'series' || selectedItem.item_type === 'anime') {
-                            setPendingSeriesScopeAction('mark_all');
+                            setPendingSeriesScopeAction('mark_again');
                             setShowSeriesScopeModal(true);
                           } else {
                             await handleMarkConsumedAgain();
@@ -4517,6 +4519,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)' }}>
                           {isRemove
                             ? (language === 'es' ? '¿Qué deseas desmarcar?' : 'What do you want to unmark?')
+                            : pendingSeriesScopeAction === 'mark_again'
+                            ? (language === 'es' ? '¿Qué deseas volver a marcar como visto?' : 'What do you want to mark as watched again?')
                             : (language === 'es' ? '¿Qué deseas marcar como visto?' : 'What do you want to mark as watched?')}
                         </h3>
                         <button
@@ -4535,7 +4539,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                             type="button"
                             onClick={async () => {
                               setShowSeriesScopeModal(false);
-                              await handleToggleAllEpisodes(isRemove ? 'remove' : 'mark_all', 'seasons_only');
+                              await handleToggleAllEpisodes(pendingSeriesScopeAction, 'seasons_only');
                             }}
                             style={{
                               display: 'flex',
@@ -4569,7 +4573,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                             type="button"
                             onClick={async () => {
                               setShowSeriesScopeModal(false);
-                              await handleToggleAllEpisodes(isRemove ? 'remove' : 'mark_all', 'seasons_and_specials');
+                              await handleToggleAllEpisodes(pendingSeriesScopeAction, 'seasons_and_specials');
                             }}
                             style={{
                               display: 'flex',
@@ -4603,7 +4607,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                             type="button"
                             onClick={async () => {
                               setShowSeriesScopeModal(false);
-                              await handleToggleAllEpisodes(isRemove ? 'remove' : 'mark_all', 'all');
+                              await handleToggleAllEpisodes(pendingSeriesScopeAction, 'all');
                             }}
                             style={{
                               display: 'flex',
@@ -5423,7 +5427,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                             await apiClient.post(`/lists/${effectiveListId}/bulk-toggle-season`, {
                               season_number: s.season_number,
                               episodes: seriesEps || null,
-                              completed: true
+                              completed: true,
+                              mark_again: true
                             });
                             const listRes = await apiClient.get(`/lists/${effectiveListId}`);
                             const updatedList = listRes.data.items || [];
