@@ -2977,28 +2977,59 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         </div>
                       ) : (selectedItem?.item_type === 'series' || selectedItem?.item_type === 'anime') ? (() => {
                         const { isAllWatched, areRegularSeasonsWatched } = (() => {
+                          const cacheKeyAll = `${selectedItem.external_id}_all_episodes`;
+                          const cachedAll = getCachedSeries(cacheKeyAll) || [];
+
+                          const isEpWatched = (epId: any, seasonNum?: number, epNum?: number) => {
+                            if (!epId) return false;
+                            const extId = `tvm-ep-${epId}`;
+                            if (globalProgress[extId] !== undefined) return !!globalProgress[extId];
+                            const found = (episodes || []).find(x => 
+                              x.external_id === extId || 
+                              x.id === epId ||
+                              (seasonNum !== undefined && epNum !== undefined && x.season_number === seasonNum && x.episode_number === epNum)
+                            );
+                            if (found) {
+                              return globalProgress[found.external_id] !== undefined ? !!globalProgress[found.external_id] : !!found.is_completed;
+                            }
+                            return false;
+                          };
+
                           const canonicalSeasons = seasons.filter((s: any) => s.season_number > 0 && !s.is_extras);
                           if (canonicalSeasons.length === 0) {
                             const isDone = selectedItem?.status === 'completed';
                             return { isAllWatched: isDone, areRegularSeasonsWatched: isDone };
                           }
+
                           const seasonsAllDone = canonicalSeasons.every((s: any) => {
-                            const listSeps = (episodes || []).filter(x => x.section === `Season ${s.season_number}`);
-                            const seriesEps = seasonEpisodes[s.season_number] || [];
-                            if (!Array.isArray(seriesEps) || seriesEps.length === 0) {
+                            let sEps = seasonEpisodes[s.season_number];
+                            if (!Array.isArray(sEps) || sEps.length === 0) {
+                              sEps = cachedAll.filter((ep: any) => 
+                                ep.season_number === s.season_number && 
+                                !ep.is_extra && 
+                                ep.ep_type !== 'insignificant_special' && 
+                                ep.ep_type !== 'significant_special' && 
+                                !ep.is_significant_special
+                              );
+                            }
+
+                            if (!Array.isArray(sEps) || sEps.length === 0) {
+                              const listSeps = (episodes || []).filter(x => x.section === `Season ${s.season_number}`);
                               return listSeps.length > 0 && listSeps.every(x => globalProgress[x.external_id] ?? x.is_completed);
                             }
-                            return seriesEps.every((te: any) => globalProgress[`tvm-ep-${te.id}`] || (episodes || []).some(x => x.external_id === `tvm-ep-${te.id}` && (globalProgress[x.external_id] ?? x.is_completed)));
+
+                            return sEps.every((te: any) => isEpWatched(te.id, s.season_number, te.episode_number ?? te.number));
                           });
+
                           if (!seasonsAllDone) return { isAllWatched: false, areRegularSeasonsWatched: false };
 
                           // Also check standalone significant specials if any exist in cached episodes
-                          const cacheKeyAll = `${selectedItem.external_id}_all_episodes`;
-                          const cachedAll = getCachedSeries(cacheKeyAll);
-                          if (cachedAll && Array.isArray(cachedAll)) {
+                          if (cachedAll && Array.isArray(cachedAll) && cachedAll.length > 0) {
                             const significantSpecials = cachedAll.filter((e: any) => (e.is_significant_special || e.ep_type === 'significant_special') && !e.is_extra);
-                            const specialsAllDone = significantSpecials.every((te: any) => globalProgress[`tvm-ep-${te.id}`] || (episodes || []).some(x => x.external_id === `tvm-ep-${te.id}` && (globalProgress[x.external_id] ?? x.is_completed)));
-                            if (!specialsAllDone) return { isAllWatched: false, areRegularSeasonsWatched: true };
+                            if (significantSpecials.length > 0) {
+                              const specialsAllDone = significantSpecials.every((te: any) => isEpWatched(te.id, te.season_number, te.episode_number ?? te.number));
+                              if (!specialsAllDone) return { isAllWatched: false, areRegularSeasonsWatched: true };
+                            }
                           }
 
                           return { isAllWatched: true, areRegularSeasonsWatched: true };
@@ -4469,7 +4500,18 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                 const hasExtras = cachedAll.some((ep: any) => ep.is_extra || ep.ep_type === 'insignificant_special' || ep.season_number === 0);
 
                 const isEpWatched = (ep: any) => {
-                  return !!globalProgress[`tvm-ep-${ep.id}`] || (episodes || []).some(x => x.external_id === `tvm-ep-${ep.id}` && (globalProgress[x.external_id] ?? x.is_completed));
+                  if (!ep || !ep.id) return false;
+                  const extId = `tvm-ep-${ep.id}`;
+                  if (globalProgress[extId] !== undefined) return !!globalProgress[extId];
+                  const found = (episodes || []).find(x => 
+                    x.external_id === extId || 
+                    x.id === ep.id ||
+                    (ep.season_number !== undefined && ep.episode_number !== undefined && x.season_number === ep.season_number && x.episode_number === ep.episode_number)
+                  );
+                  if (found) {
+                    return globalProgress[found.external_id] !== undefined ? !!globalProgress[found.external_id] : !!found.is_completed;
+                  }
+                  return false;
                 };
 
                 const watchedSeasonsCount = cachedAll.filter((ep: any) => !ep.is_significant_special && !ep.is_extra && ep.season_number > 0 && ep.ep_type !== 'significant_special' && ep.ep_type !== 'insignificant_special' && isEpWatched(ep)).length;
