@@ -1753,13 +1753,15 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     
     try {
       const url = action ? `/lists/${effectiveListId}/toggle-series-episode?action=${action}` : `/lists/${effectiveListId}/toggle-series-episode`;
+      const isComic = selectedItem?.item_type === 'comic' || String(selectedItem?.external_id || '').startsWith('cv_vol_');
+      const epIdToSend = isComic ? (String(ep.id).startsWith('cv_') ? ep.id : `cv_issue_${ep.id}`) : ep.id;
       const res = await apiClient.post(url, {
-        episode_id: ep.id,
-        title: ep.title || `${selectedItem.title} - ${ep.name || 'Untitled Episode'}`,
+        episode_id: epIdToSend,
+        title: ep.title || (isComic ? `${selectedItem.title} ${ep.name || `#${ep.issue_number || 1}`}` : `${selectedItem.title} - ${ep.name || 'Untitled Episode'}`),
         image_url: ep.image_url || ep.image?.original || ep.image?.medium || ep.still_path || selectedItem.image_url,
         overview: ep.custom_notes || ep.overview,
         season_number: ep.season_number || 1,
-        episode_number: ep.episode_number
+        episode_number: ep.episode_number ?? ep.issue_number
       });
       
       const listRes = await apiClient.get(`/lists/${effectiveListId}`);

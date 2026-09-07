@@ -1605,11 +1605,11 @@ def toggle_series_episode(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="List not found")
     
     has_access = (reading_list.creator_id == current_user.id or getattr(current_user, 'is_admin', False))
+    tracking_lib_item = db.query(UserLibraryItem).filter(
+        UserLibraryItem.user_id == current_user.id,
+        UserLibraryItem.tracking_list_id == list_id
+    ).first()
     if not has_access:
-        tracking_lib_item = db.query(UserLibraryItem).filter(
-            UserLibraryItem.user_id == current_user.id,
-            UserLibraryItem.tracking_list_id == list_id
-        ).first()
         if tracking_lib_item:
             has_access = True
             if reading_list.creator_id != current_user.id:
@@ -1619,9 +1619,17 @@ def toggle_series_episode(
     if not has_access:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You do not have access to this list")
 
-        
     raw_ep_str = str(ep_req.episode_id)
-    if raw_ep_str.startswith("cv_") or raw_ep_str.startswith("cv-"):
+    is_comic = (
+        (reading_list and reading_list.item_type == ItemTypeEnum.COMIC) or
+        (tracking_lib_item and tracking_lib_item.item_type == "comic") or
+        raw_ep_str.startswith("cv_") or
+        raw_ep_str.startswith("cv-") or
+        raw_ep_str.startswith("4000-") or
+        raw_ep_str.startswith("4050-")
+    )
+
+    if is_comic:
         ext_id = raw_ep_str if raw_ep_str.startswith("cv_issue_") else f"cv_issue_{raw_ep_str.replace('cv_vol_', '').replace('cv_', '')}"
         media_item_type = ItemTypeEnum.COMIC
         sec_name = "Volumen"

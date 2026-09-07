@@ -110,7 +110,7 @@ class ToggleSeriesEpisodeRequest(BaseModel):
     image_url: Optional[str] = None
     overview: Optional[str] = None
     season_number: int
-    episode_number: Optional[int] = None
+    episode_number: Optional[Union[int, str]] = None
 
 class BulkToggleSeasonRequest(BaseModel):
     season_number: int
