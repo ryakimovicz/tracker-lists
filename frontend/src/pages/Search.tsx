@@ -11,7 +11,7 @@ import { ReplaceFavoriteModal } from '../components/ReplaceFavoriteModal';
 import { ProModal } from '../components/ProModal';
 import { getOrderedCategories, sortFilterTabs } from '../utils/categoryOrder';
 
-import { Search as SearchIcon, AlertCircle, CheckCircle, Plus, X, Heart, Star, Users, BookOpen, Package, Puzzle, Sparkles, Gamepad2 } from 'lucide-react';
+import { Search as SearchIcon, AlertCircle, CheckCircle, Plus, X, Heart, Star, Users, BookOpen, Package, Puzzle, Sparkles, Gamepad2, Trash2 } from 'lucide-react';
 
 interface SearchResultItem {
   external_id: string;
@@ -490,14 +490,18 @@ export const Search: React.FC = () => {
     }
   };
 
-  const handleConfirmRemoveFromShelf = async () => {
+  const handleConfirmRemoveFromShelf = async (deleteHistory = false) => {
     if (!itemToRemoveFromShelf || !itemToRemoveFromShelf.id) return;
     try {
-      await apiClient.delete(`/library/${itemToRemoveFromShelf.id}`);
-      setSuccessMsg(language === 'es' ? 'Elemento eliminado de tu estantería.' : 'Item removed from your shelf.');
+      const url = deleteHistory ? `/library/${itemToRemoveFromShelf.id}?delete_history=true` : `/library/${itemToRemoveFromShelf.id}`;
+      await apiClient.delete(url);
+      setSuccessMsg(deleteHistory
+        ? (language === 'es' ? 'Elemento y su historial eliminados por completo.' : 'Item and all history deleted completely.')
+        : (language === 'es' ? 'Elemento eliminado de tu estantería (historial conservado).' : 'Item removed from your shelf (history preserved).')
+      );
       setItemToRemoveFromShelf(null);
       await loadShelfItems();
-      setTimeout(() => setSuccessMsg(''), 3000);
+      setTimeout(() => setSuccessMsg(''), 3500);
     } catch (err: any) {
       setErrorMsg(err.response?.data?.detail || 'Failed to remove item.');
       setTimeout(() => setErrorMsg(''), 4000);
@@ -1029,28 +1033,89 @@ export const Search: React.FC = () => {
 
             <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
               {language === 'es'
-                ? `¿Estás seguro de que deseas quitar "${itemToRemoveFromShelf.title}" de tu estantería? Se perderá el seguimiento de su progreso.`
-                : `Are you sure you want to remove "${itemToRemoveFromShelf.title}" from your shelf? Progress tracking will be removed.`}
+                ? 'Elige cómo deseas remover esta obra de tu biblioteca:'
+                : 'Choose how you would like to remove this item from your library:'
+              }
             </p>
 
-            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
               <button
                 type="button"
-                className="btn-secondary"
-                onClick={() => setItemToRemoveFromShelf(null)}
-                style={{ fontSize: '0.85rem', padding: '0.4rem 1rem' }}
+                onClick={() => handleConfirmRemoveFromShelf(false)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.65rem',
+                  padding: '0.75rem 1rem',
+                  borderRadius: '8px',
+                  background: 'var(--bg-tertiary)',
+                  border: '1px solid var(--border-color)',
+                  color: 'var(--text-primary)',
+                  fontWeight: 600,
+                  fontSize: '0.88rem',
+                  cursor: 'pointer',
+                  textAlign: 'left'
+                }}
               >
-                {language === 'es' ? 'Cancelar' : 'Cancel'}
+                <Trash2 size={16} style={{ flexShrink: 0, color: 'var(--text-secondary)' }} />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                  <span>{language === 'es' ? 'Quitar conservando historial' : 'Remove keeping history'}</span>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 400 }}>
+                    {language === 'es'
+                      ? 'Se quita de tu biblioteca pero se mantienen tus visualizaciones y estadísticas'
+                      : 'Removes from shelf but preserves your completions and statistics'
+                    }
+                  </span>
+                </div>
               </button>
+
               <button
                 type="button"
-                className="btn-primary"
-                onClick={handleConfirmRemoveFromShelf}
-                style={{ fontSize: '0.85rem', padding: '0.4rem 1rem', background: '#ef4444', borderColor: '#ef4444', color: '#ffffff' }}
+                onClick={() => handleConfirmRemoveFromShelf(true)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.65rem',
+                  padding: '0.75rem 1rem',
+                  borderRadius: '8px',
+                  background: 'rgba(239, 68, 68, 0.08)',
+                  border: '1px solid rgba(239, 68, 68, 0.25)',
+                  color: '#ef4444',
+                  fontWeight: 600,
+                  fontSize: '0.88rem',
+                  cursor: 'pointer',
+                  textAlign: 'left'
+                }}
               >
-                {language === 'es' ? 'Quitar' : 'Remove'}
+                <Trash2 size={16} style={{ flexShrink: 0 }} />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                  <span>{language === 'es' ? 'Quitar eliminando todo' : 'Remove deleting everything'}</span>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 400 }}>
+                    {language === 'es'
+                      ? 'Borra todo el progreso, historial de visualizaciones y calificaciones'
+                      : 'Wipes all progress, completion history, and reviews'
+                    }
+                  </span>
+                </div>
               </button>
             </div>
+
+            <button
+              type="button"
+              onClick={() => setItemToRemoveFromShelf(null)}
+              style={{
+                padding: '0.55rem',
+                borderRadius: '6px',
+                background: 'transparent',
+                border: 'none',
+                color: 'var(--text-secondary)',
+                fontSize: '0.85rem',
+                cursor: 'pointer',
+                fontWeight: 500
+              }}
+            >
+              {language === 'es' ? 'Cancelar' : 'Cancel'}
+            </button>
           </div>
         </div>
       )}
