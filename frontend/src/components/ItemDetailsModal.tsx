@@ -413,12 +413,24 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       setEpisodes(updatedList);
 
       const extIds = updatedList.map((x: any) => x.external_id).filter(Boolean);
+      let latestProg: Record<string, boolean> = {};
       if (extIds.length > 0) {
         const progRes = await apiClient.post('/users/me/progress/bulk-check', { external_ids: extIds });
-        setGlobalProgress(prev => ({ ...prev, ...progRes.data }));
+        latestProg = progRes.data || {};
+        setGlobalProgress(prev => ({ ...prev, ...latestProg }));
       }
 
-      const nextStatus = res.data?.status || (targetCompleted ? 'completed' : 'plan_to_watch');
+      // Compute next status accurately:
+      let nextStatus = res.data?.status;
+      if (!nextStatus) {
+        if (targetCompleted) {
+          nextStatus = 'completed';
+        } else {
+          const hasAnyRemainingWatched = updatedList.some((it: any) => latestProg[it.external_id] || it.is_completed);
+          nextStatus = hasAnyRemainingWatched ? 'watching' : 'plan_to_watch';
+        }
+      }
+
       setSelectedItem((prev: any) => prev ? {
         ...prev,
         status: nextStatus,
@@ -2963,15 +2975,17 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         </div>
                       ) : (selectedItem?.item_type === 'series' || selectedItem?.item_type === 'anime') ? (() => {
                         const isAllWatched = (() => {
-                          if (selectedItem?.status === 'completed') return true;
                           const canonicalSeasons = seasons.filter((s: any) => s.season_number > 0 && !s.is_extras);
-                          if (canonicalSeasons.length === 0) return false;
+                          if (canonicalSeasons.length === 0) {
+                            return selectedItem?.status === 'completed';
+                          }
                           const seasonsAllDone = canonicalSeasons.every((s: any) => {
                             const listSeps = (episodes || []).filter(x => x.section === `Season ${s.season_number}`);
                             const seriesEps = seasonEpisodes[s.season_number] || [];
-                            if (!Array.isArray(seriesEps)) return false;
-                            if (seriesEps.length === 0) return listSeps.length > 0 && listSeps.every(x => x.is_completed);
-                            return seriesEps.every((te: any) => globalProgress[`tvm-ep-${te.id}`] || (episodes || []).some(x => x.external_id === `tvm-ep-${te.id}` && x.is_completed));
+                            if (!Array.isArray(seriesEps) || seriesEps.length === 0) {
+                              return listSeps.length > 0 && listSeps.every(x => globalProgress[x.external_id] ?? x.is_completed);
+                            }
+                            return seriesEps.every((te: any) => globalProgress[`tvm-ep-${te.id}`] || (episodes || []).some(x => x.external_id === `tvm-ep-${te.id}` && (globalProgress[x.external_id] ?? x.is_completed)));
                           });
                           if (!seasonsAllDone) return false;
 
@@ -2980,7 +2994,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                           const cachedAll = getCachedSeries(cacheKeyAll);
                           if (cachedAll && Array.isArray(cachedAll)) {
                             const significantSpecials = cachedAll.filter((e: any) => (e.is_significant_special || e.ep_type === 'significant_special') && !e.is_extra);
-                            const specialsAllDone = significantSpecials.every((te: any) => globalProgress[`tvm-ep-${te.id}`] || (episodes || []).some(x => x.external_id === `tvm-ep-${te.id}` && x.is_completed));
+                            const specialsAllDone = significantSpecials.every((te: any) => globalProgress[`tvm-ep-${te.id}`] || (episodes || []).some(x => x.external_id === `tvm-ep-${te.id}` && (globalProgress[x.external_id] ?? x.is_completed)));
                             if (!specialsAllDone) return false;
                           }
 
@@ -4444,178 +4458,229 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
               )}
 
               {/* Floating Modal 1.2: Series Scope Selection Dialog (Seasons / Specials / Extras) */}
-              {showSeriesScopeModal && (
-                <div
-                  style={{
-                    position: 'fixed',
-                    inset: 0,
-                    zIndex: 9999,
-                    background: 'rgba(0, 0, 0, 0.65)',
-                    backdropFilter: 'blur(4px)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    padding: '1rem'
-                  }}
-                  onClick={() => setShowSeriesScopeModal(false)}
-                >
+              {showSeriesScopeModal && (() => {
+                const cacheKeyAll = `${selectedItem?.external_id}_all_episodes`;
+                const cachedAll = getCachedSeries(cacheKeyAll) || [];
+                
+                const hasSpecials = cachedAll.some((ep: any) => (ep.is_significant_special || ep.ep_type === 'significant_special') && !ep.is_extra);
+                const hasExtras = cachedAll.some((ep: any) => ep.is_extra || ep.ep_type === 'insignificant_special' || ep.season_number === 0);
+
+                const isEpWatched = (ep: any) => {
+                  return !!globalProgress[`tvm-ep-${ep.id}`] || (episodes || []).some(x => x.external_id === `tvm-ep-${ep.id}` && (globalProgress[x.external_id] ?? x.is_completed));
+                };
+
+                const watchedSeasonsCount = cachedAll.filter((ep: any) => !ep.is_significant_special && !ep.is_extra && ep.season_number > 0 && ep.ep_type !== 'significant_special' && ep.ep_type !== 'insignificant_special' && isEpWatched(ep)).length;
+                const watchedSpecialsCount = cachedAll.filter((ep: any) => (ep.is_significant_special || ep.ep_type === 'significant_special') && !ep.is_extra && isEpWatched(ep)).length;
+                const watchedExtrasCount = cachedAll.filter((ep: any) => (ep.is_extra || ep.ep_type === 'insignificant_special' || ep.season_number === 0) && isEpWatched(ep)).length;
+
+                const isRemove = pendingSeriesScopeAction === 'remove';
+
+                // Determine which options to show
+                const showSeasonsOption = !isRemove ? true : (watchedSeasonsCount > 0);
+                const showSpecialsOption = !isRemove ? hasSpecials : (hasSpecials && (watchedSpecialsCount > 0 || watchedSeasonsCount > 0));
+                const showAllOption = !isRemove ? (hasSpecials && hasExtras) : (hasExtras && watchedExtrasCount > 0);
+                const showExtrasOnlyOption = isRemove && hasExtras && watchedExtrasCount > 0 && watchedSeasonsCount === 0 && watchedSpecialsCount === 0;
+
+                return (
                   <div
-                    className="glass-card"
                     style={{
-                      width: '100%',
-                      maxWidth: '430px',
-                      background: 'var(--bg-secondary)',
-                      borderRadius: '12px',
-                      padding: '1.25rem',
+                      position: 'fixed',
+                      inset: 0,
+                      zIndex: 9999,
+                      background: 'rgba(0, 0, 0, 0.65)',
+                      backdropFilter: 'blur(4px)',
                       display: 'flex',
-                      flexDirection: 'column',
-                      gap: '1rem',
-                      boxShadow: '0 12px 30px rgba(0,0,0,0.4)',
-                      border: '1px solid var(--border-color)'
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: '1rem'
                     }}
-                    onClick={(e) => e.stopPropagation()}
+                    onClick={() => setShowSeriesScopeModal(false)}
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                        {pendingSeriesScopeAction === 'remove'
-                          ? (language === 'es' ? '¿Qué deseas desmarcar?' : 'What do you want to unmark?')
-                          : (language === 'es' ? '¿Qué deseas marcar como visto?' : 'What do you want to mark as watched?')}
-                      </h3>
+                    <div
+                      className="glass-card"
+                      style={{
+                        width: '100%',
+                        maxWidth: '430px',
+                        background: 'var(--bg-secondary)',
+                        borderRadius: '12px',
+                        padding: '1.25rem',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '1rem',
+                        boxShadow: '0 12px 30px rgba(0,0,0,0.4)',
+                        border: '1px solid var(--border-color)'
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                          {isRemove
+                            ? (language === 'es' ? '¿Qué deseas desmarcar?' : 'What do you want to unmark?')
+                            : (language === 'es' ? '¿Qué deseas marcar como visto?' : 'What do you want to mark as watched?')}
+                        </h3>
+                        <button
+                          type="button"
+                          onClick={() => setShowSeriesScopeModal(false)}
+                          style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '0.2rem' }}
+                        >
+                          <X size={18} />
+                        </button>
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                        {/* Option 1: Solo temporadas */}
+                        {showSeasonsOption && (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              setShowSeriesScopeModal(false);
+                              await handleToggleAllEpisodes(isRemove ? 'remove' : 'mark_all', 'seasons_only');
+                            }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.65rem',
+                              padding: '0.75rem 1rem',
+                              borderRadius: '8px',
+                              background: 'var(--bg-tertiary)',
+                              border: '1px solid var(--border-color)',
+                              color: 'var(--text-primary)',
+                              fontWeight: 600,
+                              fontSize: '0.9rem',
+                              cursor: 'pointer',
+                              textAlign: 'left'
+                            }}
+                          >
+                            {isRemove ? (
+                              <Trash2 size={16} style={{ flexShrink: 0, color: '#ef4444' }} />
+                            ) : (
+                              <Check size={16} strokeWidth={3} style={{ flexShrink: 0, color: 'var(--accent-primary)' }} />
+                            )}
+                            <span>
+                              {language === 'es' ? 'Solo temporadas' : 'Seasons only'}
+                            </span>
+                          </button>
+                        )}
+
+                        {/* Option 2: Temporadas + Especiales */}
+                        {showSpecialsOption && (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              setShowSeriesScopeModal(false);
+                              await handleToggleAllEpisodes(isRemove ? 'remove' : 'mark_all', 'seasons_and_specials');
+                            }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.65rem',
+                              padding: '0.75rem 1rem',
+                              borderRadius: '8px',
+                              background: 'var(--bg-tertiary)',
+                              border: '1px solid var(--border-color)',
+                              color: 'var(--text-primary)',
+                              fontWeight: 600,
+                              fontSize: '0.9rem',
+                              cursor: 'pointer',
+                              textAlign: 'left'
+                            }}
+                          >
+                            {isRemove ? (
+                              <Trash2 size={16} style={{ flexShrink: 0, color: '#ef4444' }} />
+                            ) : (
+                              <Check size={16} strokeWidth={3} style={{ flexShrink: 0, color: 'var(--accent-primary)' }} />
+                            )}
+                            <span>
+                              {language === 'es' ? 'Temporadas + Especiales' : 'Seasons + Specials'}
+                            </span>
+                          </button>
+                        )}
+
+                        {/* Option 3: Todo (temporadas, especiales y extras) */}
+                        {showAllOption && (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              setShowSeriesScopeModal(false);
+                              await handleToggleAllEpisodes(isRemove ? 'remove' : 'mark_all', 'all');
+                            }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.65rem',
+                              padding: '0.75rem 1rem',
+                              borderRadius: '8px',
+                              background: 'var(--bg-tertiary)',
+                              border: '1px solid var(--border-color)',
+                              color: 'var(--text-primary)',
+                              fontWeight: 600,
+                              fontSize: '0.9rem',
+                              cursor: 'pointer',
+                              textAlign: 'left'
+                            }}
+                          >
+                            {isRemove ? (
+                              <Trash2 size={16} style={{ flexShrink: 0, color: '#ef4444' }} />
+                            ) : (
+                              <Check size={16} strokeWidth={3} style={{ flexShrink: 0, color: 'var(--accent-primary)' }} />
+                            )}
+                            <span>
+                              {language === 'es' ? 'Todo (Temporadas, Especiales y Extras)' : 'All (Seasons, Specials & Extras)'}
+                            </span>
+                          </button>
+                        )}
+
+                        {/* Option 4: Solo Extras (si solo se habían marcado extras) */}
+                        {showExtrasOnlyOption && (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              setShowSeriesScopeModal(false);
+                              await handleToggleAllEpisodes('remove', 'all');
+                            }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.65rem',
+                              padding: '0.75rem 1rem',
+                              borderRadius: '8px',
+                              background: 'var(--bg-tertiary)',
+                              border: '1px solid var(--border-color)',
+                              color: 'var(--text-primary)',
+                              fontWeight: 600,
+                              fontSize: '0.9rem',
+                              cursor: 'pointer',
+                              textAlign: 'left'
+                            }}
+                          >
+                            <Trash2 size={16} style={{ flexShrink: 0, color: '#ef4444' }} />
+                            <span>
+                              {language === 'es' ? 'Desmarcar Extras' : 'Unmark Extras'}
+                            </span>
+                          </button>
+                        )}
+                      </div>
+
                       <button
                         type="button"
                         onClick={() => setShowSeriesScopeModal(false)}
-                        style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '0.2rem' }}
+                        style={{
+                          padding: '0.55rem',
+                          borderRadius: '6px',
+                          background: 'transparent',
+                          border: 'none',
+                          color: 'var(--text-secondary)',
+                          fontSize: '0.85rem',
+                          cursor: 'pointer',
+                          fontWeight: 500
+                        }}
                       >
-                        <X size={18} />
+                        {language === 'es' ? 'Cancelar' : 'Cancel'}
                       </button>
                     </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-                      {/* Option 1: Solo temporadas */}
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          setShowSeriesScopeModal(false);
-                          await handleToggleAllEpisodes(pendingSeriesScopeAction === 'remove' ? 'remove' : 'mark_all', 'seasons_only');
-                        }}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.65rem',
-                          padding: '0.75rem 1rem',
-                          borderRadius: '8px',
-                          background: 'var(--bg-tertiary)',
-                          border: '1px solid var(--border-color)',
-                          color: 'var(--text-primary)',
-                          fontWeight: 600,
-                          fontSize: '0.9rem',
-                          cursor: 'pointer',
-                          textAlign: 'left'
-                        }}
-                      >
-                        {pendingSeriesScopeAction === 'remove' ? (
-                          <Trash2 size={16} style={{ flexShrink: 0, color: '#ef4444' }} />
-                        ) : (
-                          <Check size={16} strokeWidth={3} style={{ flexShrink: 0, color: 'var(--accent-primary)' }} />
-                        )}
-                        <span>
-                          {pendingSeriesScopeAction === 'remove'
-                            ? (language === 'es' ? 'Solo temporadas' : 'Seasons only')
-                            : (language === 'es' ? 'Solo temporadas' : 'Seasons only')
-                          }
-                        </span>
-                      </button>
-
-                      {/* Option 2: Temporadas + Especiales */}
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          setShowSeriesScopeModal(false);
-                          await handleToggleAllEpisodes(pendingSeriesScopeAction === 'remove' ? 'remove' : 'mark_all', 'seasons_and_specials');
-                        }}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.65rem',
-                          padding: '0.75rem 1rem',
-                          borderRadius: '8px',
-                          background: 'var(--bg-tertiary)',
-                          border: '1px solid var(--border-color)',
-                          color: 'var(--text-primary)',
-                          fontWeight: 600,
-                          fontSize: '0.9rem',
-                          cursor: 'pointer',
-                          textAlign: 'left'
-                        }}
-                      >
-                        {pendingSeriesScopeAction === 'remove' ? (
-                          <Trash2 size={16} style={{ flexShrink: 0, color: '#ef4444' }} />
-                        ) : (
-                          <Check size={16} strokeWidth={3} style={{ flexShrink: 0, color: 'var(--accent-primary)' }} />
-                        )}
-                        <span>
-                          {pendingSeriesScopeAction === 'remove'
-                            ? (language === 'es' ? 'Temporadas + Especiales' : 'Seasons + Specials')
-                            : (language === 'es' ? 'Temporadas + Especiales' : 'Seasons + Specials')
-                          }
-                        </span>
-                      </button>
-
-                      {/* Option 3: Todo (temporadas, especiales y extras) */}
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          setShowSeriesScopeModal(false);
-                          await handleToggleAllEpisodes(pendingSeriesScopeAction === 'remove' ? 'remove' : 'mark_all', 'all');
-                        }}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.65rem',
-                          padding: '0.75rem 1rem',
-                          borderRadius: '8px',
-                          background: 'var(--bg-tertiary)',
-                          border: '1px solid var(--border-color)',
-                          color: 'var(--text-primary)',
-                          fontWeight: 600,
-                          fontSize: '0.9rem',
-                          cursor: 'pointer',
-                          textAlign: 'left'
-                        }}
-                      >
-                        {pendingSeriesScopeAction === 'remove' ? (
-                          <Trash2 size={16} style={{ flexShrink: 0, color: '#ef4444' }} />
-                        ) : (
-                          <Check size={16} strokeWidth={3} style={{ flexShrink: 0, color: 'var(--accent-primary)' }} />
-                        )}
-                        <span>
-                          {pendingSeriesScopeAction === 'remove'
-                            ? (language === 'es' ? 'Todo (Temporadas, Especiales y Extras)' : 'All (Seasons, Specials & Extras)')
-                            : (language === 'es' ? 'Todo (Temporadas, Especiales y Extras)' : 'All (Seasons, Specials & Extras)')
-                          }
-                        </span>
-                      </button>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => setShowSeriesScopeModal(false)}
-                      style={{
-                        padding: '0.55rem',
-                        borderRadius: '6px',
-                        background: 'transparent',
-                        border: 'none',
-                        color: 'var(--text-secondary)',
-                        fontSize: '0.85rem',
-                        cursor: 'pointer',
-                        fontWeight: 500
-                      }}
-                    >
-                      {language === 'es' ? 'Cancelar' : 'Cancel'}
-                    </button>
                   </div>
-                </div>
-              )}
+                );
+              })()}
 
               {/* Floating Modal 1.5: 100% Completion Decision Dialog */}
               {showHundredPercentDecisionModal && (

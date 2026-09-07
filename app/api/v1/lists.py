@@ -1889,6 +1889,21 @@ def bulk_toggle_season(
             ListItem.external_id == ext_id
         ).first()
         
+        ep_num = ep.get('episode_number')
+        ep_name = ep.get('name') or 'Untitled'
+        is_extra_ep = ep.get('is_extra') or ep.get('ep_type') == 'insignificant_special' or req.season_number == 0
+        is_special_ep = ep.get('is_significant_special') or ep.get('ep_type') == 'significant_special'
+        
+        if is_extra_ep:
+            ep_title = f"{series_title} - Extra {ep_num or 1} - {ep_name}"
+            section_name = "Extras"
+        elif is_special_ep or ep_num is None:
+            ep_title = f"{series_title} - [Especial] - {ep_name}"
+            section_name = f"Season {req.season_number}" if req.season_number > 0 else "Specials"
+        else:
+            ep_title = f"{series_title} - S{req.season_number:02d}E{ep_num:02d} - {ep_name}"
+            section_name = f"Season {req.season_number}"
+
         if not item:
             item_count += 1
             item = ListItem(
@@ -1896,10 +1911,10 @@ def bulk_toggle_season(
                 order_index=item_count,
                 item_type=ItemTypeEnum.SERIES,
                 external_id=ext_id,
-                title=f"{series_title} - S{req.season_number:02d}E{ep.get('episode_number', 1):02d} - {ep.get('name', 'Untitled')}",
+                title=ep_title,
                 image_url=ep.get('still_path') if ep.get('still_path') else None,
                 custom_notes=json.dumps({"description": ep.get('overview') or "", "release_date": ep.get('air_date') or None}),
-                section=f"Season {req.season_number}"
+                section=section_name
             )
             db.add(item)
             # Flush so item.id is populated for ItemProgress mapping without full transaction commit
@@ -2076,7 +2091,20 @@ def bulk_toggle_all_seasons(
         ).first()
         
         season_num = ep.get('season_number', 1)
-        ep_num = ep.get('episode_number', 1)
+        ep_num = ep.get('episode_number')
+        ep_name = ep.get('name') or 'Untitled'
+        is_extra_ep = ep.get('is_extra') or ep.get('ep_type') == 'insignificant_special' or season_num == 0
+        is_special_ep = ep.get('is_significant_special') or ep.get('ep_type') == 'significant_special'
+        
+        if is_extra_ep:
+            ep_title = f"{series_title} - Extra {ep_num or 1} - {ep_name}"
+            section_name = "Extras"
+        elif is_special_ep or ep_num is None:
+            ep_title = f"{series_title} - [Especial] - {ep_name}"
+            section_name = f"Season {season_num}" if season_num > 0 else "Specials"
+        else:
+            ep_title = f"{series_title} - S{season_num:02d}E{ep_num:02d} - {ep_name}"
+            section_name = f"Season {season_num}"
         
         if not item:
             item_count += 1
@@ -2085,10 +2113,10 @@ def bulk_toggle_all_seasons(
                 order_index=item_count,
                 item_type=ItemTypeEnum.SERIES,
                 external_id=ext_id,
-                title=f"{series_title} - S{season_num:02d}E{ep_num:02d} - {ep.get('name', 'Untitled')}",
+                title=ep_title,
                 image_url=ep.get('still_path') if ep.get('still_path') else None,
                 custom_notes=json.dumps({"description": ep.get('overview') or "", "release_date": ep.get('air_date') or None}),
-                section=f"Season {season_num}"
+                section=section_name
             )
             db.add(item)
             db.flush()
