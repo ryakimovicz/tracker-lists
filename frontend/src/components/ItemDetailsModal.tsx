@@ -370,25 +370,27 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     }
   };
 
-  const handleToggleAllEpisodes = async (action?: 'mark_all' | 'mark_again' | 'remove' | 'toggle', scope: 'seasons_only' | 'seasons_and_specials' | 'all' = 'seasons_and_specials') => {
+  const handleToggleAllEpisodes = async (action?: 'mark_all' | 'mark_again' | 'remove' | 'toggle', scope: 'seasons_only' | 'seasons_and_specials' | 'all' = 'seasons_and_specials', passedEpisodes?: any[]) => {
     if (!selectedItem) return;
+    const isComic = selectedItem.item_type === 'comic' || String(selectedItem.external_id || '').startsWith('cv_vol_');
     let effectiveListId = selectedItem.tracking_list_id;
     if (!effectiveListId) {
-      const tracked = await ensureTracked('watching');
+      const defaultSt = isComic ? 'reading' : 'watching';
+      const tracked = await ensureTracked(defaultSt);
       if (!tracked) return;
       effectiveListId = tracked.tracking_list_id || tracked;
     }
 
-    const isAllCompleted = selectedItem.status === 'completed';
+    const isAllCompleted = isComic ? (selectedItem.status === 'read' || selectedItem.status === 'completed') : selectedItem.status === 'completed';
     const isMarkAgain = action === 'mark_again';
     const targetCompleted = (action === 'mark_all' || isMarkAgain) ? true : action === 'remove' ? false : !isAllCompleted;
 
     const cacheKeyAll = `${selectedItem.external_id}_all_episodes`;
-    let cachedAll = getCachedSeries(cacheKeyAll);
+    let cachedAll = passedEpisodes || (seasonEpisodes[1] && seasonEpisodes[1].length > 0 ? seasonEpisodes[1] : getCachedSeries(cacheKeyAll));
 
     // Filter cachedAll according to chosen scope
     let targetEps: any[] = cachedAll && Array.isArray(cachedAll) ? [...cachedAll] : [];
-    if (targetEps.length > 0) {
+    if (!isComic && targetEps.length > 0) {
       if (scope === 'seasons_only') {
         targetEps = targetEps.filter((ep: any) => !ep.is_significant_special && !ep.is_extra && ep.season_number > 0 && ep.ep_type !== 'significant_special' && ep.ep_type !== 'insignificant_special');
       } else if (scope === 'seasons_and_specials') {
@@ -400,7 +402,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     if (targetEps.length > 0) {
       const newProg: Record<string, boolean> = {};
       targetEps.forEach((ep: any) => {
-        newProg[`tvm-ep-${ep.id}`] = targetCompleted;
+        const idKey = isComic ? `cv_issue_${ep.id}` : `tvm-ep-${ep.id}`;
+        newProg[idKey] = targetCompleted;
       });
       setGlobalProgress(prev => ({ ...prev, ...newProg }));
     }
@@ -428,17 +431,21 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       let nextStatus = res.data?.status;
       if (!nextStatus) {
         if (targetCompleted) {
-          nextStatus = 'completed';
+          nextStatus = isComic ? 'read' : 'completed';
         } else {
           const hasAnyRemainingWatched = updatedList.some((it: any) => latestProg[it.external_id] || it.is_completed);
-          nextStatus = hasAnyRemainingWatched ? 'watching' : 'plan_to_watch';
+          if (isComic) {
+            nextStatus = hasAnyRemainingWatched ? 'reading' : 'plan_to_read';
+          } else {
+            nextStatus = hasAnyRemainingWatched ? 'watching' : 'plan_to_watch';
+          }
         }
       }
 
       setSelectedItem((prev: any) => prev ? {
         ...prev,
         status: nextStatus,
-        completed_at: nextStatus === 'completed' ? (prev.completed_at || new Date().toISOString()) : null
+        completed_at: (nextStatus === 'completed' || nextStatus === 'read') ? (prev.completed_at || new Date().toISOString()) : null
       } : null);
 
       if (selectedItem?.id && user?.is_pro) {
@@ -2543,8 +2550,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
                   {/* Favorite toggler moved to 3-dots menu */}
 
-                  {/* Modern & Comfortable Pages Read Picker for books, comics and mangas */}
-                  {!isEpisode && selectedItem && ['book', 'comic', 'manga'].includes(selectedItem.item_type) && (() => {
+                  {/* Modern & Comfortable Pages Read Picker for books and mangas */}
+                  {!isEpisode && selectedItem && ['book', 'manga'].includes(selectedItem.item_type) && (() => {
                     const isRead = selectedItem.status === 'read';
                     const isReadingOrDropped = ['reading', 'dropped'].includes(selectedItem.status);
 
@@ -3102,7 +3109,65 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                             {language === 'es' ? 'Abandonado' : 'Dropped'}
                           </button>
                         </div>
-                      ) : (selectedItem?.item_type === 'series' || selectedItem?.item_type === 'anime') ? (() => {
+                      ) : (selectedItem?.item_type === 'comic' && !isEpisode) ? (() => {
+                        const cacheKeyAll = `${selectedItem.external_id}_all_episodes`;
+                        const cachedAll = getCachedSeries(cacheKeyAll) || [];
+                        const issuesList = (seasonEpisodes[1] && seasonEpisodes[1].length > 0) ? seasonEpisodes[1] : cachedAll;
+                        
+                        const isAllIssuesRead = (() => {
+                          if (selectedItem?.status === 'read' || selectedItem?.status === 'completed') return true;
+                          if (issuesList.length === 0) return false;
+                          return issuesList.every((ep: any) => {
+                            const extId = `cv_issue_${ep.id}`;
+                            if (globalProgress[extId] !== undefined) return !!globalProgress[extId];
+                            const found = (episodes || []).find(x => x.external_id === extId || x.id === ep.id);
+                            return !!found?.is_completed;
+                          });
+                        })();
+
+                        return (
+                          <div style={{ width: '100%' }}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (isAllIssuesRead || selectedItem?.status === 'read' || selectedItem?.status === 'completed') {
+                                  setShowReconsumedModal(true);
+                                } else {
+                                  const cacheKey = `${selectedItem.external_id}_all_episodes`;
+                                  const list = (seasonEpisodes[1] && seasonEpisodes[1].length > 0) ? seasonEpisodes[1] : (getCachedSeries(cacheKey) || []);
+                                  handleToggleAllEpisodes('mark_all', 'all', list);
+                                }
+                              }}
+                              style={{
+                                width: '100%',
+                                background: isAllIssuesRead 
+                                  ? 'var(--color-comic)' 
+                                  : 'var(--bg-tertiary)',
+                                border: isAllIssuesRead 
+                                  ? 'none' 
+                                  : '1px solid var(--border-color)',
+                                borderRadius: '8px',
+                                padding: '0.65rem 1rem',
+                                textAlign: 'center',
+                                cursor: 'pointer',
+                                color: isAllIssuesRead 
+                                  ? 'var(--color-text-comic)' 
+                                  : 'var(--text-primary)',
+                                fontSize: '0.88rem',
+                                fontWeight: 700,
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '0.45rem',
+                                transition: 'all 0.2s ease'
+                              }}
+                            >
+                              <Check size={16} strokeWidth={2.8} />
+                              <span>{language === 'es' ? 'Todo leído' : 'All Read'}</span>
+                            </button>
+                          </div>
+                        );
+                      })() : (selectedItem?.item_type === 'series' || selectedItem?.item_type === 'anime') ? (() => {
                         const { isAllWatched, areRegularSeasonsWatched } = (() => {
                           const cacheKeyAll = `${selectedItem.external_id}_all_episodes`;
                           const cachedAll = getCachedSeries(cacheKeyAll) || [];
@@ -4852,6 +4917,10 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                           if (selectedItem.item_type === 'series' || selectedItem.item_type === 'anime') {
                             setPendingSeriesScopeAction('mark_again');
                             setShowSeriesScopeModal(true);
+                          } else if (selectedItem.item_type === 'comic' && !isEpisode) {
+                            const cacheKey = `${selectedItem.external_id}_all_episodes`;
+                            const list = (seasonEpisodes[1] && seasonEpisodes[1].length > 0) ? seasonEpisodes[1] : (getCachedSeries(cacheKey) || []);
+                            await handleToggleAllEpisodes('mark_again', 'all', list);
                           } else {
                             await handleMarkConsumedAgain();
                           }
@@ -4920,6 +4989,10 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                           if (selectedItem.item_type === 'series' || selectedItem.item_type === 'anime') {
                             setPendingSeriesScopeAction('remove');
                             setShowSeriesScopeModal(true);
+                          } else if (selectedItem.item_type === 'comic' && !isEpisode) {
+                            const cacheKey = `${selectedItem.external_id}_all_episodes`;
+                            const list = (seasonEpisodes[1] && seasonEpisodes[1].length > 0) ? seasonEpisodes[1] : (getCachedSeries(cacheKey) || []);
+                            await handleToggleAllEpisodes('remove', 'all', list);
                           } else {
                             await handleRemoveLatestConsumption();
                           }
@@ -4941,7 +5014,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                       >
                         <Trash2 size={16} style={{ flexShrink: 0 }} />
                         <span>
-                          {selectedItem.item_type === 'series' || selectedItem.item_type === 'anime'
+                          {(selectedItem.item_type === 'series' || selectedItem.item_type === 'anime' || (selectedItem.item_type === 'comic' && !isEpisode))
                             ? (language === 'es' ? 'Desmarcar' : 'Unmark')
                             : (language === 'es' ? 'Desmarcar última visualización' : 'Unmark latest completion')
                           }

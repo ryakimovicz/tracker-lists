@@ -2084,6 +2084,7 @@ def bulk_toggle_all_seasons(
     ).first()
     
     series_title = lib_item.title if lib_item else "Series"
+    is_comic = (lib_item and lib_item.item_type == ItemTypeEnum.COMIC) or (reading_list and reading_list.item_type == ItemTypeEnum.COMIC)
     
     # Resolve all episodes list (fetch directly if not supplied)
     episodes_list = req.episodes
@@ -2105,7 +2106,19 @@ def bulk_toggle_all_seasons(
     item_count = db.query(ListItem).filter(ListItem.list_id == list_id).count()
 
     for ep in episodes_list:
-        ext_id = f"tvm-ep-{ep.get('id')}"
+        ep_id = ep.get('id')
+        if not ep_id:
+            continue
+        raw_ep_str = str(ep_id)
+        if is_comic or raw_ep_str.startswith('cv_') or raw_ep_str.startswith('cv-'):
+            ext_id = raw_ep_str if raw_ep_str.startswith('cv_issue_') else f"cv_issue_{raw_ep_str.replace('cv_vol_', '').replace('cv_', '')}"
+            media_item_type = ItemTypeEnum.COMIC
+            sec_name = "Volumen"
+        else:
+            ext_id = f"tvm-ep-{ep_id}"
+            media_item_type = ItemTypeEnum.SERIES
+            sec_name = f"Season {ep.get('season_number', 1)}"
+
         item = db.query(ListItem).filter(
             ListItem.list_id == list_id,
             ListItem.external_id == ext_id
@@ -2117,7 +2130,10 @@ def bulk_toggle_all_seasons(
         is_extra_ep = ep.get('is_extra') or ep.get('ep_type') == 'insignificant_special' or season_num == 0
         is_special_ep = ep.get('is_significant_special') or ep.get('ep_type') == 'significant_special'
         
-        if is_extra_ep:
+        if media_item_type == ItemTypeEnum.COMIC:
+            ep_title = f"{series_title} {ep_name}" if not ep_name.startswith(series_title) else ep_name
+            section_name = "Volumen"
+        elif is_extra_ep:
             ep_title = f"{series_title} - Extra {ep_num or 1} - {ep_name}"
             section_name = "Extras"
         elif is_special_ep or ep_num is None:
@@ -2132,10 +2148,10 @@ def bulk_toggle_all_seasons(
             item = ListItem(
                 list_id=list_id,
                 order_index=item_count,
-                item_type=ItemTypeEnum.SERIES,
+                item_type=media_item_type,
                 external_id=ext_id,
                 title=ep_title,
-                image_url=ep.get('still_path') if ep.get('still_path') else None,
+                image_url=ep.get('still_path') or ep.get('image_url') if (ep.get('still_path') or ep.get('image_url')) else None,
                 custom_notes=json.dumps({"description": ep.get('overview') or "", "release_date": ep.get('air_date') or None}),
                 section=section_name
             )
@@ -2157,7 +2173,7 @@ def bulk_toggle_all_seasons(
             else:
                 progress = ItemProgress(
                     user_id=current_user.id,
-                    item_type=ItemTypeEnum.SERIES,
+                    item_type=media_item_type,
                     external_id=ext_id,
                     list_item_id=item.id,
                     is_completed=True,
@@ -2200,8 +2216,12 @@ def bulk_toggle_all_seasons(
                     progress.completed_at = None
             
     if lib_item:
+        completed_val = UserLibraryStatusEnum.READ if is_comic else UserLibraryStatusEnum.COMPLETED
+        in_prog_val = UserLibraryStatusEnum.READING if is_comic else UserLibraryStatusEnum.WATCHING
+        plan_val = UserLibraryStatusEnum.PLAN_TO_READ if is_comic else UserLibraryStatusEnum.PLAN_TO_WATCH
+
         if req.completed:
-            lib_item.status = UserLibraryStatusEnum.COMPLETED
+            lib_item.status = completed_val
             lib_item.completed_at = datetime.now(timezone.utc)
             # Set last seen episode to the last episode in list
             last_ep = db.query(ListItem).filter(
@@ -2220,7 +2240,7 @@ def bulk_toggle_all_seasons(
 
             if completed_eps_count >= total_eps_count and total_eps_count > 0:
                 # All episodes still have prior completed viewings! Keep completed
-                lib_item.status = UserLibraryStatusEnum.COMPLETED
+                lib_item.status = completed_val
                 last_completed = db.query(ItemProgress).join(ListItem).filter(
                     ItemProgress.user_id == current_user.id,
                     ListItem.list_id == list_id,
@@ -2228,7 +2248,7 @@ def bulk_toggle_all_seasons(
                 ).order_by(ItemProgress.completed_at.desc()).first()
                 lib_item.completed_at = last_completed.completed_at if last_completed else datetime.now(timezone.utc)
             elif completed_eps_count > 0:
-                lib_item.status = UserLibraryStatusEnum.WATCHING
+                lib_item.status = in_prog_val
                 lib_item.completed_at = None
                 last_completed = db.query(ListItem).join(ItemProgress).filter(
                     ListItem.list_id == list_id,
@@ -2238,7 +2258,7 @@ def bulk_toggle_all_seasons(
                 if last_completed:
                     lib_item.last_seen_episode = last_completed.title
             else:
-                lib_item.status = UserLibraryStatusEnum.PLAN_TO_WATCH
+                lib_item.status = plan_val
                 lib_item.completed_at = None
                 lib_item.last_seen_episode = None
         lib_item.updated_at = datetime.now(timezone.utc)
@@ -2284,6 +2304,7 @@ def bulk_toggle_episodes(
     ).first()
     
     series_title = lib_item.title if lib_item else "Series"
+    is_comic = (lib_item and lib_item.item_type == ItemTypeEnum.COMIC) or (reading_list and reading_list.item_type == ItemTypeEnum.COMIC)
     episodes_list = req.episodes or []
     item_count = db.query(ListItem).filter(ListItem.list_id == list_id).count()
     now_dt = datetime.now(timezone.utc)
@@ -2292,7 +2313,16 @@ def bulk_toggle_episodes(
         ep_id = ep.get('id')
         if not ep_id:
             continue
-        ext_id = f"tvm-ep-{ep_id}"
+        raw_ep_str = str(ep_id)
+        if is_comic or raw_ep_str.startswith('cv_') or raw_ep_str.startswith('cv-'):
+            ext_id = raw_ep_str if raw_ep_str.startswith('cv_issue_') else f"cv_issue_{raw_ep_str.replace('cv_vol_', '').replace('cv_', '')}"
+            media_item_type = ItemTypeEnum.COMIC
+            sec_name = "Volumen"
+        else:
+            ext_id = f"tvm-ep-{ep_id}"
+            media_item_type = ItemTypeEnum.SERIES
+            sec_name = f"Season {ep.get('season_number', 1)}"
+
         item = db.query(ListItem).filter(
             ListItem.list_id == list_id,
             ListItem.external_id == ext_id
@@ -2306,12 +2336,12 @@ def bulk_toggle_episodes(
             item = ListItem(
                 list_id=list_id,
                 order_index=item_count,
-                item_type=ItemTypeEnum.SERIES,
+                item_type=media_item_type,
                 external_id=ext_id,
-                title=ep.get('title') or f"{series_title} - S{season_num:02d}E{ep_num:02d} - {ep.get('name', 'Untitled')}",
+                title=ep.get('title') or (f"{series_title} {ep.get('name', 'Untitled')}" if media_item_type == ItemTypeEnum.COMIC else f"{series_title} - S{season_num:02d}E{ep_num:02d} - {ep.get('name', 'Untitled')}"),
                 image_url=ep.get('still_path') or ep.get('image_url') or None,
                 custom_notes=json.dumps({"description": ep.get('overview') or ep.get('custom_notes') or "", "release_date": ep.get('air_date') or None}),
-                section=f"Season {season_num}"
+                section=sec_name
             )
             db.add(item)
             db.flush()
@@ -2328,7 +2358,7 @@ def bulk_toggle_episodes(
             else:
                 progress = ItemProgress(
                     user_id=current_user.id,
-                    item_type=ItemTypeEnum.SERIES,
+                    item_type=media_item_type,
                     external_id=ext_id,
                     list_item_id=item.id,
                     is_completed=True,
