@@ -2982,7 +2982,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
                           const isEpWatched = (epId: any, seasonNum?: number, epNum?: number) => {
                             if (!epId) return false;
-                            const extId = `tvm-ep-${epId}`;
+                            const extId = typeof epId === 'string' && epId.startsWith('tvm-ep-') ? epId : `tvm-ep-${epId}`;
                             if (globalProgress[extId] !== undefined) return !!globalProgress[extId];
                             const found = (episodes || []).find(x => 
                               x.external_id === extId || 
@@ -2995,9 +2995,16 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                             return false;
                           };
 
+                          if (selectedItem?.status === 'completed') {
+                            return { isAllWatched: true, areRegularSeasonsWatched: true };
+                          }
+
                           const canonicalSeasons = seasons.filter((s: any) => s.season_number > 0 && !s.is_extras);
+                          
+                          // If no seasons structure exists, check regular episodes directly from the episodes list
                           if (canonicalSeasons.length === 0) {
-                            const isDone = selectedItem?.status === 'completed';
+                            const regularDbEps = (episodes || []).filter((x: any) => x.season_number > 0 && !x.is_extra && !x.section?.toLowerCase().includes('extra'));
+                            const isDone = regularDbEps.length > 0 && regularDbEps.every((x: any) => globalProgress[x.external_id] !== undefined ? !!globalProgress[x.external_id] : !!x.is_completed);
                             return { isAllWatched: isDone, areRegularSeasonsWatched: isDone };
                           }
 
@@ -3014,8 +3021,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                             }
 
                             if (!Array.isArray(sEps) || sEps.length === 0) {
-                              const listSeps = (episodes || []).filter(x => x.section === `Season ${s.season_number}`);
-                              return listSeps.length > 0 && listSeps.every(x => globalProgress[x.external_id] ?? x.is_completed);
+                              const listSeps = (episodes || []).filter(x => x.season_number === s.season_number || x.section === `Season ${s.season_number}`);
+                              return listSeps.length > 0 && listSeps.every(x => globalProgress[x.external_id] !== undefined ? !!globalProgress[x.external_id] : !!x.is_completed);
                             }
 
                             return sEps.every((te: any) => isEpWatched(te.id, s.season_number, te.episode_number ?? te.number));
@@ -4501,7 +4508,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
                 const isEpWatched = (ep: any) => {
                   if (!ep || !ep.id) return false;
-                  const extId = `tvm-ep-${ep.id}`;
+                  const extId = typeof ep.id === 'string' && ep.id.startsWith('tvm-ep-') ? ep.id : `tvm-ep-${ep.id}`;
                   if (globalProgress[extId] !== undefined) return !!globalProgress[extId];
                   const found = (episodes || []).find(x => 
                     x.external_id === extId || 
@@ -4518,13 +4525,16 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                 const watchedSpecialsCount = cachedAll.filter((ep: any) => (ep.is_significant_special || ep.ep_type === 'significant_special') && !ep.is_extra && isEpWatched(ep)).length;
                 const watchedExtrasCount = cachedAll.filter((ep: any) => (ep.is_extra || ep.ep_type === 'insignificant_special' || ep.season_number === 0) && isEpWatched(ep)).length;
 
+                const regularDbEps = (episodes || []).filter((x: any) => x.season_number > 0 && !x.is_extra && !x.section?.toLowerCase().includes('extra'));
+                const hasWatchedRegularDb = regularDbEps.length > 0 && regularDbEps.some((x: any) => globalProgress[x.external_id] !== undefined ? !!globalProgress[x.external_id] : !!x.is_completed);
+
                 const isRemove = pendingSeriesScopeAction === 'remove';
 
                 // Determine which options to show
-                const showSeasonsOption = !isRemove ? true : (watchedSeasonsCount > 0);
-                const showSpecialsOption = !isRemove ? hasSpecials : (hasSpecials && (watchedSpecialsCount > 0 || watchedSeasonsCount > 0));
+                const showSeasonsOption = !isRemove ? true : (watchedSeasonsCount > 0 || hasWatchedRegularDb || selectedItem?.status === 'completed');
+                const showSpecialsOption = !isRemove ? hasSpecials : (hasSpecials && (watchedSpecialsCount > 0 || watchedSeasonsCount > 0 || hasWatchedRegularDb));
                 const showAllOption = !isRemove ? (hasSpecials && hasExtras) : (hasExtras && watchedExtrasCount > 0);
-                const showExtrasOnlyOption = isRemove && hasExtras && watchedExtrasCount > 0 && watchedSeasonsCount === 0 && watchedSpecialsCount === 0;
+                const showExtrasOnlyOption = isRemove && hasExtras && watchedExtrasCount > 0 && watchedSeasonsCount === 0 && watchedSpecialsCount === 0 && !hasWatchedRegularDb;
 
                 return (
                   <div
