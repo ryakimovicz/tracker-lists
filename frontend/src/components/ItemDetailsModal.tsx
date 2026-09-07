@@ -3521,12 +3521,52 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
                         const s = item.season;
                         const isSeasonActive = activeSeason === s.season_number;
-                        const isSeasonDone = (() => {
-                          const listSeps = (episodes || []).filter(x => x.section === `Season ${s.season_number}`);
-                          const seriesEps = seasonEpisodes[s.season_number] || [];
-                          if (!Array.isArray(seriesEps)) return false;
-                          if (seriesEps.length === 0) return listSeps.length > 0 && listSeps.every(x => x.is_completed);
-                          return seriesEps.every((te: any) => globalProgress[`tvm-ep-${te.id}`] || (episodes || []).some(x => x.external_id === `tvm-ep-${te.id}` && x.is_completed));
+                        const { isSeasonDone, isSeasonPartial } = (() => {
+                          const cacheKeyAll = `${selectedItem.external_id}_all_episodes`;
+                          const cachedAll = getCachedSeries(cacheKeyAll) || [];
+
+                          const isEpWatched = (epId: any, seasonNum?: number, epNum?: number) => {
+                            if (!epId) return false;
+                            const extId = typeof epId === 'string' && epId.startsWith('tvm-ep-') ? epId : `tvm-ep-${epId}`;
+                            if (globalProgress[extId] !== undefined) return !!globalProgress[extId];
+                            const found = (episodes || []).find(x => 
+                              x.external_id === extId || 
+                              x.id === epId ||
+                              (seasonNum !== undefined && epNum !== undefined && x.season_number === seasonNum && x.episode_number === epNum)
+                            );
+                            if (found) {
+                              return globalProgress[found.external_id] !== undefined ? !!globalProgress[found.external_id] : !!found.is_completed;
+                            }
+                            return false;
+                          };
+
+                          let sEps = seasonEpisodes[s.season_number];
+                          if (!Array.isArray(sEps) || sEps.length === 0) {
+                            sEps = cachedAll.filter((ep: any) => ep.season_number === s.season_number);
+                          }
+
+                          if (!Array.isArray(sEps) || sEps.length === 0) {
+                            const listSeps = (episodes || []).filter(x => x.season_number === s.season_number || x.section === `Season ${s.season_number}`);
+                            const done = listSeps.length > 0 && listSeps.every(x => globalProgress[x.external_id] !== undefined ? !!globalProgress[x.external_id] : !!x.is_completed);
+                            return { isSeasonDone: done, isSeasonPartial: false };
+                          }
+
+                          const regularEps = sEps.filter((te: any) => !te.is_extra && te.ep_type !== 'insignificant_special' && te.ep_type !== 'significant_special' && !te.is_significant_special);
+                          const specialEps = sEps.filter((te: any) => te.is_significant_special || te.ep_type === 'significant_special');
+
+                          const allDone = sEps.every((te: any) => isEpWatched(te.id, s.season_number, te.episode_number ?? te.number));
+                          if (allDone) {
+                            return { isSeasonDone: true, isSeasonPartial: false };
+                          }
+
+                          const regularDone = regularEps.length > 0 && regularEps.every((te: any) => isEpWatched(te.id, s.season_number, te.episode_number ?? te.number));
+                          const hasSpecialsUnwatched = specialEps.length > 0 && specialEps.some((te: any) => !isEpWatched(te.id, s.season_number, te.episode_number ?? te.number));
+
+                          if (regularDone && hasSpecialsUnwatched) {
+                            return { isSeasonDone: false, isSeasonPartial: true };
+                          }
+
+                          return { isSeasonDone: false, isSeasonPartial: false };
                         })();
 
                         // In the season accordion, filter out standalone specials that are rendered between seasons
@@ -3569,7 +3609,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                     tabIndex={0}
                                     onClick={async (e) => {
                                       e.stopPropagation();
-                                      if (isSeasonDone) {
+                                      if (isSeasonDone || isSeasonPartial) {
                                         setSeasonActionItem(s);
                                         return;
                                       }
@@ -3634,8 +3674,12 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                       }
                                     }}
                                     style={{
-                                      background: isSeasonDone ? `var(--color-${selectedItem.item_type || 'movie'})` : 'transparent',
-                                      border: isSeasonDone ? 'none' : '1px solid var(--border-color)',
+                                      background: isSeasonDone 
+                                        ? `var(--color-${selectedItem.item_type || 'movie'})` 
+                                        : isSeasonPartial 
+                                        ? `linear-gradient(90deg, var(--color-${selectedItem.item_type || 'movie'}) 50%, rgba(255,255,255,0.06) 50%)`
+                                        : 'transparent',
+                                      border: isSeasonDone ? 'none' : isSeasonPartial ? `1px solid var(--color-${selectedItem.item_type || 'movie'})` : '1px solid var(--border-color)',
                                       borderRadius: '50%',
                                       width: '20px',
                                       height: '20px',
@@ -3644,11 +3688,12 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                       justifyContent: 'center',
                                       cursor: 'pointer',
                                       marginRight: '0.6rem',
-                                      color: isSeasonDone ? `var(--color-text-${selectedItem.item_type || 'movie'})` : 'var(--text-muted)',
-                                      opacity: isSeasonDone ? 1 : 0.6,
+                                      color: isSeasonDone || isSeasonPartial ? `var(--color-text-${selectedItem.item_type || 'movie'})` : 'var(--text-muted)',
+                                      opacity: isSeasonDone || isSeasonPartial ? 1 : 0.6,
                                       padding: 0,
                                       transition: 'all 0.2s ease'
                                     }}
+                                    title={isSeasonDone ? (language === 'es' ? 'Temporada completa' : 'Season completed') : isSeasonPartial ? (language === 'es' ? 'Temporada regular completa (especiales pendientes)' : 'Regular season completed (specials pending)') : ''}
                                   >
                                     <Check size={12} strokeWidth={3} />
                                   </span>
