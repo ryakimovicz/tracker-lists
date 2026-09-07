@@ -856,10 +856,27 @@ export const Search: React.FC = () => {
                   {user && (
                     <button
                       type="button"
-                      onClick={(e) => {
+                      onClick={async (e) => {
                         e.stopPropagation();
                         if (shelfItem) {
-                          setItemToRemoveFromShelf(shelfItem);
+                          const hasProgress = shelfItem.status !== 'plan_to_watch' && 
+                                              shelfItem.status !== 'plan_to_play' && 
+                                              shelfItem.status !== 'plan_to_read' && 
+                                              shelfItem.status !== 'untracked' && 
+                                              Boolean(shelfItem.status || shelfItem.completed_at || shelfItem.last_seen_episode || shelfItem.rating || shelfItem.consumption_count > 0 || shelfItem.total_time_spent > 0);
+                          if (!hasProgress) {
+                            try {
+                              await apiClient.delete(`/library/${shelfItem.id}?delete_history=true`);
+                              setSuccessMsg(language === 'es' ? 'Elemento eliminado de tu estantería.' : 'Item removed from your shelf.');
+                              await loadShelfItems();
+                              setTimeout(() => setSuccessMsg(''), 3000);
+                            } catch (err: any) {
+                              setErrorMsg(err.response?.data?.detail || 'Failed to remove item.');
+                              setTimeout(() => setErrorMsg(''), 4000);
+                            }
+                          } else {
+                            setItemToRemoveFromShelf(shelfItem);
+                          }
                         } else {
                           handleQuickAddToShelf(item, e);
                         }

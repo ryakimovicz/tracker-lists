@@ -2034,9 +2034,18 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                     <div style={{ position: 'relative' }}>
                       <button
                         type="button"
-                        onClick={() => {
+                        onClick={async () => {
                           if (selectedItem?.id) {
-                            setShowRemoveShelfModal(true);
+                            const hasProgress = selectedItem.status !== 'plan_to_watch' && 
+                                                selectedItem.status !== 'plan_to_play' && 
+                                                selectedItem.status !== 'plan_to_read' && 
+                                                selectedItem.status !== 'untracked' && 
+                                                Boolean(selectedItem.status || selectedItem.completed_at || selectedItem.last_seen_episode || selectedItem.rating || selectedItem.consumption_count > 0 || selectedItem.total_time_spent > 0 || (episodes && episodes.some((ep: any) => ep.is_completed)) || Object.values(globalProgress).some(Boolean));
+                            if (!hasProgress) {
+                              await handleRemoveFromShelf(true);
+                            } else {
+                              setShowRemoveShelfModal(true);
+                            }
                           } else {
                             handleAddToShelf();
                           }
