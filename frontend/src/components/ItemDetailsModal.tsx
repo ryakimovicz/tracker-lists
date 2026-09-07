@@ -812,11 +812,12 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
   const handleLoadSeasonEpisodes = async (seriesId: string, seasonNumber: number) => {
     if (seasonEpisodes[seasonNumber]) return;
-    const cacheKeyAll = `${seriesId}_all_episodes_v2`;
+    const isComic = selectedItem?.item_type === 'comic';
+    const cacheKeyAll = isComic ? `${seriesId}_all_episodes` : `${seriesId}_all_episodes_v2`;
     const cachedAll = getCachedSeries(cacheKeyAll);
     
     const processAllEps = (allEps: any[]) => {
-      const extIds = allEps.map(e => `tvm-ep-${e.id}`);
+      const extIds = allEps.map(e => isComic ? `cv_issue_${e.id}` : `tvm-ep-${e.id}`);
       if (extIds.length > 0) {
         apiClient.post('/users/me/progress/bulk-check', { external_ids: extIds })
           .then(progRes => {
@@ -827,8 +828,9 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
       const grouped: Record<number, any[]> = {};
       allEps.forEach(ep => {
-        if (!grouped[ep.season_number]) grouped[ep.season_number] = [];
-        grouped[ep.season_number].push(ep);
+        const sNum = ep.season_number ?? 1;
+        if (!grouped[sNum]) grouped[sNum] = [];
+        grouped[sNum].push(ep);
       });
       setSeasonEpisodes(prev => ({ ...prev, ...grouped }));
     };
@@ -840,7 +842,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
     setIsLoadingSeasonEpisodes(true);
     try {
-      const res = await apiClient.get(`/search/series/${seriesId}/episodes`);
+      const url = isComic ? `/search/comic/volume/${seriesId}/issues` : `/search/series/${seriesId}/episodes`;
+      const res = await apiClient.get(url);
       setCachedSeries(cacheKeyAll, res.data);
       processAllEps(res.data || []);
     } catch (err) {
@@ -885,7 +888,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       const isActualEpisode = item.external_id && item.external_id.startsWith('tvm-ep-');
 
         const processAllEps = (allEps: any[]) => {
-          const extIds = allEps.map(e => `tvm-ep-${e.id}`);
+          const isComic = item.item_type === 'comic';
+          const extIds = allEps.map(e => isComic ? `cv_issue_${e.id}` : `tvm-ep-${e.id}`);
           if (extIds.length > 0) {
             apiClient.post('/users/me/progress/bulk-check', { external_ids: extIds })
               .then(progRes => {
