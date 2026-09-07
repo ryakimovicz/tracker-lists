@@ -378,7 +378,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       const defaultSt = isComic ? 'reading' : 'watching';
       const tracked = await ensureTracked(defaultSt);
       if (!tracked) return;
-      effectiveListId = tracked.tracking_list_id || tracked;
+      effectiveListId = typeof tracked === 'number' ? tracked : tracked.tracking_list_id;
     }
 
     const isAllCompleted = isComic ? (selectedItem.status === 'read' || selectedItem.status === 'completed') : selectedItem.status === 'completed';
@@ -1493,6 +1493,17 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
         });
         
         const newItem = res.data;
+        if (newItem && !newItem.tracking_list_id && ['series', 'anime', 'comic'].includes(selectedItem.item_type || newItem.item_type)) {
+          try {
+            const trackRes = await apiClient.post(`/library/${newItem.id}/ensure-tracking`);
+            if (trackRes.data?.tracking_list_id) {
+              newItem.tracking_list_id = trackRes.data.tracking_list_id;
+            }
+          } catch (tErr) {
+            console.error("Failed to ensure tracking list after creation", tErr);
+          }
+        }
+
         setSelectedItem((prev: any) => ({
           ...prev,
           ...newItem
@@ -1674,9 +1685,10 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
     let effectiveListId = selectedItem.tracking_list_id;
     if (!effectiveListId) {
-      const tracked = await ensureTracked('watching');
+      const isComic = selectedItem.item_type === 'comic' || String(selectedItem.external_id || '').startsWith('cv_vol_');
+      const tracked = await ensureTracked(isComic ? 'reading' : 'watching');
       if (!tracked) return;
-      effectiveListId = tracked.tracking_list_id || tracked;
+      effectiveListId = typeof tracked === 'number' ? tracked : tracked.tracking_list_id;
     }
 
     if (episodesToMark.length > 0) {
@@ -1690,20 +1702,11 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
     try {
       await apiClient.post(`/lists/${effectiveListId}/bulk-toggle-episodes`, {
-        episodes: episodesToMark,
-        completed: true
+        episodes: episodesToMark
       });
-
       const listRes = await apiClient.get(`/lists/${effectiveListId}`);
       const updatedList = listRes.data.items || [];
       setEpisodes(updatedList);
-
-      const extIds = updatedList.map((x: any) => x.external_id).filter(Boolean);
-      if (extIds.length > 0) {
-        const progRes = await apiClient.post('/users/me/progress/bulk-check', { external_ids: extIds });
-        setGlobalProgress(prev => ({ ...prev, ...progRes.data }));
-      }
-
       await checkCompletionStatus(effectiveListId, updatedList);
       onUpdate && onUpdate();
     } catch (err) {
@@ -1731,7 +1734,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
           const defaultSt = selectedItem?.item_type === 'comic' ? 'reading' : 'watching';
           const tracked = await ensureTracked(defaultSt);
           if (!tracked) return;
-          effectiveListId = tracked.tracking_list_id || tracked;
+          effectiveListId = typeof tracked === 'number' ? tracked : tracked.tracking_list_id;
         } catch (err) {
           console.error("Failed to track series automatically", err);
           return;
@@ -6005,9 +6008,10 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                           setSeasonActionItem(null);
                           let effectiveListId = selectedItem.tracking_list_id;
                           if (!effectiveListId) {
-                            const tracked = await ensureTracked('watching');
+                            const isComic = selectedItem.item_type === 'comic' || String(selectedItem.external_id || '').startsWith('cv_vol_');
+                            const tracked = await ensureTracked(isComic ? 'reading' : 'watching');
                             if (!tracked) return;
-                            effectiveListId = tracked.tracking_list_id || tracked;
+                            effectiveListId = typeof tracked === 'number' ? tracked : tracked.tracking_list_id;
                           }
 
                           let seriesEps = seasonEpisodes[s.season_number];
@@ -6252,9 +6256,10 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                             const s = prompt.targetSeason;
                             let effectiveListId = selectedItem.tracking_list_id;
                             if (!effectiveListId) {
-                              const tracked = await ensureTracked('watching');
+                              const isComic = selectedItem.item_type === 'comic' || String(selectedItem.external_id || '').startsWith('cv_vol_');
+                              const tracked = await ensureTracked(isComic ? 'reading' : 'watching');
                               if (!tracked) return;
-                              effectiveListId = tracked.tracking_list_id || tracked;
+                              effectiveListId = typeof tracked === 'number' ? tracked : tracked.tracking_list_id;
                             }
                             let seriesEps = seasonEpisodes[s.season_number];
                             if (!seriesEps || seriesEps.length === 0) {

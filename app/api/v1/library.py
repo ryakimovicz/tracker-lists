@@ -464,11 +464,11 @@ def add_to_library(
         
     tracking_list_id = existing.tracking_list_id if existing else None
     
-    if item_in.item_type in ("series", "anime") and not tracking_list_id:
+    if item_in.item_type in ("series", "anime", "comic") and not tracking_list_id:
         private_list = ReadingList(
             creator_id=current_user.id,
             title=f"Tracker: {item_in.title}",
-            description=f"Auto-generated episode tracking for '{item_in.title}'",
+            description=f"Auto-generated tracking for '{item_in.title}'",
             visibility=VisibilityEnum.PRIVATE
         )
         db.add(private_list)
@@ -476,27 +476,28 @@ def add_to_library(
         db.refresh(private_list)
         tracking_list_id = private_list.id
         
-        try:
-            episodes = TVMazeService.get_season_episodes(item_in.external_id, 1)
-            for idx, ep in enumerate(episodes, start=1):
-                ep_num = ep.get("episode_number")
-                ep_name = ep.get("name") or "Untitled Episode"
-                title = f"{item_in.title} - S01E{ep_num:02d} - {ep_name}"
-                image_url = ep.get('image')
-                db_item = ListItem(
-                    list_id=private_list.id,
-                    order_index=idx,
-                    item_type=ItemTypeEnum.SERIES,
-                    external_id=f"tvm-ep-{ep.get('id')}",
-                    title=title,
-                    image_url=image_url,
-                    custom_notes=ep.get("summary"),
-                    section="Season 1"
-                )
-                db.add(db_item)
-            db.commit()
-        except Exception as e:
-            print(f"Failed to auto-populate series episodes: {e}")
+        if item_in.item_type in ("series", "anime"):
+            try:
+                episodes = TVMazeService.get_season_episodes(item_in.external_id, 1)
+                for idx, ep in enumerate(episodes, start=1):
+                    ep_num = ep.get("episode_number")
+                    ep_name = ep.get("name") or "Untitled Episode"
+                    title = f"{item_in.title} - S01E{ep_num:02d} - {ep_name}"
+                    image_url = ep.get('image')
+                    db_item = ListItem(
+                        list_id=private_list.id,
+                        order_index=idx,
+                        item_type=ItemTypeEnum.SERIES,
+                        external_id=f"tvm-ep-{ep.get('id')}",
+                        title=title,
+                        image_url=image_url,
+                        custom_notes=ep.get("summary"),
+                        section="Season 1"
+                    )
+                    db.add(db_item)
+                db.commit()
+            except Exception as e:
+                print(f"Failed to auto-populate series episodes: {e}")
             
     status_val = item_in.status
 
