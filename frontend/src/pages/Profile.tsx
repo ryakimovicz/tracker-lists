@@ -1631,16 +1631,26 @@ export const Profile: React.FC = () => {
                               );
                             })()}
 
-                            {/* Followed series last completed episode */}
-                            {(item.item_type === 'series' || item.item_type === 'anime') && item.last_seen_episode && (
+                            {/* Followed series / comic volume last completed episode or issue */}
+                            {(item.item_type === 'series' || item.item_type === 'anime' || item.item_type === 'comic') && item.last_seen_episode && (
                               <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.3rem', marginTop: '0.35rem' }}>
                                 {(() => {
-                                  const match = item.last_seen_episode.match(/S(\d+)E(\d+)/i);
                                   let formatted = item.last_seen_episode;
-                                  if (match) {
-                                    const s = String(match[1]).padStart(2, '0');
-                                    const e = String(match[2]).padStart(2, '0');
-                                    formatted = language === 'es' ? `T${s} | E${e}` : `S${s} | E${e}`;
+                                  if (item.item_type === 'comic') {
+                                    // If title has #1 or similar, extract or format nicely
+                                    const issueMatch = item.last_seen_episode.match(/#(\d+)/);
+                                    if (issueMatch) {
+                                      formatted = `#${issueMatch[1]}`;
+                                    } else if (item.last_seen_episode.startsWith(item.title)) {
+                                      formatted = item.last_seen_episode.slice(item.title.length).trim() || item.last_seen_episode;
+                                    }
+                                  } else {
+                                    const match = item.last_seen_episode.match(/S(\d+)E(\d+)/i);
+                                    if (match) {
+                                      const s = String(match[1]).padStart(2, '0');
+                                      const e = String(match[2]).padStart(2, '0');
+                                      formatted = language === 'es' ? `T${s} | E${e}` : `S${s} | E${e}`;
+                                    }
                                   }
 
                                   const seriesRuns = item.times_completed || (item.completed_at ? 1 : 0);
@@ -1689,8 +1699,8 @@ export const Profile: React.FC = () => {
                               </span>
                             )}
 
-                            {/* Book / Comic / Manga Pages Read */}
-                            {['book', 'comic', 'manga'].includes(item.item_type) && ((item.pages_read || 0) > 0 || (item.total_pages || 0) > 0) && (
+                            {/* Book / Comic / Manga Pages Read (hide pages for tracked comic volumes with issues) */}
+                            {['book', 'comic', 'manga'].includes(item.item_type) && (!item.tracking_list_id && !item.last_seen_episode) && ((item.pages_read || 0) > 0 || (item.total_pages || 0) > 0) && (
                               <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '0.25rem', marginTop: '0.2rem' }}>
                                 <BookOpen size={12} />
                                 {(() => {

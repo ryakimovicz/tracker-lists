@@ -788,7 +788,7 @@ def auto_add_to_library(db: Session, user_id: int, item: ListItem):
         except Exception:
             pass
 
-    # Check if user is following the parent series
+    # Check if user is following the parent series / comic volume
     existing_series = None
     if show_name:
         existing_series = db.query(UserLibraryItem).filter(
@@ -796,6 +796,28 @@ def auto_add_to_library(db: Session, user_id: int, item: ListItem):
             UserLibraryItem.item_type.in_(["series", "anime"]),
             UserLibraryItem.title == show_name
         ).first()
+
+    is_cv_issue = item.external_id.startswith("cv_issue_") or item.external_id.startswith("cv_") or item.item_type == ItemTypeEnum.COMIC
+
+    # Check if this comic issue belongs to a tracked comic volume
+    existing_comic_vol = None
+    if is_cv_issue and item.list_id:
+        existing_comic_vol = db.query(UserLibraryItem).filter(
+            UserLibraryItem.user_id == user_id,
+            UserLibraryItem.item_type == "comic",
+            UserLibraryItem.tracking_list_id == item.list_id
+        ).first()
+
+    if is_cv_issue:
+        if existing_comic_vol:
+            existing_comic_vol.last_seen_episode = item.title
+            existing_comic_vol.updated_at = datetime.now(timezone.utc)
+            if existing_comic_vol.status in (UserLibraryStatusEnum.PLAN_TO_READ, UserLibraryStatusEnum.READ):
+                existing_comic_vol.status = UserLibraryStatusEnum.READING
+                existing_comic_vol.completed_at = None
+            db.commit()
+        # Never add a loose comic issue as a library item if it belongs to a tracked volume
+        return
 
     if item.external_id.startswith("tvm-ep-") and not existing_series:
         # Add loose episode card to library
@@ -1697,7 +1719,7 @@ def toggle_series_episode(
             
         progress = ItemProgress(
             user_id=current_user.id,
-            item_type=ItemTypeEnum.SERIES,
+            item_type=media_item_type,
             external_id=ext_id,
             list_item_id=item.id,
             is_completed=True,
@@ -1709,7 +1731,8 @@ def toggle_series_episode(
         
     if just_marked:
         auto_add_to_library(db, current_user.id, item)
-        background_tasks.add_task(check_series_completion, current_user.id, ext_id)
+        if media_item_type != ItemTypeEnum.COMIC:
+            background_tasks.add_task(check_series_completion, current_user.id, ext_id)
         
         ch = ConsumptionHistory(
             user_id=current_user.id,
@@ -1734,13 +1757,15 @@ def toggle_series_episode(
         
     db.commit()
     
-    # Run TV Series general UserLibraryItem automatic transitions
+    # Run TV Series & Comic Volume general UserLibraryItem automatic transitions
     lib_item = db.query(UserLibraryItem).filter(
         UserLibraryItem.user_id == current_user.id,
         UserLibraryItem.tracking_list_id == list_id
     ).first()
     
     if lib_item:
+        is_comic_vol = lib_item.item_type == "comic" or media_item_type == ItemTypeEnum.COMIC
+        
         completed_progs = db.query(ItemProgress).filter(
             ItemProgress.user_id == current_user.id,
             ItemProgress.is_completed == True
@@ -1756,7 +1781,7 @@ def toggle_series_episode(
             if li:
                 completed_ep_titles.append(li.title)
                 
-        # Update last_seen_episode based on the most recently consumed episode for this series
+        # Update last_seen_episode based on the most recently consumed episode for this series / comic
         latest_consumed = db.query(ConsumptionHistory, ListItem.title).join(
             ListItem, ListItem.external_id == ConsumptionHistory.external_id
         ).filter(
@@ -1781,46 +1806,57 @@ def toggle_series_episode(
             else:
                 lib_item.last_seen_episode = completed_ep_titles[-1]
 
-            # Check if all currently aired episodes are completed
-            all_aired_completed = False
-            if lib_item.external_id:
-                try:
-                    all_episodes = TVMazeService.get_all_episodes(lib_item.external_id)
-                    now_dt = datetime.now(timezone.utc)
-                    now_date = now_dt.strftime("%Y-%m-%d")
-
-                    def is_ep_aired_check(ep_dict):
-                        astamp = ep_dict.get("airstamp")
-                        if astamp:
-                            try:
-                                ep_dt = datetime.fromisoformat(astamp.replace("Z", "+00:00"))
-                                return ep_dt <= now_dt
-                            except Exception:
-                                pass
-                        adate = ep_dict.get("airdate")
-                        return bool(adate and adate <= now_date)
-
-                    aired_eps = [ep for ep in all_episodes if is_ep_aired_check(ep)]
-                    if aired_eps:
-                        aired_ext_ids = {f"tvm-ep-{ep['id']}" for ep in aired_eps}
-                        watched_ext_ids = {
-                            p.external_id for p in completed_progs if p.external_id
-                        }
-                        if aired_ext_ids.issubset(watched_ext_ids):
-                            all_aired_completed = True
-                except Exception as e:
-                    print(f"Error checking all_aired_completed: {e}")
-
-            if all_aired_completed:
-                lib_item.status = UserLibraryStatusEnum.COMPLETED
-                lib_item.completed_at = datetime.now(timezone.utc)
+        if is_comic_vol:
+            # Comic volume status logic
+            if completed_ep_titles:
+                lib_item.status = UserLibraryStatusEnum.READING
+                lib_item.completed_at = None
             else:
-                lib_item.status = UserLibraryStatusEnum.WATCHING
+                lib_item.last_seen_episode = None
+                lib_item.status = UserLibraryStatusEnum.PLAN_TO_READ
                 lib_item.completed_at = None
         else:
-            lib_item.last_seen_episode = None
-            lib_item.status = UserLibraryStatusEnum.PLAN_TO_WATCH
-            lib_item.completed_at = None
+            # Series / TV logic
+            all_aired_completed = False
+            if completed_ep_titles:
+                if lib_item.external_id:
+                    try:
+                        all_episodes = TVMazeService.get_all_episodes(lib_item.external_id)
+                        now_dt = datetime.now(timezone.utc)
+                        now_date = now_dt.strftime("%Y-%m-%d")
+
+                        def is_ep_aired_check(ep_dict):
+                            astamp = ep_dict.get("airstamp")
+                            if astamp:
+                                try:
+                                    ep_dt = datetime.fromisoformat(astamp.replace("Z", "+00:00"))
+                                    return ep_dt <= now_dt
+                                except Exception:
+                                    pass
+                            adate = ep_dict.get("airdate")
+                            return bool(adate and adate <= now_date)
+
+                        aired_eps = [ep for ep in all_episodes if is_ep_aired_check(ep)]
+                        if aired_eps:
+                            aired_ext_ids = {f"tvm-ep-{ep['id']}" for ep in aired_eps}
+                            watched_ext_ids = {
+                                p.external_id for p in completed_progs if p.external_id
+                            }
+                            if aired_ext_ids.issubset(watched_ext_ids):
+                                all_aired_completed = True
+                    except Exception as e:
+                        print(f"Error checking all_aired_completed: {e}")
+
+                if all_aired_completed:
+                    lib_item.status = UserLibraryStatusEnum.COMPLETED
+                    lib_item.completed_at = datetime.now(timezone.utc)
+                else:
+                    lib_item.status = UserLibraryStatusEnum.WATCHING
+                    lib_item.completed_at = None
+            else:
+                lib_item.last_seen_episode = None
+                lib_item.status = UserLibraryStatusEnum.PLAN_TO_WATCH
+                lib_item.completed_at = None
             
         lib_item.updated_at = datetime.now(timezone.utc)
         db.commit()
