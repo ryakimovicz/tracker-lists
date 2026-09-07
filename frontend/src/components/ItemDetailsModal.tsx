@@ -885,7 +885,10 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       setItemReviews([]);
       setDescExpanded(false);
 
-      const isActualEpisode = item.external_id && item.external_id.startsWith('tvm-ep-');
+      const isActualEpisode = Boolean(
+        (item.external_id && (item.external_id.startsWith('tvm-ep-') || item.external_id.startsWith('cv_issue_'))) ||
+        item.item_type === 'episode'
+      );
 
         const processAllEps = (allEps: any[]) => {
           const isComic = item.item_type === 'comic';
@@ -1365,8 +1368,21 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     initModal(initialItem);
   }, [initialItem?.external_id, initialItem?.id, profileId]);
 
-  const isEpisode = !!(String(selectedItem?.external_id || '').startsWith('tvm-ep-') || selectedItem?.item_type === 'episode' || selectedItem?.list_id);
-  const isEpisodeCompleted = Boolean(isEpisode && (selectedItem?.completed_at || selectedItem?.is_completed || (selectedItem?.id && globalProgress[`tvm-ep-${selectedItem.rawEpisodeId || selectedItem.id}`])));
+  const isEpisode = !!(
+    String(selectedItem?.external_id || '').startsWith('tvm-ep-') ||
+    String(selectedItem?.external_id || '').startsWith('cv_issue_') ||
+    selectedItem?.item_type === 'episode' ||
+    (selectedItem?.item_type !== 'comic' && selectedItem?.list_id)
+  );
+  const isEpisodeCompleted = Boolean(isEpisode && (
+    selectedItem?.completed_at || 
+    selectedItem?.is_completed || 
+    (selectedItem?.id && (
+      globalProgress[`tvm-ep-${selectedItem.rawEpisodeId || selectedItem.id}`] ||
+      globalProgress[`cv_issue_${selectedItem.rawEpisodeId || selectedItem.id}`] ||
+      globalProgress[selectedItem.external_id]
+    ))
+  ));
   const isItemTracked = isEpisode ? isEpisodeCompleted : Boolean(selectedItem?.id && selectedItem?.status);
 
   const handleSaveRating = async (ratingVal: number) => {
@@ -1757,13 +1773,21 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       if (!seriesName && selectedItem.parent_series?.title) {
         seriesName = selectedItem.parent_series.title;
       }
+      // If rawTitle contains issue number or volume title, clean it up
+      let displayTitle = rawTitle;
+      if (seriesName && displayTitle.startsWith(seriesName)) {
+        displayTitle = displayTitle.slice(seriesName.length).trim();
+      }
+      if (episodeNum && displayTitle.startsWith(`#${episodeNum}`)) {
+        displayTitle = displayTitle.replace(new RegExp(`^#${episodeNum}\\s*(-|:)?\\s*`), '').trim();
+      }
       const issueBadge = episodeNum ? `#${episodeNum}` : (language === 'es' ? 'Número individual' : 'Issue');
       return {
         seriesName: seriesName || (selectedItem.parent_series ? selectedItem.parent_series.title : null),
         seasonNum: 1,
         episodeNum,
         seasonBadge: issueBadge,
-        episodeName: rawTitle || (language === 'es' ? 'Número de cómic' : 'Comic Issue')
+        episodeName: displayTitle || (language === 'es' ? `Número #${episodeNum || 1}` : `Issue #${episodeNum || 1}`)
       };
     }
 
@@ -1944,7 +1968,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                               const libRes = await apiClient.get('/library/');
                               const libraryItems = libRes.data || [];
                               const parentSeriesInLib = libraryItems.find((li: any) => 
-                                (li.item_type === 'series' || li.item_type === 'anime') && 
+                                (['series', 'anime', 'comic'].includes(li.item_type)) && 
                                 li.tracking_list_id && 
                                 (li.tracking_list_id === selectedItem.tracking_list_id || li.tracking_list_id === selectedItem.list_id)
                               );
@@ -1958,13 +1982,14 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                             const seriesName = selectedItem.parent_series?.title || selectedItem.series_title || selectedItem.last_seen_episode || (match ? match[1].trim() : null);
                             
                             if (seriesName) {
-                               const searchRes = await apiClient.get(`/search?q=${encodeURIComponent(seriesName)}&type=series`);
+                               const searchType = selectedItem.item_type === 'comic' ? 'comic' : 'series';
+                               const searchRes = await apiClient.get(`/search?q=${encodeURIComponent(seriesName)}&type=${searchType}`);
                                if (searchRes.data && searchRes.data.length > 0) {
                                   const matchedSeries = searchRes.data[0];
                                   const libRes2 = await apiClient.get('/library/');
                                   const libSeries = (libRes2.data || []).find((li: any) => 
                                      li.external_id === matchedSeries.external_id || 
-                                     ( (li.item_type === 'series' || li.item_type === 'anime') && li.title.toLowerCase() === matchedSeries.title.toLowerCase() )
+                                     ( (li.item_type === matchedSeries.item_type) && li.title.toLowerCase() === matchedSeries.title.toLowerCase() )
                                   );
                                   onOpenItem(libSeries || matchedSeries);
                                   return;
@@ -3568,22 +3593,25 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                 </div>
                               </div>
                               <button
-                                onClick={() => onOpenItem && onOpenItem({
-                                  id: dbEp ? dbEp.id : ep.id,
-                                  list_id: selectedItem.tracking_list_id,
-                                  item_type: selectedItem.item_type === 'comic' ? 'comic' : 'episode',
-                                  external_id: String(ep.id).startsWith('cv_') ? ep.id : `tvm-ep-${ep.id}`,
-                                  title: `${selectedItem.title} - ${language === 'es' ? 'Especial' : 'Special'} • ${ep.name || 'Untitled'}`,
-                                  image_url: ep.image_url || ep.image?.original || ep.image?.medium || ep.still_path || selectedItem.image_url,
-                                  custom_notes: JSON.stringify({ description: ep.overview || '', release_date: ep.air_date || null }),
-                                  completed_at: dbEp?.completed_at,
-                                  is_completed: isCompleted,
-                                  season_number: ep.season_number,
-                                  episode_number: ep.episode_number,
-                                  rawEpisodeId: ep.id,
-                                  release_date: ep.air_date,
-                                  parent_series: selectedItem
-                                })}
+                                onClick={() => {
+                                  setHistoryStack(prev => [...prev, selectedItem]);
+                                  onOpenItem && onOpenItem({
+                                    id: dbEp ? dbEp.id : ep.id,
+                                    list_id: selectedItem.tracking_list_id,
+                                    item_type: selectedItem.item_type === 'comic' ? 'comic' : 'episode',
+                                    external_id: String(ep.id).startsWith('cv_') ? ep.id : `tvm-ep-${ep.id}`,
+                                    title: `${selectedItem.title} - ${language === 'es' ? 'Especial' : 'Special'} • ${ep.name || 'Untitled'}`,
+                                    image_url: ep.image_url || ep.image?.original || ep.image?.medium || ep.still_path || selectedItem.image_url,
+                                    custom_notes: JSON.stringify({ description: ep.overview || '', release_date: ep.air_date || null }),
+                                    completed_at: dbEp?.completed_at,
+                                    is_completed: isCompleted,
+                                    season_number: ep.season_number,
+                                    episode_number: ep.episode_number,
+                                    rawEpisodeId: ep.id,
+                                    release_date: ep.air_date,
+                                    parent_series: selectedItem
+                                  });
+                                }}
                                 className="btn-secondary"
                                 style={{ padding: '0.2rem 0.4rem', fontSize: '0.74rem', flexShrink: 0 }}
                               >
@@ -3903,22 +3931,25 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                             </div>
                                           </div>
                                           <button
-                                            onClick={() => onOpenItem && onOpenItem({
-                                              id: dbEp ? dbEp.id : ep.id,
-                                              list_id: selectedItem.tracking_list_id,
-                                              item_type: selectedItem.item_type === 'comic' ? 'comic' : 'episode',
-                                              external_id: selectedItem.item_type === 'comic' ? `cv_issue_${ep.id}` : `tvm-ep-${ep.id}`,
-                                              title: selectedItem.item_type === 'comic' ? `${selectedItem.title} ${ep.name}` : `${selectedItem.title} - ${ep.season_number > 0 ? (ep.season_number < 10 ? 'S0' + ep.season_number : 'S' + ep.season_number) : (language === 'es' ? 'Extras' : 'Extras')}${ep.episode_number != null ? (ep.episode_number < 10 ? 'E0' + ep.episode_number : 'E' + ep.episode_number) : (isSpecial ? ' • ' + (language === 'es' ? 'Especial' : 'Special') : '')} - ${ep.name || 'Untitled'}`,
-                                              image_url: ep.image_url || ep.image?.original || ep.image?.medium || ep.still_path || selectedItem.image_url,
-                                              custom_notes: JSON.stringify({ description: ep.overview || '', release_date: ep.air_date || null }),
-                                              completed_at: dbEp?.completed_at,
-                                              is_completed: isCompleted,
-                                              season_number: ep.season_number,
-                                              episode_number: ep.episode_number,
-                                              rawEpisodeId: ep.id,
-                                              release_date: ep.air_date,
-                                              parent_series: selectedItem
-                                            })}
+                                            onClick={() => {
+                                              setHistoryStack(prev => [...prev, selectedItem]);
+                                              onOpenItem && onOpenItem({
+                                                id: dbEp ? dbEp.id : ep.id,
+                                                list_id: selectedItem.tracking_list_id,
+                                                item_type: selectedItem.item_type === 'comic' ? 'comic' : 'episode',
+                                                external_id: selectedItem.item_type === 'comic' ? `cv_issue_${ep.id}` : `tvm-ep-${ep.id}`,
+                                                title: selectedItem.item_type === 'comic' ? `${selectedItem.title} ${ep.name}` : `${selectedItem.title} - ${ep.season_number > 0 ? (ep.season_number < 10 ? 'S0' + ep.season_number : 'S' + ep.season_number) : (language === 'es' ? 'Extras' : 'Extras')}${ep.episode_number != null ? (ep.episode_number < 10 ? 'E0' + ep.episode_number : 'E' + ep.episode_number) : (isSpecial ? ' • ' + (language === 'es' ? 'Especial' : 'Special') : '')} - ${ep.name || 'Untitled'}`,
+                                                image_url: ep.image_url || ep.image?.original || ep.image?.medium || ep.still_path || selectedItem.image_url,
+                                                custom_notes: JSON.stringify({ description: ep.overview || '', release_date: ep.air_date || null }),
+                                                completed_at: dbEp?.completed_at,
+                                                is_completed: isCompleted,
+                                                season_number: ep.season_number,
+                                                episode_number: ep.episode_number,
+                                                rawEpisodeId: ep.id,
+                                                release_date: ep.air_date,
+                                                parent_series: selectedItem
+                                              });
+                                            }}
                                             className="btn-secondary"
                                             style={{ padding: '0.2rem 0.4rem', fontSize: '0.74rem', flexShrink: 0 }}
                                           >
