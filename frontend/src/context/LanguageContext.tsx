@@ -100,6 +100,14 @@ const translations: Translations = {
   mediaAnime: { en: 'Anime', es: 'Anime' },
   mediaEpisode: { en: 'Episode', es: 'Episodio' },
   mediaSeason: { en: 'Season', es: 'Temporada' },
+  mediaSpecial: { en: 'Special', es: 'Especial' },
+  mediaExtras: { en: 'Extras', es: 'Extras' },
+  markSeasonsOnly: { en: 'Seasons only', es: 'Solo temporadas' },
+  markSeasonsAndSpecials: { en: 'Seasons + Specials', es: 'Temporadas + Especiales' },
+  markAllIncludingExtras: { en: 'All (Seasons, Specials & Extras)', es: 'Todo (Temporadas, Especiales y Extras)' },
+  unmarkSeasonsOnly: { en: 'Unmark seasons only', es: 'Desmarcar solo temporadas' },
+  unmarkSeasonsAndSpecials: { en: 'Unmark seasons + specials', es: 'Desmarcar temporadas + especiales' },
+  unmarkAllIncludingExtras: { en: 'Unmark everything', es: 'Desmarcar todo' },
 
   // Search Page
   searchTitle: { en: 'Explore Media Database', es: 'Explorar Base de Datos' },

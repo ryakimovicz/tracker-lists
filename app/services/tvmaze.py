@@ -91,10 +91,14 @@ class TVMazeService:
                     # Fetch episodes first to know the real episode count per season
                     all_eps = TVMazeService.get_all_episodes(series_id)
                     eps_per_season = {}
+                    extras_count = 0
                     for ep in all_eps:
-                        s_num = ep.get("season_number")
-                        if s_num is not None:
-                            eps_per_season[s_num] = eps_per_season.get(s_num, 0) + 1
+                        if ep.get("is_extra") or ep.get("season_number") == 0:
+                            extras_count += 1
+                        else:
+                            s_num = ep.get("season_number")
+                            if s_num is not None and s_num > 0:
+                                eps_per_season[s_num] = eps_per_season.get(s_num, 0) + 1
 
                     try:
                         with urllib.request.urlopen(f"https://api.tvmaze.com/shows/{real_id}/seasons", timeout=5) as s_response:
@@ -122,6 +126,15 @@ class TVMazeService:
                                 "season_number": num,
                                 "episode_count": count
                             })
+
+                    # If there are insignificant specials / extras, append the Extras season (season_number: 0) at the end
+                    if extras_count > 0:
+                        seasons.append({
+                            "id": "extras",
+                            "season_number": 0,
+                            "is_extras": True,
+                            "episode_count": extras_count
+                        })
                     
                     return {
                         "id": series_id,
@@ -140,7 +153,7 @@ class TVMazeService:
     @staticmethod
     def get_all_episodes(series_id: str) -> List[dict]:
         real_id = str(series_id).replace('tvm_', '').replace('tvm-', '')
-        url = f"https://api.tvmaze.com/shows/{real_id}/episodes"
+        url = f"https://api.tvmaze.com/shows/{real_id}/episodes?specials=1"
         req = urllib.request.Request(url, headers={"User-Agent": "TrackerLists/1.0"})
         
         episodes = []
@@ -150,16 +163,31 @@ class TVMazeService:
                     data = json.loads(response.read().decode())
                     for ep in data:
                         img = ep.get("image")
+                        ep_type = ep.get("type", "regular")
+                        is_significant = (ep_type == "significant_special")
+                        is_extra = (ep_type == "insignificant_special")
+                        raw_season = ep.get("season")
+                        
+                        # For extras (insignificant specials), assign season_number = 0
+                        # For significant specials, keep their natural broadcast season (or 0 if none)
+                        if is_extra:
+                            season_num = 0
+                        else:
+                            season_num = raw_season if raw_season is not None else 1
+
                         episodes.append({
                             "id": ep.get("id"),
                             "name": ep.get("name"),
                             "episode_number": ep.get("number"),
-                            "season_number": ep.get("season"),
+                            "season_number": season_num,
                             "still_path": img.get("original") if img else None,
                             "overview": ep.get("summary", ""),
                             "air_date": ep.get("airdate"),
                             "airtime": ep.get("airtime"),
-                            "airstamp": ep.get("airstamp")
+                            "airstamp": ep.get("airstamp"),
+                            "ep_type": ep_type,
+                            "is_significant_special": is_significant,
+                            "is_extra": is_extra
                         })
         except Exception:
             pass
@@ -169,6 +197,7 @@ class TVMazeService:
     def get_season_episodes(series_id: str, season_number: int) -> List[dict]:
         all_eps = TVMazeService.get_all_episodes(series_id)
         return [ep for ep in all_eps if ep.get("season_number") == season_number]
+
 
     @staticmethod
     def get_episode_detail(series_id: str, season_number: int, episode_number: int) -> dict:

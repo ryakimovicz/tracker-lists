@@ -2313,7 +2313,10 @@ def bulk_toggle_episodes(
                         adate = ep_dict.get("airdate")
                         return bool(adate and adate <= now_date)
 
-                    aired_eps = [e for e in all_episodes if is_ep_aired_check(e)]
+                    aired_eps = [
+                        e for e in all_episodes 
+                        if is_ep_aired_check(e) and not e.get("is_extra") and e.get("season_number", 1) != 0 and e.get("ep_type") != "insignificant_special"
+                    ]
                     if aired_eps:
                         aired_ext_ids = {f"tvm-ep-{e['id']}" for e in aired_eps}
                         completed_progs = db.query(ItemProgress.external_id).filter(
