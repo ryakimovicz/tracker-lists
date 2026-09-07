@@ -7,6 +7,7 @@ class ItemTypeEnum(str, enum.Enum):
     ANIME = "anime"
     MANGA = "manga"
     BOOK = "book"
+    COMIC = "comic"
     MOVIE = "movie"
     SERIES = "series"
     GAME = "game"

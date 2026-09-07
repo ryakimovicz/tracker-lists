@@ -1621,7 +1621,6 @@ def toggle_series_episode(
 
     raw_ep_str = str(ep_req.episode_id)
     is_comic = (
-        (reading_list and reading_list.item_type == ItemTypeEnum.COMIC) or
         (tracking_lib_item and tracking_lib_item.item_type == "comic") or
         raw_ep_str.startswith("cv_") or
         raw_ep_str.startswith("cv-") or
@@ -2128,7 +2127,7 @@ def bulk_toggle_all_seasons(
     ).first()
     
     series_title = lib_item.title if lib_item else "Series"
-    is_comic = (lib_item and lib_item.item_type == ItemTypeEnum.COMIC) or (reading_list and reading_list.item_type == ItemTypeEnum.COMIC)
+    is_comic = (lib_item and lib_item.item_type == "comic")
     
     # Resolve all episodes list (fetch directly if not supplied)
     episodes_list = req.episodes
@@ -2348,7 +2347,7 @@ def bulk_toggle_episodes(
     ).first()
     
     series_title = lib_item.title if lib_item else "Series"
-    is_comic = (lib_item and lib_item.item_type == ItemTypeEnum.COMIC) or (reading_list and reading_list.item_type == ItemTypeEnum.COMIC)
+    is_comic = (lib_item and lib_item.item_type == "comic")
     episodes_list = req.episodes or []
     item_count = db.query(ListItem).filter(ListItem.list_id == list_id).count()
     now_dt = datetime.now(timezone.utc)
