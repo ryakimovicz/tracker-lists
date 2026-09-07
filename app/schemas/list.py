@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Union
 from pydantic import BaseModel, Field
 from app.models.list import VisibilityEnum
 from app.models.list_item import ItemTypeEnum
@@ -105,7 +105,7 @@ class BulkToggleRequest(BaseModel):
     completed: bool
 
 class ToggleSeriesEpisodeRequest(BaseModel):
-    episode_id: int
+    episode_id: Union[int, str]
     title: str
     image_url: Optional[str] = None
     overview: Optional[str] = None

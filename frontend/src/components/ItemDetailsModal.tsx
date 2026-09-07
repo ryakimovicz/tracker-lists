@@ -170,9 +170,11 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   const [hasInteractedWithTime, setHasInteractedWithTime] = useState<boolean>(false);
   const [isSavingReview, setIsSavingReview] = useState(false);
 
-  // Game relations & Navigation history
+  // Game & Manga relations & Navigation history
   const [gameRelations, setGameRelations] = useState<{ collections?: any[], bundle_games?: any[], editions?: any[], dlcs?: any[], parent_game?: any } | null>(null);
   const [isLoadingGameRelations, setIsLoadingGameRelations] = useState<boolean>(false);
+  const [mangaRelations, setMangaRelations] = useState<{ sequels_prequels?: any[], spin_offs_side_stories?: any[], other_relations?: any[] } | null>(null);
+  const [isLoadingMangaRelations, setIsLoadingMangaRelations] = useState<boolean>(false);
   const [historyStack, setHistoryStack] = useState<any[]>([]);
 
   const [descExpanded, setDescExpanded] = useState(false);
@@ -1028,21 +1030,86 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
         }
       }
 
-      // Fetch game relations (collections, DLCs, editions, base game)
-      if (item.item_type === 'game' && item.external_id) {
-        setIsLoadingGameRelations(true);
-        apiClient.get(`/search/game/${item.external_id}/relations`)
-          .then(res => {
-            setGameRelations(res.data || null);
-          })
-          .catch(e => {
-            console.error("Failed to load game relations", e);
-            setGameRelations(null);
-          })
-          .finally(() => setIsLoadingGameRelations(false));
-      } else {
-        setGameRelations(null);
-      }
+        // Comic Volume loading (structured like series with seasons/issues)
+        const isComicVolume = item.item_type === 'comic' && !isActualEpisode && item.external_id && (item.external_id.startsWith('cv_vol_') || !item.external_id.startsWith('cv_issue_'));
+        if (isComicVolume) {
+          const volId = item.external_id;
+          const cacheKeyMeta = `${volId}_metadata`;
+          const cacheKeyAll = `${volId}_all_episodes`;
+          const cachedMeta = getCachedSeries(cacheKeyMeta);
+          const cachedAll = getCachedSeries(cacheKeyAll);
+
+          if (!cachedMeta || !cachedMeta.seasons) {
+            apiClient.get(`/search/comic/volume/${volId}`).then(volRes => {
+              const volData = volRes.data || {};
+              let rawSeasons = volData?.seasons || [{ id: 1, season_number: 1, episode_count: volData.count_of_issues || 1 }];
+              setCachedSeries(cacheKeyMeta, { ...volData, seasons: rawSeasons });
+              setSeasons(rawSeasons);
+              setActiveSeason(1);
+            }).catch(console.error);
+          } else {
+            setSeasons(cachedMeta.seasons);
+            setActiveSeason(1);
+          }
+
+          apiClient.get(`/search/comic/volume/${volId}/issues`).then(res => {
+            if (Array.isArray(res.data) && res.data.length > 0) {
+              setCachedSeries(cacheKeyAll, res.data);
+              processAllEps(res.data);
+            }
+          }).catch(console.error).finally(() => setIsLoadingSeasonEpisodes(false));
+
+          if (!cachedAll || !Array.isArray(cachedAll) || cachedAll.length === 0) {
+            setIsLoadingSeasonEpisodes(true);
+          }
+        }
+
+        // Comic Issue individual loading (enrich parent series information if missing)
+        const isComicIssue = item.item_type === 'comic' && (isActualEpisode || (item.external_id && item.external_id.startsWith('cv_issue_')));
+        if (isComicIssue && !item.parent_series && item.external_id) {
+          apiClient.get(`/search/comic/issue/${item.external_id}`).then(res => {
+            if (res.data) {
+              setSelectedItem((prev: any) => prev ? {
+                ...prev,
+                parent_series: res.data.parent_series || prev.parent_series,
+                overview: res.data.overview || prev.overview,
+                description: res.data.description || prev.description
+              } : null);
+            }
+          }).catch(console.error);
+        }
+
+        // Fetch game relations (collections, DLCs, editions, base game)
+        if (item.item_type === 'game' && item.external_id) {
+          setIsLoadingGameRelations(true);
+          apiClient.get(`/search/game/${item.external_id}/relations`)
+            .then(res => {
+              setGameRelations(res.data || null);
+            })
+            .catch(e => {
+              console.error("Failed to load game relations", e);
+              setGameRelations(null);
+            })
+            .finally(() => setIsLoadingGameRelations(false));
+        } else {
+          setGameRelations(null);
+        }
+
+        // Fetch manga relations (sequels, prequels, spin-offs, side stories)
+        if (item.item_type === 'manga' && item.external_id) {
+          setIsLoadingMangaRelations(true);
+          apiClient.get(`/search/manga/${item.external_id}/relations`)
+            .then(res => {
+              setMangaRelations(res.data || null);
+            })
+            .catch(e => {
+              console.error("Failed to load manga relations", e);
+              setMangaRelations(null);
+            })
+            .finally(() => setIsLoadingMangaRelations(false));
+        } else {
+          setMangaRelations(null);
+        }
 
       // Movie metadata enrichment (if poster is missing or placeholder)
       if (item.item_type === 'movie') {
@@ -1491,7 +1558,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
             }
           }
           if (targetId) {
-            const fallbackStatus = completedEpisodes > 0 ? 'watching' : 'plan_to_watch';
+            const fallbackStatus = completedEpisodes > 0 ? (selectedItem.item_type === 'comic' ? 'reading' : 'watching') : (selectedItem.item_type === 'comic' ? 'plan_to_read' : 'plan_to_watch');
             await apiClient.put(`/library/${targetId}`, { status: fallbackStatus });
             if (selectedItem.item_type !== 'episode') {
               setSelectedItem((prev: any) => ({ ...prev, status: fallbackStatus, id: targetId }));
@@ -1504,13 +1571,40 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     }
   };
 
+  const handleGoBackHistory = () => {
+    if (historyStack.length === 0) {
+      onClose();
+      return;
+    }
+    const prevItem = historyStack[historyStack.length - 1];
+    setHistoryStack(prev => prev.slice(0, prev.length - 1));
+    if (onOpenItem) {
+      onOpenItem(prevItem);
+    } else {
+      setSelectedItem(prevItem);
+    }
+  };
+
+  const handleSavePagesRead = async (pages: number) => {
+    if (!selectedItem) return;
+    if (selectedItem.id) {
+      try {
+        await apiClient.put(`/library/${selectedItem.id}`, { pages_read: pages });
+        setSelectedItem((prev: any) => prev ? { ...prev, pages_read: pages } : null);
+        onUpdate && onUpdate();
+      } catch (err) {
+        console.error("Failed to save pages read", err);
+      }
+    }
+  };
+
   const handleOpenRelatedGame = (related: any) => {
     setHistoryStack(prev => [...prev, selectedItem]);
     const target = {
       external_id: String(related.external_id || related.id),
       title: related.title,
       image_url: related.image_url,
-      item_type: 'game'
+      item_type: related.item_type || 'game'
     };
     if (onOpenItem) {
       onOpenItem(target);
@@ -1519,15 +1613,18 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     }
   };
 
-  const handleGoBackHistory = () => {
-    if (historyStack.length > 0) {
-      const prevItem = historyStack[historyStack.length - 1];
-      setHistoryStack(prev => prev.slice(0, -1));
-      if (onOpenItem) {
-        onOpenItem(prevItem);
-      } else {
-        setSelectedItem(prevItem);
-      }
+  const handleOpenRelatedManga = (related: any) => {
+    setHistoryStack(prev => [...prev, selectedItem]);
+    const target = {
+      external_id: String(related.external_id || related.id),
+      title: related.title,
+      image_url: related.image_url,
+      item_type: 'manga'
+    };
+    if (onOpenItem) {
+      onOpenItem(target);
+    } else {
+      setSelectedItem(target);
     }
   };
 
@@ -1541,37 +1638,20 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       effectiveListId = tracked.tracking_list_id || tracked;
     }
 
-    // 1. Optimistic global progress update for all target episodes in 0ms
-    const newProg: Record<string, boolean> = {};
-    episodesToMark.forEach(ep => {
-      newProg[`tvm-ep-${ep.id}`] = true;
-    });
-    setGlobalProgress(prev => ({ ...prev, ...newProg }));
+    if (episodesToMark.length > 0) {
+      const newProg: Record<string, boolean> = {};
+      episodesToMark.forEach((ep: any) => {
+        const idKey = String(ep.id).startsWith('cv_') ? ep.id : `tvm-ep-${ep.id}`;
+        newProg[idKey] = true;
+      });
+      setGlobalProgress(prev => ({ ...prev, ...newProg }));
+    }
 
-    // 2. Single atomic bulk request to the server
     try {
-      const payload = episodesToMark.map(ep => ({
-        id: ep.id,
-        title: ep.title || `${selectedItem.title} - S${ep.season_number < 10 ? '0' + ep.season_number : ep.season_number}E${ep.episode_number < 10 ? '0' + ep.episode_number : ep.episode_number} - ${ep.name || 'Untitled Episode'}`,
-        image_url: ep.image_url || ep.image?.original || ep.image?.medium || ep.still_path || selectedItem.image_url,
-        overview: ep.custom_notes || ep.overview,
-        season_number: ep.season_number,
-        episode_number: ep.episode_number,
-        air_date: ep.air_date || ep.airdate || null
-      }));
-
-      const res = await apiClient.post(`/lists/${effectiveListId}/bulk-toggle-episodes`, {
-        episodes: payload,
+      await apiClient.post(`/lists/${effectiveListId}/bulk-toggle-episodes`, {
+        episodes: episodesToMark,
         completed: true
       });
-
-      if (res.data?.status) {
-        setSelectedItem((prev: any) => prev ? {
-          ...prev,
-          status: res.data.status,
-          completed_at: res.data.status === 'completed' ? new Date().toISOString() : null
-        } : null);
-      }
 
       const listRes = await apiClient.get(`/lists/${effectiveListId}`);
       const updatedList = listRes.data.items || [];
@@ -1584,47 +1664,31 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       }
 
       await checkCompletionStatus(effectiveListId, updatedList);
-      onUpdate();
+      onUpdate && onUpdate();
     } catch (err) {
-      console.error("Bulk episodes mark failed", err);
+      console.error("Bulk toggle missing episodes failed", err);
     }
   };
 
-  const handleToggleEpisode = async (listId: number, ep: any, action?: string) => {
-
-    let effectiveListId = listId;
+  const handleToggleEpisode = async (listId: number, ep: any, action?: 'mark_again' | 'remove') => {
+    let effectiveListId = listId || selectedItem?.tracking_list_id;
+    
     if (!effectiveListId) {
-      if (selectedItem.parent_series) {
+      if (selectedItem?.id) {
         try {
-          const res = await apiClient.post('/library/', {
-            external_id: selectedItem.parent_series.external_id,
-            title: selectedItem.parent_series.title,
-            image_url: selectedItem.parent_series.image_url,
-            item_type: selectedItem.parent_series.item_type,
-            status: 'watching'
-          });
+          const res = await apiClient.post(`/library/${selectedItem.id}/ensure-tracking`);
           effectiveListId = res.data.tracking_list_id;
-        } catch (e) {
-          console.error("Failed to track parent series", e);
+          if (effectiveListId) {
+            setSelectedItem((prev: any) => prev ? { ...prev, tracking_list_id: effectiveListId } : null);
+          }
+        } catch (err) {
+          console.error("Failed to ensure tracking list", err);
+          return;
         }
-      }
-
-      if (!effectiveListId && selectedItem.id && selectedItem.item_type === 'episode') {
+      } else {
         try {
-           const isComplete = !!(selectedItem.completed_at || selectedItem.is_completed);
-           const res = await apiClient.put(`/library/${selectedItem.id}`, { completed_at: isComplete ? null : new Date().toISOString() });
-           setSelectedItem((prev: any) => prev ? { ...prev, completed_at: res.data.completed_at, is_completed: !!res.data.completed_at } : null);
-           onUpdate && onUpdate();
-           return;
-        } catch (e) {
-           console.error("Failed to update standalone episode", e);
-           return;
-        }
-      }
-
-      if (!effectiveListId) {
-        try {
-          const tracked = await ensureTracked('watching');
+          const defaultSt = selectedItem?.item_type === 'comic' ? 'reading' : 'watching';
+          const tracked = await ensureTracked(defaultSt);
           if (!tracked) return;
           effectiveListId = tracked.tracking_list_id || tracked;
         } catch (err) {
@@ -1638,10 +1702,10 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       const url = action ? `/lists/${effectiveListId}/toggle-series-episode?action=${action}` : `/lists/${effectiveListId}/toggle-series-episode`;
       const res = await apiClient.post(url, {
         episode_id: ep.id,
-        title: ep.title || `${selectedItem.title} - S${ep.season_number < 10 ? '0' + ep.season_number : ep.season_number}E${ep.episode_number < 10 ? '0' + ep.episode_number : ep.episode_number} - ${ep.name || 'Untitled Episode'}`,
+        title: ep.title || `${selectedItem.title} - ${ep.name || 'Untitled Episode'}`,
         image_url: ep.image_url || ep.image?.original || ep.image?.medium || ep.still_path || selectedItem.image_url,
         overview: ep.custom_notes || ep.overview,
-        season_number: ep.season_number,
+        season_number: ep.season_number || 1,
         episode_number: ep.episode_number
       });
       
@@ -1649,11 +1713,11 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       const updatedList = listRes.data.items || [];
       setEpisodes(updatedList);
 
-      if (selectedItem && (selectedItem.external_id === `tvm-ep-${ep.id}` || selectedItem.id === ep.id || selectedItem.rawEpisodeId === ep.id)) {
+      if (selectedItem && (selectedItem.external_id === `tvm-ep-${ep.id}` || selectedItem.external_id === `cv_issue_${ep.id}` || selectedItem.id === ep.id || selectedItem.rawEpisodeId === ep.id)) {
         setSelectedItem((prev: any) => prev ? { ...prev, completed_at: res.data.completed_at, is_completed: res.data.is_completed } : null);
         const targetFetchKey = selectedItem.id || selectedItem.external_id || `tvm-ep-${ep.id}`;
         if (targetFetchKey && user?.is_pro) {
-          apiClient.get(`/library/${targetFetchKey}/consumption-history?item_type=episode`)
+          apiClient.get(`/library/${targetFetchKey}/consumption-history?item_type=${selectedItem.item_type || 'episode'}`)
             .then(hRes => {
               if (hRes.data) {
                 if (hRes.data.history) setConsumptionHistory(hRes.data.history);
@@ -1665,30 +1729,9 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       }
       
       await checkCompletionStatus(effectiveListId, updatedList);
-      onUpdate();
+      onUpdate && onUpdate();
     } catch (err) {
       console.error("Failed to toggle episode", err);
-    }
-  };
-
-  const handleSavePagesRead = async (val: number) => {
-    if (!selectedItem) return;
-    try {
-      let targetId = selectedItem.id;
-      if (!targetId) {
-        const defaultStatus = ['book', 'comic', 'manga'].includes(selectedItem.item_type) ? 'reading' : (selectedItem.item_type === 'game' ? 'playing' : 'watching');
-        const tracked = await ensureTracked(defaultStatus);
-        if (tracked) targetId = tracked.id;
-      }
-      if (targetId) {
-        const res = await apiClient.put(`/library/${targetId}`, {
-          pages_read: val
-        });
-        setSelectedItem((prev: any) => prev ? { ...prev, pages_read: res.data.pages_read, status: res.data.status } : null);
-        onUpdate && onUpdate();
-      }
-    } catch (err) {
-      console.error("Failed to update pages read", err);
     }
   };
 
@@ -1698,12 +1741,28 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
   const getEpisodeHeaderInfo = () => {
     if (!isEpisode) return null;
-    let seriesName = selectedItem.parent_series?.title || selectedItem.series_title || '';
+    let seriesName = selectedItem.parent_series?.title || selectedItem.series_title || selectedItem.volume_name || '';
     let seasonNum = selectedItem.season_number;
-    let episodeNum = selectedItem.episode_number;
+    let episodeNum = selectedItem.episode_number || selectedItem.issue_number;
     let episodeName = selectedItem.episode_name || '';
 
+    const isComic = selectedItem.item_type === 'comic' || String(selectedItem.external_id || '').startsWith('cv_issue_');
     const rawTitle = selectedItem.title || '';
+
+    if (isComic) {
+      if (!seriesName && selectedItem.parent_series?.title) {
+        seriesName = selectedItem.parent_series.title;
+      }
+      const issueBadge = episodeNum ? `#${episodeNum}` : (language === 'es' ? 'Número individual' : 'Issue');
+      return {
+        seriesName: seriesName || (selectedItem.parent_series ? selectedItem.parent_series.title : null),
+        seasonNum: 1,
+        episodeNum,
+        seasonBadge: issueBadge,
+        episodeName: rawTitle || (language === 'es' ? 'Número de cómic' : 'Comic Issue')
+      };
+    }
+
     const matchFull = rawTitle.match(/^(.*?)\s*-\s*S(\d+)E(\d+)\s*-\s*(.*)$/i);
     if (matchFull) {
       if (!seriesName) seriesName = matchFull[1].trim();
@@ -1746,6 +1805,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     if (isEpisode) {
       if (selectedItem.parent_series?.item_type === 'anime' || selectedItem.category === 'anime') {
         cat = 'anime';
+      } else if (selectedItem.parent_series?.item_type === 'comic' || selectedItem.item_type === 'comic' || String(selectedItem.external_id || '').startsWith('cv_issue_')) {
+        cat = 'comic';
       } else {
         cat = 'series';
       }
@@ -1832,8 +1893,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   if (!selectedItem) return null;
   
   return (
-          <div
-            style={{
+    <div
+      style={{
               position: 'fixed',
               top: 0, left: 0, right: 0, bottom: 0,
               background: 'rgba(0, 0, 0, 0.75)',
@@ -3321,14 +3382,13 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                       </div>
                     </div>
                   )}
-                </div>
-              </div>
-
-              {/* TV Series Season Accordion Tracking */}
-              {(selectedItem.item_type === 'series' || selectedItem.item_type === 'anime') && seasons.length > 0 && !isEpisode && (
+                       {/* TV Series Season / Comic Volume Accordion Tracking */}
+              {(selectedItem.item_type === 'series' || selectedItem.item_type === 'anime' || selectedItem.item_type === 'comic') && seasons.length > 0 && !isEpisode && (
                 <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                   <h4 style={{ margin: 0, fontSize: '1.1rem' }}>
-                    {language === 'es' ? 'Seguimiento de Temporadas' : 'Season Tracking'}
+                    {selectedItem.item_type === 'comic' 
+                      ? (language === 'es' ? 'Seguimiento de Números' : 'Issues Tracking')
+                      : (language === 'es' ? 'Seguimiento de Temporadas' : 'Season Tracking')}
                   </h4>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                     {(() => {
@@ -3419,8 +3479,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                       return timeline.map((item) => {
                         if (item.type === 'standalone_special') {
                           const ep = item.episode;
-                          const dbEp = (episodes || []).find(x => x.external_id === `tvm-ep-${ep.id}`);
-                          const isCompleted = !!globalProgress[`tvm-ep-${ep.id}`] || !!dbEp?.is_completed;
+                          const dbEp = (episodes || []).find(x => x.external_id === `tvm-ep-${ep.id}` || x.external_id === `cv_issue_${ep.id}`);
+                          const isCompleted = !!globalProgress[`tvm-ep-${ep.id}`] || !!globalProgress[`cv_issue_${ep.id}`] || !!dbEp?.is_completed;
 
                           return (
                             <div
@@ -3442,7 +3502,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                     type="button"
                                     disabled={!user}
                                     onClick={() => {
-                                      const currentIsCompleted = !!globalProgress[`tvm-ep-${ep.id}`] || !!dbEp?.is_completed;
+                                      const currentIsCompleted = !!globalProgress[`tvm-ep-${ep.id}`] || !!globalProgress[`cv_issue_${ep.id}`] || !!dbEp?.is_completed;
                                       if (currentIsCompleted) {
                                         setEpisodeActionItem({ ep, listId: selectedItem.tracking_list_id });
                                       } else {
@@ -3455,7 +3515,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                           });
                                           return;
                                         }
-                                        setGlobalProgress(prev => ({ ...prev, [`tvm-ep-${ep.id}`]: true }));
+                                        const progressKey = String(ep.id).startsWith('cv_') ? ep.id : `tvm-ep-${ep.id}`;
+                                        setGlobalProgress(prev => ({ ...prev, [progressKey]: true }));
                                         handleToggleEpisode(selectedItem.tracking_list_id, ep);
                                       }
                                     }}
@@ -3492,11 +3553,11 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                   }}>
                                     {language === 'es' ? 'Especial' : 'Special'}
                                   </span>
-                                  <span style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={ep.name || 'Untitled'}>
+                                  <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={ep.name || 'Untitled'}>
                                     {ep.name || 'Untitled'}
                                   </span>
                                   {ep.air_date && (
-                                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', flexShrink: 0 }}>
+                                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', flexShrink: 0 }}>
                                       ({formatReleaseDate(ep.air_date)})
                                     </span>
                                   )}
@@ -3506,8 +3567,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                 onClick={() => onOpenItem && onOpenItem({
                                   id: dbEp ? dbEp.id : ep.id,
                                   list_id: selectedItem.tracking_list_id,
-                                  item_type: 'episode',
-                                  external_id: `tvm-ep-${ep.id}`,
+                                  item_type: selectedItem.item_type === 'comic' ? 'comic' : 'episode',
+                                  external_id: String(ep.id).startsWith('cv_') ? ep.id : `tvm-ep-${ep.id}`,
                                   title: `${selectedItem.title} - ${language === 'es' ? 'Especial' : 'Special'} • ${ep.name || 'Untitled'}`,
                                   image_url: ep.image_url || ep.image?.original || ep.image?.medium || ep.still_path || selectedItem.image_url,
                                   custom_notes: JSON.stringify({ description: ep.overview || '', release_date: ep.air_date || null }),
@@ -3536,7 +3597,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
                           const isEpWatched = (epId: any, seasonNum?: number, epNum?: number) => {
                             if (!epId) return false;
-                            const extId = typeof epId === 'string' && epId.startsWith('tvm-ep-') ? epId : `tvm-ep-${epId}`;
+                            const extId = typeof epId === 'string' && (epId.startsWith('tvm-ep-') || epId.startsWith('cv_issue_')) ? epId : (selectedItem.item_type === 'comic' ? `cv_issue_${epId}` : `tvm-ep-${epId}`);
                             if (globalProgress[extId] !== undefined) return !!globalProgress[extId];
                             const found = (episodes || []).find(x => 
                               x.external_id === extId || 
@@ -3555,7 +3616,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                           }
 
                           if (!Array.isArray(sEps) || sEps.length === 0) {
-                            const listSeps = (episodes || []).filter(x => x.season_number === s.season_number || x.section === `Season ${s.season_number}`);
+                            const listSeps = (episodes || []).filter(x => x.season_number === s.season_number || x.section === `Season ${s.season_number}` || x.section === 'Volumen');
                             const done = listSeps.length > 0 && listSeps.every(x => globalProgress[x.external_id] !== undefined ? !!globalProgress[x.external_id] : !!x.is_completed);
                             return { isSeasonDone: done, isSeasonPartial: false };
                           }
@@ -3583,6 +3644,16 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         const displayedSeasonEps = rawSeasonEps.filter((ep: any) => {
                           return !standaloneSpecials.some((sp: any) => sp.id === ep.id);
                         });
+
+                        const seasonLabel = selectedItem.item_type === 'comic'
+                          ? (s.name || (language === 'es' ? `Volumen ${s.season_number}` : `Volume ${s.season_number}`))
+                          : s.is_extras || s.season_number === 0
+                          ? (language === 'es' ? 'Extras' : 'Extras')
+                          : (language === 'es' ? `Temporada ${s.season_number}` : `Season ${s.season_number}`);
+
+                        const countUnitLabel = selectedItem.item_type === 'comic'
+                          ? (language === 'es' ? 'números' : 'issues')
+                          : (language === 'es' ? 'capítulos' : 'episodes');
 
                         return (
                           <div key={s.id || s.season_number} style={{ border: '1px solid var(--border-color)', borderRadius: '6px', overflow: 'hidden' }}>
@@ -3635,7 +3706,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
                                       let effectiveListId = selectedItem.tracking_list_id;
                                       if (!effectiveListId) {
-                                        const tracked = await ensureTracked('watching');
+                                        const defaultStatus = selectedItem.item_type === 'comic' ? 'reading' : 'watching';
+                                        const tracked = await ensureTracked(defaultStatus);
                                         if (!tracked) return;
                                         effectiveListId = tracked.tracking_list_id || tracked;
                                       }
@@ -3653,7 +3725,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                       if (seriesEps && seriesEps.length > 0) {
                                         const newProg: Record<string, boolean> = {};
                                         seriesEps.forEach((ep: any) => {
-                                          newProg[`tvm-ep-${ep.id}`] = true;
+                                          const key = selectedItem.item_type === 'comic' ? `cv_issue_${ep.id}` : `tvm-ep-${ep.id}`;
+                                          newProg[key] = true;
                                         });
                                         setGlobalProgress(prev => ({ ...prev, ...newProg }));
                                       }
@@ -3702,16 +3775,14 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                       padding: 0,
                                       transition: 'all 0.2s ease'
                                     }}
-                                    title={isSeasonDone ? (language === 'es' ? 'Temporada completa' : 'Season completed') : isSeasonPartial ? (language === 'es' ? 'Temporada regular completa (especiales pendientes)' : 'Regular season completed (specials pending)') : ''}
+                                    title={isSeasonDone ? (language === 'es' ? 'Volumen completo' : 'Completed') : isSeasonPartial ? (language === 'es' ? 'Regular completo (pendientes especiales)' : 'Regular completed') : ''}
                                   >
                                     <Check size={12} strokeWidth={3} />
                                   </span>
                                 </span>
-                                  {s.is_extras || s.season_number === 0 
-                                    ? (language === 'es' ? 'Extras' : 'Extras')
-                                    : (language === 'es' ? `Temporada ${s.season_number}` : `Season ${s.season_number}`)}
+                                  {seasonLabel}
                                   <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginLeft: '0.5rem', fontWeight: 400 }}>
-                                    ({displayedSeasonEps.length > 0 ? displayedSeasonEps.length : s.episode_count} {language === 'es' ? 'capítulos' : 'episodes'})
+                                    ({displayedSeasonEps.length > 0 ? displayedSeasonEps.length : s.episode_count} {countUnitLabel})
                                   </span>
                                 </span>
                                 <span>{isSeasonActive ? '▼' : '►'}</span>
@@ -3721,16 +3792,17 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                 <div style={{ padding: '0.5rem', background: 'var(--bg-primary)', display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '220px', overflowY: 'auto' }}>
                                   {isLoadingSeasonEpisodes ? (
                                     <div style={{ padding: '1rem', textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                                      {language === 'es' ? 'Cargando capítulos...' : 'Loading episodes...'}
+                                      {language === 'es' ? 'Cargando contenido...' : 'Loading...'}
                                     </div>
                                   ) : displayedSeasonEps.length === 0 ? (
                                     <div style={{ padding: '1rem', textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                                      {language === 'es' ? 'No se encontraron capítulos.' : 'No episodes found.'}
+                                      {language === 'es' ? 'No se encontraron números.' : 'No items found.'}
                                     </div>
                                   ) : (
                                     displayedSeasonEps.map((ep: any) => {
-                                      const dbEp = (episodes || []).find(x => x.external_id === `tvm-ep-${ep.id}`);
-                                      const isCompleted = !!globalProgress[`tvm-ep-${ep.id}`] || !!dbEp?.is_completed;
+                                      const extIdKey = selectedItem.item_type === 'comic' ? `cv_issue_${ep.id}` : `tvm-ep-${ep.id}`;
+                                      const dbEp = (episodes || []).find(x => x.external_id === extIdKey || x.id === ep.id);
+                                      const isCompleted = !!globalProgress[extIdKey] || !!dbEp?.is_completed;
                                       const isSpecial = ep.is_significant_special || ep.ep_type === 'significant_special' || (ep.episode_number == null && !ep.is_extra && ep.season_number > 0);
                                       const isExtra = ep.is_extra || ep.ep_type === 'insignificant_special' || ep.season_number === 0;
 
@@ -3754,7 +3826,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                                 type="button"
                                                 disabled={!user}
                                                 onClick={() => {
-                                                  const currentIsCompleted = !!globalProgress[`tvm-ep-${ep.id}`] || !!dbEp?.is_completed;
+                                                  const currentIsCompleted = !!globalProgress[extIdKey] || !!dbEp?.is_completed;
                                                   if (currentIsCompleted) {
                                                     setEpisodeActionItem({ ep, listId: selectedItem.tracking_list_id });
                                                   } else {
@@ -3767,7 +3839,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                                       });
                                                       return;
                                                     }
-                                                    setGlobalProgress(prev => ({ ...prev, [`tvm-ep-${ep.id}`]: true }));
+                                                    setGlobalProgress(prev => ({ ...prev, [extIdKey]: true }));
                                                     handleToggleEpisode(selectedItem.tracking_list_id, ep);
                                                   }
                                                 }}
@@ -3822,7 +3894,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                                 </span>
                                               )}
                                               <span style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={ep.name || 'Untitled'}>
-                                                {ep.episode_number ? `${ep.episode_number}. ` : ''}{ep.name || 'Untitled'}
+                                                {selectedItem.item_type === 'comic' ? ep.name : (ep.episode_number ? `${ep.episode_number}. ` : '') + (ep.name || 'Untitled')}
                                               </span>
                                             </div>
                                           </div>
@@ -3830,9 +3902,9 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                             onClick={() => onOpenItem && onOpenItem({
                                               id: dbEp ? dbEp.id : ep.id,
                                               list_id: selectedItem.tracking_list_id,
-                                              item_type: 'episode',
-                                              external_id: `tvm-ep-${ep.id}`,
-                                              title: `${selectedItem.title} - ${ep.season_number > 0 ? (ep.season_number < 10 ? 'S0' + ep.season_number : 'S' + ep.season_number) : (language === 'es' ? 'Extras' : 'Extras')}${ep.episode_number != null ? (ep.episode_number < 10 ? 'E0' + ep.episode_number : 'E' + ep.episode_number) : (isSpecial ? ' • ' + (language === 'es' ? 'Especial' : 'Special') : '')} - ${ep.name || 'Untitled'}`,
+                                              item_type: selectedItem.item_type === 'comic' ? 'comic' : 'episode',
+                                              external_id: selectedItem.item_type === 'comic' ? `cv_issue_${ep.id}` : `tvm-ep-${ep.id}`,
+                                              title: selectedItem.item_type === 'comic' ? `${selectedItem.title} ${ep.name}` : `${selectedItem.title} - ${ep.season_number > 0 ? (ep.season_number < 10 ? 'S0' + ep.season_number : 'S' + ep.season_number) : (language === 'es' ? 'Extras' : 'Extras')}${ep.episode_number != null ? (ep.episode_number < 10 ? 'E0' + ep.episode_number : 'E' + ep.episode_number) : (isSpecial ? ' • ' + (language === 'es' ? 'Especial' : 'Special') : '')} - ${ep.name || 'Untitled'}`,
                                               image_url: ep.image_url || ep.image?.original || ep.image?.medium || ep.still_path || selectedItem.image_url,
                                               custom_notes: JSON.stringify({ description: ep.overview || '', release_date: ep.air_date || null }),
                                               completed_at: dbEp?.completed_at,
@@ -4248,6 +4320,209 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                 </div>
               )}
 
+              {/* Manga Relations: Sequels, Prequels, Spin-offs, Side Stories */}
+              {selectedItem?.item_type === 'manga' && !isEpisode && (mangaRelations || isLoadingMangaRelations) && (
+                <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                  {isLoadingMangaRelations && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                      <span className="spinner" style={{ width: '16px', height: '16px' }} />
+                      {language === 'es' ? 'Cargando mangas relacionados...' : 'Loading related manga...'}
+                    </div>
+                  )}
+
+                  {/* Sequels & Prequels */}
+                  {mangaRelations?.sequels_prequels && mangaRelations.sequels_prequels.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      <h5 style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 600 }}>
+                        <Layers size={16} color="var(--color-manga)" />
+                        {language === 'es' ? 'Secuelas y Precuelas' : 'Sequels & Prequels'}
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400 }}>({mangaRelations.sequels_prequels.length})</span>
+                      </h5>
+                      <ModalScrollRow>
+                        {mangaRelations.sequels_prequels.map((m: any) => (
+                          <div
+                            key={m.id || m.external_id}
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => handleOpenRelatedManga(m)}
+                            className="glass-card"
+                            style={{
+                              minWidth: '120px',
+                              maxWidth: '120px',
+                              padding: '0.4rem',
+                              borderRadius: '8px',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '0.35rem',
+                              transition: 'transform 0.15s ease, border-color 0.15s ease',
+                              border: '1px solid var(--border-color)',
+                              background: 'var(--bg-secondary)',
+                              flexShrink: 0
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.transform = 'translateY(-2px)';
+                              e.currentTarget.style.borderColor = 'var(--color-manga)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.transform = 'translateY(0)';
+                              e.currentTarget.style.borderColor = 'var(--border-color)';
+                            }}
+                          >
+                            <div style={{ width: '100%', height: '140px', borderRadius: '6px', overflow: 'hidden', background: '#111', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              {m.image_url ? (
+                                <img src={m.image_url} alt={m.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              ) : (
+                                <BookOpen size={24} color="var(--text-muted)" />
+                              )}
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+                              <span style={{ fontSize: '0.76rem', fontWeight: 600, color: 'var(--text-primary)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: '1.2' }}>
+                                {m.title}
+                              </span>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontSize: '0.68rem', color: 'var(--color-manga)', fontWeight: 600 }}>
+                                  {m.relation_type === 'SEQUEL' ? (language === 'es' ? 'Secuela' : 'Sequel') : (language === 'es' ? 'Precuela' : 'Prequel')}
+                                </span>
+                                {m.release_year && (
+                                  <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{m.release_year}</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </ModalScrollRow>
+                    </div>
+                  )}
+
+                  {/* Spin-offs, Side Stories & Alternative */}
+                  {mangaRelations?.spin_offs_side_stories && mangaRelations.spin_offs_side_stories.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      <h5 style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 600 }}>
+                        <Sparkles size={16} color="#f59e0b" />
+                        {language === 'es' ? 'Spin-offs e Historias Alternativas' : 'Spin-offs & Side Stories'}
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400 }}>({mangaRelations.spin_offs_side_stories.length})</span>
+                      </h5>
+                      <ModalScrollRow>
+                        {mangaRelations.spin_offs_side_stories.map((m: any) => (
+                          <div
+                            key={m.id || m.external_id}
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => handleOpenRelatedManga(m)}
+                            className="glass-card"
+                            style={{
+                              minWidth: '120px',
+                              maxWidth: '120px',
+                              padding: '0.4rem',
+                              borderRadius: '8px',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '0.35rem',
+                              transition: 'transform 0.15s ease, border-color 0.15s ease',
+                              border: '1px solid var(--border-color)',
+                              background: 'var(--bg-secondary)',
+                              flexShrink: 0
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.transform = 'translateY(-2px)';
+                              e.currentTarget.style.borderColor = '#f59e0b';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.transform = 'translateY(0)';
+                              e.currentTarget.style.borderColor = 'var(--border-color)';
+                            }}
+                          >
+                            <div style={{ width: '100%', height: '140px', borderRadius: '6px', overflow: 'hidden', background: '#111', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              {m.image_url ? (
+                                <img src={m.image_url} alt={m.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              ) : (
+                                <Sparkles size={24} color="var(--text-muted)" />
+                              )}
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+                              <span style={{ fontSize: '0.76rem', fontWeight: 600, color: 'var(--text-primary)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: '1.2' }}>
+                                {m.title}
+                              </span>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontSize: '0.68rem', color: '#f59e0b', fontWeight: 600 }}>
+                                  {m.relation_type === 'SPIN_OFF' ? 'Spin-off' : m.relation_type === 'SIDE_STORY' ? (language === 'es' ? 'Historia paralela' : 'Side Story') : (language === 'es' ? 'Alternativo' : 'Alternative')}
+                                </span>
+                                {m.release_year && (
+                                  <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{m.release_year}</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </ModalScrollRow>
+                    </div>
+                  )}
+
+                  {/* Other Relations */}
+                  {mangaRelations?.other_relations && mangaRelations.other_relations.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      <h5 style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 600 }}>
+                        <Layers size={16} color="#10b981" />
+                        {language === 'es' ? 'Otras Obras Relacionadas' : 'Other Related Works'}
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400 }}>({mangaRelations.other_relations.length})</span>
+                      </h5>
+                      <ModalScrollRow>
+                        {mangaRelations.other_relations.map((m: any) => (
+                          <div
+                            key={m.id || m.external_id}
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => handleOpenRelatedManga(m)}
+                            className="glass-card"
+                            style={{
+                              minWidth: '120px',
+                              maxWidth: '120px',
+                              padding: '0.4rem',
+                              borderRadius: '8px',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '0.35rem',
+                              transition: 'transform 0.15s ease, border-color 0.15s ease',
+                              border: '1px solid var(--border-color)',
+                              background: 'var(--bg-secondary)',
+                              flexShrink: 0
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.transform = 'translateY(-2px)';
+                              e.currentTarget.style.borderColor = '#10b981';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.transform = 'translateY(0)';
+                              e.currentTarget.style.borderColor = 'var(--border-color)';
+                            }}
+                          >
+                            <div style={{ width: '100%', height: '140px', borderRadius: '6px', overflow: 'hidden', background: '#111', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              {m.image_url ? (
+                                <img src={m.image_url} alt={m.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              ) : (
+                                <BookOpen size={24} color="var(--text-muted)" />
+                              )}
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+                              <span style={{ fontSize: '0.76rem', fontWeight: 600, color: 'var(--text-primary)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: '1.2' }}>
+                                {m.title}
+                              </span>
+                              {m.release_year && (
+                                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{m.release_year}</span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </ModalScrollRow>
+                    </div>
+                  )}
+
+                </div>
+              )}
+
               {/* Comment write area */}
               <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 <h4 style={{ margin: 0, fontSize: '1.1rem' }}>{language === 'es' ? 'Tu Comentario' : 'Your Comment'}</h4>
@@ -4374,7 +4649,9 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                 )}
               </div>
 
+            </div>
           </div>
+        </div>
               {/* Floating Modal 1: Re-consumption Options Dialog */}
               {showReconsumedModal && (
                 <div
@@ -5841,6 +6118,6 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                   </div>
                 </div>
               )}
-            </div>
-        );
+    </div>
+  );
 };

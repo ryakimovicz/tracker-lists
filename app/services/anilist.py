@@ -497,3 +497,110 @@ class AnilistService:
                     "air_date": detail.get("first_air_date")
                 })
         return episodes
+
+    @staticmethod
+    def get_manga_relations(manga_id: str) -> dict:
+        import json, urllib.request
+        url = "https://graphql.anilist.co"
+        clean_id = str(manga_id).replace("manga_", "").replace("anilist_", "")
+        if not clean_id.isdigit():
+            return {"sequels_prequels": [], "spin_offs_side_stories": [], "other_relations": []}
+
+        graphql_query = """
+        query ($id: Int) {
+          Media(id: $id, type: MANGA) {
+            id
+            title { romaji english }
+            relations {
+              edges {
+                relationType
+                node {
+                  id
+                  type
+                  format
+                  title { romaji english }
+                  coverImage { large extraLarge }
+                  startDate { year }
+                  status
+                  averageScore
+                }
+              }
+            }
+          }
+        }
+        """
+
+        payload = json.dumps({
+            "query": graphql_query,
+            "variables": {"id": int(clean_id)}
+        }).encode("utf-8")
+
+        req = urllib.request.Request(
+            url,
+            data=payload,
+            headers={
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                "User-Agent": "Pathd/1.0"
+            }
+        )
+
+        sequels_prequels = []
+        spin_offs_side_stories = []
+        other_relations = []
+
+        try:
+            with urllib.request.urlopen(req, timeout=6) as response:
+                if response.status == 200:
+                    data = json.loads(response.read().decode())
+                    edges = data.get("data", {}).get("Media", {}).get("relations", {}).get("edges", [])
+                    
+                    seen_ids = set()
+                    for edge in edges:
+                        rel_type = edge.get("relationType")
+                        node = edge.get("node", {})
+                        n_id = node.get("id")
+                        if not n_id or n_id in seen_ids:
+                            continue
+                        
+                        # We focus on MANGA, NOVEL, ONE_SHOT
+                        node_type = node.get("type")
+                        if node_type != "MANGA":
+                            continue
+
+                        seen_ids.add(n_id)
+
+                        t_obj = node.get("title", {})
+                        title = t_obj.get("english") or t_obj.get("romaji") or "Untitled Manga"
+                        c_obj = node.get("coverImage", {})
+                        img_url = c_obj.get("extraLarge") or c_obj.get("large")
+                        s_year = node.get("startDate", {}).get("year")
+
+                        item_data = {
+                            "id": str(n_id),
+                            "external_id": str(n_id),
+                            "title": title,
+                            "image_url": img_url,
+                            "release_year": str(s_year) if s_year else None,
+                            "relation_type": rel_type,
+                            "format": node.get("format"),
+                            "status": node.get("status"),
+                            "item_type": "manga"
+                        }
+
+                        if rel_type in ("SEQUEL", "PREQUEL"):
+                            sequels_prequels.append(item_data)
+                        elif rel_type in ("SPIN_OFF", "SIDE_STORY", "ALTERNATIVE"):
+                            spin_offs_side_stories.append(item_data)
+                        else:
+                            other_relations.append(item_data)
+
+        except Exception as e:
+            print(f"AniList get_manga_relations error: {e}")
+
+        return {
+            "sequels_prequels": sequels_prequels,
+            "spin_offs_side_stories": spin_offs_side_stories,
+            "other_relations": other_relations
+        }
+

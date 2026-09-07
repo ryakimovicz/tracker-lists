@@ -127,17 +127,19 @@ class ComicVineService:
                                         if not is_safe_media_item(title_parts, desc):
                                             continue
 
-                                        item_type_val = "comic"
+                                        issue_id_str = str(item.get("id"))
+                                        ext_id = f"cv_issue_{issue_id_str}" if not issue_id_str.startswith("cv_") else issue_id_str
 
                                         issue_results.append(
                                             SearchResultItem(
-                                                external_id=str(item.get("id")),
+                                                external_id=ext_id,
                                                 title=title_parts,
                                                 image_url=image_url,
                                                 description=desc,
                                                 item_type=item_type_val,
                                                 release_date=item.get("cover_date") or (str(item.get("start_year")) if item.get("start_year") else None),
-                                                page_count=item.get("count_of_pages") or item.get("count_of_issues")
+                                                page_count=item.get("count_of_pages") or item.get("count_of_issues"),
+                                                badge=f"#{issue_num}" if issue_num else "Issue"
                                             )
                                         )
                         except Exception as e:
@@ -167,6 +169,7 @@ class ComicVineService:
                             image_data = item.get("image", {})
                             image_url = image_data.get("super_url") or image_data.get("medium_url") or image_data.get("thumb_url")
                             
+                            raw_id = str(item.get("id"))
                             if resource_type == "issue":
                                 vol_name = item.get("volume", {}).get("name") or "Unknown Volume"
                                 issue_num = item.get("issue_number") or ""
@@ -175,8 +178,15 @@ class ComicVineService:
                                 if issue_name:
                                     title_parts += f" ({issue_name})"
                                 title = title_parts
+                                ext_id = f"cv_issue_{raw_id}" if not raw_id.startswith("cv_") else raw_id
+                                badge_val = f"#{issue_num}" if issue_num else "Issue"
                             else:
-                                title = item.get("name") or "Untitled Volume"
+                                vol_name = item.get("name") or "Untitled Volume"
+                                start_year = item.get("start_year")
+                                issue_count = item.get("count_of_issues")
+                                title = f"{vol_name} ({start_year})" if start_year else vol_name
+                                ext_id = f"cv_vol_{raw_id}" if not raw_id.startswith("cv_") else raw_id
+                                badge_val = f"{issue_count} Números" if issue_count else "Volumen"
 
                             if any(bn in title.lower() for bn in blocked_names):
                                 continue
@@ -189,13 +199,14 @@ class ComicVineService:
 
                             global_results.append(
                                 SearchResultItem(
-                                    external_id=str(item.get("id")),
+                                    external_id=ext_id,
                                     title=title,
                                     image_url=image_url,
                                     description=desc,
                                     item_type=item_type_val,
                                     release_date=item.get("cover_date") or (str(item.get("start_year")) if item.get("start_year") else None),
-                                    page_count=item.get("count_of_pages") or item.get("count_of_issues")
+                                    page_count=item.get("count_of_pages") or item.get("count_of_issues"),
+                                    badge=badge_val
                                 )
                             )
             except Exception as e:
@@ -243,6 +254,189 @@ class ComicVineService:
         except Exception as e:
             print(f"Comic Vine API Error: {e}")
             return []
+
+    @staticmethod
+    def get_comic_volume_detail(vol_id: str) -> dict:
+        api_key = settings.COMIC_VINE_API_KEY
+        if not api_key:
+            return None
+        
+        raw_id = str(vol_id).replace("cv_vol_", "").replace("cv_volume_", "").replace("cv_", "")
+        if not raw_id.isdigit():
+            return None
+
+        url = f"https://comicvine.gamespot.com/api/volume/4050-{raw_id}/?api_key={api_key}&format=json"
+        req = urllib.request.Request(url, headers={"User-Agent": "Pathd/1.0 (contact@pathd.app)"})
+        try:
+            with urllib.request.urlopen(req, timeout=8) as response:
+                if response.status == 200:
+                    data = json.loads(response.read().decode())
+                    v = data.get("results", {})
+                    if not v:
+                        return None
+                    
+                    vol_name = v.get("name") or "Untitled Volume"
+                    start_yr = v.get("start_year")
+                    count_issues = v.get("count_of_issues") or 0
+                    img_data = v.get("image", {})
+                    img_url = img_data.get("super_url") or img_data.get("medium_url") or img_data.get("thumb_url")
+                    
+                    desc = v.get("description") or v.get("deck") or ""
+                    import re
+                    desc = re.sub('<[^<]+?>', '', desc)
+                    
+                    publisher_name = v.get("publisher", {}).get("name") if v.get("publisher") else None
+
+                    # Format seasons array: Volume 1 as the primary season containing the issues
+                    seasons = [{
+                        "id": int(raw_id),
+                        "season_number": 1,
+                        "episode_count": count_issues,
+                        "name": f"Volumen ({start_yr})" if start_yr else "Volumen"
+                    }]
+
+                    return {
+                        "id": f"cv_vol_{raw_id}",
+                        "name": f"{vol_name} ({start_yr})" if start_yr else vol_name,
+                        "volume_name": vol_name,
+                        "start_year": start_yr,
+                        "publisher": publisher_name,
+                        "number_of_seasons": 1,
+                        "seasons": seasons,
+                        "overview": desc,
+                        "first_air_date": str(start_yr) if start_yr else None,
+                        "image_url": img_url,
+                        "count_of_issues": count_issues
+                    }
+        except Exception as e:
+            print(f"Comic Vine get_comic_volume_detail error: {e}")
+        return None
+
+    @staticmethod
+    def get_comic_volume_issues(vol_id: str) -> List[dict]:
+        api_key = settings.COMIC_VINE_API_KEY
+        if not api_key:
+            return []
+        
+        raw_id = str(vol_id).replace("cv_vol_", "").replace("cv_volume_", "").replace("cv_", "")
+        if not raw_id.isdigit():
+            return []
+
+        # Query all issues for this volume, sorted by issue_number ascending
+        url = f"https://comicvine.gamespot.com/api/issues/?api_key={api_key}&format=json&filter=volume:{raw_id}&sort=cover_date:asc&limit=100"
+        req = urllib.request.Request(url, headers={"User-Agent": "Pathd/1.0 (contact@pathd.app)"})
+        try:
+            with urllib.request.urlopen(req, timeout=10) as response:
+                if response.status == 200:
+                    data = json.loads(response.read().decode())
+                    raw_issues = data.get("results", [])
+                    episodes = []
+                    
+                    # Sort numerically by issue_number where possible
+                    def parse_issue_num(num_val):
+                        if num_val is None:
+                            return 999999
+                        try:
+                            return float(str(num_val).strip())
+                        except Exception:
+                            # Extract first number
+                            import re
+                            m = re.search(r'\d+', str(num_val))
+                            return float(m.group(0)) if m else 999999
+
+                    sorted_issues = sorted(raw_issues, key=lambda x: parse_issue_num(x.get("issue_number")))
+
+                    for idx, itm in enumerate(sorted_issues, start=1):
+                        i_id = str(itm.get("id"))
+                        issue_num_str = itm.get("issue_number") or str(idx)
+                        i_name = itm.get("name")
+                        title_str = f"#{issue_num_str}"
+                        if i_name:
+                            title_str += f" - {i_name}"
+                        
+                        img_data = itm.get("image", {})
+                        img_url = img_data.get("super_url") or img_data.get("medium_url") or img_data.get("thumb_url")
+                        
+                        desc = itm.get("description") or itm.get("deck") or ""
+                        import re
+                        desc = re.sub('<[^<]+?>', '', desc)
+
+                        episodes.append({
+                            "id": i_id,
+                            "name": title_str,
+                            "episode_number": int(parse_issue_num(issue_num_str)) if parse_issue_num(issue_num_str) < 999999 else idx,
+                            "season_number": 1,
+                            "still_path": img_url,
+                            "image_url": img_url,
+                            "overview": desc,
+                            "air_date": itm.get("cover_date") or itm.get("store_date")
+                        })
+                    return episodes
+        except Exception as e:
+            print(f"Comic Vine get_comic_volume_issues error: {e}")
+        return []
+
+    @staticmethod
+    def get_comic_issue_detail(issue_id: str) -> dict:
+        api_key = settings.COMIC_VINE_API_KEY
+        if not api_key:
+            return None
+        
+        raw_id = str(issue_id).replace("cv_issue_", "").replace("cv_", "")
+        if not raw_id.isdigit():
+            return None
+
+        url = f"https://comicvine.gamespot.com/api/issue/4000-{raw_id}/?api_key={api_key}&format=json"
+        req = urllib.request.Request(url, headers={"User-Agent": "Pathd/1.0 (contact@pathd.app)"})
+        try:
+            with urllib.request.urlopen(req, timeout=8) as response:
+                if response.status == 200:
+                    data = json.loads(response.read().decode())
+                    itm = data.get("results", {})
+                    if not itm:
+                        return None
+                    
+                    vol_data = itm.get("volume", {})
+                    vol_id = vol_data.get("id")
+                    vol_name = vol_data.get("name") or "Unknown Volume"
+                    issue_num = itm.get("issue_number") or ""
+                    issue_name = itm.get("name")
+                    
+                    full_title = f"{vol_name} #{issue_num}"
+                    if issue_name:
+                        full_title += f" ({issue_name})"
+                    
+                    img_data = itm.get("image", {})
+                    img_url = img_data.get("super_url") or img_data.get("medium_url") or img_data.get("thumb_url")
+                    
+                    desc = itm.get("description") or itm.get("deck") or ""
+                    import re
+                    desc = re.sub('<[^<]+?>', '', desc)
+
+                    parent_series = None
+                    if vol_id:
+                        parent_series = {
+                            "external_id": f"cv_vol_{vol_id}",
+                            "title": vol_name,
+                            "item_type": "comic"
+                        }
+
+                    return {
+                        "id": f"cv_issue_{raw_id}",
+                        "title": full_title,
+                        "name": full_title,
+                        "issue_number": issue_num,
+                        "volume_id": f"cv_vol_{vol_id}" if vol_id else None,
+                        "volume_name": vol_name,
+                        "overview": desc,
+                        "description": desc,
+                        "image_url": img_url,
+                        "release_date": itm.get("cover_date") or itm.get("store_date"),
+                        "parent_series": parent_series
+                    }
+        except Exception as e:
+            print(f"Comic Vine get_comic_issue_detail error: {e}")
+        return None
 
     @staticmethod
     def get_new_comics() -> List[SearchResultItem]:

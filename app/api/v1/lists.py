@@ -1598,7 +1598,15 @@ def toggle_series_episode(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You do not have access to this list")
 
         
-    ext_id = f"tvm-ep-{ep_req.episode_id}"
+    raw_ep_str = str(ep_req.episode_id)
+    if raw_ep_str.startswith("cv_") or raw_ep_str.startswith("cv-"):
+        ext_id = raw_ep_str if raw_ep_str.startswith("cv_issue_") else f"cv_issue_{raw_ep_str.replace('cv_vol_', '').replace('cv_', '')}"
+        media_item_type = ItemTypeEnum.COMIC
+        sec_name = "Volumen"
+    else:
+        ext_id = f"tvm-ep-{raw_ep_str}"
+        media_item_type = ItemTypeEnum.SERIES
+        sec_name = f"Season {ep_req.season_number}"
     
     # Check if ListItem already exists
     item = db.query(ListItem).filter(
@@ -1613,12 +1621,12 @@ def toggle_series_episode(
         item = ListItem(
             list_id=list_id,
             order_index=item_count + 1,
-            item_type=ItemTypeEnum.SERIES,
+            item_type=media_item_type,
             external_id=ext_id,
             title=ep_req.title,
             image_url=ep_req.image_url,
             custom_notes=json.dumps({"description": ep_req.overview or "", "release_date": None}),
-            section=f"Season {ep_req.season_number}"
+            section=sec_name
         )
         db.add(item)
         db.commit()
@@ -1883,7 +1891,14 @@ def bulk_toggle_season(
     item_count = db.query(ListItem).filter(ListItem.list_id == list_id).count()
 
     for ep in episodes_list:
-        ext_id = f"tvm-ep-{ep.get('id')}"
+        raw_id = str(ep.get('id'))
+        if raw_id.startswith('cv_') or raw_id.startswith('cv-') or (lib_item and lib_item.item_type == 'comic'):
+            ext_id = raw_id if raw_id.startswith("cv_issue_") else f"cv_issue_{raw_id.replace('cv_', '')}"
+            media_item_type = ItemTypeEnum.COMIC
+        else:
+            ext_id = f"tvm-ep-{raw_id}"
+            media_item_type = ItemTypeEnum.SERIES
+
         item = db.query(ListItem).filter(
             ListItem.list_id == list_id,
             ListItem.external_id == ext_id
@@ -1894,7 +1909,10 @@ def bulk_toggle_season(
         is_extra_ep = ep.get('is_extra') or ep.get('ep_type') == 'insignificant_special' or req.season_number == 0
         is_special_ep = ep.get('is_significant_special') or ep.get('ep_type') == 'significant_special'
         
-        if is_extra_ep:
+        if media_item_type == ItemTypeEnum.COMIC:
+            ep_title = f"{series_title} {ep_name}" if not ep_name.startswith(series_title) else ep_name
+            section_name = "Volumen"
+        elif is_extra_ep:
             ep_title = f"{series_title} - Extra {ep_num or 1} - {ep_name}"
             section_name = "Extras"
         elif is_special_ep or ep_num is None:
@@ -1909,10 +1927,10 @@ def bulk_toggle_season(
             item = ListItem(
                 list_id=list_id,
                 order_index=item_count,
-                item_type=ItemTypeEnum.SERIES,
+                item_type=media_item_type,
                 external_id=ext_id,
                 title=ep_title,
-                image_url=ep.get('still_path') if ep.get('still_path') else None,
+                image_url=ep.get('still_path') or ep.get('image_url') if (ep.get('still_path') or ep.get('image_url')) else None,
                 custom_notes=json.dumps({"description": ep.get('overview') or "", "release_date": ep.get('air_date') or None}),
                 section=section_name
             )
@@ -1935,7 +1953,7 @@ def bulk_toggle_season(
             else:
                 progress = ItemProgress(
                     user_id=current_user.id,
-                    item_type=ItemTypeEnum.SERIES,
+                    item_type=media_item_type,
                     external_id=ext_id,
                     list_item_id=item.id,
                     is_completed=True,

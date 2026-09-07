@@ -682,4 +682,59 @@ def get_game_relations(
         print(f"Error fetching game relations for {game_id}: {e}")
         return {"collections": [], "bundle_games": [], "editions": [], "dlcs": [], "parent_game": None}
 
+@router.get("/comic/volume/{vol_id}")
+def get_comic_volume_detail(
+    vol_id: str,
+    request: Request
+):
+    try:
+        detail = ComicVineService.get_comic_volume_detail(vol_id)
+        if not detail:
+            raise HTTPException(status_code=404, detail="Comic volume not found")
+        return detail
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error fetching comic volume {vol_id}: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.get("/comic/volume/{vol_id}/issues")
+def get_comic_volume_issues(
+    vol_id: str,
+    request: Request
+):
+    try:
+        return ComicVineService.get_comic_volume_issues(vol_id)
+    except Exception as e:
+        print(f"Error fetching issues for comic volume {vol_id}: {e}")
+        return []
+
+@router.get("/comic/issue/{issue_id}")
+def get_comic_issue_detail(
+    issue_id: str,
+    request: Request
+):
+    try:
+        detail = ComicVineService.get_comic_issue_detail(issue_id)
+        if not detail:
+            raise HTTPException(status_code=404, detail="Comic issue not found")
+        return detail
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error fetching comic issue {issue_id}: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.get("/manga/{manga_id}/relations")
+def get_manga_relations(
+    manga_id: str,
+    request: Request
+):
+    try:
+        return AnilistService.get_manga_relations(manga_id)
+    except Exception as e:
+        print(f"Error fetching manga relations for {manga_id}: {e}")
+        return {"sequels_prequels": [], "spin_offs_side_stories": [], "other_relations": []}
+
+
 
