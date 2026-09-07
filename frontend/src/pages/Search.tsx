@@ -247,9 +247,7 @@ export const Search: React.FC = () => {
 
   // Shelf tracking states
   const [shelfItems, setShelfItems] = useState<any[]>([]);
-  const [selectedItemForShelf, setSelectedItemForShelf] = useState<SearchResultItem | null>(null);
   const [itemToRemoveFromShelf, setItemToRemoveFromShelf] = useState<any | null>(null);
-  const [shelfStatus, setShelfStatus] = useState('');
 
   // Details Modal states
   const [selectedItem, setSelectedItem] = useState<SearchResultItem | null>(null);
@@ -410,40 +408,33 @@ export const Search: React.FC = () => {
     ];
   };
 
-  const handleOpenAddShelf = (item: SearchResultItem, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    const defaultStatuses = getStatusesForType(item.item_type);
-    setSelectedItemForShelf(item);
-    setShelfStatus(defaultStatuses[0].value);
+  const getDefaultStatus = (type: string) => {
+    if (type === 'game') return 'plan_to_play';
+    if (['book', 'comic', 'manga'].includes(type)) return 'plan_to_read';
+    return 'plan_to_watch';
   };
 
-  const handleAddToShelfSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedItemForShelf || !shelfStatus) return;
-
+  const handleQuickAddToShelf = async (item: SearchResultItem, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     setErrorMsg('');
     setSuccessMsg('');
+    const status = getDefaultStatus(item.item_type);
     try {
       await apiClient.post('/library/', {
-        item_type: selectedItemForShelf.item_type,
-        external_id: selectedItemForShelf.external_id,
-        title: selectedItemForShelf.title,
-        image_url: selectedItemForShelf.image_url,
-        imdb_id: selectedItemForShelf.imdb_id,
-        custom_badge: selectedItemForShelf.badge || null,
-        status: shelfStatus
+        item_type: item.item_type,
+        external_id: item.external_id,
+        title: item.title,
+        image_url: item.image_url,
+        imdb_id: item.imdb_id,
+        custom_badge: item.badge || null,
+        status: status
       });
       setSuccessMsg(t('searchItemAdded'));
-      setSelectedItemForShelf(null);
       await loadShelfItems();
-      
-      // If modal details is open, refresh its shelf state
-      if (selectedItem && selectedItem.external_id === selectedItemForShelf.external_id) {
-        // Shelf is already reloaded via loadShelfItems() above.
-      }
-      setTimeout(() => setSuccessMsg(''), 4000);
+      setTimeout(() => setSuccessMsg(''), 3000);
     } catch (err: any) {
       setErrorMsg(err.response?.data?.detail || 'Failed to add item to your library shelf.');
+      setTimeout(() => setErrorMsg(''), 4000);
     }
   };
 
@@ -870,7 +861,7 @@ export const Search: React.FC = () => {
                         if (shelfItem) {
                           setItemToRemoveFromShelf(shelfItem);
                         } else {
-                          handleOpenAddShelf(item, e);
+                          handleQuickAddToShelf(item, e);
                         }
                       }}
                       className={`btn-card-add-shelf ${onShelf ? 'on-shelf' : ''}`}
@@ -1074,52 +1065,8 @@ export const Search: React.FC = () => {
         </div>
       )}
 
-      {/* Add To Shelf Overlay Modal */}
       {/* Non-intrusive Explore / Search Bottom AdBanner */}
       <AdBanner />
-
-      {selectedItemForShelf && (
-        <div style={{
-          position: 'fixed',
-          top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0,0,0,0.6)',
-          backdropFilter: 'blur(4px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 2100
-        }}>
-          <div className="glass-card" style={{ width: '400px', padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-            <h3 style={{ margin: 0, textAlign: 'left' }}>{t('searchSelectStatus')}</h3>
-            <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-secondary)', textAlign: 'left' }}>
-              {selectedItemForShelf.title}
-            </p>
-
-            <form onSubmit={handleAddToShelfSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-              <select
-                className="input-field"
-                value={shelfStatus}
-                onChange={(e) => setShelfStatus(e.target.value)}
-              >
-                {getStatusesForType(selectedItemForShelf.item_type).map(status => (
-                  <option key={status.value} value={status.value}>
-                    {status.label}
-                  </option>
-                ))}
-              </select>
-
-              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
-                <button type="button" className="btn-secondary" onClick={() => setSelectedItemForShelf(null)}>
-                  {language === 'es' ? 'Cancelar' : 'Cancel'}
-                </button>
-                <button type="submit" className="btn-primary">
-                  {language === 'es' ? 'Agregar' : 'Add'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {selectedItem && (
         <ItemDetailsModal 
