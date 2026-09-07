@@ -208,7 +208,7 @@ class ComicVineService:
                                 vol_name = item.get("name") or "Untitled Volume"
                                 start_year = item.get("start_year")
                                 issue_count = item.get("count_of_issues")
-                                title = f"{vol_name} ({start_year})" if start_year else vol_name
+                                title = vol_name
                                 ext_id = f"cv_vol_{raw_id}" if not raw_id.startswith("cv_") else raw_id
                                 badge_val = f"{issue_count} Números" if issue_count else "Volumen"
 
@@ -327,7 +327,7 @@ class ComicVineService:
 
                     return {
                         "id": f"cv_vol_{raw_id}",
-                        "name": f"{vol_name} ({start_yr})" if start_yr else vol_name,
+                        "name": vol_name,
                         "volume_name": vol_name,
                         "start_year": start_yr,
                         "publisher": publisher_name,
