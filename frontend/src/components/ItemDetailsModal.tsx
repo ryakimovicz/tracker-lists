@@ -953,8 +953,9 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
           });
         };
 
-        // 2. If it's a series, immediately load and render from memory cache if available (0 ms)
-        if ((item.item_type === 'series' || item.item_type === 'anime') && !isActualEpisode && item.external_id) {
+        // 2. If it's a series or comic volume, immediately load and render from memory cache if available (0 ms)
+        const isSeriesOrComic = (item.item_type === 'series' || item.item_type === 'anime' || item.item_type === 'comic') && !isActualEpisode && item.external_id;
+        if (isSeriesOrComic) {
           const seriesId = item.external_id;
           const cacheKeyMeta = `${seriesId}_metadata`;
           const cacheKeyAll = `${seriesId}_all_episodes`;
@@ -997,6 +998,14 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                 apiClient.get(`/lists/${myMatch.tracking_list_id}`).then(listRes => {
                   const itemsList = listRes.data.items || [];
                   setEpisodes(itemsList);
+                  const extIds = itemsList.map((x: any) => x.external_id).filter(Boolean);
+                  if (extIds.length > 0) {
+                    apiClient.post('/users/me/progress/bulk-check', { external_ids: extIds })
+                      .then(progRes => {
+                        setGlobalProgress(prev => ({ ...prev, ...progRes.data }));
+                      })
+                      .catch(e => console.error("Failed to fetch global progress from tracker list", e));
+                  }
                 }).catch(() => {});
               }
             }
