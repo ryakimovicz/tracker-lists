@@ -2974,10 +2974,11 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                           </button>
                         </div>
                       ) : (selectedItem?.item_type === 'series' || selectedItem?.item_type === 'anime') ? (() => {
-                        const isAllWatched = (() => {
+                        const { isAllWatched, areRegularSeasonsWatched } = (() => {
                           const canonicalSeasons = seasons.filter((s: any) => s.season_number > 0 && !s.is_extras);
                           if (canonicalSeasons.length === 0) {
-                            return selectedItem?.status === 'completed';
+                            const isDone = selectedItem?.status === 'completed';
+                            return { isAllWatched: isDone, areRegularSeasonsWatched: isDone };
                           }
                           const seasonsAllDone = canonicalSeasons.every((s: any) => {
                             const listSeps = (episodes || []).filter(x => x.section === `Season ${s.season_number}`);
@@ -2987,7 +2988,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                             }
                             return seriesEps.every((te: any) => globalProgress[`tvm-ep-${te.id}`] || (episodes || []).some(x => x.external_id === `tvm-ep-${te.id}` && (globalProgress[x.external_id] ?? x.is_completed)));
                           });
-                          if (!seasonsAllDone) return false;
+                          if (!seasonsAllDone) return { isAllWatched: false, areRegularSeasonsWatched: false };
 
                           // Also check standalone significant specials if any exist in cached episodes
                           const cacheKeyAll = `${selectedItem.external_id}_all_episodes`;
@@ -2995,22 +2996,18 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                           if (cachedAll && Array.isArray(cachedAll)) {
                             const significantSpecials = cachedAll.filter((e: any) => (e.is_significant_special || e.ep_type === 'significant_special') && !e.is_extra);
                             const specialsAllDone = significantSpecials.every((te: any) => globalProgress[`tvm-ep-${te.id}`] || (episodes || []).some(x => x.external_id === `tvm-ep-${te.id}` && (globalProgress[x.external_id] ?? x.is_completed)));
-                            if (!specialsAllDone) return false;
+                            if (!specialsAllDone) return { isAllWatched: false, areRegularSeasonsWatched: true };
                           }
 
-                          return true;
+                          return { isAllWatched: true, areRegularSeasonsWatched: true };
                         })();
-
-                        const hasAnyWatched = selectedItem?.status === 'completed' ||
-                          (episodes || []).some(x => globalProgress[x.external_id] ?? x.is_completed) ||
-                          Object.entries(globalProgress).some(([k, v]) => v && k.startsWith('tvm-ep-'));
 
                         return (
                           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem' }}>
                             <button
                               type="button"
                               onClick={() => {
-                                if (isAllWatched || hasAnyWatched) {
+                                if (areRegularSeasonsWatched) {
                                   setShowReconsumedModal(true);
                                 } else {
                                   setPendingSeriesScopeAction('mark_all');
