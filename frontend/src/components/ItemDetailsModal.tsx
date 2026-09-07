@@ -3,7 +3,7 @@ import { useTranslation } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
 import { getProfileTheme } from '../utils/profileThemes';
 import { apiClient } from '../api/client';
-import { Star, Heart, X, Flag, CheckCircle, Check, Plus, MoreVertical, Trash2, ArrowLeft, Clock, ChevronUp, ChevronDown, RotateCcw, BookOpen, Gamepad2, Package, Sparkles, Puzzle, Layers, ChevronLeft, ChevronRight, Calendar, RefreshCw, AlertCircle, Globe, Repeat, Trophy, ShieldAlert } from 'lucide-react';
+import { Star, Heart, X, Flag, CheckCircle, Check, Plus, MoreVertical, Trash2, ArrowLeft, Clock, ChevronUp, ChevronDown, RotateCcw, BookOpen, Gamepad2, Package, Sparkles, Puzzle, Layers, ChevronLeft, ChevronRight, Calendar, RefreshCw, AlertCircle, Globe, Repeat, Trophy, ShieldAlert, Infinity as InfinityIcon } from 'lucide-react';
 
 
 
@@ -2976,7 +2976,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                       </div>
                     );
                   })()}
-
+                  </div>
+                </div>
 
 
                   {/* Completion / Status Buttons */}
@@ -3028,19 +3029,25 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                               color: (selectedItem?.status === 'completed' && !selectedItem?.is_hundred_percent) ? '#ffffff' : 'var(--text-primary)',
                               fontSize: '0.75rem',
                               fontWeight: 600,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '0.25rem',
                               transition: 'all 0.2s ease'
                             }}
                           >
-                            {language === 'es' ? 'Completado' : 'Completed'}
+                            <Check size={13} strokeWidth={2.2} />
+                            <span>{language === 'es' ? 'Terminado' : 'Beaten'}</span>
                           </button>
                           <button
                             type="button"
                             onClick={() => handleToggleStatus('playing')}
                             style={{
-                              background: selectedItem?.status === 'playing' ? '#3b82f6' : 'var(--bg-tertiary)',
+                              width: '100%',
+                              background: selectedItem?.status === 'playing' ? 'var(--color-game)' : 'var(--bg-tertiary)',
                               border: selectedItem?.status === 'playing' ? 'none' : '1px solid var(--border-color)',
                               borderRadius: '8px',
-                              padding: '0.5rem',
+                              padding: '0.5rem 0.2rem',
                               textAlign: 'center',
                               cursor: 'pointer',
                               color: selectedItem?.status === 'playing' ? '#ffffff' : 'var(--text-primary)',
@@ -3055,28 +3062,35 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                             type="button"
                             onClick={() => handleToggleStatus('endless')}
                             style={{
-                              background: selectedItem?.status === 'endless' ? '#8b5cf6' : 'var(--bg-tertiary)',
+                              width: '100%',
+                              background: selectedItem?.status === 'endless' ? 'var(--color-game)' : 'var(--bg-tertiary)',
                               border: selectedItem?.status === 'endless' ? 'none' : '1px solid var(--border-color)',
                               borderRadius: '8px',
-                              padding: '0.5rem',
+                              padding: '0.5rem 0.2rem',
                               textAlign: 'center',
                               cursor: 'pointer',
                               color: selectedItem?.status === 'endless' ? '#ffffff' : 'var(--text-primary)',
                               fontSize: '0.75rem',
                               fontWeight: 600,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '0.25rem',
                               transition: 'all 0.2s ease'
                             }}
                           >
-                            {language === 'es' ? 'Infinito' : 'Endless'}
+                            <InfinityIcon size={13} strokeWidth={2.2} />
+                            <span>{language === 'es' ? 'Continuo' : 'Endless'}</span>
                           </button>
                           <button
                             type="button"
                             onClick={() => handleToggleStatus('dropped')}
                             style={{
+                              width: '100%',
                               background: selectedItem?.status === 'dropped' ? '#ef4444' : 'var(--bg-tertiary)',
                               border: selectedItem?.status === 'dropped' ? 'none' : '1px solid var(--border-color)',
                               borderRadius: '8px',
-                              padding: '0.5rem',
+                              padding: '0.5rem 0.2rem',
                               textAlign: 'center',
                               cursor: 'pointer',
                               color: selectedItem?.status === 'dropped' ? '#ffffff' : 'var(--text-primary)',
@@ -3148,7 +3162,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                             const significantSpecials = cachedAll.filter((e: any) => (e.is_significant_special || e.ep_type === 'significant_special') && !e.is_extra);
                             if (significantSpecials.length > 0) {
                               const specialsAllDone = significantSpecials.every((te: any) => isEpWatched(te.id, te.season_number, te.episode_number ?? te.number));
-                              if (!specialsAllDone) return { isAllWatched: false, areRegularSeasonsWatched: true };
+                              return { isAllWatched: specialsAllDone, areRegularSeasonsWatched: true };
                             }
                           }
 
@@ -3156,41 +3170,77 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         })();
 
                         return (
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
                             <button
                               type="button"
                               onClick={() => {
-                                if (areRegularSeasonsWatched) {
-                                  setShowReconsumedModal(true);
+                                if (selectedItem?.status === 'completed') {
+                                  setShowAllWatchedMenu(true);
                                 } else {
-                                  setPendingSeriesScopeAction('mark_all');
-                                  setShowSeriesScopeModal(true);
+                                  handleToggleStatus('completed');
                                 }
                               }}
                               style={{
                                 width: '100%',
-                                background: isAllWatched ? `var(--color-${selectedItem.item_type || 'series'})` : 'var(--bg-tertiary)',
-                                border: isAllWatched ? 'none' : '1px solid var(--border-color)',
+                                background: isAllWatched 
+                                  ? `var(--color-${selectedItem?.item_type})` 
+                                  : areRegularSeasonsWatched 
+                                    ? 'transparent' 
+                                    : 'var(--bg-tertiary)',
+                                border: isAllWatched 
+                                  ? 'none' 
+                                  : areRegularSeasonsWatched 
+                                    ? `2px dashed var(--color-${selectedItem?.item_type})` 
+                                    : '1px solid var(--border-color)',
                                 borderRadius: '8px',
-                                padding: '0.5rem',
+                                padding: '0.6rem 0.5rem',
                                 textAlign: 'center',
                                 cursor: 'pointer',
-                                color: isAllWatched ? '#ffffff' : 'var(--text-primary)',
+                                color: isAllWatched 
+                                  ? `var(--color-text-${selectedItem?.item_type})` 
+                                  : areRegularSeasonsWatched 
+                                    ? `var(--color-${selectedItem?.item_type})` 
+                                    : 'var(--text-primary)',
+                                fontSize: '0.85rem',
+                                fontWeight: 600,
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '0.35rem',
+                                transition: 'all 0.2s ease'
+                              }}
+                            >
+                              <Check size={14} strokeWidth={2.5} />
+                              <span>{language === 'es' ? 'Visto' : 'Watched'}</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleToggleStatus('watching')}
+                              style={{
+                                width: '100%',
+                                background: selectedItem?.status === 'watching' ? `var(--color-${selectedItem?.item_type})` : 'var(--bg-tertiary)',
+                                border: selectedItem?.status === 'watching' ? 'none' : '1px solid var(--border-color)',
+                                borderRadius: '8px',
+                                padding: '0.6rem 0.5rem',
+                                textAlign: 'center',
+                                cursor: 'pointer',
+                                color: selectedItem?.status === 'watching' ? `var(--color-text-${selectedItem?.item_type})` : 'var(--text-primary)',
                                 fontSize: '0.85rem',
                                 fontWeight: 600,
                                 transition: 'all 0.2s ease'
                               }}
                             >
-                              {language === 'es' ? 'Todo visto' : 'All watched'}
+                              {language === 'es' ? 'Viendo' : 'Watching'}
                             </button>
                             <button
                               type="button"
                               onClick={() => handleToggleStatus('dropped')}
                               style={{
+                                width: '100%',
                                 background: selectedItem?.status === 'dropped' ? '#ef4444' : 'var(--bg-tertiary)',
                                 border: selectedItem?.status === 'dropped' ? 'none' : '1px solid var(--border-color)',
                                 borderRadius: '8px',
-                                padding: '0.5rem',
+                                padding: '0.6rem 0.5rem',
                                 textAlign: 'center',
                                 cursor: 'pointer',
                                 color: selectedItem?.status === 'dropped' ? '#ffffff' : 'var(--text-primary)',
@@ -3203,76 +3253,66 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                             </button>
                           </div>
                         );
-                      })() : ['movie', 'book', 'comic', 'manga'].includes(selectedItem?.item_type) ? (
+                      })() : (
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
                           <button
                             type="button"
                             onClick={() => {
-                              const isCurrentlyActive = selectedItem.status === (['book', 'comic', 'manga'].includes(selectedItem.item_type) ? 'read' : 'completed');
-                              if (isCurrentlyActive) {
-                                setShowReconsumedModal(true);
-                                return;
+                              if (selectedItem?.status === 'completed' || selectedItem?.status === 'read') {
+                                setShowSingleWatchedMenu(true);
+                              } else {
+                                handleToggleStatus(['book', 'comic', 'manga'].includes(selectedItem?.item_type) ? 'read' : 'completed');
                               }
-
-                              if (['book', 'comic', 'manga'].includes(selectedItem.item_type) && totalPagesVal !== '') {
-                                // Auto-fill pages_read to totalPagesVal
-                                setPagesReadVal(totalPagesVal);
-                                if (selectedItem.id) {
-                                  apiClient.put(`/library/${selectedItem.id}`, { pages_read: totalPagesVal }).catch(console.error);
-                                }
-                              } else if (selectedItem.item_type === 'movie') {
-                                const movieTotal = selectedItem.total_pages || selectedItem.page_count;
-                                if (movieTotal) {
-                                  setPagesReadVal(movieTotal);
-                                  if (selectedItem.id) {
-                                    apiClient.put(`/library/${selectedItem.id}`, { pages_read: movieTotal }).catch(console.error);
-                                  }
-                                }
-                              }
-                              handleToggleStatus(['book', 'comic', 'manga'].includes(selectedItem.item_type) ? 'read' : 'completed');
                             }}
                             style={{
                               width: '100%',
-                              background: ['completed', 'read'].includes(selectedItem?.status) ? (selectedItem.item_type === 'movie' ? 'var(--color-movie)' : 'var(--color-book)') : 'var(--bg-tertiary)',
-                              border: ['completed', 'read'].includes(selectedItem?.status) ? 'none' : '1px solid var(--border-color)',
+                              background: (selectedItem?.status === 'completed' || selectedItem?.status === 'read') ? `var(--color-${selectedItem?.item_type})` : 'var(--bg-tertiary)',
+                              border: (selectedItem?.status === 'completed' || selectedItem?.status === 'read') ? 'none' : '1px solid var(--border-color)',
                               borderRadius: '8px',
-                              padding: '0.5rem',
+                              padding: '0.6rem 0.5rem',
                               textAlign: 'center',
                               cursor: 'pointer',
-                              color: ['completed', 'read'].includes(selectedItem?.status) ? '#ffffff' : 'var(--text-primary)',
+                              color: (selectedItem?.status === 'completed' || selectedItem?.status === 'read') ? `var(--color-text-${selectedItem?.item_type})` : 'var(--text-primary)',
                               fontSize: '0.85rem',
                               fontWeight: 600,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '0.35rem',
                               transition: 'all 0.2s ease'
                             }}
                           >
-                            {['book', 'comic', 'manga'].includes(selectedItem.item_type) ? (language === 'es' ? 'Leído' : 'Read') : (language === 'es' ? 'Visto' : 'Watched')}
+                            <Check size={14} strokeWidth={2.5} />
+                            <span>{['book', 'comic', 'manga'].includes(selectedItem?.item_type) ? (language === 'es' ? 'Leído' : 'Read') : (language === 'es' ? 'Visto' : 'Watched')}</span>
                           </button>
                           <button
                             type="button"
-                            onClick={() => handleToggleStatus(['book', 'comic', 'manga'].includes(selectedItem.item_type) ? 'reading' : 'watching')}
+                            onClick={() => handleToggleStatus(['book', 'comic', 'manga'].includes(selectedItem?.item_type) ? 'reading' : 'watching')}
                             style={{
-                              background: ['watching', 'reading'].includes(selectedItem?.status) ? '#3b82f6' : 'var(--bg-tertiary)',
+                              width: '100%',
+                              background: ['watching', 'reading'].includes(selectedItem?.status) ? `var(--color-${selectedItem?.item_type})` : 'var(--bg-tertiary)',
                               border: ['watching', 'reading'].includes(selectedItem?.status) ? 'none' : '1px solid var(--border-color)',
                               borderRadius: '8px',
-                              padding: '0.5rem',
+                              padding: '0.6rem 0.5rem',
                               textAlign: 'center',
                               cursor: 'pointer',
-                              color: ['watching', 'reading'].includes(selectedItem?.status) ? '#ffffff' : 'var(--text-primary)',
+                              color: ['watching', 'reading'].includes(selectedItem?.status) ? `var(--color-text-${selectedItem?.item_type})` : 'var(--text-primary)',
                               fontSize: '0.85rem',
                               fontWeight: 600,
                               transition: 'all 0.2s ease'
                             }}
                           >
-                            {['book', 'comic', 'manga'].includes(selectedItem.item_type) ? (language === 'es' ? 'Leyendo' : 'Reading') : (language === 'es' ? 'Pausa' : 'Paused')}
+                            {['book', 'comic', 'manga'].includes(selectedItem?.item_type) ? (language === 'es' ? 'Leyendo' : 'Reading') : (language === 'es' ? 'Viendo' : 'Watching')}
                           </button>
                           <button
                             type="button"
                             onClick={() => handleToggleStatus('dropped')}
                             style={{
+                              width: '100%',
                               background: selectedItem?.status === 'dropped' ? '#ef4444' : 'var(--bg-tertiary)',
                               border: selectedItem?.status === 'dropped' ? 'none' : '1px solid var(--border-color)',
                               borderRadius: '8px',
-                              padding: '0.5rem',
+                              padding: '0.6rem 0.5rem',
                               textAlign: 'center',
                               cursor: 'pointer',
                               color: selectedItem?.status === 'dropped' ? '#ffffff' : 'var(--text-primary)',
@@ -3284,51 +3324,14 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                             {language === 'es' ? 'Abandonado' : 'Dropped'}
                           </button>
                         </div>
-                      ) : (
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
-                          <button
-                            type="button"
-                            disabled={!isOwnProfile}
-                            onClick={() => {
-                              const isComp = (selectedItem?.status === 'completed' || selectedItem?.status === 'read');
-                              if (isComp) {
-                                setShowReconsumedModal(true);
-                              } else {
-                                handleMarkCompleted();
-                              }
-                            }}
-                            style={{
-                              background: (selectedItem?.status === 'completed' || selectedItem?.status === 'read') ? `var(--color-${selectedItem.item_type || 'movie'})` : 'var(--bg-tertiary)',
-                              border: (selectedItem?.status === 'completed' || selectedItem?.status === 'read') ? 'none' : '1px solid var(--border-color)',
-                              borderRadius: '20px',
-                              padding: '0.45rem 1rem',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '0.5rem',
-                              cursor: isOwnProfile ? 'pointer' : 'default',
-                              color: (selectedItem?.status === 'completed' || selectedItem?.status === 'read') ? `var(--color-text-${selectedItem.item_type || 'movie'})` : 'var(--text-primary)',
-                              fontSize: '0.85rem',
-                              fontWeight: 600,
-                              transition: 'all 0.2s ease'
-                            }}
-                          >
-                            <Check size={16} strokeWidth={3} />
-                            <span>
-                              {(selectedItem?.status === 'completed' || selectedItem?.status === 'read')
-                                ? (selectedItem.item_type === 'game' ? (language === 'es' ? 'Jugado' : 'Played') : (language === 'es' ? 'Visto' : 'Watched'))
-                                : (selectedItem.item_type === 'game' ? (language === 'es' ? 'Marcar como jugado' : 'Mark as played') : (language === 'es' ? 'Marcar como visto' : 'Mark as seen'))
-                              }
-                            </span>
-                          </button>
-                        </div>
                       )}
                     </div>
                   )}
 
-                  {/* PRO Consumption History (Visible for PRO users when re-consumed > 1, for non-series or episodes) */}
-                  {user?.is_pro && consumptionHistory.length > 1 && (isEpisode || !['series', 'anime'].includes(selectedItem?.item_type)) && (
+                  {/* PRO Consumption History for Single Items (Movies, Games, Books, Comic Issues, Manga Volumes) */}
+                  {user?.is_pro && !['series', 'anime'].includes(selectedItem?.item_type) && consumptionHistory.length > 1 && (
                     <div style={{
-                      marginTop: '0.85rem',
+                      marginTop: '0.75rem',
                       padding: '0.65rem 0.85rem',
                       background: 'rgba(124, 58, 237, 0.05)',
                       border: '1px solid rgba(124, 58, 237, 0.2)',
@@ -3366,7 +3369,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         display: 'flex',
                         flexDirection: 'column',
                         gap: '0.25rem',
-                        maxHeight: '110px',
+                        maxHeight: '130px',
                         overflowY: 'auto',
                         paddingRight: '0.25rem'
                       }}>
@@ -3381,10 +3384,9 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                 minute: '2-digit'
                               })
                             : dStr;
-                          
-                          const isEntryHundred = consumptionEntries && consumptionEntries[idx]
-                            ? consumptionEntries[idx].is_hundred_percent
-                            : (idx === 0 && selectedItem?.is_hundred_percent);
+
+                          const matchingEntry = consumptionEntries.find(e => e.consumed_at === dStr);
+                          const isEntryHundred = matchingEntry ? matchingEntry.is_hundred_percent : (idx === 0 && selectedItem?.is_hundred_percent);
 
                           return (
                             <div key={idx} style={{
@@ -3425,733 +3427,734 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                       </div>
                     </div>
                   )}
-                       {/* TV Series Season / Comic Volume Accordion Tracking */}
-{(selectedItem.item_type === 'series' || selectedItem.item_type === 'anime' || selectedItem.item_type === 'comic') && seasons.length > 0 && !isEpisode && (
-                <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  <h4 style={{ margin: 0, fontSize: '1.1rem' }}>
-                    {selectedItem.item_type === 'comic' 
-                      ? (language === 'es' ? 'Seguimiento de Números' : 'Issues Tracking')
-                      : (language === 'es' ? 'Seguimiento de Temporadas' : 'Season Tracking')}
-                  </h4>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    {selectedItem.item_type === 'comic' ? (
-                      (() => {
-                        const cacheKeyAll = `${selectedItem.external_id}_all_episodes`;
-                        const cachedAll = getCachedSeries(cacheKeyAll);
-                        const displayedIssues = (seasonEpisodes[1] && seasonEpisodes[1].length > 0)
-                          ? seasonEpisodes[1]
-                          : (Array.isArray(cachedAll) ? cachedAll : []);
 
-                        if (isLoadingSeasonEpisodes && displayedIssues.length === 0) {
-                          return (
-                            <div style={{ padding: '1rem', textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                              {language === 'es' ? 'Cargando números...' : 'Loading issues...'}
-                            </div>
-                          );
-                        }
+                  {/* TV Series Season / Comic Volume Accordion Tracking */}
+                  {(selectedItem.item_type === 'series' || selectedItem.item_type === 'anime' || selectedItem.item_type === 'comic') && seasons.length > 0 && !isEpisode && (
+                    <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                      <h4 style={{ margin: 0, fontSize: '1.1rem' }}>
+                        {selectedItem.item_type === 'comic' 
+                          ? (language === 'es' ? 'Seguimiento de Números' : 'Issues Tracking')
+                          : (language === 'es' ? 'Seguimiento de Temporadas' : 'Season Tracking')}
+                      </h4>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                        {selectedItem.item_type === 'comic' ? (
+                          (() => {
+                            const cacheKeyAll = `${selectedItem.external_id}_all_episodes`;
+                            const cachedAll = getCachedSeries(cacheKeyAll);
+                            const displayedIssues = (seasonEpisodes[1] && seasonEpisodes[1].length > 0)
+                              ? seasonEpisodes[1]
+                              : (Array.isArray(cachedAll) ? cachedAll : []);
 
-                        if (displayedIssues.length === 0) {
-                          return (
-                            <div style={{ padding: '1rem', textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                              {language === 'es' ? 'No se encontraron números.' : 'No issues found.'}
-                            </div>
-                          );
-                        }
-
-                        return (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '380px', overflowY: 'auto', paddingRight: '0.25rem' }}>
-                            {displayedIssues.map((ep: any) => {
-                              const extIdKey = `cv_issue_${ep.id}`;
-                              const dbEp = (episodes || []).find(x => x.external_id === extIdKey || x.id === ep.id);
-                              const isCompleted = !!globalProgress[extIdKey] || !!dbEp?.is_completed;
-
+                            if (isLoadingSeasonEpisodes && displayedIssues.length === 0) {
                               return (
-                                <div
-                                  key={ep.id}
-                                  style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'space-between',
-                                    padding: '0.45rem 0.65rem',
-                                    background: 'var(--bg-secondary)',
-                                    border: '1px solid var(--border-color)',
-                                    borderRadius: '6px',
-                                    gap: '1rem'
-                                  }}
-                                >
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', minWidth: 0 }}>
-                                    <div style={{ position: 'relative', flexShrink: 0 }}>
+                                <div style={{ padding: '1rem', textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                                  {language === 'es' ? 'Cargando números...' : 'Loading issues...'}
+                                </div>
+                              );
+                            }
+
+                            if (displayedIssues.length === 0) {
+                              return (
+                                <div style={{ padding: '1rem', textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                                  {language === 'es' ? 'No se encontraron números.' : 'No issues found.'}
+                                </div>
+                              );
+                            }
+
+                            return (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '380px', overflowY: 'auto', paddingRight: '0.25rem' }}>
+                                {displayedIssues.map((ep: any) => {
+                                  const extIdKey = `cv_issue_${ep.id}`;
+                                  const dbEp = (episodes || []).find(x => x.external_id === extIdKey || x.id === ep.id);
+                                  const isCompleted = !!globalProgress[extIdKey] || !!dbEp?.is_completed;
+
+                                  return (
+                                    <div
+                                      key={ep.id}
+                                      style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        padding: '0.45rem 0.65rem',
+                                        background: 'var(--bg-secondary)',
+                                        border: '1px solid var(--border-color)',
+                                        borderRadius: '6px',
+                                        gap: '1rem'
+                                      }}
+                                    >
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', minWidth: 0 }}>
+                                        <div style={{ position: 'relative', flexShrink: 0 }}>
+                                          <button
+                                            type="button"
+                                            disabled={!user}
+                                            onClick={() => {
+                                              const currentIsCompleted = !!globalProgress[extIdKey] || !!dbEp?.is_completed;
+                                              if (currentIsCompleted) {
+                                                setEpisodeActionItem({ ep, listId: selectedItem.tracking_list_id });
+                                              } else {
+                                                setGlobalProgress(prev => ({ ...prev, [extIdKey]: true }));
+                                                handleToggleEpisode(selectedItem.tracking_list_id, ep);
+                                              }
+                                            }}
+                                            style={{
+                                              background: isCompleted ? `var(--color-${selectedItem.item_type || 'movie'})` : 'transparent',
+                                              border: isCompleted ? 'none' : '1px solid var(--border-color)',
+                                              borderRadius: '50%',
+                                              width: '20px',
+                                              height: '20px',
+                                              display: 'inline-flex',
+                                              alignItems: 'center',
+                                              justifyContent: 'center',
+                                              cursor: user ? 'pointer' : 'default',
+                                              color: isCompleted ? `var(--color-text-${selectedItem.item_type || 'movie'})` : 'var(--text-muted)',
+                                              opacity: isCompleted ? 1 : 0.6,
+                                              transition: 'all 0.2s ease',
+                                              padding: 0
+                                            }}
+                                          >
+                                            <Check size={12} strokeWidth={3} />
+                                          </button>
+                                        </div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', minWidth: 0, overflow: 'hidden' }}>
+                                          <span style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={ep.name || 'Untitled'}>
+                                            {ep.name || 'Untitled'}
+                                          </span>
+                                          {ep.air_date && (
+                                            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', flexShrink: 0 }}>
+                                              ({formatReleaseDate(ep.air_date)})
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
                                       <button
-                                        type="button"
-                                        disabled={!user}
                                         onClick={() => {
-                                          const currentIsCompleted = !!globalProgress[extIdKey] || !!dbEp?.is_completed;
-                                          if (currentIsCompleted) {
-                                            setEpisodeActionItem({ ep, listId: selectedItem.tracking_list_id });
-                                          } else {
-                                            setGlobalProgress(prev => ({ ...prev, [extIdKey]: true }));
-                                            handleToggleEpisode(selectedItem.tracking_list_id, ep);
-                                          }
+                                          setHistoryStack(prev => [...prev, selectedItem]);
+                                          onOpenItem && onOpenItem({
+                                            id: dbEp ? dbEp.id : ep.id,
+                                            list_id: selectedItem.tracking_list_id,
+                                            item_type: 'comic',
+                                            external_id: `cv_issue_${ep.id}`,
+                                            title: `${selectedItem.title} ${ep.name}`,
+                                            image_url: ep.image_url || ep.image?.original || ep.image?.medium || ep.still_path || selectedItem.image_url,
+                                            custom_notes: JSON.stringify({ description: ep.overview || '', release_date: ep.air_date || null }),
+                                            completed_at: dbEp?.completed_at,
+                                            is_completed: isCompleted,
+                                            season_number: ep.season_number,
+                                            episode_number: ep.episode_number,
+                                            rawEpisodeId: ep.id,
+                                            release_date: ep.air_date,
+                                            parent_series: selectedItem
+                                          });
                                         }}
-                                        style={{
-                                          background: isCompleted ? `var(--color-${selectedItem.item_type || 'movie'})` : 'transparent',
-                                          border: isCompleted ? 'none' : '1px solid var(--border-color)',
-                                          borderRadius: '50%',
-                                          width: '20px',
-                                          height: '20px',
-                                          display: 'inline-flex',
-                                          alignItems: 'center',
-                                          justifyContent: 'center',
-                                          cursor: user ? 'pointer' : 'default',
-                                          color: isCompleted ? `var(--color-text-${selectedItem.item_type || 'movie'})` : 'var(--text-muted)',
-                                          opacity: isCompleted ? 1 : 0.6,
-                                          transition: 'all 0.2s ease',
-                                          padding: 0
-                                        }}
+                                        className="btn-secondary"
+                                        style={{ padding: '0.2rem 0.4rem', fontSize: '0.74rem', flexShrink: 0 }}
                                       >
-                                        <Check size={12} strokeWidth={3} />
+                                        {language === 'es' ? 'Ver Info' : 'View Info'}
                                       </button>
                                     </div>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', minWidth: 0, overflow: 'hidden' }}>
-                                      <span style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={ep.name || 'Untitled'}>
-                                        {ep.name || 'Untitled'}
-                                      </span>
-                                      {ep.air_date && (
-                                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', flexShrink: 0 }}>
-                                          ({formatReleaseDate(ep.air_date)})
-                                        </span>
-                                      )}
-                                    </div>
-                                  </div>
-                                  <button
-                                    onClick={() => {
-                                      setHistoryStack(prev => [...prev, selectedItem]);
-                                      onOpenItem && onOpenItem({
-                                        id: dbEp ? dbEp.id : ep.id,
-                                        list_id: selectedItem.tracking_list_id,
-                                        item_type: 'comic',
-                                        external_id: `cv_issue_${ep.id}`,
-                                        title: `${selectedItem.title} ${ep.name}`,
-                                        image_url: ep.image_url || ep.image?.original || ep.image?.medium || ep.still_path || selectedItem.image_url,
-                                        custom_notes: JSON.stringify({ description: ep.overview || '', release_date: ep.air_date || null }),
-                                        completed_at: dbEp?.completed_at,
-                                        is_completed: isCompleted,
-                                        season_number: ep.season_number,
-                                        episode_number: ep.episode_number,
-                                        rawEpisodeId: ep.id,
-                                        release_date: ep.air_date,
-                                        parent_series: selectedItem
-                                      });
+                                  );
+                                })}
+                              </div>
+                            );
+                          })()
+                        ) : (
+                          (() => {
+                            // 1. Calculate air date range for each regular season
+                            const seasonDateRanges: Record<number, { start?: string, end?: string }> = {};
+                            seasons.forEach((s: any) => {
+                              if (s.season_number === 0 || s.is_extras) return;
+                              const sEps = (seasonEpisodes[s.season_number] || []).filter((e: any) => e.air_date);
+                              if (sEps.length > 0) {
+                                const sortedDates = sEps.map((e: any) => e.air_date).sort();
+                                seasonDateRanges[s.season_number] = {
+                                  start: sortedDates[0],
+                                  end: sortedDates[sortedDates.length - 1]
+                                };
+                              }
+                            });
+
+                            // 2. Extract standalone specials from cached all episodes
+                            const cacheKeyAll = `${selectedItem.external_id}_all_episodes`;
+                            const cachedAll = getCachedSeries(cacheKeyAll);
+                            const standaloneSpecials: any[] = [];
+                            if (cachedAll && Array.isArray(cachedAll)) {
+                              cachedAll.forEach((ep: any) => {
+                                const isSig = ep.is_significant_special || ep.ep_type === 'significant_special';
+                                const isExt = ep.is_extra || ep.ep_type === 'insignificant_special' || ep.season_number === 0;
+                                if (isSig && !isExt) {
+                                  const parentSeason = ep.season_number;
+                                  const parentRange = parentSeason ? seasonDateRanges[parentSeason] : null;
+                                  const epDate = ep.air_date;
+                                  const isInsideParentSeason = parentRange && parentRange.start && parentRange.end && epDate && epDate >= parentRange.start && epDate <= parentRange.end;
+                                  if (!isInsideParentSeason) {
+                                    standaloneSpecials.push(ep);
+                                  }
+                                }
+                              });
+                            }
+
+                            standaloneSpecials.sort((a, b) => {
+                              if (a.air_date && b.air_date) return new Date(a.air_date).getTime() - new Date(b.air_date).getTime();
+                              return 0;
+                            });
+
+                            type TimelineItem = 
+                              | { type: 'season'; season: any }
+                              | { type: 'standalone_special'; episode: any };
+
+                            const timeline: TimelineItem[] = [];
+                            const regularSeasons = seasons.filter((s: any) => s.season_number > 0 && !s.is_extras).sort((a: any, b: any) => a.season_number - b.season_number);
+                            let unplacedSpecials = [...standaloneSpecials];
+
+                            regularSeasons.forEach((s: any) => {
+                              const sRange = seasonDateRanges[s.season_number];
+                              const sStart = sRange?.start;
+
+                              if (sStart) {
+                                const before = unplacedSpecials.filter(ep => ep.air_date && ep.air_date < sStart);
+                                before.forEach(ep => timeline.push({ type: 'standalone_special', episode: ep }));
+                                unplacedSpecials = unplacedSpecials.filter(ep => !ep.air_date || ep.air_date >= sStart);
+                              }
+
+                              timeline.push({ type: 'season', season: s });
+                            });
+
+                            unplacedSpecials.forEach(ep => timeline.push({ type: 'standalone_special', episode: ep }));
+
+                            const extrasSeason = seasons.find((s: any) => s.season_number === 0 || s.is_extras);
+                            if (extrasSeason) {
+                              timeline.push({ type: 'season', season: extrasSeason });
+                            }
+
+                            return timeline.map((item) => {
+                              if (item.type === 'standalone_special') {
+                                const ep = item.episode;
+                                const extIdKey = `tvm-ep-${ep.id}`;
+                                const dbEp = (episodes || []).find(x => x.external_id === extIdKey || x.id === ep.id);
+                                const isCompleted = !!globalProgress[extIdKey] || !!dbEp?.is_completed;
+
+                                return (
+                                  <div
+                                    key={`standalone-${ep.id}`}
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'space-between',
+                                      padding: '0.45rem 0.65rem',
+                                      background: 'rgba(245, 158, 11, 0.05)',
+                                      border: '1px dashed rgba(245, 158, 11, 0.35)',
+                                      borderRadius: '6px',
+                                      gap: '1rem'
                                     }}
-                                    className="btn-secondary"
-                                    style={{ padding: '0.2rem 0.4rem', fontSize: '0.74rem', flexShrink: 0 }}
                                   >
-                                    {language === 'es' ? 'Ver Info' : 'View Info'}
-                                  </button>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', minWidth: 0 }}>
+                                      <div style={{ position: 'relative', flexShrink: 0 }}>
+                                        <button
+                                          type="button"
+                                          disabled={!user}
+                                          onClick={() => {
+                                            const currentIsCompleted = !!globalProgress[extIdKey] || !!dbEp?.is_completed;
+                                            if (currentIsCompleted) {
+                                              setEpisodeActionItem({ ep, listId: selectedItem.tracking_list_id });
+                                            } else {
+                                              const missing = getMissingPreviousEpisodesForEp(ep);
+                                              if (missing.length > 0) {
+                                                setPendingPreviousPrompt({
+                                                  type: 'episode',
+                                                  targetEp: ep,
+                                                  missingEpisodes: missing
+                                                });
+                                                return;
+                                              }
+                                              setGlobalProgress(prev => ({ ...prev, [extIdKey]: true }));
+                                              handleToggleEpisode(selectedItem.tracking_list_id, ep);
+                                            }
+                                          }}
+                                          style={{
+                                            background: isCompleted ? `var(--color-${selectedItem.item_type || 'movie'})` : 'transparent',
+                                            border: isCompleted ? 'none' : '1px solid var(--border-color)',
+                                            borderRadius: '50%',
+                                            width: '20px',
+                                            height: '20px',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            cursor: user ? 'pointer' : 'default',
+                                            color: isCompleted ? `var(--color-text-${selectedItem.item_type || 'movie'})` : 'var(--text-muted)',
+                                            opacity: isCompleted ? 1 : 0.6,
+                                            transition: 'all 0.2s ease',
+                                            padding: 0
+                                          }}
+                                        >
+                                          <Check size={12} strokeWidth={3} />
+                                        </button>
+                                      </div>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', minWidth: 0, overflow: 'hidden' }}>
+                                        <span style={{
+                                          fontSize: '0.68rem',
+                                          fontWeight: 700,
+                                          textTransform: 'uppercase',
+                                          background: 'rgba(245, 158, 11, 0.15)',
+                                          color: '#f59e0b',
+                                          border: '1px solid rgba(245, 158, 11, 0.35)',
+                                          padding: '0.1rem 0.35rem',
+                                          borderRadius: '4px',
+                                          flexShrink: 0
+                                        }}>
+                                          {language === 'es' ? 'Especial' : 'Special'}
+                                        </span>
+                                        <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={ep.name || 'Untitled'}>
+                                          {ep.name || 'Untitled'}
+                                        </span>
+                                        {ep.air_date && (
+                                          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', flexShrink: 0 }}>
+                                            ({formatReleaseDate(ep.air_date)})
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <button
+                                      onClick={() => {
+                                        setHistoryStack(prev => [...prev, selectedItem]);
+                                        onOpenItem && onOpenItem({
+                                          id: dbEp ? dbEp.id : ep.id,
+                                          list_id: selectedItem.tracking_list_id,
+                                          item_type: 'episode',
+                                          external_id: `tvm-ep-${ep.id}`,
+                                          title: `${selectedItem.title} - ${language === 'es' ? 'Especial' : 'Special'} • ${ep.name || 'Untitled'}`,
+                                          image_url: ep.image_url || ep.image?.original || ep.image?.medium || ep.still_path || selectedItem.image_url,
+                                          custom_notes: JSON.stringify({ description: ep.overview || '', release_date: ep.air_date || null }),
+                                          completed_at: dbEp?.completed_at,
+                                          is_completed: isCompleted,
+                                          season_number: ep.season_number,
+                                          episode_number: ep.episode_number,
+                                          rawEpisodeId: ep.id,
+                                          release_date: ep.air_date,
+                                          parent_series: selectedItem
+                                        });
+                                      }}
+                                      className="btn-secondary"
+                                      style={{ padding: '0.2rem 0.4rem', fontSize: '0.74rem', flexShrink: 0 }}
+                                    >
+                                      {language === 'es' ? 'Ver Info' : 'View Info'}
+                                    </button>
+                                  </div>
+                                );
+                              }
+
+                              const s = item.season;
+                              const isSeasonActive = activeSeason === s.season_number;
+                              const { isSeasonDone, isSeasonPartial } = (() => {
+                                const cacheKeyAll = `${selectedItem.external_id}_all_episodes`;
+                                const cachedAll = getCachedSeries(cacheKeyAll) || [];
+
+                                const isEpWatched = (epId: any, seasonNum?: number, epNum?: number) => {
+                                  if (!epId) return false;
+                                  const extId = typeof epId === 'string' && epId.startsWith('tvm-ep-') ? epId : `tvm-ep-${epId}`;
+                                  if (globalProgress[extId] !== undefined) return !!globalProgress[extId];
+                                  const found = (episodes || []).find(x => 
+                                    x.external_id === extId || 
+                                    x.id === epId ||
+                                    (x.season_number === seasonNum && x.episode_number === epNum)
+                                  );
+                                  return !!found?.is_completed;
+                                };
+
+                                let seasonEps = seasonEpisodes[s.season_number];
+                                if (!seasonEps || seasonEps.length === 0) {
+                                  seasonEps = cachedAll.filter((e: any) => e.season_number === s.season_number);
+                                }
+
+                                if (!seasonEps || seasonEps.length === 0) return { isSeasonDone: false, isSeasonPartial: false };
+
+                                const regularEps = seasonEps.filter((e: any) => !e.is_extra && e.ep_type !== 'insignificant_special' && !e.is_significant_special && e.ep_type !== 'significant_special');
+                                const sigSpecials = seasonEps.filter((e: any) => e.is_significant_special || e.ep_type === 'significant_special');
+
+                                const regularAllDone = regularEps.length > 0 && regularEps.every((e: any) => isEpWatched(e.id, e.season_number, e.episode_number));
+                                const sigAllDone = sigSpecials.length === 0 || sigSpecials.every((e: any) => isEpWatched(e.id, e.season_number, e.episode_number));
+
+                                return {
+                                  isSeasonDone: regularAllDone && sigAllDone,
+                                  isSeasonPartial: regularAllDone && !sigAllDone
+                                };
+                              })();
+
+                              const seasonLabel = s.season_number > 0 
+                                ? `${language === 'es' ? 'Temporada' : 'Season'} ${s.season_number}` 
+                                : (language === 'es' ? 'Extras' : 'Extras');
+
+                              const displayedSeasonEps = (seasonEpisodes[s.season_number] && seasonEpisodes[s.season_number].length > 0)
+                                ? seasonEpisodes[s.season_number]
+                                : ((getCachedSeries(`${selectedItem.external_id}_all_episodes`) || []).filter((e: any) => e.season_number === s.season_number));
+
+                              const countUnitLabel = language === 'es' ? 'capítulos' : 'episodes';
+
+                              return (
+                                <div key={s.id || s.season_number} style={{ border: '1px solid var(--border-color)', borderRadius: '6px', overflow: 'hidden' }}>
+                                  <div
+                                    role="button"
+                                    tabIndex={0}
+                                    onClick={() => {
+                                      if (isSeasonActive) {
+                                        setActiveSeason(null);
+                                      } else {
+                                        setActiveSeason(s.season_number);
+                                        handleLoadSeasonEpisodes(selectedItem.external_id, s.season_number);
+                                      }
+                                    }}
+                                    style={{
+                                      width: '100%',
+                                      padding: '0.75rem 1rem',
+                                      background: 'var(--bg-secondary)',
+                                      border: 'none',
+                                      color: 'var(--text-primary)',
+                                      fontWeight: 600,
+                                      textAlign: 'left',
+                                      cursor: 'pointer',
+                                      display: 'flex',
+                                      justifyContent: 'space-between',
+                                      alignItems: 'center'
+                                    }}
+                                  >
+                                    <span>
+                                      <span style={{ position: 'relative', display: 'inline-flex', verticalAlign: 'middle' }}>
+                                        <span
+                                          role="button"
+                                          tabIndex={0}
+                                          onClick={async (e) => {
+                                            e.stopPropagation();
+                                            if (isSeasonDone || isSeasonPartial) {
+                                              setSeasonActionItem(s);
+                                              return;
+                                            }
+
+                                            const missing = getMissingPreviousEpisodesForSeason(s);
+                                            if (missing.length > 0) {
+                                              setPendingPreviousPrompt({
+                                                type: 'season',
+                                                targetSeason: s,
+                                                missingEpisodes: missing
+                                              });
+                                              return;
+                                            }
+
+                                            let effectiveListId = selectedItem.tracking_list_id;
+                                            if (!effectiveListId) {
+                                              const defaultStatus = 'watching';
+                                              const tracked = await ensureTracked(defaultStatus);
+                                              if (!tracked) return;
+                                              effectiveListId = tracked.tracking_list_id || tracked;
+                                            }
+                                            
+                                            const cacheKeyAll = `${selectedItem.external_id}_all_episodes`;
+                                            let allEps = getCachedSeries(cacheKeyAll) || [];
+                                            let seasonEps = seasonEpisodes[s.season_number];
+                                            if (!seasonEps || seasonEps.length === 0) {
+                                              seasonEps = allEps.filter((e: any) => e.season_number === s.season_number);
+                                            }
+
+                                            const newProgress: Record<string, boolean> = {};
+                                            seasonEps.forEach((e: any) => {
+                                              if (!e.is_extra && e.ep_type !== 'insignificant_special') {
+                                                newProgress[`tvm-ep-${e.id}`] = true;
+                                              }
+                                            });
+                                            setGlobalProgress(prev => ({ ...prev, ...newProgress }));
+
+                                            try {
+                                              await apiClient.post(`/lists/${effectiveListId}/bulk-episodes`, {
+                                                season_number: s.season_number,
+                                                episodes: seasonEps.map((e: any) => ({
+                                                  external_id: `tvm-ep-${e.id}`,
+                                                  title: `${selectedItem.title} - ${s.season_number > 0 ? (s.season_number < 10 ? 'S0' + s.season_number : 'S' + s.season_number) : (language === 'es' ? 'Extras' : 'Extras')}${e.episode_number != null ? (e.episode_number < 10 ? 'E0' + e.episode_number : 'E' + e.episode_number) : (e.is_significant_special ? ' • ' + (language === 'es' ? 'Especial' : 'Special') : '')} - ${e.name || 'Untitled'}`,
+                                                  image_url: e.image_url || e.image?.original || e.image?.medium || e.still_path || selectedItem.image_url,
+                                                  custom_notes: JSON.stringify({ description: e.overview || '', release_date: e.air_date || null }),
+                                                  season_number: e.season_number,
+                                                  episode_number: e.episode_number,
+                                                  release_date: e.air_date,
+                                                  is_completed: true,
+                                                  is_significant_special: e.is_significant_special || e.ep_type === 'significant_special',
+                                                  is_extra: e.is_extra || e.ep_type === 'insignificant_special' || e.season_number === 0
+                                                }))
+                                              });
+
+                                              const updatedList = await apiClient.get(`/lists/${effectiveListId}`);
+                                              setEpisodes(updatedList.data.items || []);
+                                              onUpdate && onUpdate();
+                                            } catch (err) {
+                                              console.error("Failed to mark season as completed", err);
+                                            }
+                                          }}
+                                          style={{
+                                            background: isSeasonDone 
+                                              ? `var(--color-${selectedItem.item_type || 'movie'})` 
+                                              : isSeasonPartial 
+                                                ? 'transparent' 
+                                                : 'transparent',
+                                            border: isSeasonDone 
+                                              ? 'none' 
+                                              : isSeasonPartial 
+                                                ? `2px dashed var(--color-${selectedItem.item_type || 'movie'})` 
+                                                : '1px solid var(--border-color)',
+                                            borderRadius: '50%',
+                                            width: '20px',
+                                            height: '20px',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            cursor: user ? 'pointer' : 'default',
+                                            color: isSeasonDone 
+                                              ? `var(--color-text-${selectedItem.item_type || 'movie'})` 
+                                              : isSeasonPartial 
+                                                ? `var(--color-${selectedItem.item_type || 'movie'})` 
+                                                : 'var(--text-muted)',
+                                            marginRight: '0.65rem',
+                                            opacity: isSeasonDone || isSeasonPartial ? 1 : 0.6,
+                                            padding: 0,
+                                            transition: 'all 0.2s ease'
+                                          }}
+                                          title={isSeasonDone ? (language === 'es' ? 'Temporada completa' : 'Completed') : isSeasonPartial ? (language === 'es' ? 'Regular completo (pendientes especiales)' : 'Regular completed') : ''}
+                                        >
+                                          <Check size={12} strokeWidth={3} />
+                                        </span>
+                                      </span>
+                                        {seasonLabel}
+                                        <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginLeft: '0.5rem', fontWeight: 400 }}>
+                                          ({displayedSeasonEps.length > 0 ? displayedSeasonEps.length : s.episode_count} {countUnitLabel})
+                                        </span>
+                                      </span>
+                                      <span>{isSeasonActive ? '▼' : '►'}</span>
+                                    </div>
+
+                                    {isSeasonActive && (
+                                      <div style={{ padding: '0.5rem', background: 'var(--bg-primary)', display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '220px', overflowY: 'auto' }}>
+                                        {isLoadingSeasonEpisodes ? (
+                                          <div style={{ padding: '1rem', textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                                            {language === 'es' ? 'Cargando contenido...' : 'Loading...'}
+                                          </div>
+                                        ) : displayedSeasonEps.length === 0 ? (
+                                          <div style={{ padding: '1rem', textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                                            {language === 'es' ? 'No se encontraron capítulos.' : 'No episodes found.'}
+                                          </div>
+                                        ) : (
+                                          displayedSeasonEps.map((ep: any) => {
+                                            const extIdKey = `tvm-ep-${ep.id}`;
+                                            const dbEp = (episodes || []).find(x => x.external_id === extIdKey || x.id === ep.id);
+                                            const isCompleted = !!globalProgress[extIdKey] || !!dbEp?.is_completed;
+                                            const isSpecial = ep.is_significant_special || ep.ep_type === 'significant_special' || (ep.episode_number == null && !ep.is_extra && ep.season_number > 0);
+                                            const isExtra = ep.is_extra || ep.ep_type === 'insignificant_special' || ep.season_number === 0;
+
+                                            return (
+                                              <div
+                                                key={ep.id}
+                                                style={{
+                                                  display: 'flex',
+                                                  alignItems: 'center',
+                                                  justifyContent: 'space-between',
+                                                  padding: '0.4rem 0.6rem',
+                                                  background: 'var(--bg-secondary)',
+                                                  border: '1px solid var(--border-color)',
+                                                  borderRadius: '4px',
+                                                  gap: '1rem'
+                                                }}
+                                              >
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', minWidth: 0 }}>
+                                                  <div style={{ position: 'relative', flexShrink: 0 }}>
+                                                    <button
+                                                      type="button"
+                                                      disabled={!user}
+                                                      onClick={() => {
+                                                        const currentIsCompleted = !!globalProgress[extIdKey] || !!dbEp?.is_completed;
+                                                        if (currentIsCompleted) {
+                                                          setEpisodeActionItem({ ep, listId: selectedItem.tracking_list_id });
+                                                        } else {
+                                                          const missing = getMissingPreviousEpisodesForEp(ep);
+                                                          if (missing.length > 0) {
+                                                            setPendingPreviousPrompt({
+                                                              type: 'episode',
+                                                              targetEp: ep,
+                                                              missingEpisodes: missing
+                                                            });
+                                                            return;
+                                                          }
+                                                          setGlobalProgress(prev => ({ ...prev, [extIdKey]: true }));
+                                                          handleToggleEpisode(selectedItem.tracking_list_id, ep);
+                                                        }
+                                                      }}
+                                                      style={{
+                                                        background: isCompleted ? `var(--color-${selectedItem.item_type || 'movie'})` : 'transparent',
+                                                        border: isCompleted ? 'none' : '1px solid var(--border-color)',
+                                                        borderRadius: '50%',
+                                                        width: '20px',
+                                                        height: '20px',
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        cursor: user ? 'pointer' : 'default',
+                                                        color: isCompleted ? `var(--color-text-${selectedItem.item_type || 'movie'})` : 'var(--text-muted)',
+                                                        opacity: isCompleted ? 1 : 0.6,
+                                                        transition: 'all 0.2s ease',
+                                                        padding: 0
+                                                      }}
+                                                    >
+                                                      <Check size={12} strokeWidth={3} />
+                                                    </button>
+                                                  </div>
+                                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', minWidth: 0, overflow: 'hidden' }}>
+                                                    {isSpecial && (
+                                                      <span style={{
+                                                        fontSize: '0.68rem',
+                                                        fontWeight: 700,
+                                                        textTransform: 'uppercase',
+                                                        background: 'rgba(245, 158, 11, 0.15)',
+                                                        color: '#f59e0b',
+                                                        border: '1px solid rgba(245, 158, 11, 0.35)',
+                                                        padding: '0.1rem 0.35rem',
+                                                        borderRadius: '4px',
+                                                        flexShrink: 0
+                                                      }}>
+                                                        {language === 'es' ? 'Especial' : 'Special'}
+                                                      </span>
+                                                    )}
+                                                    {isExtra && (
+                                                      <span style={{
+                                                        fontSize: '0.68rem',
+                                                        fontWeight: 700,
+                                                        textTransform: 'uppercase',
+                                                        background: 'rgba(148, 163, 184, 0.15)',
+                                                        color: 'var(--text-muted)',
+                                                        border: '1px solid var(--border-color)',
+                                                        padding: '0.1rem 0.35rem',
+                                                        borderRadius: '4px',
+                                                        flexShrink: 0
+                                                      }}>
+                                                        {language === 'es' ? 'Extra' : 'Extra'}
+                                                      </span>
+                                                    )}
+                                                    <span style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={ep.name || 'Untitled'}>
+                                                      {(ep.episode_number ? `${ep.episode_number}. ` : '') + (ep.name || 'Untitled')}
+                                                    </span>
+                                                  </div>
+                                                </div>
+                                                <button
+                                                  onClick={() => {
+                                                    setHistoryStack(prev => [...prev, selectedItem]);
+                                                    onOpenItem && onOpenItem({
+                                                      id: dbEp ? dbEp.id : ep.id,
+                                                      list_id: selectedItem.tracking_list_id,
+                                                      item_type: 'episode',
+                                                      external_id: `tvm-ep-${ep.id}`,
+                                                      title: `${selectedItem.title} - ${ep.season_number > 0 ? (ep.season_number < 10 ? 'S0' + ep.season_number : 'S' + ep.season_number) : (language === 'es' ? 'Extras' : 'Extras')}${ep.episode_number != null ? (ep.episode_number < 10 ? 'E0' + ep.episode_number : 'E' + ep.episode_number) : (isSpecial ? ' • ' + (language === 'es' ? 'Especial' : 'Special') : '')} - ${ep.name || 'Untitled'}`,
+                                                      image_url: ep.image_url || ep.image?.original || ep.image?.medium || ep.still_path || selectedItem.image_url,
+                                                      custom_notes: JSON.stringify({ description: ep.overview || '', release_date: ep.air_date || null }),
+                                                      completed_at: dbEp?.completed_at,
+                                                      is_completed: isCompleted,
+                                                      season_number: ep.season_number,
+                                                      episode_number: ep.episode_number,
+                                                      rawEpisodeId: ep.id,
+                                                      release_date: ep.air_date,
+                                                      parent_series: selectedItem
+                                                    });
+                                                  }}
+                                                  className="btn-secondary"
+                                                  style={{ padding: '0.2rem 0.4rem', fontSize: '0.74rem', flexShrink: 0 }}
+                                                >
+                                                  {language === 'es' ? 'Ver Info' : 'View Info'}
+                                                </button>
+                                              </div>
+                                            );
+                                          })
+                                        )}
+                                      </div>
+                                    )}
+                                </div>
+                              );
+                            });
+                          })()
+                        )}
+                      </div>
+
+                      {/* PRO Consumption History for Series (Rendered below seasons & episodes) */}
+                      {user?.is_pro && consumptionHistory.length > 1 && (
+                        <div style={{
+                          marginTop: '0.85rem',
+                          padding: '0.65rem 0.85rem',
+                          background: 'rgba(124, 58, 237, 0.05)',
+                          border: '1px solid rgba(124, 58, 237, 0.2)',
+                          borderRadius: '8px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '0.4rem'
+                        }}>
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            fontSize: '0.78rem',
+                            fontWeight: 700,
+                            color: 'var(--accent-primary)',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px'
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                              <Calendar size={13} />
+                              <span>{language === 'es' ? 'Historial de Registros (Serie Completa)' : 'Full Series Consumption History'} ({consumptionHistory.length})</span>
+                            </div>
+                            <span style={{
+                              fontSize: '0.68rem',
+                              background: 'var(--accent-primary)',
+                              color: '#ffffff',
+                              padding: '0.15rem 0.4rem',
+                              borderRadius: '4px',
+                              fontWeight: 700
+                            }}>
+                              PREMIUM
+                            </span>
+                          </div>
+                          <div style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '0.25rem',
+                            maxHeight: '130px',
+                            overflowY: 'auto',
+                            paddingRight: '0.25rem'
+                          }}>
+                            {consumptionHistory.map((dStr, idx) => {
+                              const dateObj = new Date(dStr);
+                              const dateFormatted = !isNaN(dateObj.getTime())
+                                ? dateObj.toLocaleDateString(language === 'es' ? 'es-ES' : 'en-US', {
+                                    year: 'numeric',
+                                    month: 'short',
+                                    day: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                  })
+                                : dStr;
+
+                              return (
+                                <div key={idx} style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  fontSize: '0.78rem',
+                                  color: 'var(--text-secondary)'
+                                }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                    <span style={{ fontWeight: 500 }}>
+                                      #{consumptionHistory.length - idx} {idx === 0 ? (language === 'es' ? '(Última vez completada)' : '(Latest completed run)') : ''}
+                                    </span>
+                                  </div>
+                                  <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
+                                    {dateFormatted}
+                                  </span>
                                 </div>
                               );
                             })}
                           </div>
-                        );
-                      })()
-                    ) : (
-                      (() => {
-                        // 1. Calculate air date range for each regular season
-                        const seasonDateRanges: Record<number, { start?: string, end?: string }> = {};
-                        seasons.forEach((s: any) => {
-                          if (s.season_number === 0 || s.is_extras) return;
-                          const sEps = (seasonEpisodes[s.season_number] || []).filter((e: any) => e.air_date);
-                          if (sEps.length > 0) {
-                            const sortedDates = sEps.map((e: any) => e.air_date).sort();
-                            seasonDateRanges[s.season_number] = {
-                              start: sortedDates[0],
-                              end: sortedDates[sortedDates.length - 1]
-                            };
-                          }
-                        });
-
-                        // 2. Extract standalone specials from cached all episodes
-                        const cacheKeyAll = `${selectedItem.external_id}_all_episodes`;
-                        const cachedAll = getCachedSeries(cacheKeyAll);
-                        const standaloneSpecials: any[] = [];
-                        if (cachedAll && Array.isArray(cachedAll)) {
-                          cachedAll.forEach((ep: any) => {
-                            const isSig = ep.is_significant_special || ep.ep_type === 'significant_special';
-                            const isExt = ep.is_extra || ep.ep_type === 'insignificant_special' || ep.season_number === 0;
-                            if (isSig && !isExt) {
-                              const parentSeason = ep.season_number;
-                              const parentRange = parentSeason ? seasonDateRanges[parentSeason] : null;
-                              const epDate = ep.air_date;
-                              const isInsideParentSeason = parentRange && parentRange.start && parentRange.end && epDate && epDate >= parentRange.start && epDate <= parentRange.end;
-                              if (!isInsideParentSeason) {
-                                standaloneSpecials.push(ep);
-                              }
-                            }
-                          });
-                        }
-
-                        standaloneSpecials.sort((a, b) => {
-                          if (a.air_date && b.air_date) return new Date(a.air_date).getTime() - new Date(b.air_date).getTime();
-                          return 0;
-                        });
-
-                        type TimelineItem = 
-                          | { type: 'season'; season: any }
-                          | { type: 'standalone_special'; episode: any };
-
-                        const timeline: TimelineItem[] = [];
-                        const regularSeasons = seasons.filter((s: any) => s.season_number > 0 && !s.is_extras).sort((a: any, b: any) => a.season_number - b.season_number);
-                        let unplacedSpecials = [...standaloneSpecials];
-
-                        regularSeasons.forEach((s: any) => {
-                          const sRange = seasonDateRanges[s.season_number];
-                          const sStart = sRange?.start;
-
-                          if (sStart) {
-                            const before = unplacedSpecials.filter(ep => ep.air_date && ep.air_date < sStart);
-                            before.forEach(ep => timeline.push({ type: 'standalone_special', episode: ep }));
-                            unplacedSpecials = unplacedSpecials.filter(ep => !ep.air_date || ep.air_date >= sStart);
-                          }
-
-                          timeline.push({ type: 'season', season: s });
-                        });
-
-                        unplacedSpecials.forEach(ep => timeline.push({ type: 'standalone_special', episode: ep }));
-
-                        const extrasSeason = seasons.find((s: any) => s.season_number === 0 || s.is_extras);
-                        if (extrasSeason) {
-                          timeline.push({ type: 'season', season: extrasSeason });
-                        }
-
-                        return timeline.map((item) => {
-                          if (item.type === 'standalone_special') {
-                            const ep = item.episode;
-                            const extIdKey = `tvm-ep-${ep.id}`;
-                            const dbEp = (episodes || []).find(x => x.external_id === extIdKey || x.id === ep.id);
-                            const isCompleted = !!globalProgress[extIdKey] || !!dbEp?.is_completed;
-
-                            return (
-                              <div
-                                key={`standalone-${ep.id}`}
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'space-between',
-                                  padding: '0.45rem 0.65rem',
-                                  background: 'rgba(245, 158, 11, 0.05)',
-                                  border: '1px dashed rgba(245, 158, 11, 0.35)',
-                                  borderRadius: '6px',
-                                  gap: '1rem'
-                                }}
-                              >
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', minWidth: 0 }}>
-                                  <div style={{ position: 'relative', flexShrink: 0 }}>
-                                    <button
-                                      type="button"
-                                      disabled={!user}
-                                      onClick={() => {
-                                        const currentIsCompleted = !!globalProgress[extIdKey] || !!dbEp?.is_completed;
-                                        if (currentIsCompleted) {
-                                          setEpisodeActionItem({ ep, listId: selectedItem.tracking_list_id });
-                                        } else {
-                                          const missing = getMissingPreviousEpisodesForEp(ep);
-                                          if (missing.length > 0) {
-                                            setPendingPreviousPrompt({
-                                              type: 'episode',
-                                              targetEp: ep,
-                                              missingEpisodes: missing
-                                            });
-                                            return;
-                                          }
-                                          setGlobalProgress(prev => ({ ...prev, [extIdKey]: true }));
-                                          handleToggleEpisode(selectedItem.tracking_list_id, ep);
-                                        }
-                                      }}
-                                      style={{
-                                        background: isCompleted ? `var(--color-${selectedItem.item_type || 'movie'})` : 'transparent',
-                                        border: isCompleted ? 'none' : '1px solid var(--border-color)',
-                                        borderRadius: '50%',
-                                        width: '20px',
-                                        height: '20px',
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        cursor: user ? 'pointer' : 'default',
-                                        color: isCompleted ? `var(--color-text-${selectedItem.item_type || 'movie'})` : 'var(--text-muted)',
-                                        opacity: isCompleted ? 1 : 0.6,
-                                        transition: 'all 0.2s ease',
-                                        padding: 0
-                                      }}
-                                    >
-                                      <Check size={12} strokeWidth={3} />
-                                    </button>
-                                  </div>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', minWidth: 0, overflow: 'hidden' }}>
-                                    <span style={{
-                                      fontSize: '0.68rem',
-                                      fontWeight: 700,
-                                      textTransform: 'uppercase',
-                                      background: 'rgba(245, 158, 11, 0.15)',
-                                      color: '#f59e0b',
-                                      border: '1px solid rgba(245, 158, 11, 0.35)',
-                                      padding: '0.1rem 0.35rem',
-                                      borderRadius: '4px',
-                                      flexShrink: 0
-                                    }}>
-                                      {language === 'es' ? 'Especial' : 'Special'}
-                                    </span>
-                                    <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={ep.name || 'Untitled'}>
-                                      {ep.name || 'Untitled'}
-                                    </span>
-                                    {ep.air_date && (
-                                      <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', flexShrink: 0 }}>
-                                        ({formatReleaseDate(ep.air_date)})
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                                <button
-                                  onClick={() => {
-                                    setHistoryStack(prev => [...prev, selectedItem]);
-                                    onOpenItem && onOpenItem({
-                                      id: dbEp ? dbEp.id : ep.id,
-                                      list_id: selectedItem.tracking_list_id,
-                                      item_type: 'episode',
-                                      external_id: `tvm-ep-${ep.id}`,
-                                      title: `${selectedItem.title} - ${language === 'es' ? 'Especial' : 'Special'} • ${ep.name || 'Untitled'}`,
-                                      image_url: ep.image_url || ep.image?.original || ep.image?.medium || ep.still_path || selectedItem.image_url,
-                                      custom_notes: JSON.stringify({ description: ep.overview || '', release_date: ep.air_date || null }),
-                                      completed_at: dbEp?.completed_at,
-                                      is_completed: isCompleted,
-                                      season_number: ep.season_number,
-                                      episode_number: ep.episode_number,
-                                      rawEpisodeId: ep.id,
-                                      release_date: ep.air_date,
-                                      parent_series: selectedItem
-                                    });
-                                  }}
-                                  className="btn-secondary"
-                                  style={{ padding: '0.2rem 0.4rem', fontSize: '0.74rem', flexShrink: 0 }}
-                                >
-                                  {language === 'es' ? 'Ver Info' : 'View Info'}
-                                </button>
-                              </div>
-                            );
-                          }
-
-                          const s = item.season;
-                          const isSeasonActive = activeSeason === s.season_number;
-                          const { isSeasonDone, isSeasonPartial } = (() => {
-                            const cacheKeyAll = `${selectedItem.external_id}_all_episodes`;
-                            const cachedAll = getCachedSeries(cacheKeyAll) || [];
-
-                            const isEpWatched = (epId: any, seasonNum?: number, epNum?: number) => {
-                              if (!epId) return false;
-                              const extId = typeof epId === 'string' && epId.startsWith('tvm-ep-') ? epId : `tvm-ep-${epId}`;
-                              if (globalProgress[extId] !== undefined) return !!globalProgress[extId];
-                              const found = (episodes || []).find(x => 
-                                x.external_id === extId || 
-                                x.id === epId ||
-                                (x.season_number === seasonNum && x.episode_number === epNum)
-                              );
-                              return !!found?.is_completed;
-                            };
-
-                            let seasonEps = seasonEpisodes[s.season_number];
-                            if (!seasonEps || seasonEps.length === 0) {
-                              seasonEps = cachedAll.filter((e: any) => e.season_number === s.season_number);
-                            }
-
-                            if (!seasonEps || seasonEps.length === 0) return { isSeasonDone: false, isSeasonPartial: false };
-
-                            const regularEps = seasonEps.filter((e: any) => !e.is_extra && e.ep_type !== 'insignificant_special' && !e.is_significant_special && e.ep_type !== 'significant_special');
-                            const sigSpecials = seasonEps.filter((e: any) => e.is_significant_special || e.ep_type === 'significant_special');
-
-                            const regularAllDone = regularEps.length > 0 && regularEps.every((e: any) => isEpWatched(e.id, e.season_number, e.episode_number));
-                            const sigAllDone = sigSpecials.length === 0 || sigSpecials.every((e: any) => isEpWatched(e.id, e.season_number, e.episode_number));
-
-                            return {
-                              isSeasonDone: regularAllDone && sigAllDone,
-                              isSeasonPartial: regularAllDone && !sigAllDone
-                            };
-                          })();
-
-                          const seasonLabel = s.season_number > 0 
-                            ? `${language === 'es' ? 'Temporada' : 'Season'} ${s.season_number}` 
-                            : (language === 'es' ? 'Extras' : 'Extras');
-
-                          const displayedSeasonEps = (seasonEpisodes[s.season_number] && seasonEpisodes[s.season_number].length > 0)
-                            ? seasonEpisodes[s.season_number]
-                            : ((getCachedSeries(`${selectedItem.external_id}_all_episodes`) || []).filter((e: any) => e.season_number === s.season_number));
-
-                          const countUnitLabel = language === 'es' ? 'capítulos' : 'episodes';
-
-                          return (
-                            <div key={s.id || s.season_number} style={{ border: '1px solid var(--border-color)', borderRadius: '6px', overflow: 'hidden' }}>
-                              <div
-                                role="button"
-                                tabIndex={0}
-                                onClick={() => {
-                                  if (isSeasonActive) {
-                                    setActiveSeason(null);
-                                  } else {
-                                    setActiveSeason(s.season_number);
-                                    handleLoadSeasonEpisodes(selectedItem.external_id, s.season_number);
-                                  }
-                                }}
-                                style={{
-                                  width: '100%',
-                                  padding: '0.75rem 1rem',
-                                  background: 'var(--bg-secondary)',
-                                  border: 'none',
-                                  color: 'var(--text-primary)',
-                                  fontWeight: 600,
-                                  textAlign: 'left',
-                                  cursor: 'pointer',
-                                  display: 'flex',
-                                  justifyContent: 'space-between',
-                                  alignItems: 'center'
-                                }}
-                              >
-                                <span>
-                                  <span style={{ position: 'relative', display: 'inline-flex', verticalAlign: 'middle' }}>
-                                    <span
-                                      role="button"
-                                      tabIndex={0}
-                                      onClick={async (e) => {
-                                        e.stopPropagation();
-                                        if (isSeasonDone || isSeasonPartial) {
-                                          setSeasonActionItem(s);
-                                          return;
-                                        }
-
-                                        const missing = getMissingPreviousEpisodesForSeason(s);
-                                        if (missing.length > 0) {
-                                          setPendingPreviousPrompt({
-                                            type: 'season',
-                                            targetSeason: s,
-                                            missingEpisodes: missing
-                                          });
-                                          return;
-                                        }
-
-                                        let effectiveListId = selectedItem.tracking_list_id;
-                                        if (!effectiveListId) {
-                                          const defaultStatus = 'watching';
-                                          const tracked = await ensureTracked(defaultStatus);
-                                          if (!tracked) return;
-                                          effectiveListId = tracked.tracking_list_id || tracked;
-                                        }
-                                        
-                                        const cacheKeyAll = `${selectedItem.external_id}_all_episodes`;
-                                        let allEps = getCachedSeries(cacheKeyAll) || [];
-                                        let seasonEps = seasonEpisodes[s.season_number];
-                                        if (!seasonEps || seasonEps.length === 0) {
-                                          seasonEps = allEps.filter((e: any) => e.season_number === s.season_number);
-                                        }
-
-                                        const newProgress: Record<string, boolean> = {};
-                                        seasonEps.forEach((e: any) => {
-                                          if (!e.is_extra && e.ep_type !== 'insignificant_special') {
-                                            newProgress[`tvm-ep-${e.id}`] = true;
-                                          }
-                                        });
-                                        setGlobalProgress(prev => ({ ...prev, ...newProgress }));
-
-                                        try {
-                                          await apiClient.post(`/lists/${effectiveListId}/bulk-episodes`, {
-                                            season_number: s.season_number,
-                                            episodes: seasonEps.map((e: any) => ({
-                                              external_id: `tvm-ep-${e.id}`,
-                                              title: `${selectedItem.title} - ${s.season_number > 0 ? (s.season_number < 10 ? 'S0' + s.season_number : 'S' + s.season_number) : (language === 'es' ? 'Extras' : 'Extras')}${e.episode_number != null ? (e.episode_number < 10 ? 'E0' + e.episode_number : 'E' + e.episode_number) : (e.is_significant_special ? ' • ' + (language === 'es' ? 'Especial' : 'Special') : '')} - ${e.name || 'Untitled'}`,
-                                              image_url: e.image_url || e.image?.original || e.image?.medium || e.still_path || selectedItem.image_url,
-                                              custom_notes: JSON.stringify({ description: e.overview || '', release_date: e.air_date || null }),
-                                              season_number: e.season_number,
-                                              episode_number: e.episode_number,
-                                              release_date: e.air_date,
-                                              is_completed: true,
-                                              is_significant_special: e.is_significant_special || e.ep_type === 'significant_special',
-                                              is_extra: e.is_extra || e.ep_type === 'insignificant_special' || e.season_number === 0
-                                            }))
-                                          });
-
-                                          const updatedList = await apiClient.get(`/lists/${effectiveListId}`);
-                                          setEpisodes(updatedList.data.items || []);
-                                          onUpdate && onUpdate();
-                                        } catch (err) {
-                                          console.error("Failed to mark season as completed", err);
-                                        }
-                                      }}
-                                      style={{
-                                        background: isSeasonDone 
-                                          ? `var(--color-${selectedItem.item_type || 'movie'})` 
-                                          : isSeasonPartial 
-                                            ? 'transparent' 
-                                            : 'transparent',
-                                        border: isSeasonDone 
-                                          ? 'none' 
-                                          : isSeasonPartial 
-                                            ? `2px dashed var(--color-${selectedItem.item_type || 'movie'})` 
-                                            : '1px solid var(--border-color)',
-                                        borderRadius: '50%',
-                                        width: '20px',
-                                        height: '20px',
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        cursor: user ? 'pointer' : 'default',
-                                        color: isSeasonDone 
-                                          ? `var(--color-text-${selectedItem.item_type || 'movie'})` 
-                                          : isSeasonPartial 
-                                            ? `var(--color-${selectedItem.item_type || 'movie'})` 
-                                            : 'var(--text-muted)',
-                                        marginRight: '0.65rem',
-                                        opacity: isSeasonDone || isSeasonPartial ? 1 : 0.6,
-                                        padding: 0,
-                                        transition: 'all 0.2s ease'
-                                      }}
-                                      title={isSeasonDone ? (language === 'es' ? 'Temporada completa' : 'Completed') : isSeasonPartial ? (language === 'es' ? 'Regular completo (pendientes especiales)' : 'Regular completed') : ''}
-                                    >
-                                      <Check size={12} strokeWidth={3} />
-                                    </span>
-                                  </span>
-                                    {seasonLabel}
-                                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginLeft: '0.5rem', fontWeight: 400 }}>
-                                      ({displayedSeasonEps.length > 0 ? displayedSeasonEps.length : s.episode_count} {countUnitLabel})
-                                    </span>
-                                  </span>
-                                  <span>{isSeasonActive ? '▼' : '►'}</span>
-                                </div>
-
-                                {isSeasonActive && (
-                                  <div style={{ padding: '0.5rem', background: 'var(--bg-primary)', display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '220px', overflowY: 'auto' }}>
-                                    {isLoadingSeasonEpisodes ? (
-                                      <div style={{ padding: '1rem', textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                                        {language === 'es' ? 'Cargando contenido...' : 'Loading...'}
-                                      </div>
-                                    ) : displayedSeasonEps.length === 0 ? (
-                                      <div style={{ padding: '1rem', textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                                        {language === 'es' ? 'No se encontraron capítulos.' : 'No episodes found.'}
-                                      </div>
-                                    ) : (
-                                      displayedSeasonEps.map((ep: any) => {
-                                        const extIdKey = `tvm-ep-${ep.id}`;
-                                        const dbEp = (episodes || []).find(x => x.external_id === extIdKey || x.id === ep.id);
-                                        const isCompleted = !!globalProgress[extIdKey] || !!dbEp?.is_completed;
-                                        const isSpecial = ep.is_significant_special || ep.ep_type === 'significant_special' || (ep.episode_number == null && !ep.is_extra && ep.season_number > 0);
-                                        const isExtra = ep.is_extra || ep.ep_type === 'insignificant_special' || ep.season_number === 0;
-
-                                        return (
-                                          <div
-                                            key={ep.id}
-                                            style={{
-                                              display: 'flex',
-                                              alignItems: 'center',
-                                              justifyContent: 'space-between',
-                                              padding: '0.4rem 0.6rem',
-                                              background: 'var(--bg-secondary)',
-                                              border: '1px solid var(--border-color)',
-                                              borderRadius: '4px',
-                                              gap: '1rem'
-                                            }}
-                                          >
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', minWidth: 0 }}>
-                                              <div style={{ position: 'relative', flexShrink: 0 }}>
-                                                <button
-                                                  type="button"
-                                                  disabled={!user}
-                                                  onClick={() => {
-                                                    const currentIsCompleted = !!globalProgress[extIdKey] || !!dbEp?.is_completed;
-                                                    if (currentIsCompleted) {
-                                                      setEpisodeActionItem({ ep, listId: selectedItem.tracking_list_id });
-                                                    } else {
-                                                      const missing = getMissingPreviousEpisodesForEp(ep);
-                                                      if (missing.length > 0) {
-                                                        setPendingPreviousPrompt({
-                                                          type: 'episode',
-                                                          targetEp: ep,
-                                                          missingEpisodes: missing
-                                                        });
-                                                        return;
-                                                      }
-                                                      setGlobalProgress(prev => ({ ...prev, [extIdKey]: true }));
-                                                      handleToggleEpisode(selectedItem.tracking_list_id, ep);
-                                                    }
-                                                  }}
-                                                  style={{
-                                                    background: isCompleted ? `var(--color-${selectedItem.item_type || 'movie'})` : 'transparent',
-                                                    border: isCompleted ? 'none' : '1px solid var(--border-color)',
-                                                    borderRadius: '50%',
-                                                    width: '20px',
-                                                    height: '20px',
-                                                    display: 'inline-flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                    cursor: user ? 'pointer' : 'default',
-                                                    color: isCompleted ? `var(--color-text-${selectedItem.item_type || 'movie'})` : 'var(--text-muted)',
-                                                    opacity: isCompleted ? 1 : 0.6,
-                                                    transition: 'all 0.2s ease',
-                                                    padding: 0
-                                                  }}
-                                                >
-                                                  <Check size={12} strokeWidth={3} />
-                                                </button>
-                                              </div>
-                                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', minWidth: 0, overflow: 'hidden' }}>
-                                                {isSpecial && (
-                                                  <span style={{
-                                                    fontSize: '0.68rem',
-                                                    fontWeight: 700,
-                                                    textTransform: 'uppercase',
-                                                    background: 'rgba(245, 158, 11, 0.15)',
-                                                    color: '#f59e0b',
-                                                    border: '1px solid rgba(245, 158, 11, 0.35)',
-                                                    padding: '0.1rem 0.35rem',
-                                                    borderRadius: '4px',
-                                                    flexShrink: 0
-                                                  }}>
-                                                    {language === 'es' ? 'Especial' : 'Special'}
-                                                  </span>
-                                                )}
-                                                {isExtra && (
-                                                  <span style={{
-                                                    fontSize: '0.68rem',
-                                                    fontWeight: 700,
-                                                    textTransform: 'uppercase',
-                                                    background: 'rgba(148, 163, 184, 0.15)',
-                                                    color: 'var(--text-muted)',
-                                                    border: '1px solid var(--border-color)',
-                                                    padding: '0.1rem 0.35rem',
-                                                    borderRadius: '4px',
-                                                    flexShrink: 0
-                                                  }}>
-                                                    {language === 'es' ? 'Extra' : 'Extra'}
-                                                  </span>
-                                                )}
-                                                <span style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={ep.name || 'Untitled'}>
-                                                  {(ep.episode_number ? `${ep.episode_number}. ` : '') + (ep.name || 'Untitled')}
-                                                </span>
-                                              </div>
-                                            </div>
-                                            <button
-                                              onClick={() => {
-                                                setHistoryStack(prev => [...prev, selectedItem]);
-                                                onOpenItem && onOpenItem({
-                                                  id: dbEp ? dbEp.id : ep.id,
-                                                  list_id: selectedItem.tracking_list_id,
-                                                  item_type: 'episode',
-                                                  external_id: `tvm-ep-${ep.id}`,
-                                                  title: `${selectedItem.title} - ${ep.season_number > 0 ? (ep.season_number < 10 ? 'S0' + ep.season_number : 'S' + ep.season_number) : (language === 'es' ? 'Extras' : 'Extras')}${ep.episode_number != null ? (ep.episode_number < 10 ? 'E0' + ep.episode_number : 'E' + ep.episode_number) : (isSpecial ? ' • ' + (language === 'es' ? 'Especial' : 'Special') : '')} - ${ep.name || 'Untitled'}`,
-                                                  image_url: ep.image_url || ep.image?.original || ep.image?.medium || ep.still_path || selectedItem.image_url,
-                                                  custom_notes: JSON.stringify({ description: ep.overview || '', release_date: ep.air_date || null }),
-                                                  completed_at: dbEp?.completed_at,
-                                                  is_completed: isCompleted,
-                                                  season_number: ep.season_number,
-                                                  episode_number: ep.episode_number,
-                                                  rawEpisodeId: ep.id,
-                                                  release_date: ep.air_date,
-                                                  parent_series: selectedItem
-                                                });
-                                              }}
-                                              className="btn-secondary"
-                                              style={{ padding: '0.2rem 0.4rem', fontSize: '0.74rem', flexShrink: 0 }}
-                                            >
-                                              {language === 'es' ? 'Ver Info' : 'View Info'}
-                                            </button>
-                                          </div>
-                                        );
-                                      })
-                                    )}
-                                  </div>
-                                )}
-                            </div>
-                          );
-                        });
-                      })()
-                    )}
-                  </div>
-
-                  {/* PRO Consumption History for Series (Rendered below seasons & episodes) */}
-                  {user?.is_pro && consumptionHistory.length > 1 && (
-                    <div style={{
-                      marginTop: '0.85rem',
-                      padding: '0.65rem 0.85rem',
-                      background: 'rgba(124, 58, 237, 0.05)',
-                      border: '1px solid rgba(124, 58, 237, 0.2)',
-                      borderRadius: '8px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '0.4rem'
-                    }}>
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        fontSize: '0.78rem',
-                        fontWeight: 700,
-                        color: 'var(--accent-primary)',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.5px'
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                          <Calendar size={13} />
-                          <span>{language === 'es' ? 'Historial de Registros (Serie Completa)' : 'Full Series Consumption History'} ({consumptionHistory.length})</span>
                         </div>
-                        <span style={{
-                          fontSize: '0.68rem',
-                          background: 'var(--accent-primary)',
-                          color: '#ffffff',
-                          padding: '0.15rem 0.4rem',
-                          borderRadius: '4px',
-                          fontWeight: 700
-                        }}>
-                          PREMIUM
-                        </span>
-                      </div>
-                      <div style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '0.25rem',
-                        maxHeight: '130px',
-                        overflowY: 'auto',
-                        paddingRight: '0.25rem'
-                      }}>
-                        {consumptionHistory.map((dStr, idx) => {
-                          const dateObj = new Date(dStr);
-                          const dateFormatted = !isNaN(dateObj.getTime())
-                            ? dateObj.toLocaleDateString(language === 'es' ? 'es-ES' : 'en-US', {
-                                year: 'numeric',
-                                month: 'short',
-                                day: 'numeric',
-                                hour: '2-digit',
-                                minute: '2-digit'
-                              })
-                            : dStr;
-
-                          return (
-                            <div key={idx} style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              fontSize: '0.78rem',
-                              color: 'var(--text-secondary)'
-                            }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                                <span style={{ fontWeight: 500 }}>
-                                  #{consumptionHistory.length - idx} {idx === 0 ? (language === 'es' ? '(Última vez completada)' : '(Latest completed run)') : ''}
-                                </span>
-                              </div>
-                              <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
-                                {dateFormatted}
-                              </span>
-                            </div>
-                          );
-                        })}
-                      </div>
+                      )}
                     </div>
                   )}
-                </div>
-              )}
 
               {/* Game Relations: Base Game, Collections, Editions, DLCs */}
               {selectedItem?.item_type === 'game' && !isEpisode && (gameRelations || isLoadingGameRelations) && (
@@ -4789,8 +4792,6 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
               </div>
 
             </div>
-          </div>
-        </div>
               {/* Floating Modal 1: Re-consumption Options Dialog */}
               {showReconsumedModal && (
                 <div
