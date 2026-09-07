@@ -50,7 +50,9 @@ class ComicVineService:
             print(f"Notice loading blocked franchises: {e}")
 
         try:
-            # 1. Detect if the query ends with an issue number (e.g. "The New Teen Titans 39" or "Justice League of America 9")
+            item_type_val = "comic"
+
+            # 1. Detect if the query ends with an issue number (e.g. "The New Teen Titans 39" or "Justice League of America #9")
             issue_number_match = re.search(r'^(.*?)\s*#?\s*(\d+)$', cleaned_query)
             if issue_number_match:
                 series_name = issue_number_match.group(1).strip()
@@ -58,7 +60,7 @@ class ComicVineService:
                 
                 if series_name:
                     encoded_series = urllib.parse.quote(series_name)
-                    matching_volume_ids = []
+                    matching_volumes = []
 
                     # Method A: Query the volumes endpoint directly filtering by name (highly precise)
                     volumes_url = f"https://comicvine.gamespot.com/api/volumes/?api_key={api_key}&format=json&filter=name:{encoded_series}"
@@ -67,43 +69,65 @@ class ComicVineService:
                         headers={"User-Agent": "Pathd/1.0 (contact@pathd.app)"}
                     )
                     try:
-                        with urllib.request.urlopen(req_volumes, timeout=5) as response:
+                        with urllib.request.urlopen(req_volumes, timeout=6) as response:
                             if response.status == 200:
                                 v_data = json.loads(response.read().decode())
                                 for v_item in v_data.get("results", []):
                                     v_id = v_item.get("id")
                                     if v_id and v_id not in blocked_vol_ids:
-                                        matching_volume_ids.append(v_id)
+                                        matching_volumes.append(v_item)
                     except Exception as e:
                         print(f"Comic Vine Volume Filter Error: {e}")
 
                     # Fallback Method B: Query search endpoint for volumes if Method A returned nothing
-                    if not matching_volume_ids:
+                    if not matching_volumes:
                         volume_search_url = f"https://comicvine.gamespot.com/api/search/?api_key={api_key}&format=json&resources=volume&query={encoded_series}"
                         req_volumes_search = urllib.request.Request(
                             volume_search_url,
                             headers={"User-Agent": "Pathd/1.0 (contact@pathd.app)"}
                         )
                         try:
-                            with urllib.request.urlopen(req_volumes_search, timeout=5) as response:
+                            with urllib.request.urlopen(req_volumes_search, timeout=6) as response:
                                 if response.status == 200:
                                     v_data = json.loads(response.read().decode())
-                                    for v_item in v_data.get("results", [])[:5]:
+                                    for v_item in v_data.get("results", [])[:8]:
                                         v_id = v_item.get("id")
-                                        if v_id and v_id not in blocked_vol_ids and v_id not in matching_volume_ids:
-                                            matching_volume_ids.append(v_id)
+                                        if v_id and v_id not in blocked_vol_ids:
+                                            matching_volumes.append(v_item)
                         except Exception as e:
                             print(f"Comic Vine Volume Search Fallback Error: {e}")
 
-                    # Step C: Query issues for all matched volume IDs
-                    for vol_id in matching_volume_ids[:4]: # Limit to top 4 volume matches to prevent slow requests
+                    # Sort matching volumes: exact volume name match first, then by count_of_issues / start_year
+                    def vol_sort_key(v):
+                        v_name = (v.get("name") or "").strip().lower()
+                        s_name = series_name.lower()
+                        is_exact = 1 if v_name == s_name else 0
+                        issues_count = v.get("count_of_issues") or 0
+                        try:
+                            start_yr = int(v.get("start_year") or 0)
+                        except Exception:
+                            start_yr = 0
+                        return (is_exact, issues_count > 0, -start_yr if start_yr else 0)
+
+                    matching_volumes.sort(key=vol_sort_key, reverse=True)
+
+                    # Step C: Query issues for all matched volume IDs (top 6 volumes)
+                    seen_v_ids = set()
+                    for v_obj in matching_volumes:
+                        vol_id = v_obj.get("id")
+                        if not vol_id or vol_id in seen_v_ids:
+                            continue
+                        seen_v_ids.add(vol_id)
+                        if len(seen_v_ids) > 6:
+                            break
+
                         issues_url = f"https://comicvine.gamespot.com/api/issues/?api_key={api_key}&format=json&filter=volume:{vol_id},issue_number:{issue_number}"
                         req_issues = urllib.request.Request(
                             issues_url,
                             headers={"User-Agent": "Pathd/1.0 (contact@pathd.app)"}
                         )
                         try:
-                            with urllib.request.urlopen(req_issues, timeout=5) as response:
+                            with urllib.request.urlopen(req_issues, timeout=6) as response:
                                 if response.status == 200:
                                     data = json.loads(response.read().decode())
                                     for item in data.get("results", []):
@@ -195,8 +219,6 @@ class ComicVineService:
                             if not is_safe_media_item(title, desc):
                                 continue
 
-                            item_type_val = "comic"
-
                             global_results.append(
                                 SearchResultItem(
                                     external_id=ext_id,
@@ -227,29 +249,37 @@ class ComicVineService:
                     merged_results.append(item)
 
             # Sort merged results using relevance scoring based on the query
-            def get_relevance_score(title_str: str) -> float:
-                t_lower = title_str.lower()
-                q_lower = query.lower()
+            def get_relevance_score(item_res: SearchResultItem) -> float:
+                t_lower = item_res.title.lower()
+                q_lower = query.lower().replace('#', ' ')
+                q_clean = " ".join(q_lower.split())
                 
+                # Check target issue pattern e.g. "justice league of america 9"
+                if issue_number_match:
+                    s_name = issue_number_match.group(1).strip().lower()
+                    i_num = issue_number_match.group(2).strip()
+                    target_issue_str = f"{s_name} #{i_num}"
+                    if t_lower.startswith(target_issue_str):
+                        return 150.0
+
                 # Perfect exact match
-                if t_lower == q_lower:
+                if t_lower == q_clean or t_lower == query.lower():
                     return 100.0
                 
                 # Prefix match (starts with the query name)
-                if t_lower.startswith(q_lower):
-                    # Prioritize issue numbers sequence
-                    rem = t_lower[len(q_lower):].strip()
-                    if rem.startswith('#') or (rem and rem[0].isdigit()):
-                        return 80.0
-                    return 70.0
+                if t_lower.startswith(q_clean):
+                    rem = t_lower[len(q_clean):].strip()
+                    if rem.startswith('#') or (rem and rem[0].isdigit()) or rem.startswith('('):
+                        return 90.0
+                    return 75.0
                     
                 # Substring match
-                if q_lower in t_lower:
-                    return 40.0
+                if q_clean in t_lower:
+                    return 50.0
                     
                 return 0.0
 
-            merged_results.sort(key=lambda x: get_relevance_score(x.title), reverse=True)
+            merged_results.sort(key=get_relevance_score, reverse=True)
             return merged_results
         except Exception as e:
             print(f"Comic Vine API Error: {e}")
