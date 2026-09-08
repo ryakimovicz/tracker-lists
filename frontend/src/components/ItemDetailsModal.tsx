@@ -1768,7 +1768,15 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       const updatedList = listRes.data.items || [];
       setEpisodes(updatedList);
 
-      if (selectedItem && (selectedItem.external_id === `tvm-ep-${ep.id}` || selectedItem.external_id === `cv_issue_${ep.id}` || selectedItem.id === ep.id || selectedItem.rawEpisodeId === ep.id)) {
+      const isTargetEpisode = selectedItem && (
+        isEpisode ||
+        selectedItem.is_episode ||
+        selectedItem.external_id === `tvm-ep-${ep.id}` ||
+        selectedItem.external_id === `cv_issue_${ep.id}` ||
+        (selectedItem.rawEpisodeId && String(selectedItem.rawEpisodeId) === String(ep.id))
+      );
+
+      if (isTargetEpisode) {
         setSelectedItem((prev: any) => prev ? { ...prev, completed_at: res.data.completed_at, is_completed: res.data.is_completed } : null);
         const targetFetchKey = selectedItem.id || selectedItem.external_id || `tvm-ep-${ep.id}`;
         if (targetFetchKey && user?.is_pro) {
@@ -3408,7 +3416,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                   )}
 
                   {/* PRO Consumption History for Single Items (Movies, Games, Books, Comic Issues, Manga Volumes) */}
-                  {user?.is_pro && !['series', 'anime'].includes(selectedItem?.item_type) && consumptionHistory.length > 1 && (
+                  {user?.is_pro && (!['series', 'anime', 'comic'].includes(selectedItem?.item_type) || isEpisode) && consumptionHistory.length > 1 && (
                     <div style={{
                       marginTop: '0.75rem',
                       padding: '0.65rem 0.85rem',
@@ -4177,7 +4185,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                           }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                               <Calendar size={13} />
-                              <span>{language === 'es' ? 'Historial de Registros (Serie Completa)' : 'Full Series Consumption History'} ({consumptionHistory.length})</span>
+                              <span>{language === 'es' ? (selectedItem?.item_type === 'comic' ? 'Historial de Registros (Volumen Completo)' : 'Historial de Registros (Serie Completa)') : (selectedItem?.item_type === 'comic' ? 'Full Volume Consumption History' : 'Full Series Consumption History')} ({consumptionHistory.length})</span>
                             </div>
                             <span style={{
                               fontSize: '0.68rem',

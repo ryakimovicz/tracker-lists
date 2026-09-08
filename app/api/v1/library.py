@@ -237,54 +237,83 @@ def get_library_item_consumption_history(
     resolved_type = (item.item_type if item else item_type) or ""
     tracking_list_id = item.tracking_list_id if item else None
 
-    if resolved_type in ("series", "anime", "comic") and external_id:
-        ep_ext_ids = []
-        if tracking_list_id:
-            list_items = db.query(ListItem).filter(ListItem.list_id == tracking_list_id).all()
-            ep_ext_ids = [it.external_id for it in list_items if it.external_id]
-        
-        if not ep_ext_ids and resolved_type in ("series", "anime"):
+    is_single_ep_or_issue = (
+        str(external_id).startswith("tvm-ep-") or
+        str(external_id).startswith("cv_issue_")
+    )
+
+    if resolved_type in ("series", "anime", "comic") and external_id and not is_single_ep_or_issue:
+        all_canonical_ids = []
+        if resolved_type in ("series", "anime"):
             try:
                 from app.services.tvmaze import TVMazeService
                 tvm_eps = TVMazeService.get_all_episodes(external_id)
                 if tvm_eps:
-                    ep_ext_ids = [f"tvm-ep-{e['id']}" for e in tvm_eps if e.get('id')]
+                    all_canonical_ids = [f"tvm-ep-{e['id']}" for e in tvm_eps if e.get('id') and not e.get('is_extra') and e.get('season_number', 1) > 0]
             except Exception as e:
                 print(f"Failed to fetch TVMaze episodes for history calculation: {e}")
+        elif resolved_type == "comic":
+            try:
+                from app.services.comicvine import ComicVineService
+                cv_issues = ComicVineService.get_comic_volume_issues(external_id)
+                if cv_issues:
+                    all_canonical_ids = [f"cv_issue_{i['id']}" for i in cv_issues if i.get('id')]
+            except Exception as e:
+                print(f"Failed to fetch ComicVine issues for history calculation: {e}")
 
-        if ep_ext_ids:
-            # Group consumption history by episode
+        # Fallback to tracking list items only if canonical items could not be fetched AND item is marked completed
+        if not all_canonical_ids and tracking_list_id and (item and item.completed_at):
+            list_items = db.query(ListItem).filter(ListItem.list_id == tracking_list_id).all()
+            all_canonical_ids = [it.external_id for it in list_items if it.external_id]
+
+        if all_canonical_ids:
             from collections import defaultdict
             ep_consumptions = defaultdict(list)
+            # Query all possible representations of issue/episode external IDs
+            clean_ids = [str(eid).replace("cv_issue_", "").replace("tvm-ep-", "") for eid in all_canonical_ids]
+            query_ids = list(set(all_canonical_ids + clean_ids))
             all_ep_ch = db.query(ConsumptionHistory).filter(
                 ConsumptionHistory.user_id == current_user.id,
-                ConsumptionHistory.external_id.in_(ep_ext_ids)
+                ConsumptionHistory.external_id.in_(query_ids)
             ).order_by(ConsumptionHistory.consumed_at.asc()).all()
             
             for ch in all_ep_ch:
-                ep_consumptions[ch.external_id].append(ch)
+                matched_canonical = None
+                for cid in all_canonical_ids:
+                    if ch.external_id == cid or ch.external_id == str(cid).replace("cv_issue_", "").replace("tvm-ep-", ""):
+                        matched_canonical = cid
+                        break
+                if matched_canonical:
+                    ep_consumptions[matched_canonical].append(ch)
             
-            # The series is completed N times if all episodes have at least N consumptions
-            min_completed_times = min(len(ep_consumptions[eid]) for eid in ep_ext_ids) if len(ep_consumptions) == len(ep_ext_ids) else 0
+            # The series/volume is completed N times ONLY IF ALL canonical episodes/issues have at least N consumptions
+            if len(ep_consumptions) >= len(all_canonical_ids):
+                min_completed_times = min(len(ep_consumptions[eid]) for eid in all_canonical_ids)
+            else:
+                min_completed_times = 0
             
             series_entries = []
             for run_idx in range(min_completed_times):
-                # The timestamp for run_idx completion of the series is the latest timestamp among all episodes for that run
-                run_timestamps = [ep_consumptions[eid][run_idx].consumed_at for eid in ep_ext_ids]
+                run_timestamps = [ep_consumptions[eid][run_idx].consumed_at for eid in all_canonical_ids]
                 completion_time = max(run_timestamps)
                 series_entries.append({
-                    "id": ep_consumptions[ep_ext_ids[0]][run_idx].id,
+                    "id": ep_consumptions[all_canonical_ids[0]][run_idx].id,
                     "consumed_at": completion_time,
                     "is_hundred_percent": False
                 })
             
-            # Sort descending for display
             series_entries.sort(key=lambda x: x["consumed_at"], reverse=True)
             result_dates = [e["consumed_at"] for e in series_entries]
             return {
                 "count": len(series_entries),
                 "history": result_dates,
                 "entries": series_entries
+            }
+        else:
+            return {
+                "count": 0,
+                "history": [],
+                "entries": []
             }
 
     history = db.query(ConsumptionHistory).filter(
@@ -643,9 +672,13 @@ def get_library(
                     ConsumptionHistory.external_id.in_(ep_eids)
                 ).group_by(ConsumptionHistory.external_id).all()
                 ep_c_dict = dict(ep_c)
-                min_c = min(ep_c_dict.get(eid, 0) for eid in ep_eids)
-                if min_c > 0:
-                    series_times_map[s_it.external_id] = min_c
+                
+                is_done = s_it.status in (UserLibraryStatusEnum.READ, UserLibraryStatusEnum.COMPLETED) or s_it.completed_at is not None
+                if is_done:
+                    min_c = min(ep_c_dict.get(eid, 0) for eid in ep_eids) if ep_eids else 1
+                    series_times_map[s_it.external_id] = max(min_c, 1)
+                else:
+                    series_times_map[s_it.external_id] = 0
 
                 if s_it.last_seen_episode:
                     # Find matching episode / issue item by title
@@ -676,9 +709,8 @@ def get_library(
     res = []
     for it in items:
         # Pydantic will convert from attributes/dict
-        c_val = counts_map.get(it.external_id, 0)
-        if it.item_type in ("series", "anime", "comic") and it.external_id in series_times_map:
-            times_c = max(series_times_map[it.external_id], 1 if it.completed_at else 0)
+        if it.item_type in ("series", "anime", "comic") and it.tracking_list_id:
+            times_c = series_times_map.get(it.external_id, 1 if (it.completed_at or it.status in (UserLibraryStatusEnum.READ, UserLibraryStatusEnum.COMPLETED)) else 0)
         else:
             # If item has completed_at but no consumption history yet, treat as 1
             times_c = max(c_val, 1 if it.completed_at else 0)
