@@ -759,9 +759,13 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
       ? (currentEpToMark.image_url || currentEpToMark.image?.original || currentEpToMark.image?.medium || currentEpToMark.still_path || item.image_url)
       : (currentEpToMark.still_path || null);
 
+    const epIdToSend = isComic
+      ? (String(currentEpToMark.id).startsWith('cv_') ? currentEpToMark.id : `cv_issue_${currentEpToMark.id}`)
+      : currentEpToMark.id;
+
     // Non-blocking background sync
     apiClient.post(url, {
-      episode_id: currentEpToMark.id,
+      episode_id: epIdToSend,
       title: titleToSend,
       image_url: imageToSend,
       overview: currentEpToMark.overview,
@@ -1404,7 +1408,7 @@ export const Home: React.FC = () => {
       // 2. Non-blocking background auto-sync of series/anime & metadata enrichment for standalone works
       const nowMs = Date.now();
       const trackingSeries = currentLib.filter((i: any) => (i.item_type === 'series' || i.item_type === 'anime') && i.tracking_list_id);
-      const standaloneItems = currentLib.filter((i: any) => i.item_type !== 'series' && i.item_type !== 'anime');
+      const standaloneItems = currentLib.filter((i: any) => ['movie', 'game', 'book', 'manga'].includes(i.item_type) && !i.tracking_list_id);
 
       // Fetch release dates / metadata for standalone works with missing dates (cached or throttled)
       (async () => {
