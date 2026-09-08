@@ -709,6 +709,7 @@ def get_library(
     res = []
     for it in items:
         # Pydantic will convert from attributes/dict
+        c_val = counts_map.get(it.external_id, 0)
         if it.item_type in ("series", "anime", "comic") and it.tracking_list_id:
             times_c = series_times_map.get(it.external_id, 1 if (it.completed_at or it.status in (UserLibraryStatusEnum.READ, UserLibraryStatusEnum.COMPLETED)) else 0)
         else:
