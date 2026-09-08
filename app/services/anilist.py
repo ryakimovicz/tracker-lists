@@ -3,6 +3,14 @@ import urllib.request
 from typing import List
 from app.services.base import SearchResultItem
 
+_ANILIST_HEADERS = {
+    "Content-Type": "application/json",
+    "Accept": "application/json",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Origin": "https://anilist.co",
+    "Referer": "https://anilist.co/"
+}
+
 class AnilistService:
     @staticmethod
     def search_manga(query: str) -> List[SearchResultItem]:
@@ -44,11 +52,7 @@ class AnilistService:
         req = urllib.request.Request(
             url,
             data=payload,
-            headers={
-                "Content-Type": "application/json",
-                "Accept": "application/json",
-                "User-Agent": "Pathd/1.0"
-            }
+            headers=_ANILIST_HEADERS
         )
 
         try:
@@ -100,15 +104,7 @@ class AnilistService:
 
         except Exception as e:
             print(f"AniList API Search Error: {e}")
-            return [
-                SearchResultItem(
-                    external_id="error-api",
-                    title="Error al consultar AniList",
-                    image_url=None,
-                    description=str(e),
-                    item_type="manga"
-                )
-            ]
+            return []
         return []
 
     @staticmethod
@@ -131,7 +127,7 @@ class AnilistService:
         '''
         import json, urllib.request
         payload = json.dumps({"query": graphql_query}).encode("utf-8")
-        req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json", "Accept": "application/json", "User-Agent": "Pathd/1.0"})
+        req = urllib.request.Request(url, data=payload, headers=_ANILIST_HEADERS)
         try:
             with urllib.request.urlopen(req, timeout=5) as response:
                 if response.status == 200:
@@ -188,7 +184,7 @@ class AnilistService:
             "query": graphql_query,
             "variables": {"end": today_int}
         }).encode("utf-8")
-        req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json", "Accept": "application/json", "User-Agent": "Pathd/1.0"})
+        req = urllib.request.Request(url, data=payload, headers=_ANILIST_HEADERS)
         try:
             with urllib.request.urlopen(req, timeout=5) as response:
                 if response.status == 200:
@@ -277,7 +273,7 @@ class AnilistService:
         req = urllib.request.Request(
             url,
             data=payload,
-            headers={"Content-Type": "application/json", "Accept": "application/json", "User-Agent": "TrackerLists/1.0"}
+            headers=_ANILIST_HEADERS
         )
         try:
             with urllib.request.urlopen(req, timeout=5) as response:
@@ -344,7 +340,7 @@ class AnilistService:
         '''
         import json, urllib.request
         payload = json.dumps({"query": graphql_query}).encode("utf-8")
-        req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json", "Accept": "application/json", "User-Agent": "Pathd/1.0"})
+        req = urllib.request.Request(url, data=payload, headers=_ANILIST_HEADERS)
         try:
             with urllib.request.urlopen(req, timeout=5) as response:
                 if response.status == 200:
@@ -423,7 +419,7 @@ class AnilistService:
         req = urllib.request.Request(
             url,
             data=payload,
-            headers={"Content-Type": "application/json", "Accept": "application/json", "User-Agent": "TrackerLists/1.0"}
+            headers=_ANILIST_HEADERS
         )
         try:
             with urllib.request.urlopen(req, timeout=5) as response:
@@ -538,11 +534,7 @@ class AnilistService:
         req = urllib.request.Request(
             url,
             data=payload,
-            headers={
-                "Content-Type": "application/json",
-                "Accept": "application/json",
-                "User-Agent": "Pathd/1.0"
-            }
+            headers=_ANILIST_HEADERS
         )
 
         sequels_prequels = []
