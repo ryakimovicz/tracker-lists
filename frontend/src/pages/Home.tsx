@@ -486,11 +486,24 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
         return true;
       });
       if (aired.length > 0) {
-        const getTracked = (ep: any) => cachedList.find((t: any) =>
-          isComic 
-            ? (t.external_id === `cv_issue_${ep.id}` || t.id === ep.id || (ep.issue_number && t.title && t.title.includes(`#${ep.issue_number}`)))
-            : (t.external_id === `tvm-ep-${ep.id}` || t.id === ep.id || (t.title && t.title.includes(`S${pad(ep.season_number)}E${pad(ep.episode_number)}`)))
-        );
+        const getTracked = (ep: any) => cachedList.find((t: any) => {
+          if (isComic) {
+            const cleanId = String(ep.id).replace('cv_issue_', '');
+            const tCleanId = String(t.external_id || '').replace('cv_issue_', '');
+            return (
+              t.external_id === `cv_issue_${cleanId}` ||
+              tCleanId === cleanId ||
+              (ep.issue_number && t.title && (t.title.includes(`#${ep.issue_number}`) || t.episode_number == ep.issue_number))
+            );
+          }
+          const cleanTvmId = String(ep.id).replace('tvm-ep-', '');
+          const tCleanTvmId = String(t.external_id || '').replace('tvm-ep-', '');
+          return (
+            t.external_id === `tvm-ep-${cleanTvmId}` ||
+            tCleanTvmId === cleanTvmId ||
+            (t.title && t.title.includes(`S${pad(ep.season_number)}E${pad(ep.episode_number)}`))
+          );
+        });
         const airedCounts = aired.map((ep: any) => {
           const t = getTracked(ep);
           return (t?.consumption_count !== undefined) ? t.consumption_count : (t?.is_completed ? 1 : 0);
@@ -602,9 +615,22 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
         const getTracked = (ep: any) => {
           return currentTracked.find((t: any) => {
             if (isComic) {
-              return t.external_id === `cv_issue_${ep.id}` || t.id === ep.id || (ep.issue_number && t.title && t.title.includes(`#${ep.issue_number}`));
+              const cleanId = String(ep.id).replace('cv_issue_', '');
+              const tCleanId = String(t.external_id || '').replace('cv_issue_', '');
+              return (
+                t.external_id === `cv_issue_${cleanId}` ||
+                tCleanId === cleanId ||
+                (ep.issue_number && t.title && (t.title.includes(`#${ep.issue_number}`) || t.episode_number == ep.issue_number))
+              );
             }
-            return (t.external_id === `tvm-ep-${ep.id}` || t.id === ep.id || (t.title && t.title.includes(`S${pad(ep.season_number)}E${pad(ep.episode_number)}`)) || (t.title && t.title.includes(`E${pad(ep.episode_number)}`) && (t.section === `Season ${ep.season_number}` || t.title.includes(`S${ep.season_number}`))));
+            const cleanTvmId = String(ep.id).replace('tvm-ep-', '');
+            const tCleanTvmId = String(t.external_id || '').replace('tvm-ep-', '');
+            return (
+              t.external_id === `tvm-ep-${cleanTvmId}` ||
+              tCleanTvmId === cleanTvmId ||
+              (t.title && t.title.includes(`S${pad(ep.season_number)}E${pad(ep.episode_number)}`)) ||
+              (t.title && t.title.includes(`E${pad(ep.episode_number)}`) && (t.section === `Season ${ep.season_number}` || t.title.includes(`S${ep.season_number}`)))
+            );
           });
         };
 
@@ -621,29 +647,12 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
             // All currently aired episodes/issues are already consumed up to minAiredSeen!
             targetEp = null;
           } else {
-            if (maxAiredSeen > minAiredSeen && maxAiredSeen > 1) {
-              let highestIdx = -1;
-              for (let idx = airedEps.length - 1; idx >= 0; idx--) {
-                if (airedCounts[idx] === maxAiredSeen) {
-                  highestIdx = idx;
-                  break;
-                }
-              }
-              if (highestIdx !== -1 && highestIdx + 1 < airedEps.length) {
-                targetEp = airedEps[highestIdx + 1];
-              } else if (highestIdx !== -1 && highestIdx + 1 >= airedEps.length) {
-                targetEp = null;
-              }
-            }
-
-            if (!targetEp) {
-              targetCycle = minAiredSeen + 1;
-              targetEp = airedEps.find((ep: any) => {
-                const t = getTracked(ep);
-                const count = (t?.consumption_count !== undefined) ? t.consumption_count : (t?.is_completed ? 1 : 0);
-                return count < targetCycle;
-              });
-            }
+            targetCycle = minAiredSeen + 1;
+            targetEp = airedEps.find((ep: any) => {
+              const t = getTracked(ep);
+              const count = (t?.consumption_count !== undefined) ? t.consumption_count : (t?.is_completed ? 1 : 0);
+              return count < targetCycle;
+            }) || null;
           }
         }
       }
@@ -742,9 +751,21 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
     try {
       const isAlreadyCompleted = trackedEpisodes.some((t: any) => {
         if (isComic) {
-          return (t.external_id === `cv_issue_${currentEpToMark.id}` || t.id === currentEpToMark.id || (currentEpToMark.issue_number && t.title && t.title.includes(`#${currentEpToMark.issue_number}`))) && t.is_completed;
+          const cleanId = String(currentEpToMark.id).replace('cv_issue_', '');
+          const tCleanId = String(t.external_id || '').replace('cv_issue_', '');
+          return (
+            t.external_id === `cv_issue_${cleanId}` ||
+            tCleanId === cleanId ||
+            (currentEpToMark.issue_number && t.title && (t.title.includes(`#${currentEpToMark.issue_number}`) || t.episode_number == currentEpToMark.issue_number))
+          ) && t.is_completed;
         }
-        return (t.external_id === `tvm-ep-${currentEpToMark.id}` || t.id === currentEpToMark.id || (t.title && t.title.includes(`S${pad(currentEpToMark.season_number)}E${pad(currentEpToMark.episode_number)}`))) && t.is_completed;
+        const cleanTvmId = String(currentEpToMark.id).replace('tvm-ep-', '');
+        const tCleanTvmId = String(t.external_id || '').replace('tvm-ep-', '');
+        return (
+          t.external_id === `tvm-ep-${cleanTvmId}` ||
+          tCleanTvmId === cleanTvmId ||
+          (t.title && t.title.includes(`S${pad(currentEpToMark.season_number)}E${pad(currentEpToMark.episode_number)}`))
+        ) && t.is_completed;
       });
       if (isAlreadyCompleted) {
         url += `?action=mark_again`;
