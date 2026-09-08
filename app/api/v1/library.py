@@ -204,7 +204,7 @@ def sync_show_episodes_and_get_last_seen(db: Session, user_id: int, tracking_lis
         return None
 
     completed_eps.sort(key=lambda x: (x[0], x[1]))
-    return completed_eps[-1][2]
+    return completed_eps[-1][4]
 
 @router.get("/{item_id}/consumption-history")
 def get_library_item_consumption_history(
@@ -680,6 +680,34 @@ def get_library(
                 else:
                     series_times_map[s_it.external_id] = 0
 
+                if list_eps:
+                    from app.models.item_progress import ItemProgress
+                    completed_prog_items = db.query(ListItem.title).join(
+                        ItemProgress, ItemProgress.external_id == ListItem.external_id
+                    ).filter(
+                        ListItem.list_id == s_it.tracking_list_id,
+                        ItemProgress.user_id == target_user_id,
+                        ItemProgress.is_completed == True
+                    ).all()
+                    c_titles = [r[0] for r in completed_prog_items if r[0]]
+                    if c_titles:
+                        import re
+                        ep_tups = []
+                        for t_str in c_titles:
+                            m_ep = re.search(r'S(\d+)E(\d+)', t_str, re.IGNORECASE)
+                            if m_ep:
+                                ep_tups.append((int(m_ep.group(1)), int(m_ep.group(2)), t_str))
+                        if ep_tups:
+                            ep_tups.sort(key=lambda x: (x[0], x[1]))
+                            s_it.last_seen_episode = ep_tups[-1][2]
+                        else:
+                            s_it.last_seen_episode = c_titles[-1]
+                    else:
+                        s_it.last_seen_episode = None
+                        if s_it.status in (UserLibraryStatusEnum.WATCHING, UserLibraryStatusEnum.COMPLETED):
+                            s_it.status = UserLibraryStatusEnum.PLAN_TO_WATCH
+                            db.commit()
+
                 if s_it.last_seen_episode:
                     # Find matching episode / issue item by title
                     import re
@@ -809,6 +837,8 @@ def update_library_item(
             lib_item.completed_at = None
             if item_in.is_hundred_percent is None:
                 lib_item.is_hundred_percent = False
+            if item_in.status in (UserLibraryStatusEnum.PLAN_TO_WATCH, UserLibraryStatusEnum.PLAN_TO_READ):
+                lib_item.last_seen_episode = None
             
         lib_item.updated_at = datetime.now(timezone.utc)
         

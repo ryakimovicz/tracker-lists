@@ -3,7 +3,7 @@ import { useTranslation } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
 import { getProfileTheme } from '../utils/profileThemes';
 import { apiClient } from '../api/client';
-import { Star, Heart, X, Flag, CheckCircle, Check, Plus, MoreVertical, Trash2, ArrowLeft, Clock, ChevronUp, ChevronDown, RotateCcw, BookOpen, Gamepad2, Package, Sparkles, Puzzle, Layers, ChevronLeft, ChevronRight, Calendar, RefreshCw, AlertCircle, Globe, Repeat, Trophy, ShieldAlert, Infinity as InfinityIcon } from 'lucide-react';
+import { Star, Heart, X, Flag, CheckCircle, Check, CheckCheck, Plus, MoreVertical, Trash2, ArrowLeft, Clock, ChevronUp, ChevronDown, RotateCcw, BookOpen, Gamepad2, Package, Sparkles, Puzzle, Layers, ChevronLeft, ChevronRight, Calendar, RefreshCw, AlertCircle, Globe, Repeat, Trophy, ShieldAlert, Infinity as InfinityIcon, Reply, ThumbsUp, Edit2 } from 'lucide-react';
 
 
 
@@ -169,6 +169,13 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   const [totalPagesVal, setTotalPagesVal] = useState<number | ''>('');
   const [hasInteractedWithTime, setHasInteractedWithTime] = useState<boolean>(false);
   const [isSavingReview, setIsSavingReview] = useState(false);
+  const [replyTarget, setReplyTarget] = useState<{ rootReviewId: number; replyToUser: string; targetReviewId: number } | null>(null);
+  const [replyText, setReplyText] = useState<string>('');
+  const [collapsedReplies, setCollapsedReplies] = useState<Record<number, boolean>>({});
+  const [isSubmittingReply, setIsSubmittingReply] = useState<boolean>(false);
+  const [isEditingComment, setIsEditingComment] = useState<boolean>(false);
+  const [editingReplyId, setEditingReplyId] = useState<number | null>(null);
+  const [editingReplyText, setEditingReplyText] = useState<string>('');
 
   // Game & Manga relations & Navigation history
   const [gameRelations, setGameRelations] = useState<{ collections?: any[], bundle_games?: any[], editions?: any[], dlcs?: any[], parent_game?: any } | null>(null);
@@ -386,11 +393,24 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     const targetCompleted = (action === 'mark_all' || isMarkAgain) ? true : action === 'remove' ? false : !isAllCompleted;
 
     const cacheKeyAll = `${selectedItem.external_id}_all_episodes`;
-    let cachedAll = passedEpisodes || (seasonEpisodes[1] && seasonEpisodes[1].length > 0 ? seasonEpisodes[1] : getCachedSeries(cacheKeyAll));
+    let cachedAll = passedEpisodes || getCachedSeries(cacheKeyAll);
 
-    // Filter cachedAll according to chosen scope
+    if (!cachedAll || !Array.isArray(cachedAll) || cachedAll.length === 0) {
+      try {
+        const endpoint = isComic ? `/search/comic/volume/${selectedItem.external_id}/issues` : `/search/series/${selectedItem.external_id}/episodes`;
+        const epRes = await apiClient.get(endpoint);
+        if (Array.isArray(epRes.data) && epRes.data.length > 0) {
+          cachedAll = epRes.data;
+          setCachedSeries(cacheKeyAll, cachedAll);
+        }
+      } catch (err) {
+        console.error("Failed to fetch all episodes for bulk toggle", err);
+      }
+    }
+
+    // Filter cachedAll according to chosen scope (when removing, unmark all episodes)
     let targetEps: any[] = cachedAll && Array.isArray(cachedAll) ? [...cachedAll] : [];
-    if (!isComic && targetEps.length > 0) {
+    if (!isComic && targetEps.length > 0 && action !== 'remove') {
       if (scope === 'seasons_only') {
         targetEps = targetEps.filter((ep: any) => !ep.is_significant_special && !ep.is_extra && ep.season_number > 0 && ep.ep_type !== 'significant_special' && ep.ep_type !== 'insignificant_special');
       } else if (scope === 'seasons_and_specials') {
@@ -399,13 +419,22 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     }
 
     // Optimistically update global progress
-    if (targetEps.length > 0) {
+    const allKnownEps: any[] = (cachedAll && Array.isArray(cachedAll) && cachedAll.length > 0) ? cachedAll : (targetEps.length > 0 ? targetEps : (episodes || []));
+    if (allKnownEps.length > 0) {
       const newProg: Record<string, boolean> = {};
-      targetEps.forEach((ep: any) => {
-        const idKey = isComic ? `cv_issue_${ep.id}` : `tvm-ep-${ep.id}`;
-        newProg[idKey] = targetCompleted;
+      allKnownEps.forEach((ep: any) => {
+        const idKey = ep.external_id || (isComic ? `cv_issue_${ep.id}` : (typeof ep.id === 'string' && ep.id.startsWith('tvm-ep-') ? ep.id : `tvm-ep-${ep.id}`));
+        if (idKey) newProg[idKey] = targetCompleted;
       });
       setGlobalProgress(prev => ({ ...prev, ...newProg }));
+    }
+
+    if (!targetCompleted) {
+      setSelectedItem((prev: any) => prev ? {
+        ...prev,
+        status: isComic ? 'plan_to_read' : 'plan_to_watch',
+        completed_at: null
+      } : null);
     }
 
     try {
@@ -418,13 +447,34 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       const listRes = await apiClient.get(`/lists/${effectiveListId}`);
       const updatedList = listRes.data.items || [];
       setEpisodes(updatedList);
+      setCachedSeries(`list_${effectiveListId}`, updatedList);
 
       const extIds = updatedList.map((x: any) => x.external_id).filter(Boolean);
       let latestProg: Record<string, boolean> = {};
       if (extIds.length > 0) {
         const progRes = await apiClient.post('/users/me/progress/bulk-check', { external_ids: extIds });
         latestProg = progRes.data || {};
-        setGlobalProgress(prev => ({ ...prev, ...latestProg }));
+        if (!targetCompleted) {
+          // Explicitly ensure all known and list items default to false unless active in latestProg
+          const resetProg: Record<string, boolean> = {};
+          allKnownEps.forEach((ep: any) => {
+            const idKey = ep.external_id || (isComic ? `cv_issue_${ep.id}` : (typeof ep.id === 'string' && ep.id.startsWith('tvm-ep-') ? ep.id : `tvm-ep-${ep.id}`));
+            if (idKey) resetProg[idKey] = !!latestProg[idKey];
+          });
+          extIds.forEach((eid: string) => {
+            resetProg[eid] = !!latestProg[eid];
+          });
+          setGlobalProgress(prev => ({ ...prev, ...resetProg }));
+        } else {
+          setGlobalProgress(prev => ({ ...prev, ...latestProg }));
+        }
+      } else if (!targetCompleted) {
+        const resetProg: Record<string, boolean> = {};
+        allKnownEps.forEach((ep: any) => {
+          const idKey = ep.external_id || (isComic ? `cv_issue_${ep.id}` : (typeof ep.id === 'string' && ep.id.startsWith('tvm-ep-') ? ep.id : `tvm-ep-${ep.id}`));
+          if (idKey) resetProg[idKey] = false;
+        });
+        setGlobalProgress(prev => ({ ...prev, ...resetProg }));
       }
 
       // Compute next status accurately:
@@ -433,7 +483,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
         if (targetCompleted) {
           nextStatus = isComic ? 'read' : 'completed';
         } else {
-          const hasAnyRemainingWatched = updatedList.some((it: any) => latestProg[it.external_id] || it.is_completed);
+          const hasAnyRemainingWatched = updatedList.some((it: any) => latestProg[it.external_id] || (latestProg[it.external_id] === undefined && it.is_completed));
           if (isComic) {
             nextStatus = hasAnyRemainingWatched ? 'reading' : 'plan_to_read';
           } else {
@@ -978,7 +1028,25 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
         }
 
         // 3. Asynchronously fetch personal library state and freshest series metadata in parallel
-        if (user && incomingItem.external_id) {
+        const effectiveTrackingListId = incomingItem.tracking_list_id || incomingItem.list_id || incomingItem.parent_series?.tracking_list_id;
+
+        if (user && effectiveTrackingListId) {
+          apiClient.get(`/lists/${effectiveTrackingListId}`).then(listRes => {
+            const itemsList = listRes.data.items || [];
+            setEpisodes(itemsList);
+            setCachedSeries(`list_${effectiveTrackingListId}`, itemsList);
+            const extIds = itemsList.map((x: any) => x.external_id).filter(Boolean);
+            if (extIds.length > 0) {
+              apiClient.post('/users/me/progress/bulk-check', { external_ids: extIds })
+                .then(progRes => {
+                  setGlobalProgress(prev => ({ ...prev, ...progRes.data }));
+                })
+                .catch(e => console.error("Failed to fetch global progress from tracker list", e));
+            }
+          }).catch(() => {});
+        }
+
+        if (user && incomingItem.external_id && !isActualEpisode) {
           apiClient.get('/library/').then(myLibRes => {
             const myLib = myLibRes.data || [];
             const myMatch = myLib.find((li: any) => li.external_id === incomingItem.external_id && (li.item_type === incomingItem.item_type || (['series', 'anime'].includes(li.item_type) && ['series', 'anime'].includes(incomingItem.item_type))));
@@ -994,10 +1062,11 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                 is_favorite: myMatch.is_favorite
               } : null);
 
-              if (myMatch.tracking_list_id) {
+              if (myMatch.tracking_list_id && myMatch.tracking_list_id !== effectiveTrackingListId) {
                 apiClient.get(`/lists/${myMatch.tracking_list_id}`).then(listRes => {
                   const itemsList = listRes.data.items || [];
                   setEpisodes(itemsList);
+                  setCachedSeries(`list_${myMatch.tracking_list_id}`, itemsList);
                   const extIds = itemsList.map((x: any) => x.external_id).filter(Boolean);
                   if (extIds.length > 0) {
                     apiClient.post('/users/me/progress/bulk-check', { external_ids: extIds })
@@ -1452,6 +1521,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       });
       const revRes = await apiClient.get(`/reviews/${selectedItem.item_type}/${selectedItem.external_id}`);
       setItemReviews(revRes.data);
+      setIsEditingComment(false);
     } catch(err) {
       console.error("Failed to save comment", err);
     } finally {
@@ -1469,11 +1539,168 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       setUserComment('');
       const revRes = await apiClient.get(`/reviews/${selectedItem.item_type}/${selectedItem.external_id}`);
       setItemReviews(revRes.data);
+      setIsEditingComment(false);
     } catch(err) {
       console.error("Failed to delete comment", err);
     } finally {
       setIsSavingReview(false);
     }
+  };
+
+  const handleDeleteReviewItem = async (reviewId: number) => {
+    try {
+      await apiClient.delete(`/reviews/${reviewId}`);
+      if (selectedItem?.item_type && selectedItem?.external_id) {
+        const revRes = await apiClient.get(`/reviews/${selectedItem.item_type}/${selectedItem.external_id}`);
+        setItemReviews(revRes.data);
+        const myReview = revRes.data.find((r: any) => r.user_id === user?.id && !r.parent_id);
+        if (myReview) {
+          setUserComment(myReview.content || '');
+          setUserRating(myReview.rating || 0);
+        } else {
+          setUserComment('');
+        }
+      }
+    } catch (err) {
+      console.error("Failed to delete review", err);
+    }
+  };
+
+  const handleVoteReview = async (reviewId: number) => {
+    if (!user) return;
+    try {
+      const res = await apiClient.post(`/reviews/${reviewId}/vote`);
+      setItemReviews(prev => prev.map(r => {
+        if (r.id === reviewId) {
+          return {
+            ...r,
+            vote_count: res.data.vote_count,
+            is_voted_by_me: res.data.is_voted_by_me
+          };
+        }
+        return r;
+      }));
+    } catch (err) {
+      console.error("Failed to vote review", err);
+    }
+  };
+
+  const handleOpenReply = (rootReviewId: number, targetReviewId: number, targetUsername: string) => {
+    if (replyTarget && replyTarget.targetReviewId === targetReviewId) {
+      setReplyTarget(null);
+      setReplyText('');
+    } else {
+      setReplyTarget({
+        rootReviewId,
+        replyToUser: targetUsername,
+        targetReviewId
+      });
+      setReplyText(`@${targetUsername} `);
+      setCollapsedReplies(prev => ({ ...prev, [rootReviewId]: false }));
+    }
+  };
+
+  const handlePostReply = async (e: React.FormEvent, rootParentId: number) => {
+    e.preventDefault();
+    if (!selectedItem || !replyText.trim() || isSubmittingReply) return;
+    setIsSubmittingReply(true);
+    try {
+      const res = await apiClient.post(`/reviews/${selectedItem.item_type}/${selectedItem.external_id}`, {
+        content: replyText.trim(),
+        parent_id: rootParentId
+      });
+      setItemReviews(prev => [...prev, res.data]);
+      setReplyText('');
+      setReplyTarget(null);
+      setCollapsedReplies(prev => ({ ...prev, [rootParentId]: false }));
+    } catch (err) {
+      console.error("Failed to post reply", err);
+    } finally {
+      setIsSubmittingReply(false);
+    }
+  };
+
+  const handleSaveEditReply = async (replyId: number) => {
+    if (!editingReplyText.trim() || isSubmittingReply) return;
+    setIsSubmittingReply(true);
+    try {
+      const res = await apiClient.put(`/reviews/${replyId}`, {
+        content: editingReplyText.trim()
+      });
+      setItemReviews(prev => prev.map(r => r.id === replyId ? res.data : r));
+      setEditingReplyId(null);
+      setEditingReplyText('');
+    } catch (err: any) {
+      if (err.response?.data?.detail) {
+        alert(err.response.data.detail);
+      } else {
+        console.error("Failed to edit reply", err);
+      }
+    } finally {
+      setIsSubmittingReply(false);
+    }
+  };
+
+  const toggleCollapseReplies = (reviewId: number) => {
+    setCollapsedReplies(prev => ({
+      ...prev,
+      [reviewId]: !prev[reviewId]
+    }));
+  };
+
+  const isWithinEditWindow = (createdDateStr: string) => {
+    if (!createdDateStr) return false;
+    try {
+      const d = new Date(createdDateStr.endsWith('Z') ? createdDateStr : `${createdDateStr}Z`);
+      const now = new Date();
+      return (now.getTime() - d.getTime()) <= 30 * 60 * 1000;
+    } catch {
+      return false;
+    }
+  };
+
+  const formatReviewDate = (dateStr: string) => {
+    if (!dateStr) return '';
+    try {
+      const d = new Date(dateStr.endsWith('Z') ? dateStr : `${dateStr}Z`);
+      return d.toLocaleDateString(language === 'es' ? 'es-ES' : 'en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      });
+    } catch {
+      return dateStr;
+    }
+  };
+
+  const renderReviewContent = (content: string) => {
+    if (!content) return null;
+    const parts = content.split(/(@[a-zA-Z0-9_\-.]+)/g);
+    return (
+      <span>
+        {parts.map((part, idx) => {
+          if (part.startsWith('@') && part.length > 1) {
+            return (
+              <span
+                key={idx}
+                style={{
+                  color: 'var(--accent-primary)',
+                  fontWeight: 600,
+                  background: 'rgba(99, 102, 241, 0.12)',
+                  padding: '0.1rem 0.35rem',
+                  borderRadius: '4px',
+                  marginRight: '0.2rem',
+                  display: 'inline-block'
+                }}
+              >
+                {part}
+              </span>
+            );
+          }
+          return <span key={idx}>{part}</span>;
+        })}
+      </span>
+    );
   };
 
 
@@ -1622,7 +1849,12 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
             const fallbackStatus = completedEpisodes > 0 ? (selectedItem.item_type === 'comic' ? 'reading' : 'watching') : (selectedItem.item_type === 'comic' ? 'plan_to_read' : 'plan_to_watch');
             await apiClient.put(`/library/${targetId}`, { status: fallbackStatus });
             if (selectedItem.item_type !== 'episode') {
-              setSelectedItem((prev: any) => ({ ...prev, status: fallbackStatus, id: targetId }));
+              setSelectedItem((prev: any) => ({
+                ...prev,
+                status: fallbackStatus,
+                id: targetId,
+                last_seen_episode: completedEpisodes > 0 ? prev?.last_seen_episode : null
+              }));
             }
           }
         } catch (e) {
@@ -1767,6 +1999,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       const listRes = await apiClient.get(`/lists/${effectiveListId}`);
       const updatedList = listRes.data.items || [];
       setEpisodes(updatedList);
+      setCachedSeries(`list_${effectiveListId}`, updatedList);
 
       const isTargetEpisode = selectedItem && (
         isEpisode ||
@@ -1775,6 +2008,9 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
         selectedItem.external_id === `cv_issue_${ep.id}` ||
         (selectedItem.rawEpisodeId && String(selectedItem.rawEpisodeId) === String(ep.id))
       );
+
+      const targetKeyProg = isComic ? (String(ep.id).startsWith('cv_') ? ep.id : `cv_issue_${ep.id}`) : `tvm-ep-${ep.id}`;
+      setGlobalProgress(prev => ({ ...prev, [targetKeyProg]: !!res.data.is_completed }));
 
       if (isTargetEpisode) {
         setSelectedItem((prev: any) => prev ? { ...prev, completed_at: res.data.completed_at, is_completed: res.data.is_completed } : null);
@@ -1792,6 +2028,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       }
       
       await checkCompletionStatus(effectiveListId, updatedList);
+      window.dispatchEvent(new Event('library-updated'));
       onUpdate && onUpdate();
     } catch (err) {
       console.error("Failed to toggle episode", err);
@@ -1834,8 +2071,30 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       };
     }
 
+    // Check special and extra formats
+    const matchSpecialWithSeason = rawTitle.match(/^(.*?)\s*-\s*S(\d+)\s*[•·-]\s*\[?Especial\]?\s*-\s*(.*)$/i);
+    const matchSpecialSimple = rawTitle.match(/^(.*?)\s*-\s*\[?Especial\]?\s*-\s*(.*)$/i);
+    const matchExtra = rawTitle.match(/^(.*?)\s*-\s*Extras?\s*(\d+)?\s*-\s*(.*)$/i);
     const matchFull = rawTitle.match(/^(.*?)\s*-\s*S(\d+)E(\d+)\s*-\s*(.*)$/i);
-    if (matchFull) {
+
+    let isSpecial = selectedItem.is_significant_special || selectedItem.ep_type === 'significant_special' || (!episodeNum && seasonNum === 0);
+    let isExtra = selectedItem.is_extra || selectedItem.ep_type === 'insignificant_special' || (seasonNum === 0 && !selectedItem.is_significant_special && selectedItem.ep_type !== 'significant_special');
+
+    if (matchSpecialWithSeason) {
+      if (!seriesName) seriesName = matchSpecialWithSeason[1].trim();
+      if (!seasonNum) seasonNum = parseInt(matchSpecialWithSeason[2], 10);
+      episodeName = matchSpecialWithSeason[3].trim();
+      isSpecial = true;
+    } else if (matchSpecialSimple) {
+      if (!seriesName) seriesName = matchSpecialSimple[1].trim();
+      episodeName = matchSpecialSimple[2].trim();
+      isSpecial = true;
+    } else if (matchExtra) {
+      if (!seriesName) seriesName = matchExtra[1].trim();
+      if (!episodeNum && matchExtra[2]) episodeNum = parseInt(matchExtra[2], 10);
+      episodeName = matchExtra[3].trim();
+      isExtra = true;
+    } else if (matchFull) {
       if (!seriesName) seriesName = matchFull[1].trim();
       if (!seasonNum) seasonNum = parseInt(matchFull[2], 10);
       if (!episodeNum) episodeNum = parseInt(matchFull[3], 10);
@@ -1850,21 +2109,44 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     }
 
     if (!episodeName && rawTitle) {
-      const cleaned = rawTitle.replace(/^(.*?)\s*-\s*S\d+E\d+\s*-\s*/i, '').trim();
-      episodeName = cleaned || rawTitle;
+      episodeName = rawTitle;
+    }
+
+    if (episodeName) {
+      if (seriesName && episodeName.startsWith(seriesName)) {
+        const afterSeries = episodeName.slice(seriesName.length);
+        if (/^\s*[-•·]\s*/.test(afterSeries)) {
+          episodeName = afterSeries.replace(/^\s*[-•·]\s*/, '').trim();
+        }
+      }
+      episodeName = episodeName
+        .replace(/^S\d+\s*[•·-]\s*\[?Especial\]?\s*-\s*/i, '')
+        .replace(/^\[?Especial\]?\s*-\s*/i, '')
+        .replace(/^Extras?\s*\d*\s*-\s*/i, '')
+        .replace(/^Extras?\s*-\s*/i, '')
+        .replace(/^S\d+E\d+\s*-\s*/i, '')
+        .trim();
     }
     if (!episodeName) {
       episodeName = language === 'es' ? 'Episodio sin título' : 'Untitled Episode';
     }
 
-    const sStr = seasonNum !== undefined && seasonNum !== null ? (seasonNum < 10 ? `0${seasonNum}` : `${seasonNum}`) : null;
-    const eStr = episodeNum !== undefined && episodeNum !== null ? (episodeNum < 10 ? `0${episodeNum}` : `${episodeNum}`) : null;
+    let seasonBadge: string | null = null;
+    if (isExtra) {
+      seasonBadge = episodeNum ? (language === 'es' ? `Extra ${episodeNum}` : `Extra ${episodeNum}`) : (language === 'es' ? 'Extra' : 'Extra');
+    } else if (isSpecial) {
+      seasonBadge = seasonNum && seasonNum > 0
+        ? (language === 'es' ? `Temporada ${seasonNum} • Especial` : `Season ${seasonNum} • Special`)
+        : (language === 'es' ? 'Especial' : 'Special');
+    } else if (seasonNum !== undefined && seasonNum !== null && episodeNum !== undefined && episodeNum !== null) {
+      seasonBadge = language === 'es' ? `Temporada ${seasonNum} • Episodio ${episodeNum}` : `Season ${seasonNum} • Episode ${episodeNum}`;
+    }
 
     return {
       seriesName: seriesName || (selectedItem.parent_series ? selectedItem.parent_series.title : null),
       seasonNum,
       episodeNum,
-      seasonBadge: sStr && eStr ? (language === 'es' ? `Temporada ${seasonNum} • Episodio ${episodeNum}` : `Season ${seasonNum} • Episode ${episodeNum}`) : null,
+      seasonBadge,
       episodeName
     };
   };
@@ -3194,6 +3476,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                           const cacheKeyAll = `${selectedItem.external_id}_all_episodes`;
                           const cachedAll = getCachedSeries(cacheKeyAll) || [];
 
+                          // Helper to check if an episode is watched
                           const isEpWatched = (epId: any, seasonNum?: number, epNum?: number) => {
                             if (!epId) return false;
                             const extId = typeof epId === 'string' && epId.startsWith('tvm-ep-') ? epId : `tvm-ep-${epId}`;
@@ -3209,16 +3492,15 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                             return false;
                           };
 
-                          if (selectedItem?.status === 'completed') {
-                            return { isAllWatched: true, areRegularSeasonsWatched: true };
-                          }
-
                           const canonicalSeasons = seasons.filter((s: any) => s.season_number > 0 && !s.is_extras);
                           
                           // If no seasons structure exists, check regular episodes directly from the episodes list
                           if (canonicalSeasons.length === 0) {
                             const regularDbEps = (episodes || []).filter((x: any) => x.season_number > 0 && !x.is_extra && !x.section?.toLowerCase().includes('extra'));
                             const isDone = regularDbEps.length > 0 && regularDbEps.every((x: any) => globalProgress[x.external_id] !== undefined ? !!globalProgress[x.external_id] : !!x.is_completed);
+                            if (regularDbEps.length === 0 && selectedItem?.status === 'completed') {
+                              return { isAllWatched: true, areRegularSeasonsWatched: true };
+                            }
                             return { isAllWatched: isDone, areRegularSeasonsWatched: isDone };
                           }
 
@@ -3257,36 +3539,37 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         })();
 
                         return (
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem' }}>
                             <button
                               type="button"
                               onClick={() => {
-                                if (selectedItem?.status === 'completed') {
-                                  setShowAllWatchedMenu(true);
+                                if (selectedItem?.status === 'completed' || isAllWatched) {
+                                  setShowReconsumedModal(true);
                                 } else {
-                                  handleToggleStatus('completed');
+                                  setPendingSeriesScopeAction('mark_all');
+                                  setShowSeriesScopeModal(true);
                                 }
                               }}
                               style={{
                                 width: '100%',
                                 background: isAllWatched 
-                                  ? `var(--color-${selectedItem?.item_type})` 
+                                  ? `var(--color-${selectedItem?.item_type || 'series'})` 
                                   : areRegularSeasonsWatched 
                                     ? 'transparent' 
                                     : 'var(--bg-tertiary)',
                                 border: isAllWatched 
                                   ? 'none' 
                                   : areRegularSeasonsWatched 
-                                    ? `2px dashed var(--color-${selectedItem?.item_type})` 
+                                    ? `2px dashed var(--color-${selectedItem?.item_type || 'series'})` 
                                     : '1px solid var(--border-color)',
                                 borderRadius: '8px',
                                 padding: '0.6rem 0.5rem',
                                 textAlign: 'center',
                                 cursor: 'pointer',
                                 color: isAllWatched 
-                                  ? `var(--color-text-${selectedItem?.item_type})` 
+                                  ? `var(--color-text-${selectedItem?.item_type || 'series'})` 
                                   : areRegularSeasonsWatched 
-                                    ? `var(--color-${selectedItem?.item_type})` 
+                                    ? `var(--color-${selectedItem?.item_type || 'series'})` 
                                     : 'var(--text-primary)',
                                 fontSize: '0.85rem',
                                 fontWeight: 600,
@@ -3297,27 +3580,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                 transition: 'all 0.2s ease'
                               }}
                             >
-                              <Check size={14} strokeWidth={2.5} />
-                              <span>{language === 'es' ? 'Visto' : 'Watched'}</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleToggleStatus('watching')}
-                              style={{
-                                width: '100%',
-                                background: selectedItem?.status === 'watching' ? `var(--color-${selectedItem?.item_type})` : 'var(--bg-tertiary)',
-                                border: selectedItem?.status === 'watching' ? 'none' : '1px solid var(--border-color)',
-                                borderRadius: '8px',
-                                padding: '0.6rem 0.5rem',
-                                textAlign: 'center',
-                                cursor: 'pointer',
-                                color: selectedItem?.status === 'watching' ? `var(--color-text-${selectedItem?.item_type})` : 'var(--text-primary)',
-                                fontSize: '0.85rem',
-                                fontWeight: 600,
-                                transition: 'all 0.2s ease'
-                              }}
-                            >
-                              {language === 'es' ? 'Viendo' : 'Watching'}
+                              <CheckCheck size={16} strokeWidth={2.5} />
+                              <span>{language === 'es' ? 'Todo visto' : 'All watched'}</span>
                             </button>
                             <button
                               type="button"
@@ -3854,6 +4118,15 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
                                 if (!seasonEps || seasonEps.length === 0) return { isSeasonDone: false, isSeasonPartial: false };
 
+                                const isExtrasSeason = s.season_number === 0 || s.is_extras;
+                                if (isExtrasSeason) {
+                                  const extrasAllDone = seasonEps.length > 0 && seasonEps.every((e: any) => isEpWatched(e.id, e.season_number, e.episode_number));
+                                  return {
+                                    isSeasonDone: extrasAllDone,
+                                    isSeasonPartial: false
+                                  };
+                                }
+
                                 const regularEps = seasonEps.filter((e: any) => !e.is_extra && e.ep_type !== 'insignificant_special' && !e.is_significant_special && e.ep_type !== 'significant_special');
                                 const sigSpecials = seasonEps.filter((e: any) => e.is_significant_special || e.ep_type === 'significant_special');
 
@@ -3940,33 +4213,26 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                               seasonEps = allEps.filter((e: any) => e.season_number === s.season_number);
                                             }
 
+                                            const isExtrasSeason = s.season_number === 0 || s.is_extras;
                                             const newProgress: Record<string, boolean> = {};
                                             seasonEps.forEach((e: any) => {
-                                              if (!e.is_extra && e.ep_type !== 'insignificant_special') {
+                                              if (isExtrasSeason || (!e.is_extra && e.ep_type !== 'insignificant_special')) {
                                                 newProgress[`tvm-ep-${e.id}`] = true;
                                               }
                                             });
                                             setGlobalProgress(prev => ({ ...prev, ...newProgress }));
 
                                             try {
-                                              await apiClient.post(`/lists/${effectiveListId}/bulk-episodes`, {
+                                              await apiClient.post(`/lists/${effectiveListId}/bulk-toggle-season`, {
                                                 season_number: s.season_number,
-                                                episodes: seasonEps.map((e: any) => ({
-                                                  external_id: `tvm-ep-${e.id}`,
-                                                  title: `${selectedItem.title} - ${s.season_number > 0 ? (s.season_number < 10 ? 'S0' + s.season_number : 'S' + s.season_number) : (language === 'es' ? 'Extras' : 'Extras')}${e.episode_number != null ? (e.episode_number < 10 ? 'E0' + e.episode_number : 'E' + e.episode_number) : (e.is_significant_special ? ' • ' + (language === 'es' ? 'Especial' : 'Special') : '')} - ${e.name || 'Untitled'}`,
-                                                  image_url: e.image_url || e.image?.original || e.image?.medium || e.still_path || selectedItem.image_url,
-                                                  custom_notes: JSON.stringify({ description: e.overview || '', release_date: e.air_date || null }),
-                                                  season_number: e.season_number,
-                                                  episode_number: e.episode_number,
-                                                  release_date: e.air_date,
-                                                  is_completed: true,
-                                                  is_significant_special: e.is_significant_special || e.ep_type === 'significant_special',
-                                                  is_extra: e.is_extra || e.ep_type === 'insignificant_special' || e.season_number === 0
-                                                }))
+                                                episodes: seasonEps || null,
+                                                completed: true
                                               });
 
-                                              const updatedList = await apiClient.get(`/lists/${effectiveListId}`);
-                                              setEpisodes(updatedList.data.items || []);
+                                              const listRes = await apiClient.get(`/lists/${effectiveListId}`);
+                                              const updatedList = listRes.data.items || [];
+                                              setEpisodes(updatedList);
+                                              await checkCompletionStatus(effectiveListId, updatedList);
                                               onUpdate && onUpdate();
                                             } catch (err) {
                                               console.error("Failed to mark season as completed", err);
@@ -4752,84 +5018,561 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                 </div>
               )}
 
-              {/* Comment write area */}
-              <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                <h4 style={{ margin: 0, fontSize: '1.1rem' }}>{language === 'es' ? 'Tu Comentario' : 'Your Comment'}</h4>
-                <textarea
-                  className="input-field"
-                  value={userComment}
-                  onChange={(e) => setUserComment(e.target.value)}
-                  placeholder={language === 'es' ? '¿Qué te pareció este elemento? Escribe tu comentario aquí...' : 'What did you think of this item? Write your comment here...'}
-                  style={{ width: '100%', minHeight: '80px', padding: '0.75rem', background: 'var(--bg-secondary)', resize: 'vertical' }}
-                />
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', alignItems: 'center' }}>
-                  {userComment && (
-                    <button
-                      type="button"
-                      onClick={handleDeleteComment}
-                      disabled={isSavingReview}
-                      style={{
-                        background: 'transparent',
-                        border: 'none',
-                        color: '#ef4444',
-                        fontSize: '0.82rem',
-                        cursor: 'pointer',
-                        padding: '0.4rem 0.6rem'
-                      }}
-                    >
-                      {language === 'es' ? 'Eliminar comentario' : 'Delete comment'}
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={handleSaveComment}
-                    className="btn-primary"
-                    disabled={isSavingReview || !user}
-                    style={{ padding: '0.4rem 1rem', fontSize: '0.85rem' }}
-                  >
-                    {isSavingReview
-                      ? (language === 'es' ? 'Guardando...' : 'Saving...')
-                      : (language === 'es' ? 'Guardar Comentario' : 'Save Comment')
-                    }
-                  </button>
-                </div>
-              </div>
+              {/* Comment write area - only shown if user has not yet posted a root comment OR is actively editing it */}
+              {(() => {
+                const myRootReview = (itemReviews || []).find((r: any) => r.user_id === user?.id && !r.parent_id);
+                const hasExistingComment = Boolean(myRootReview?.content && myRootReview.content.trim());
+
+                if (hasExistingComment && !isEditingComment) {
+                  return null;
+                }
+
+                return (
+                  <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <h4 style={{ margin: 0, fontSize: '1.1rem' }}>
+                        {isEditingComment 
+                          ? (language === 'es' ? 'Editar Tu Comentario' : 'Edit Your Comment')
+                          : (language === 'es' ? 'Tu Comentario' : 'Your Comment')
+                        }
+                      </h4>
+                      {isEditingComment && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsEditingComment(false);
+                            setUserComment(myRootReview?.content || '');
+                          }}
+                          style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', fontSize: '0.8rem', cursor: 'pointer' }}
+                        >
+                          {language === 'es' ? 'Cancelar' : 'Cancel'}
+                        </button>
+                      )}
+                    </div>
+                    <textarea
+                      className="input-field"
+                      value={userComment}
+                      onChange={(e) => setUserComment(e.target.value)}
+                      placeholder={language === 'es' ? '¿Qué te pareció este elemento? Escribe tu comentario aquí...' : 'What did you think of this item? Write your comment here...'}
+                      style={{ width: '100%', minHeight: '80px', padding: '0.75rem', background: 'var(--bg-secondary)', resize: 'vertical' }}
+                    />
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', alignItems: 'center' }}>
+                      {hasExistingComment && (
+                        <button
+                          type="button"
+                          onClick={handleDeleteComment}
+                          disabled={isSavingReview}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            color: '#ef4444',
+                            fontSize: '0.82rem',
+                            cursor: 'pointer',
+                            padding: '0.4rem 0.6rem'
+                          }}
+                        >
+                          {language === 'es' ? 'Eliminar comentario' : 'Delete comment'}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={handleSaveComment}
+                        className="btn-primary"
+                        disabled={isSavingReview || !user || !userComment.trim()}
+                        style={{ padding: '0.4rem 1rem', fontSize: '0.85rem' }}
+                      >
+                        {isSavingReview
+                          ? (language === 'es' ? 'Publicando...' : 'Publishing...')
+                          : (language === 'es' ? 'Publicar' : 'Publish')
+                        }
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Community Reviews List */}
               <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', textAlign: 'left' }}>
                 <h4 style={{ margin: 0, fontSize: '1.1rem' }}>{language === 'es' ? 'Comentarios de la Comunidad' : 'Community Comments'}</h4>
-                {itemReviews.length === 0 ? (
-                  <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                    {language === 'es' ? 'Nadie ha comentado sobre esto aún.' : 'No comments on this item yet.'}
-                  </p>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '180px', overflowY: 'auto' }}>
-                    {itemReviews.map((rev: any) => (
-                      <div key={rev.id} style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: '0.85rem', fontWeight: 600, textTransform: 'capitalize' }}>{rev.username}</span>
-                          {rev.rating && (
-                            <div style={{ display: 'flex', gap: '0.1rem' }}>
-                              {[1, 2, 3, 4, 5].map((star) => (
-                                <Star
-                                  key={star}
-                                  size={12}
-                                  fill={star <= rev.rating ? '#f59e0b' : 'none'}
-                                  color={star <= rev.rating ? '#f59e0b' : 'var(--text-muted)'}
-                                />
-                              ))}
+                {(() => {
+                  const rootReviews = (itemReviews || []).filter((r: any) => !r.parent_id && r.content && r.content.trim());
+                  if (rootReviews.length === 0) {
+                    return (
+                      <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                        {language === 'es' ? 'Nadie ha comentado sobre esto aún.' : 'No comments on this item yet.'}
+                      </p>
+                    );
+                  }
+
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', maxHeight: '420px', overflowY: 'auto', paddingRight: '0.25rem' }}>
+                      {rootReviews.map((rootNode: any) => {
+                        const childReplies = (itemReviews || []).filter((r: any) => r.parent_id === rootNode.id);
+                        const hasReplies = childReplies.length > 0;
+                        const isCollapsed = !!collapsedReplies[rootNode.id];
+                        const isReplyingRoot = replyTarget?.targetReviewId === rootNode.id;
+
+                        return (
+                          <div
+                            key={rootNode.id}
+                            style={{
+                              padding: '1rem',
+                              background: 'var(--bg-secondary)',
+                              borderRadius: '8px',
+                              border: '1px solid var(--border-color)',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '0.6rem'
+                            }}
+                          >
+                            {/* Header */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                                {rootNode.photo_url ? (
+                                  <img
+                                    src={rootNode.photo_url}
+                                    alt={rootNode.username}
+                                    style={{
+                                      width: '32px',
+                                      height: '32px',
+                                      borderRadius: '50%',
+                                      objectFit: 'cover',
+                                      border: '1px solid var(--border-color)',
+                                      flexShrink: 0
+                                    }}
+                                  />
+                                ) : (
+                                  <div style={{
+                                    width: '32px',
+                                    height: '32px',
+                                    borderRadius: '50%',
+                                    background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))',
+                                    color: '#fff',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontSize: '0.82rem',
+                                    fontWeight: 700,
+                                    flexShrink: 0
+                                  }}>
+                                    {(rootNode.username || 'U')[0].toUpperCase()}
+                                  </div>
+                                )}
+                                <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>{rootNode.username}</span>
+                                {rootNode.created_at && (
+                                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                                    • {formatReviewDate(rootNode.created_at)}
+                                    {rootNode.is_edited && (
+                                      <span style={{ marginLeft: '0.35rem', fontStyle: 'italic', color: 'var(--text-muted)', fontSize: '0.74rem' }}>
+                                        ({language === 'es' ? 'Editado' : 'Edited'})
+                                      </span>
+                                    )}
+                                  </span>
+                                )}
+                              </div>
+
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                {rootNode.rating && (
+                                  <div style={{ display: 'flex', gap: '0.1rem' }}>
+                                    {[1, 2, 3, 4, 5].map((star) => (
+                                      <Star
+                                        key={star}
+                                        size={13}
+                                        fill={star <= rootNode.rating ? '#f59e0b' : 'none'}
+                                        color={star <= rootNode.rating ? '#f59e0b' : 'var(--text-muted)'}
+                                      />
+                                    ))}
+                                  </div>
+                                )}
+                                {user && user.id === rootNode.user_id && isWithinEditWindow(rootNode.created_at) && (
+                                  <button
+                                    onClick={() => {
+                                      setUserComment(rootNode.content || '');
+                                      setIsEditingComment(true);
+                                    }}
+                                    title={language === 'es' ? 'Editar comentario' : 'Edit comment'}
+                                    style={{
+                                      background: 'transparent',
+                                      border: 'none',
+                                      color: 'var(--text-muted)',
+                                      cursor: 'pointer',
+                                      padding: '0.2rem',
+                                      display: 'flex',
+                                      alignItems: 'center'
+                                    }}
+                                    onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--accent-primary)')}
+                                    onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
+                                  >
+                                    <Edit2 size={13} />
+                                  </button>
+                                )}
+                                {user && (user.id === rootNode.user_id || user.is_admin) && (
+                                  <button
+                                    onClick={() => handleDeleteReviewItem(rootNode.id)}
+                                    title={language === 'es' ? 'Eliminar comentario' : 'Delete comment'}
+                                    style={{
+                                      background: 'transparent',
+                                      border: 'none',
+                                      color: 'var(--text-muted)',
+                                      cursor: 'pointer',
+                                      padding: '0.2rem',
+                                      display: 'flex',
+                                      alignItems: 'center'
+                                    }}
+                                    onMouseEnter={(e) => (e.currentTarget.style.color = '#ef4444')}
+                                    onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                )}
+                              </div>
                             </div>
-                          )}
-                        </div>
-                        {rev.content && (
-                          <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: '1.3' }}>
-                            {rev.content}
-                          </p>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
+
+                            {/* Comment text */}
+                            <p style={{ margin: 0, fontSize: '0.92rem', color: 'var(--text-primary)', whiteSpace: 'pre-wrap', lineHeight: '1.45' }}>
+                              {renderReviewContent(rootNode.content)}
+                            </p>
+
+                            {/* Actions */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '0.25rem', flexWrap: 'wrap' }}>
+                              <button
+                                onClick={() => handleVoteReview(rootNode.id)}
+                                style={{
+                                  background: rootNode.is_voted_by_me ? 'rgba(59, 130, 246, 0.15)' : 'transparent',
+                                  border: rootNode.is_voted_by_me ? '1px solid rgba(59, 130, 246, 0.3)' : '1px solid var(--border-color)',
+                                  color: rootNode.is_voted_by_me ? '#3b82f6' : 'var(--text-secondary)',
+                                  borderRadius: '4px',
+                                  padding: '0.2rem 0.5rem',
+                                  fontSize: '0.78rem',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.35rem',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.2s ease'
+                                }}
+                              >
+                                <ThumbsUp size={12} fill={rootNode.is_voted_by_me ? '#3b82f6' : 'none'} />
+                                <span>{rootNode.vote_count || 0}</span>
+                              </button>
+
+                              {user && (
+                                <button
+                                  onClick={() => handleOpenReply(rootNode.id, rootNode.id, rootNode.username)}
+                                  style={{
+                                    background: 'transparent',
+                                    border: 'none',
+                                    color: isReplyingRoot ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                                    fontSize: '0.78rem',
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '0.3rem',
+                                    padding: '0.2rem 0.4rem'
+                                  }}
+                                >
+                                  <Reply size={13} />
+                                  <span>{isReplyingRoot ? (language === 'es' ? 'Cancelar respuesta' : 'Cancel reply') : (language === 'es' ? 'Responder' : 'Reply')}</span>
+                                </button>
+                              )}
+
+                              {hasReplies && (
+                                <button
+                                  onClick={() => toggleCollapseReplies(rootNode.id)}
+                                  style={{
+                                    background: 'transparent',
+                                    border: 'none',
+                                    color: 'var(--text-muted)',
+                                    fontSize: '0.78rem',
+                                    fontWeight: 500,
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '0.25rem',
+                                    padding: '0.2rem 0.4rem'
+                                  }}
+                                >
+                                  {isCollapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
+                                  <span>
+                                    {isCollapsed
+                                      ? (language === 'es' ? `Mostrar ${childReplies.length} ${childReplies.length === 1 ? 'respuesta' : 'respuestas'}` : `Show ${childReplies.length} ${childReplies.length === 1 ? 'reply' : 'replies'}`)
+                                      : (language === 'es' ? `Ocultar ${childReplies.length} ${childReplies.length === 1 ? 'respuesta' : 'respuestas'}` : `Hide ${childReplies.length} ${childReplies.length === 1 ? 'reply' : 'replies'}`)
+                                    }
+                                  </span>
+                                </button>
+                              )}
+                            </div>
+
+                            {/* Inline Reply Form under Root Review */}
+                            {replyTarget?.rootReviewId === rootNode.id && (
+                              <form
+                                onSubmit={(e) => handlePostReply(e, rootNode.id)}
+                                style={{
+                                  marginTop: '0.5rem',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  gap: '0.5rem',
+                                  padding: '0.75rem',
+                                  background: 'rgba(0,0,0,0.15)',
+                                  borderRadius: '6px',
+                                  border: '1px solid var(--border-color)'
+                                }}
+                              >
+                                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between' }}>
+                                  <span>{language === 'es' ? `Respondiendo a @${replyTarget?.replyToUser || ''}` : `Replying to @${replyTarget?.replyToUser || ''}`}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => setReplyTarget(null)}
+                                    style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '0.75rem' }}
+                                  >
+                                    {language === 'es' ? 'Cancelar' : 'Cancel'}
+                                  </button>
+                                </div>
+                                <textarea
+                                  value={replyText}
+                                  onChange={(e) => setReplyText(e.target.value)}
+                                  placeholder={language === 'es' ? 'Escribe una respuesta...' : 'Write a reply...'}
+                                  rows={2}
+                                  className="input-field"
+                                  style={{ width: '100%', fontSize: '0.85rem', padding: '0.5rem', resize: 'vertical' }}
+                                  autoFocus
+                                />
+                                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                                  <button
+                                    type="submit"
+                                    className="btn-primary"
+                                    disabled={!replyText.trim() || isSubmittingReply}
+                                    style={{ padding: '0.3rem 0.8rem', fontSize: '0.8rem' }}
+                                  >
+                                    {isSubmittingReply
+                                      ? (language === 'es' ? 'Enviando...' : 'Sending...')
+                                      : (language === 'es' ? 'Responder' : 'Reply')
+                                    }
+                                  </button>
+                                </div>
+                              </form>
+                            )}
+
+                            {/* Replies List */}
+                            {hasReplies && !isCollapsed && (
+                              <div
+                                style={{
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  gap: '0.5rem',
+                                  marginLeft: '1.25rem',
+                                  paddingLeft: '0.85rem',
+                                  borderLeft: '2px solid var(--border-color)',
+                                  marginTop: '0.25rem'
+                                }}
+                              >
+                                {childReplies.map((reply: any) => {
+                                  const isReplyingChild = replyTarget?.targetReviewId === reply.id;
+                                  const isEditingThisReply = editingReplyId === reply.id;
+
+                                  return (
+                                    <div
+                                      key={reply.id}
+                                      style={{
+                                        padding: '0.75rem',
+                                        background: 'rgba(255,255,255,0.02)',
+                                        borderRadius: '6px',
+                                        border: '1px solid var(--border-color)',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: '0.4rem'
+                                      }}
+                                    >
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                          {reply.photo_url ? (
+                                            <img
+                                              src={reply.photo_url}
+                                              alt={reply.username}
+                                              style={{
+                                                width: '24px',
+                                                height: '24px',
+                                                borderRadius: '50%',
+                                                objectFit: 'cover',
+                                                border: '1px solid var(--border-color)',
+                                                flexShrink: 0
+                                              }}
+                                            />
+                                          ) : (
+                                            <div style={{
+                                              width: '24px',
+                                              height: '24px',
+                                              borderRadius: '50%',
+                                              background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))',
+                                              color: '#fff',
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              justifyContent: 'center',
+                                              fontSize: '0.7rem',
+                                              fontWeight: 700,
+                                              flexShrink: 0
+                                            }}>
+                                              {(reply.username || 'U')[0].toUpperCase()}
+                                            </div>
+                                          )}
+                                          <span style={{ fontWeight: 600, fontSize: '0.85rem' }}>{reply.username}</span>
+                                          {reply.created_at && (
+                                            <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                                              • {formatReviewDate(reply.created_at)}
+                                              {reply.is_edited && (
+                                                <span style={{ marginLeft: '0.35rem', fontStyle: 'italic', color: 'var(--text-muted)', fontSize: '0.7rem' }}>
+                                                  ({language === 'es' ? 'Editado' : 'Edited'})
+                                                </span>
+                                              )}
+                                            </span>
+                                          )}
+                                        </div>
+
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                          {user && user.id === reply.user_id && isWithinEditWindow(reply.created_at) && (
+                                            <button
+                                              onClick={() => {
+                                                if (isEditingThisReply) {
+                                                  setEditingReplyId(null);
+                                                  setEditingReplyText('');
+                                                } else {
+                                                  setEditingReplyId(reply.id);
+                                                  setEditingReplyText(reply.content || '');
+                                                }
+                                              }}
+                                              title={language === 'es' ? 'Editar respuesta' : 'Edit reply'}
+                                              style={{
+                                                background: 'transparent',
+                                                border: 'none',
+                                                color: isEditingThisReply ? 'var(--accent-primary)' : 'var(--text-muted)',
+                                                cursor: 'pointer',
+                                                padding: '0.2rem',
+                                                display: 'flex',
+                                                alignItems: 'center'
+                                              }}
+                                              onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--accent-primary)')}
+                                              onMouseLeave={(e) => (e.currentTarget.style.color = isEditingThisReply ? 'var(--accent-primary)' : 'var(--text-muted)')}
+                                            >
+                                              <Edit2 size={12} />
+                                            </button>
+                                          )}
+                                          {user && (user.id === reply.user_id || user.is_admin) && (
+                                            <button
+                                              onClick={() => handleDeleteReviewItem(reply.id)}
+                                              title={language === 'es' ? 'Eliminar respuesta' : 'Delete reply'}
+                                              style={{
+                                                background: 'transparent',
+                                                border: 'none',
+                                                color: 'var(--text-muted)',
+                                                cursor: 'pointer',
+                                                padding: '0.2rem',
+                                                display: 'flex',
+                                                alignItems: 'center'
+                                              }}
+                                              onMouseEnter={(e) => (e.currentTarget.style.color = '#ef4444')}
+                                              onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
+                                            >
+                                              <Trash2 size={13} />
+                                            </button>
+                                          )}
+                                        </div>
+                                      </div>
+
+                                      {isEditingThisReply ? (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.2rem' }}>
+                                          <textarea
+                                            value={editingReplyText}
+                                            onChange={(e) => setEditingReplyText(e.target.value)}
+                                            rows={2}
+                                            className="input-field"
+                                            style={{ width: '100%', fontSize: '0.85rem', padding: '0.4rem', resize: 'vertical' }}
+                                            autoFocus
+                                          />
+                                          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.4rem' }}>
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                setEditingReplyId(null);
+                                                setEditingReplyText('');
+                                              }}
+                                              style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', fontSize: '0.75rem', cursor: 'pointer', padding: '0.2rem 0.5rem' }}
+                                            >
+                                              {language === 'es' ? 'Cancelar' : 'Cancel'}
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={() => handleSaveEditReply(reply.id)}
+                                              className="btn-primary"
+                                              disabled={!editingReplyText.trim() || isSubmittingReply}
+                                              style={{ padding: '0.2rem 0.6rem', fontSize: '0.75rem' }}
+                                            >
+                                              {isSubmittingReply
+                                                ? (language === 'es' ? 'Guardando...' : 'Saving...')
+                                                : (language === 'es' ? 'Guardar' : 'Save')
+                                              }
+                                            </button>
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-primary)', whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>
+                                          {renderReviewContent(reply.content)}
+                                        </p>
+                                      )}
+
+                                      {!isEditingThisReply && (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginTop: '0.15rem' }}>
+                                          <button
+                                            onClick={() => handleVoteReview(reply.id)}
+                                            style={{
+                                              background: reply.is_voted_by_me ? 'rgba(59, 130, 246, 0.15)' : 'transparent',
+                                              border: reply.is_voted_by_me ? '1px solid rgba(59, 130, 246, 0.3)' : '1px solid var(--border-color)',
+                                              color: reply.is_voted_by_me ? '#3b82f6' : 'var(--text-secondary)',
+                                              borderRadius: '4px',
+                                              padding: '0.15rem 0.45rem',
+                                              fontSize: '0.74rem',
+                                              display: 'inline-flex',
+                                              alignItems: 'center',
+                                              gap: '0.3rem',
+                                              cursor: 'pointer'
+                                            }}
+                                          >
+                                            <ThumbsUp size={11} fill={reply.is_voted_by_me ? '#3b82f6' : 'none'} />
+                                            <span>{reply.vote_count || 0}</span>
+                                          </button>
+
+                                          {user && (
+                                            <button
+                                              onClick={() => handleOpenReply(rootNode.id, reply.id, reply.username)}
+                                              style={{
+                                                background: 'transparent',
+                                                border: 'none',
+                                                color: isReplyingChild ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                                                fontSize: '0.74rem',
+                                                fontWeight: 600,
+                                                cursor: 'pointer',
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '0.25rem',
+                                                padding: '0.15rem 0.35rem'
+                                              }}
+                                            >
+                                              <Reply size={12} />
+                                              <span>{isReplyingChild ? (language === 'es' ? 'Cancelar' : 'Cancel') : (language === 'es' ? 'Responder' : 'Reply')}</span>
+                                            </button>
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Data Provider Attribution Footer */}
@@ -5009,8 +5752,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         onClick={async () => {
                           setShowReconsumedModal(false);
                           if (selectedItem.item_type === 'series' || selectedItem.item_type === 'anime') {
-                            setPendingSeriesScopeAction('remove');
-                            setShowSeriesScopeModal(true);
+                            await handleToggleAllEpisodes('remove', 'all');
                           } else if (selectedItem.item_type === 'comic' && !isEpisode) {
                             const cacheKey = `${selectedItem.external_id}_all_episodes`;
                             const list = (seasonEpisodes[1] && seasonEpisodes[1].length > 0) ? seasonEpisodes[1] : (getCachedSeries(cacheKey) || []);

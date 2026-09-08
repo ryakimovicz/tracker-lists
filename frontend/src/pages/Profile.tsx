@@ -1572,19 +1572,8 @@ export const Profile: React.FC = () => {
                               }
                               // Series / Anime
                               else if (item.item_type === 'series' || item.item_type === 'anime') {
-                                if (hasEverCompleted) {
-                                  // Check if series is completely ended or just up to date with released episodes
-                                  const cacheKey = `series_${item.external_id}`;
-                                  const cached = item.external_id ? getCachedSeries(cacheKey) : null;
-                                  const anyItem = item as any;
-                                  const sStatus = cached?.status || anyItem.series_status;
-                                  const isEnded = seriesEndedMap[item.external_id] === true || sStatus === 'Ended' || sStatus === 'Finished' || anyItem.is_ended === true;
-
-                                  if (isEnded) {
-                                    badges.push({ text: language === 'es' ? 'Terminada' : 'Completed', color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)' });
-                                  } else {
-                                    badges.push({ text: language === 'es' ? 'Al día' : 'Up to date', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' });
-                                  }
+                                if (hasEverCompleted || item.status === 'completed') {
+                                  badges.push({ text: language === 'es' ? 'Terminada' : 'Completed', color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)' });
                                 } else if (item.status === 'watching') {
                                   badges.push({ text: language === 'es' ? 'Viendo' : 'Watching', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' });
                                 }
@@ -1645,11 +1634,23 @@ export const Profile: React.FC = () => {
                                       formatted = item.last_seen_episode.slice(item.title.length).trim() || item.last_seen_episode;
                                     }
                                   } else {
+                                    const matchSpecialSeason = item.last_seen_episode.match(/S(\d+)\s*[•·-]\s*\[?Especial\]?/i);
+                                    const matchSpecial = item.last_seen_episode.match(/\[?Especial\]?/i);
+                                    const matchExtra = item.last_seen_episode.match(/Extras?\s*(\d+)?/i);
                                     const match = item.last_seen_episode.match(/S(\d+)E(\d+)/i);
+
                                     if (match) {
                                       const s = String(match[1]).padStart(2, '0');
                                       const e = String(match[2]).padStart(2, '0');
                                       formatted = language === 'es' ? `T${s} | E${e}` : `S${s} | E${e}`;
+                                    } else if (matchSpecialSeason) {
+                                      const s = String(matchSpecialSeason[1]).padStart(2, '0');
+                                      formatted = language === 'es' ? `T${s} • Especial` : `S${s} • Special`;
+                                    } else if (matchExtra) {
+                                      const epNum = matchExtra[1];
+                                      formatted = epNum ? `Extra ${epNum}` : 'Extra';
+                                    } else if (matchSpecial) {
+                                      formatted = language === 'es' ? 'Especial' : 'Special';
                                     }
                                   }
 

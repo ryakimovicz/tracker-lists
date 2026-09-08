@@ -468,6 +468,44 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
   const pad = (n: number) => n < 10 ? '0' + n : n;
   const isComic = item.item_type === 'comic' || String(item.external_id || '').startsWith('cv_vol_');
 
+  // Helpers for episode categorization and chronological sorting
+  const isExtraEpisode = (ep: any) => {
+    if (isComic) return false;
+    return ep.is_extra || ep.ep_type === 'insignificant_special' || (ep.season_number === 0 && !ep.is_significant_special && ep.ep_type !== 'significant_special');
+  };
+
+  const isSpecialEpisode = (ep: any) => {
+    if (isComic) return false;
+    return ep.is_significant_special || ep.ep_type === 'significant_special' || (ep.episode_number == null && !ep.is_extra && ep.season_number > 0);
+  };
+
+  const sortEpisodesChronologically = (eps: any[]) => {
+    return [...eps].sort((a: any, b: any) => {
+      if (isComic) {
+        const numA = parseFloat(a.issue_number || a.episode_number || '0');
+        const numB = parseFloat(b.issue_number || b.episode_number || '0');
+        if (numA !== numB) return numA - numB;
+        return (a.id || 0) - (b.id || 0);
+      }
+      const aIsSpecial = isSpecialEpisode(a);
+      const bIsSpecial = isSpecialEpisode(b);
+      const aAir = a.airdate || a.air_date || (a.airstamp ? a.airstamp.substring(0, 10) : null);
+      const bAir = b.airdate || b.air_date || (b.airstamp ? b.airstamp.substring(0, 10) : null);
+
+      if ((aIsSpecial || bIsSpecial) && aAir && bAir && aAir !== bAir) {
+        return new Date(aAir).getTime() - new Date(bAir).getTime();
+      }
+
+      const sA = a.season_number === 0 ? (aIsSpecial ? 0 : 9999) : (a.season_number || 1);
+      const sB = b.season_number === 0 ? (bIsSpecial ? 0 : 9999) : (b.season_number || 1);
+      if (sA !== sB) return sA - sB;
+
+      const eA = a.episode_number != null ? a.episode_number : 0;
+      const eB = b.episode_number != null ? b.episode_number : 0;
+      return eA - eB;
+    });
+  };
+
   // Synchronously determine if next episode/issue is cached or if already caught up
   const [initialData] = useState(() => {
     if (!item.tracking_list_id) return { nextEp: null, isCaughtUp: false, initialLoad: false };
@@ -475,7 +513,9 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
     const cachedList = getCachedSeries(`list_${item.tracking_list_id}`);
     if (allEps && Array.isArray(allEps) && allEps.length > 0 && cachedList && Array.isArray(cachedList)) {
       const now = Date.now();
-      const aired = allEps.filter((ep: any) => {
+      const validEps = !isComic ? allEps.filter((ep: any) => !isExtraEpisode(ep)) : allEps;
+      const sortedValidEps = sortEpisodesChronologically(validEps);
+      const aired = sortedValidEps.filter((ep: any) => {
         if (isComic) return true;
         if (ep.airstamp) return new Date(ep.airstamp).getTime() <= now;
         if (ep.airdate || ep.air_date) {
@@ -501,7 +541,9 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
           return (
             t.external_id === `tvm-ep-${cleanTvmId}` ||
             tCleanTvmId === cleanTvmId ||
-            (t.title && t.title.includes(`S${pad(ep.season_number)}E${pad(ep.episode_number)}`))
+            (ep.episode_number != null && t.title && t.title.includes(`S${pad(ep.season_number)}E${pad(ep.episode_number)}`)) ||
+            (ep.episode_number != null && t.title && t.title.includes(`E${pad(ep.episode_number)}`) && (t.section === `Season ${ep.season_number}` || t.title.includes(`S${ep.season_number}`))) ||
+            (ep.name && t.title && t.title.includes(ep.name))
           );
         });
         const airedCounts = aired.map((ep: any) => {
@@ -598,15 +640,9 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
       let targetEp = null;
       let targetCycle = 1;
       if (allEps && Array.isArray(allEps) && allEps.length > 0) {
-        const sortedAllEps = [...allEps].sort((a: any, b: any) => {
-          if (isComic) {
-            const numA = parseFloat(a.issue_number || a.episode_number || '0');
-            const numB = parseFloat(b.issue_number || b.episode_number || '0');
-            if (numA !== numB) return numA - numB;
-            return (a.id || 0) - (b.id || 0);
-          }
-          return a.season_number !== b.season_number ? a.season_number - b.season_number : a.episode_number - b.episode_number;
-        });
+        // Exclude extras completely
+        const validEps = !isComic ? allEps.filter((ep: any) => !isExtraEpisode(ep)) : allEps;
+        const sortedAllEps = sortEpisodesChronologically(validEps);
 
         // Filter only AIRED episodes for active viewing progression
         const airedEps = sortedAllEps.filter(isEpAired);
@@ -628,8 +664,9 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
             return (
               t.external_id === `tvm-ep-${cleanTvmId}` ||
               tCleanTvmId === cleanTvmId ||
-              (t.title && t.title.includes(`S${pad(ep.season_number)}E${pad(ep.episode_number)}`)) ||
-              (t.title && t.title.includes(`E${pad(ep.episode_number)}`) && (t.section === `Season ${ep.season_number}` || t.title.includes(`S${ep.season_number}`)))
+              (ep.episode_number != null && t.title && t.title.includes(`S${pad(ep.season_number)}E${pad(ep.episode_number)}`)) ||
+              (ep.episode_number != null && t.title && t.title.includes(`E${pad(ep.episode_number)}`) && (t.section === `Season ${ep.season_number}` || t.title.includes(`S${ep.season_number}`))) ||
+              (ep.name && t.title && t.title.includes(ep.name))
             );
           });
         };
@@ -680,11 +717,8 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
       } else {
         const hasWatchedAny = currentTracked.some((t: any) => t.is_completed);
         const seriesData = getCachedSeries(`series_${item.external_id}`);
-        const showStatus = (seriesData?.status || '').toLowerCase();
-        const isEnded = showStatus === 'ended' || showStatus === 'finished' || showStatus === 'canceled';
-
         const completedStatus = isComic ? 'read' : 'completed';
-        if (item.status !== completedStatus && hasWatchedAny && (isEnded || !seriesData || isComic)) {
+        if (item.status !== completedStatus && hasWatchedAny) {
           item.status = completedStatus;
           await apiClient.put(`/library/${item.id}`, { status: completedStatus });
           onUpdate();
@@ -715,15 +749,8 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
     let nextCandidate: any = null;
 
     if (allEps && Array.isArray(allEps)) {
-      const sortedAllEps = [...allEps].sort((a: any, b: any) => {
-        if (isComic) {
-          const numA = parseFloat(a.issue_number || a.episode_number || '0');
-          const numB = parseFloat(b.issue_number || b.episode_number || '0');
-          if (numA !== numB) return numA - numB;
-          return (a.id || 0) - (b.id || 0);
-        }
-        return a.season_number !== b.season_number ? a.season_number - b.season_number : a.episode_number - b.episode_number;
-      });
+      const validEps = !isComic ? allEps.filter((ep: any) => !isExtraEpisode(ep)) : allEps;
+      const sortedAllEps = sortEpisodesChronologically(validEps);
       const currentIndex = sortedAllEps.findIndex((ep: any) => ep.id === currentEpToMark.id);
       if (currentIndex !== -1 && currentIndex + 1 < sortedAllEps.length) {
         const candidate = sortedAllEps[currentIndex + 1];
@@ -764,7 +791,8 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
         return (
           t.external_id === `tvm-ep-${cleanTvmId}` ||
           tCleanTvmId === cleanTvmId ||
-          (t.title && t.title.includes(`S${pad(currentEpToMark.season_number)}E${pad(currentEpToMark.episode_number)}`))
+          (currentEpToMark.episode_number != null && t.title && t.title.includes(`S${pad(currentEpToMark.season_number)}E${pad(currentEpToMark.episode_number)}`)) ||
+          (currentEpToMark.name && t.title && t.title.includes(currentEpToMark.name))
         ) && t.is_completed;
       });
       if (isAlreadyCompleted) {
@@ -772,9 +800,12 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
       }
     } catch (err) {}
 
+    const isCurrentSpecial = isSpecialEpisode(currentEpToMark);
     const titleToSend = isComic
       ? (currentEpToMark.title || `${item.title} ${currentEpToMark.name || `#${currentEpToMark.issue_number || 1}`}`)
-      : (currentEpToMark.title || `${item.title} - S${pad(currentEpToMark.season_number)}E${pad(currentEpToMark.episode_number)} - ${currentEpToMark.name || 'Untitled'}`);
+      : isCurrentSpecial
+        ? `${item.title} - ${language === 'es' ? 'Especial' : 'Special'} - ${currentEpToMark.name || 'Untitled'}`
+        : (currentEpToMark.title || `${item.title} - S${pad(currentEpToMark.season_number)}E${pad(currentEpToMark.episode_number)} - ${currentEpToMark.name || 'Untitled'}`);
 
     const imageToSend = isComic
       ? (currentEpToMark.image_url || currentEpToMark.image?.original || currentEpToMark.image?.medium || currentEpToMark.still_path || item.image_url)
@@ -790,8 +821,9 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
       title: titleToSend,
       image_url: imageToSend,
       overview: currentEpToMark.overview,
-      season_number: currentEpToMark.season_number || 1,
-      episode_number: currentEpToMark.episode_number || currentEpToMark.issue_number
+      season_number: currentEpToMark.season_number ?? 1,
+      episode_number: currentEpToMark.episode_number ?? currentEpToMark.issue_number ?? null,
+      is_significant_special: isCurrentSpecial
     }).then(async () => {
       // If the series / comic was in plan_to_watch / plan_to_read, move it to in-progress
       if (item.status === 'plan_to_watch' || item.status === 'plan_to_read') {
@@ -823,6 +855,14 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
   const handleCardClick = () => {
     if (nextEp) {
       if (isComic) {
+        const cleanId = String(nextEp.id).replace('cv_issue_', '');
+        const matchedTracked = trackedEpisodes.find((t: any) => {
+          const tCleanId = String(t.external_id || '').replace('cv_issue_', '');
+          return t.external_id === `cv_issue_${cleanId}` || tCleanId === cleanId || (nextEp.issue_number && t.title && (t.title.includes(`#${nextEp.issue_number}`) || t.episode_number == nextEp.issue_number));
+        });
+        const isCompleted = !!matchedTracked?.is_completed;
+        const completedAt = matchedTracked?.completed_at || null;
+
         onOpenSeries({
           id: nextEp.id,
           rawEpisodeId: nextEp.id,
@@ -838,25 +878,51 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
           image_url: nextEp.image_url || nextEp.image?.original || nextEp.image?.medium || nextEp.still_path || item.image_url,
           custom_notes: JSON.stringify({ description: nextEp.overview || '', release_date: nextEp.air_date || nextEp.cover_date || null }),
           release_date: nextEp.air_date || nextEp.cover_date || null,
-          is_completed: false,
+          is_completed: isCompleted,
+          completed_at: completedAt,
           parent_series: item
         });
       } else {
+        const isNextSpecial = isSpecialEpisode(nextEp);
+        const cleanTvmId = String(nextEp.id).replace('tvm-ep-', '');
+        const matchedTracked = trackedEpisodes.find((t: any) => {
+          const tCleanTvmId = String(t.external_id || '').replace('tvm-ep-', '');
+          return (
+            t.external_id === `tvm-ep-${cleanTvmId}` ||
+            tCleanTvmId === cleanTvmId ||
+            (nextEp.episode_number != null && t.title && t.title.includes(`S${pad(nextEp.season_number)}E${pad(nextEp.episode_number)}`)) ||
+            (nextEp.episode_number != null && t.title && t.title.includes(`E${pad(nextEp.episode_number)}`) && (t.section === `Season ${nextEp.season_number}` || t.title.includes(`S${nextEp.season_number}`))) ||
+            (nextEp.name && t.title && t.title.includes(nextEp.name))
+          );
+        });
+        const isCompleted = !!matchedTracked?.is_completed;
+        const completedAt = matchedTracked?.completed_at || null;
+
+        const modalEpTitle = isNextSpecial
+          ? `${item.title} - ${language === 'es' ? 'Especial' : 'Special'} - ${nextEp.name || 'Untitled'}`
+          : `${item.title} - S${pad(nextEp.season_number)}E${pad(nextEp.episode_number)} - ${nextEp.name || 'Untitled'}`;
+
+        const modalEpName = isNextSpecial
+          ? (nextEp.name || (language === 'es' ? 'Especial' : 'Special'))
+          : (nextEp.name || `Episode ${nextEp.episode_number}`);
+
         onOpenSeries({
           id: nextEp.id,
           rawEpisodeId: nextEp.id,
           list_id: item.tracking_list_id,
           tracking_list_id: item.tracking_list_id,
           item_type: 'episode',
-          title: `${item.title} - S${pad(nextEp.season_number)}E${pad(nextEp.episode_number)} - ${nextEp.name || 'Untitled'}`,
-          episode_name: nextEp.name || `Episode ${nextEp.episode_number}`,
+          title: modalEpTitle,
+          episode_name: modalEpName,
           season_number: nextEp.season_number,
           episode_number: nextEp.episode_number,
+          is_significant_special: isNextSpecial,
           external_id: `tvm-ep-${nextEp.id}`,
           image_url: nextEp.still_path || nextEp.image?.original || nextEp.image?.medium || item.image_url,
           custom_notes: JSON.stringify({ description: nextEp.overview || '', release_date: nextEp.air_date || nextEp.airdate || null }),
           release_date: nextEp.air_date || nextEp.airdate || null,
-          is_completed: false,
+          is_completed: isCompleted,
+          completed_at: completedAt,
           parent_series: item
         });
       }
@@ -884,10 +950,16 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
       seasonText = issueNum ? `#${issueNum}` : (language === 'es' ? 'Número' : 'Issue');
       epName = nextEp.name || (nextEp.issue_number ? `#${nextEp.issue_number}` : (language === 'es' ? 'Número' : 'Issue'));
     } else {
-      const sStr = pad(nextEp.season_number);
-      const eStr = pad(nextEp.episode_number);
-      seasonText = language === 'es' ? `T${sStr} | E${eStr}` : `S${sStr} | E${eStr}`;
-      epName = nextEp.name || (language === 'es' ? 'Episodio' : 'Episode');
+      const isNextSpecial = isSpecialEpisode(nextEp);
+      if (isNextSpecial) {
+        seasonText = language === 'es' ? 'Especial' : 'Special';
+        epName = nextEp.name || (language === 'es' ? 'Especial' : 'Special');
+      } else {
+        const sStr = pad(nextEp.season_number);
+        const eStr = pad(nextEp.episode_number);
+        seasonText = language === 'es' ? `T${sStr} | E${eStr}` : `S${sStr} | E${eStr}`;
+        epName = nextEp.name || (language === 'es' ? 'Episodio' : 'Episode');
+      }
     }
   }
 
@@ -1493,6 +1565,8 @@ export const Home: React.FC = () => {
                 trackedEps = [];
               }
                     const isAiredFn = (ep: any) => {
+                const isExtra = ep.is_extra || ep.ep_type === 'insignificant_special' || (ep.season_number === 0 && !ep.is_significant_special && ep.ep_type !== 'significant_special');
+                if (isExtra) return false;
                 if (ep.airstamp) return new Date(ep.airstamp).getTime() <= nowMs;
                 if (ep.airdate || ep.air_date) {
                   const ad = ep.airdate || ep.air_date;
@@ -1581,7 +1655,7 @@ export const Home: React.FC = () => {
                   item.status = 'watching';
                   return { id: item.id, status: 'watching', futureEps };
                 } catch (e) {}
-              } else if (item.status === 'watching' && hasWatchedAny && !hasUnwatchedInCurrentCycle && minAllCycle > 0 && isEnded) {
+              } else if (item.status === 'watching' && hasWatchedAny && !hasUnwatchedInCurrentCycle && minAllCycle > 0) {
                 try {
                   await apiClient.put(`/library/${item.id}`, { status: 'completed' });
                   item.status = 'completed';
@@ -1684,6 +1758,8 @@ export const Home: React.FC = () => {
           if (i.tracking_list_id) {
             const isAiredCheck = (ep: any) => {
               if (isComic) return true;
+              const isExtra = ep.is_extra || ep.ep_type === 'insignificant_special' || (ep.season_number === 0 && !ep.is_significant_special && ep.ep_type !== 'significant_special');
+              if (isExtra) return false;
               if (ep.airstamp) return new Date(ep.airstamp).getTime() <= nowMs;
               if (ep.airdate || ep.air_date) {
                 const ad = ep.airdate || ep.air_date;
@@ -1705,8 +1781,9 @@ export const Home: React.FC = () => {
                   ? (t.external_id === `cv_issue_${ep.id}` || t.id === ep.id || (ep.issue_number && t.title && t.title.includes(`#${ep.issue_number}`)))
                   : (t.external_id === `tvm-ep-${ep.id}` || 
                      t.id === ep.id || 
-                     (t.title && t.title.includes(`S${pad(ep.season_number)}E${pad(ep.episode_number)}`)) ||
-                     (t.title && t.title.includes(`E${pad(ep.episode_number)}`) && (t.section === `Season ${ep.season_number}` || t.title.includes(`S${ep.season_number}`)))
+                     (ep.episode_number != null && t.title && t.title.includes(`S${pad(ep.season_number)}E${pad(ep.episode_number)}`)) ||
+                     (ep.episode_number != null && t.title && t.title.includes(`E${pad(ep.episode_number)}`) && (t.section === `Season ${ep.season_number}` || t.title.includes(`S${ep.season_number}`))) ||
+                     (ep.name && t.title && t.title.includes(ep.name))
                     )
               );
               const airedCounts = airedEps.map(ep => {
@@ -1779,16 +1856,6 @@ export const Home: React.FC = () => {
       if (i.status === "endless") return false;
       if (!["completed", "read"].includes(i.status)) return false;
       if (i.item_type === "custom") return false;
-
-      // For series and anime in 'completed', ensure the series is actually ended
-      if (i.item_type === "series" || i.item_type === "anime") {
-        const seriesData = getCachedSeries(`series_${i.external_id}`);
-        if (seriesData && seriesData.status) {
-          const showStatus = seriesData.status.toLowerCase();
-          const isEnded = showStatus === 'ended' || showStatus === 'finished' || showStatus === 'canceled';
-          if (!isEnded) return false;
-        }
-      }
 
       return true;
     });

@@ -76,6 +76,52 @@ def auto_migrate_schema():
                     logger.info("Auto-migration: Added column 'is_hundred_percent' to consumption_history table.")
                 except Exception as e:
                     logger.warning(f"Auto-migration: Failed to add column 'is_hundred_percent' to consumption_history: {e}")
+
+        if "media_reviews" in inspector.get_table_names():
+            existing_rev_cols = {col["name"] for col in inspector.get_columns("media_reviews")}
+            if "parent_id" not in existing_rev_cols:
+                try:
+                    with engine.begin() as conn:
+                        conn.execute(text("ALTER TABLE media_reviews ADD COLUMN parent_id INTEGER REFERENCES media_reviews(id) ON DELETE CASCADE;"))
+                    logger.info("Auto-migration: Added column 'parent_id' to media_reviews table.")
+                except Exception as e:
+                    logger.warning(f"Auto-migration: Failed to add column 'parent_id' to media_reviews: {e}")
+            if "is_edited" not in existing_rev_cols:
+                try:
+                    with engine.begin() as conn:
+                        conn.execute(text("ALTER TABLE media_reviews ADD COLUMN is_edited DATETIME;"))
+                    logger.info("Auto-migration: Added column 'is_edited' to media_reviews table.")
+                except Exception as e:
+                    logger.warning(f"Auto-migration: Failed to add column 'is_edited' to media_reviews: {e}")
+            try:
+                with engine.begin() as conn:
+                    table_sql_res = conn.execute(text("SELECT sql FROM sqlite_master WHERE type='table' AND name='media_reviews';")).fetchone()
+                    if table_sql_res and "uq_user_item_review" in table_sql_res[0]:
+                        conn.execute(text("PRAGMA foreign_keys=off;"))
+                        conn.execute(text("""
+                            CREATE TABLE media_reviews_new (
+                                id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                                user_id INTEGER NOT NULL,
+                                item_type VARCHAR(50) NOT NULL,
+                                external_id VARCHAR(100) NOT NULL,
+                                rating INTEGER,
+                                content TEXT,
+                                created_at DATETIME NOT NULL,
+                                parent_id INTEGER REFERENCES media_reviews_new(id) ON DELETE CASCADE,
+                                FOREIGN KEY(user_id) REFERENCES users (id) ON DELETE CASCADE
+                            );
+                        """))
+                        conn.execute(text("""
+                            INSERT INTO media_reviews_new (id, user_id, item_type, external_id, rating, content, created_at, parent_id)
+                            SELECT id, user_id, item_type, external_id, rating, content, created_at, parent_id FROM media_reviews;
+                        """))
+                        conn.execute(text("DROP TABLE media_reviews;"))
+                        conn.execute(text("ALTER TABLE media_reviews_new RENAME TO media_reviews;"))
+                        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_media_reviews_id ON media_reviews (id);"))
+                        conn.execute(text("PRAGMA foreign_keys=on;"))
+                        logger.info("Auto-migration: Rebuilt media_reviews table to drop uq_user_item_review constraint.")
+            except Exception as e:
+                logger.warning(f"Auto-migration: Note on dropping constraint: {e}")
     except Exception as e:
         logger.error(f"Error during schema inspection migration: {e}")
 

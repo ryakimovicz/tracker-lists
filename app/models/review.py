@@ -8,20 +8,19 @@ class MediaReview(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    parent_id = Column(Integer, ForeignKey("media_reviews.id", ondelete="CASCADE"), nullable=True)
     item_type = Column(String(50), nullable=False)  # comic, manga, book, movie, series, game
     external_id = Column(String(100), nullable=False)
     rating = Column(Integer, nullable=True)  # 1 to 5 stars
     content = Column(Text, nullable=True)     # Review commentary text
+    is_edited = Column(DateTime(timezone=True), nullable=True)  # Or boolean / timestamp
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 
     # Relationships
     user = relationship("User", backref="media_reviews")
+    replies = relationship("MediaReview", cascade="all, delete-orphan")
     votes = relationship("MediaReviewVote", back_populates="review", cascade="all, delete-orphan")
     reports = relationship("MediaReviewReport", back_populates="review", cascade="all, delete-orphan")
-
-    __table_args__ = (
-        UniqueConstraint("user_id", "item_type", "external_id", name="uq_user_item_review"),
-    )
 
 class MediaReviewVote(Base):
     __tablename__ = "media_review_votes"

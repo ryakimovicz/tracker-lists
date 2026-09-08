@@ -2266,12 +2266,25 @@ def bulk_toggle_all_seasons(
         if req.completed:
             lib_item.status = completed_val
             lib_item.completed_at = datetime.now(timezone.utc)
-            # Set last seen episode to the last episode in list
-            last_ep = db.query(ListItem).filter(
-                ListItem.list_id == list_id
-            ).order_by(ListItem.id.desc()).first()
-            if last_ep:
-                lib_item.last_seen_episode = last_ep.title
+            # Set last seen episode to the last completed episode in list
+            completed_items = db.query(ListItem.title).join(ItemProgress, ItemProgress.external_id == ListItem.external_id).filter(
+                ListItem.list_id == list_id,
+                ItemProgress.user_id == current_user.id,
+                ItemProgress.is_completed == True
+            ).all()
+            completed_titles = [r[0] for r in completed_items if r[0]]
+            if completed_titles:
+                import re
+                ep_tuples = []
+                for t in completed_titles:
+                    m = re.search(r'S(\d+)E(\d+)', t, re.IGNORECASE)
+                    if m:
+                        ep_tuples.append((int(m.group(1)), int(m.group(2)), t))
+                if ep_tuples:
+                    ep_tuples.sort(key=lambda x: (x[0], x[1]))
+                    lib_item.last_seen_episode = ep_tuples[-1][2]
+                else:
+                    lib_item.last_seen_episode = completed_titles[-1]
         else:
             # Check if all episodes are still completed, or some, or none
             total_eps_count = db.query(ListItem).filter(ListItem.list_id == list_id).count()
@@ -2462,12 +2475,25 @@ def bulk_toggle_episodes(
                 lib_item.status = UserLibraryStatusEnum.WATCHING
                 lib_item.completed_at = None
 
-            # Update last seen episode
-            last_ep = db.query(ListItem).filter(
-                ListItem.list_id == list_id
-            ).order_by(ListItem.id.desc()).first()
-            if last_ep:
-                lib_item.last_seen_episode = last_ep.title
+            # Update last seen episode based on completed episodes
+            completed_items = db.query(ListItem.title).join(ItemProgress, ItemProgress.external_id == ListItem.external_id).filter(
+                ListItem.list_id == list_id,
+                ItemProgress.user_id == current_user.id,
+                ItemProgress.is_completed == True
+            ).all()
+            completed_titles = [r[0] for r in completed_items if r[0]]
+            if completed_titles:
+                import re
+                ep_tuples = []
+                for t in completed_titles:
+                    m = re.search(r'S(\d+)E(\d+)', t, re.IGNORECASE)
+                    if m:
+                        ep_tuples.append((int(m.group(1)), int(m.group(2)), t))
+                if ep_tuples:
+                    ep_tuples.sort(key=lambda x: (x[0], x[1]))
+                    lib_item.last_seen_episode = ep_tuples[-1][2]
+                else:
+                    lib_item.last_seen_episode = completed_titles[-1]
 
         lib_item.updated_at = now_dt
 
