@@ -237,13 +237,13 @@ def get_library_item_consumption_history(
     resolved_type = (item.item_type if item else item_type) or ""
     tracking_list_id = item.tracking_list_id if item else None
 
-    if resolved_type in ("series", "anime") and external_id:
+    if resolved_type in ("series", "anime", "comic") and external_id:
         ep_ext_ids = []
         if tracking_list_id:
             list_items = db.query(ListItem).filter(ListItem.list_id == tracking_list_id).all()
             ep_ext_ids = [it.external_id for it in list_items if it.external_id]
         
-        if not ep_ext_ids:
+        if not ep_ext_ids and resolved_type in ("series", "anime"):
             try:
                 from app.services.tvmaze import TVMazeService
                 tvm_eps = TVMazeService.get_all_episodes(external_id)
@@ -621,8 +621,8 @@ def get_library(
         for ext_id, c in counts:
             counts_map[ext_id] = c
 
-    # For series and anime, query episode consumption counts if tracked to get accurate series completions and last seen episode count
-    series_items = [it for it in items if it.item_type in ("series", "anime") and it.tracking_list_id]
+    # For series, anime, and tracked comic volumes, query episode/issue consumption counts if tracked to get accurate completions and last seen episode/issue count
+    series_items = [it for it in items if it.item_type in ("series", "anime", "comic") and it.tracking_list_id]
     series_times_map = {}
     series_last_ep_count_map = {}
     if series_items:
@@ -648,17 +648,28 @@ def get_library(
                     series_times_map[s_it.external_id] = min_c
 
                 if s_it.last_seen_episode:
-                    # Find matching episode item by title
+                    # Find matching episode / issue item by title
                     import re
-                    m_last = re.search(r'S(\d+)E(\d+)', s_it.last_seen_episode, re.IGNORECASE)
                     matched_eid = None
-                    for le in list_eps:
-                        if m_last and re.search(r'S0?' + str(int(m_last.group(1))) + r'E0?' + str(int(m_last.group(2))) + r'\b', le.title or '', re.IGNORECASE):
-                            matched_eid = le.external_id
-                            break
-                        elif le.title == s_it.last_seen_episode:
-                            matched_eid = le.external_id
-                            break
+                    if s_it.item_type == "comic":
+                        issue_m = re.search(r'#(\d+)', s_it.last_seen_episode)
+                        for le in list_eps:
+                            if issue_m and re.search(r'#' + issue_m.group(1) + r'\b', le.title or ''):
+                                matched_eid = le.external_id
+                                break
+                            elif le.title == s_it.last_seen_episode:
+                                matched_eid = le.external_id
+                                break
+                    else:
+                        m_last = re.search(r'S(\d+)E(\d+)', s_it.last_seen_episode, re.IGNORECASE)
+                        for le in list_eps:
+                            if m_last and re.search(r'S0?' + str(int(m_last.group(1))) + r'E0?' + str(int(m_last.group(2))) + r'\b', le.title or '', re.IGNORECASE):
+                                matched_eid = le.external_id
+                                break
+                            elif le.title == s_it.last_seen_episode:
+                                matched_eid = le.external_id
+                                break
+
                     if matched_eid:
                         series_last_ep_count_map[s_it.id] = max(ep_c_dict.get(matched_eid, 1), 1)
 
@@ -666,13 +677,13 @@ def get_library(
     for it in items:
         # Pydantic will convert from attributes/dict
         c_val = counts_map.get(it.external_id, 0)
-        if it.item_type in ("series", "anime") and it.external_id in series_times_map:
+        if it.item_type in ("series", "anime", "comic") and it.external_id in series_times_map:
             times_c = max(series_times_map[it.external_id], 1 if it.completed_at else 0)
         else:
             # If item has completed_at but no consumption history yet, treat as 1
             times_c = max(c_val, 1 if it.completed_at else 0)
 
-        last_ep_cnt = series_last_ep_count_map.get(it.id, 1) if it.item_type in ("series", "anime") else 1
+        last_ep_cnt = series_last_ep_count_map.get(it.id, 1) if it.item_type in ("series", "anime", "comic") else 1
 
         it_dict = {
             "id": it.id,
