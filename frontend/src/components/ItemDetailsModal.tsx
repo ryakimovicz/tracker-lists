@@ -558,6 +558,9 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       if (statusId === 'dropped' && (selectedItem.item_type === 'series' || selectedItem.item_type === 'anime')) {
         const hasProgress = episodes.some((ep: any) => ep.is_completed) || Object.values(globalProgress).some(Boolean) || !!selectedItem.last_seen_episode;
         newStatus = hasProgress ? 'watching' : getDefaultStatus(selectedItem.item_type);
+      } else if (statusId === 'dropped' && selectedItem.item_type === 'comic') {
+        const hasProgress = episodes.some((ep: any) => ep.is_completed) || Object.values(globalProgress).some(Boolean) || !!selectedItem.last_seen_episode;
+        newStatus = hasProgress ? 'reading' : getDefaultStatus(selectedItem.item_type);
       } else {
         newStatus = getDefaultStatus(selectedItem.item_type);
       }
@@ -3430,7 +3433,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         })();
 
                         return (
-                          <div style={{ width: '100%' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem', width: '100%' }}>
                             <button
                               type="button"
                               onClick={() => {
@@ -3451,23 +3454,42 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                   ? 'none' 
                                   : '1px solid var(--border-color)',
                                 borderRadius: '8px',
-                                padding: '0.65rem 1rem',
+                                padding: '0.6rem 0.5rem',
                                 textAlign: 'center',
                                 cursor: 'pointer',
                                 color: isAllIssuesRead 
                                   ? 'var(--color-text-comic)' 
                                   : 'var(--text-primary)',
-                                fontSize: '0.88rem',
-                                fontWeight: 700,
+                                fontSize: '0.85rem',
+                                fontWeight: 600,
                                 display: 'inline-flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                gap: '0.45rem',
+                                gap: '0.35rem',
                                 transition: 'all 0.2s ease'
                               }}
                             >
                               <Check size={16} strokeWidth={2.8} />
                               <span>{language === 'es' ? 'Todo leído' : 'All Read'}</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleToggleStatus('dropped')}
+                              style={{
+                                width: '100%',
+                                background: selectedItem?.status === 'dropped' ? '#ef4444' : 'var(--bg-tertiary)',
+                                border: selectedItem?.status === 'dropped' ? 'none' : '1px solid var(--border-color)',
+                                borderRadius: '8px',
+                                padding: '0.6rem 0.5rem',
+                                textAlign: 'center',
+                                cursor: 'pointer',
+                                color: selectedItem?.status === 'dropped' ? '#ffffff' : 'var(--text-primary)',
+                                fontSize: '0.85rem',
+                                fontWeight: 600,
+                                transition: 'all 0.2s ease'
+                              }}
+                            >
+                              {language === 'es' ? 'Abandonado' : 'Dropped'}
                             </button>
                           </div>
                         );
