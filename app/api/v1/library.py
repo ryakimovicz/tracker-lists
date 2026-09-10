@@ -226,20 +226,24 @@ def get_library_item_consumption_history(
     
     external_id = item.external_id if item else None
     
-    if not item and item_id.isdigit():
-        # Check if item_id corresponds to a ListItem (e.g. an episode)
-        list_item = db.query(ListItem).filter(ListItem.id == int(item_id)).first()
-        if list_item:
-            external_id = list_item.external_id
-    elif not item and not item_id.isdigit():
-        external_id = item_id
+    if not item:
+        if item_id.isdigit():
+            # Check if item_id corresponds to a ListItem (e.g. an episode)
+            list_item = db.query(ListItem).filter(ListItem.id == int(item_id)).first()
+            if list_item:
+                external_id = list_item.external_id
+            else:
+                external_id = item_id
+        else:
+            external_id = item_id
 
     resolved_type = (item.item_type if item else item_type) or ""
     tracking_list_id = item.tracking_list_id if item else None
 
     is_single_ep_or_issue = (
         str(external_id).startswith("tvm-ep-") or
-        str(external_id).startswith("cv_issue_")
+        str(external_id).startswith("cv_issue_") or
+        item_type == "episode"
     )
 
     if resolved_type in ("series", "anime", "comic") and external_id and not is_single_ep_or_issue:
@@ -316,10 +320,20 @@ def get_library_item_consumption_history(
                 "entries": []
             }
 
+    query_ids = [external_id] if external_id else []
+    if external_id:
+        clean_id = str(external_id).replace("cv_issue_", "").replace("tvm-ep-", "")
+        if f"cv_issue_{clean_id}" not in query_ids:
+            query_ids.append(f"cv_issue_{clean_id}")
+        if f"tvm-ep-{clean_id}" not in query_ids:
+            query_ids.append(f"tvm-ep-{clean_id}")
+        if clean_id not in query_ids:
+            query_ids.append(clean_id)
+
     history = db.query(ConsumptionHistory).filter(
         ConsumptionHistory.user_id == current_user.id,
-        ConsumptionHistory.external_id == external_id
-    ).order_by(ConsumptionHistory.consumed_at.desc()).all()
+        ConsumptionHistory.external_id.in_(query_ids)
+    ).order_by(ConsumptionHistory.consumed_at.desc()).all() if query_ids else []
     
     # If no history records yet, but library item was completed, backfill the original completion date
     if not history and item and item.completed_at:

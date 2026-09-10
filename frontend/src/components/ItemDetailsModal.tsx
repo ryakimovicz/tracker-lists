@@ -230,6 +230,15 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     missingEpisodes: any[];
   } | null>(null);
 
+  // Dialog for comic issue status confirmations & re-read / unmark options
+  const [comicIssuePrompt, setComicIssuePrompt] = useState<{
+    type: 'unmark_reading' | 'unmark_dropped' | 'read_options' | 'read_to_reading';
+    cleanId: string;
+    extId: string;
+    issueNum: number;
+    effectiveListId?: number;
+  } | null>(null);
+
   const getMissingPreviousEpisodesForEp = (ep: any) => {
     const cacheKeyAll = `${selectedItem.external_id}_all_episodes`;
     let allEps = getCachedSeries(cacheKeyAll);
@@ -735,7 +744,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     await handleMarkConsumedAgain(true);
   };
 
-  const isAnySubModalOpen = showReconsumedModal || showSeriesScopeModal || showHundredPercentDecisionModal || showStatusChangeModal || showRemoveShelfModal || showReportMediaModal || !!episodeActionItem || !!seasonActionItem || !!pendingPreviousPrompt;
+  const isAnySubModalOpen = showReconsumedModal || showSeriesScopeModal || showHundredPercentDecisionModal || showStatusChangeModal || showRemoveShelfModal || showReportMediaModal || !!episodeActionItem || !!seasonActionItem || !!pendingPreviousPrompt || !!comicIssuePrompt;
 
   const handleRemoveLatestConsumption = async () => {
     if (!selectedItem || !selectedItem.id) return;
@@ -949,6 +958,76 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
         (item.external_id && (item.external_id.startsWith('tvm-ep-') || item.external_id.startsWith('cv_issue_'))) ||
         item.item_type === 'episode'
       );
+      const isComicIssueInit = item.item_type === 'comic' && (isActualEpisode || (item.external_id && item.external_id.startsWith('cv_issue_')) || item.issue_number != null);
+
+      if (isComicIssueInit && item.external_id) {
+        const cleanId = String(item.external_id).replace('cv_issue_', '').replace('cv_', '');
+        const extId = `cv_issue_${cleanId}`;
+        const effectiveTrackingListId = item.tracking_list_id || item.list_id || item.parent_series?.tracking_list_id;
+
+        // 1. Check local list cache for completion
+        let isReadFromList = Boolean(item.is_completed || item.completed_at || globalProgress[extId]);
+        if (!isReadFromList && effectiveTrackingListId) {
+          const cachedList = getCachedSeries(`list_${effectiveTrackingListId}`);
+          if (Array.isArray(cachedList)) {
+            const found = cachedList.find((it: any) => {
+              const cId = String(it.external_id || '').replace('cv_issue_', '').replace('cv_', '');
+              return (cId === cleanId || it.external_id === extId) && it.is_completed;
+            });
+            if (found) isReadFromList = true;
+          }
+        }
+
+        const cachedIssueState = getCachedSeries(`issue_state_cv_issue_${cleanId}`) || getCachedSeries(`issue_state_${extId}`);
+
+        if (isReadFromList || (cachedIssueState && cachedIssueState.status === 'read')) {
+          item = {
+            ...item,
+            status: 'read',
+            is_completed: true,
+            pages_read: item.total_pages || item.page_count || cachedIssueState?.pages_read || item.pages_read || 0,
+            total_pages: cachedIssueState?.total_pages !== undefined ? cachedIssueState.total_pages : (item.total_pages || item.page_count)
+          };
+          setPagesReadVal(item.pages_read || 0);
+          setTotalPagesVal(item.total_pages || item.page_count || '');
+          setSelectedItem(item);
+        } else if (cachedIssueState) {
+          item = {
+            ...item,
+            status: cachedIssueState.status || item.status,
+            pages_read: cachedIssueState.pages_read !== undefined ? cachedIssueState.pages_read : item.pages_read,
+            total_pages: cachedIssueState.total_pages !== undefined ? cachedIssueState.total_pages : (item.total_pages || item.page_count)
+          };
+          setPagesReadVal(item.pages_read || 0);
+          setTotalPagesVal(item.total_pages || item.page_count || '');
+          setSelectedItem(item);
+        }
+
+        // 2. Perform quick bulk-check for this issue in background to verify read status with backend
+        apiClient.post('/users/me/progress/bulk-check', { external_ids: [extId] })
+          .then(res => {
+            if (res.data && res.data[extId]) {
+              setGlobalProgress(prev => ({ ...prev, [extId]: true }));
+              setSelectedItem((prev: any) => prev ? {
+                ...prev,
+                status: 'read',
+                is_completed: true,
+                pages_read: prev.total_pages || prev.page_count || prev.pages_read
+              } : null);
+              setCachedSeries(`issue_state_${extId}`, {
+                status: 'read',
+                pages_read: item.total_pages || item.page_count || 0,
+                total_pages: item.total_pages || item.page_count
+              });
+              setCachedSeries(`issue_state_cv_issue_${cleanId}`, {
+                status: 'read',
+                pages_read: item.total_pages || item.page_count || 0,
+                total_pages: item.total_pages || item.page_count
+              });
+            }
+          })
+          .catch(() => {});
+      }
 
         const processAllEps = (allEps: any[]) => {
           const isComic = item.item_type === 'comic';
@@ -1049,10 +1128,26 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
           }).catch(() => {});
         }
 
-        if (user && incomingItem.external_id && !isActualEpisode) {
+        if (user && incomingItem.external_id) {
           apiClient.get('/library/').then(myLibRes => {
             const myLib = myLibRes.data || [];
-            const myMatch = myLib.find((li: any) => li.external_id === incomingItem.external_id && (li.item_type === incomingItem.item_type || (['series', 'anime'].includes(li.item_type) && ['series', 'anime'].includes(incomingItem.item_type))));
+            
+            // Clean up any rogue standalone comic issue rows from database in background
+            const rogueIssues = myLib.filter((li: any) => String(li.external_id || '').startsWith('cv_issue_'));
+            rogueIssues.forEach((li: any) => {
+              apiClient.delete(`/library/${li.id}`).catch(() => {});
+            });
+
+            if (isComicIssueInit) {
+              return; // Comic issues are tracked as items in volume lists, not standalone library items
+            }
+
+            const cleanIncomingId = String(incomingItem.external_id || '').replace('cv_issue_', '').replace('cv_', '');
+            const myMatch = myLib.find((li: any) => {
+              const cleanLiId = String(li.external_id || '').replace('cv_issue_', '').replace('cv_', '');
+              return (li.external_id === incomingItem.external_id || cleanLiId === cleanIncomingId) &&
+                     (li.item_type === incomingItem.item_type || (['series', 'anime'].includes(li.item_type) && ['series', 'anime'].includes(incomingItem.item_type)));
+            });
             if (myMatch) {
               setSelectedItem((prev: any) => prev ? {
                 ...prev,
@@ -1064,6 +1159,13 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                 tracking_list_id: myMatch.tracking_list_id,
                 is_favorite: myMatch.is_favorite
               } : null);
+
+              if (myMatch.pages_read !== undefined && myMatch.pages_read !== null) {
+                setPagesReadVal(myMatch.pages_read);
+              }
+              if (myMatch.total_pages) {
+                setTotalPagesVal(myMatch.total_pages);
+              }
 
               if (myMatch.tracking_list_id && myMatch.tracking_list_id !== effectiveTrackingListId) {
                 apiClient.get(`/lists/${myMatch.tracking_list_id}`).then(listRes => {
@@ -1174,16 +1276,21 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
         }
 
         // Comic Issue individual loading (enrich parent series information if missing)
-        const isComicIssue = item.item_type === 'comic' && (isActualEpisode || (item.external_id && item.external_id.startsWith('cv_issue_')));
-        if (isComicIssue && !item.parent_series && item.external_id) {
+        const isComicIssueFetch = item.item_type === 'comic' && (isActualEpisode || (item.external_id && item.external_id.startsWith('cv_issue_')));
+        if (isComicIssueFetch && item.external_id) {
           apiClient.get(`/search/comic/issue/${item.external_id}`).then(res => {
             if (res.data) {
               setSelectedItem((prev: any) => prev ? {
                 ...prev,
                 parent_series: res.data.parent_series || prev.parent_series,
                 overview: res.data.overview || prev.overview,
-                description: res.data.description || prev.description
+                description: res.data.description || prev.description,
+                page_count: res.data.page_count || prev.page_count,
+                total_pages: res.data.page_count || res.data.total_pages || prev.total_pages
               } : null);
+              if (res.data.page_count) {
+                setTotalPagesVal((prev: any) => (prev !== '' && prev !== 0) ? prev : res.data.page_count);
+              }
             }
           }).catch(console.error);
         }
@@ -1308,9 +1415,11 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       }
 
       // Fetch consumption history if user is Pro
-      const historyTargetKey = item.id || item.external_id || (isActualEpisode ? item.rawEpisodeId : null);
+      const historyTargetKey = isComicIssueInit
+        ? (item.external_id ? `cv_issue_${String(item.external_id).replace('cv_issue_', '').replace('cv_', '')}` : item.id)
+        : (item.id || item.external_id || (isActualEpisode ? item.rawEpisodeId : null));
       if (historyTargetKey && user?.is_pro) {
-        const itemTypeParam = item.item_type ? `?item_type=${item.item_type}` : '';
+        const itemTypeParam = isComicIssueInit ? '?item_type=episode' : (item.item_type ? `?item_type=${item.item_type}` : '');
         apiClient.get(`/library/${historyTargetKey}/consumption-history${itemTypeParam}`)
           .then(hRes => {
             if (hRes.data) {
@@ -1476,7 +1585,12 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     selectedItem?.item_type === 'episode' ||
     (selectedItem?.item_type !== 'comic' && selectedItem?.list_id)
   );
+  const isComicIssue = Boolean(
+    (selectedItem?.item_type === 'comic' || selectedItem?.parent_series?.item_type === 'comic' || String(selectedItem?.external_id || '').startsWith('cv_issue_')) &&
+    (isEpisode || selectedItem?.item_type === 'episode' || String(selectedItem?.external_id || '').startsWith('cv_issue_') || selectedItem?.issue_number != null || selectedItem?.badge === 'issue')
+  );
   const isEpisodeCompleted = Boolean(isEpisode && (
+    selectedItem?.status === 'read' ||
     selectedItem?.completed_at || 
     selectedItem?.is_completed || 
     (selectedItem?.id && (
@@ -1485,7 +1599,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       globalProgress[selectedItem.external_id]
     ))
   ));
-  const isItemTracked = isEpisode ? isEpisodeCompleted : Boolean(selectedItem?.id && selectedItem?.status);
+  const isItemTracked = isEpisode ? (isComicIssue ? Boolean(selectedItem?.status || isEpisodeCompleted) : isEpisodeCompleted) : Boolean(selectedItem?.id && selectedItem?.status);
 
   const handleSaveRating = async (ratingVal: number) => {
     if (!selectedItem || !selectedItem.external_id || !isItemTracked) return;
@@ -1881,8 +1995,327 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     }
   };
 
+  const handleUnmarkComicIssue = async () => {
+    if (!comicIssuePrompt) return;
+    const { cleanId, extId, effectiveListId, issueNum } = comicIssuePrompt;
+    setComicIssuePrompt(null);
+
+    let stillCompleted = false;
+    let newCompletedAt: string | null = null;
+
+    if (effectiveListId) {
+      try {
+        const res = await apiClient.post(`/lists/${effectiveListId}/toggle-series-episode?action=remove`, {
+          episode_id: extId,
+          title: selectedItem?.title || `Issue #${issueNum}`,
+          image_url: selectedItem?.image_url,
+          overview: selectedItem?.overview || selectedItem?.custom_notes || '',
+          season_number: 1,
+          episode_number: issueNum
+        });
+        stillCompleted = Boolean(res.data?.is_completed);
+        newCompletedAt = res.data?.completed_at || null;
+      } catch (e) {
+        console.error("Failed to unmark issue from tracking list", e);
+      }
+    }
+
+    const totalP = totalPagesVal !== '' ? totalPagesVal : (selectedItem?.total_pages || selectedItem?.page_count || 0);
+
+    if (stillCompleted) {
+      const readState = {
+        status: 'read',
+        pages_read: totalP,
+        total_pages: totalP || null
+      };
+      setCachedSeries(`issue_state_${extId}`, readState);
+      setCachedSeries(`issue_state_cv_issue_${cleanId}`, readState);
+      setGlobalProgress(prev => ({ ...prev, [extId]: true }));
+      setSelectedItem((prev: any) => prev ? {
+        ...prev,
+        status: 'read',
+        is_completed: true,
+        completed_at: newCompletedAt || prev.completed_at,
+        pages_read: totalP
+      } : null);
+      setPagesReadVal(totalP);
+    } else {
+      const emptyState = {
+        status: '',
+        pages_read: 0,
+        total_pages: totalP || null
+      };
+      setCachedSeries(`issue_state_${extId}`, emptyState);
+      setCachedSeries(`issue_state_cv_issue_${cleanId}`, emptyState);
+      setGlobalProgress(prev => ({ ...prev, [extId]: false }));
+      setSelectedItem((prev: any) => prev ? {
+        ...prev,
+        status: '',
+        is_completed: false,
+        completed_at: null,
+        pages_read: 0
+      } : null);
+      setPagesReadVal(0);
+    }
+
+    // Refresh consumption history
+    const targetHistoryKey = extId || cleanId || selectedItem?.external_id || selectedItem?.id;
+    if (targetHistoryKey && user?.is_pro) {
+      try {
+        const hRes = await apiClient.get(`/library/${targetHistoryKey}/consumption-history?item_type=episode`);
+        if (hRes.data) {
+          setConsumptionHistory(hRes.data.history || []);
+          setConsumptionEntries(hRes.data.entries || []);
+        }
+      } catch (e) {
+        console.error("Failed to refresh consumption history", e);
+      }
+    } else {
+      setConsumptionHistory([]);
+      setConsumptionEntries([]);
+    }
+
+    window.dispatchEvent(new Event('library-updated'));
+    onUpdate && onUpdate();
+  };
+
+  const handleComicIssueReadToReading = async (keepHistory: boolean) => {
+    if (!comicIssuePrompt) return;
+    const { cleanId, extId, effectiveListId, issueNum } = comicIssuePrompt;
+    setComicIssuePrompt(null);
+
+    if (!keepHistory && effectiveListId) {
+      try {
+        await apiClient.post(`/lists/${effectiveListId}/toggle-series-episode?action=remove`, {
+          episode_id: extId,
+          title: selectedItem?.title || `Issue #${issueNum}`,
+          image_url: selectedItem?.image_url,
+          overview: selectedItem?.overview || selectedItem?.custom_notes || '',
+          season_number: 1,
+          episode_number: issueNum
+        });
+      } catch (e) {
+        console.error("Failed to remove previous completion", e);
+      }
+    }
+
+    setGlobalProgress(prev => ({ ...prev, [extId]: false }));
+
+    const stateToSave = {
+      status: 'reading',
+      pages_read: 0,
+      total_pages: totalPagesVal !== '' ? totalPagesVal : (selectedItem?.total_pages || selectedItem?.page_count || null)
+    };
+    setCachedSeries(`issue_state_${extId}`, stateToSave);
+    setCachedSeries(`issue_state_cv_issue_${cleanId}`, stateToSave);
+
+    setSelectedItem((prev: any) => prev ? {
+      ...prev,
+      status: 'reading',
+      is_completed: false,
+      completed_at: null,
+      pages_read: 0
+    } : null);
+    setPagesReadVal(0);
+
+    // Refresh consumption history
+    const targetHistoryKey = extId || cleanId || selectedItem?.external_id || selectedItem?.id;
+    if (targetHistoryKey && user?.is_pro) {
+      try {
+        const hRes = await apiClient.get(`/library/${targetHistoryKey}/consumption-history?item_type=episode`);
+        if (hRes.data) {
+          setConsumptionHistory(hRes.data.history || []);
+          setConsumptionEntries(hRes.data.entries || []);
+        }
+      } catch (e) {
+        console.error("Failed to refresh consumption history", e);
+      }
+    }
+
+    window.dispatchEvent(new Event('library-updated'));
+    onUpdate && onUpdate();
+  };
+
+  const handleToggleComicIssueStatus = async (newStatus: 'read' | 'reading' | 'dropped', bypassPrompt = false) => {
+    if (!selectedItem) return;
+
+    const cleanId = String(selectedItem.external_id || selectedItem.id || '').replace('cv_issue_', '').replace('cv_', '');
+    const extId = `cv_issue_${cleanId}`;
+    const issueNum = selectedItem.episode_number ?? selectedItem.issue_number ?? (cleanId.match(/\d+$/)?.[0] ? parseInt(cleanId.match(/\d+$/)![0]) : 1);
+    const effectiveListId = selectedItem.list_id || selectedItem.tracking_list_id || selectedItem.parent_series?.tracking_list_id;
+
+    if (!bypassPrompt) {
+      // 1. If currently 'reading' and clicks 'reading' -> confirm unmark
+      if (newStatus === 'reading' && selectedItem.status === 'reading' && !isEpisodeCompleted) {
+        setComicIssuePrompt({ type: 'unmark_reading', cleanId, extId, issueNum, effectiveListId });
+        return;
+      }
+      // 2. If currently 'dropped' and clicks 'dropped' -> confirm unmark
+      if (newStatus === 'dropped' && selectedItem.status === 'dropped' && !isEpisodeCompleted) {
+        setComicIssuePrompt({ type: 'unmark_dropped', cleanId, extId, issueNum, effectiveListId });
+        return;
+      }
+      // 3. If currently 'read' and clicks 'read' -> options (re-read or unmark)
+      if (newStatus === 'read' && (selectedItem.status === 'read' || isEpisodeCompleted)) {
+        setComicIssuePrompt({ type: 'read_options', cleanId, extId, issueNum, effectiveListId });
+        return;
+      }
+      // 4. If currently 'read' and clicks 'reading' -> options (new reading or replace/edit)
+      if (newStatus === 'reading' && (selectedItem.status === 'read' || isEpisodeCompleted)) {
+        setComicIssuePrompt({ type: 'read_to_reading', cleanId, extId, issueNum, effectiveListId });
+        return;
+      }
+    }
+
+    // 1. Resolve parent volume
+    let parentVol = selectedItem.parent_series;
+    if (!parentVol && selectedItem.external_id) {
+      try {
+        const issueRes = await apiClient.get(`/search/comic/issue/${selectedItem.external_id}`);
+        if (issueRes.data?.parent_series) {
+          parentVol = issueRes.data.parent_series;
+          setSelectedItem((prev: any) => ({ ...prev, parent_series: parentVol }));
+        }
+      } catch (e) {
+        console.error("Failed to fetch comic issue parent volume", e);
+      }
+    }
+
+    // 2. Add or update parent volume in user's library
+    let parentLibItem: any = null;
+    if (parentVol && parentVol.external_id) {
+      try {
+        const volumeTargetStatus = newStatus === 'dropped' ? 'dropped' : 'reading';
+        
+        const volPostRes = await apiClient.post('/library/', {
+          external_id: parentVol.external_id,
+          title: parentVol.title,
+          image_url: parentVol.image_url,
+          description: parentVol.description || '',
+          item_type: 'comic',
+          release_date: parentVol.release_date || null,
+          status: volumeTargetStatus
+        });
+        parentLibItem = volPostRes.data;
+
+        if (parentLibItem && parentLibItem.id) {
+          if (newStatus === 'dropped' && parentLibItem.status !== 'dropped') {
+            await apiClient.put(`/library/${parentLibItem.id}`, { status: 'dropped' });
+            parentLibItem.status = 'dropped';
+          } else if ((newStatus === 'reading' || newStatus === 'read') && (parentLibItem.status === 'plan_to_read' || parentLibItem.status === 'dropped' || parentLibItem.status === 'untracked')) {
+            await apiClient.put(`/library/${parentLibItem.id}`, { status: 'reading' });
+            parentLibItem.status = 'reading';
+          }
+        }
+
+        if (parentLibItem && !parentLibItem.tracking_list_id) {
+          try {
+            const trackRes = await apiClient.post(`/library/${parentLibItem.id}/ensure-tracking`);
+            if (trackRes.data?.tracking_list_id) {
+              parentLibItem.tracking_list_id = trackRes.data.tracking_list_id;
+            }
+          } catch (tErr) {
+            console.error("Failed to ensure tracking list for volume", tErr);
+          }
+        }
+      } catch (vErr) {
+        console.error("Failed to add/update parent volume in library", vErr);
+      }
+    }
+
+    // 3. Update Issue in Tracking List
+    const targetListId = effectiveListId || parentLibItem?.tracking_list_id;
+
+    if (targetListId) {
+      try {
+        if (newStatus === 'read') {
+          await apiClient.post(`/lists/${targetListId}/toggle-series-episode?action=mark_again`, {
+            episode_id: extId,
+            title: selectedItem.title || `Issue #${issueNum}`,
+            image_url: selectedItem.image_url,
+            overview: selectedItem.overview || selectedItem.custom_notes || '',
+            season_number: 1,
+            episode_number: issueNum
+          });
+          setGlobalProgress(prev => ({ ...prev, [extId]: true }));
+        } else if (newStatus === 'reading' || newStatus === 'dropped') {
+          const isComplete = Boolean(selectedItem.completed_at || selectedItem.is_completed || globalProgress[extId]);
+          if (isComplete) {
+            await apiClient.post(`/lists/${targetListId}/toggle-series-episode?action=remove`, {
+              episode_id: extId,
+              title: selectedItem.title || `Issue #${issueNum}`,
+              image_url: selectedItem.image_url,
+              overview: selectedItem.overview || selectedItem.custom_notes || '',
+              season_number: 1,
+              episode_number: issueNum
+            });
+          }
+          setGlobalProgress(prev => ({ ...prev, [extId]: false }));
+        }
+      } catch (tErr) {
+        console.error("Failed to update issue in tracking list", tErr);
+      }
+    }
+
+    // 4. Update cache
+    const updatedPagesRead = newStatus === 'read' ? (totalPagesVal || selectedItem.total_pages || selectedItem.page_count || 0) : (pagesReadVal || 0);
+
+    const stateToSave = {
+      status: newStatus,
+      pages_read: updatedPagesRead,
+      total_pages: totalPagesVal !== '' ? totalPagesVal : (selectedItem.total_pages || selectedItem.page_count || null)
+    };
+    setCachedSeries(`issue_state_${extId}`, stateToSave);
+    setCachedSeries(`issue_state_cv_issue_${cleanId}`, stateToSave);
+
+    // 5. Update local selectedItem state
+    if (newStatus === 'read') {
+      const finalPages = totalPagesVal || selectedItem.total_pages || selectedItem.page_count || 0;
+      setPagesReadVal(finalPages);
+    }
+
+    setSelectedItem((prev: any) => ({
+      ...prev,
+      status: newStatus,
+      is_completed: newStatus === 'read',
+      completed_at: newStatus === 'read' ? (prev?.completed_at || new Date().toISOString()) : null,
+      pages_read: updatedPagesRead,
+      parent_series: parentVol ? { ...parentVol, status: newStatus === 'dropped' ? 'dropped' : (parentLibItem?.status || 'reading') } : prev?.parent_series
+    }));
+
+    const targetHistoryKey = extId || cleanId || selectedItem.external_id || selectedItem.id;
+    if (targetHistoryKey && user?.is_pro) {
+      apiClient.get(`/library/${targetHistoryKey}/consumption-history?item_type=episode`)
+        .then(hRes => {
+          if (hRes.data) {
+            if (hRes.data.history) setConsumptionHistory(hRes.data.history);
+            if (hRes.data.entries) setConsumptionEntries(hRes.data.entries);
+          }
+        })
+        .catch(console.error);
+    }
+
+    window.dispatchEvent(new Event('library-updated'));
+    onUpdate && onUpdate();
+  };
+
   const handleSavePagesRead = async (pages: number) => {
     if (!selectedItem) return;
+    const cleanId = String(selectedItem.external_id || selectedItem.id || '').replace('cv_issue_', '').replace('cv_', '');
+    const extId = `cv_issue_${cleanId}`;
+
+    if (isComicIssue) {
+      const stateToSave = {
+        status: selectedItem.status || 'reading',
+        pages_read: pages,
+        total_pages: totalPagesVal !== '' ? totalPagesVal : (selectedItem.total_pages || selectedItem.page_count || null)
+      };
+      setCachedSeries(`issue_state_${extId}`, stateToSave);
+      setCachedSeries(`issue_state_cv_issue_${cleanId}`, stateToSave);
+      setSelectedItem((prev: any) => prev ? { ...prev, pages_read: pages } : null);
+      return;
+    }
+
     if (selectedItem.id) {
       try {
         await apiClient.put(`/library/${selectedItem.id}`, { pages_read: pages });
@@ -1891,6 +2324,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       } catch (err) {
         console.error("Failed to save pages read", err);
       }
+    } else {
+      setSelectedItem((prev: any) => prev ? { ...prev, pages_read: pages } : null);
     }
   };
 
@@ -1935,11 +2370,23 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       effectiveListId = typeof tracked === 'number' ? tracked : tracked.tracking_list_id;
     }
 
+    const isComic = selectedItem?.item_type === 'comic' || String(selectedItem?.external_id || '').startsWith('cv_vol_');
+
     if (episodesToMark.length > 0) {
       const newProg: Record<string, boolean> = {};
       episodesToMark.forEach((ep: any) => {
-        const idKey = String(ep.id).startsWith('cv_') ? ep.id : `tvm-ep-${ep.id}`;
+        const idKey = isComic ? (String(ep.id).startsWith('cv_') ? ep.id : `cv_issue_${ep.id}`) : (String(ep.id).startsWith('tvm-ep-') ? ep.id : `tvm-ep-${ep.id}`);
         newProg[idKey] = true;
+        if (isComic) {
+          const cleanEpId = String(ep.id).replace('cv_issue_', '').replace('cv_', '');
+          const issueState = {
+            status: 'read',
+            pages_read: ep.page_count || ep.total_pages || 0,
+            total_pages: ep.page_count || ep.total_pages || 0
+          };
+          setCachedSeries(`issue_state_cv_issue_${cleanEpId}`, issueState);
+          setCachedSeries(`issue_state_cv_issue_${ep.id}`, issueState);
+        }
       });
       setGlobalProgress(prev => ({ ...prev, ...newProg }));
     }
@@ -2014,6 +2461,17 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
       const targetKeyProg = isComic ? (String(ep.id).startsWith('cv_') ? ep.id : `cv_issue_${ep.id}`) : `tvm-ep-${ep.id}`;
       setGlobalProgress(prev => ({ ...prev, [targetKeyProg]: !!res.data.is_completed }));
+
+      if (isComic) {
+        const cleanEpId = String(ep.id).replace('cv_issue_', '').replace('cv_', '');
+        const issueState = {
+          status: res.data.is_completed ? 'read' : 'reading',
+          pages_read: res.data.is_completed ? (ep.page_count || ep.total_pages || 0) : 0,
+          total_pages: ep.page_count || ep.total_pages || 0
+        };
+        setCachedSeries(`issue_state_cv_issue_${cleanEpId}`, issueState);
+        setCachedSeries(`issue_state_cv_issue_${ep.id}`, issueState);
+      }
 
       if (isTargetEpisode) {
         setSelectedItem((prev: any) => prev ? { ...prev, completed_at: res.data.completed_at, is_completed: res.data.is_completed } : null);
@@ -2491,7 +2949,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                   )}
 
                   {/* Completion Tick Button for Episodes (Top Right) */}
-                  {user && isEpisode && (
+                  {user && isEpisode && !isComicIssue && (
                     <div style={{ position: 'relative' }}>
                       <button
                         type="button"
@@ -2857,10 +3315,10 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
                   {/* Favorite toggler moved to 3-dots menu */}
 
-                  {/* Modern & Comfortable Pages Read Picker for books and mangas */}
-                  {!isEpisode && selectedItem && ['book', 'manga'].includes(selectedItem.item_type) && (() => {
-                    const isRead = selectedItem.status === 'read';
-                    const isReadingOrDropped = ['reading', 'dropped'].includes(selectedItem.status);
+                  {/* Modern & Comfortable Pages Read Picker for books, mangas and comic issues */}
+                  {((!isEpisode && selectedItem && ['book', 'manga'].includes(selectedItem.item_type)) || isComicIssue) && (() => {
+                    const isRead = selectedItem.status === 'read' || (isComicIssue && isEpisodeCompleted);
+                    const isReadingOrDropped = ['reading', 'dropped'].includes(selectedItem.status) || (isComicIssue && !isRead && selectedItem.status);
 
                     if (!isRead && !isReadingOrDropped) {
                       return null;
@@ -2877,10 +3335,18 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         if (finalPages >= maxPages) {
                           finalPages = maxPages;
                           if (selectedItem.status !== 'read') {
-                            handleToggleStatus('read');
+                            if (isComicIssue) {
+                              handleToggleComicIssueStatus('read');
+                            } else {
+                              handleToggleStatus('read');
+                            }
                           }
                         } else if (selectedItem.status === 'read') {
-                          handleToggleStatus('reading');
+                          if (isComicIssue) {
+                            handleToggleComicIssueStatus('reading');
+                          } else {
+                            handleToggleStatus('reading');
+                          }
                         }
                       }
                       setPagesReadVal(finalPages);
@@ -2890,11 +3356,24 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                     const handleTotalPagesBlur = () => {
                       const finalTotal = (totalPagesVal === '' || totalPagesVal === 0) ? null : totalPagesVal;
                       setTotalPagesVal(totalPagesVal);
-                      if (selectedItem.id) {
+                      const cleanId = String(selectedItem?.external_id || selectedItem?.id || '').replace('cv_issue_', '').replace('cv_', '');
+                      const extId = `cv_issue_${cleanId}`;
+
+                      if (isComicIssue) {
+                        setCachedSeries(`issue_state_${extId}`, {
+                          status: selectedItem?.status || 'reading',
+                          pages_read: pagesReadVal || 0,
+                          total_pages: finalTotal
+                        });
+                      }
+
+                      if (selectedItem?.id) {
                         apiClient.put(`/library/${selectedItem.id}`, { total_pages: finalTotal }).then(() => {
                           setSelectedItem((prev: any) => prev ? { ...prev, total_pages: finalTotal } : null);
                           onUpdate && onUpdate();
                         });
+                      } else if (isComicIssue) {
+                        setSelectedItem((prev: any) => prev ? { ...prev, total_pages: finalTotal, page_count: finalTotal } : null);
                       }
                     };
 
@@ -3295,7 +3774,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
 
                   {/* Completion / Status Buttons */}
-                  {user && !isEpisode && !isCosmeticDlc && (
+                  {user && (!isEpisode || isComicIssue) && !isCosmeticDlc && (
                     <div style={{ marginTop: '0.75rem' }}>
                       {selectedItem?.item_type === 'game' ? (
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.4rem' }}>
@@ -3409,6 +3888,73 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                               cursor: 'pointer',
                               color: selectedItem?.status === 'dropped' ? '#ffffff' : 'var(--text-primary)',
                               fontSize: '0.75rem',
+                              fontWeight: 600,
+                              transition: 'all 0.2s ease'
+                            }}
+                          >
+                            {language === 'es' ? 'Abandonado' : 'Dropped'}
+                          </button>
+                        </div>
+                      ) : isComicIssue ? (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleComicIssueStatus('read')}
+                            style={{
+                              width: '100%',
+                              background: (selectedItem?.status === 'read' || isEpisodeCompleted) ? 'var(--color-comic)' : 'var(--bg-tertiary)',
+                              border: (selectedItem?.status === 'read' || isEpisodeCompleted) ? 'none' : '1px solid var(--border-color)',
+                              borderRadius: '8px',
+                              padding: '0.6rem 0.5rem',
+                              textAlign: 'center',
+                              cursor: 'pointer',
+                              color: (selectedItem?.status === 'read' || isEpisodeCompleted) ? 'var(--color-text-comic)' : 'var(--text-primary)',
+                              fontSize: '0.85rem',
+                              fontWeight: 600,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '0.35rem',
+                              transition: 'all 0.2s ease'
+                            }}
+                          >
+                            <Check size={14} strokeWidth={2.5} />
+                            <span>{language === 'es' ? 'Leído' : 'Read'}</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleToggleComicIssueStatus('reading')}
+                            style={{
+                              width: '100%',
+                              background: (selectedItem?.status === 'reading' && !isEpisodeCompleted) ? 'var(--color-comic)' : 'var(--bg-tertiary)',
+                              border: (selectedItem?.status === 'reading' && !isEpisodeCompleted) ? 'none' : '1px solid var(--border-color)',
+                              borderRadius: '8px',
+                              padding: '0.6rem 0.5rem',
+                              textAlign: 'center',
+                              cursor: 'pointer',
+                              color: (selectedItem?.status === 'reading' && !isEpisodeCompleted) ? 'var(--color-text-comic)' : 'var(--text-primary)',
+                              fontSize: '0.85rem',
+                              fontWeight: 600,
+                              transition: 'all 0.2s ease'
+                            }}
+                          >
+                            {language === 'es' ? 'Leyendo' : 'Reading'}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleToggleComicIssueStatus('dropped')}
+                            style={{
+                              width: '100%',
+                              background: selectedItem?.status === 'dropped' ? '#ef4444' : 'var(--bg-tertiary)',
+                              border: selectedItem?.status === 'dropped' ? 'none' : '1px solid var(--border-color)',
+                              borderRadius: '8px',
+                              padding: '0.6rem 0.5rem',
+                              textAlign: 'center',
+                              cursor: 'pointer',
+                              color: selectedItem?.status === 'dropped' ? '#ffffff' : 'var(--text-primary)',
+                              fontSize: '0.85rem',
                               fontWeight: 600,
                               transition: 'all 0.2s ease'
                             }}
@@ -3702,7 +4248,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                   )}
 
                   {/* PRO Consumption History for Single Items (Movies, Games, Books, Comic Issues, Manga Volumes) */}
-                  {user?.is_pro && (!['series', 'anime', 'comic'].includes(selectedItem?.item_type) || isEpisode) && consumptionHistory.length > 1 && (
+                  {user?.is_pro && (!['series', 'anime', 'comic'].includes(selectedItem?.item_type) || isEpisode || isComicIssue) && consumptionHistory.length > 1 && (
                     <div style={{
                       marginTop: '0.75rem',
                       padding: '0.65rem 0.85rem',
@@ -7103,6 +7649,228 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                     <button
                       type="button"
                       onClick={() => setPendingPreviousPrompt(null)}
+                      style={{
+                        padding: '0.55rem',
+                        borderRadius: '6px',
+                        background: 'transparent',
+                        border: 'none',
+                        color: 'var(--text-secondary)',
+                        fontSize: '0.85rem',
+                        cursor: 'pointer',
+                        fontWeight: 500
+                      }}
+                    >
+                      {language === 'es' ? 'Cancelar' : 'Cancel'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Floating Modal 7: Comic Issue Options / Decision Dialog */}
+              {comicIssuePrompt && (
+                <div
+                  style={{
+                    position: 'fixed',
+                    inset: 0,
+                    zIndex: 9999,
+                    background: 'rgba(0, 0, 0, 0.65)',
+                    backdropFilter: 'blur(4px)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '1rem'
+                  }}
+                  onClick={() => setComicIssuePrompt(null)}
+                >
+                  <div
+                    className="glass-card"
+                    style={{
+                      width: '100%',
+                      maxWidth: '400px',
+                      background: 'var(--bg-secondary)',
+                      borderRadius: '12px',
+                      padding: '1.25rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '1rem',
+                      boxShadow: '0 12px 30px rgba(0,0,0,0.4)',
+                      border: '1px solid var(--border-color)'
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                        {comicIssuePrompt.type === 'unmark_reading'
+                          ? (language === 'es' ? '¿Desmarcar como Leyendo?' : 'Unmark from Reading?')
+                          : comicIssuePrompt.type === 'unmark_dropped'
+                          ? (language === 'es' ? '¿Desmarcar como Abandonado?' : 'Unmark from Dropped?')
+                          : comicIssuePrompt.type === 'read_options'
+                          ? (language === 'es' ? 'Opciones del número' : 'Issue options')
+                          : (language === 'es' ? 'Cambio de Estado' : 'Status Change')
+                        }
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={() => setComicIssuePrompt(null)}
+                        style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '0.2rem' }}
+                      >
+                        <X size={18} />
+                      </button>
+                    </div>
+
+                    <div style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+                      {comicIssuePrompt.type === 'unmark_reading' && (
+                        <span>{language === 'es' ? 'El número dejará de estar marcado en progreso.' : 'This issue will no longer be marked as in progress.'}</span>
+                      )}
+                      {comicIssuePrompt.type === 'unmark_dropped' && (
+                        <span>{language === 'es' ? 'El número dejará de estar marcado como abandonado.' : 'This issue will no longer be marked as dropped.'}</span>
+                      )}
+                      {comicIssuePrompt.type === 'read_options' && (
+                        <span>{language === 'es' ? 'Este número ya está marcado como leído. ¿Qué deseas hacer?' : 'This issue is already marked as read. What would you like to do?'}</span>
+                      )}
+                      {comicIssuePrompt.type === 'read_to_reading' && (
+                        <span>{language === 'es' ? 'Este número ya fue completado. ¿Cómo deseas guardar este nuevo estado a Leyendo?' : 'This issue was already completed. How would you like to save this new status to Reading?'}</span>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                      {(comicIssuePrompt.type === 'unmark_reading' || comicIssuePrompt.type === 'unmark_dropped') && (
+                        <button
+                          type="button"
+                          onClick={handleUnmarkComicIssue}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.65rem',
+                            padding: '0.75rem 1rem',
+                            borderRadius: '8px',
+                            background: 'rgba(239, 68, 68, 0.08)',
+                            border: '1px solid rgba(239, 68, 68, 0.25)',
+                            color: '#ef4444',
+                            fontWeight: 600,
+                            fontSize: '0.9rem',
+                            cursor: 'pointer',
+                            textAlign: 'left'
+                          }}
+                        >
+                          <Trash2 size={16} style={{ flexShrink: 0 }} />
+                          <span>{language === 'es' ? 'Desmarcar' : 'Unmark'}</span>
+                        </button>
+                      )}
+
+                      {comicIssuePrompt.type === 'read_options' && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setComicIssuePrompt(null);
+                              handleToggleComicIssueStatus('read', true);
+                            }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.65rem',
+                              padding: '0.75rem 1rem',
+                              borderRadius: '8px',
+                              background: 'var(--bg-tertiary)',
+                              border: '1px solid var(--border-color)',
+                              color: 'var(--text-primary)',
+                              fontWeight: 600,
+                              fontSize: '0.9rem',
+                              cursor: 'pointer',
+                              textAlign: 'left'
+                            }}
+                          >
+                            <RotateCcw size={16} style={{ flexShrink: 0, color: 'var(--color-comic)' }} />
+                            <span>{language === 'es' ? 'Volver a marcar como leído (releída)' : 'Mark as read again'}</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={handleUnmarkComicIssue}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.65rem',
+                              padding: '0.75rem 1rem',
+                              borderRadius: '8px',
+                              background: 'rgba(239, 68, 68, 0.08)',
+                              border: '1px solid rgba(239, 68, 68, 0.25)',
+                              color: '#ef4444',
+                              fontWeight: 600,
+                              fontSize: '0.9rem',
+                              cursor: 'pointer',
+                              textAlign: 'left'
+                            }}
+                          >
+                            <Trash2 size={16} style={{ flexShrink: 0 }} />
+                            <span>{language === 'es' ? 'Desmarcar número' : 'Unmark issue'}</span>
+                          </button>
+                        </>
+                      )}
+
+                      {comicIssuePrompt.type === 'read_to_reading' && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => handleComicIssueReadToReading(true)}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.65rem',
+                              padding: '0.75rem 1rem',
+                              borderRadius: '8px',
+                              background: 'var(--bg-tertiary)',
+                              border: '1px solid var(--border-color)',
+                              color: 'var(--text-primary)',
+                              fontWeight: 600,
+                              fontSize: '0.88rem',
+                              cursor: 'pointer',
+                              textAlign: 'left'
+                            }}
+                          >
+                            <RotateCcw size={16} style={{ flexShrink: 0, color: 'var(--color-comic)' }} />
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                              <span>{language === 'es' ? 'Comenzar nueva leída' : 'Start new reading'}</span>
+                              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 400 }}>
+                                {language === 'es' ? 'Conserva la lectura anterior y pasa a Leyendo' : 'Preserve past read date and set status to Reading'}
+                              </span>
+                            </div>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleComicIssueReadToReading(false)}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.65rem',
+                              padding: '0.75rem 1rem',
+                              borderRadius: '8px',
+                              background: 'rgba(239, 68, 68, 0.08)',
+                              border: '1px solid rgba(239, 68, 68, 0.25)',
+                              color: '#ef4444',
+                              fontWeight: 600,
+                              fontSize: '0.88rem',
+                              cursor: 'pointer',
+                              textAlign: 'left'
+                            }}
+                          >
+                            <Trash2 size={16} style={{ flexShrink: 0 }} />
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                              <span>{language === 'es' ? 'Reemplazar / Editar última leída' : 'Replace / Edit latest read'}</span>
+                              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 400 }}>
+                                {language === 'es' ? 'Borra la finalización anterior y pasa a Leyendo' : 'Delete previous completion and set status to Reading'}
+                              </span>
+                            </div>
+                          </button>
+                        </>
+                      )}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setComicIssuePrompt(null)}
                       style={{
                         padding: '0.55rem',
                         borderRadius: '6px',

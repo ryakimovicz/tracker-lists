@@ -395,13 +395,19 @@ export const Profile: React.FC = () => {
         apiClient.get(targetActivityUrl)
       ]);
 
-      const rawLibItems: LibraryItem[] = libraryRes.data || [];
+      const rawLibItems: LibraryItem[] = (libraryRes.data || []).filter((item: LibraryItem) => !item.external_id?.startsWith('cv_issue_'));
       setLibraryItems(rawLibItems);
       setActivities(activityRes.data || []);
       if (!targetUserIdentifier) {
         try {
           sessionStorage.setItem('pathd_lib_cache', JSON.stringify(rawLibItems));
           sessionStorage.setItem('pathd_act_cache', JSON.stringify(activityRes.data || []));
+          
+          // Background clean up rogue standalone comic issue rows from user library
+          const rogueIssues = (libraryRes.data || []).filter((item: LibraryItem) => item.external_id?.startsWith('cv_issue_'));
+          rogueIssues.forEach((item: LibraryItem) => {
+            apiClient.delete(`/library/${item.id}`).catch(() => {});
+          });
         } catch (e) {}
       }
 
@@ -791,6 +797,7 @@ export const Profile: React.FC = () => {
 
 
   const isLooseEpisodeOrSeason = (item: LibraryItem) => {
+    if (item.external_id?.startsWith('cv_issue_')) return false;
     const isLooseType = item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tvm-ep-');
     if (!isLooseType) return false;
     
@@ -804,6 +811,7 @@ export const Profile: React.FC = () => {
 
   const filteredItems = libraryItems
     .filter(item => {
+      if (item.external_id?.startsWith('cv_issue_')) return false;
       let matchesMedia = false;
       if (mediaFilter === 'all') matchesMedia = true;
       else if (mediaFilter === 'series') matchesMedia = item.item_type === 'series' || item.item_type === 'episode' || item.item_type === 'season';
@@ -837,6 +845,7 @@ export const Profile: React.FC = () => {
   );
 
   const visualLibraryItems = libraryItems.filter(item => {
+    if (item.external_id?.startsWith('cv_issue_')) return false;
     const isPlanToStatus = ['plan_to_watch', 'plan_to_play', 'plan_to_read'].includes(item.status);
     if (isPlanToStatus) return false;
 

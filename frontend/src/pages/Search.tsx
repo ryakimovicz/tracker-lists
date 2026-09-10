@@ -833,68 +833,75 @@ export const Search: React.FC = () => {
                     {renderMediaBadge(item.badge, language)}
                   </div>
 
-                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', textAlign: 'left', paddingRight: user ? '36px' : 0 }}>
-                    <h4 style={{ margin: '0 0 0.15rem 0', fontSize: '1rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.title}>
-                      {item.title}
-                    </h4>
-                    {item.release_date && (
-                      <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
-                        {formatReleaseDate(item.release_date)}
-                      </div>
-                    )}
-                    {activeTab === 'all' && (
-                      <span className={getTagClass(item.item_type)} style={{ alignSelf: 'flex-start' }}>
-                        {item.item_type === 'comic' ? (language === 'es' ? 'Cómic' : 'Comic') : item.item_type === 'manga' ? 'Manga' : t('media' + item.item_type.charAt(0).toUpperCase() + item.item_type.slice(1))}
-                      </span>
-                    )}
-                  </div>
+                  {(() => {
+                    const isComicIssue = item.item_type === 'comic' && (String(item.external_id || '').startsWith('cv_issue_') || item.badge === 'issue');
+                    return (
+                      <>
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', textAlign: 'left', paddingRight: (user && !isComicIssue) ? '36px' : 0 }}>
+                          <h4 style={{ margin: '0 0 0.15rem 0', fontSize: '1rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.title}>
+                            {item.title}
+                          </h4>
+                          {item.release_date && (
+                            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
+                              {formatReleaseDate(item.release_date)}
+                            </div>
+                          )}
+                          {activeTab === 'all' && (
+                            <span className={getTagClass(item.item_type)} style={{ alignSelf: 'flex-start' }}>
+                              {item.item_type === 'comic' ? (language === 'es' ? 'Cómic' : 'Comic') : item.item_type === 'manga' ? 'Manga' : t('media' + item.item_type.charAt(0).toUpperCase() + item.item_type.slice(1))}
+                            </span>
+                          )}
+                        </div>
 
-                  {user && (
-                    <button
-                      type="button"
-                      onClick={async (e) => {
-                        e.stopPropagation();
-                        if (shelfItem) {
-                          const hasProgress = shelfItem.status !== 'plan_to_watch' && 
-                                              shelfItem.status !== 'plan_to_play' && 
-                                              shelfItem.status !== 'plan_to_read' && 
-                                              shelfItem.status !== 'untracked' && 
-                                              Boolean(shelfItem.status || shelfItem.completed_at || shelfItem.last_seen_episode || shelfItem.rating || shelfItem.consumption_count > 0 || shelfItem.total_time_spent > 0);
-                          if (!hasProgress) {
-                            try {
-                              await apiClient.delete(`/library/${shelfItem.id}?delete_history=true`);
-                              setSuccessMsg(language === 'es' ? 'Elemento eliminado de tu estantería.' : 'Item removed from your shelf.');
-                              await loadShelfItems();
-                              setTimeout(() => setSuccessMsg(''), 3000);
-                            } catch (err: any) {
-                              setErrorMsg(err.response?.data?.detail || 'Failed to remove item.');
-                              setTimeout(() => setErrorMsg(''), 4000);
+                        {user && !isComicIssue && (
+                          <button
+                            type="button"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              if (shelfItem) {
+                                const hasProgress = shelfItem.status !== 'plan_to_watch' && 
+                                                    shelfItem.status !== 'plan_to_play' && 
+                                                    shelfItem.status !== 'plan_to_read' && 
+                                                    shelfItem.status !== 'untracked' && 
+                                                    Boolean(shelfItem.status || shelfItem.completed_at || shelfItem.last_seen_episode || shelfItem.rating || shelfItem.consumption_count > 0 || shelfItem.total_time_spent > 0);
+                                if (!hasProgress) {
+                                  try {
+                                    await apiClient.delete(`/library/${shelfItem.id}?delete_history=true`);
+                                    setSuccessMsg(language === 'es' ? 'Elemento eliminado de tu estantería.' : 'Item removed from your shelf.');
+                                    await loadShelfItems();
+                                    setTimeout(() => setSuccessMsg(''), 3000);
+                                  } catch (err: any) {
+                                    setErrorMsg(err.response?.data?.detail || 'Failed to remove item.');
+                                    setTimeout(() => setErrorMsg(''), 4000);
+                                  }
+                                } else {
+                                  setItemToRemoveFromShelf(shelfItem);
+                                }
+                              } else {
+                                handleQuickAddToShelf(item, e);
+                              }
+                            }}
+                            className={`btn-card-add-shelf ${onShelf ? 'on-shelf' : ''}`}
+                            title={onShelf 
+                              ? (language === 'es' ? 'Quitar de estantería' : 'Remove from shelf')
+                              : (language === 'es' ? 'Agregar a estantería' : 'Add to shelf')
                             }
-                          } else {
-                            setItemToRemoveFromShelf(shelfItem);
-                          }
-                        } else {
-                          handleQuickAddToShelf(item, e);
-                        }
-                      }}
-                      className={`btn-card-add-shelf ${onShelf ? 'on-shelf' : ''}`}
-                      title={onShelf 
-                        ? (language === 'es' ? 'Quitar de estantería' : 'Remove from shelf')
-                        : (language === 'es' ? 'Agregar a estantería' : 'Add to shelf')
-                      }
-                      style={{
-                        position: 'absolute',
-                        bottom: '0.75rem',
-                        right: '0.75rem',
-                        width: '32px',
-                        height: '32px',
-                        '--category-color': itemTypeColor,
-                        '--category-text-color': itemTypeTextColor,
-                      } as React.CSSProperties}
-                    >
-                      <Plus size={18} />
-                    </button>
-                  )}
+                            style={{
+                              position: 'absolute',
+                              bottom: '0.75rem',
+                              right: '0.75rem',
+                              width: '32px',
+                              height: '32px',
+                              '--category-color': itemTypeColor,
+                              '--category-text-color': itemTypeTextColor,
+                            } as React.CSSProperties}
+                          >
+                            <Plus size={18} />
+                          </button>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               );
               })()}

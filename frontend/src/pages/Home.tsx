@@ -792,6 +792,14 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
     setTrackedEpisodes(updatedTracked);
     setCachedSeries(`list_${item.tracking_list_id}`, updatedTracked);
 
+    if (isComic) {
+      setCachedSeries(`issue_state_cv_issue_${cleanId}`, {
+        status: 'read',
+        pages_read: currentEpToMark.page_count || 0,
+        total_pages: currentEpToMark.page_count || 0
+      });
+    }
+
     // Check if this item was already completed before in a previous run (rewatch mode)
     let url = `/lists/${item.tracking_list_id}/toggle-series-episode`;
     try {
