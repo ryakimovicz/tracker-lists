@@ -539,9 +539,9 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
           return (
             t.external_id === `tvm-ep-${cleanTvmId}` ||
             tCleanTvmId === cleanTvmId ||
+            (ep.season_number != null && ep.episode_number != null && t.season_number === ep.season_number && t.episode_number === ep.episode_number) ||
             (ep.episode_number != null && t.title && t.title.includes(`S${pad(ep.season_number)}E${pad(ep.episode_number)}`)) ||
-            (ep.episode_number != null && t.title && t.title.includes(`E${pad(ep.episode_number)}`) && (t.section === `Season ${ep.season_number}` || t.title.includes(`S${ep.season_number}`))) ||
-            (ep.name && t.title && t.title.includes(ep.name))
+            (ep.episode_number != null && t.title && t.title.includes(`E${pad(ep.episode_number)}`) && (t.section === `Season ${ep.season_number}` || t.title.includes(`S${ep.season_number}`)))
           );
         });
         const airedCounts = aired.map((ep: any) => {
@@ -555,28 +555,20 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
         }
         
         let candidate = null;
-        if (isComic) {
-          const targetCycle = minSeen + 1;
-          let lastReadIndex = -1;
-          for (let i = aired.length - 1; i >= 0; i--) {
-            const count = airedCounts[i];
-            if (count >= targetCycle) {
-              lastReadIndex = i;
-              break;
-            }
+        const targetCycle = minSeen + 1;
+        let lastWatchedIndex = -1;
+        for (let i = aired.length - 1; i >= 0; i--) {
+          const count = airedCounts[i];
+          if (count >= targetCycle) {
+            lastWatchedIndex = i;
+            break;
           }
-          if (lastReadIndex !== -1 && lastReadIndex + 1 < aired.length) {
-            candidate = aired.slice(lastReadIndex + 1).find((_, idx) => airedCounts[lastReadIndex + 1 + idx] < targetCycle) || null;
-          }
-          if (!candidate) {
-            candidate = aired.find((_, idx) => airedCounts[idx] < targetCycle) || null;
-          }
-        } else {
-          candidate = aired.find((ep: any) => {
-            const t = getTracked(ep);
-            const count = (t?.consumption_count !== undefined) ? t.consumption_count : (t?.is_completed ? 1 : 0);
-            return count < minSeen + 1;
-          });
+        }
+        if (lastWatchedIndex !== -1 && lastWatchedIndex + 1 < aired.length) {
+          candidate = aired.slice(lastWatchedIndex + 1).find((_, idx) => airedCounts[lastWatchedIndex + 1 + idx] < targetCycle) || null;
+        }
+        if (!candidate) {
+          candidate = aired.find((_, idx) => airedCounts[idx] < targetCycle) || null;
         }
         if (candidate) {
           return { nextEp: candidate, isCaughtUp: false, initialLoad: false };
@@ -663,10 +655,13 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
         setIsCaughtUp(true);
         setNextEp(null);
       } else {
+        const seriesCacheKey = `series_${item.external_id}`;
+        const cachedSeriesData = item.external_id ? getCachedSeries(seriesCacheKey) : null;
+        const isEnded = isComic ? (item.is_ended || item.status === 'Ended') : (cachedSeriesData?.status === 'Ended' || item.is_ended === true);
         const hasWatchedAny = currentTracked.some((t: any) => t.is_completed);
         const allEpsCount = Array.isArray(allEps) ? allEps.length : 0;
         const completedTrackedCount = currentTracked.filter((t: any) => t.is_completed).length;
-        const isTrulyFinished = allEpsCount > 0 && completedTrackedCount >= allEpsCount;
+        const isTrulyFinished = isEnded && allEpsCount > 0 && completedTrackedCount >= allEpsCount;
         const completedStatus = isComic ? 'read' : 'completed';
         if (isTrulyFinished && item.status !== completedStatus && hasWatchedAny) {
           item.status = completedStatus;
@@ -1801,9 +1796,9 @@ export const Home: React.FC = () => {
                 return (
                   t.external_id === `tvm-ep-${ep.id}` || 
                   t.id === ep.id || 
+                  (ep.season_number != null && ep.episode_number != null && t.season_number === ep.season_number && t.episode_number === ep.episode_number) ||
                   (ep.episode_number != null && t.title && t.title.includes(`S${pad(ep.season_number)}E${pad(ep.episode_number)}`)) ||
-                  (ep.episode_number != null && t.title && t.title.includes(`E${pad(ep.episode_number)}`) && (t.section === `Season ${ep.season_number}` || t.title.includes(`S${ep.season_number}`))) ||
-                  (ep.name && t.title && t.title.includes(ep.name))
+                  (ep.episode_number != null && t.title && t.title.includes(`E${pad(ep.episode_number)}`) && (t.section === `Season ${ep.season_number}` || t.title.includes(`S${ep.season_number}`)))
                 );
               });
               const airedCounts = airedEps.map(ep => {
@@ -1876,6 +1871,23 @@ export const Home: React.FC = () => {
       if (i.status === "endless") return false;
       if (!["completed", "read"].includes(i.status)) return false;
       if (i.item_type === "custom") return false;
+
+      // Ongoing series / anime that are not ended (isEnded is false) are "Al día", NOT completed!
+      if (i.item_type === 'series' || i.item_type === 'anime') {
+        const cacheKey = `series_${i.external_id}`;
+        const cached = i.external_id ? getCachedSeries(cacheKey) : null;
+        const anyItem = i as any;
+        const sStatus = cached?.status || anyItem.series_status;
+        const isEnded = sStatus === 'Ended' || anyItem.is_ended === true;
+        if (!isEnded) {
+          // If database had saved it as completed, restore to watching
+          if (i.status === 'completed') {
+            i.status = 'watching';
+            apiClient.put(`/library/${i.id}`, { status: 'watching' }).catch(() => {});
+          }
+          return false;
+        }
+      }
 
       return true;
     });

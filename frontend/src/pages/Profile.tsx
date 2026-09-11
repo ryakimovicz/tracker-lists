@@ -1581,10 +1581,43 @@ export const Profile: React.FC = () => {
                               }
                               // Series / Anime
                               else if (item.item_type === 'series' || item.item_type === 'anime') {
+                                const cacheKey = `series_${item.external_id}`;
+                                const cached = item.external_id ? getCachedSeries(cacheKey) : null;
+                                const anyItem = item as any;
+                                const sStatus = cached?.status || anyItem.series_status;
+                                const isEnded = sStatus === 'Ended' || anyItem.is_ended === true;
+
                                 if (hasEverCompleted || item.status === 'completed') {
-                                  badges.push({ text: language === 'es' ? 'Terminada' : 'Completed', color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)' });
+                                  if (isEnded) {
+                                    badges.push({ text: language === 'es' ? 'Terminada' : 'Completed', color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)' });
+                                  } else {
+                                    badges.push({ text: language === 'es' ? 'Al día' : 'Up to date', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' });
+                                  }
                                 } else if (item.status === 'watching') {
-                                  badges.push({ text: language === 'es' ? 'Viendo' : 'Watching', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' });
+                                  const cacheKeyAll = `${item.external_id}_all_episodes`;
+                                  const allEps = item.external_id ? getCachedSeries(cacheKeyAll) : null;
+                                  let isUpToDate = false;
+                                  if (allEps && Array.isArray(allEps) && allEps.length > 0) {
+                                    const nowMs = Date.now();
+                                    const canonicalAired = allEps.filter((e: any) => {
+                                      if (e.is_extra || e.season_number === 0) return false;
+                                      if (e.airstamp) return new Date(e.airstamp).getTime() <= nowMs;
+                                      if (e.airdate || e.air_date) {
+                                        const ad = e.airdate || e.air_date;
+                                        const at = e.airtime || '00:00';
+                                        return new Date(`${ad}T${at}:00Z`).getTime() <= nowMs;
+                                      }
+                                      return true;
+                                    });
+                                    if (canonicalAired.length > 0 && item.last_seen_episode_count != null && item.last_seen_episode_count >= canonicalAired.length) {
+                                      isUpToDate = true;
+                                    }
+                                  }
+                                  if (isUpToDate) {
+                                    badges.push({ text: language === 'es' ? 'Al día' : 'Up to date', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' });
+                                  } else {
+                                    badges.push({ text: language === 'es' ? 'Viendo' : 'Watching', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' });
+                                  }
                                 }
                               }
                               // Reading (Books, Comics, Manga)

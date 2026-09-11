@@ -240,17 +240,20 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   } | null>(null);
   const getMissingPreviousEpisodesForEp = (ep: any, passedAllEps?: any[]) => {
     const isComic = selectedItem?.item_type === 'comic' || String(selectedItem?.external_id || '').startsWith('cv_vol_') || String(selectedItem?.external_id || '').startsWith('cv_issue_');
-    const cleanVolId = String(selectedItem?.external_id || selectedItem?.id || '').replace('cv_vol_', '').replace('cv_issue_', '').replace('cv_', '');
+    const cleanId = String(selectedItem?.external_id || selectedItem?.id || '').replace('tvm-ep-', '').replace('cv_vol_', '').replace('cv_issue_', '').replace('cv_', '');
     
     let allEps: any[] = [];
+    const flattenedSeasonEps = Object.values(seasonEpisodes || {}).flat();
     const poolCandidates = [
       passedAllEps,
-      seasonEpisodes[1],
-      getCachedSeries(`${cleanVolId}_all_episodes`),
-      getCachedSeries(`cv_vol_${cleanVolId}_all_episodes`),
+      flattenedSeasonEps,
+      getCachedSeries(`${cleanId}_all_episodes_v2`),
+      getCachedSeries(`${selectedItem?.external_id}_all_episodes_v2`),
+      getCachedSeries(`${cleanId}_all_episodes`),
+      getCachedSeries(`cv_vol_${cleanId}_all_episodes`),
       getCachedSeries(`${selectedItem?.external_id}_all_episodes`),
-      (seasonEpisodes && seasonEpisodes[ep?.season_number || 1]),
-      ...Object.values(seasonEpisodes || {})
+      seasonEpisodes[1],
+      (seasonEpisodes && seasonEpisodes[ep?.season_number || 1])
     ];
     for (const c of poolCandidates) {
       if (Array.isArray(c) && c.length > allEps.length) {
@@ -379,27 +382,110 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       return missing;
     }
 
+    // Series / Anime Episodes Logic
     // Filter only canonical episodes (regular and significant specials, ignore extras/insignificant specials)
     const canonicalEps = allEps.filter((e: any) => !e.is_extra && e.season_number > 0);
 
     const sortedAllEps = [...canonicalEps].sort((a: any, b: any) => {
-      if (a.season_number !== b.season_number) return a.season_number - b.season_number;
+      const sA = a.season_number || 1;
+      const sB = b.season_number || 1;
+      if (sA !== sB) return sA - sB;
+      const eA = a.episode_number ?? 0;
+      const eB = b.episode_number ?? 0;
+      if (eA !== eB) return eA - eB;
       if (a.air_date && b.air_date) {
         const dateA = new Date(a.air_date).getTime();
         const dateB = new Date(b.air_date).getTime();
         if (dateA !== dateB) return dateA - dateB;
       }
-      return (a.episode_number || 999) - (b.episode_number || 999);
+      return (a.id || 0) - (b.id || 0);
     });
 
-    const targetIndex = sortedAllEps.findIndex((itemEp: any) => itemEp.id === ep.id);
-    if (targetIndex <= 0) return [];
+    const targetSeason = ep.season_number || 1;
+    const targetEpNumber = ep.episode_number ?? 0;
 
-    return sortedAllEps.slice(0, targetIndex).filter((itemEp: any) => {
-      const dbEp = (episodes || []).find(x => x.external_id === `tvm-ep-${itemEp.id}` || x.id === itemEp.id);
-      const isCompleted = !!globalProgress[`tvm-ep-${itemEp.id}`] || !!dbEp?.is_completed;
-      return !isCompleted;
+    // Episode S1E1 never has preceding missing episodes
+    if (targetSeason === 1 && targetEpNumber === 1) {
+      return [];
+    }
+
+    const targetIndex = sortedAllEps.findIndex((itemEp: any) => {
+      if (ep.id && (String(itemEp.id) === String(ep.id) || itemEp.external_id === ep.external_id || itemEp.external_id === `tvm-ep-${ep.id}`)) return true;
+      if (itemEp.season_number === targetSeason && itemEp.episode_number === targetEpNumber) return true;
+      return false;
     });
+
+    const completedEpIds = new Set<string>();
+    const completedEpKeys = new Set<string>();
+
+    Object.keys(globalProgress).forEach(k => {
+      if (globalProgress[k]) {
+        completedEpIds.add(k);
+        const cleanK = k.replace('tvm-ep-', '');
+        completedEpIds.add(cleanK);
+        completedEpIds.add(`tvm-ep-${cleanK}`);
+      }
+    });
+
+    (episodes || []).forEach((x: any) => {
+      if (x.is_completed || x.completed_at) {
+        if (x.id) {
+          completedEpIds.add(String(x.id));
+          completedEpIds.add(`tvm-ep-${x.id}`);
+        }
+        if (x.external_id) {
+          completedEpIds.add(x.external_id);
+          const cleanX = x.external_id.replace('tvm-ep-', '');
+          completedEpIds.add(cleanX);
+          completedEpIds.add(`tvm-ep-${cleanX}`);
+        }
+        if (x.season_number != null && x.episode_number != null) {
+          completedEpKeys.add(`s${x.season_number}_e${x.episode_number}`);
+        }
+      }
+    });
+
+    const isEpCompleted = (itemEp: any) => {
+      const epIdStr = String(itemEp.id);
+      const extKey = `tvm-ep-${epIdStr}`;
+      if (completedEpIds.has(extKey) || completedEpIds.has(epIdStr) || (itemEp.external_id && completedEpIds.has(itemEp.external_id))) {
+        return true;
+      }
+      if (itemEp.season_number != null && itemEp.episode_number != null && completedEpKeys.has(`s${itemEp.season_number}_e${itemEp.episode_number}`)) {
+        return true;
+      }
+      return false;
+    };
+
+    let precedingEps: any[] = [];
+    if (targetIndex > 0) {
+      precedingEps = sortedAllEps.slice(0, targetIndex);
+    } else {
+      precedingEps = sortedAllEps.filter((itemEp: any) => {
+        const s = itemEp.season_number || 1;
+        const e = itemEp.episode_number ?? 0;
+        if (s < targetSeason) return true;
+        if (s === targetSeason && e < targetEpNumber) return true;
+        return false;
+      });
+    }
+
+    if (precedingEps.length === 0) return [];
+
+    // Find closest previous completed episode
+    let lastMarkedIndex = -1;
+    for (let i = precedingEps.length - 1; i >= 0; i--) {
+      if (isEpCompleted(precedingEps[i])) {
+        lastMarkedIndex = i;
+        break;
+      }
+    }
+
+    const sliceStart = lastMarkedIndex !== -1 ? lastMarkedIndex + 1 : 0;
+    const candidates = precedingEps.slice(sliceStart);
+    const missing = candidates.filter((itemEp: any) => !isEpCompleted(itemEp));
+
+    return missing;
   };
 
   const getMissingPreviousEpisodesForSeason = (s: any) => {
@@ -2007,64 +2093,24 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     })();
 
     return await ensureTrackedPromiseRef.current;
-  };
-
-  const checkCompletionStatus = async (effectiveListId: number, currentEpisodes: any[]) => {
+  };  const checkCompletionStatus = async (effectiveListId: number, currentEpisodes: any[]) => {
+    const isComic = selectedItem?.item_type === 'comic' || String(selectedItem?.external_id || '').startsWith('cv_vol_');
     const canonicalSeasons = (seasons || []).filter((s: any) => s.season_number > 0 && !s.is_extras);
-    if (canonicalSeasons.length === 0) return;
+    if (canonicalSeasons.length === 0 && !isComic) return;
     const totalEpisodes = canonicalSeasons.reduce((acc: number, s: any) => acc + (s.episode_count || 0), 0);
     const completedEpisodes = currentEpisodes.filter((ep: any) => ep.is_completed && ep.season_number !== 0 && !ep.is_extra).length;
-    
-    // Check if all episodes are completed
-    let isAllDone = totalEpisodes > 0 && completedEpisodes >= totalEpisodes;
 
-    // If not all episodes are completed, check if the user is "Up to Date" (all currently released canonical episodes watched)
-    if (!isAllDone) {
-      const cacheKeyAll = `${selectedItem.external_id}_all_episodes`;
-      let allEps = getCachedSeries(cacheKeyAll);
-      if (!allEps) {
-        try {
-          const epRes = await apiClient.get(`/search/series/${selectedItem.external_id}/episodes`);
-          allEps = epRes.data;
-          setCachedSeries(cacheKeyAll, allEps);
-        } catch (e) {
-          allEps = null;
-        }
-      }
+    // Check if the series is ended/finished forever
+    const seriesCacheKey = `series_${selectedItem?.external_id}`;
+    const cachedSeriesData = selectedItem?.external_id ? getCachedSeries(seriesCacheKey) : null;
+    const isEnded = isComic ? (selectedItem?.is_ended || selectedItem?.status === 'Ended' || selectedItem?.status === 'completed') : (cachedSeriesData?.status === 'Ended' || selectedItem?.is_ended === true || selectedItem?.series_status === 'Ended');
 
-      if (allEps && Array.isArray(allEps) && allEps.length > 0) {
-        const canonicalAllEps = allEps.filter((e: any) => !e.is_extra && e.ep_type !== 'insignificant_special' && e.season_number !== 0);
-        const nowMs = Date.now();
-        const pad = (n: number) => String(n).padStart(2, '0');
+    // Truly finished ONLY if series is ended AND all total episodes of all seasons are completed
+    const isTrulyCompleted = isEnded && totalEpisodes > 0 && completedEpisodes >= totalEpisodes;
 
-        // Find if there is any unwatched episode whose exact air timestamp has arrived
-        const hasUnwatchedAired = canonicalAllEps.some(ep => {
-          let isAired = true;
-          if (ep.airstamp) {
-            isAired = new Date(ep.airstamp).getTime() <= nowMs;
-          } else if (ep.airdate || ep.air_date) {
-            const ad = ep.airdate || ep.air_date;
-            const at = ep.airtime || '00:00';
-            isAired = new Date(`${ad}T${at}:00Z`).getTime() <= nowMs;
-          }
-          const isWatched = currentEpisodes.some((tracked: any) => 
-            (tracked.external_id === `tvm-ep-${ep.id}` || 
-             tracked.id === ep.id || 
-             (tracked.title && tracked.title.includes(`S${pad(ep.season_number)}E${pad(ep.episode_number)}`)) ||
-             (tracked.title && tracked.title.includes(`E${pad(ep.episode_number)}`) && (tracked.section === `Season ${ep.season_number}` || tracked.title.includes(`S${ep.season_number}`)))
-            ) && tracked.is_completed
-          );
-          return isAired && !isWatched;
-        });
-
-        if (!hasUnwatchedAired) {
-          isAllDone = true;
-        }
-      }
-    }
-
-    if (isAllDone) {
-      if (selectedItem.status !== 'completed') {
+    if (isTrulyCompleted) {
+      const completedStatus = isComic ? 'read' : 'completed';
+      if (selectedItem.status !== completedStatus) {
         try {
           let targetId = selectedItem.item_type === 'episode' ? (selectedItem.parent_series?.id || null) : selectedItem.id;
           const targetExtId = selectedItem.parent_series?.external_id || (selectedItem.item_type !== 'episode' ? selectedItem.external_id : null);
@@ -2076,9 +2122,9 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
             }
           }
           if (targetId) {
-            await apiClient.put(`/library/${targetId}`, { status: 'completed' });
+            await apiClient.put(`/library/${targetId}`, { status: completedStatus });
             if (selectedItem.item_type !== 'episode') {
-              setSelectedItem((prev: any) => ({ ...prev, status: 'completed', id: targetId }));
+              setSelectedItem((prev: any) => ({ ...prev, status: completedStatus, id: targetId }));
             }
           }
         } catch (e) {
@@ -2086,7 +2132,9 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
         }
       }
     } else {
-      if (selectedItem.status === 'completed' || selectedItem.item_type === 'episode') {
+      // If the series is NOT truly ended/completed (e.g. ongoing series caught up "Al día", or partially watched)
+      // Its status in library should be watching (or reading), NOT completed!
+      if (selectedItem.status === 'completed' || selectedItem.status === 'read' || selectedItem.item_type === 'episode') {
         try {
           let targetId = selectedItem.item_type === 'episode' ? (selectedItem.parent_series?.id || null) : selectedItem.id;
           const targetExtId = selectedItem.parent_series?.external_id || (selectedItem.item_type !== 'episode' ? selectedItem.external_id : null);
@@ -2098,7 +2146,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
             }
           }
           if (targetId) {
-            const fallbackStatus = completedEpisodes > 0 ? (selectedItem.item_type === 'comic' ? 'reading' : 'watching') : (selectedItem.item_type === 'comic' ? 'plan_to_read' : 'plan_to_watch');
+            const fallbackStatus = completedEpisodes > 0 ? (isComic ? 'reading' : 'watching') : (isComic ? 'plan_to_read' : 'plan_to_watch');
             await apiClient.put(`/library/${targetId}`, { status: fallbackStatus });
             if (selectedItem.item_type !== 'episode') {
               setSelectedItem((prev: any) => ({
