@@ -238,11 +238,146 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     issueNum: number;
     effectiveListId?: number;
   } | null>(null);
+  const getMissingPreviousEpisodesForEp = (ep: any, passedAllEps?: any[]) => {
+    const isComic = selectedItem?.item_type === 'comic' || String(selectedItem?.external_id || '').startsWith('cv_vol_') || String(selectedItem?.external_id || '').startsWith('cv_issue_');
+    const cleanVolId = String(selectedItem?.external_id || selectedItem?.id || '').replace('cv_vol_', '').replace('cv_issue_', '').replace('cv_', '');
+    
+    let allEps: any[] = [];
+    const poolCandidates = [
+      passedAllEps,
+      seasonEpisodes[1],
+      getCachedSeries(`${cleanVolId}_all_episodes`),
+      getCachedSeries(`cv_vol_${cleanVolId}_all_episodes`),
+      getCachedSeries(`${selectedItem?.external_id}_all_episodes`),
+      (seasonEpisodes && seasonEpisodes[ep?.season_number || 1]),
+      ...Object.values(seasonEpisodes || {})
+    ];
+    for (const c of poolCandidates) {
+      if (Array.isArray(c) && c.length > allEps.length) {
+        allEps = c;
+      }
+    }
 
-  const getMissingPreviousEpisodesForEp = (ep: any) => {
-    const cacheKeyAll = `${selectedItem.external_id}_all_episodes`;
-    let allEps = getCachedSeries(cacheKeyAll);
-    if (!allEps || !Array.isArray(allEps)) return [];
+    if (!allEps || !Array.isArray(allEps) || allEps.length === 0) {
+      return [];
+    }
+
+    const getIssueNum = (x: any) => {
+      if (x == null) return -1;
+      if (x.issue_number != null && !isNaN(parseFloat(x.issue_number))) return parseFloat(x.issue_number);
+      if (x.episode_number != null && !isNaN(parseFloat(x.episode_number))) return parseFloat(x.episode_number);
+      if (x.name) {
+        const match = String(x.name).match(/#(\d+(\.\d+)?)/);
+        if (match) return parseFloat(match[1]);
+      }
+      if (x.title) {
+        const match = String(x.title).match(/#(\d+(\.\d+)?)/);
+        if (match) return parseFloat(match[1]);
+      }
+      return -1;
+    };
+
+    if (isComic) {
+      const targetEpNum = getIssueNum(ep);
+      const cleanEpId = String(ep.id || ep.external_id || '').replace('cv_issue_', '').replace('cv_', '');
+
+      // Issue #1 never has preceding missing issues
+      if (targetEpNum === 1 || (targetEpNum < 0 && cleanEpId === '1')) {
+        return [];
+      }
+
+      // Build fast lookup set of completed issue numbers and IDs for O(1) lookups
+      const completedExtIds = new Set<string>();
+      const completedIssueNums = new Set<number>();
+
+      Object.keys(globalProgress).forEach(k => {
+        if (globalProgress[k]) {
+          const cleanK = k.replace('cv_issue_', '').replace('cv_', '');
+          completedExtIds.add(k);
+          completedExtIds.add(cleanK);
+          completedExtIds.add(`cv_issue_${cleanK}`);
+        }
+      });
+
+      (episodes || []).forEach((x: any) => {
+        if (x.is_completed || x.completed_at) {
+          const cleanX = String(x.external_id || x.id || '').replace('cv_issue_', '').replace('cv_', '');
+          if (cleanX) {
+            completedExtIds.add(cleanX);
+            completedExtIds.add(`cv_issue_${cleanX}`);
+          }
+          if (x.external_id) completedExtIds.add(x.external_id);
+          const xNum = getIssueNum(x);
+          if (xNum >= 0) completedIssueNums.add(xNum);
+        }
+      });
+
+      // Sort issues by issue_number ascending
+      const sortedIssues = [...allEps].sort((a: any, b: any) => {
+        const numA = getIssueNum(a);
+        const numB = getIssueNum(b);
+        if (numA >= 0 && numB >= 0 && numA !== numB) return numA - numB;
+        if (numA >= 0 && numB < 0) return -1;
+        if (numA < 0 && numB >= 0) return 1;
+        return (a.id || 0) - (b.id || 0);
+      });
+
+      const isIssueCompleted = (itemEp: any) => {
+        const rawId = String(itemEp.id || itemEp.external_id || '').replace('cv_issue_', '').replace('cv_', '');
+        const extKey = `cv_issue_${rawId}`;
+        const itemEpNum = getIssueNum(itemEp);
+
+        if (completedExtIds.has(extKey) || completedExtIds.has(rawId) || (itemEp.id && completedExtIds.has(String(itemEp.id))) || (itemEp.external_id && completedExtIds.has(itemEp.external_id))) {
+          return true;
+        }
+        if (itemEpNum >= 0 && completedIssueNums.has(itemEpNum)) {
+          return true;
+        }
+
+        const cachedState = getCachedSeries(`issue_state_${extKey}`) || getCachedSeries(`issue_state_cv_issue_${rawId}`);
+        if (cachedState && (cachedState.status === 'read' || cachedState.is_completed)) return true;
+
+        return false;
+      };
+
+      // Filter all preceding issues (issues strictly before target)
+      let precedingIssues: any[] = [];
+      if (targetEpNum > 0) {
+        precedingIssues = sortedIssues.filter((itemEp: any) => {
+          const n = getIssueNum(itemEp);
+          return n >= 0 && n < targetEpNum;
+        });
+      }
+
+      if (precedingIssues.length === 0) {
+        const targetIndex = sortedIssues.findIndex((itemEp: any) => {
+          const cleanItemId = String(itemEp.id || itemEp.external_id || '').replace('cv_issue_', '').replace('cv_', '');
+          return (cleanEpId && cleanItemId && cleanEpId === cleanItemId) || String(itemEp.id) === String(ep.id);
+        });
+        if (targetIndex > 0) {
+          precedingIssues = sortedIssues.slice(0, targetIndex);
+        }
+      }
+
+      if (precedingIssues.length === 0) {
+        return [];
+      }
+
+      // Find closest previous completed issue
+      let lastMarkedIndex = -1;
+      for (let i = precedingIssues.length - 1; i >= 0; i--) {
+        if (isIssueCompleted(precedingIssues[i])) {
+          lastMarkedIndex = i;
+          break;
+        }
+      }
+
+      const sliceStart = lastMarkedIndex !== -1 ? lastMarkedIndex + 1 : 0;
+      const candidates = precedingIssues.slice(sliceStart);
+      const missing = candidates.filter((itemEp: any) => !isIssueCompleted(itemEp));
+
+      return missing;
+    }
 
     // Filter only canonical episodes (regular and significant specials, ignore extras/insignificant specials)
     const canonicalEps = allEps.filter((e: any) => !e.is_extra && e.season_number > 0);
@@ -2375,17 +2510,20 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     if (episodesToMark.length > 0) {
       const newProg: Record<string, boolean> = {};
       episodesToMark.forEach((ep: any) => {
-        const idKey = isComic ? (String(ep.id).startsWith('cv_') ? ep.id : `cv_issue_${ep.id}`) : (String(ep.id).startsWith('tvm-ep-') ? ep.id : `tvm-ep-${ep.id}`);
+        const cleanEpId = String(ep.id || ep.external_id || '').replace('cv_issue_', '').replace('cv_', '');
+        const idKey = isComic ? `cv_issue_${cleanEpId}` : (String(ep.id).startsWith('tvm-ep-') ? ep.id : `tvm-ep-${ep.id}`);
         newProg[idKey] = true;
         if (isComic) {
-          const cleanEpId = String(ep.id).replace('cv_issue_', '').replace('cv_', '');
+          if (cleanEpId) newProg[cleanEpId] = true;
+          if (ep.id) newProg[String(ep.id)] = true;
+          if (ep.external_id) newProg[ep.external_id] = true;
           const issueState = {
             status: 'read',
             pages_read: ep.page_count || ep.total_pages || 0,
             total_pages: ep.page_count || ep.total_pages || 0
           };
           setCachedSeries(`issue_state_cv_issue_${cleanEpId}`, issueState);
-          setCachedSeries(`issue_state_cv_issue_${ep.id}`, issueState);
+          setCachedSeries(`issue_state_${idKey}`, issueState);
         }
       });
       setGlobalProgress(prev => ({ ...prev, ...newProg }));
@@ -2459,18 +2597,27 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
         (selectedItem.rawEpisodeId && String(selectedItem.rawEpisodeId) === String(ep.id))
       );
 
-      const targetKeyProg = isComic ? (String(ep.id).startsWith('cv_') ? ep.id : `cv_issue_${ep.id}`) : `tvm-ep-${ep.id}`;
-      setGlobalProgress(prev => ({ ...prev, [targetKeyProg]: !!res.data.is_completed }));
+      const cleanEpId = String(ep.id || ep.external_id || '').replace('cv_issue_', '').replace('cv_', '');
+      const targetKeyProg = isComic ? `cv_issue_${cleanEpId}` : `tvm-ep-${ep.id}`;
+      setGlobalProgress(prev => ({
+        ...prev,
+        [targetKeyProg]: !!res.data.is_completed,
+        ...(isComic ? {
+          [cleanEpId]: !!res.data.is_completed,
+          [String(ep.id)]: !!res.data.is_completed,
+          ...(ep.external_id ? { [ep.external_id]: !!res.data.is_completed } : {})
+        } : {})
+      }));
 
       if (isComic) {
-        const cleanEpId = String(ep.id).replace('cv_issue_', '').replace('cv_', '');
         const issueState = {
-          status: res.data.is_completed ? 'read' : 'reading',
+          status: res.data.is_completed ? 'read' : '',
           pages_read: res.data.is_completed ? (ep.page_count || ep.total_pages || 0) : 0,
           total_pages: ep.page_count || ep.total_pages || 0
         };
         setCachedSeries(`issue_state_cv_issue_${cleanEpId}`, issueState);
-        setCachedSeries(`issue_state_cv_issue_${ep.id}`, issueState);
+        setCachedSeries(`issue_state_${targetKeyProg}`, issueState);
+        if (ep.external_id) setCachedSeries(`issue_state_${ep.external_id}`, issueState);
       }
 
       if (isTargetEpisode) {
@@ -4383,9 +4530,36 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                             return (
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '380px', overflowY: 'auto', paddingRight: '0.25rem' }}>
                                 {displayedIssues.map((ep: any) => {
-                                  const extIdKey = `cv_issue_${ep.id}`;
-                                  const dbEp = (episodes || []).find(x => x.external_id === extIdKey || x.id === ep.id);
-                                  const isCompleted = !!globalProgress[extIdKey] || !!dbEp?.is_completed;
+                                  const cleanEpId = String(ep.id || ep.external_id || '').replace('cv_issue_', '').replace('cv_', '');
+                                  const extIdKey = `cv_issue_${cleanEpId}`;
+                                  
+                                  const parseEpNum = (x: any) => {
+                                    if (x == null) return -1;
+                                    if (x.issue_number != null && !isNaN(parseFloat(x.issue_number))) return parseFloat(x.issue_number);
+                                    if (x.episode_number != null && !isNaN(parseFloat(x.episode_number))) return parseFloat(x.episode_number);
+                                    if (x.name) {
+                                      const m = String(x.name).match(/#(\d+(\.\d+)?)/);
+                                      if (m) return parseFloat(m[1]);
+                                    }
+                                    if (x.title) {
+                                      const m = String(x.title).match(/#(\d+(\.\d+)?)/);
+                                      if (m) return parseFloat(m[1]);
+                                    }
+                                    return -1;
+                                  };
+                                  const epNumFloat = parseEpNum(ep);
+
+                                  const dbEp = (episodes || []).find(x => {
+                                    const xClean = String(x.external_id || '').replace('cv_issue_', '').replace('cv_', '');
+                                    if (xClean && cleanEpId && xClean === cleanEpId) return true;
+                                    if (x.external_id && (x.external_id === extIdKey || x.external_id === ep.external_id || x.external_id === cleanEpId)) return true;
+                                    const xNum = parseEpNum(x);
+                                    if (epNumFloat >= 0 && xNum >= 0 && epNumFloat === xNum) return true;
+                                    return false;
+                                  });
+
+                                  const cachedIssueState = getCachedSeries(`issue_state_${extIdKey}`) || getCachedSeries(`issue_state_cv_issue_${cleanEpId}`);
+                                  const isCompleted = !!globalProgress[extIdKey] || !!globalProgress[cleanEpId] || (cachedIssueState && (cachedIssueState.status === 'read' || cachedIssueState.is_completed)) || !!dbEp?.is_completed || !!dbEp?.completed_at;
 
                                   return (
                                     <div
@@ -4407,11 +4581,20 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                             type="button"
                                             disabled={!user}
                                             onClick={() => {
-                                              const currentIsCompleted = !!globalProgress[extIdKey] || !!dbEp?.is_completed;
+                                              const currentIsCompleted = isCompleted;
                                               if (currentIsCompleted) {
                                                 setEpisodeActionItem({ ep, listId: selectedItem.tracking_list_id });
                                               } else {
-                                                setGlobalProgress(prev => ({ ...prev, [extIdKey]: true }));
+                                                const missing = getMissingPreviousEpisodesForEp(ep, displayedIssues);
+                                                if (missing.length > 0) {
+                                                  setPendingPreviousPrompt({
+                                                    type: 'episode',
+                                                    targetEp: ep,
+                                                    missingEpisodes: missing
+                                                  });
+                                                  return;
+                                                }
+                                                setGlobalProgress(prev => ({ ...prev, [extIdKey]: true, [cleanEpId]: true }));
                                                 handleToggleEpisode(selectedItem.tracking_list_id, ep);
                                               }
                                             }}
@@ -4436,7 +4619,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                         </div>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', minWidth: 0, overflow: 'hidden' }}>
                                           <span style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={ep.name || 'Untitled'}>
-                                            {ep.name || 'Untitled'}
+                                            {ep.name || (ep.issue_number ? `#${ep.issue_number}` : 'Untitled')}
                                           </span>
                                           {ep.air_date && (
                                             <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', flexShrink: 0 }}>
@@ -4452,14 +4635,15 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                             id: dbEp ? dbEp.id : ep.id,
                                             list_id: selectedItem.tracking_list_id,
                                             item_type: 'comic',
-                                            external_id: `cv_issue_${ep.id}`,
-                                            title: `${selectedItem.title} ${ep.name}`,
+                                            external_id: extIdKey,
+                                            title: `${selectedItem.title} #${ep.issue_number || ep.episode_number || 1}${ep.name ? ` - ${ep.name}` : ''}`,
                                             image_url: ep.image_url || ep.image?.original || ep.image?.medium || ep.still_path || selectedItem.image_url,
                                             custom_notes: JSON.stringify({ description: ep.overview || '', release_date: ep.air_date || null }),
                                             completed_at: dbEp?.completed_at,
                                             is_completed: isCompleted,
                                             season_number: ep.season_number,
                                             episode_number: ep.episode_number,
+                                            issue_number: ep.issue_number ?? ep.episode_number,
                                             rawEpisodeId: ep.id,
                                             release_date: ep.air_date,
                                             parent_series: selectedItem
@@ -4548,9 +4732,26 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                             return timeline.map((item) => {
                               if (item.type === 'standalone_special') {
                                 const ep = item.episode;
-                                const extIdKey = `tvm-ep-${ep.id}`;
-                                const dbEp = (episodes || []).find(x => x.external_id === extIdKey || x.id === ep.id);
-                                const isCompleted = !!globalProgress[extIdKey] || !!dbEp?.is_completed;
+                                const isComic = selectedItem?.item_type === 'comic' || String(selectedItem?.external_id || '').startsWith('cv_vol_');
+                                const cleanEpId = String(ep.id || ep.external_id || '').replace('cv_issue_', '').replace('cv_', '');
+                                const extIdKey = isComic ? `cv_issue_${cleanEpId}` : `tvm-ep-${ep.id}`;
+                                const epNumFloat = parseFloat(ep.issue_number ?? ep.episode_number ?? -1);
+
+                                const dbEp = (episodes || []).find(x => {
+                                  if (isComic) {
+                                    const xClean = String(x.external_id || '').replace('cv_issue_', '').replace('cv_', '');
+                                    if (xClean && xClean === cleanEpId) return true;
+                                    if (x.external_id === extIdKey || x.external_id === ep.external_id) return true;
+                                    if (epNumFloat >= 0 && parseFloat(x.episode_number ?? -1) === epNumFloat) return true;
+                                    return false;
+                                  }
+                                  return x.external_id === extIdKey || x.id === ep.id;
+                                });
+
+                                const cachedIssueState = isComic ? (getCachedSeries(`issue_state_${extIdKey}`) || getCachedSeries(`issue_state_cv_issue_${cleanEpId}`)) : null;
+                                const isCompleted = isComic
+                                  ? (!!globalProgress[extIdKey] || !!globalProgress[cleanEpId] || (cachedIssueState && (cachedIssueState.status === 'read' || cachedIssueState.is_completed)) || !!dbEp?.is_completed || !!dbEp?.completed_at)
+                                  : (!!globalProgress[extIdKey] || !!dbEp?.is_completed);
 
                                 return (
                                   <div
@@ -4572,7 +4773,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                           type="button"
                                           disabled={!user}
                                           onClick={() => {
-                                            const currentIsCompleted = !!globalProgress[extIdKey] || !!dbEp?.is_completed;
+                                            const currentIsCompleted = isCompleted;
                                             if (currentIsCompleted) {
                                               setEpisodeActionItem({ ep, listId: selectedItem.tracking_list_id });
                                             } else {
@@ -4585,7 +4786,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                                 });
                                                 return;
                                               }
-                                              setGlobalProgress(prev => ({ ...prev, [extIdKey]: true }));
+                                              setGlobalProgress(prev => ({ ...prev, [extIdKey]: true, ...(isComic ? { [cleanEpId]: true } : {}) }));
                                               handleToggleEpisode(selectedItem.tracking_list_id, ep);
                                             }
                                           }}
@@ -4638,15 +4839,18 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                         onOpenItem && onOpenItem({
                                           id: dbEp ? dbEp.id : ep.id,
                                           list_id: selectedItem.tracking_list_id,
-                                          item_type: 'episode',
-                                          external_id: `tvm-ep-${ep.id}`,
-                                          title: `${selectedItem.title} - ${language === 'es' ? 'Especial' : 'Special'} • ${ep.name || 'Untitled'}`,
+                                          item_type: isComic ? 'comic' : 'episode',
+                                          external_id: extIdKey,
+                                          title: isComic
+                                            ? `${selectedItem.title} #${ep.issue_number || ep.episode_number || 1}${ep.name ? ` - ${ep.name}` : ''}`
+                                            : `${selectedItem.title} - ${language === 'es' ? 'Especial' : 'Special'} • ${ep.name || 'Untitled'}`,
                                           image_url: ep.image_url || ep.image?.original || ep.image?.medium || ep.still_path || selectedItem.image_url,
                                           custom_notes: JSON.stringify({ description: ep.overview || '', release_date: ep.air_date || null }),
                                           completed_at: dbEp?.completed_at,
                                           is_completed: isCompleted,
                                           season_number: ep.season_number,
                                           episode_number: ep.episode_number,
+                                          issue_number: ep.issue_number ?? ep.episode_number,
                                           rawEpisodeId: ep.id,
                                           release_date: ep.air_date,
                                           parent_series: selectedItem
@@ -4859,9 +5063,27 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                           </div>
                                         ) : (
                                           displayedSeasonEps.map((ep: any) => {
-                                            const extIdKey = `tvm-ep-${ep.id}`;
-                                            const dbEp = (episodes || []).find(x => x.external_id === extIdKey || x.id === ep.id);
-                                            const isCompleted = !!globalProgress[extIdKey] || !!dbEp?.is_completed;
+                                            const isComic = selectedItem?.item_type === 'comic' || String(selectedItem?.external_id || '').startsWith('cv_vol_');
+                                            const cleanEpId = String(ep.id || ep.external_id || '').replace('cv_issue_', '').replace('cv_', '');
+                                            const extIdKey = isComic ? `cv_issue_${cleanEpId}` : `tvm-ep-${ep.id}`;
+                                            const epNumFloat = parseFloat(ep.issue_number ?? ep.episode_number ?? -1);
+
+                                            const dbEp = (episodes || []).find(x => {
+                                              if (isComic) {
+                                                const xClean = String(x.external_id || '').replace('cv_issue_', '').replace('cv_', '');
+                                                if (xClean && xClean === cleanEpId) return true;
+                                                if (x.external_id === extIdKey || x.external_id === ep.external_id) return true;
+                                                if (epNumFloat >= 0 && parseFloat(x.episode_number ?? -1) === epNumFloat) return true;
+                                                return false;
+                                              }
+                                              return x.external_id === extIdKey || x.id === ep.id;
+                                            });
+
+                                            const cachedIssueState = isComic ? (getCachedSeries(`issue_state_${extIdKey}`) || getCachedSeries(`issue_state_cv_issue_${cleanEpId}`)) : null;
+                                            const isCompleted = isComic
+                                              ? (!!globalProgress[extIdKey] || !!globalProgress[cleanEpId] || (cachedIssueState && (cachedIssueState.status === 'read' || cachedIssueState.is_completed)) || !!dbEp?.is_completed || !!dbEp?.completed_at)
+                                              : (!!globalProgress[extIdKey] || !!dbEp?.is_completed);
+
                                             const isSpecial = ep.is_significant_special || ep.ep_type === 'significant_special' || (ep.episode_number == null && !ep.is_extra && ep.season_number > 0);
                                             const isExtra = ep.is_extra || ep.ep_type === 'insignificant_special' || ep.season_number === 0;
 
@@ -4885,7 +5107,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                                       type="button"
                                                       disabled={!user}
                                                       onClick={() => {
-                                                        const currentIsCompleted = !!globalProgress[extIdKey] || !!dbEp?.is_completed;
+                                                        const currentIsCompleted = isCompleted;
                                                         if (currentIsCompleted) {
                                                           setEpisodeActionItem({ ep, listId: selectedItem.tracking_list_id });
                                                         } else {
@@ -4898,7 +5120,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                                             });
                                                             return;
                                                           }
-                                                          setGlobalProgress(prev => ({ ...prev, [extIdKey]: true }));
+                                                          setGlobalProgress(prev => ({ ...prev, [extIdKey]: true, ...(isComic ? { [cleanEpId]: true } : {}) }));
                                                           handleToggleEpisode(selectedItem.tracking_list_id, ep);
                                                         }
                                                       }}
@@ -4963,15 +5185,18 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                                     onOpenItem && onOpenItem({
                                                       id: dbEp ? dbEp.id : ep.id,
                                                       list_id: selectedItem.tracking_list_id,
-                                                      item_type: 'episode',
-                                                      external_id: `tvm-ep-${ep.id}`,
-                                                      title: `${selectedItem.title} - ${ep.season_number > 0 ? (ep.season_number < 10 ? 'S0' + ep.season_number : 'S' + ep.season_number) : (language === 'es' ? 'Extras' : 'Extras')}${ep.episode_number != null ? (ep.episode_number < 10 ? 'E0' + ep.episode_number : 'E' + ep.episode_number) : (isSpecial ? ' • ' + (language === 'es' ? 'Especial' : 'Special') : '')} - ${ep.name || 'Untitled'}`,
+                                                      item_type: isComic ? 'comic' : 'episode',
+                                                      external_id: extIdKey,
+                                                      title: isComic
+                                                        ? `${selectedItem.title} #${ep.issue_number || ep.episode_number || 1}${ep.name ? ` - ${ep.name}` : ''}`
+                                                        : `${selectedItem.title} - ${ep.season_number > 0 ? (ep.season_number < 10 ? 'S0' + ep.season_number : 'S' + ep.season_number) : (language === 'es' ? 'Extras' : 'Extras')}${ep.episode_number != null ? (ep.episode_number < 10 ? 'E0' + ep.episode_number : 'E' + ep.episode_number) : (isSpecial ? ' • ' + (language === 'es' ? 'Especial' : 'Special') : '')} - ${ep.name || 'Untitled'}`,
                                                       image_url: ep.image_url || ep.image?.original || ep.image?.medium || ep.still_path || selectedItem.image_url,
                                                       custom_notes: JSON.stringify({ description: ep.overview || '', release_date: ep.air_date || null }),
                                                       completed_at: dbEp?.completed_at,
                                                       is_completed: isCompleted,
                                                       season_number: ep.season_number,
                                                       episode_number: ep.episode_number,
+                                                      issue_number: ep.issue_number ?? ep.episode_number,
                                                       rawEpisodeId: ep.id,
                                                       release_date: ep.air_date,
                                                       parent_series: selectedItem
@@ -7185,7 +7410,9 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                        {language === 'es' ? 'Opciones del episodio' : 'Episode options'}
+                        {selectedItem?.item_type === 'comic' || String(selectedItem?.external_id || '').startsWith('cv_vol_')
+                          ? (language === 'es' ? 'Opciones del número' : 'Issue options')
+                          : (language === 'es' ? 'Opciones del episodio' : 'Episode options')}
                       </h3>
                       <button
                         type="button"
@@ -7198,7 +7425,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
                     <div style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
                       <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
-                        {episodeActionItem.ep.name || episodeActionItem.ep.title || (language === 'es' ? `Episodio ${episodeActionItem.ep.episode_number}` : `Episode ${episodeActionItem.ep.episode_number}`)}
+                        {episodeActionItem.ep.name || episodeActionItem.ep.title || (episodeActionItem.ep.issue_number ? `#${episodeActionItem.ep.issue_number}` : (language === 'es' ? `Episodio ${episodeActionItem.ep.episode_number}` : `Episode ${episodeActionItem.ep.episode_number}`))}
                       </span>
                     </div>
 
@@ -7226,7 +7453,11 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         }}
                       >
                         <RotateCcw size={16} style={{ flexShrink: 0, color: 'var(--accent-primary)' }} />
-                        <span>{language === 'es' ? 'Volver a marcar como visto' : 'Mark as seen again'}</span>
+                        <span>
+                          {selectedItem?.item_type === 'comic' || String(selectedItem?.external_id || '').startsWith('cv_vol_')
+                            ? (language === 'es' ? 'Volver a marcar como leído' : 'Mark as read again')
+                            : (language === 'es' ? 'Volver a marcar como visto' : 'Mark as seen again')}
+                        </span>
                       </button>
 
                       <button
@@ -7234,7 +7465,25 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         onClick={async () => {
                           const item = episodeActionItem;
                           setEpisodeActionItem(null);
-                          setGlobalProgress(prev => ({ ...prev, [`tvm-ep-${item.ep.id}`]: false }));
+                          const isComic = selectedItem?.item_type === 'comic' || String(selectedItem?.external_id || '').startsWith('cv_vol_');
+                          const cleanEpId = String(item.ep.id || item.ep.external_id || '').replace('cv_issue_', '').replace('cv_', '');
+                          const progKey = isComic ? `cv_issue_${cleanEpId}` : `tvm-ep-${item.ep.id}`;
+                          setGlobalProgress(prev => ({
+                            ...prev,
+                            [progKey]: false,
+                            ...(isComic ? {
+                              [cleanEpId]: false,
+                              [`cv_issue_${cleanEpId}`]: false,
+                              [String(item.ep.id)]: false,
+                              ...(item.ep.external_id ? { [item.ep.external_id]: false } : {})
+                            } : { [`tvm-ep-${item.ep.id}`]: false })
+                          }));
+                          if (isComic) {
+                            const emptyState = { status: '', pages_read: 0, total_pages: item.ep.page_count || item.ep.total_pages || null };
+                            setCachedSeries(`issue_state_cv_issue_${cleanEpId}`, emptyState);
+                            setCachedSeries(`issue_state_${progKey}`, emptyState);
+                            if (item.ep.external_id) setCachedSeries(`issue_state_${item.ep.external_id}`, emptyState);
+                          }
                           await handleToggleEpisode(item.listId, item.ep, 'remove');
                         }}
                         style={{
@@ -7501,7 +7750,10 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                        {language === 'es' ? '¿Marcar episodios anteriores?' : 'Mark previous episodes?'}
+                        {selectedItem?.item_type === 'comic' || String(selectedItem?.external_id || '').startsWith('cv_vol_')
+                          ? (language === 'es' ? '¿Marcar números anteriores?' : 'Mark previous issues?')
+                          : (language === 'es' ? '¿Marcar episodios anteriores?' : 'Mark previous episodes?')
+                        }
                       </h3>
                       <button
                         type="button"
@@ -7514,9 +7766,15 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
                     <div style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
                       {pendingPreviousPrompt.type === 'episode' ? (
-                        language === 'es'
-                          ? `Tienes ${pendingPreviousPrompt.missingEpisodes.length} episodio${pendingPreviousPrompt.missingEpisodes.length > 1 ? 's anteriores sin marcar' : ' anterior sin marcar'}. ¿Deseas marcar también los faltantes o solo este episodio?`
-                          : `You have ${pendingPreviousPrompt.missingEpisodes.length} missing previous episode${pendingPreviousPrompt.missingEpisodes.length > 1 ? 's' : ''}. Do you want to mark all previous missing episodes as watched too?`
+                        (selectedItem?.item_type === 'comic' || String(selectedItem?.external_id || '').startsWith('cv_vol_')) ? (
+                          language === 'es'
+                            ? `Tienes ${pendingPreviousPrompt.missingEpisodes.length} número${pendingPreviousPrompt.missingEpisodes.length > 1 ? 's anteriores sin marcar' : ' anterior sin marcar'}. ¿Deseas marcar también los faltantes o solo este número?`
+                            : `You have ${pendingPreviousPrompt.missingEpisodes.length} missing previous issue${pendingPreviousPrompt.missingEpisodes.length > 1 ? 's' : ''}. Do you want to mark all previous missing issues as read too?`
+                        ) : (
+                          language === 'es'
+                            ? `Tienes ${pendingPreviousPrompt.missingEpisodes.length} episodio${pendingPreviousPrompt.missingEpisodes.length > 1 ? 's anteriores sin marcar' : ' anterior sin marcar'}. ¿Deseas marcar también los faltantes o solo este episodio?`
+                            : `You have ${pendingPreviousPrompt.missingEpisodes.length} missing previous episode${pendingPreviousPrompt.missingEpisodes.length > 1 ? 's' : ''}. Do you want to mark all previous missing episodes as watched too?`
+                        )
                       ) : (
                         language === 'es'
                           ? `Tienes ${pendingPreviousPrompt.missingEpisodes.length} episodio${pendingPreviousPrompt.missingEpisodes.length > 1 ? 's de temporadas anteriores sin marcar' : ' de temporadas anteriores sin marcar'}. ¿Deseas marcar también los faltantes o solo esta temporada?`
@@ -7579,7 +7837,10 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                           const prompt = pendingPreviousPrompt;
                           setPendingPreviousPrompt(null);
                           if (prompt.type === 'episode') {
-                            setGlobalProgress(prev => ({ ...prev, [`tvm-ep-${prompt.targetEp.id}`]: true }));
+                            const isComic = selectedItem?.item_type === 'comic' || String(selectedItem?.external_id || '').startsWith('cv_vol_');
+                            const cleanEpId = String(prompt.targetEp.id || prompt.targetEp.external_id || '').replace('cv_issue_', '').replace('cv_', '');
+                            const progKey = isComic ? `cv_issue_${cleanEpId}` : `tvm-ep-${prompt.targetEp.id}`;
+                            setGlobalProgress(prev => ({ ...prev, [progKey]: true, ...(isComic ? { [cleanEpId]: true } : {}) }));
                             await handleToggleEpisode(selectedItem.tracking_list_id, prompt.targetEp);
                           } else if (prompt.type === 'season') {
                             const s = prompt.targetSeason;
@@ -7640,7 +7901,10 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         <span>
                           {pendingPreviousPrompt.type === 'season'
                             ? (language === 'es' ? 'Marcar únicamente esta temporada' : 'Mark only this season')
-                            : (language === 'es' ? 'Marcar únicamente este episodio' : 'Mark only this episode')
+                            : (selectedItem?.item_type === 'comic' || String(selectedItem?.external_id || '').startsWith('cv_vol_')
+                                ? (language === 'es' ? 'Marcar únicamente este número' : 'Mark only this issue')
+                                : (language === 'es' ? 'Marcar únicamente este episodio' : 'Mark only this episode')
+                              )
                           }
                         </span>
                       </button>
