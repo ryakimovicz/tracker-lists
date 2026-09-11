@@ -64,16 +64,13 @@ class TVMazeService:
                 spain_title = aka_name
             elif c_code in LATAM_COUNTRY_CODES:
                 latam_title = aka_name
-            elif not c_code or c_code in ('', 'US', 'INT', 'GLOBAL'):
-                if not other_es_title:
-                    other_es_title = aka_name
 
-        # Priority resolution
+        # Priority resolution: strictly Spanish regions
         if is_spain_user:
-            return spain_title or latam_title or other_es_title or original_name
+            return spain_title or latam_title or original_name
         else:
-            # Latin America or any other region with Spanish language active (including US)
-            return latam_title or other_es_title or spain_title or original_name
+            # Latin America or any other region with Spanish language active
+            return latam_title or spain_title or original_name
 
     @staticmethod
     def search_shows(query: str, is_anime: bool = False, lang: str = 'es', country_code: str = 'AR') -> List[SearchResultItem]:

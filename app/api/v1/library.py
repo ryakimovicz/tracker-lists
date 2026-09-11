@@ -1,6 +1,6 @@
 from typing import List, Optional
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -628,6 +628,7 @@ def add_to_library(
 
 @router.get("/", response_model=List[LibraryItemResponse])
 def get_library(
+    request: Request,
     user_id: Optional[int] = Query(None, description="Get library of a specific user"),
     status: Optional[UserLibraryStatusEnum] = Query(None, description="Filter library by status"),
     skip: int = 0,
@@ -635,6 +636,11 @@ def get_library(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    accept_lang = request.headers.get("Accept-Language", "es")
+    parts = accept_lang.split("-")
+    client_lang = parts[0].lower() if parts else "es"
+    client_country = parts[1].upper() if len(parts) > 1 else ("ES" if client_lang == "es" and "es-es" in accept_lang.lower() else "AR")
+
     from sqlalchemy import desc, func
     from app.models.consumption import ConsumptionHistory
     target_user_id = user_id if user_id is not None else current_user.id
@@ -760,20 +766,35 @@ def get_library(
 
         last_ep_cnt = series_last_ep_count_map.get(it.id, 1) if it.item_type in ("series", "anime", "comic") else 1
 
+        display_title = it.title
+        display_last_seen = it.last_seen_episode
+        if it.item_type == "series" and it.external_id and it.external_id.startswith("tvm_"):
+            try:
+                sid_str = it.external_id.replace("tvm_", "").replace("tvm-", "")
+                if sid_str.isdigit():
+                    loc_title = TVMazeService.get_localized_title(int(sid_str), it.title, lang=client_lang, country_code=client_country)
+                    display_title = loc_title
+                    if display_last_seen and it.title and loc_title != it.title:
+                        # Replace parent series name in last_seen_episode format
+                        if display_last_seen.startswith(it.title):
+                            display_last_seen = loc_title + display_last_seen[len(it.title):]
+            except Exception:
+                pass
+
         it_dict = {
             "id": it.id,
             "user_id": it.user_id,
             "item_type": it.item_type.value if hasattr(it.item_type, 'value') else it.item_type,
             "external_id": it.external_id,
             "imdb_id": it.imdb_id,
-            "title": it.title,
+            "title": display_title,
             "image_url": it.image_url,
             "status": it.status,
             "is_favorite": it.is_favorite,
             "is_hundred_percent": it.is_hundred_percent,
             "completed_at": it.completed_at,
             "updated_at": it.updated_at,
-            "last_seen_episode": it.last_seen_episode,
+            "last_seen_episode": display_last_seen,
             "custom_badge": it.custom_badge,
             "pages_read": it.pages_read or 0,
             "total_pages": it.total_pages,

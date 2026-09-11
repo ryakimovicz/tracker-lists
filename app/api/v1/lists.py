@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 import json
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
-from fastapi import APIRouter, Depends, HTTPException, status, Query, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Request, BackgroundTasks
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -113,10 +113,16 @@ def create_list(
 @router.get("/{list_id}", response_model=ReadingListDetailsResponse)
 def get_list_details(
     list_id: int,
+    request: Request,
     current_user: Optional[User] = Depends(get_current_user_optional),
     db: Session = Depends(get_db),
     draft: bool = Query(False)
 ):
+    accept_lang = request.headers.get("Accept-Language", "es")
+    parts = accept_lang.split("-")
+    client_lang = parts[0].lower() if parts else "es"
+    client_country = parts[1].upper() if len(parts) > 1 else ("ES" if client_lang == "es" and "es-es" in accept_lang.lower() else "AR")
+
     reading_list = db.query(ReadingList).filter(ReadingList.id == list_id).first()
     if not reading_list:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="List not found")
@@ -269,6 +275,18 @@ def get_list_details(
 
     # Process base items
     formatted_base_items = []
+    # If list is a series tracker, check parent series localized name
+    parent_series_loc = None
+    if reading_list.title and reading_list.title.startswith("Tracker: "):
+        try:
+            parent_lib_item = db.query(UserLibraryItem).filter(UserLibraryItem.tracking_list_id == list_id).first()
+            if parent_lib_item and parent_lib_item.item_type == "series" and parent_lib_item.external_id:
+                sid_str = parent_lib_item.external_id.replace("tvm_", "").replace("tvm-", "")
+                if sid_str.isdigit():
+                    parent_series_loc = (parent_lib_item.title, TVMazeService.get_localized_title(int(sid_str), parent_lib_item.title, lang=client_lang, country_code=client_country))
+        except Exception:
+            pass
+
     for item in items:
         # Check progress
         if item.external_id:
@@ -281,6 +299,12 @@ def get_list_details(
         if is_comp and c_cnt == 0:
             c_cnt = 1
 
+        display_item_title = item.title
+        if parent_series_loc and display_item_title:
+            orig_name, loc_name = parent_series_loc
+            if loc_name and orig_name and loc_name != orig_name and display_item_title.startswith(orig_name):
+                display_item_title = loc_name + display_item_title[len(orig_name):]
+
         formatted_base_items.append(
             ListItemProgressResponse(
                 id=item.id,
@@ -288,7 +312,7 @@ def get_list_details(
                 order_index=item.order_index,
                 item_type=item.item_type,
                 external_id=item.external_id,
-                title=item.title,
+                title=display_item_title,
                 image_url=item.image_url,
                 custom_notes=item.custom_notes,
                 section=item.section,

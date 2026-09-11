@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
 import { Link, useNavigate } from 'react-router-dom';
 import { AdBanner } from '../components/AdBanner';
+import { useTranslation } from '../context/LanguageContext';
 
 export const Social: React.FC = () => {
   const [feed, setFeed] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const { language } = useTranslation();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -38,7 +40,15 @@ export const Social: React.FC = () => {
       }
     };
     fetchSocial();
-  }, []);
+
+    const handleLanguageUpdate = () => {
+      fetchSocial();
+    };
+    window.addEventListener('language-updated', handleLanguageUpdate);
+    return () => {
+      window.removeEventListener('language-updated', handleLanguageUpdate);
+    };
+  }, [language]);
 
   if (loading) {
     return <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>Cargando actividad...</div>;

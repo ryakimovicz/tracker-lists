@@ -1592,7 +1592,8 @@ export const Home: React.FC = () => {
               } catch (e) {
                 trackedEps = [];
               }
-                    const isAiredFn = (ep: any) => {
+
+              const isAiredFn = (ep: any) => {
                 const isExtra = ep.is_extra || ep.ep_type === 'insignificant_special' || (ep.season_number === 0 && !ep.is_significant_special && ep.ep_type !== 'significant_special');
                 if (isExtra) return false;
                 if (ep.airstamp) return new Date(ep.airstamp).getTime() <= nowMs;
@@ -1607,13 +1608,18 @@ export const Home: React.FC = () => {
               const airedEpisodes = allEps.filter(isAiredFn);
               const pad = (n: number) => String(n).padStart(2, '0');
               const getEpTracked = (ep: any) => {
-                return trackedEps.find((t: any) => 
-                  (t.external_id === `tvm-ep-${ep.id}` || 
-                   t.id === ep.id || 
-                   (t.title && t.title.includes(`S${pad(ep.season_number)}E${pad(ep.episode_number)}`)) ||
-                   (t.title && t.title.includes(`E${pad(ep.episode_number)}`) && (t.section === `Season ${ep.season_number}` || t.title.includes(`S${ep.season_number}`)))
-                  )
-                );
+                const epIdStr = String(ep.id || '');
+                return trackedEps.find((t: any) => {
+                  if (t.external_id === `tvm-ep-${ep.id}` || t.external_id === epIdStr || t.id === ep.id) return true;
+                  const extIdClean = String(t.external_id || '').replace('tvm-ep-', '');
+                  if (extIdClean && extIdClean === epIdStr) return true;
+                  if (t.season_number != null && t.episode_number != null) {
+                    return t.season_number === ep.season_number && t.episode_number === ep.episode_number;
+                  }
+                  if (t.title && t.title.includes(`S${pad(ep.season_number)}E${pad(ep.episode_number)}`)) return true;
+                  if (t.title && t.title.includes(`E${pad(ep.episode_number)}`) && (t.section === `Season ${ep.season_number}` || t.title.includes(`S${ep.season_number}`))) return true;
+                  return false;
+                });
               };
 
               const airedCounts = airedEpisodes.map((ep: any) => {
@@ -1622,7 +1628,7 @@ export const Home: React.FC = () => {
               });
               const minAiredCount = airedCounts.length > 0 ? Math.min(...airedCounts) : 0;
               const maxAiredCount = airedCounts.length > 0 ? Math.max(...airedCounts) : 0;
-              // True only if there are aired episodes waiting to be watched in the current cycle
+              // Has unwatched aired episodes only if some aired episode is at 0 or behind the max cycle
               const hasUnwatchedAiredEpisode = airedCounts.length > 0 && (minAiredCount < maxAiredCount || minAiredCount === 0);
 
               // Extract future unwatched episodes for Upcoming tab
@@ -1663,11 +1669,20 @@ export const Home: React.FC = () => {
               const hasWatchedAny = trackedEps.some((t: any) => t.is_completed);
 
               // Check if show has ended / finished
-              const seriesData = getCachedSeries(`series_${item.external_id}`);
+              let seriesData = getCachedSeries(`series_${item.external_id}`) || getCachedSeries(`${item.external_id}_metadata`);
+              if (!seriesData && item.external_id) {
+                try {
+                  const sRes = await apiClient.get(`/search/series/${item.external_id}`);
+                  if (sRes.data) {
+                    seriesData = sRes.data;
+                    setCachedSeries(`series_${item.external_id}`, sRes.data);
+                  }
+                } catch (e) {}
+              }
               const showStatus = (seriesData?.status || '').toLowerCase();
-              const isEnded = showStatus === 'ended' || showStatus === 'finished' || showStatus === 'canceled';
+              const isEnded = showStatus === 'ended' || showStatus === 'finished' || showStatus === 'canceled' || seriesData?.is_ended === true;
 
-              // Check if all canonical episodes (regular seasons + significant specials, excluding extras) have been watched for the current cycle
+              // Check canonical episodes (regular seasons + significant specials, strictly excluding extras)
               const canonicalAllEps = allEps.filter((ep: any) => !ep.is_extra && ep.ep_type !== 'insignificant_special' && ep.season_number !== 0);
               const epsToCheck = canonicalAllEps.length > 0 ? canonicalAllEps : allEps;
               const allEpCycles = epsToCheck.map((ep: any) => {
@@ -1675,7 +1690,8 @@ export const Home: React.FC = () => {
                 return (t?.consumption_count !== undefined) ? t.consumption_count : (t?.is_completed ? 1 : 0);
               });
               const minAllCycle = allEpCycles.length > 0 ? Math.min(...allEpCycles) : 0;
-              const hasUnwatchedInCurrentCycle = allEpCycles.some((c: number) => c === minAllCycle);
+              const maxAllCycle = allEpCycles.length > 0 ? Math.max(...allEpCycles) : 0;
+              const allCanonicalCompleted = allEpCycles.length > 0 && minAllCycle > 0 && minAllCycle === maxAllCycle;
 
               if (item.status === 'completed' && hasUnwatchedAiredEpisode) {
                 try {
@@ -1683,7 +1699,7 @@ export const Home: React.FC = () => {
                   item.status = 'watching';
                   return { id: item.id, status: 'watching', futureEps };
                 } catch (e) {}
-              } else if (item.status === 'watching' && hasWatchedAny && !hasUnwatchedInCurrentCycle && minAllCycle > 0) {
+              } else if (item.status === 'watching' && hasWatchedAny && allCanonicalCompleted && isEnded) {
                 try {
                   await apiClient.put(`/library/${item.id}`, { status: 'completed' });
                   item.status = 'completed';
@@ -1722,16 +1738,21 @@ export const Home: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchDashboard(libraryItems.length > 0);
+    fetchDashboard(false);
 
     const handleLibraryUpdate = () => {
       fetchDashboard(true);
     };
+    const handleLanguageUpdate = () => {
+      fetchDashboard(false);
+    };
     window.addEventListener('library-updated', handleLibraryUpdate);
+    window.addEventListener('language-updated', handleLanguageUpdate);
     return () => {
       window.removeEventListener('library-updated', handleLibraryUpdate);
+      window.removeEventListener('language-updated', handleLanguageUpdate);
     };
-  }, []);
+  }, [language]);
 
   const handleMarkDone = async (e: React.MouseEvent, item: any) => {
     e.stopPropagation();

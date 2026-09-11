@@ -1,5 +1,5 @@
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 
@@ -11,6 +11,7 @@ from app.models.list_item import ListItem
 from app.models.item_progress import ItemProgress
 from app.models.social import ListVote, ListReport, Comment, CommentVote, CommentReport, Follow
 from app.models.activity import UserActivityLog
+from app.services.tvmaze import TVMazeService
 from app.schemas.social import (
     CommentCreate,
     CommentResponse,
@@ -23,6 +24,7 @@ from app.schemas.list import ReadingListResponse
 from app.schemas.user import UserResponse
 
 router = APIRouter()
+tvmaze_service = TVMazeService()
 
 # --- 1. List Ratings, Votes & Reports ---
 
@@ -442,11 +444,17 @@ def get_followed_users_lists(
 
 @router.get("/users/feed/activity", response_model=List[ActivityFeedItemResponse])
 def get_followed_activity_feed(
+    request: Request,
     skip: int = 0,
     limit: int = 20,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    accept_lang = request.headers.get("Accept-Language", "es")
+    parts = accept_lang.split("-")
+    client_lang = parts[0].lower() if parts else "es"
+    client_country = parts[1].upper() if len(parts) > 1 else ("ES" if client_lang == "es" and "es-es" in accept_lang.lower() else "AR")
+
     # Fetch all activities from followed users
     followed_ids_query = db.query(Follow.followed_id).filter(Follow.follower_id == current_user.id)
     
@@ -461,13 +469,21 @@ def get_followed_activity_feed(
         if not user:
             continue
             
+        final_title = r.item_title
+        if r.item_type == 'series' and r.external_id and r.external_id.startswith('tvm_'):
+            clean_show_id = r.external_id.replace('tvm_', '')
+            if clean_show_id.isdigit():
+                loc_name = tvmaze_service.get_show_localized_name(int(clean_show_id), lang=client_lang, country=client_country)
+                if loc_name:
+                    final_title = loc_name
+
         feed.append(
             ActivityFeedItemResponse(
                 id=r.id,
                 user_id=r.user_id,
                 username=user.username,
                 activity_type=r.activity_type,
-                item_title=r.item_title,
+                item_title=final_title,
                 item_type=r.item_type,
                 external_id=r.external_id,
                 list_id=r.list_id,

@@ -1441,9 +1441,14 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                 return a.season_number - b.season_number;
               });
               setCachedSeries(cacheKeyMeta, { ...seriesData, seasons: sortedSeasons });
+              if (seriesData.title) {
+                setSelectedItem((prev: any) => prev ? { ...prev, title: seriesData.title } : null);
+              }
               setSeasons(sortedSeasons);
               setActiveSeason(sortedSeasons[0]?.season_number ?? 1);
             }).catch(console.error);
+          } else if (cachedMeta.title) {
+            setSelectedItem((prev: any) => prev ? { ...prev, title: cachedMeta.title } : null);
           }
 
           // Background network sync: always fetch latest episodes in background so newly released episodes appear seamlessly

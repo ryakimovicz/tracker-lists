@@ -1,6 +1,6 @@
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
-from fastapi import APIRouter, Depends, Query, HTTPException, status
+from fastapi import APIRouter, Depends, Query, HTTPException, status, Request
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -18,6 +18,7 @@ from app.models.addition import ListAddition, UserAdoptedAddition
 from app.models.social import Follow
 from app.core.security import verify_password, get_password_hash
 from app.services.lastfm import LastFMService
+from app.services.tvmaze import TVMazeService
 from app.models.activity import UserActivityLog
 from app.schemas.user import UserResponse, UserDashboardResponse
 from app.schemas.list import ReadingListResponse
@@ -27,6 +28,7 @@ from app.schemas.auth import PasswordChangeRequest, UsernameUpdateRequest
 
 
 router = APIRouter()
+tvmaze_service = TVMazeService()
 
 def check_user_is_pro(user: User) -> bool:
     if not user:
@@ -188,9 +190,15 @@ def get_user_top_albums(user_id: int, db: Session = Depends(get_db)):
 
 @router.get("/me/up-next", response_model=UpNextResponse)
 def get_user_up_next(
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    accept_lang = request.headers.get("Accept-Language", "es")
+    parts = accept_lang.split("-")
+    client_lang = parts[0].lower() if parts else "es"
+    client_country = parts[1].upper() if len(parts) > 1 else ("ES" if client_lang == "es" and "es-es" in accept_lang.lower() else "AR")
+
     # Fetch all reading lists associated with the user (both created and saved)
     all_user_lists = db.query(ReadingList).filter(
         (ReadingList.creator_id == current_user.id) | 
@@ -322,17 +330,39 @@ def get_user_up_next(
             if not is_completed:
                 first_uncompleted = (item, is_addition, add_id, add_item_id)
                 break
-                    
+                
         if first_uncompleted:
             item, is_addition, add_id, add_item_id = first_uncompleted
+            item_title_val = item.title
+            list_title_val = rlist.title
+            
+            # Localize series title if applicable
+            if item.item_type == 'series' or (item.external_id and (item.external_id.startswith('tvm_') or item.external_id.startswith('tvm-ep-'))):
+                clean_show_id = None
+                if item.external_id:
+                    if item.external_id.startswith('tvm_'):
+                        clean_show_id = item.external_id.replace('tvm_', '')
+                    elif item.external_id.startswith('tvm-ep-'):
+                        pass # handled if needed
+                if clean_show_id and clean_show_id.isdigit():
+                    loc_name = tvmaze_service.get_show_localized_name(int(clean_show_id), lang=client_lang, country=client_country)
+                    if loc_name:
+                        item_title_val = loc_name
+            
+            # Also check if it is a personal tracker list whose title starts with "Tracker: " or similar
+            if list_title_val and list_title_val.startswith("Tracker: "):
+                # If the item or tracker corresponds to a series, localize list title too
+                if item.item_type == 'series' and item_title_val:
+                    list_title_val = f"Tracker: {item_title_val}"
+
             up_next_item = UpNextItemResponse(
                 item_id=item.id,
                 list_id=rlist.id,
-                list_title=rlist.title,
+                list_title=list_title_val,
                 order_index=item.order_index,
                 item_type=item.item_type,
                 external_id=item.external_id,
-                title=item.title,
+                title=item_title_val,
                 image_url=item.image_url,
                 custom_notes=item.custom_notes,
                 section=item.section,
@@ -809,24 +839,38 @@ def dismiss_admin_warning(
 @router.get("/{user_id}/activity")
 def get_user_activity(
     user_id: int,
+    request: Request,
     limit: int = 15,
     db: Session = Depends(get_db)
 ):
+    accept_lang = request.headers.get("Accept-Language", "es")
+    parts = accept_lang.split("-")
+    client_lang = parts[0].lower() if parts else "es"
+    client_country = parts[1].upper() if len(parts) > 1 else ("ES" if client_lang == "es" and "es-es" in accept_lang.lower() else "AR")
+
     activities = db.query(UserActivityLog).filter(
         UserActivityLog.user_id == user_id
     ).order_by(UserActivityLog.created_at.desc()).limit(limit).all()
     
-    return [
-        {
+    res = []
+    for act in activities:
+        final_title = act.item_title
+        if act.item_type == 'series' and act.external_id and act.external_id.startswith('tvm_'):
+            clean_show_id = act.external_id.replace('tvm_', '')
+            if clean_show_id.isdigit():
+                loc_name = tvmaze_service.get_show_localized_name(int(clean_show_id), lang=client_lang, country=client_country)
+                if loc_name:
+                    final_title = loc_name
+        
+        res.append({
             "id": act.id,
             "activity_type": act.activity_type,
-            "item_title": act.item_title,
+            "item_title": final_title,
             "item_type": act.item_type,
             "details": act.details,
             "created_at": act.created_at
-        }
-        for act in activities
-    ]
+        })
+    return res
 
 class MockProRequest(BaseModel):
     is_pro: bool

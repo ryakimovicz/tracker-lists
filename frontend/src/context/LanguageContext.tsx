@@ -160,6 +160,15 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const setLanguage = (lang: Language) => {
     setLanguageState(lang);
     localStorage.setItem('language', lang);
+    try {
+      sessionStorage.removeItem('pathd_lib_cache');
+      sessionStorage.removeItem('pathd_upnext_cache');
+      sessionStorage.removeItem('pathd_updates_cache');
+      sessionStorage.removeItem('pathd_social_cache');
+      sessionStorage.removeItem('pathd_me_cache');
+      sessionStorage.removeItem('pathd_act_cache');
+    } catch (e) {}
+    window.dispatchEvent(new CustomEvent('language-updated', { detail: lang }));
   };
 
 

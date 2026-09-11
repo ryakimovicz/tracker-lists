@@ -236,6 +236,7 @@ export const Profile: React.FC = () => {
   // Overlay modal states for shelf items details
   const [selectedItem, setSelectedItem] = useState<any | null>(null);
   const [seriesEndedMap, setSeriesEndedMap] = useState<Record<string, boolean>>({});
+  const [seriesEpisodesMap, setSeriesEpisodesMap] = useState<Record<string, any[]>>({});
                         
   // Favorites state (local highlight mock for UX polish)
   const [favorites, setFavorites] = useState<LibraryItem[]>([]);
@@ -354,14 +355,19 @@ export const Profile: React.FC = () => {
     const handleProfileUpdate = () => {
       fetchProfileAndLibrary();
     };
+    const handleLanguageUpdate = () => {
+      fetchProfileAndLibrary();
+    };
 
     window.addEventListener('profile-updated', handleProfileUpdate);
     window.addEventListener('library-updated', handleProfileUpdate);
+    window.addEventListener('language-updated', handleLanguageUpdate);
     return () => {
       window.removeEventListener('profile-updated', handleProfileUpdate);
       window.removeEventListener('library-updated', handleProfileUpdate);
+      window.removeEventListener('language-updated', handleLanguageUpdate);
     };
-  }, [usernameParam, userIdParam]);
+  }, [usernameParam, userIdParam, language]);
 
 
   const fetchProfileAndLibrary = async () => {
@@ -419,18 +425,27 @@ export const Profile: React.FC = () => {
       // Render profile immediately!
       setLoading(false);
 
-      // 3. Preload / check 'Ended' status in background
+      // 3. Preload / check 'Ended' status and episodes in background
       const endedMap: Record<string, boolean> = {};
-      const completedSeries = rawLibItems.filter(i => (i.item_type === 'series' || i.item_type === 'anime') && i.status === 'completed' && i.external_id);
+      const allSeriesItems = rawLibItems.filter(i => (i.item_type === 'series' || i.item_type === 'anime') && i.external_id);
       
       const missingSeriesIds: string[] = [];
-      completedSeries.forEach(s => {
+      const missingEpisodeSeriesIds: string[] = [];
+      allSeriesItems.forEach(s => {
         const cacheKey = `series_${s.external_id}`;
         const cached = getCachedSeries(cacheKey);
         if (cached && (cached.status || cached.is_ended !== undefined)) {
-          endedMap[s.external_id] = cached.status === 'Ended' || cached.status === 'Finished' || cached.is_ended === true;
+          endedMap[s.external_id] = cached.status === 'Ended' || cached.status === 'Finished' || cached.status === 'Canceled' || cached.is_ended === true;
         } else {
           missingSeriesIds.push(s.external_id);
+        }
+
+        const cacheKeyAll = `${s.external_id}_all_episodes`;
+        const cachedEps = getCachedSeries(cacheKeyAll);
+        if (cachedEps && Array.isArray(cachedEps)) {
+          setSeriesEpisodesMap(prev => ({ ...prev, [s.external_id]: cachedEps }));
+        } else if (s.status === 'watching') {
+          missingEpisodeSeriesIds.push(s.external_id);
         }
       });
       setSeriesEndedMap(prev => ({ ...prev, ...endedMap }));
@@ -441,7 +456,7 @@ export const Profile: React.FC = () => {
             try {
               const res = await apiClient.get(`/search/series/${extId}`);
               const sData = res.data;
-              const isEnded = sData.status === 'Ended' || sData.status === 'Finished' || sData.is_ended === true;
+              const isEnded = sData.status === 'Ended' || sData.status === 'Finished' || sData.status === 'Canceled' || sData.is_ended === true;
               const cacheKey = `series_${extId}`;
               const existingCached = getCachedSeries(cacheKey) || {};
               setCachedSeries(cacheKey, { ...existingCached, ...sData, status: sData.status });
@@ -458,6 +473,33 @@ export const Profile: React.FC = () => {
             }
           });
           setSeriesEndedMap(prev => ({ ...prev, ...newMap }));
+        });
+      }
+
+      if (missingEpisodeSeriesIds.length > 0) {
+        Promise.allSettled(
+          missingEpisodeSeriesIds.map(async (extId) => {
+            try {
+              const res = await apiClient.get(`/search/series/${extId}/episodes`);
+              if (Array.isArray(res.data) && res.data.length > 0) {
+                setCachedSeries(`${extId}_all_episodes`, res.data);
+                return { extId, episodes: res.data };
+              }
+              return { extId, episodes: [] };
+            } catch (e) {
+              return { extId, episodes: [] };
+            }
+          })
+        ).then(results => {
+          const newEpMap: Record<string, any[]> = {};
+          results.forEach(r => {
+            if (r.status === 'fulfilled' && r.value && r.value.episodes.length > 0) {
+              newEpMap[r.value.extId] = r.value.episodes;
+            }
+          });
+          if (Object.keys(newEpMap).length > 0) {
+            setSeriesEpisodesMap(prev => ({ ...prev, ...newEpMap }));
+          }
         });
       }
 
@@ -1583,10 +1625,10 @@ export const Profile: React.FC = () => {
                               // Series / Anime
                               else if (item.item_type === 'series' || item.item_type === 'anime') {
                                 const cacheKey = `series_${item.external_id}`;
-                                const cached = item.external_id ? getCachedSeries(cacheKey) : null;
+                                const cached = item.external_id ? (getCachedSeries(cacheKey) || getCachedSeries(`${item.external_id}_metadata`)) : null;
                                 const anyItem = item as any;
                                 const sStatus = cached?.status || anyItem.series_status;
-                                const isEnded = sStatus === 'Ended' || anyItem.is_ended === true;
+                                const isEnded = sStatus === 'Ended' || sStatus === 'Finished' || sStatus === 'Canceled' || anyItem.is_ended === true || cached?.is_ended === true || (item.external_id ? seriesEndedMap[item.external_id] === true : false);
 
                                 if (hasEverCompleted || item.status === 'completed') {
                                   if (isEnded) {
@@ -1596,12 +1638,13 @@ export const Profile: React.FC = () => {
                                   }
                                 } else if (item.status === 'watching') {
                                   const cacheKeyAll = `${item.external_id}_all_episodes`;
-                                  const allEps = item.external_id ? getCachedSeries(cacheKeyAll) : null;
+                                  const allEps = item.external_id ? (seriesEpisodesMap[item.external_id] || getCachedSeries(cacheKeyAll)) : null;
                                   let isUpToDate = false;
                                   if (allEps && Array.isArray(allEps) && allEps.length > 0) {
                                     const nowMs = Date.now();
                                     const canonicalAired = allEps.filter((e: any) => {
-                                      if (e.is_extra || e.season_number === 0) return false;
+                                      const isExtra = e.is_extra || e.ep_type === 'insignificant_special' || (e.season_number === 0 && !e.is_significant_special && e.ep_type !== 'significant_special');
+                                      if (isExtra) return false;
                                       if (e.airstamp) return new Date(e.airstamp).getTime() <= nowMs;
                                       if (e.airdate || e.air_date) {
                                         const ad = e.airdate || e.air_date;
