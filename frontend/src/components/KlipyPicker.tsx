@@ -2,6 +2,37 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Search, X, Loader2, Sparkles, Image as ImageIcon, Smile, Film, FileQuestion } from 'lucide-react';
 import { useTranslation } from '../context/LanguageContext';
 
+// Official Klipy Ribbon/K Symbol SVG
+const KlipyLogo = ({ size = 20 }: { size?: number }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    style={{ display: 'block', flexShrink: 0 }}
+  >
+    <path
+      d="M5.5 3.5C4.39543 3.5 3.5 4.39543 3.5 5.5V18.5C3.5 19.6046 4.39543 20.5 5.5 20.5H7.5C8.60457 20.5 9.5 19.6046 9.5 18.5V5.5C9.5 4.39543 8.60457 3.5 7.5 3.5H5.5Z"
+      fill="url(#klipy_gradient_1)"
+    />
+    <path
+      d="M10.8 11.2L16.2 4.6C16.9 3.7 18.3 3.7 19 4.6C19.7 5.4 19.6 6.7 18.8 7.4L13.8 12L19.2 18.6C20 19.4 19.9 20.7 19.1 21.4C18.3 22.1 17 22 16.3 21.1L10.8 12.8V11.2Z"
+      fill="url(#klipy_gradient_2)"
+    />
+    <defs>
+      <linearGradient id="klipy_gradient_1" x1="3.5" y1="3.5" x2="9.5" y2="20.5" gradientUnits="userSpaceOnUse">
+        <stop stopColor="#FF007A" />
+        <stop offset="1" stopColor="#7928CA" />
+      </linearGradient>
+      <linearGradient id="klipy_gradient_2" x1="10.8" y1="3.5" x2="20" y2="21.5" gradientUnits="userSpaceOnUse">
+        <stop stopColor="#FF007A" />
+        <stop offset="1" stopColor="#7928CA" />
+      </linearGradient>
+    </defs>
+  </svg>
+);
+
 interface KlipyMediaItem {
   id: number | string;
   slug: string;
@@ -64,133 +95,132 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  // Determine endpoint segment based on active tab
-  const getEndpointSegment = (tab: 'gifs' | 'stickers' | 'memes' | 'clips') => {
-    switch (tab) {
-      case 'gifs': return 'gifs';
-      case 'stickers': return 'stickers';
-      case 'memes': return 'static-memes';
-      case 'clips': return 'clips';
-    }
-  };
+  // Load Initial Data when Tab Changes
+  useEffect(() => {
+    if (!isOpen) return;
+    setItems([]);
+    setPage(1);
+    setHasMore(true);
+    setSelectedCategory(null);
+    setSearchQuery('');
+    loadCategories(activeTab);
+    fetchMedia(activeTab, '', 1, false);
+  }, [activeTab, isOpen]);
 
-  // Fetch Categories for active tab
-  const fetchCategories = async (tab: 'gifs' | 'stickers' | 'memes' | 'clips') => {
+  // Fetch Categories for current tab
+  const loadCategories = async (tab: string) => {
+    if (!KLIPY_API_KEY) return;
     try {
-      const segment = getEndpointSegment(tab);
-      const localeParam = language === 'es' ? 'es_ES' : 'en_US';
+      const segment = tab === 'memes' ? 'static-memes' : tab;
+      const localeParam = language === 'es' ? 'es' : 'en';
       const res = await fetch(`${BASE_URL}/${KLIPY_API_KEY}/${segment}/categories?locale=${localeParam}`);
       if (res.ok) {
         const data = await res.json();
-        if (data.result && data.data && Array.isArray(data.data.categories)) {
-          setCategories(data.data.categories);
-        } else {
-          setCategories([]);
-        }
+        const cats = data.data || data.categories || [];
+        setCategories(cats);
       }
     } catch (err) {
       console.error('Failed to load KLIPY categories', err);
-      setCategories([]);
     }
   };
 
-  // Fetch items (Trending or Search)
-  const fetchMedia = async (tab: 'gifs' | 'stickers' | 'memes' | 'clips', query: string, pageNum: number, append = false) => {
+  // Fetch Media Items
+  const fetchMedia = async (tab: string, query: string, pageNum: number, append: boolean = false) => {
     if (!KLIPY_API_KEY) return;
     setLoading(true);
     try {
-      const segment = getEndpointSegment(tab);
-      const isSearch = Boolean(query.trim());
-      const endpoint = isSearch ? 'search' : 'trending';
-      const locale = language === 'es' ? 'es' : 'us';
-      
+      const segment = tab === 'memes' ? 'static-memes' : tab;
+      const endpoint = query ? 'search' : 'trending';
+      const locale = language === 'es' ? 'es' : 'en';
       let url = `${BASE_URL}/${KLIPY_API_KEY}/${segment}/${endpoint}?page=${pageNum}&per_page=24&locale=${locale}&content_filter=medium`;
-      if (isSearch) {
-        url += `&q=${encodeURIComponent(query.trim())}`;
+      if (query) {
+        url += `&q=${encodeURIComponent(query)}`;
       }
 
       const res = await fetch(url);
       if (res.ok) {
-        const data = await res.json();
-        if (data.result && data.data) {
-          const list = data.data.data || [];
-          setItems(prev => append ? [...prev, ...list] : list);
-          setHasMore(Boolean(data.data.has_next));
+        const json = await res.json();
+        const newItems: KlipyMediaItem[] = json.data || json.results || [];
+        if (append) {
+          setItems((prev) => [...prev, ...newItems]);
         } else {
-          if (!append) setItems([]);
-          setHasMore(false);
+          setItems(newItems);
         }
+        setHasMore(newItems.length >= 24);
       }
     } catch (err) {
       console.error('Failed to fetch media from KLIPY', err);
-      if (!append) setItems([]);
     } finally {
       setLoading(false);
     }
   };
 
-  // When tab changes, reset state and fetch categories + initial items
-  useEffect(() => {
-    if (!isOpen) return;
-    setSearchQuery('');
-    setSelectedCategory(null);
-    setPage(1);
-    fetchCategories(activeTab);
-    fetchMedia(activeTab, '', 1, false);
-  }, [activeTab, isOpen, language]);
-
-  // Handle Search Input Debouncing
+  // Handle Search Input Debounce
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
-    setSearchQuery(val);
+    const query = e.target.value;
+    setSearchQuery(query);
     setSelectedCategory(null);
-    setPage(1);
 
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
     }
 
     searchTimeoutRef.current = setTimeout(() => {
-      fetchMedia(activeTab, val, 1, false);
-    }, 350);
+      setPage(1);
+      setHasMore(true);
+      fetchMedia(activeTab, query, 1, false);
+    }, 400);
   };
 
-  const handleCategoryClick = (catQuery: string) => {
-    if (selectedCategory === catQuery) {
+  const handleCategoryClick = (categoryQuery: string) => {
+    if (selectedCategory === categoryQuery) {
       setSelectedCategory(null);
       setSearchQuery('');
       setPage(1);
       fetchMedia(activeTab, '', 1, false);
     } else {
-      setSelectedCategory(catQuery);
-      setSearchQuery(catQuery);
+      setSelectedCategory(categoryQuery);
+      setSearchQuery(categoryQuery);
       setPage(1);
-      fetchMedia(activeTab, catQuery, 1, false);
+      fetchMedia(activeTab, categoryQuery, 1, false);
     }
+  };
+
+  const handleClearSearch = () => {
+    setSearchQuery('');
+    setSelectedCategory(null);
+    setPage(1);
+    fetchMedia(activeTab, '', 1, false);
   };
 
   // Helper to extract best media URL from KLIPY item
   const extractMediaUrls = (item: KlipyMediaItem) => {
-    const file = item.file || {};
-    // Priority for display: sm or md webp/gif
-    let previewUrl = '';
-    let mainUrl = '';
-
-    const sizes = [file.md, file.hd, file.sm, file.xs].filter(Boolean);
-    for (const s of sizes) {
-      if (s?.gif?.url) { mainUrl = mainUrl || s.gif.url; }
-      if (s?.webp?.url) { mainUrl = mainUrl || s.webp.url; }
-      if (s?.png?.url) { mainUrl = mainUrl || s.png.url; }
-      if (s?.mp4?.url) { mainUrl = mainUrl || s.mp4.url; }
-      if (s?.jpg?.url) { mainUrl = mainUrl || s.jpg.url; }
+    const file = item.file;
+    if (!file) {
+      return { mainUrl: '', previewUrl: '' };
     }
 
-    const smSizes = [file.sm, file.md, file.xs, file.hd].filter(Boolean);
-    for (const s of smSizes) {
-      if (s?.webp?.url) { previewUrl = previewUrl || s.webp.url; }
-      if (s?.gif?.url) { previewUrl = previewUrl || s.gif.url; }
-      if (s?.png?.url) { previewUrl = previewUrl || s.png.url; }
-      if (s?.jpg?.url) { previewUrl = previewUrl || s.jpg.url; }
+    // Best resolution priorities based on file availability
+    const hd = file.hd;
+    const md = file.md;
+    const sm = file.sm;
+
+    let mainUrl = '';
+    let previewUrl = '';
+
+    if (item.type === 'clip') {
+      mainUrl = hd?.mp4?.url || md?.mp4?.url || sm?.mp4?.url || '';
+      previewUrl = md?.gif?.url || sm?.gif?.url || md?.webp?.url || '';
+    } else if (item.type === 'sticker') {
+      mainUrl = hd?.gif?.url || hd?.png?.url || md?.gif?.url || md?.png?.url || sm?.gif?.url || '';
+      previewUrl = sm?.gif?.url || sm?.png?.url || md?.png?.url || '';
+    } else if (item.type === 'meme') {
+      mainUrl = hd?.jpg?.url || hd?.png?.url || md?.jpg?.url || md?.png?.url || sm?.jpg?.url || '';
+      previewUrl = sm?.jpg?.url || sm?.png?.url || md?.jpg?.url || '';
+    } else {
+      // Default / GIF
+      mainUrl = hd?.gif?.url || md?.gif?.url || sm?.gif?.url || hd?.webp?.url || '';
+      previewUrl = sm?.gif?.url || sm?.webp?.url || md?.gif?.url || '';
     }
 
     return {
@@ -204,9 +234,15 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
     if (!mainUrl) return;
 
     let mediaType: SelectedKlipyMedia['type'] = 'gif';
-    if (activeTab === 'stickers') mediaType = 'sticker';
-    else if (activeTab === 'memes') mediaType = 'meme';
-    else if (activeTab === 'clips') mediaType = 'clip';
+    if (item.type) {
+      mediaType = item.type;
+    } else if (activeTab === 'stickers') {
+      mediaType = 'sticker';
+    } else if (activeTab === 'memes') {
+      mediaType = 'meme';
+    } else if (activeTab === 'clips') {
+      mediaType = 'clip';
+    }
 
     onSelectMedia({
       url: mainUrl,
@@ -272,19 +308,19 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
         {/* Modal Header & Tabs */}
         <div style={{ padding: '0.9rem 1rem 0.5rem', borderBottom: '1px solid var(--border-color, rgba(255,255,255,0.08))' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
               <div style={{
-                background: 'linear-gradient(135deg, #ec4899, #8b5cf6)',
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
                 borderRadius: '8px',
-                padding: '0.35rem',
+                padding: '0.3rem 0.4rem',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center',
-                color: '#fff'
+                justifyContent: 'center'
               }}>
-                <Sparkles size={16} />
+                <KlipyLogo size={18} />
               </div>
-              <span style={{ fontWeight: 700, fontSize: '1rem', letterSpacing: '-0.01em', color: 'var(--text-primary)' }}>
+              <span style={{ fontWeight: 800, fontSize: '1.05rem', letterSpacing: '0.02em', color: 'var(--text-primary)' }}>
                 KLIPY
               </span>
             </div>
