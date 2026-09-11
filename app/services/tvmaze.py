@@ -1,13 +1,82 @@
 import urllib.request
 import urllib.parse
 import json
-from typing import List
+import time
+from typing import List, Dict, Optional
 from app.services.base import SearchResultItem
 from app.core.sfw_filter import is_safe_media_item
 
+# In-memory cache for show akas (localized titles): show_id -> (timestamp, list of akas)
+_TVMAZE_AKAS_CACHE: Dict[int, tuple[float, List[dict]]] = {}
+_TVMAZE_AKAS_TTL = 3600 * 24  # 24 hours
+
+LATAM_COUNTRY_CODES = {
+    'AR', 'MX', 'CO', 'CL', 'PE', 'VE', 'EC', 'GT', 'CU', 'BO', 
+    'DO', 'HN', 'PY', 'SV', 'NI', 'CR', 'PA', 'UY', 'PR'
+}
+
 class TVMazeService:
     @staticmethod
-    def search_shows(query: str, is_anime: bool = False) -> List[SearchResultItem]:
+    def get_show_akas(show_id: int) -> List[dict]:
+        now = time.time()
+        if show_id in _TVMAZE_AKAS_CACHE:
+            ts, cached_akas = _TVMAZE_AKAS_CACHE[show_id]
+            if now - ts < _TVMAZE_AKAS_TTL:
+                return cached_akas
+        
+        url = f"https://api.tvmaze.com/shows/{show_id}/akas"
+        req = urllib.request.Request(url, headers={"User-Agent": "TrackerLists/1.0"})
+        try:
+            with urllib.request.urlopen(req, timeout=3) as res:
+                if res.status == 200:
+                    data = json.loads(res.read().decode('utf-8')) or []
+                    _TVMAZE_AKAS_CACHE[show_id] = (now, data)
+                    return data
+        except Exception:
+            pass
+        _TVMAZE_AKAS_CACHE[show_id] = (now, [])
+        return []
+
+    @staticmethod
+    def get_localized_title(show_id: int, original_name: str, lang: str = 'es', country_code: str = 'AR') -> str:
+        if lang != 'es':
+            return original_name
+
+        akas = TVMazeService.get_show_akas(show_id)
+        if not akas:
+            return original_name
+
+        clean_country = (country_code or 'AR').upper()
+        is_spain_user = (clean_country == 'ES')
+
+        latam_title = None
+        spain_title = None
+        other_es_title = None
+
+        for aka in akas:
+            aka_name = aka.get("name")
+            if not aka_name:
+                continue
+            aka_country = aka.get("country")
+            c_code = (aka_country.get("code") or "").upper() if aka_country else ""
+
+            if c_code == 'ES':
+                spain_title = aka_name
+            elif c_code in LATAM_COUNTRY_CODES:
+                latam_title = aka_name
+            elif not c_code or c_code in ('', 'US', 'INT', 'GLOBAL'):
+                if not other_es_title:
+                    other_es_title = aka_name
+
+        # Priority resolution
+        if is_spain_user:
+            return spain_title or latam_title or other_es_title or original_name
+        else:
+            # Latin America or any other region with Spanish language active (including US)
+            return latam_title or other_es_title or spain_title or original_name
+
+    @staticmethod
+    def search_shows(query: str, is_anime: bool = False, lang: str = 'es', country_code: str = 'AR') -> List[SearchResultItem]:
         if not query:
             return []
         
@@ -27,9 +96,9 @@ class TVMazeService:
                     for item in data:
                         show = item.get("show", {})
                         
-                        show_name = show.get("name") or "Untitled Show"
+                        raw_show_name = show.get("name") or "Untitled Show"
                         show_summary = show.get("summary") or ""
-                        if not is_safe_media_item(show_name, show_summary):
+                        if not is_safe_media_item(raw_show_name, show_summary):
                             continue
 
                         # TVMaze doesn't have a strict 'anime' genre flag that is 100% reliable,
@@ -60,10 +129,14 @@ class TVMazeService:
                         weight = show.get("weight")
                         pop_score = float(weight) if weight is not None else None
 
+                        # Resolve localized title if lang is 'es'
+                        show_id_int = show.get("id")
+                        localized_name = TVMazeService.get_localized_title(show_id_int, raw_show_name, lang, country_code) if show_id_int else raw_show_name
+
                         results.append(
                             SearchResultItem(
                                 external_id=f"tvm_{show.get('id')}",
-                                title=show_name,
+                                title=localized_name,
                                 image_url=image_url,
                                 description=show_summary,
                                 item_type="anime" if is_anime else "series",
@@ -78,7 +151,7 @@ class TVMazeService:
         return results
 
     @staticmethod
-    def get_series_detail(series_id: str) -> dict:
+    def get_series_detail(series_id: str, lang: str = 'es', country_code: str = 'AR') -> dict:
         # TVMaze id is like tvm_123, we need to extract 123
         real_id = str(series_id).replace('tvm_', '').replace('tvm-', '')
         url = f"https://api.tvmaze.com/shows/{real_id}"
@@ -136,9 +209,13 @@ class TVMazeService:
                             "episode_count": extras_count
                         })
                     
+                    raw_name = data.get("name")
+                    show_int_id = int(real_id) if real_id.isdigit() else 0
+                    localized_series_name = TVMazeService.get_localized_title(show_int_id, raw_name, lang, country_code) if show_int_id else raw_name
+
                     return {
                         "id": series_id,
-                        "name": data.get("name"),
+                        "name": localized_series_name,
                         "status": data.get("status"),
                         "number_of_seasons": len(seasons),
                         "seasons": seasons,

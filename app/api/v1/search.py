@@ -148,7 +148,14 @@ def search_media(
         
     import time
     now_ts = time.time()
-    cache_key = f"search_single_{type_lower}_{q.strip().lower()}"
+
+    # Extract language and country from Accept-Language header (e.g. 'es-AR', 'es-ES', 'es')
+    accept_lang = request.headers.get("Accept-Language", "es")
+    parts = accept_lang.split("-")
+    client_lang = parts[0].lower() if parts else "es"
+    client_country = parts[1].upper() if len(parts) > 1 else ("ES" if client_lang == "es" and "es-es" in accept_lang.lower() else "AR")
+
+    cache_key = f"search_single_{type_lower}_{q.strip().lower()}_{client_lang}_{client_country}"
     if cache_key in _SEARCH_QUERY_CACHE:
         cache_time, cached_items = _SEARCH_QUERY_CACHE[cache_key]
         if now_ts - cache_time < _SEARCH_CACHE_TTL:
@@ -173,9 +180,9 @@ def search_media(
         elif type_lower == "movie":
             return OMDbService.search_movies(var)
         elif type_lower == "anime":
-            return TVMazeService.search_shows(var, is_anime=True)
+            return TVMazeService.search_shows(var, is_anime=True, lang=client_lang, country_code=client_country)
         elif type_lower == "series":
-            return TVMazeService.search_shows(var, is_anime=False)
+            return TVMazeService.search_shows(var, is_anime=False, lang=client_lang, country_code=client_country)
         return []
 
     from app.models.social import BlockedMediaItem
@@ -207,7 +214,13 @@ def search_all_media(
 ):
     import time
     now_ts = time.time()
-    cache_key = f"search_all_{q.strip().lower()}"
+    
+    accept_lang = request.headers.get("Accept-Language", "es")
+    parts = accept_lang.split("-")
+    client_lang = parts[0].lower() if parts else "es"
+    client_country = parts[1].upper() if len(parts) > 1 else ("ES" if client_lang == "es" and "es-es" in accept_lang.lower() else "AR")
+
+    cache_key = f"search_all_{q.strip().lower()}_{client_lang}_{client_country}"
     if cache_key in _SEARCH_QUERY_CACHE:
         cache_time, cached_items = _SEARCH_QUERY_CACHE[cache_key]
         if now_ts - cache_time < _SEARCH_CACHE_TTL:
@@ -223,8 +236,8 @@ def search_all_media(
         futures = []
         for var in variations:
             futures.append(executor.submit(OMDbService.search_movies, var))
-            futures.append(executor.submit(TVMazeService.search_shows, var, False))
-            futures.append(executor.submit(TVMazeService.search_shows, var, True))
+            futures.append(executor.submit(TVMazeService.search_shows, var, False, client_lang, client_country))
+            futures.append(executor.submit(TVMazeService.search_shows, var, True, client_lang, client_country))
             futures.append(executor.submit(GoogleBooksService.search_books, var))
             futures.append(executor.submit(IGDBService.search_games, var))
             futures.append(executor.submit(ComicVineService.search_comics, var))
@@ -304,15 +317,21 @@ def get_all_episodes(
 
 @router.get("/series/{series_id}")
 def get_series_detail(
-    series_id: str
+    series_id: str,
+    request: Request
 ):
     try:
+        accept_lang = request.headers.get("Accept-Language", "es")
+        parts = accept_lang.split("-")
+        client_lang = parts[0].lower() if parts else "es"
+        client_country = parts[1].upper() if len(parts) > 1 else ("ES" if client_lang == "es" and "es-es" in accept_lang.lower() else "AR")
+
         if str(series_id).startswith("anime_"):
             detail = AnilistService.get_anime_detail(series_id)
             if not detail:
                 raise HTTPException(status_code=404, detail="Anime not found")
             return detail
-        return TVMazeService.get_series_detail(series_id)
+        return TVMazeService.get_series_detail(series_id, lang=client_lang, country_code=client_country)
     except HTTPException:
         raise
     except Exception as e:

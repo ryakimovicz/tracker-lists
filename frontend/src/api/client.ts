@@ -16,11 +16,17 @@ apiClient.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('access_token');
     const lang = localStorage.getItem('language') || 'es';
+    // Get device locale (e.g. 'es-AR', 'es-ES', 'en-US') to determine region
+    const deviceLocale = typeof navigator !== 'undefined' ? (navigator.language || '') : '';
+    const localeParts = deviceLocale.split('-');
+    const regionCode = localeParts.length > 1 ? localeParts[1].toUpperCase() : '';
+    const fullLocale = regionCode ? `${lang}-${regionCode}` : lang;
+
     if (config.headers) {
       if (token) {
         config.headers['Authorization'] = `Bearer ${token}`;
       }
-      config.headers['Accept-Language'] = lang;
+      config.headers['Accept-Language'] = fullLocale;
     }
     return config;
   },
