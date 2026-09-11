@@ -4105,7 +4105,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                             }}
                           >
                             <InfinityIcon size={13} strokeWidth={2.2} />
-                            <span>{language === 'es' ? 'Continuo' : 'Endless'}</span>
+                            <span>{language === 'es' ? 'Infinito' : 'Endless'}</span>
                           </button>
                           <button
                             type="button"
