@@ -3,7 +3,7 @@ import { useTranslation } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
 import { getProfileTheme } from '../utils/profileThemes';
 import { apiClient } from '../api/client';
-import { Star, Heart, X, Flag, CheckCircle, Check, CheckCheck, Plus, MoreVertical, Trash2, ArrowLeft, Clock, ChevronUp, ChevronDown, RotateCcw, BookOpen, Gamepad2, Package, Sparkles, Puzzle, Layers, ChevronLeft, ChevronRight, Calendar, RefreshCw, AlertCircle, Globe, Repeat, Trophy, ShieldAlert, Infinity as InfinityIcon, Reply, ThumbsUp, Edit2 } from 'lucide-react';
+import { Star, Heart, X, Flag, CheckCircle, Check, CheckCheck, Plus, MoreVertical, Trash2, ArrowLeft, Clock, ChevronUp, ChevronDown, RotateCcw, BookOpen, Gamepad2, Package, Sparkles, Puzzle, Layers, ChevronLeft, ChevronRight, Calendar, RefreshCw, AlertCircle, Globe, Repeat, Trophy, ShieldAlert, Infinity as InfinityIcon, Reply, ThumbsUp, Edit2, Image as ImageIcon } from 'lucide-react';
 
 
 
@@ -246,7 +246,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     issueNum: number;
     effectiveListId?: number;
   } | null>(null);
-  const getMissingPreviousEpisodesForEp = (ep: any, passedAllEps?: any[]) => {
+
+  const getMissingPreviousEpisodesForEp = (ep: any, passedAllEps?: any[]) => {
     const isComic = selectedItem?.item_type === 'comic' || String(selectedItem?.external_id || '').startsWith('cv_vol_') || String(selectedItem?.external_id || '').startsWith('cv_issue_');
     const cleanId = String(selectedItem?.external_id || selectedItem?.id || '').replace('tvm-ep-', '').replace('cv_vol_', '').replace('cv_issue_', '').replace('cv_', '');
     
@@ -2176,7 +2177,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     })();
 
     return await ensureTrackedPromiseRef.current;
-  };  const checkCompletionStatus = async (effectiveListId: number, currentEpisodes: any[]) => {
+  };
+  const checkCompletionStatus = async (effectiveListId: number, currentEpisodes: any[]) => {
     const isComic = selectedItem?.item_type === 'comic' || String(selectedItem?.external_id || '').startsWith('cv_vol_');
     const canonicalSeasons = (seasons || []).filter((s: any) => s.season_number > 0 && !s.is_extras);
     if (canonicalSeasons.length === 0 && !isComic) return;
@@ -6078,40 +6080,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                     )}
 
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      {/* Attach GIF / Media Button */}
                       <div>
-                        <button
-                          type="button"
-                          onClick={() => setKlipyPickerTarget('comment')}
-                          style={{
-                            background: 'rgba(255,255,255,0.06)',
-                            border: '1px solid var(--border-color)',
-                            color: commentMedia ? 'var(--accent-primary)' : 'var(--text-secondary)',
-                            borderRadius: '6px',
-                            padding: '0.35rem 0.65rem',
-                            fontSize: '0.8rem',
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '0.4rem',
-                            transition: 'all 0.15s ease'
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.borderColor = 'var(--accent-primary)';
-                            e.currentTarget.style.color = 'var(--accent-primary)';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.borderColor = 'var(--border-color)';
-                            e.currentTarget.style.color = commentMedia ? 'var(--accent-primary)' : 'var(--text-secondary)';
-                          }}
-                        >
-                          <Sparkles size={14} color="#ec4899" />
-                          <span>GIF / Media</span>
-                        </button>
-                      </div>
-
-                      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                         {hasExistingComment && (
                           <button
                             type="button"
@@ -6129,6 +6098,39 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                             {language === 'es' ? 'Eliminar comentario' : 'Delete comment'}
                           </button>
                         )}
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                        {/* Attach GIF / Media Button */}
+                        <button
+                          type="button"
+                          onClick={() => setKlipyPickerTarget('comment')}
+                          title={language === 'es' ? 'Añadir GIF / Multimedia' : 'Add GIF / Media'}
+                          aria-label={language === 'es' ? 'Añadir GIF / Multimedia' : 'Add GIF / Media'}
+                          style={{
+                            background: commentMedia ? 'rgba(236, 72, 153, 0.12)' : 'rgba(255,255,255,0.06)',
+                            border: commentMedia ? '1px solid #ec4899' : '1px solid var(--border-color)',
+                            color: commentMedia ? '#ec4899' : 'var(--text-secondary)',
+                            borderRadius: '6px',
+                            padding: '0.42rem 0.55rem',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            transition: 'all 0.15s ease'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.borderColor = '#ec4899';
+                            e.currentTarget.style.color = '#ec4899';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.borderColor = commentMedia ? '#ec4899' : 'var(--border-color)';
+                            e.currentTarget.style.color = commentMedia ? '#ec4899' : 'var(--text-secondary)';
+                          }}
+                        >
+                          <ImageIcon size={16} />
+                        </button>
+
                         <button
                           type="button"
                           onClick={handleSaveComment}
@@ -6506,41 +6508,47 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                   </div>
                                 )}
 
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '0.4rem' }}>
                                   <button
                                     type="button"
                                     onClick={() => setKlipyPickerTarget('reply')}
+                                    title={language === 'es' ? 'Añadir GIF / Multimedia' : 'Add GIF / Media'}
+                                    aria-label={language === 'es' ? 'Añadir GIF / Multimedia' : 'Add GIF / Media'}
                                     style={{
-                                      background: 'transparent',
-                                      border: '1px solid var(--border-color)',
-                                      color: replyMedia ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                                      background: replyMedia ? 'rgba(236, 72, 153, 0.12)' : 'transparent',
+                                      border: replyMedia ? '1px solid #ec4899' : '1px solid var(--border-color)',
+                                      color: replyMedia ? '#ec4899' : 'var(--text-secondary)',
                                       borderRadius: '6px',
-                                      padding: '0.25rem 0.5rem',
-                                      fontSize: '0.75rem',
-                                      fontWeight: 600,
+                                      padding: '0.3rem 0.45rem',
                                       cursor: 'pointer',
                                       display: 'inline-flex',
                                       alignItems: 'center',
-                                      gap: '0.35rem'
+                                      justifyContent: 'center',
+                                      transition: 'all 0.15s ease'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                      e.currentTarget.style.borderColor = '#ec4899';
+                                      e.currentTarget.style.color = '#ec4899';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      e.currentTarget.style.borderColor = replyMedia ? '#ec4899' : 'var(--border-color)';
+                                      e.currentTarget.style.color = replyMedia ? '#ec4899' : 'var(--text-secondary)';
                                     }}
                                   >
-                                    <Sparkles size={13} color="#ec4899" />
-                                    <span>GIF / Media</span>
+                                    <ImageIcon size={14} />
                                   </button>
 
-                                  <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                    <button
-                                      type="submit"
-                                      className="btn-primary"
-                                      disabled={(!replyText.trim() && !replyMedia) || isSubmittingReply}
-                                      style={{ padding: '0.3rem 0.8rem', fontSize: '0.8rem' }}
-                                    >
-                                      {isSubmittingReply
-                                        ? (language === 'es' ? 'Enviando...' : 'Sending...')
-                                        : (language === 'es' ? 'Responder' : 'Reply')
-                                      }
-                                    </button>
-                                  </div>
+                                  <button
+                                    type="submit"
+                                    className="btn-primary"
+                                    disabled={(!replyText.trim() && !replyMedia) || isSubmittingReply}
+                                    style={{ padding: '0.3rem 0.8rem', fontSize: '0.8rem' }}
+                                  >
+                                    {isSubmittingReply
+                                      ? (language === 'es' ? 'Enviando...' : 'Sending...')
+                                      : (language === 'es' ? 'Responder' : 'Reply')
+                                    }
+                                  </button>
                                 </div>
                               </form>
                             )}
@@ -6747,36 +6755,44 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                             <button
                                               type="button"
-                                              onClick={() => setKlipyPickerTarget('edit_reply')}
-                                              style={{
-                                                background: 'transparent',
-                                                border: '1px solid var(--border-color)',
-                                                color: editingReplyMedia ? 'var(--accent-primary)' : 'var(--text-secondary)',
-                                                borderRadius: '6px',
-                                                padding: '0.2rem 0.45rem',
-                                                fontSize: '0.72rem',
-                                                fontWeight: 600,
-                                                cursor: 'pointer',
-                                                display: 'inline-flex',
-                                                alignItems: 'center',
-                                                gap: '0.3rem'
+                                              onClick={() => {
+                                                setEditingReplyId(null);
+                                                setEditingReplyText('');
+                                                setEditingReplyMedia(null);
                                               }}
+                                              style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', fontSize: '0.75rem', cursor: 'pointer', padding: '0.2rem 0.5rem' }}
                                             >
-                                              <Sparkles size={12} color="#ec4899" />
-                                              <span>GIF / Media</span>
+                                              {language === 'es' ? 'Cancelar' : 'Cancel'}
                                             </button>
 
-                                            <div style={{ display: 'flex', gap: '0.4rem' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                                               <button
                                                 type="button"
-                                                onClick={() => {
-                                                  setEditingReplyId(null);
-                                                  setEditingReplyText('');
-                                                  setEditingReplyMedia(null);
+                                                onClick={() => setKlipyPickerTarget('edit_reply')}
+                                                title={language === 'es' ? 'Añadir GIF / Multimedia' : 'Add GIF / Media'}
+                                                aria-label={language === 'es' ? 'Añadir GIF / Multimedia' : 'Add GIF / Media'}
+                                                style={{
+                                                  background: editingReplyMedia ? 'rgba(236, 72, 153, 0.12)' : 'transparent',
+                                                  border: editingReplyMedia ? '1px solid #ec4899' : '1px solid var(--border-color)',
+                                                  color: editingReplyMedia ? '#ec4899' : 'var(--text-secondary)',
+                                                  borderRadius: '6px',
+                                                  padding: '0.3rem 0.45rem',
+                                                  cursor: 'pointer',
+                                                  display: 'inline-flex',
+                                                  alignItems: 'center',
+                                                  justifyContent: 'center',
+                                                  transition: 'all 0.15s ease'
                                                 }}
-                                                style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', fontSize: '0.75rem', cursor: 'pointer', padding: '0.2rem 0.5rem' }}
+                                                onMouseEnter={(e) => {
+                                                  e.currentTarget.style.borderColor = '#ec4899';
+                                                  e.currentTarget.style.color = '#ec4899';
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                  e.currentTarget.style.borderColor = editingReplyMedia ? '#ec4899' : 'var(--border-color)';
+                                                  e.currentTarget.style.color = editingReplyMedia ? '#ec4899' : 'var(--text-secondary)';
+                                                }}
                                               >
-                                                {language === 'es' ? 'Cancelar' : 'Cancel'}
+                                                <ImageIcon size={14} />
                                               </button>
                                               <button
                                                 type="button"
