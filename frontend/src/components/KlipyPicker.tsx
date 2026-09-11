@@ -116,11 +116,19 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
       const res = await fetch(`${BASE_URL}/${KLIPY_API_KEY}/${segment}/categories?locale=${localeParam}`);
       if (res.ok) {
         const data = await res.json();
-        const cats = data.data || data.categories || [];
+        let cats: any[] = [];
+        if (Array.isArray(data.categories)) {
+          cats = data.categories;
+        } else if (Array.isArray(data.data?.categories)) {
+          cats = data.data.categories;
+        } else if (Array.isArray(data.data)) {
+          cats = data.data;
+        }
         setCategories(cats);
       }
     } catch (err) {
       console.error('Failed to load KLIPY categories', err);
+      setCategories([]);
     }
   };
 
@@ -140,16 +148,32 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
       const res = await fetch(url);
       if (res.ok) {
         const json = await res.json();
-        const newItems: KlipyMediaItem[] = json.data || json.results || [];
+        let newItems: KlipyMediaItem[] = [];
+        let hasNext = false;
+
+        if (Array.isArray(json.data?.data)) {
+          newItems = json.data.data;
+          hasNext = Boolean(json.data.has_next);
+        } else if (Array.isArray(json.data)) {
+          newItems = json.data;
+          hasNext = newItems.length >= 24;
+        } else if (Array.isArray(json.results)) {
+          newItems = json.results;
+          hasNext = newItems.length >= 24;
+        }
+
         if (append) {
-          setItems((prev) => [...prev, ...newItems]);
+          setItems((prev) => [...(Array.isArray(prev) ? prev : []), ...newItems]);
         } else {
           setItems(newItems);
         }
-        setHasMore(newItems.length >= 24);
+        setHasMore(hasNext);
+      } else {
+        if (!append) setItems([]);
       }
     } catch (err) {
       console.error('Failed to fetch media from KLIPY', err);
+      if (!append) setItems([]);
     } finally {
       setLoading(false);
     }
@@ -538,7 +562,7 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
             alignContent: 'start'
           }}
         >
-          {items.map((item, idx) => {
+          {Array.isArray(items) && items.map((item, idx) => {
             const { mainUrl, previewUrl } = extractMediaUrls(item);
             if (!mainUrl && !previewUrl) return null;
 
@@ -598,7 +622,7 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
             );
           })}
 
-          {items.length === 0 && !loading && (
+          {(!Array.isArray(items) || items.length === 0) && !loading && (
             <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '3rem 1rem', color: 'var(--text-muted)' }}>
               <p style={{ margin: 0, fontSize: '0.9rem' }}>
                 {language === 'es' ? 'No se encontraron resultados en KLIPY' : 'No results found on KLIPY'}
