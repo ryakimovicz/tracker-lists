@@ -24,6 +24,7 @@ class AnilistService:
             media(search: $search, type: MANGA, sort: POPULARITY_DESC, isAdult: false) {
               id
               isAdult
+              status
               genres
               title {
                 romaji
@@ -89,6 +90,11 @@ class AnilistService:
                         if not is_safe_media_item(title, desc):
                             continue
 
+                        ani_status = item.get("status")
+                        is_upcoming = ani_status == "NOT_YET_RELEASED"
+                        mapped_status = "Upcoming" if is_upcoming else None
+                        badge = "upcoming" if is_upcoming else None
+
                         results.append(
                             SearchResultItem(
                                 external_id=str(item.get("id")),
@@ -97,7 +103,9 @@ class AnilistService:
                                 description=desc,
                                 item_type="manga",
                                 release_date=release_date,
-                                popularity=float(item.get("averageScore") or 0)
+                                popularity=float(item.get("averageScore") or 0),
+                                status=mapped_status,
+                                badge=badge
                             )
                         )
                     return results

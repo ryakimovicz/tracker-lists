@@ -2,6 +2,8 @@ import urllib.request
 import urllib.parse
 import json
 import time
+import re
+from datetime import datetime
 from typing import List, Optional, Tuple, Dict, Any
 from app.services.base import SearchResultItem
 from app.core.config import settings
@@ -132,6 +134,15 @@ class OMDbService:
             else:
                 poster = None
             
+        current_year = datetime.now().year
+        year_str = str(item.get("Year") or "")
+        year_clean = int(re.search(r'\b(20\d\d)\b', year_str).group(1)) if re.search(r'\b(20\d\d)\b', year_str) else None
+        
+        is_upcoming_movie = False
+        if year_clean and year_clean >= current_year:
+            if not full_release_date or not re.search(r'\d{4}-\d{2}-\d{2}', str(full_release_date)):
+                is_upcoming_movie = True
+
         result = SearchResultItem(
             external_id=f"omdb_{imdb_id}",
             title=item.get("Title"),
@@ -140,7 +151,9 @@ class OMDbService:
             item_type="movie",
             release_date=full_release_date,
             imdb_id=imdb_id,
-            page_count=runtime
+            page_count=runtime,
+            status="Upcoming" if is_upcoming_movie else None,
+            badge="upcoming" if is_upcoming_movie else None
         )
 
         if imdb_id:

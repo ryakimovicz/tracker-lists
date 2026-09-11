@@ -1523,24 +1523,39 @@ export const Home: React.FC = () => {
         for (const item of missingItems) {
           const descCacheKey = `desc_${item.item_type}_${item.external_id}`;
           const cachedDesc = getCachedSeries(descCacheKey);
-          if (cachedDesc && cachedDesc.release_date) {
-            item.release_date = cachedDesc.release_date;
+          if (cachedDesc && (cachedDesc.release_date || cachedDesc.status)) {
+            if (cachedDesc.release_date) item.release_date = cachedDesc.release_date;
+            if (cachedDesc.status) (item as any).status_meta = cachedDesc.status;
+            if (cachedDesc.badge && !item.custom_badge) item.custom_badge = cachedDesc.badge;
             hasUpdatedStandalone = true;
           } else {
             try {
               if (item.item_type === 'movie' && item.external_id && item.external_id.startsWith('omdb_')) {
                 const mRes = await apiClient.get(`/search/movies/${item.external_id}`);
-                if (mRes.data && mRes.data.release_date) {
-                  item.release_date = mRes.data.release_date;
-                  setCachedSeries(descCacheKey, { description: mRes.data.description, release_date: mRes.data.release_date });
+                if (mRes.data) {
+                  if (mRes.data.release_date) item.release_date = mRes.data.release_date;
+                  if (mRes.data.badge && !item.custom_badge) item.custom_badge = mRes.data.badge;
+                  setCachedSeries(descCacheKey, { 
+                    description: mRes.data.description, 
+                    release_date: mRes.data.release_date,
+                    status: mRes.data.status,
+                    badge: mRes.data.badge
+                  });
                   hasUpdatedStandalone = true;
                 }
               } else if (item.external_id) {
                 const sRes = await apiClient.get('/search/', { params: { q: item.title, type: item.item_type } });
                 const match = (sRes.data || []).find((x: any) => x.external_id === item.external_id) || (sRes.data || [])[0];
-                if (match && match.release_date) {
-                  item.release_date = match.release_date;
-                  setCachedSeries(descCacheKey, { description: match.description, release_date: match.release_date });
+                if (match) {
+                  if (match.release_date) item.release_date = match.release_date;
+                  if (match.status) (item as any).status_meta = match.status;
+                  if (match.badge && !item.custom_badge) item.custom_badge = match.badge;
+                  setCachedSeries(descCacheKey, { 
+                    description: match.description, 
+                    release_date: match.release_date,
+                    status: match.status,
+                    badge: match.badge
+                  });
                   hasUpdatedStandalone = true;
                 }
               }
@@ -1918,15 +1933,24 @@ export const Home: React.FC = () => {
     // 1. Standalone library works (movies, games, books, comics, manga)
     libraryItems.forEach(item => {
       if (item.item_type !== 'series' && item.item_type !== 'anime') {
-        if (item.release_date) {
-          const parts = item.release_date.split('-');
+        // Resolve release_date from item or cached metadata
+        const descCacheKey = `desc_${item.item_type}_${item.external_id}`;
+        const cachedDesc = getCachedSeries(descCacheKey);
+        const effectiveDate = item.release_date || cachedDesc?.release_date || (item as any).year || null;
+
+        if (effectiveDate) {
+          const parts = String(effectiveDate).split('-');
           let releaseTime = 0;
           if (parts.length === 3) {
             releaseTime = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2])).getTime();
+          } else if (parts.length === 1 && parts[0].length === 4) {
+            releaseTime = new Date(parseInt(parts[0]), 11, 31).getTime();
           } else {
-            releaseTime = new Date(item.release_date).getTime();
+            releaseTime = new Date(effectiveDate).getTime();
           }
-          if (releaseTime >= startOfTodayMs) {
+
+          // Only include in Upcoming Calendar if it releases in the future / today
+          if (!isNaN(releaseTime) && releaseTime >= startOfTodayMs) {
             upcomingAllItems.push({
               id: `lib-${item.id}`,
               title: item.title,
@@ -1934,23 +1958,29 @@ export const Home: React.FC = () => {
               themeColor: `var(--color-${item.item_type})`,
               themeTextColor: `var(--color-text-${item.item_type})`,
               timestamp: releaseTime,
-              release_date: item.release_date,
+              release_date: effectiveDate,
               item_type: item.item_type,
               rawItem: item
             });
           }
         } else {
-          // Without release date (TBA / Por confirmar)
-          tbaAllItems.push({
-            id: `lib-${item.id}`,
-            title: item.title,
-            coverUrl: item.image_url,
-            themeColor: `var(--color-${item.item_type})`,
-            themeTextColor: `var(--color-text-${item.item_type})`,
-            timestamp: 0,
-            item_type: item.item_type,
-            rawItem: item
-          });
+          // Check if item has explicit metadata indicating it is upcoming/announced (TBA)
+          const isExplicitTba = item.custom_badge === 'upcoming' || 
+                                (item as any).status_meta === 'Upcoming' ||
+                                (cachedDesc && (cachedDesc.status === 'In Production' || cachedDesc.status === 'Upcoming' || cachedDesc.status === 'Planned' || cachedDesc.badge === 'upcoming'));
+          
+          if (isExplicitTba && item.status !== 'completed' && item.status !== 'read') {
+            tbaAllItems.push({
+              id: `lib-${item.id}`,
+              title: item.title,
+              coverUrl: item.image_url,
+              themeColor: `var(--color-${item.item_type})`,
+              themeTextColor: `var(--color-text-${item.item_type})`,
+              timestamp: 0,
+              item_type: item.item_type,
+              rawItem: item
+            });
+          }
         }
       }
     });

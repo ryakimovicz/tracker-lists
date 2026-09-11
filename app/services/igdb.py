@@ -61,7 +61,7 @@ class IGDBService:
 
         # IGDB Apicalypse query with metadata for smart ranking
         safe_query = query.replace('"', '\\"')
-        fields_str = 'fields id, name, category, game_type, parent_game, version_parent, cover.image_id, first_release_date, summary, total_rating, rating_count, hypes, follows, themes, age_ratings.rating;'
+        fields_str = 'fields id, name, status, category, game_type, parent_game, version_parent, cover.image_id, first_release_date, summary, total_rating, rating_count, hypes, follows, themes, age_ratings.rating;'
         body = f'search "{safe_query}"; {fields_str} limit 100;'
         
         req = urllib.request.Request(
@@ -187,6 +187,7 @@ class IGDBService:
                 # Clean mapping using official IGDB game_type / category enum + version_parent
                 cat = item.get("game_type") if item.get("game_type") is not None else item.get("category", 0)
                 has_version_parent = bool(item.get("version_parent"))
+                game_status_val = item.get("status")
                 
                 badge = None
                 if cat in (2, 4, 6):
@@ -205,6 +206,10 @@ class IGDBService:
                     badge = "remake"
                 elif cat == 9:
                     badge = "remaster"
+                elif game_status_val in (2, 3, 4, 7) or (not release_date and (item.get("hypes", 0) > 0 or item.get("follows", 0) > 0)):
+                    badge = "upcoming"
+
+                mapped_status = "Upcoming" if (badge == "upcoming" or game_status_val in (2, 3, 4, 7)) else None
 
                 results.append(
                     SearchResultItem(
@@ -215,6 +220,7 @@ class IGDBService:
                         item_type="game",
                         release_date=release_date,
                         popularity=pop_val,
+                        status=mapped_status,
                         badge=badge
                     )
                 )
