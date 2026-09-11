@@ -13,6 +13,8 @@ class MediaReview(Base):
     external_id = Column(String(100), nullable=False)
     rating = Column(Integer, nullable=True)  # 1 to 5 stars
     content = Column(Text, nullable=True)     # Review commentary text
+    media_url = Column(String(500), nullable=True)   # Attached GIF/Media URL
+    media_type = Column(String(50), nullable=True)   # gif, sticker, meme, clip
     is_edited = Column(DateTime(timezone=True), nullable=True)  # Or boolean / timestamp
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 

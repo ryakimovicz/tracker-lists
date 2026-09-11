@@ -5,6 +5,8 @@ from pydantic import BaseModel, Field
 class MediaReviewCreate(BaseModel):
     rating: Optional[int] = Field(None, ge=1, le=5, description="Rating from 1 to 5 stars")
     content: Optional[str] = Field(None, description="Optional text commentary review")
+    media_url: Optional[str] = Field(None, description="Optional attached media/GIF URL")
+    media_type: Optional[str] = Field(None, description="Optional media type (gif, sticker, meme, clip)")
     parent_id: Optional[int] = Field(None, description="Parent review ID if this is a reply")
 
 class MediaReviewResponse(BaseModel):
@@ -16,6 +18,8 @@ class MediaReviewResponse(BaseModel):
     external_id: str
     rating: Optional[int] = None
     content: Optional[str] = None
+    media_url: Optional[str] = None
+    media_type: Optional[str] = None
     parent_id: Optional[int] = None
     is_edited: Optional[datetime] = None
     created_at: datetime

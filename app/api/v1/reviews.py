@@ -62,6 +62,8 @@ def create_or_update_review(
             external_id=external_id,
             rating=None,
             content=review_in.content,
+            media_url=review_in.media_url,
+            media_type=review_in.media_type,
             created_at=datetime.now(timezone.utc)
         )
         db.add(reply_review)
@@ -88,6 +90,8 @@ def create_or_update_review(
             external_id=reply_review.external_id,
             rating=None,
             content=reply_review.content,
+            media_url=reply_review.media_url,
+            media_type=reply_review.media_type,
             parent_id=reply_review.parent_id,
             created_at=reply_review.created_at,
             vote_count=0,
@@ -121,6 +125,10 @@ def create_or_update_review(
             review.rating = review_in.rating
         if "content" in fields_set:
             review.content = review_in.content
+        if "media_url" in fields_set:
+            review.media_url = review_in.media_url
+        if "media_type" in fields_set:
+            review.media_type = review_in.media_type
     else:
         review = MediaReview(
             user_id=current_user.id,
@@ -129,6 +137,8 @@ def create_or_update_review(
             external_id=external_id,
             rating=review_in.rating,
             content=review_in.content,
+            media_url=review_in.media_url,
+            media_type=review_in.media_type,
             created_at=datetime.now(timezone.utc)
         )
         db.add(review)
@@ -172,6 +182,8 @@ def create_or_update_review(
         external_id=review.external_id,
         rating=review.rating,
         content=review.content,
+        media_url=review.media_url,
+        media_type=review.media_type,
         parent_id=review.parent_id,
         is_edited=review.is_edited,
         created_at=review.created_at,
@@ -207,6 +219,11 @@ def edit_review_or_reply(
     if "content" in fields_set:
         review.content = review_in.content
         review.is_edited = datetime.now(timezone.utc)
+    if "media_url" in fields_set:
+        review.media_url = review_in.media_url
+        review.is_edited = datetime.now(timezone.utc)
+    if "media_type" in fields_set:
+        review.media_type = review_in.media_type
     if "rating" in fields_set and review.parent_id is None:
         review.rating = review_in.rating
 
@@ -228,6 +245,8 @@ def edit_review_or_reply(
         external_id=review.external_id,
         rating=review.rating,
         content=review.content,
+        media_url=review.media_url,
+        media_type=review.media_type,
         parent_id=review.parent_id,
         is_edited=review.is_edited,
         created_at=review.created_at,
@@ -270,6 +289,8 @@ def get_item_reviews(
                 external_id=r.external_id,
                 rating=r.rating,
                 content=r.content,
+                media_url=r.media_url,
+                media_type=r.media_type,
                 parent_id=r.parent_id,
                 is_edited=r.is_edited,
                 created_at=r.created_at,
