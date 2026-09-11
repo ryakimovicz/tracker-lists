@@ -514,7 +514,13 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
       const validEps = !isComic ? allEps.filter((ep: any) => !isExtraEpisode(ep)) : allEps;
       const sortedValidEps = sortEpisodesChronologically(validEps);
       const aired = sortedValidEps.filter((ep: any) => {
-        if (isComic) return true;
+        if (isComic) {
+          if (ep.air_date || ep.airdate) {
+            const ad = ep.air_date || ep.airdate;
+            return new Date(ad).getTime() <= now;
+          }
+          return true;
+        }
         if (ep.airstamp) return new Date(ep.airstamp).getTime() <= now;
         if (ep.airdate || ep.air_date) {
           const ad = ep.airdate || ep.air_date;
@@ -1823,8 +1829,10 @@ export const Home: React.FC = () => {
       if (i.item_type === "custom") return false;
       if (i.badge === "dlc" || i.custom_badge === "dlc" || i.badge === "expansion" || i.custom_badge === "expansion") return false;
       
-      // 1. Standalone items (movies, games, books, comics, manga)
-      if (i.item_type !== 'series' && i.item_type !== 'anime') {
+      const isEpisodicComic = i.item_type === 'comic' && (!!i.tracking_list_id || String(i.external_id || '').startsWith('cv_vol_'));
+
+      // 1. Standalone items (movies, games, books, standalone comics, manga)
+      if (i.item_type !== 'series' && i.item_type !== 'anime' && !isEpisodicComic) {
         // If it has no release date at all (unreleased/announced without date like Half-Life 3), do not show in No comenzado
         if (!i.release_date) return false;
 
@@ -1839,12 +1847,20 @@ export const Home: React.FC = () => {
         if (rTime >= startOfTodayMs && rTime > nowMs) return false;
       }
 
-      // 2. Series / anime that haven't aired any episode yet belong only in Upcoming
-      if (i.item_type === 'series' || i.item_type === 'anime') {
-        const cacheKeyAll = `${i.external_id}_all_episodes`;
-        const allEps = getCachedSeries(cacheKeyAll);
+      // 2. Series / anime / comic volumes that haven't aired/released any episode/issue yet belong only in Upcoming
+      if (i.item_type === 'series' || i.item_type === 'anime' || isEpisodicComic) {
+        const cleanVolId = String(i.external_id || '').replace('cv_vol_', '').replace('cv_issue_', '').replace('cv_', '');
+        const cacheKeyAll = isEpisodicComic ? `${cleanVolId}_all_episodes` : `${i.external_id}_all_episodes`;
+        const allEps = getCachedSeries(cacheKeyAll) || (isEpisodicComic ? getCachedSeries(`cv_vol_${cleanVolId}_all_episodes`) : null) || (isEpisodicComic ? getCachedSeries(`${i.external_id}_all_episodes`) : null);
         if (allEps && Array.isArray(allEps) && allEps.length > 0) {
           const hasAnyAired = allEps.some((ep: any) => {
+            if (isEpisodicComic) {
+              if (ep.air_date || ep.airdate) {
+                const ad = ep.air_date || ep.airdate;
+                return new Date(ad).getTime() <= nowMs;
+              }
+              return true;
+            }
             if (ep.airstamp) return new Date(ep.airstamp).getTime() <= nowMs;
             if (ep.airdate || ep.air_date) {
               const ad = ep.airdate || ep.air_date;
@@ -1855,11 +1871,6 @@ export const Home: React.FC = () => {
           });
           // If no episode has aired yet, do not show in plan_to_watch
           if (!hasAnyAired) return false;
-        } else if (!allEps) {
-          // If episodes not loaded yet, check if release_date is missing or future
-          if (!i.release_date) {
-            // Series without any release date info yet
-          }
         }
       }
 
@@ -1872,18 +1883,23 @@ export const Home: React.FC = () => {
       if (!["completed", "read"].includes(i.status)) return false;
       if (i.item_type === "custom") return false;
 
-      // Ongoing series / anime that are not ended (isEnded is false) are "Al día", NOT completed!
-      if (i.item_type === 'series' || i.item_type === 'anime') {
-        const cacheKey = `series_${i.external_id}`;
-        const cached = i.external_id ? getCachedSeries(cacheKey) : null;
+      // Ongoing series / anime / comic volumes that are not ended (isEnded is false) are "Al día", NOT completed!
+      if (i.item_type === 'series' || i.item_type === 'anime' || i.item_type === 'comic') {
+        const cleanVolId = String(i.external_id || '').replace('cv_vol_', '').replace('cv_issue_', '').replace('cv_', '');
+        const volMeta = i.item_type === 'comic' ? (getCachedSeries(`comic_vol_${i.external_id}`) || getCachedSeries(`${i.external_id}_metadata`) || getCachedSeries(`cv_vol_${cleanVolId}_metadata`) || getCachedSeries(`series_${i.external_id}`)) : null;
+        const cached = i.item_type === 'comic' ? volMeta : (i.external_id ? getCachedSeries(`series_${i.external_id}`) : null);
         const anyItem = i as any;
         const sStatus = cached?.status || anyItem.series_status;
-        const isEnded = sStatus === 'Ended' || anyItem.is_ended === true;
+        const currentYear = new Date().getFullYear();
+        const titleYearMatch = i.title ? String(i.title).match(/\b(19\d\d|20\d\d)\b/) : null;
+        const startYr = parseInt(i.release_date || cached?.start_year || cached?.first_air_date || (titleYearMatch ? titleYearMatch[1] : '0'));
+        const isEnded = sStatus === 'Ended' || anyItem.is_ended === true || cached?.is_ended === true || (startYr > 0 && startYr < currentYear - 1);
         if (!isEnded) {
-          // If database had saved it as completed, restore to watching
-          if (i.status === 'completed') {
-            i.status = 'watching';
-            apiClient.put(`/library/${i.id}`, { status: 'watching' }).catch(() => {});
+          // If database had saved it as completed/read, restore to watching/reading
+          if (i.status === 'completed' || i.status === 'read') {
+            const revertStatus = i.item_type === 'comic' ? 'reading' : 'watching';
+            i.status = revertStatus;
+            apiClient.put(`/library/${i.id}`, { status: revertStatus }).catch(() => {});
           }
           return false;
         }
@@ -2454,7 +2470,7 @@ export const Home: React.FC = () => {
                         );
                       }
 
-                      if (activeTab === "completed" && (item.item_type === "series" || item.item_type === "anime")) {
+                      if (activeTab === "completed" && (item.item_type === "series" || item.item_type === "anime" || isTrackedComic)) {
                         return (
                           <CompletedSeriesCard 
                             key={item.id}
@@ -2468,7 +2484,7 @@ export const Home: React.FC = () => {
                         );
                       }
 
-                      if (activeTab === "dropped" && (item.item_type === "series" || item.item_type === "anime")) {
+                      if (activeTab === "dropped" && (item.item_type === "series" || item.item_type === "anime" || isTrackedComic)) {
                         return (
                           <DroppedSeriesCard 
                             key={item.id}

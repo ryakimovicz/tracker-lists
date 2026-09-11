@@ -325,6 +325,12 @@ class ComicVineService:
                         "name": f"Volumen ({start_yr})" if start_yr else "Volumen"
                     }]
 
+                    from datetime import datetime
+                    current_year = datetime.now().year
+                    start_yr_int = int(start_yr) if (start_yr and str(start_yr).isdigit()) else 0
+                    is_ended = True if (start_yr_int and start_yr_int < current_year - 1) else False
+                    status_str = "Ended" if is_ended else "Running"
+
                     return {
                         "id": f"cv_vol_{raw_id}",
                         "name": vol_name,
@@ -336,7 +342,9 @@ class ComicVineService:
                         "overview": desc,
                         "first_air_date": str(start_yr) if start_yr else None,
                         "image_url": img_url,
-                        "count_of_issues": count_issues
+                        "count_of_issues": count_issues,
+                        "status": status_str,
+                        "is_ended": is_ended
                     }
         except Exception as e:
             print(f"Comic Vine get_comic_volume_detail error: {e}")

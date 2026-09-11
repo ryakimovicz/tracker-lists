@@ -76,6 +76,7 @@ interface LibraryItem {
   tracking_list_id?: number;
   times_completed?: number;
   last_seen_episode_count?: number;
+  release_date?: string;
 }
 
 
@@ -1622,10 +1623,51 @@ export const Profile: React.FC = () => {
                               }
                               // Reading (Books, Comics, Manga)
                               else if (['book', 'comic', 'manga'].includes(item.item_type)) {
-                                if (hasEverCompleted) {
-                                  badges.push({ text: language === 'es' ? 'Leído' : 'Read', color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)' });
-                                } else if (item.status === 'reading') {
-                                  badges.push({ text: language === 'es' ? 'Leyendo' : 'Reading', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' });
+                                if (item.item_type === 'comic') {
+                                  const cleanVolId = String(item.external_id || '').replace('cv_vol_', '').replace('cv_issue_', '').replace('cv_', '');
+                                  const volMeta = getCachedSeries(`comic_vol_${item.external_id}`) || getCachedSeries(`${item.external_id}_metadata`) || getCachedSeries(`cv_vol_${cleanVolId}_metadata`) || getCachedSeries(`series_${item.external_id}`);
+                                  const anyItem = item as any;
+                                  const sStatus = volMeta?.status || anyItem.series_status;
+                                  const currentYear = new Date().getFullYear();
+                                  const titleYearMatch = item.title ? String(item.title).match(/\b(19\d\d|20\d\d)\b/) : null;
+                                  const startYr = parseInt(item.release_date || volMeta?.start_year || volMeta?.first_air_date || (titleYearMatch ? titleYearMatch[1] : '0'));
+                                  const isEnded = sStatus === 'Ended' || anyItem.is_ended === true || volMeta?.is_ended === true || (startYr > 0 && startYr < currentYear - 1);
+
+                                  if (hasEverCompleted || item.status === 'completed' || item.status === 'read') {
+                                    if (isEnded) {
+                                      badges.push({ text: language === 'es' ? 'Leído' : 'Read', color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)' });
+                                    } else {
+                                      badges.push({ text: language === 'es' ? 'Al día' : 'Up to date', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' });
+                                    }
+                                  } else if (item.status === 'reading') {
+                                    const cleanVolId = String(item.external_id || '').replace('cv_vol_', '').replace('cv_issue_', '').replace('cv_', '');
+                                    const allEps = getCachedSeries(`${cleanVolId}_all_episodes`) || getCachedSeries(`cv_vol_${cleanVolId}_all_episodes`) || getCachedSeries(`${item.external_id}_all_episodes`);
+                                    let isUpToDate = false;
+                                    if (allEps && Array.isArray(allEps) && allEps.length > 0) {
+                                      const nowMs = Date.now();
+                                      const releasedIssues = allEps.filter((e: any) => {
+                                        if (e.air_date || e.airdate) {
+                                          const ad = e.air_date || e.airdate;
+                                          return new Date(ad).getTime() <= nowMs;
+                                        }
+                                        return true;
+                                      });
+                                      if (releasedIssues.length > 0 && item.last_seen_episode_count != null && item.last_seen_episode_count >= releasedIssues.length) {
+                                        isUpToDate = true;
+                                      }
+                                    }
+                                    if (isUpToDate) {
+                                      badges.push({ text: language === 'es' ? 'Al día' : 'Up to date', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' });
+                                    } else {
+                                      badges.push({ text: language === 'es' ? 'Leyendo' : 'Reading', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' });
+                                    }
+                                  }
+                                } else {
+                                  if (hasEverCompleted || item.status === 'completed' || item.status === 'read') {
+                                    badges.push({ text: language === 'es' ? 'Leído' : 'Read', color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)' });
+                                  } else if (item.status === 'reading') {
+                                    badges.push({ text: language === 'es' ? 'Leyendo' : 'Reading', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' });
+                                  }
                                 }
                               }
 
