@@ -304,20 +304,29 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  // Load Initial Data when Tab Changes
+  // Reset state when modal opens or closes
   useEffect(() => {
-    if (!isOpen) {
+    if (isOpen) {
+      setActiveTab(initialTab);
+      setSearchQuery('');
+      setSelectedCategory(null);
       setUnmutedClipId(null);
-      return;
+    } else {
+      setUnmutedClipId(null);
     }
+  }, [isOpen, initialTab]);
+
+  // Load Categories & Media when Tab Changes or Modal Opens
+  useEffect(() => {
+    if (!isOpen) return;
+
     setItems([]);
     setPage(1);
     setHasMore(true);
     setSelectedCategory(null);
-    setSearchQuery('');
     setUnmutedClipId(null);
     loadCategories(activeTab);
-    fetchMedia(activeTab, '', 1, false);
+    fetchMedia(activeTab, searchQuery, 1, false);
   }, [activeTab, isOpen]);
 
   // Fetch Categories for current tab
