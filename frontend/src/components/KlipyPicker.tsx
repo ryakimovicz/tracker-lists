@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Search, X, Loader2, Sparkles, Image as ImageIcon, Smile, Film, FileQuestion, Volume2, VolumeX } from 'lucide-react';
+import { Search, X, Loader2, Sparkles, Image as ImageIcon, Smile, Film, FileQuestion, Volume2, VolumeX, Heart, FolderHeart, ArrowLeft } from 'lucide-react';
 import { useTranslation } from '../context/LanguageContext';
+import { getKlipyFavorites, isKlipyFavorite, toggleKlipyFavorite } from '../utils/klipyFavorites';
+import type { KlipyFavoriteItem } from '../utils/klipyFavorites';
 
 // Official Klipy Ribbon/K Symbol SVG
 const KlipyLogo = ({ size = 20 }: { size?: number }) => (
@@ -137,6 +139,34 @@ const KlipyClipCard: React.FC<{
     e.stopPropagation();
   };
 
+  const [isFavorite, setIsFavorite] = useState<boolean>(() => isKlipyFavorite(mainUrl));
+
+  useEffect(() => {
+    setIsFavorite(isKlipyFavorite(mainUrl));
+    const handleFavChange = (e: CustomEvent<{ url: string; isFavorite: boolean }>) => {
+      if (e.detail?.url === mainUrl) {
+        setIsFavorite(e.detail.isFavorite);
+      }
+    };
+    window.addEventListener('klipy_favorites_changed' as any, handleFavChange as EventListener);
+    return () => {
+      window.removeEventListener('klipy_favorites_changed' as any, handleFavChange as EventListener);
+    };
+  }, [mainUrl]);
+
+  const handleToggleFavorite = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const nowFav = toggleKlipyFavorite({
+      id: item?.id,
+      url: mainUrl,
+      type: item?.type || 'clip',
+      slug: item?.slug,
+      title: item?.title,
+      preview_url: previewUrl || mainUrl
+    });
+    setIsFavorite(nowFav);
+  };
+
   return (
     <div
       ref={containerRef}
@@ -166,6 +196,43 @@ const KlipyClipCard: React.FC<{
         if (!isUnmuted) e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.06)';
       }}
     >
+      {/* Top-Left Favorite Button */}
+      <button
+        type="button"
+        onClick={handleToggleFavorite}
+        title={isFavorite ? 'Quitar de favoritos' : 'Guardar en favoritos'}
+        aria-label={isFavorite ? 'Quitar de favoritos' : 'Guardar en favoritos'}
+        style={{
+          position: 'absolute',
+          top: '5px',
+          left: '5px',
+          background: isFavorite ? 'rgba(236, 72, 153, 0.95)' : 'rgba(0, 0, 0, 0.65)',
+          color: isFavorite ? '#fff' : '#cbd5e1',
+          border: '1px solid rgba(255, 255, 255, 0.2)',
+          borderRadius: '50%',
+          width: '24px',
+          height: '24px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          zIndex: 4,
+          backdropFilter: 'blur(4px)',
+          transition: 'all 0.15s ease',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.4)'
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.transform = 'scale(1.15)';
+          if (!isFavorite) e.currentTarget.style.color = '#ec4899';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.transform = 'scale(1)';
+          if (!isFavorite) e.currentTarget.style.color = '#cbd5e1';
+        }}
+      >
+        <Heart size={13} fill={isFavorite ? '#fff' : 'none'} />
+      </button>
+
       <video
         ref={videoRef}
         src={mainUrl}
@@ -243,6 +310,121 @@ const KlipyClipCard: React.FC<{
   );
 };
 
+const KlipyMediaCard: React.FC<{
+  item: any;
+  mainUrl: string;
+  previewUrl?: string;
+  mediaType: 'gif' | 'sticker' | 'meme' | 'emoji';
+  onSelect: () => void;
+}> = ({ item, mainUrl, previewUrl, mediaType, onSelect }) => {
+  const [isFavorite, setIsFavorite] = useState<boolean>(() => isKlipyFavorite(mainUrl));
+
+  useEffect(() => {
+    setIsFavorite(isKlipyFavorite(mainUrl));
+    const handleFavChange = (e: CustomEvent<{ url: string; isFavorite: boolean }>) => {
+      if (e.detail?.url === mainUrl) {
+        setIsFavorite(e.detail.isFavorite);
+      }
+    };
+    window.addEventListener('klipy_favorites_changed' as any, handleFavChange as EventListener);
+    return () => {
+      window.removeEventListener('klipy_favorites_changed' as any, handleFavChange as EventListener);
+    };
+  }, [mainUrl]);
+
+  const handleToggleFavorite = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const nowFav = toggleKlipyFavorite({
+      id: item?.id,
+      url: mainUrl,
+      type: mediaType,
+      slug: item?.slug,
+      title: item?.title,
+      preview_url: previewUrl || mainUrl
+    });
+    setIsFavorite(nowFav);
+  };
+
+  return (
+    <div
+      onClick={onSelect}
+      style={{
+        position: 'relative',
+        width: '100%',
+        height: '100%',
+        borderRadius: '8px',
+        overflow: 'hidden',
+        background: 'rgba(255, 255, 255, 0.03)',
+        border: '1px solid rgba(255, 255, 255, 0.06)',
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        transition: 'transform 0.15s ease, box-shadow 0.15s ease'
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.transform = 'scale(1.03)';
+        e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.4)';
+        e.currentTarget.style.borderColor = 'var(--accent-primary, #6366f1)';
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.transform = 'scale(1)';
+        e.currentTarget.style.boxShadow = 'none';
+        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.06)';
+      }}
+    >
+      {/* Top-Left Favorite Button */}
+      <button
+        type="button"
+        onClick={handleToggleFavorite}
+        title={isFavorite ? 'Quitar de favoritos' : 'Guardar en favoritos'}
+        aria-label={isFavorite ? 'Quitar de favoritos' : 'Guardar en favoritos'}
+        style={{
+          position: 'absolute',
+          top: '5px',
+          left: '5px',
+          background: isFavorite ? 'rgba(236, 72, 153, 0.95)' : 'rgba(0, 0, 0, 0.65)',
+          color: isFavorite ? '#fff' : '#cbd5e1',
+          border: '1px solid rgba(255, 255, 255, 0.2)',
+          borderRadius: '50%',
+          width: '24px',
+          height: '24px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          zIndex: 4,
+          backdropFilter: 'blur(4px)',
+          transition: 'all 0.15s ease',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.4)'
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.transform = 'scale(1.15)';
+          if (!isFavorite) e.currentTarget.style.color = '#ec4899';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.transform = 'scale(1)';
+          if (!isFavorite) e.currentTarget.style.color = '#cbd5e1';
+        }}
+      >
+        <Heart size={13} fill={isFavorite ? '#fff' : 'none'} />
+      </button>
+
+      <img
+        src={previewUrl || mainUrl}
+        alt={item?.title || 'media'}
+        loading="lazy"
+        style={{
+          width: '100%',
+          height: '100%',
+          objectFit: mediaType === 'sticker' ? 'contain' : 'cover',
+          display: 'block'
+        }}
+      />
+    </div>
+  );
+};
+
 export interface KlipyPickerProps {
   isOpen: boolean;
   onClose: () => void;
@@ -278,6 +460,20 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
     }
   });
 
+  const [viewFavorites, setViewFavorites] = useState(false);
+  const [favoritesList, setFavoritesList] = useState<KlipyFavoriteItem[]>(() => getKlipyFavorites());
+
+  // Listen to favorite additions/removals
+  useEffect(() => {
+    const handleFavChange = () => {
+      setFavoritesList(getKlipyFavorites());
+    };
+    window.addEventListener('klipy_favorites_changed' as any, handleFavChange as EventListener);
+    return () => {
+      window.removeEventListener('klipy_favorites_changed' as any, handleFavChange as EventListener);
+    };
+  }, []);
+
   const handleClipVolumeChange = (itemKey: string, newVol: number) => {
     setClipVolume(newVol);
     try {
@@ -310,9 +506,12 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
       setActiveTab(initialTab);
       setSearchQuery('');
       setSelectedCategory(null);
+      setViewFavorites(false);
       setUnmutedClipId(null);
+      setFavoritesList(getKlipyFavorites());
     } else {
       setUnmutedClipId(null);
+      setViewFavorites(false);
     }
   }, [isOpen, initialTab]);
 
@@ -324,6 +523,7 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
     setPage(1);
     setHasMore(true);
     setSelectedCategory(null);
+    setViewFavorites(false);
     setUnmutedClipId(null);
     loadCategories(activeTab);
     fetchMedia(activeTab, searchQuery, 1, false);
@@ -766,6 +966,43 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
           </div>
         )}
 
+        {/* Grid Content Header / Folder Banner when viewing favorites */}
+        {viewFavorites && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '0.4rem 1rem 0.2rem',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.06)'
+          }}>
+            <button
+              onClick={() => setViewFavorites(false)}
+              style={{
+                background: 'rgba(255, 255, 255, 0.06)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                color: 'var(--text-primary)',
+                borderRadius: '8px',
+                padding: '0.3rem 0.6rem',
+                fontSize: '0.78rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease'
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'var(--accent-primary, #6366f1)')}
+              onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)')}
+            >
+              <ArrowLeft size={14} />
+              <span>{language === 'es' ? 'Volver a explorar' : 'Back to explore'}</span>
+            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: '#ec4899', fontSize: '0.82rem', fontWeight: 600 }}>
+              <Heart size={14} fill="#ec4899" />
+              <span>{language === 'es' ? 'Favoritos guardados' : 'Saved Favorites'}</span>
+            </div>
+          </div>
+        )}
+
         {/* Grid Content */}
         <div
           onScroll={handleScroll}
@@ -780,7 +1017,154 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
             alignContent: 'start'
           }}
         >
-          {Array.isArray(items) && items.map((item, idx) => {
+          {/* Favorites Folder as the very first item when not searching and not inside folder */}
+          {!searchQuery && !viewFavorites && (
+            <div
+              onClick={() => setViewFavorites(true)}
+              style={{
+                position: 'relative',
+                width: '100%',
+                height: '100%',
+                borderRadius: '8px',
+                overflow: 'hidden',
+                background: 'linear-gradient(135deg, rgba(236, 72, 153, 0.15) 0%, rgba(99, 102, 241, 0.15) 100%)',
+                border: '1px dashed rgba(236, 72, 153, 0.5)',
+                cursor: 'pointer',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.4rem',
+                transition: 'transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease',
+                userSelect: 'none'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'scale(1.03)';
+                e.currentTarget.style.boxShadow = '0 6px 16px rgba(236, 72, 153, 0.25)';
+                e.currentTarget.style.borderColor = '#ec4899';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'scale(1)';
+                e.currentTarget.style.boxShadow = 'none';
+                e.currentTarget.style.borderColor = 'rgba(236, 72, 153, 0.5)';
+              }}
+            >
+              <div style={{
+                background: 'rgba(236, 72, 153, 0.2)',
+                borderRadius: '50%',
+                width: '36px',
+                height: '36px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#ec4899'
+              }}>
+                <FolderHeart size={20} />
+              </div>
+              <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '0.02em' }}>
+                {language === 'es' ? 'Favoritos' : 'Favorites'}
+              </span>
+              <span style={{ fontSize: '0.68rem', color: '#ec4899', fontWeight: 600 }}>
+                {favoritesList.filter(f => activeTab === 'clips' ? f.type === 'clip' : activeTab === 'stickers' ? f.type === 'sticker' : activeTab === 'memes' ? f.type === 'meme' : (f.type === 'gif' || !f.type)).length}{' '}
+                {language === 'es' ? 'guardados' : 'saved'}
+              </span>
+            </div>
+          )}
+
+          {/* VIEW: Favorites Mode */}
+          {viewFavorites && (() => {
+            const currentTabFavs = favoritesList.filter((f) => {
+              if (activeTab === 'clips') return f.type === 'clip' || f.url?.endsWith('.mp4');
+              if (activeTab === 'stickers') return f.type === 'sticker';
+              if (activeTab === 'memes') return f.type === 'meme';
+              return f.type === 'gif' || (!f.type && !f.url?.endsWith('.mp4'));
+            });
+
+            if (currentTabFavs.length === 0) {
+              return (
+                <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '3.5rem 1rem', color: 'var(--text-muted)' }}>
+                  <FolderHeart size={36} color="#ec4899" style={{ margin: '0 auto 0.75rem', opacity: 0.6 }} />
+                  <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                    {language === 'es' ? 'No tienes favoritos en esta categoría' : 'No favorites in this category yet'}
+                  </p>
+                  <p style={{ margin: '0.35rem 0 0', fontSize: '0.78rem' }}>
+                    {language === 'es'
+                      ? 'Haz clic en el corazón de cualquier elemento para guardarlo aquí.'
+                      : 'Click the heart icon on any media item to save it here.'}
+                  </p>
+                </div>
+              );
+            }
+
+            return currentTabFavs.map((fav, idx) => {
+              const itemKey = `fav-${fav.id || fav.url}-${idx}`;
+              const isClip = activeTab === 'clips' || fav.type === 'clip' || fav.url?.endsWith('.mp4');
+
+              if (isClip) {
+                return (
+                  <KlipyClipCard
+                    key={itemKey}
+                    item={fav}
+                    mainUrl={fav.url}
+                    previewUrl={fav.preview_url || fav.url}
+                    isUnmuted={unmutedClipId === itemKey}
+                    volume={clipVolume}
+                    onVolumeChange={(newVol) => handleClipVolumeChange(itemKey, newVol)}
+                    onToggleSound={(e) => {
+                      e.stopPropagation();
+                      if (unmutedClipId === itemKey) {
+                        setUnmutedClipId(null);
+                      } else {
+                        if (clipVolume === 0) {
+                          setClipVolume(0.8);
+                          try { localStorage.setItem('klipy_clip_volume', '0.8'); } catch (err) {}
+                        }
+                        setUnmutedClipId(itemKey);
+                      }
+                    }}
+                    onSelect={() => {
+                      onSelectMedia({
+                        url: fav.url,
+                        preview_url: fav.preview_url || fav.url,
+                        type: 'clip',
+                        slug: fav.slug || String(fav.id || 'fav-clip'),
+                        title: fav.title || 'Clip'
+                      });
+                      onClose();
+                    }}
+                  />
+                );
+              }
+
+              return (
+                <KlipyMediaCard
+                  key={itemKey}
+                  item={fav}
+                  mainUrl={fav.url}
+                  previewUrl={fav.preview_url || fav.url}
+                  mediaType={(fav.type as any) || (activeTab === 'stickers' ? 'sticker' : activeTab === 'memes' ? 'meme' : 'gif')}
+                  onSelect={() => {
+                    let mediaType: SelectedKlipyMedia['type'] = 'gif';
+                    if (activeTab === 'stickers' || fav.type === 'sticker') mediaType = 'sticker';
+                    else if (activeTab === 'memes' || fav.type === 'meme') mediaType = 'meme';
+                    else mediaType = 'gif';
+
+                    onSelectMedia({
+                      url: fav.url,
+                      preview_url: fav.preview_url || fav.url,
+                      type: mediaType,
+                      slug: fav.slug || String(fav.id || 'fav-media'),
+                      title: fav.title || 'Media'
+                    });
+                    onClose();
+                  }}
+                />
+              );
+            });
+          })()}
+
+          {/* VIEW: Regular Klipy Explorer Items */}
+          {!viewFavorites && Array.isArray(items) && items.map((item, idx) => {
             const { mainUrl, previewUrl } = extractMediaUrls(item);
             if (!mainUrl && !previewUrl) return null;
 
@@ -815,50 +1199,18 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
             }
 
             return (
-              <div
+              <KlipyMediaCard
                 key={itemKey}
-                onClick={() => handleSelect(item)}
-                style={{
-                  position: 'relative',
-                  width: '100%',
-                  height: '100%',
-                  borderRadius: '8px',
-                  overflow: 'hidden',
-                  background: 'rgba(255, 255, 255, 0.03)',
-                  border: '1px solid rgba(255, 255, 255, 0.06)',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  transition: 'transform 0.15s ease, box-shadow 0.15s ease'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'scale(1.03)';
-                  e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.4)';
-                  e.currentTarget.style.borderColor = 'var(--accent-primary, #6366f1)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'scale(1)';
-                  e.currentTarget.style.boxShadow = 'none';
-                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.06)';
-                }}
-              >
-                <img
-                  src={previewUrl || mainUrl}
-                  alt={item.title || 'media'}
-                  loading="lazy"
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    objectFit: activeTab === 'stickers' ? 'contain' : 'cover',
-                    display: 'block'
-                  }}
-                />
-              </div>
+                item={item}
+                mainUrl={mainUrl}
+                previewUrl={previewUrl}
+                mediaType={activeTab === 'stickers' ? 'sticker' : activeTab === 'memes' ? 'meme' : 'gif'}
+                onSelect={() => handleSelect(item)}
+              />
             );
           })}
 
-          {(!Array.isArray(items) || items.length === 0) && !loading && (
+          {!viewFavorites && (!Array.isArray(items) || items.length === 0) && !loading && (
             <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '3rem 1rem', color: 'var(--text-muted)' }}>
               <p style={{ margin: 0, fontSize: '0.9rem' }}>
                 {language === 'es' ? 'No se encontraron resultados en KLIPY' : 'No results found on KLIPY'}
@@ -866,7 +1218,7 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
             </div>
           )}
 
-          {loading && (
+          {!viewFavorites && loading && (
             <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'center', padding: '1.5rem' }}>
               <Loader2 className="animate-spin" size={24} color="var(--accent-primary)" />
             </div>

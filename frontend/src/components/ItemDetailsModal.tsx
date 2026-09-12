@@ -12,6 +12,7 @@ import { getCachedSeries, setCachedSeries } from '../utils/seriesCache';
 import { useAuth } from '../context/AuthContext';
 import { KlipyPicker } from './KlipyPicker';
 import type { SelectedKlipyMedia } from './KlipyPicker';
+import { isKlipyFavorite, toggleKlipyFavorite } from '../utils/klipyFavorites';
 
 
 
@@ -290,6 +291,37 @@ const MediaAttachmentView: React.FC<{
     }
   };
 
+  const [isFavorite, setIsFavorite] = useState<boolean>(() => {
+    return mediaUrl ? isKlipyFavorite(mediaUrl) : false;
+  });
+
+  useEffect(() => {
+    if (!mediaUrl) return;
+    setIsFavorite(isKlipyFavorite(mediaUrl));
+
+    const handleFavChange = (e: CustomEvent<{ url: string; isFavorite: boolean }>) => {
+      if (e.detail?.url === mediaUrl) {
+        setIsFavorite(e.detail.isFavorite);
+      }
+    };
+
+    window.addEventListener('klipy_favorites_changed' as any, handleFavChange as EventListener);
+    return () => {
+      window.removeEventListener('klipy_favorites_changed' as any, handleFavChange as EventListener);
+    };
+  }, [mediaUrl]);
+
+  const handleToggleFavorite = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!mediaUrl) return;
+    const nowFav = toggleKlipyFavorite({
+      url: mediaUrl,
+      type: (mediaType as any) || (isClip ? 'clip' : isSticker ? 'sticker' : 'gif'),
+      preview_url: mediaUrl
+    });
+    setIsFavorite(nowFav);
+  };
+
   return (
     <div
       ref={containerRef}
@@ -304,6 +336,42 @@ const MediaAttachmentView: React.FC<{
       display: 'inline-block',
       userSelect: 'none'
     }}>
+      {/* Top-Left Favorite Button */}
+      <button
+        type="button"
+        onClick={handleToggleFavorite}
+        title={isFavorite ? 'Quitar de favoritos' : 'Guardar en favoritos'}
+        aria-label={isFavorite ? 'Quitar de favoritos' : 'Guardar en favoritos'}
+        style={{
+          position: 'absolute',
+          top: '5px',
+          left: '5px',
+          background: isFavorite ? 'rgba(236, 72, 153, 0.95)' : 'rgba(0, 0, 0, 0.65)',
+          color: isFavorite ? '#fff' : '#cbd5e1',
+          border: '1px solid rgba(255, 255, 255, 0.2)',
+          borderRadius: '50%',
+          width: '24px',
+          height: '24px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          zIndex: 4,
+          backdropFilter: 'blur(4px)',
+          transition: 'all 0.15s ease',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.4)'
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.transform = 'scale(1.15)';
+          if (!isFavorite) e.currentTarget.style.color = '#ec4899';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.transform = 'scale(1)';
+          if (!isFavorite) e.currentTarget.style.color = '#cbd5e1';
+        }}
+      >
+        <Heart size={13} fill={isFavorite ? '#fff' : 'none'} />
+      </button>
       {isClip ? (
         <div
           onClick={togglePlayPause}
