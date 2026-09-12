@@ -26,6 +26,32 @@ export const getTagClass = (type: string) => {
   }
 };
 
+export const cleanComicIssueName = (rawName?: string, issueNum?: any): string => {
+  if (!rawName) return '';
+  let name = String(rawName).trim();
+  const numStr = issueNum != null ? String(issueNum).trim() : '';
+
+  // If name is just "#1" or "Issue 1" or "Issue #1" or identical to number
+  if (/^#?\s*\d+(\.\d+)?$/i.test(name) || /^issue\s*#?\s*\d+(\.\d+)?$/i.test(name)) {
+    return '';
+  }
+
+  // If name includes volume title prefix e.g. "Batman (2016) #1 - The Joker" or "Batman #1 - The Joker"
+  const volumePrefixMatch = name.match(/^(.*?)(?:#\s*\d+(\.\d+)?|issue\s*#?\s*\d+(\.\d+)?)\s*[-:–—.]\s*(.*)$/i);
+  if (volumePrefixMatch && volumePrefixMatch[3]) {
+    name = volumePrefixMatch[3].trim();
+  }
+
+  // Strip leading issue number prefix, e.g. "#1 - Title", "#1: Title", "1. Title", "Issue #1 - Title"
+  name = name.replace(/^(issue\s*)?#?\s*\d+(\.\d+)?\s*[-:–—.]\s*/i, '').trim();
+
+  // If after stripping it's empty or still just the issue number
+  if (!name || (numStr && (name === numStr || name === `#${numStr}` || name.toLowerCase() === `issue ${numStr}` || name.toLowerCase() === `issue #${numStr}`))) {
+    return '';
+  }
+  return name;
+};
+
 // --- Helper Components ---
 
 const getSavedMode = (key?: string): 'one-row' | 'two-rows' | 'collapsed' => {
@@ -1014,7 +1040,7 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
     if (isComic) {
       const issueNum = nextEp.issue_number || nextEp.episode_number;
       seasonText = issueNum ? `#${issueNum}` : (language === 'es' ? 'Número' : 'Issue');
-      epName = nextEp.name || (nextEp.issue_number ? `#${nextEp.issue_number}` : (language === 'es' ? 'Número' : 'Issue'));
+      epName = cleanComicIssueName(nextEp.name || nextEp.title, issueNum);
     } else {
       const isNextSpecial = isSpecialEpisode(nextEp);
       if (isNextSpecial) {
@@ -1087,7 +1113,9 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
           ) : seasonText ? (
             <>
               <div style={{ fontSize: "0.88rem", color: "var(--text-primary)", fontWeight: 700 }}>{seasonText}</div>
-              <div style={{ fontSize: isPoster ? "0.78rem" : "0.8rem", color: "var(--text-secondary)", fontWeight: 500, lineHeight: 1.2, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", paddingRight: isPoster ? undefined : "36px" }}>{epName}</div>
+              {epName ? (
+                <div style={{ fontSize: isPoster ? "0.78rem" : "0.8rem", color: "var(--text-secondary)", fontWeight: 500, lineHeight: 1.2, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", paddingRight: isPoster ? undefined : "36px" }}>{epName}</div>
+              ) : null}
             </>
           ) : (
             <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text-secondary)", marginTop: "auto", marginBottom: "auto" }}>
@@ -1160,14 +1188,76 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
 };
 
 const CompletedSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, themeTextColor }: { item: any, onUpdate: () => void, language: string, onOpenSeries: (item: any) => void, themeColor?: string, themeTextColor?: string }) => {
-  const [seriesTotals, setSeriesTotals] = useState<{ seasons: number; episodes: number } | null>(null);
-
-  const pad = (n: number) => n < 10 ? '0' + n : n;
+  const [seriesTotals, setSeriesTotals] = useState<{ seasons: number; episodes: number; pages?: number } | null>(null);
+  const isComic = item.item_type === 'comic' || String(item.external_id || '').startsWith('cv_vol_');
 
   useEffect(() => {
     let isMounted = true;
     const fetchSeriesTotals = async () => {
       try {
+        if (isComic) {
+          const cleanVolId = String(item.external_id || '').replace('cv_vol_', '').replace('cv_issue_', '').replace('cv_', '');
+          const cacheKeyAll = `${item.external_id}_all_episodes`;
+          let allEps = getCachedSeries(cacheKeyAll) || getCachedSeries(`cv_vol_${cleanVolId}_all_episodes`);
+          if (!allEps || !Array.isArray(allEps) || allEps.length === 0) {
+            try {
+              const epRes = await apiClient.get(`/search/comic/volume/${item.external_id}/issues`);
+              allEps = epRes.data;
+              setCachedSeries(cacheKeyAll, allEps);
+            } catch (e) {
+              allEps = null;
+            }
+          }
+          const totalIssues = (Array.isArray(allEps) && allEps.length > 0)
+            ? allEps.length
+            : (item.count_of_issues || (item.seasons?.[0]?.episode_count) || 1);
+
+          let trackedItems = item.tracking_list_id ? (getCachedSeries(`list_${item.tracking_list_id}`) || []) : [];
+          if ((!trackedItems || trackedItems.length === 0) && item.tracking_list_id) {
+            try {
+              const listRes = await apiClient.get(`/lists/${item.tracking_list_id}`);
+              trackedItems = listRes.data.items || [];
+              setCachedSeries(`list_${item.tracking_list_id}`, trackedItems);
+            } catch (e) {}
+          }
+
+          let totalPagesSum = 0;
+          if (Array.isArray(allEps) && allEps.length > 0) {
+            allEps.forEach((ep: any) => {
+              const cleanId = String(ep.id || ep.external_id || '').replace('cv_issue_', '').replace('cv_', '');
+              const extIdKey = `cv_issue_${cleanId}`;
+              const trackedItem = (trackedItems || []).find((t: any) => {
+                const tClean = String(t.external_id || '').replace('cv_issue_', '').replace('cv_', '');
+                return (tClean && tClean === cleanId) || t.external_id === extIdKey || (ep.issue_number && t.title && (t.title.includes(`#${ep.issue_number}`) || t.episode_number == ep.issue_number));
+              });
+              const cachedState = getCachedSeries(`issue_state_${extIdKey}`) || getCachedSeries(`issue_state_cv_issue_${cleanId}`);
+
+              const p = (trackedItem && (trackedItem.pages_read || trackedItem.total_pages || trackedItem.page_count))
+                || (cachedState && (cachedState.pages_read || cachedState.total_pages))
+                || ep.page_count
+                || ep.total_pages
+                || ep.pages_read
+                || 0;
+
+              const parsed = parseInt(String(p), 10);
+              if (!isNaN(parsed) && parsed > 0) {
+                totalPagesSum += parsed;
+              }
+            });
+          } else if (item.pages_read || item.total_pages) {
+            totalPagesSum = parseInt(String(item.pages_read || item.total_pages), 10) || 0;
+          }
+
+          if (isMounted) {
+            setSeriesTotals({
+              seasons: 1,
+              episodes: totalIssues,
+              pages: totalPagesSum
+            });
+          }
+          return;
+        }
+
         const cacheKey = `series_${item.external_id}`;
         let seasonsCount = 0;
         let cached = getCachedSeries(cacheKey);
@@ -1211,7 +1301,14 @@ const CompletedSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColo
       }
     };
     fetchSeriesTotals();
-    return () => { isMounted = false; };
+    const handleLibUpdated = () => {
+      fetchSeriesTotals();
+    };
+    window.addEventListener('library-updated', handleLibUpdated);
+    return () => {
+      isMounted = false;
+      window.removeEventListener('library-updated', handleLibUpdated);
+    };
   }, [item, language]);
 
   const seasonsLabel = seriesTotals 
@@ -1223,6 +1320,16 @@ const CompletedSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColo
     ? (language === 'es' 
         ? `${seriesTotals.episodes} ${seriesTotals.episodes === 1 ? 'episodio' : 'episodios'}` 
         : `${seriesTotals.episodes} ${seriesTotals.episodes === 1 ? 'episode' : 'episodes'}`) 
+    : '';
+  const comicIssuesLabel = seriesTotals 
+    ? (language === 'es' 
+        ? `${seriesTotals.episodes} ${seriesTotals.episodes === 1 ? 'número' : 'números'}` 
+        : `${seriesTotals.episodes} ${seriesTotals.episodes === 1 ? 'issue' : 'issues'}`) 
+    : '';
+  const comicPagesLabel = seriesTotals && seriesTotals.pages !== undefined && seriesTotals.pages > 0
+    ? (language === 'es' 
+        ? `${seriesTotals.pages} ${seriesTotals.pages === 1 ? 'página' : 'páginas'}` 
+        : `${seriesTotals.pages} ${seriesTotals.pages === 1 ? 'page' : 'pages'}`) 
     : '';
 
   return (
@@ -1256,14 +1363,27 @@ const CompletedSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColo
       
       <div style={{ padding: "0.75rem", display: "flex", flexDirection: "column", gap: "0.2rem", flex: 1, minHeight: "2.5rem", justifyContent: "center" }}>
         {seriesTotals ? (
-          <>
-            <div style={{ fontSize: "0.88rem", color: "var(--text-primary)", fontWeight: 700 }}>
-              {seasonsLabel}
-            </div>
-            <div style={{ fontSize: "0.78rem", color: "var(--text-secondary)", fontWeight: 500 }}>
-              {episodesLabel}
-            </div>
-          </>
+          isComic ? (
+            <>
+              <div style={{ fontSize: "0.88rem", color: "var(--text-primary)", fontWeight: 700 }}>
+                {comicIssuesLabel}
+              </div>
+              {comicPagesLabel ? (
+                <div style={{ fontSize: "0.78rem", color: "var(--text-secondary)", fontWeight: 500 }}>
+                  {comicPagesLabel}
+                </div>
+              ) : null}
+            </>
+          ) : (
+            <>
+              <div style={{ fontSize: "0.88rem", color: "var(--text-primary)", fontWeight: 700 }}>
+                {seasonsLabel}
+              </div>
+              <div style={{ fontSize: "0.78rem", color: "var(--text-secondary)", fontWeight: 500 }}>
+                {episodesLabel}
+              </div>
+            </>
+          )
         ) : (
           <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text-secondary)" }}>
             ...
@@ -1279,6 +1399,7 @@ const DroppedSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor,
   const [isLoading, setIsLoading] = useState(false);
 
   const pad = (n: number) => n < 10 ? '0' + n : n;
+  const isComic = item.item_type === 'comic' || String(item.external_id || '').startsWith('cv_vol_');
 
   useEffect(() => {
     let isMounted = true;
@@ -1300,25 +1421,40 @@ const DroppedSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor,
 
         if (completed.length > 0) {
           const last = completed[completed.length - 1];
-          const sStr = pad(last.season);
-          const eStr = pad(last.episode);
-          const seasonText = language === 'es' ? `T${sStr} | E${eStr}` : `S${sStr} | E${eStr}`;
-          
-          let epName = '';
-          const match = (last.title || '').match(/^(.*?)\s*-\s*S\d+E\d+\s*-\s*(.*)$/i);
-          if (match) {
-            epName = match[2].trim();
-          } else {
-            epName = last.title || (language === 'es' ? 'Episodio' : 'Episode');
-          }
-          if (isMounted) setLastEpInfo({ seasonText, epName });
-        } else if (item.last_seen_episode) {
-          const match = item.last_seen_episode.match(/S(\d+)E(\d+)/i);
-          if (match) {
-            const seasonText = language === 'es' ? `T${match[1]} | E${match[2]}` : `S${match[1]} | E${match[2]}`;
-            const nameMatch = item.last_seen_episode.match(/-\s*([^-]+)$/);
-            const epName = nameMatch ? nameMatch[1].trim() : '';
+          if (isComic) {
+            const issueNum = last.issue_number || last.episode_number || (last.title ? (last.title.match(/#(\d+(\.\d+)?)/)?.[1]) : null);
+            const seasonText = issueNum ? `#${issueNum}` : (language === 'es' ? 'Número' : 'Issue');
+            const epName = cleanComicIssueName(last.name || last.title || '', issueNum);
             if (isMounted) setLastEpInfo({ seasonText, epName });
+          } else {
+            const sStr = pad(last.season);
+            const eStr = pad(last.episode);
+            const seasonText = language === 'es' ? `T${sStr} | E${eStr}` : `S${sStr} | E${eStr}`;
+            
+            let epName = '';
+            const match = (last.title || '').match(/^(.*?)\s*-\s*S\d+E\d+\s*-\s*(.*)$/i);
+            if (match) {
+              epName = match[2].trim();
+            } else {
+              epName = last.title || (language === 'es' ? 'Episodio' : 'Episode');
+            }
+            if (isMounted) setLastEpInfo({ seasonText, epName });
+          }
+        } else if (item.last_seen_episode) {
+          if (isComic) {
+            const issueMatch = item.last_seen_episode.match(/#(\d+(\.\d+)?)/);
+            const issueNum = issueMatch ? issueMatch[1] : null;
+            const seasonText = issueNum ? `#${issueNum}` : (language === 'es' ? 'Número' : 'Issue');
+            const epName = cleanComicIssueName(item.last_seen_episode, issueNum);
+            if (isMounted) setLastEpInfo({ seasonText, epName });
+          } else {
+            const match = item.last_seen_episode.match(/S(\d+)E(\d+)/i);
+            if (match) {
+              const seasonText = language === 'es' ? `T${match[1]} | E${match[2]}` : `S${match[1]} | E${match[2]}`;
+              const nameMatch = item.last_seen_episode.match(/-\s*([^-]+)$/);
+              const epName = nameMatch ? nameMatch[1].trim() : '';
+              if (isMounted) setLastEpInfo({ seasonText, epName });
+            }
           }
         }
       } catch (e) {
@@ -1333,7 +1469,8 @@ const DroppedSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor,
     e.stopPropagation();
     setIsLoading(true);
     try {
-      await apiClient.put(`/library/${item.id}`, { status: 'watching' });
+      const nextSt = isComic ? 'reading' : 'watching';
+      await apiClient.put(`/library/${item.id}`, { status: nextSt });
       onUpdate();
     } catch (err) {
       console.error(err);
@@ -1375,11 +1512,15 @@ const DroppedSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor,
         {lastEpInfo ? (
           <>
             <div style={{ fontSize: "0.88rem", color: "var(--text-primary)", fontWeight: 700 }}>{lastEpInfo.seasonText}</div>
-            <div style={{ fontSize: "0.78rem", color: "var(--text-secondary)", fontWeight: 500, lineHeight: 1.2, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{lastEpInfo.epName}</div>
+            {lastEpInfo.epName ? (
+              <div style={{ fontSize: "0.78rem", color: "var(--text-secondary)", fontWeight: 500, lineHeight: 1.2, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{lastEpInfo.epName}</div>
+            ) : null}
           </>
         ) : (
           <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", fontWeight: 500 }}>
-            {language === 'es' ? 'Sin capítulos vistos' : 'No watched episodes'}
+            {language === 'es' 
+              ? (isComic ? 'Sin números leídos' : 'Sin episodios vistos') 
+              : (isComic ? 'No issues read' : 'No episodes watched')}
           </div>
         )}
       </div>

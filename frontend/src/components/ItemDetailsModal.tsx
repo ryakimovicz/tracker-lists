@@ -3580,6 +3580,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       setCachedSeries(`issue_state_${extId}`, stateToSave);
       setCachedSeries(`issue_state_cv_issue_${cleanId}`, stateToSave);
       setSelectedItem((prev: any) => prev ? { ...prev, pages_read: pages } : null);
+      window.dispatchEvent(new Event('library-updated'));
+      onUpdate && onUpdate();
       return;
     }
 
@@ -3587,12 +3589,15 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       try {
         await apiClient.put(`/library/${selectedItem.id}`, { pages_read: pages });
         setSelectedItem((prev: any) => prev ? { ...prev, pages_read: pages } : null);
+        window.dispatchEvent(new Event('library-updated'));
         onUpdate && onUpdate();
       } catch (err) {
         console.error("Failed to save pages read", err);
       }
     } else {
       setSelectedItem((prev: any) => prev ? { ...prev, pages_read: pages } : null);
+      window.dispatchEvent(new Event('library-updated'));
+      onUpdate && onUpdate();
     }
   };
 
@@ -4645,20 +4650,25 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                       const extId = `cv_issue_${cleanId}`;
 
                       if (isComicIssue) {
-                        setCachedSeries(`issue_state_${extId}`, {
+                        const stateToSave = {
                           status: selectedItem?.status || 'reading',
                           pages_read: pagesReadVal || 0,
                           total_pages: finalTotal
-                        });
+                        };
+                        setCachedSeries(`issue_state_${extId}`, stateToSave);
+                        setCachedSeries(`issue_state_cv_issue_${cleanId}`, stateToSave);
+                        setSelectedItem((prev: any) => prev ? { ...prev, total_pages: finalTotal, page_count: finalTotal } : null);
+                        window.dispatchEvent(new Event('library-updated'));
+                        onUpdate && onUpdate();
+                        return;
                       }
 
                       if (selectedItem?.id) {
                         apiClient.put(`/library/${selectedItem.id}`, { total_pages: finalTotal }).then(() => {
                           setSelectedItem((prev: any) => prev ? { ...prev, total_pages: finalTotal } : null);
+                          window.dispatchEvent(new Event('library-updated'));
                           onUpdate && onUpdate();
-                        });
-                      } else if (isComicIssue) {
-                        setSelectedItem((prev: any) => prev ? { ...prev, total_pages: finalTotal, page_count: finalTotal } : null);
+                        }).catch(() => {});
                       }
                     };
 
