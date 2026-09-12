@@ -724,9 +724,6 @@ def get_library(
                             s_it.last_seen_episode = c_titles[-1]
                     else:
                         s_it.last_seen_episode = None
-                        if s_it.status in (UserLibraryStatusEnum.WATCHING, UserLibraryStatusEnum.COMPLETED):
-                            s_it.status = UserLibraryStatusEnum.PLAN_TO_WATCH
-                            db.commit()
 
                 if s_it.last_seen_episode:
                     # Find matching episode / issue item by title
@@ -827,6 +824,20 @@ def update_library_item(
     if item_in.status is not None:
         validate_media_status(lib_item.item_type, item_in.status)
         lib_item.status = item_in.status
+        
+        # Ensure tracking list exists for series, anime, comic
+        t_str = lib_item.item_type.value if hasattr(lib_item.item_type, "value") else str(lib_item.item_type)
+        if t_str in ("series", "anime", "comic") and not lib_item.tracking_list_id:
+            private_list = ReadingList(
+                creator_id=current_user.id,
+                title=f"Tracker: {lib_item.title}",
+                description=f"Auto-generated tracking for '{lib_item.title}'",
+                visibility=VisibilityEnum.PRIVATE
+            )
+            db.add(private_list)
+            db.commit()
+            db.refresh(private_list)
+            lib_item.tracking_list_id = private_list.id
         
         # Set completed_at date
         if item_in.status in (UserLibraryStatusEnum.COMPLETED, UserLibraryStatusEnum.READ):

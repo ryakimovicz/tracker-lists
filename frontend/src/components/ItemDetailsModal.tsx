@@ -1943,6 +1943,176 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     }
   };
   const lastInitialKeyRef = React.useRef<string>('');
+  const hasManuallyToggledSeasonRef = React.useRef<boolean>(false);
+  const lastScrolledEpisodeKeyRef = React.useRef<string | null>(null);
+
+  const findNextEpisodeCandidate = React.useCallback((
+    allEps: any[],
+    trackedList: any[],
+    currentProgress: Record<string, boolean>,
+    isComic: boolean
+  ) => {
+    if (!allEps || !Array.isArray(allEps) || allEps.length === 0) {
+      return { nextEp: null, isCaughtUp: false };
+    }
+
+    const pad = (n: number) => n < 10 ? '0' + n : String(n);
+
+    const isExtraEpisode = (ep: any) => {
+      if (isComic) return false;
+      return ep.is_extra || ep.ep_type === 'insignificant_special' || (ep.season_number === 0 && !ep.is_significant_special && ep.ep_type !== 'significant_special');
+    };
+
+    const isSpecialEpisode = (ep: any) => {
+      if (isComic) return false;
+      return ep.is_significant_special || ep.ep_type === 'significant_special' || (ep.episode_number == null && !ep.is_extra && ep.season_number > 0);
+    };
+
+    const sortEpisodesChronologically = (eps: any[]) => {
+      return [...eps].sort((a: any, b: any) => {
+        if (isComic) {
+          const numA = parseFloat(a.issue_number || a.episode_number || '0');
+          const numB = parseFloat(b.issue_number || b.episode_number || '0');
+          if (numA !== numB) return numA - numB;
+          return (a.id || 0) - (b.id || 0);
+        }
+        const aIsSpecial = isSpecialEpisode(a);
+        const bIsSpecial = isSpecialEpisode(b);
+        const aAir = a.airdate || a.air_date || (a.airstamp ? a.airstamp.substring(0, 10) : null);
+        const bAir = b.airdate || b.air_date || (b.airstamp ? b.airstamp.substring(0, 10) : null);
+
+        if ((aIsSpecial || bIsSpecial) && aAir && bAir && aAir !== bAir) {
+          return new Date(aAir).getTime() - new Date(bAir).getTime();
+        }
+
+        const sA = a.season_number === 0 ? (aIsSpecial ? 0 : 9999) : (a.season_number || 1);
+        const sB = b.season_number === 0 ? (bIsSpecial ? 0 : 9999) : (b.season_number || 1);
+        if (sA !== sB) return sA - sB;
+
+        const eA = a.episode_number != null ? a.episode_number : 0;
+        const eB = b.episode_number != null ? b.episode_number : 0;
+        return eA - eB;
+      });
+    };
+
+    const now = Date.now();
+    const validEps = !isComic ? allEps.filter((ep: any) => !isExtraEpisode(ep)) : allEps;
+    const sortedValidEps = sortEpisodesChronologically(validEps);
+    const aired = sortedValidEps.filter((ep: any) => {
+      if (isComic) {
+        if (ep.air_date || ep.airdate) {
+          const ad = ep.air_date || ep.airdate;
+          return new Date(ad).getTime() <= now;
+        }
+        return true;
+      }
+      if (ep.airstamp) return new Date(ep.airstamp).getTime() <= now;
+      if (ep.airdate || ep.air_date) {
+        const ad = ep.airdate || ep.air_date;
+        const at = ep.airtime || '00:00';
+        return new Date(`${ad}T${at}:00Z`).getTime() <= now;
+      }
+      return true;
+    });
+
+    if (aired.length === 0) {
+      return { nextEp: null, isCaughtUp: false };
+    }
+
+    const getTrackedCount = (ep: any) => {
+      if (isComic) {
+        const cleanId = String(ep.id || ep.external_id || '').replace('cv_issue_', '').replace('cv_', '');
+        const extIdKey = `cv_issue_${cleanId}`;
+        const cachedState = getCachedSeries(`issue_state_${extIdKey}`) || getCachedSeries(`issue_state_cv_issue_${cleanId}`);
+        if (currentProgress[extIdKey] || currentProgress[cleanId] || (cachedState && (cachedState.status === 'read' || cachedState.is_completed))) {
+          return 1;
+        }
+        const t = (trackedList || []).find((x: any) => {
+          const xClean = String(x.external_id || '').replace('cv_issue_', '').replace('cv_', '');
+          return (xClean && xClean === cleanId) || x.external_id === extIdKey || (ep.issue_number && x.title && (x.title.includes(`#${ep.issue_number}`) || x.episode_number == ep.issue_number));
+        });
+        return (t?.consumption_count !== undefined) ? t.consumption_count : (t?.is_completed ? 1 : 0);
+      }
+
+      const cleanTvmId = String(ep.id).replace('tvm-ep-', '');
+      const extIdKey = `tvm-ep-${cleanTvmId}`;
+      if (currentProgress[extIdKey] || currentProgress[cleanTvmId]) {
+        return 1;
+      }
+      const t = (trackedList || []).find((x: any) => {
+        const tCleanTvmId = String(x.external_id || '').replace('tvm-ep-', '');
+        return (
+          x.external_id === extIdKey ||
+          tCleanTvmId === cleanTvmId ||
+          x.id === ep.id ||
+          (ep.season_number != null && ep.episode_number != null && x.season_number === ep.season_number && x.episode_number === ep.episode_number) ||
+          (ep.episode_number != null && x.title && x.title.includes(`S${pad(ep.season_number)}E${pad(ep.episode_number)}`)) ||
+          (ep.episode_number != null && x.title && x.title.includes(`E${pad(ep.episode_number)}`) && (x.section === `Season ${ep.season_number}` || x.title.includes(`S${ep.season_number}`)))
+        );
+      });
+      return (t?.consumption_count !== undefined) ? t.consumption_count : (t?.is_completed ? 1 : 0);
+    };
+
+    const airedCounts = aired.map(ep => getTrackedCount(ep));
+    const minSeen = Math.min(...airedCounts);
+    const maxSeen = Math.max(...airedCounts);
+    if (minSeen === maxSeen && minSeen > 0) {
+      return { nextEp: null, isCaughtUp: true };
+    }
+
+    let candidate = null;
+    const targetCycle = minSeen + 1;
+    let lastWatchedIndex = -1;
+    for (let i = aired.length - 1; i >= 0; i--) {
+      const count = airedCounts[i];
+      if (count >= targetCycle) {
+        lastWatchedIndex = i;
+        break;
+      }
+    }
+    if (lastWatchedIndex !== -1 && lastWatchedIndex + 1 < aired.length) {
+      candidate = aired.slice(lastWatchedIndex + 1).find((_, idx) => airedCounts[lastWatchedIndex + 1 + idx] < targetCycle) || null;
+    }
+    if (!candidate) {
+      candidate = aired.find((_, idx) => airedCounts[idx] < targetCycle) || null;
+    }
+    return { nextEp: candidate, isCaughtUp: false };
+  }, []);
+
+  const calculateDefaultActiveSeason = React.useCallback((
+    allEps: any[],
+    currentSeasons: any[],
+    currentProgress: Record<string, boolean>,
+    userEps: any[],
+    isComic: boolean
+  ): number => {
+    const firstSeason = currentSeasons?.find((s: any) => s.season_number > 0)?.season_number ?? currentSeasons?.[0]?.season_number ?? 1;
+    if (!allEps || allEps.length === 0) {
+      return firstSeason;
+    }
+    const { nextEp, isCaughtUp } = findNextEpisodeCandidate(allEps, userEps, currentProgress, isComic);
+    if (isCaughtUp) {
+      return firstSeason;
+    }
+    if (nextEp && nextEp.season_number != null) {
+      return nextEp.season_number;
+    }
+    return firstSeason;
+  }, [findNextEpisodeCandidate]);
+
+  useEffect(() => {
+    if (!hasManuallyToggledSeasonRef.current && selectedItem?.external_id && seasons.length > 0) {
+      const isComic = selectedItem.item_type === 'comic' || String(selectedItem.external_id || '').startsWith('cv_vol_');
+      const cacheKeyAll = `${selectedItem.external_id}_all_episodes`;
+      const allEps = getCachedSeries(cacheKeyAll);
+      if (allEps && Array.isArray(allEps) && allEps.length > 0) {
+        const targetSeason = calculateDefaultActiveSeason(allEps, seasons, globalProgress, episodes, isComic);
+        if (targetSeason != null) {
+          setActiveSeason(targetSeason);
+        }
+      }
+    }
+  }, [globalProgress, episodes, seasons, selectedItem?.external_id, calculateDefaultActiveSeason]);
 
   useEffect(() => {
     const originalStyle = window.getComputedStyle(document.body).overflow;
@@ -1961,6 +2131,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       return;
     }
     lastInitialKeyRef.current = currentKey;
+    hasManuallyToggledSeasonRef.current = false;
+    lastScrolledEpisodeKeyRef.current = null;
     
     const initModal = async (incomingItem: any) => {
       let item = incomingItem;
@@ -2050,13 +2222,20 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
           .catch(() => {});
       }
 
-        const processAllEps = (allEps: any[]) => {
+        const processAllEps = (allEps: any[], customProgress?: Record<string, boolean>, customList?: any[]) => {
           const isComic = item.item_type === 'comic';
           const extIds = allEps.map(e => isComic ? `cv_issue_${e.id}` : `tvm-ep-${e.id}`);
           if (extIds.length > 0) {
             apiClient.post('/users/me/progress/bulk-check', { external_ids: extIds })
               .then(progRes => {
-                setGlobalProgress(prev => ({ ...prev, ...progRes.data }));
+                setGlobalProgress(prev => {
+                  const merged = { ...prev, ...progRes.data };
+                  if (!hasManuallyToggledSeasonRef.current) {
+                    const targetSeason = calculateDefaultActiveSeason(allEps, seasons, merged, customList || episodes, isComic);
+                    setActiveSeason(targetSeason);
+                  }
+                  return merged;
+                });
               })
               .catch(e => console.error("Failed to fetch global progress", e));
           }
@@ -2102,6 +2281,11 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
               return a.season_number - b.season_number;
             });
 
+            if (!hasManuallyToggledSeasonRef.current) {
+              const targetSeason = calculateDefaultActiveSeason(allEps, validSeasons, customProgress || globalProgress, customList || episodes, isComic);
+              setActiveSeason(targetSeason);
+            }
+
             return validSeasons.length > 0 ? validSeasons : prevSeasons;
           });
         };
@@ -2122,7 +2306,11 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
               return a.season_number - b.season_number;
             });
             setSeasons(sortedSeasons);
-            setActiveSeason(sortedSeasons[0]?.season_number ?? 1);
+            if (!hasManuallyToggledSeasonRef.current) {
+              const isComic = item.item_type === 'comic';
+              const targetSeason = calculateDefaultActiveSeason(cachedAll || [], sortedSeasons, globalProgress, episodes, isComic);
+              setActiveSeason(targetSeason);
+            }
           }
 
           if (cachedAll && Array.isArray(cachedAll) && cachedAll.length > 0) {
@@ -2233,7 +2421,10 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                 setSelectedItem((prev: any) => prev ? { ...prev, title: seriesData.title } : null);
               }
               setSeasons(sortedSeasons);
-              setActiveSeason(sortedSeasons[0]?.season_number ?? 1);
+              if (!hasManuallyToggledSeasonRef.current) {
+                const targetSeason = calculateDefaultActiveSeason(cachedAll || [], sortedSeasons, globalProgress, episodes, false);
+                setActiveSeason(targetSeason);
+              }
             }).catch(console.error);
           } else if (cachedMeta.title) {
             setSelectedItem((prev: any) => prev ? { ...prev, title: cachedMeta.title } : null);
@@ -2276,7 +2467,10 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
               setCachedSeries(`comic_vol_${volId}`, fullMeta);
               setCachedSeries(`series_${volId}`, fullMeta);
               setSeasons(rawSeasons);
-              setActiveSeason(1);
+              if (!hasManuallyToggledSeasonRef.current) {
+                const targetSeason = calculateDefaultActiveSeason(cachedAll || [], rawSeasons, globalProgress, episodes, true);
+                setActiveSeason(targetSeason);
+              }
               setSelectedItem((prev: any) => prev ? {
                 ...prev,
                 title: prev.title || volData.name || volData.volume_name,
@@ -2295,7 +2489,10 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
             const statusVal = cachedMeta.status || (isEndedVal ? 'Ended' : 'Running');
             
             setSeasons(cachedMeta.seasons);
-            setActiveSeason(1);
+            if (!hasManuallyToggledSeasonRef.current) {
+              const targetSeason = calculateDefaultActiveSeason(cachedAll || [], cachedMeta.seasons, globalProgress, episodes, true);
+              setActiveSeason(targetSeason);
+            }
             setSelectedItem((prev: any) => prev ? {
               ...prev,
               title: prev.title || cachedMeta.name || cachedMeta.volume_name,
@@ -5461,8 +5658,10 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                               );
                             }
 
+                            const comicNextCandidate = findNextEpisodeCandidate(displayedIssues, episodes, globalProgress, true).nextEp;
+
                             return (
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '380px', overflowY: 'auto', paddingRight: '0.25rem' }}>
+                              <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '380px', overflowY: 'auto', paddingRight: '0.25rem' }}>
                                 {displayedIssues.map((ep: any) => {
                                   const cleanEpId = String(ep.id || ep.external_id || '').replace('cv_issue_', '').replace('cv_', '');
                                   const extIdKey = `cv_issue_${cleanEpId}`;
@@ -5483,6 +5682,12 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                   };
                                   const epNumFloat = parseEpNum(ep);
 
+                                  const isCandidateNext = comicNextCandidate && (
+                                    String(ep.id).replace('cv_issue_', '') === String(comicNextCandidate.id).replace('cv_issue_', '') ||
+                                    (epNumFloat >= 0 && epNumFloat === parseFloat(comicNextCandidate.issue_number ?? comicNextCandidate.episode_number ?? -1)) ||
+                                    (ep.external_id && (ep.external_id === comicNextCandidate.external_id || ep.external_id === `cv_issue_${comicNextCandidate.id}`))
+                                  );
+
                                   const dbEp = (episodes || []).find(x => {
                                     const xClean = String(x.external_id || '').replace('cv_issue_', '').replace('cv_', '');
                                     if (xClean && cleanEpId && xClean === cleanEpId) return true;
@@ -5498,6 +5703,23 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                   return (
                                     <div
                                       key={ep.id}
+                                      ref={(el) => {
+                                        if (el && isCandidateNext) {
+                                          const scrollKey = `comic_${selectedItem?.external_id}_${comicNextCandidate.id || comicNextCandidate.issue_number}`;
+                                          if (lastScrolledEpisodeKeyRef.current !== scrollKey) {
+                                            lastScrolledEpisodeKeyRef.current = scrollKey;
+                                            setTimeout(() => {
+                                              const container = el.parentElement;
+                                              if (container) {
+                                                const prevEl = el.previousElementSibling as HTMLElement | null;
+                                                const targetEl = prevEl || el;
+                                                const topPos = Math.max(0, targetEl.offsetTop - 8);
+                                                container.scrollTo({ top: topPos, behavior: 'smooth' });
+                                              }
+                                            }, 80);
+                                          }
+                                        }
+                                      }}
                                       style={{
                                         display: 'flex',
                                         alignItems: 'center',
@@ -5876,6 +6098,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                     role="button"
                                     tabIndex={0}
                                     onClick={() => {
+                                      hasManuallyToggledSeasonRef.current = true;
                                       if (isSeasonActive) {
                                         setActiveSeason(null);
                                       } else {
@@ -6013,55 +6236,85 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                     </div>
 
                                     {isSeasonActive && (
-                                      <div style={{ padding: '0.5rem', background: 'var(--bg-primary)', display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '220px', overflowY: 'auto' }}>
-                                        {isLoadingSeasonEpisodes ? (
-                                          <div style={{ padding: '1rem', textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                                            {language === 'es' ? 'Cargando contenido...' : 'Loading...'}
-                                          </div>
-                                        ) : displayedSeasonEps.length === 0 ? (
-                                          <div style={{ padding: '1rem', textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                                            {language === 'es' ? 'No se encontraron capítulos.' : 'No episodes found.'}
-                                          </div>
-                                        ) : (
-                                          displayedSeasonEps.map((ep: any) => {
-                                            const isComic = selectedItem?.item_type === 'comic' || String(selectedItem?.external_id || '').startsWith('cv_vol_');
-                                            const cleanEpId = String(ep.id || ep.external_id || '').replace('cv_issue_', '').replace('cv_', '');
-                                            const extIdKey = isComic ? `cv_issue_${cleanEpId}` : `tvm-ep-${ep.id}`;
-                                            const epNumFloat = parseFloat(ep.issue_number ?? ep.episode_number ?? -1);
+                                       <div style={{ position: 'relative', padding: '0.5rem', background: 'var(--bg-primary)', display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '220px', overflowY: 'auto' }}>
+                                         {isLoadingSeasonEpisodes ? (
+                                           <div style={{ padding: '1rem', textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                                             {language === 'es' ? 'Cargando contenido...' : 'Loading...'}
+                                           </div>
+                                         ) : displayedSeasonEps.length === 0 ? (
+                                           <div style={{ padding: '1rem', textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                                             {language === 'es' ? 'No se encontraron capítulos.' : 'No episodes found.'}
+                                           </div>
+                                         ) : (() => {
+                                             const nextCandidate = (() => {
+                                               const isComic = selectedItem?.item_type === 'comic' || String(selectedItem?.external_id || '').startsWith('cv_vol_');
+                                               const cacheKeyAll = `${selectedItem?.external_id}_all_episodes`;
+                                               const allEps = getCachedSeries(cacheKeyAll) || [];
+                                               return findNextEpisodeCandidate(allEps, episodes, globalProgress, isComic).nextEp;
+                                             })();
 
-                                            const dbEp = (episodes || []).find(x => {
-                                              if (isComic) {
-                                                const xClean = String(x.external_id || '').replace('cv_issue_', '').replace('cv_', '');
-                                                if (xClean && xClean === cleanEpId) return true;
-                                                if (x.external_id === extIdKey || x.external_id === ep.external_id) return true;
-                                                if (epNumFloat >= 0 && parseFloat(x.episode_number ?? -1) === epNumFloat) return true;
-                                                return false;
-                                              }
-                                              return x.external_id === extIdKey || x.id === ep.id;
-                                            });
+                                             return displayedSeasonEps.map((ep: any) => {
+                                               const isComic = selectedItem?.item_type === 'comic' || String(selectedItem?.external_id || '').startsWith('cv_vol_');
+                                               const cleanEpId = String(ep.id || ep.external_id || '').replace('cv_issue_', '').replace('cv_', '');
+                                               const extIdKey = isComic ? `cv_issue_${cleanEpId}` : `tvm-ep-${ep.id}`;
+                                               const epNumFloat = parseFloat(ep.issue_number ?? ep.episode_number ?? -1);
 
-                                            const cachedIssueState = isComic ? (getCachedSeries(`issue_state_${extIdKey}`) || getCachedSeries(`issue_state_cv_issue_${cleanEpId}`)) : null;
-                                            const isCompleted = isComic
-                                              ? (!!globalProgress[extIdKey] || !!globalProgress[cleanEpId] || (cachedIssueState && (cachedIssueState.status === 'read' || cachedIssueState.is_completed)) || !!dbEp?.is_completed || !!dbEp?.completed_at)
-                                              : (!!globalProgress[extIdKey] || !!dbEp?.is_completed);
+                                               const isCandidateNext = nextCandidate && (
+                                                 String(ep.id).replace('tvm-ep-', '') === String(nextCandidate.id).replace('tvm-ep-', '') ||
+                                                 (ep.season_number === nextCandidate.season_number && ep.episode_number != null && ep.episode_number === nextCandidate.episode_number) ||
+                                                 (isComic && epNumFloat >= 0 && epNumFloat === parseFloat(nextCandidate.issue_number ?? nextCandidate.episode_number ?? -1))
+                                               );
 
-                                            const isSpecial = ep.is_significant_special || ep.ep_type === 'significant_special' || (ep.episode_number == null && !ep.is_extra && ep.season_number > 0);
-                                            const isExtra = ep.is_extra || ep.ep_type === 'insignificant_special' || ep.season_number === 0;
+                                               const dbEp = (episodes || []).find(x => {
+                                                 if (isComic) {
+                                                   const xClean = String(x.external_id || '').replace('cv_issue_', '').replace('cv_', '');
+                                                   if (xClean && xClean === cleanEpId) return true;
+                                                   if (x.external_id === extIdKey || x.external_id === ep.external_id) return true;
+                                                   if (epNumFloat >= 0 && parseFloat(x.episode_number ?? -1) === epNumFloat) return true;
+                                                   return false;
+                                                 }
+                                                 return x.external_id === extIdKey || x.id === ep.id;
+                                               });
 
-                                            return (
-                                              <div
-                                                key={ep.id}
-                                                style={{
-                                                  display: 'flex',
-                                                  alignItems: 'center',
-                                                  justifyContent: 'space-between',
-                                                  padding: '0.4rem 0.6rem',
-                                                  background: 'var(--bg-secondary)',
-                                                  border: '1px solid var(--border-color)',
-                                                  borderRadius: '4px',
-                                                  gap: '1rem'
-                                                }}
-                                              >
+                                               const cachedIssueState = isComic ? (getCachedSeries(`issue_state_${extIdKey}`) || getCachedSeries(`issue_state_cv_issue_${cleanEpId}`)) : null;
+                                               const isCompleted = isComic
+                                                 ? (!!globalProgress[extIdKey] || !!globalProgress[cleanEpId] || (cachedIssueState && (cachedIssueState.status === 'read' || cachedIssueState.is_completed)) || !!dbEp?.is_completed || !!dbEp?.completed_at)
+                                                 : (!!globalProgress[extIdKey] || !!dbEp?.is_completed);
+
+                                               const isSpecial = ep.is_significant_special || ep.ep_type === 'significant_special' || (ep.episode_number == null && !ep.is_extra && ep.season_number > 0);
+                                               const isExtra = ep.is_extra || ep.ep_type === 'insignificant_special' || ep.season_number === 0;
+
+                                               return (
+                                               <div
+                                                 key={ep.id}
+                                                 ref={(el) => {
+                                                   if (el && isCandidateNext) {
+                                                     const scrollKey = `${selectedItem?.external_id}_${nextCandidate.id || nextCandidate.episode_number}`;
+                                                     if (lastScrolledEpisodeKeyRef.current !== scrollKey) {
+                                                       lastScrolledEpisodeKeyRef.current = scrollKey;
+                                                       setTimeout(() => {
+                                                         const container = el.parentElement;
+                                                         if (container) {
+                                                           const prevEl = el.previousElementSibling as HTMLElement | null;
+                                                           const targetEl = prevEl || el;
+                                                           const topPos = Math.max(0, targetEl.offsetTop - 8);
+                                                           container.scrollTo({ top: topPos, behavior: 'smooth' });
+                                                         }
+                                                       }, 80);
+                                                     }
+                                                   }
+                                                 }}
+                                                 style={{
+                                                   display: 'flex',
+                                                   alignItems: 'center',
+                                                   justifyContent: 'space-between',
+                                                   padding: '0.4rem 0.6rem',
+                                                   background: 'var(--bg-secondary)',
+                                                   border: '1px solid var(--border-color)',
+                                                   borderRadius: '4px',
+                                                   gap: '1rem'
+                                                 }}
+                                               >
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', minWidth: 0 }}>
                                                   <div style={{ position: 'relative', flexShrink: 0 }}>
                                                     <button
@@ -6170,8 +6423,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                                 </button>
                                               </div>
                                             );
-                                          })
-                                        )}
+                                          });
+                                        })()}
                                       </div>
                                     )}
                                 </div>

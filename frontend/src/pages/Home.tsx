@@ -340,19 +340,18 @@ const ScrollRow = ({
       )}
     </div>
   );
-};
-
-const CustomCard = ({ 
+};const CustomCard = ({ 
   title, 
   coverUrl, 
   subtitle1, 
   subtitle2, 
-  preSubtitle,
-  coverTopText,
-  coverBottomText,
+  preSubtitle, 
+  coverTopText, 
+  coverBottomText, 
   onCheck, 
+  onPlay,
   onClick, 
-  onTitleClick,
+  onTitleClick, 
   language,
   themeColor,
   themeTextColor,
@@ -366,6 +365,7 @@ const CustomCard = ({
   coverTopText?: string;
   coverBottomText?: string;
   onCheck?: (e: React.MouseEvent) => void;
+  onPlay?: (e: React.MouseEvent) => void;
   onClick?: () => void;
   onTitleClick?: (e: React.MouseEvent) => void;
   language?: string;
@@ -373,6 +373,9 @@ const CustomCard = ({
   themeTextColor?: string;
   actionIcon?: 'check' | 'play';
 }) => {
+  const showBoth = !!(onCheck && onPlay);
+  const hasAction = !!(onCheck || onPlay);
+
   return (
     <div 
       onClick={onClick}
@@ -438,15 +441,49 @@ const CustomCard = ({
           </div>
         )}
       </div>
-      <div style={{ padding: "0.75rem", display: "flex", flexDirection: "column", gap: "0.25rem", flex: 1, minHeight: "2.5rem", paddingRight: onCheck ? "40px" : "0.75rem" }}>
+      <div style={{ padding: "0.75rem", display: "flex", flexDirection: "column", gap: "0.25rem", flex: 1, minHeight: "2.5rem", paddingRight: showBoth ? "75px" : hasAction ? "40px" : "0.75rem" }}>
         {preSubtitle && <div style={{ fontSize: "0.95rem", color: "var(--text-primary)", fontWeight: 800, lineHeight: 1.2, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{preSubtitle}</div>}
         {subtitle1 && <div style={{ fontSize: "0.9rem", color: "var(--text-primary)", fontWeight: 700 }}>{subtitle1}</div>}
         {subtitle2 && <div style={{ fontSize: "0.8rem", color: "var(--text-secondary)", fontWeight: 500, lineHeight: 1.2, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{subtitle2}</div>}
       </div>
-      {onCheck && (
+      {showBoth ? (
+        <div style={{ position: "absolute", bottom: "0.5rem", right: "0.5rem", display: "flex", gap: "0.35rem", zIndex: 2 }}>
+          <button 
+            onClick={onCheck}
+            className="btn-check-seen"
+            title={language === 'es' ? 'Marcar como completado' : 'Mark as completed'}
+            style={{
+              width: "30px", height: "30px", borderRadius: "50%",
+              background: "var(--bg-tertiary)", border: `2px solid ${themeColor || "var(--text-muted)"}`,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              cursor: "pointer", color: themeColor || "var(--text-primary)",
+              "--btn-hover-bg": themeColor,
+              "--btn-hover-text": themeTextColor
+            } as React.CSSProperties}
+          >
+            <Check size={15} />
+          </button>
+          <button 
+            onClick={onPlay}
+            className="btn-check-seen"
+            title={language === 'es' ? 'Comenzar' : 'Start'}
+            style={{
+              width: "30px", height: "30px", borderRadius: "50%",
+              background: "var(--bg-tertiary)", border: `2px solid ${themeColor || "var(--text-muted)"}`,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              cursor: "pointer", color: themeColor || "var(--text-primary)",
+              "--btn-hover-bg": themeColor,
+              "--btn-hover-text": themeTextColor
+            } as React.CSSProperties}
+          >
+            <Play size={14} style={{ marginLeft: '2px' }} />
+          </button>
+        </div>
+      ) : hasAction ? (
         <button 
-          onClick={onCheck}
+          onClick={onCheck || onPlay}
           className="btn-check-seen"
+          title={onPlay ? (language === 'es' ? 'Reanudar en Continuar' : 'Resume in Continue') : (language === 'es' ? 'Marcar como completado' : 'Mark as completed')}
           style={{
             position: "absolute", bottom: "0.5rem", right: "0.5rem",
             width: "32px", height: "32px", borderRadius: "50%",
@@ -457,14 +494,14 @@ const CustomCard = ({
             "--btn-hover-text": themeTextColor
           } as React.CSSProperties}
         >
-          {actionIcon === 'play' ? <Play size={15} style={{ marginLeft: '2px' }} /> : <Check size={16} />}
+          {actionIcon === 'play' || onPlay ? <Play size={15} style={{ marginLeft: '2px' }} /> : <Check size={16} />}
         </button>
-      )}
+      ) : null}
     </div>
   );
 };
 
-const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, themeTextColor, actionIcon = 'check' }: { item: any, onUpdate: () => void, language: string, onOpenSeries: (item: any) => void, themeColor?: string, themeTextColor?: string, actionIcon?: 'check' | 'play' }) => {
+const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, themeTextColor, actionIcon = 'check', variant = 'episode' }: { item: any, onUpdate: () => void, language: string, onOpenSeries: (item: any) => void, themeColor?: string, themeTextColor?: string, actionIcon?: 'check' | 'play', variant?: 'episode' | 'poster' }) => {
   const pad = (n: number) => n < 10 ? '0' + n : n;
   const isComic = item.item_type === 'comic' || String(item.external_id || '').startsWith('cv_vol_');
 
@@ -507,7 +544,6 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
   };
 
   const computeNextCandidate = (trackedList: any[], allEpisodesOverride?: any[]) => {
-    if (!item.tracking_list_id) return { nextEp: null, isCaughtUp: false, initialLoad: false };
     const allEps = allEpisodesOverride || getCachedSeries(`${item.external_id}_all_episodes`);
     if (allEps && Array.isArray(allEps) && allEps.length > 0 && trackedList && Array.isArray(trackedList)) {
       const now = Date.now();
@@ -530,7 +566,7 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
         return true;
       });
       if (aired.length > 0) {
-        const getTracked = (ep: any) => trackedList.find((t: any) => {
+        const getTracked = (ep: any) => (trackedList || []).find((t: any) => {
           if (isComic) {
             const cleanId = String(ep.id).replace('cv_issue_', '');
             const tCleanId = String(t.external_id || '').replace('cv_issue_', '');
@@ -594,14 +630,8 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
   const [isInitialLoad, setIsInitialLoad] = useState(initialComputed.initialLoad);
 
   const fetchNextEpisode = async () => {
-    if (!item.tracking_list_id) {
-      setIsLoading(false);
-      setIsInitialLoad(false);
-      return;
-    }
-    
     // Check if we already have a valid candidate from cache to avoid flicker
-    const cachedList = getCachedSeries(`list_${item.tracking_list_id}`) || [];
+    const cachedList = item.tracking_list_id ? (getCachedSeries(`list_${item.tracking_list_id}`) || []) : [];
     const syncCandidate = computeNextCandidate(Array.isArray(cachedList) ? cachedList : []);
     if (syncCandidate.nextEp) {
       setNextEp(syncCandidate.nextEp);
@@ -612,14 +642,16 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
     setIsLoading(true);
     try {
       let currentTracked: any[] = [];
-      try {
-        const listRes = await apiClient.get(`/lists/${item.tracking_list_id}`);
-        currentTracked = listRes.data.items || [];
-        setTrackedEpisodes(currentTracked);
-        setCachedSeries(`list_${item.tracking_list_id}`, currentTracked);
-      } catch (err) {
-        console.error("Failed to load tracking list for Home card", err);
-        currentTracked = getCachedSeries(`list_${item.tracking_list_id}`) || [];
+      if (item.tracking_list_id) {
+        try {
+          const listRes = await apiClient.get(`/lists/${item.tracking_list_id}`);
+          currentTracked = listRes.data.items || [];
+          setTrackedEpisodes(currentTracked);
+          setCachedSeries(`list_${item.tracking_list_id}`, currentTracked);
+        } catch (err) {
+          console.error("Failed to load tracking list for Home card", err);
+          currentTracked = getCachedSeries(`list_${item.tracking_list_id}`) || [];
+        }
       }
 
       if (!isComic) {
@@ -864,7 +896,29 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
     });
   };
 
+  const handleStartWatching = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsLoading(true);
+    try {
+      const nextSt = isComic ? 'reading' : 'watching';
+      const res = await apiClient.put(`/library/${item.id}`, { status: nextSt });
+      if (res.data?.tracking_list_id) {
+        item.tracking_list_id = res.data.tracking_list_id;
+      }
+      onUpdate();
+      window.dispatchEvent(new Event('library-updated'));
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleCardClick = () => {
+    if (variant === 'poster') {
+      onOpenSeries(item);
+      return;
+    }
     if (nextEp) {
       if (isComic) {
         const cleanId = String(nextEp.id).replace('cv_issue_', '');
@@ -984,15 +1038,23 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
     return null;
   }
 
+  const isPoster = variant === 'poster';
+
   return (
     <>
       <div 
         onClick={handleCardClick}
         style={{ 
-          minWidth: "220px", maxWidth: "220px", background: "var(--bg-secondary)", 
-          border: `1px solid ${themeColor || "var(--border-color)"}`, borderRadius: "12px", 
-          overflow: "hidden", cursor: "pointer", position: "relative",
-          display: "flex", flexDirection: "column",
+          minWidth: isPoster ? "180px" : "220px",
+          maxWidth: isPoster ? "180px" : "220px",
+          background: "var(--bg-secondary)", 
+          border: `1px solid ${themeColor || "var(--border-color)"}`,
+          borderRadius: "12px", 
+          overflow: "hidden",
+          cursor: "pointer",
+          position: "relative",
+          display: "flex",
+          flexDirection: "column",
           boxShadow: themeColor ? `0 0 10px ${themeColor}33` : "none",
           "--title-hover-color": themeColor
         } as React.CSSProperties}
@@ -1000,22 +1062,23 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
       >
         <div 
           onClick={(e) => { e.stopPropagation(); onOpenSeries(item); }}
-          className="card-series-title"
+          className={isPoster ? "card-item-title" : "card-series-title"}
           style={{ padding: "0.5rem 0.75rem", fontSize: "0.85rem", fontWeight: 600, borderBottom: "1px solid var(--border-color)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between" }}
+          title={item.title}
         >
           <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{item.title}</span>
-          <ChevronRight size={14} style={{ flexShrink: 0, marginLeft: "0.25rem", opacity: 0.7 }} />
+          {!isPoster && <ChevronRight size={14} style={{ flexShrink: 0, marginLeft: "0.25rem", opacity: 0.7 }} />}
         </div>
         
-        <div style={{ width: "100%", height: "125px", background: "var(--bg-tertiary)", position: "relative" }}>
-          {coverUrl ? (
-            <img src={coverUrl} alt={item.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        <div style={{ width: "100%", height: isPoster ? "240px" : "125px", background: "var(--bg-tertiary)", position: "relative" }}>
+          {(isPoster ? item.image_url : coverUrl) ? (
+            <img src={isPoster ? item.image_url : coverUrl} alt={item.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
           ) : (
             <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: "2rem" }}>?</div>
           )}
         </div>
         
-        <div style={{ padding: "0.75rem", display: "flex", flexDirection: "column", gap: "0.25rem", flex: 1 }}>
+        <div style={{ padding: "0.75rem", display: "flex", flexDirection: "column", gap: "0.25rem", flex: 1, minHeight: isPoster ? "2.5rem" : undefined, paddingRight: isPoster ? "75px" : undefined }}>
           {isInitialLoad ? (
             <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem", marginTop: "auto", marginBottom: "auto" }}>
               <div style={{ width: "65px", height: "14px", borderRadius: "4px", background: "var(--bg-tertiary)", animation: "pulse 1.5s infinite" }} />
@@ -1023,8 +1086,8 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
             </div>
           ) : seasonText ? (
             <>
-              <div style={{ fontSize: "0.9rem", color: "var(--text-primary)", fontWeight: 700 }}>{seasonText}</div>
-              <div style={{ fontSize: "0.8rem", color: "var(--text-secondary)", fontWeight: 500, lineHeight: 1.2, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", paddingRight: "36px" }}>{epName}</div>
+              <div style={{ fontSize: "0.88rem", color: "var(--text-primary)", fontWeight: 700 }}>{seasonText}</div>
+              <div style={{ fontSize: isPoster ? "0.78rem" : "0.8rem", color: "var(--text-secondary)", fontWeight: 500, lineHeight: 1.2, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", paddingRight: isPoster ? undefined : "36px" }}>{epName}</div>
             </>
           ) : (
             <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text-secondary)", marginTop: "auto", marginBottom: "auto" }}>
@@ -1034,23 +1097,62 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
         </div>
         
         {nextEp && !isInitialLoad && (
-          <button 
-            onClick={handleMarkSeen}
-            disabled={isLoading}
-            className="btn-check-seen"
-            style={{
-              position: "absolute", bottom: "0.5rem", right: "0.5rem",
-              width: "32px", height: "32px", borderRadius: "50%",
-              background: "var(--bg-tertiary)", border: `2px solid ${themeColor || "var(--text-muted)"}`,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              cursor: isLoading ? "wait" : "pointer", color: themeColor || "var(--text-primary)",
-              opacity: isLoading ? 0.6 : 1,
-              "--btn-hover-bg": themeColor,
-              "--btn-hover-text": themeTextColor
-            } as React.CSSProperties}
-          >
-            {actionIcon === 'play' ? <Play size={15} style={{ marginLeft: '2px' }} /> : <Check size={16} />}
-          </button>
+          isPoster ? (
+            <div style={{ position: "absolute", bottom: "0.5rem", right: "0.5rem", display: "flex", gap: "0.35rem", zIndex: 2 }}>
+              <button 
+                onClick={handleMarkSeen}
+                disabled={isLoading}
+                className="btn-check-seen"
+                title={language === 'es' ? (isComic ? 'Marcar primer número' : 'Marcar primer episodio') : (isComic ? 'Mark first issue' : 'Mark first episode')}
+                style={{
+                  width: "30px", height: "30px", borderRadius: "50%",
+                  background: "var(--bg-tertiary)", border: `2px solid ${themeColor || "var(--text-muted)"}`,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  cursor: isLoading ? "wait" : "pointer", color: themeColor || "var(--text-primary)",
+                  opacity: isLoading ? 0.6 : 1,
+                  "--btn-hover-bg": themeColor,
+                  "--btn-hover-text": themeTextColor
+                } as React.CSSProperties}
+              >
+                <Check size={15} />
+              </button>
+              <button 
+                onClick={handleStartWatching}
+                disabled={isLoading}
+                className="btn-check-seen"
+                title={language === 'es' ? (isComic ? 'Comenzar a leer' : 'Comenzar a ver') : (isComic ? 'Start reading' : 'Start watching')}
+                style={{
+                  width: "30px", height: "30px", borderRadius: "50%",
+                  background: "var(--bg-tertiary)", border: `2px solid ${themeColor || "var(--text-muted)"}`,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  cursor: isLoading ? "wait" : "pointer", color: themeColor || "var(--text-primary)",
+                  opacity: isLoading ? 0.6 : 1,
+                  "--btn-hover-bg": themeColor,
+                  "--btn-hover-text": themeTextColor
+                } as React.CSSProperties}
+              >
+                <Play size={14} style={{ marginLeft: '2px' }} />
+              </button>
+            </div>
+          ) : (
+            <button 
+              onClick={handleMarkSeen}
+              disabled={isLoading}
+              className="btn-check-seen"
+              style={{
+                position: "absolute", bottom: "0.5rem", right: "0.5rem",
+                width: "32px", height: "32px", borderRadius: "50%",
+                background: "var(--bg-tertiary)", border: `2px solid ${themeColor || "var(--text-muted)"}`,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                cursor: isLoading ? "wait" : "pointer", color: themeColor || "var(--text-primary)",
+                opacity: isLoading ? 0.6 : 1,
+                "--btn-hover-bg": themeColor,
+                "--btn-hover-text": themeTextColor
+              } as React.CSSProperties}
+            >
+              <Check size={16} />
+            </button>
+          )
         )}
       </div>
     </>
@@ -1754,7 +1856,7 @@ export const Home: React.FC = () => {
     };
   }, [language]);
 
-  const handleMarkDone = async (e: React.MouseEvent, item: any) => {
+  const handleStartConsuming = async (e: React.MouseEvent, item: any) => {
     e.stopPropagation();
     try {
       if (item.is_addition) {
@@ -1762,15 +1864,29 @@ export const Home: React.FC = () => {
       } else if (item.item_id) {
         await apiClient.post(`/lists/items/${item.item_id}/toggle`);
       } else {
-        if (["plan_to_watch", "plan_to_play", "plan_to_read", "dropped"].includes(item.status)) {
-          let targetStatus = 'watching';
-          if (item.item_type === 'game') targetStatus = 'playing';
-          else if (['book', 'comic', 'manga'].includes(item.item_type)) targetStatus = 'reading';
-          else targetStatus = 'watching';
-          await apiClient.put(`/library/${item.id}`, { status: targetStatus });
-        } else {
-          await apiClient.put(`/library/${item.id}`, { status: ['book', 'comic', 'manga'].includes(item.item_type) ? 'read' : 'completed' });
-        }
+        let targetStatus = 'watching';
+        if (item.item_type === 'game') targetStatus = 'playing';
+        else if (['book', 'comic', 'manga'].includes(item.item_type)) targetStatus = 'reading';
+        else targetStatus = 'watching';
+        await apiClient.put(`/library/${item.id}`, { status: targetStatus });
+      }
+      fetchDashboard(true);
+      window.dispatchEvent(new Event('library-updated'));
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleMarkCompleted = async (e: React.MouseEvent, item: any) => {
+    e.stopPropagation();
+    try {
+      if (item.is_addition) {
+        await apiClient.post(`/additions/items/additions/${item.addition_item_id}/toggle`);
+      } else if (item.item_id) {
+        await apiClient.post(`/lists/items/${item.item_id}/toggle`);
+      } else {
+        const compStatus = ['book', 'comic', 'manga'].includes(item.item_type) ? 'read' : 'completed';
+        await apiClient.put(`/library/${item.id}`, { status: compStatus });
       }
       fetchDashboard(true);
       window.dispatchEvent(new Event('library-updated'));
@@ -2431,7 +2547,7 @@ export const Home: React.FC = () => {
                   coverBottomText={undefined}
                   subtitle1={bottomText1}
                   subtitle2={bottomText2}
-                  onCheck={(e) => handleMarkDone(e, g)}
+                  onCheck={(e) => handleMarkCompleted(e, g)}
                   onClick={() => setSelectedItem({ ...g, id: g.item_id })}
                   onTitleClick={(e) => { e.stopPropagation(); navigate(`/guide/${g.list_id}`); }}
                   language={language}
@@ -2513,6 +2629,7 @@ export const Home: React.FC = () => {
                             item={item}
                             language={language}
                             actionIcon={activeTab === "plan_to_watch" ? "play" : "check"}
+                            variant={activeTab === "plan_to_watch" ? "poster" : "episode"}
                             onUpdate={() => fetchDashboard(true)}
                             onOpenSeries={(seriesItem) => setSelectedItem(seriesItem)}
                             themeColor={`var(--color-${item.item_type})`}
@@ -2588,7 +2705,8 @@ export const Home: React.FC = () => {
                             }
                             return "";
                           })()}
-                          onCheck={!['completed', 'read', 'endless'].includes(item.status) ? (e) => handleMarkDone(e, item) : undefined}
+                          onCheck={activeTab === 'plan_to_watch' || activeTab === 'watching' ? (e) => handleMarkCompleted(e, item) : undefined}
+                          onPlay={activeTab === 'plan_to_watch' || activeTab === 'dropped' ? (e) => handleStartConsuming(e, item) : undefined}
                           onClick={() => setSelectedItem(item)}
                           language={language}
                         />
