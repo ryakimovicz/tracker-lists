@@ -3760,7 +3760,10 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
         '--accent-hover': cfg.accent,
         '--border-color': cfg.border,
         '--border-glow': cfg.glow,
-        '--card-shadow': `0 20px 50px -10px ${cfg.glow}`
+        '--card-shadow': `0 20px 50px -10px ${cfg.glow}`,
+        '--scrollbar-thumb': cfg.border,
+        '--scrollbar-thumb-hover': cfg.accent,
+        '--scrollbar-track': isLightMode ? 'rgba(0, 0, 0, 0.05)' : 'rgba(0, 0, 0, 0.25)'
       } as React.CSSProperties,
       modalStyles: {
         background: bgGradient,
