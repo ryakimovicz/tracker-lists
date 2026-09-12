@@ -343,9 +343,6 @@ export const Register: React.FC = () => {
         </form>
       )}
 
-      {/* Non-intrusive bottom sponsor / AdBanner */}
-      <AdBanner style={{ maxWidth: '440px', margin: '1.5rem auto 0 auto' }} />
-
       <GoogleUsernameModal
         isOpen={showGoogleModal}
         email={googleEmail}

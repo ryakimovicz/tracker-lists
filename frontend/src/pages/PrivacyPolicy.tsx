@@ -70,18 +70,34 @@ export const PrivacyPolicy: React.FC = () => {
 
         <section style={{ marginBottom: '2rem' }}>
           <h2 style={{ fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)' }}>
-            <Database size={20} /> {isEs ? '4. APIs y Servicios de Terceros' : '4. Third-Party APIs & Services'}
+            <Database size={20} /> {isEs ? '4. Publicidad, Google AdSense y Cookies' : '4. Advertising, Google AdSense & Cookies'}
           </h2>
           <p style={{ color: 'var(--text-secondary)' }}>
             {isEs
-              ? 'Para enriquecer tus listas con carátulas, sinopsis y datos de entretenimiento, Pathd utiliza APIs de metadatos de terceros (como IGDB/Twitch, OMDb/TMDB, Google Books, Comic Vine, Fanart.tv y Last.fm). Estos servicios no reciben tus datos personales identificables, únicamente consultas anónimas de búsqueda de contenido multimedia.'
-              : 'To enrich your lists with posters, synopses, and entertainment metadata, Pathd integrates with third-party data APIs (such as IGDB/Twitch, OMDb/TMDB, Google Books, Comic Vine, Fanart.tv, and Last.fm). These services do not receive your personal identifiable information, only anonymized media search queries.'}
+              ? 'Pathd utiliza Google AdSense para mostrar anuncios publicitarios a usuarios no suscritos al plan Premium. Google utiliza cookies (como la cookie de DoubleClick) para publicar anuncios basados en las visitas anteriores de los usuarios a este u otros sitios web.'
+              : 'Pathd uses Google AdSense to serve advertisements to non-Premium users. Google uses cookies (such as the DoubleClick cookie) to serve ads based on users\' prior visits to this or other websites.'}
+          </p>
+          <p style={{ color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
+            {isEs
+              ? 'Los usuarios pueden inhabilitar el uso de cookies para publicidad personalizada accediendo a la Configuración de anuncios de Google (https://adssettings.google.com) o a través del portal www.aboutads.info.'
+              : 'Users may opt out of personalized advertising by visiting Google Ads Settings (https://adssettings.google.com) or via www.aboutads.info.'}
           </p>
         </section>
 
         <section style={{ marginBottom: '2rem' }}>
           <h2 style={{ fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)' }}>
-            <Lock size={20} /> {isEs ? '5. Tus Derechos y Eliminación de Datos (GDPR / CCPA)' : '5. Your Rights & Data Deletion (GDPR / CCPA)'}
+            <Database size={20} /> {isEs ? '5. APIs y Servicios de Terceros' : '5. Third-Party APIs & Services'}
+          </h2>
+          <p style={{ color: 'var(--text-secondary)' }}>
+            {isEs
+              ? 'Para enriquecer tus listas con carátulas, sinopsis y datos de entretenimiento, Pathd utiliza APIs de metadatos de terceros (como IGDB/Twitch, OMDb/TMDB, Google Books, Comic Vine, Fanart.tv, KLIPY y Last.fm). Estos servicios no reciben tus datos personales identificables, únicamente consultas anónimas de búsqueda de contenido multimedia.'
+              : 'To enrich your lists with posters, synopses, and entertainment metadata, Pathd integrates with third-party data APIs (such as IGDB/Twitch, OMDb/TMDB, Google Books, Comic Vine, Fanart.tv, KLIPY, and Last.fm). These services do not receive your personal identifiable information, only anonymized media search queries.'}
+          </p>
+        </section>
+
+        <section style={{ marginBottom: '2rem' }}>
+          <h2 style={{ fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)' }}>
+            <Lock size={20} /> {isEs ? '6. Tus Derechos y Eliminación de Datos (GDPR / CCPA)' : '6. Your Rights & Data Deletion (GDPR / CCPA)'}
           </h2>
           <p style={{ color: 'var(--text-secondary)' }}>
             {isEs
@@ -92,7 +108,7 @@ export const PrivacyPolicy: React.FC = () => {
 
         <section>
           <h2 style={{ fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)' }}>
-            <Mail size={20} /> {isEs ? '6. Contacto de Privacidad y Soporte' : '6. Privacy & Support Contact'}
+            <Mail size={20} /> {isEs ? '7. Contacto de Privacidad y Soporte' : '7. Privacy & Support Contact'}
           </h2>
           <p style={{ color: 'var(--text-secondary)' }}>
             {isEs

@@ -1,10 +1,18 @@
 import React from 'react';
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { AdBanner } from './AdBanner';
 
 export const RightSidebarAd: React.FC = () => {
   const { user } = useAuth();
+  const location = useLocation();
   const isLocalDev = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
+  // AdSense Policy: Do not display ads on empty, authentication or utility screens
+  const excludedPaths = ['/login', '/register', '/verify-email', '/forgot-password', '/reset-password', '/privacy', '/terms'];
+  if (excludedPaths.some(path => location.pathname.startsWith(path))) {
+    return null;
+  }
 
   // Hide completely for Pro/VIP/Admin users in production
   if (!isLocalDev && (user?.is_pro || user?.is_vip || user?.is_admin)) {
