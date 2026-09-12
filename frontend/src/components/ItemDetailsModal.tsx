@@ -3,7 +3,7 @@ import { useTranslation } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
 import { getProfileTheme } from '../utils/profileThemes';
 import { apiClient } from '../api/client';
-import { Star, Heart, X, Flag, CheckCircle, Check, CheckCheck, Plus, MoreVertical, Trash2, ArrowLeft, Clock, ChevronUp, ChevronDown, RotateCcw, BookOpen, Gamepad2, Package, Sparkles, Puzzle, Layers, ChevronLeft, ChevronRight, Calendar, RefreshCw, AlertCircle, Globe, Repeat, Trophy, ShieldAlert, Infinity as InfinityIcon, Reply, ThumbsUp, Edit2, Image as ImageIcon } from 'lucide-react';
+import { Star, Heart, X, Flag, CheckCircle, Check, CheckCheck, Plus, MoreVertical, Trash2, ArrowLeft, Clock, ChevronUp, ChevronDown, RotateCcw, BookOpen, Gamepad2, Package, Sparkles, Puzzle, Layers, ChevronLeft, ChevronRight, Calendar, RefreshCw, AlertCircle, Globe, Repeat, Trophy, ShieldAlert, Infinity as InfinityIcon, Reply, ThumbsUp, Edit2, Image as ImageIcon, Volume2, VolumeX, Play, Pause } from 'lucide-react';
 
 
 
@@ -133,6 +133,645 @@ const ModalScrollRow: React.FC<{ children: React.ReactNode }> = ({ children }) =
 export const ItemDetailsModal: React.FC<ItemDetailsModalProps> = (props) => {
   return <ErrorBoundary><ItemDetailsModalInner {...props} /></ErrorBoundary>;
 };
+
+const MediaAttachmentView: React.FC<{
+  mediaUrl?: string | null;
+  mediaType?: string | null;
+  maxWidth?: string;
+  maxHeight?: string;
+  isRemovable?: boolean;
+  onRemove?: () => void;
+  removeTitle?: string;
+  borderAccent?: boolean;
+  allowPausePlay?: boolean;
+}> = React.memo(({
+  mediaUrl,
+  mediaType,
+  maxWidth = '260px',
+  maxHeight = '200px',
+  isRemovable = false,
+  onRemove,
+  removeTitle = 'Remove media',
+  borderAccent = false,
+  allowPausePlay = true
+}) => {
+  const [isMuted, setIsMuted] = useState(true);
+  const [volume, setVolume] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('klipy_clip_volume');
+      return saved ? parseFloat(saved) : 0.8;
+    } catch (e) {
+      return 0.8;
+    }
+  });
+  const [isPaused, setIsPaused] = useState(false);
+  const [showVolumeSlider, setShowVolumeSlider] = useState(false);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  if (!mediaUrl) return null;
+  const isClip = mediaType === 'clip' || mediaUrl.endsWith('.mp4') || mediaUrl.endsWith('.webm');
+  const isSticker = mediaType === 'sticker';
+
+  const togglePlayPause = (e: React.MouseEvent) => {
+    if (!allowPausePlay || !videoRef.current) return;
+    e.stopPropagation();
+    if (videoRef.current.paused) {
+      videoRef.current.play().catch(() => {});
+      setIsPaused(false);
+    } else {
+      videoRef.current.pause();
+      setIsPaused(true);
+    }
+  };
+
+  const toggleMute = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (videoRef.current) {
+      if (isMuted) {
+        const targetVol = volume > 0 ? volume : 0.8;
+        videoRef.current.muted = false;
+        videoRef.current.volume = targetVol;
+        if (volume === 0) setVolume(0.8);
+        setIsMuted(false);
+      } else {
+        videoRef.current.muted = true;
+        setIsMuted(true);
+      }
+    }
+  };
+
+  const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    e.stopPropagation();
+    const newVol = parseFloat(e.target.value);
+    setVolume(newVol);
+    try {
+      localStorage.setItem('klipy_clip_volume', String(newVol));
+    } catch (err) {}
+    if (videoRef.current) {
+      videoRef.current.volume = newVol;
+      if (newVol > 0) {
+        videoRef.current.muted = false;
+        setIsMuted(false);
+      } else {
+        videoRef.current.muted = true;
+        setIsMuted(true);
+      }
+    }
+  };
+
+  return (
+    <div style={{
+      position: 'relative',
+      maxWidth: isSticker ? '140px' : maxWidth,
+      maxHeight: maxHeight,
+      borderRadius: '8px',
+      overflow: 'hidden',
+      border: isSticker ? 'none' : (borderAccent ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)'),
+      background: isSticker ? 'transparent' : '#000',
+      display: 'inline-block',
+      userSelect: 'none'
+    }}>
+      {isClip ? (
+        <div
+          onClick={togglePlayPause}
+          style={{
+            position: 'relative',
+            width: '100%',
+            height: '100%',
+            cursor: allowPausePlay ? 'pointer' : 'default'
+          }}
+        >
+          <video
+            ref={videoRef}
+            src={mediaUrl}
+            muted={isMuted}
+            loop
+            autoPlay
+            playsInline
+            style={{ width: '100%', maxHeight: maxHeight, objectFit: 'contain', display: 'block' }}
+          />
+
+          {/* Pause overlay icon */}
+          {allowPausePlay && isPaused && (
+            <div style={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              background: 'rgba(0, 0, 0, 0.65)',
+              color: '#fff',
+              borderRadius: '50%',
+              width: '40px',
+              height: '40px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              pointerEvents: 'none',
+              backdropFilter: 'blur(4px)',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.5)'
+            }}>
+              <Play size={20} fill="#fff" style={{ marginLeft: '3px' }} />
+            </div>
+          )}
+
+          {/* Audio controls container */}
+          <div
+            onClick={(e) => e.stopPropagation()}
+            onMouseEnter={() => setShowVolumeSlider(true)}
+            onMouseLeave={() => setShowVolumeSlider(false)}
+            style={{
+              position: 'absolute',
+              bottom: '6px',
+              right: '6px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              background: 'rgba(0, 0, 0, 0.8)',
+              padding: showVolumeSlider ? '3px 8px 3px 4px' : '0px',
+              borderRadius: '20px',
+              backdropFilter: 'blur(6px)',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              zIndex: 3,
+              transition: 'all 0.2s ease'
+            }}
+          >
+            <button
+              type="button"
+              onClick={toggleMute}
+              title={isMuted ? 'Activar sonido' : 'Silenciar'}
+              aria-label={isMuted ? 'Activar sonido' : 'Silenciar'}
+              style={{
+                background: isMuted ? 'transparent' : 'rgba(236, 72, 153, 0.85)',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '50%',
+                width: '26px',
+                height: '26px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              {isMuted || volume === 0 ? <VolumeX size={13} /> : <Volume2 size={13} />}
+            </button>
+
+            {showVolumeSlider && (
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.05"
+                value={volume}
+                onChange={handleVolumeChange}
+                onClick={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+                title={`Volumen: ${Math.round(volume * 100)}%`}
+                style={{
+                  width: '55px',
+                  height: '4px',
+                  accentColor: '#ec4899',
+                  cursor: 'pointer'
+                }}
+              />
+            )}
+          </div>
+        </div>
+      ) : (
+        <img
+          src={mediaUrl}
+          alt="Media attachment"
+          loading="lazy"
+          style={{
+            width: '100%',
+            maxHeight: maxHeight,
+            objectFit: isSticker ? 'contain' : 'cover',
+            display: 'block'
+          }}
+        />
+      )}
+
+      {isRemovable && onRemove && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove();
+          }}
+          title={removeTitle}
+          style={{
+            position: 'absolute',
+            top: '4px',
+            right: '4px',
+            background: 'rgba(0,0,0,0.7)',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '50%',
+            width: '22px',
+            height: '22px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            zIndex: 4
+          }}
+        >
+          <X size={13} />
+        </button>
+      )}
+    </div>
+  );
+});
+
+const RootCommentEditor: React.FC<{
+  initialComment: string;
+  commentMedia: SelectedKlipyMedia | null;
+  onSave: (content: string) => void;
+  onDelete: () => void;
+  onCancelEdit: () => void;
+  onOpenKlipy: () => void;
+  onRemoveMedia: () => void;
+  isEditing: boolean;
+  hasExistingComment: boolean;
+  isSaving: boolean;
+  user: any;
+  language: string;
+}> = React.memo(({
+  initialComment,
+  commentMedia,
+  onSave,
+  onDelete,
+  onCancelEdit,
+  onOpenKlipy,
+  onRemoveMedia,
+  isEditing,
+  hasExistingComment,
+  isSaving,
+  user,
+  language
+}) => {
+  const [text, setText] = useState(initialComment);
+
+  useEffect(() => {
+    setText(initialComment);
+  }, [initialComment]);
+
+  return (
+    <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <h4 style={{ margin: 0, fontSize: '1.1rem' }}>
+          {isEditing 
+            ? (language === 'es' ? 'Editar Tu Comentario' : 'Edit Your Comment')
+            : (language === 'es' ? 'Tu Comentario' : 'Your Comment')
+          }
+        </h4>
+        {isEditing && (
+          <button
+            type="button"
+            onClick={onCancelEdit}
+            style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', fontSize: '0.8rem', cursor: 'pointer' }}
+          >
+            {language === 'es' ? 'Cancelar' : 'Cancel'}
+          </button>
+        )}
+      </div>
+      <textarea
+        className="input-field"
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder={language === 'es' ? '¿Qué te pareció este elemento? Escribe tu comentario aquí...' : 'What did you think of this item? Write your comment here...'}
+        style={{ width: '100%', minHeight: '80px', padding: '0.75rem', background: 'var(--bg-secondary)', resize: 'vertical' }}
+      />
+
+      {/* Attached Media Preview */}
+      {commentMedia && (
+        <MediaAttachmentView
+          mediaUrl={commentMedia.url}
+          mediaType={commentMedia.type}
+          maxWidth="220px"
+          maxHeight="160px"
+          borderAccent
+          isRemovable
+          onRemove={onRemoveMedia}
+          removeTitle={language === 'es' ? 'Quitar multimedia' : 'Remove media'}
+          allowPausePlay={true}
+        />
+      )}
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          {hasExistingComment && (
+            <button
+              type="button"
+              onClick={onDelete}
+              disabled={isSaving}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: '#ef4444',
+                fontSize: '0.82rem',
+                cursor: 'pointer',
+                padding: '0.4rem 0.6rem'
+              }}
+            >
+              {language === 'es' ? 'Eliminar comentario' : 'Delete comment'}
+            </button>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          {/* Attach GIF / Media Button */}
+          <button
+            type="button"
+            onClick={onOpenKlipy}
+            title={language === 'es' ? 'Añadir GIF / Multimedia' : 'Add GIF / Media'}
+            aria-label={language === 'es' ? 'Añadir GIF / Multimedia' : 'Add GIF / Media'}
+            style={{
+              background: commentMedia ? 'rgba(236, 72, 153, 0.12)' : 'rgba(255,255,255,0.06)',
+              border: commentMedia ? '1px solid #ec4899' : '1px solid var(--border-color)',
+              color: commentMedia ? '#ec4899' : 'var(--text-secondary)',
+              borderRadius: '6px',
+              padding: '0.42rem 0.55rem',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.15s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = '#ec4899';
+              e.currentTarget.style.color = '#ec4899';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = commentMedia ? '#ec4899' : 'var(--border-color)';
+              e.currentTarget.style.color = commentMedia ? '#ec4899' : 'var(--text-secondary)';
+            }}
+          >
+            <ImageIcon size={16} />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onSave(text)}
+            className="btn-primary"
+            disabled={isSaving || !user || (!text.trim() && !commentMedia)}
+            style={{ padding: '0.4rem 1rem', fontSize: '0.85rem' }}
+          >
+            {isSaving
+              ? (language === 'es' ? 'Publicando...' : 'Publishing...')
+              : (language === 'es' ? 'Publicar' : 'Publish')
+            }
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+});
+
+const ReviewReplyForm: React.FC<{
+  replyToUser: string;
+  replyMedia: SelectedKlipyMedia | null;
+  onCancel: () => void;
+  onOpenKlipy: () => void;
+  onRemoveMedia: () => void;
+  onSubmit: (text: string) => void;
+  isSubmitting: boolean;
+  language: string;
+}> = React.memo(({
+  replyToUser,
+  replyMedia,
+  onCancel,
+  onOpenKlipy,
+  onRemoveMedia,
+  onSubmit,
+  isSubmitting,
+  language
+}) => {
+  const [text, setText] = useState(`@${replyToUser} `);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  useEffect(() => {
+    if (textareaRef.current) {
+      const len = textareaRef.current.value.length;
+      textareaRef.current.focus();
+      textareaRef.current.setSelectionRange(len, len);
+    }
+  }, []);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!text.trim() && !replyMedia) return;
+    onSubmit(text);
+  };
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+      style={{
+        marginTop: '0.5rem',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '0.5rem',
+        padding: '0.75rem',
+        background: 'rgba(0,0,0,0.15)',
+        borderRadius: '6px',
+        border: '1px solid var(--border-color)'
+      }}
+    >
+      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between' }}>
+        <span>{language === 'es' ? `Respondiendo a @${replyToUser}` : `Replying to @${replyToUser}`}</span>
+        <button
+          type="button"
+          onClick={onCancel}
+          style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '0.75rem' }}
+        >
+          {language === 'es' ? 'Cancelar' : 'Cancel'}
+        </button>
+      </div>
+      <textarea
+        ref={textareaRef}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder={language === 'es' ? 'Escribe una respuesta...' : 'Write a reply...'}
+        rows={2}
+        className="input-field"
+        style={{ width: '100%', fontSize: '0.85rem', padding: '0.5rem', resize: 'vertical' }}
+      />
+
+      {/* Attached Reply Media Preview */}
+      {replyMedia && (
+        <MediaAttachmentView
+          mediaUrl={replyMedia.url}
+          mediaType={replyMedia.type}
+          maxWidth="180px"
+          maxHeight="130px"
+          borderAccent
+          isRemovable
+          onRemove={onRemoveMedia}
+          removeTitle={language === 'es' ? 'Quitar multimedia' : 'Remove media'}
+          allowPausePlay={true}
+        />
+      )}
+
+      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '0.4rem' }}>
+        <button
+          type="button"
+          onClick={onOpenKlipy}
+          title={language === 'es' ? 'Añadir GIF / Multimedia' : 'Add GIF / Media'}
+          aria-label={language === 'es' ? 'Añadir GIF / Multimedia' : 'Add GIF / Media'}
+          style={{
+            background: replyMedia ? 'rgba(236, 72, 153, 0.12)' : 'transparent',
+            border: replyMedia ? '1px solid #ec4899' : '1px solid var(--border-color)',
+            color: replyMedia ? '#ec4899' : 'var(--text-secondary)',
+            borderRadius: '6px',
+            padding: '0.3rem 0.45rem',
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'all 0.15s ease'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = '#ec4899';
+            e.currentTarget.style.color = '#ec4899';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = replyMedia ? '#ec4899' : 'var(--border-color)';
+            e.currentTarget.style.color = replyMedia ? '#ec4899' : 'var(--text-secondary)';
+          }}
+        >
+          <ImageIcon size={14} />
+        </button>
+
+        <button
+          type="submit"
+          className="btn-primary"
+          disabled={(!text.trim() && !replyMedia) || isSubmitting}
+          style={{ padding: '0.3rem 0.8rem', fontSize: '0.8rem' }}
+        >
+          {isSubmitting
+            ? (language === 'es' ? 'Enviando...' : 'Sending...')
+            : (language === 'es' ? 'Responder' : 'Reply')
+          }
+        </button>
+      </div>
+    </form>
+  );
+});
+
+const ReviewEditReplyForm: React.FC<{
+  initialText: string;
+  editingMedia: SelectedKlipyMedia | null;
+  onCancel: () => void;
+  onOpenKlipy: () => void;
+  onRemoveMedia: () => void;
+  onSave: (text: string) => void;
+  isSubmitting: boolean;
+  language: string;
+}> = React.memo(({
+  initialText,
+  editingMedia,
+  onCancel,
+  onOpenKlipy,
+  onRemoveMedia,
+  onSave,
+  isSubmitting,
+  language
+}) => {
+  const [text, setText] = useState(initialText);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  useEffect(() => {
+    if (textareaRef.current) {
+      const len = textareaRef.current.value.length;
+      textareaRef.current.focus();
+      textareaRef.current.setSelectionRange(len, len);
+    }
+  }, []);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.2rem', width: '100%' }}>
+      <textarea
+        ref={textareaRef}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        rows={2}
+        className="input-field"
+        style={{ width: '100%', fontSize: '0.85rem', padding: '0.4rem', resize: 'vertical' }}
+      />
+
+      {/* Attached Edit Reply Media Preview */}
+      {editingMedia && (
+        <MediaAttachmentView
+          mediaUrl={editingMedia.url}
+          mediaType={editingMedia.type}
+          maxWidth="160px"
+          maxHeight="120px"
+          borderAccent
+          isRemovable
+          onRemove={onRemoveMedia}
+          removeTitle={language === 'es' ? 'Quitar multimedia' : 'Remove media'}
+          allowPausePlay={true}
+        />
+      )}
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <button
+          type="button"
+          onClick={onCancel}
+          style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', fontSize: '0.75rem', cursor: 'pointer', padding: '0.2rem 0.5rem' }}
+        >
+          {language === 'es' ? 'Cancelar' : 'Cancel'}
+        </button>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          <button
+            type="button"
+            onClick={onOpenKlipy}
+            title={language === 'es' ? 'Añadir GIF / Multimedia' : 'Add GIF / Media'}
+            aria-label={language === 'es' ? 'Añadir GIF / Multimedia' : 'Add GIF / Media'}
+            style={{
+              background: editingMedia ? 'rgba(236, 72, 153, 0.12)' : 'transparent',
+              border: editingMedia ? '1px solid #ec4899' : '1px solid var(--border-color)',
+              color: editingMedia ? '#ec4899' : 'var(--text-secondary)',
+              borderRadius: '6px',
+              padding: '0.3rem 0.45rem',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.15s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = '#ec4899';
+              e.currentTarget.style.color = '#ec4899';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = editingMedia ? '#ec4899' : 'var(--border-color)';
+              e.currentTarget.style.color = editingMedia ? '#ec4899' : 'var(--text-secondary)';
+            }}
+          >
+            <ImageIcon size={14} />
+          </button>
+          <button
+            type="button"
+            onClick={() => onSave(text)}
+            className="btn-primary"
+            disabled={(!text.trim() && !editingMedia) || isSubmitting}
+            style={{ padding: '0.2rem 0.6rem', fontSize: '0.75rem' }}
+          >
+            {isSubmitting
+              ? (language === 'es' ? 'Guardando...' : 'Saving...')
+              : (language === 'es' ? 'Guardar' : 'Save')
+            }
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+});
 
 
 const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
@@ -1906,15 +2545,17 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     }
   };
 
-  const handleSaveComment = async () => {
+  const handleSaveComment = async (customContent?: string) => {
     if (!selectedItem || !selectedItem.external_id) return;
+    const textToSave = customContent !== undefined ? customContent : userComment;
     setIsSavingReview(true);
     try {
       await apiClient.post(`/reviews/${selectedItem.item_type}/${selectedItem.external_id}`, {
-        content: userComment.trim() ? userComment : null,
+        content: textToSave.trim() ? textToSave : null,
         media_url: commentMedia?.url || null,
         media_type: commentMedia?.type || null
       });
+      setUserComment(textToSave);
       const revRes = await apiClient.get(`/reviews/${selectedItem.item_type}/${selectedItem.external_id}`);
       setItemReviews(revRes.data);
       setIsEditingComment(false);
@@ -2012,15 +2653,14 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     }
   };
 
-  const handlePostReply = async (e: React.FormEvent, rootParentId: number) => {
-    e.preventDefault();
-    const hasText = Boolean(replyText.trim());
+  const handlePostReply = async (customText: string, rootParentId: number) => {
+    const hasText = Boolean(customText.trim());
     const hasMedia = Boolean(replyMedia?.url);
     if (!selectedItem || (!hasText && !hasMedia) || isSubmittingReply) return;
     setIsSubmittingReply(true);
     try {
       const res = await apiClient.post(`/reviews/${selectedItem.item_type}/${selectedItem.external_id}`, {
-        content: replyText.trim() || null,
+        content: customText.trim() || null,
         media_url: replyMedia?.url || null,
         media_type: replyMedia?.type || null,
         parent_id: rootParentId
@@ -2037,14 +2677,15 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     }
   };
 
-  const handleSaveEditReply = async (replyId: number) => {
-    const hasText = Boolean(editingReplyText.trim());
+  const handleSaveEditReply = async (replyId: number, customText?: string) => {
+    const textToSave = customText !== undefined ? customText : editingReplyText;
+    const hasText = Boolean(textToSave.trim());
     const hasMedia = Boolean(editingReplyMedia?.url);
     if ((!hasText && !hasMedia) || isSubmittingReply) return;
     setIsSubmittingReply(true);
     try {
       const res = await apiClient.put(`/reviews/${replyId}`, {
-        content: editingReplyText.trim() || null,
+        content: textToSave.trim() || null,
         media_url: editingReplyMedia?.url || null,
         media_type: editingReplyMedia?.type || null
       });
@@ -5997,155 +6638,23 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                 }
 
                 return (
-                  <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <h4 style={{ margin: 0, fontSize: '1.1rem' }}>
-                        {isEditingComment 
-                          ? (language === 'es' ? 'Editar Tu Comentario' : 'Edit Your Comment')
-                          : (language === 'es' ? 'Tu Comentario' : 'Your Comment')
-                        }
-                      </h4>
-                      {isEditingComment && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsEditingComment(false);
-                            setUserComment(myRootReview?.content || '');
-                          }}
-                          style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', fontSize: '0.8rem', cursor: 'pointer' }}
-                        >
-                          {language === 'es' ? 'Cancelar' : 'Cancel'}
-                        </button>
-                      )}
-                    </div>
-                    <textarea
-                      className="input-field"
-                      value={userComment}
-                      onChange={(e) => setUserComment(e.target.value)}
-                      placeholder={language === 'es' ? '¿Qué te pareció este elemento? Escribe tu comentario aquí...' : 'What did you think of this item? Write your comment here...'}
-                      style={{ width: '100%', minHeight: '80px', padding: '0.75rem', background: 'var(--bg-secondary)', resize: 'vertical' }}
-                    />
-
-                    {/* Attached Media Preview */}
-                    {commentMedia && (
-                      <div style={{
-                        position: 'relative',
-                        display: 'inline-block',
-                        maxWidth: '220px',
-                        maxHeight: '160px',
-                        borderRadius: '8px',
-                        overflow: 'hidden',
-                        border: '1px solid var(--accent-primary)',
-                        background: '#000'
-                      }}>
-                        {commentMedia.type === 'clip' ? (
-                          <video
-                            src={commentMedia.url}
-                            muted
-                            loop
-                            autoPlay
-                            playsInline
-                            style={{ width: '100%', maxHeight: '160px', objectFit: 'contain', display: 'block' }}
-                          />
-                        ) : (
-                          <img
-                            src={commentMedia.url}
-                            alt="Attached media"
-                            style={{ width: '100%', maxHeight: '160px', objectFit: 'contain', display: 'block' }}
-                          />
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => setCommentMedia(null)}
-                          title={language === 'es' ? 'Quitar multimedia' : 'Remove media'}
-                          style={{
-                            position: 'absolute',
-                            top: '4px',
-                            right: '4px',
-                            background: 'rgba(0,0,0,0.7)',
-                            color: '#fff',
-                            border: 'none',
-                            borderRadius: '50%',
-                            width: '22px',
-                            height: '22px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          <X size={13} />
-                        </button>
-                      </div>
-                    )}
-
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        {hasExistingComment && (
-                          <button
-                            type="button"
-                            onClick={handleDeleteComment}
-                            disabled={isSavingReview}
-                            style={{
-                              background: 'transparent',
-                              border: 'none',
-                              color: '#ef4444',
-                              fontSize: '0.82rem',
-                              cursor: 'pointer',
-                              padding: '0.4rem 0.6rem'
-                            }}
-                          >
-                            {language === 'es' ? 'Eliminar comentario' : 'Delete comment'}
-                          </button>
-                        )}
-                      </div>
-
-                      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                        {/* Attach GIF / Media Button */}
-                        <button
-                          type="button"
-                          onClick={() => setKlipyPickerTarget('comment')}
-                          title={language === 'es' ? 'Añadir GIF / Multimedia' : 'Add GIF / Media'}
-                          aria-label={language === 'es' ? 'Añadir GIF / Multimedia' : 'Add GIF / Media'}
-                          style={{
-                            background: commentMedia ? 'rgba(236, 72, 153, 0.12)' : 'rgba(255,255,255,0.06)',
-                            border: commentMedia ? '1px solid #ec4899' : '1px solid var(--border-color)',
-                            color: commentMedia ? '#ec4899' : 'var(--text-secondary)',
-                            borderRadius: '6px',
-                            padding: '0.42rem 0.55rem',
-                            cursor: 'pointer',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            transition: 'all 0.15s ease'
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.borderColor = '#ec4899';
-                            e.currentTarget.style.color = '#ec4899';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.borderColor = commentMedia ? '#ec4899' : 'var(--border-color)';
-                            e.currentTarget.style.color = commentMedia ? '#ec4899' : 'var(--text-secondary)';
-                          }}
-                        >
-                          <ImageIcon size={16} />
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={handleSaveComment}
-                          className="btn-primary"
-                          disabled={isSavingReview || !user || (!userComment.trim() && !commentMedia)}
-                          style={{ padding: '0.4rem 1rem', fontSize: '0.85rem' }}
-                        >
-                          {isSavingReview
-                            ? (language === 'es' ? 'Publicando...' : 'Publishing...')
-                            : (language === 'es' ? 'Publicar' : 'Publish')
-                          }
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+                  <RootCommentEditor
+                    initialComment={userComment}
+                    commentMedia={commentMedia}
+                    onSave={handleSaveComment}
+                    onDelete={handleDeleteComment}
+                    onCancelEdit={() => {
+                      setIsEditingComment(false);
+                      setUserComment(myRootReview?.content || '');
+                    }}
+                    onOpenKlipy={() => setKlipyPickerTarget('comment')}
+                    onRemoveMedia={() => setCommentMedia(null)}
+                    isEditing={isEditingComment}
+                    hasExistingComment={hasExistingComment}
+                    isSaving={isSavingReview}
+                    user={user}
+                    language={language}
+                  />
                 );
               })()}
 
@@ -6164,42 +6673,16 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
                   const renderMediaAttachment = (mediaUrl?: string | null, mediaType?: string | null) => {
                     if (!mediaUrl) return null;
-                    const isClip = mediaType === 'clip' || mediaUrl.endsWith('.mp4') || mediaUrl.endsWith('.webm');
                     const isSticker = mediaType === 'sticker';
 
                     return (
-                      <div style={{
-                        marginTop: '0.4rem',
-                        maxWidth: isSticker ? '140px' : '260px',
-                        maxHeight: '200px',
-                        borderRadius: '8px',
-                        overflow: 'hidden',
-                        border: isSticker ? 'none' : '1px solid var(--border-color)',
-                        background: isSticker ? 'transparent' : 'rgba(0,0,0,0.3)',
-                        display: 'inline-block'
-                      }}>
-                        {isClip ? (
-                          <video
-                            src={mediaUrl}
-                            muted
-                            loop
-                            autoPlay
-                            playsInline
-                            style={{ width: '100%', maxHeight: '200px', objectFit: 'contain', display: 'block' }}
-                          />
-                        ) : (
-                          <img
-                            src={mediaUrl}
-                            alt="Media attachment"
-                            loading="lazy"
-                            style={{
-                              width: '100%',
-                              maxHeight: '200px',
-                              objectFit: isSticker ? 'contain' : 'cover',
-                              display: 'block'
-                            }}
-                          />
-                        )}
+                      <div style={{ marginTop: '0.4rem' }}>
+                        <MediaAttachmentView
+                          mediaUrl={mediaUrl}
+                          mediaType={mediaType}
+                          maxWidth={isSticker ? '140px' : '260px'}
+                          maxHeight="200px"
+                        />
                       </div>
                     );
                   };
@@ -6419,138 +6902,20 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                             </div>
 
                             {/* Inline Reply Form under Root Review */}
-                            {replyTarget?.rootReviewId === rootNode.id && (
-                              <form
-                                onSubmit={(e) => handlePostReply(e, rootNode.id)}
-                                style={{
-                                  marginTop: '0.5rem',
-                                  display: 'flex',
-                                  flexDirection: 'column',
-                                  gap: '0.5rem',
-                                  padding: '0.75rem',
-                                  background: 'rgba(0,0,0,0.15)',
-                                  borderRadius: '6px',
-                                  border: '1px solid var(--border-color)'
+                            {replyTarget?.targetReviewId === rootNode.id && (
+                              <ReviewReplyForm
+                                replyToUser={replyTarget?.replyToUser || ''}
+                                replyMedia={replyMedia}
+                                onCancel={() => {
+                                  setReplyTarget(null);
+                                  setReplyMedia(null);
                                 }}
-                              >
-                                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between' }}>
-                                  <span>{language === 'es' ? `Respondiendo a @${replyTarget?.replyToUser || ''}` : `Replying to @${replyTarget?.replyToUser || ''}`}</span>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setReplyTarget(null);
-                                      setReplyMedia(null);
-                                    }}
-                                    style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '0.75rem' }}
-                                  >
-                                    {language === 'es' ? 'Cancelar' : 'Cancel'}
-                                  </button>
-                                </div>
-                                <textarea
-                                  value={replyText}
-                                  onChange={(e) => setReplyText(e.target.value)}
-                                  placeholder={language === 'es' ? 'Escribe una respuesta...' : 'Write a reply...'}
-                                  rows={2}
-                                  className="input-field"
-                                  style={{ width: '100%', fontSize: '0.85rem', padding: '0.5rem', resize: 'vertical' }}
-                                  autoFocus
-                                />
-
-                                {/* Attached Reply Media Preview */}
-                                {replyMedia && (
-                                  <div style={{
-                                    position: 'relative',
-                                    display: 'inline-block',
-                                    maxWidth: '180px',
-                                    maxHeight: '130px',
-                                    borderRadius: '6px',
-                                    overflow: 'hidden',
-                                    border: '1px solid var(--accent-primary)',
-                                    background: '#000'
-                                  }}>
-                                    {replyMedia.type === 'clip' ? (
-                                      <video
-                                        src={replyMedia.url}
-                                        muted
-                                        loop
-                                        autoPlay
-                                        playsInline
-                                        style={{ width: '100%', maxHeight: '130px', objectFit: 'contain', display: 'block' }}
-                                      />
-                                    ) : (
-                                      <img
-                                        src={replyMedia.url}
-                                        alt="Attached media"
-                                        style={{ width: '100%', maxHeight: '130px', objectFit: 'contain', display: 'block' }}
-                                      />
-                                    )}
-                                    <button
-                                      type="button"
-                                      onClick={() => setReplyMedia(null)}
-                                      style={{
-                                        position: 'absolute',
-                                        top: '3px',
-                                        right: '3px',
-                                        background: 'rgba(0,0,0,0.7)',
-                                        color: '#fff',
-                                        border: 'none',
-                                        borderRadius: '50%',
-                                        width: '20px',
-                                        height: '20px',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        cursor: 'pointer'
-                                      }}
-                                    >
-                                      <X size={12} />
-                                    </button>
-                                  </div>
-                                )}
-
-                                <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '0.4rem' }}>
-                                  <button
-                                    type="button"
-                                    onClick={() => setKlipyPickerTarget('reply')}
-                                    title={language === 'es' ? 'Añadir GIF / Multimedia' : 'Add GIF / Media'}
-                                    aria-label={language === 'es' ? 'Añadir GIF / Multimedia' : 'Add GIF / Media'}
-                                    style={{
-                                      background: replyMedia ? 'rgba(236, 72, 153, 0.12)' : 'transparent',
-                                      border: replyMedia ? '1px solid #ec4899' : '1px solid var(--border-color)',
-                                      color: replyMedia ? '#ec4899' : 'var(--text-secondary)',
-                                      borderRadius: '6px',
-                                      padding: '0.3rem 0.45rem',
-                                      cursor: 'pointer',
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      transition: 'all 0.15s ease'
-                                    }}
-                                    onMouseEnter={(e) => {
-                                      e.currentTarget.style.borderColor = '#ec4899';
-                                      e.currentTarget.style.color = '#ec4899';
-                                    }}
-                                    onMouseLeave={(e) => {
-                                      e.currentTarget.style.borderColor = replyMedia ? '#ec4899' : 'var(--border-color)';
-                                      e.currentTarget.style.color = replyMedia ? '#ec4899' : 'var(--text-secondary)';
-                                    }}
-                                  >
-                                    <ImageIcon size={14} />
-                                  </button>
-
-                                  <button
-                                    type="submit"
-                                    className="btn-primary"
-                                    disabled={(!replyText.trim() && !replyMedia) || isSubmittingReply}
-                                    style={{ padding: '0.3rem 0.8rem', fontSize: '0.8rem' }}
-                                  >
-                                    {isSubmittingReply
-                                      ? (language === 'es' ? 'Enviando...' : 'Sending...')
-                                      : (language === 'es' ? 'Responder' : 'Reply')
-                                    }
-                                  </button>
-                                </div>
-                              </form>
+                                onOpenKlipy={() => setKlipyPickerTarget('reply')}
+                                onRemoveMedia={() => setReplyMedia(null)}
+                                onSubmit={(text) => handlePostReply(text, rootNode.id)}
+                                isSubmitting={isSubmittingReply}
+                                language={language}
+                              />
                             )}
 
                             {/* Replies List */}
@@ -6690,125 +7055,20 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                       </div>
 
                                       {isEditingThisReply ? (
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.2rem' }}>
-                                          <textarea
-                                            value={editingReplyText}
-                                            onChange={(e) => setEditingReplyText(e.target.value)}
-                                            rows={2}
-                                            className="input-field"
-                                            style={{ width: '100%', fontSize: '0.85rem', padding: '0.4rem', resize: 'vertical' }}
-                                            autoFocus
-                                          />
-
-                                          {/* Attached Edit Reply Media Preview */}
-                                          {editingReplyMedia && (
-                                            <div style={{
-                                              position: 'relative',
-                                              display: 'inline-block',
-                                              maxWidth: '160px',
-                                              maxHeight: '120px',
-                                              borderRadius: '6px',
-                                              overflow: 'hidden',
-                                              border: '1px solid var(--accent-primary)',
-                                              background: '#000'
-                                            }}>
-                                              {editingReplyMedia.type === 'clip' ? (
-                                                <video
-                                                  src={editingReplyMedia.url}
-                                                  muted
-                                                  loop
-                                                  autoPlay
-                                                  playsInline
-                                                  style={{ width: '100%', maxHeight: '120px', objectFit: 'contain', display: 'block' }}
-                                                />
-                                              ) : (
-                                                <img
-                                                  src={editingReplyMedia.url}
-                                                  alt="Attached media"
-                                                  style={{ width: '100%', maxHeight: '120px', objectFit: 'contain', display: 'block' }}
-                                                />
-                                              )}
-                                              <button
-                                                type="button"
-                                                onClick={() => setEditingReplyMedia(null)}
-                                                style={{
-                                                  position: 'absolute',
-                                                  top: '3px',
-                                                  right: '3px',
-                                                  background: 'rgba(0,0,0,0.7)',
-                                                  color: '#fff',
-                                                  border: 'none',
-                                                  borderRadius: '50%',
-                                                  width: '20px',
-                                                  height: '20px',
-                                                  display: 'flex',
-                                                  alignItems: 'center',
-                                                  justifyContent: 'center',
-                                                  cursor: 'pointer'
-                                                }}
-                                              >
-                                                <X size={12} />
-                                              </button>
-                                            </div>
-                                          )}
-
-                                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                            <button
-                                              type="button"
-                                              onClick={() => {
-                                                setEditingReplyId(null);
-                                                setEditingReplyText('');
-                                                setEditingReplyMedia(null);
-                                              }}
-                                              style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', fontSize: '0.75rem', cursor: 'pointer', padding: '0.2rem 0.5rem' }}
-                                            >
-                                              {language === 'es' ? 'Cancelar' : 'Cancel'}
-                                            </button>
-
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                                              <button
-                                                type="button"
-                                                onClick={() => setKlipyPickerTarget('edit_reply')}
-                                                title={language === 'es' ? 'Añadir GIF / Multimedia' : 'Add GIF / Media'}
-                                                aria-label={language === 'es' ? 'Añadir GIF / Multimedia' : 'Add GIF / Media'}
-                                                style={{
-                                                  background: editingReplyMedia ? 'rgba(236, 72, 153, 0.12)' : 'transparent',
-                                                  border: editingReplyMedia ? '1px solid #ec4899' : '1px solid var(--border-color)',
-                                                  color: editingReplyMedia ? '#ec4899' : 'var(--text-secondary)',
-                                                  borderRadius: '6px',
-                                                  padding: '0.3rem 0.45rem',
-                                                  cursor: 'pointer',
-                                                  display: 'inline-flex',
-                                                  alignItems: 'center',
-                                                  justifyContent: 'center',
-                                                  transition: 'all 0.15s ease'
-                                                }}
-                                                onMouseEnter={(e) => {
-                                                  e.currentTarget.style.borderColor = '#ec4899';
-                                                  e.currentTarget.style.color = '#ec4899';
-                                                }}
-                                                onMouseLeave={(e) => {
-                                                  e.currentTarget.style.borderColor = editingReplyMedia ? '#ec4899' : 'var(--border-color)';
-                                                  e.currentTarget.style.color = editingReplyMedia ? '#ec4899' : 'var(--text-secondary)';
-                                                }}
-                                              >
-                                                <ImageIcon size={14} />
-                                              </button>
-                                              <button
-                                                type="button"
-                                                onClick={() => handleSaveEditReply(reply.id)}
-                                                className="btn-primary"
-                                                disabled={(!editingReplyText.trim() && !editingReplyMedia) || isSubmittingReply}
-                                                style={{ padding: '0.2rem 0.6rem', fontSize: '0.75rem' }}
-                                              >
-                                                {isSubmittingReply
-                                                  ? (language === 'es' ? 'Guardando...' : 'Saving...')
-                                                  : (language === 'es' ? 'Guardar' : 'Save')
-                                                }
-                                              </button>
-                                            </div>
-                                          </div>
-                                        </div>
+                                        <ReviewEditReplyForm
+                                          initialText={reply.content || ''}
+                                          editingMedia={editingReplyMedia}
+                                          onCancel={() => {
+                                            setEditingReplyId(null);
+                                            setEditingReplyText('');
+                                            setEditingReplyMedia(null);
+                                          }}
+                                          onOpenKlipy={() => setKlipyPickerTarget('edit_reply')}
+                                          onRemoveMedia={() => setEditingReplyMedia(null)}
+                                          onSave={(text) => handleSaveEditReply(reply.id, text)}
+                                          isSubmitting={isSubmittingReply}
+                                          language={language}
+                                        />
                                       ) : (
                                         <>
                                           {reply.content && (
@@ -6861,6 +7121,25 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                               <span>{isReplyingChild ? (language === 'es' ? 'Cancelar' : 'Cancel') : (language === 'es' ? 'Responder' : 'Reply')}</span>
                                             </button>
                                           )}
+                                        </div>
+                                      )}
+
+                                      {/* Inline Reply Form under this Child Reply */}
+                                      {replyTarget?.targetReviewId === reply.id && (
+                                        <div style={{ marginTop: '0.35rem' }}>
+                                          <ReviewReplyForm
+                                            replyToUser={replyTarget?.replyToUser || reply.username}
+                                            replyMedia={replyMedia}
+                                            onCancel={() => {
+                                              setReplyTarget(null);
+                                              setReplyMedia(null);
+                                            }}
+                                            onOpenKlipy={() => setKlipyPickerTarget('reply')}
+                                            onRemoveMedia={() => setReplyMedia(null)}
+                                            onSubmit={(text) => handlePostReply(text, rootNode.id)}
+                                            isSubmitting={isSubmittingReply}
+                                            language={language}
+                                          />
                                         </div>
                                       )}
                                     </div>

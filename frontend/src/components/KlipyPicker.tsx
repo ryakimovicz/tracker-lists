@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, X, Loader2, Sparkles, Image as ImageIcon, Smile, Film, FileQuestion } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { Search, X, Loader2, Sparkles, Image as ImageIcon, Smile, Film, FileQuestion, Volume2, VolumeX } from 'lucide-react';
 import { useTranslation } from '../context/LanguageContext';
 
 // Official Klipy Ribbon/K Symbol SVG
@@ -55,7 +56,145 @@ export interface SelectedKlipyMedia {
   preview_url?: string;
 }
 
-interface KlipyPickerProps {
+const KlipyClipCard: React.FC<{
+  item: any;
+  mainUrl: string;
+  previewUrl?: string;
+  isUnmuted: boolean;
+  volume: number;
+  onToggleSound: (e: React.MouseEvent) => void;
+  onVolumeChange: (newVol: number) => void;
+  onSelect: () => void;
+}> = ({ item, mainUrl, previewUrl, isUnmuted, volume, onToggleSound, onVolumeChange, onSelect }) => {
+  const [showVolumeSlider, setShowVolumeSlider] = useState(false);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.muted = !isUnmuted;
+      videoRef.current.volume = volume;
+      if (isUnmuted) {
+        videoRef.current.play().catch(() => {});
+      }
+    }
+  }, [isUnmuted, volume]);
+
+  const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    e.stopPropagation();
+    const newVol = parseFloat(e.target.value);
+    onVolumeChange(newVol);
+  };
+
+  const handleSliderClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+  };
+
+  return (
+    <div
+      onClick={onSelect}
+      style={{
+        position: 'relative',
+        width: '100%',
+        height: '100%',
+        borderRadius: '8px',
+        overflow: 'hidden',
+        background: 'rgba(255, 255, 255, 0.03)',
+        border: isUnmuted ? '1px solid #ec4899' : '1px solid rgba(255, 255, 255, 0.06)',
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        transition: 'transform 0.15s ease, box-shadow 0.15s ease'
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.transform = 'scale(1.03)';
+        e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.4)';
+        if (!isUnmuted) e.currentTarget.style.borderColor = 'var(--accent-primary, #6366f1)';
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.transform = 'scale(1)';
+        e.currentTarget.style.boxShadow = 'none';
+        if (!isUnmuted) e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.06)';
+      }}
+    >
+      <video
+        ref={videoRef}
+        src={mainUrl}
+        poster={previewUrl}
+        muted={!isUnmuted}
+        loop
+        autoPlay
+        playsInline
+        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+      />
+      
+      <div
+        onClick={(e) => e.stopPropagation()}
+        onMouseEnter={() => setShowVolumeSlider(true)}
+        onMouseLeave={() => setShowVolumeSlider(false)}
+        style={{
+          position: 'absolute',
+          bottom: '6px',
+          right: '6px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '4px',
+          background: 'rgba(0, 0, 0, 0.8)',
+          padding: showVolumeSlider ? '3px 8px 3px 4px' : '0px',
+          borderRadius: '20px',
+          backdropFilter: 'blur(6px)',
+          border: '1px solid rgba(255, 255, 255, 0.2)',
+          zIndex: 3,
+          transition: 'all 0.2s ease'
+        }}
+      >
+        <button
+          type="button"
+          onClick={onToggleSound}
+          title={isUnmuted ? 'Silenciar' : 'Escuchar audio'}
+          aria-label={isUnmuted ? 'Silenciar' : 'Escuchar audio'}
+          style={{
+            background: isUnmuted ? 'rgba(236, 72, 153, 0.9)' : 'transparent',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '50%',
+            width: '26px',
+            height: '26px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            transition: 'all 0.15s ease'
+          }}
+        >
+          {isUnmuted && volume > 0 ? <Volume2 size={13} /> : <VolumeX size={13} />}
+        </button>
+
+        {showVolumeSlider && (
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.05"
+            value={volume}
+            onChange={handleSliderChange}
+            onClick={handleSliderClick}
+            onMouseDown={handleSliderClick}
+            title={`Volumen: ${Math.round(volume * 100)}%`}
+            style={{
+              width: '55px',
+              height: '4px',
+              accentColor: '#ec4899',
+              cursor: 'pointer'
+            }}
+          />
+        )}
+      </div>
+    </div>
+  );
+};
+
+export interface KlipyPickerProps {
   isOpen: boolean;
   onClose: () => void;
   onSelectMedia: (media: SelectedKlipyMedia) => void;
@@ -80,6 +219,27 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
+  const [unmutedClipId, setUnmutedClipId] = useState<string | number | null>(null);
+  const [clipVolume, setClipVolume] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('klipy_clip_volume');
+      return saved ? parseFloat(saved) : 0.8;
+    } catch (e) {
+      return 0.8;
+    }
+  });
+
+  const handleClipVolumeChange = (itemKey: string, newVol: number) => {
+    setClipVolume(newVol);
+    try {
+      localStorage.setItem('klipy_clip_volume', String(newVol));
+    } catch (e) {}
+    if (newVol > 0) {
+      setUnmutedClipId(itemKey);
+    } else {
+      setUnmutedClipId(null);
+    }
+  };
 
   const containerRef = useRef<HTMLDivElement>(null);
   const searchTimeoutRef = useRef<any>(null);
@@ -97,12 +257,16 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
 
   // Load Initial Data when Tab Changes
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      setUnmutedClipId(null);
+      return;
+    }
     setItems([]);
     setPage(1);
     setHasMore(true);
     setSelectedCategory(null);
     setSearchQuery('');
+    setUnmutedClipId(null);
     loadCategories(activeTab);
     fetchMedia(activeTab, '', 1, false);
   }, [activeTab, isOpen]);
@@ -219,12 +383,20 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
 
   // Helper to extract best media URL from KLIPY item
   const extractMediaUrls = (item: KlipyMediaItem) => {
-    const file = item.file;
+    const file: any = item.file;
     if (!file) {
       return { mainUrl: '', previewUrl: '' };
     }
 
-    // Best resolution priorities based on file availability
+    // Direct string structure for Clips: file: { mp4: "...", gif: "...", webp: "..." }
+    if (typeof file.mp4 === 'string') {
+      return {
+        mainUrl: file.mp4,
+        previewUrl: file.gif || file.webp || file.mp4
+      };
+    }
+
+    // Nested resolution objects (hd, md, sm, xs) for GIFs, Stickers, Memes
     const hd = file.hd;
     const md = file.md;
     const sm = file.sm;
@@ -258,14 +430,14 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
     if (!mainUrl) return;
 
     let mediaType: SelectedKlipyMedia['type'] = 'gif';
-    if (item.type) {
-      mediaType = item.type;
-    } else if (activeTab === 'stickers') {
-      mediaType = 'sticker';
-    } else if (activeTab === 'memes') {
-      mediaType = 'meme';
-    } else if (activeTab === 'clips') {
+    if (activeTab === 'clips' || item.type === 'clip') {
       mediaType = 'clip';
+    } else if (activeTab === 'stickers' || item.type === 'sticker') {
+      mediaType = 'sticker';
+    } else if (activeTab === 'memes' || item.type === 'meme') {
+      mediaType = 'meme';
+    } else if (item.type) {
+      mediaType = item.type;
     }
 
     onSelectMedia({
@@ -291,7 +463,7 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
 
   if (!isOpen) return null;
 
-  return (
+  return createPortal(
     <div
       style={{
         position: 'fixed',
@@ -299,9 +471,9 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.65)',
+        backgroundColor: 'rgba(0, 0, 0, 0.75)',
         backdropFilter: 'blur(6px)',
-        zIndex: 100000,
+        zIndex: 999999,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -321,7 +493,7 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
           backgroundColor: 'var(--bg-primary, #12151d)',
           borderRadius: '16px',
           border: '1px solid var(--border-color, rgba(255, 255, 255, 0.12))',
-          boxShadow: '0 20px 40px rgba(0, 0, 0, 0.6)',
+          boxShadow: '0 20px 40px rgba(0, 0, 0, 0.8)',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
@@ -484,30 +656,17 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
                 background: 'transparent',
                 border: 'none',
                 outline: 'none',
-                color: 'var(--text-primary, #fff)',
-                fontSize: '0.88rem',
+                color: 'var(--text-primary)',
+                fontSize: '0.875rem',
                 width: '100%'
               }}
             />
             {searchQuery && (
               <button
-                onClick={() => {
-                  setSearchQuery('');
-                  setSelectedCategory(null);
-                  setPage(1);
-                  fetchMedia(activeTab, '', 1, false);
-                }}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: 'var(--text-muted)',
-                  cursor: 'pointer',
-                  padding: '0.1rem',
-                  display: 'flex',
-                  alignItems: 'center'
-                }}
+                onClick={handleClearSearch}
+                style={{ background: 'transparent', border: 'none', color: 'var(--text-muted, #94a3b8)', cursor: 'pointer', padding: 0 }}
               >
-                <X size={14} />
+                <X size={15} />
               </button>
             )}
           </div>
@@ -557,7 +716,8 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
             overflowY: 'auto',
             padding: '0.5rem 1rem 1rem',
             display: 'grid',
-            gridTemplateColumns: activeTab === 'clips' ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)',
+            gridTemplateColumns: activeTab === 'clips' ? 'repeat(2, minmax(0, 1fr))' : 'repeat(3, minmax(0, 1fr))',
+            gridAutoRows: activeTab === 'stickers' ? '120px' : activeTab === 'clips' ? '130px' : '110px',
             gap: '0.5rem',
             alignContent: 'start'
           }}
@@ -566,20 +726,49 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
             const { mainUrl, previewUrl } = extractMediaUrls(item);
             if (!mainUrl && !previewUrl) return null;
 
-            const isClip = activeTab === 'clips' || (item.file?.hd?.mp4?.url || item.file?.md?.mp4?.url);
+            const isClip = activeTab === 'clips' || item.type === 'clip' || mainUrl.endsWith('.mp4');
+            const itemKey = `${item.id}-${idx}`;
+
+            if (isClip) {
+              return (
+                <KlipyClipCard
+                  key={itemKey}
+                  item={item}
+                  mainUrl={mainUrl}
+                  previewUrl={previewUrl}
+                  isUnmuted={unmutedClipId === itemKey}
+                  volume={clipVolume}
+                  onVolumeChange={(newVol) => handleClipVolumeChange(itemKey, newVol)}
+                  onToggleSound={(e) => {
+                    e.stopPropagation();
+                    if (unmutedClipId === itemKey) {
+                      setUnmutedClipId(null);
+                    } else {
+                      if (clipVolume === 0) {
+                        setClipVolume(0.8);
+                        try { localStorage.setItem('klipy_clip_volume', '0.8'); } catch (err) {}
+                      }
+                      setUnmutedClipId(itemKey);
+                    }
+                  }}
+                  onSelect={() => handleSelect(item)}
+                />
+              );
+            }
 
             return (
               <div
-                key={`${item.id}-${idx}`}
+                key={itemKey}
                 onClick={() => handleSelect(item)}
                 style={{
                   position: 'relative',
+                  width: '100%',
+                  height: '100%',
                   borderRadius: '8px',
                   overflow: 'hidden',
                   background: 'rgba(255, 255, 255, 0.03)',
                   border: '1px solid rgba(255, 255, 255, 0.06)',
                   cursor: 'pointer',
-                  aspectRatio: activeTab === 'stickers' ? '1 / 1' : activeTab === 'clips' ? '16 / 9' : '4 / 3',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -596,28 +785,17 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
                   e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.06)';
                 }}
               >
-                {isClip && item.file?.md?.mp4?.url ? (
-                  <video
-                    src={item.file.md.mp4.url}
-                    muted
-                    loop
-                    autoPlay
-                    playsInline
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                  />
-                ) : (
-                  <img
-                    src={previewUrl || mainUrl}
-                    alt={item.title || 'media'}
-                    loading="lazy"
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      objectFit: activeTab === 'stickers' ? 'contain' : 'cover',
-                      display: 'block'
-                    }}
-                  />
-                )}
+                <img
+                  src={previewUrl || mainUrl}
+                  alt={item.title || 'media'}
+                  loading="lazy"
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: activeTab === 'stickers' ? 'contain' : 'cover',
+                    display: 'block'
+                  }}
+                />
               </div>
             );
           })}
@@ -657,7 +835,8 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 
