@@ -167,10 +167,78 @@ const MediaAttachmentView: React.FC<{
   const [isPaused, setIsPaused] = useState(false);
   const [showVolumeSlider, setShowVolumeSlider] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const clipInstanceId = useRef<string>(Math.random().toString(36).substring(2, 9));
 
   if (!mediaUrl) return null;
   const isClip = mediaType === 'clip' || mediaUrl.endsWith('.mp4') || mediaUrl.endsWith('.webm');
   const isSticker = mediaType === 'sticker';
+
+  // Global sound coordination: Only one clip unmuted at any given time across all comments/modals
+  useEffect(() => {
+    if (!isClip) return;
+    const handleOtherClipUnmuted = (e: CustomEvent<{ id: string }>) => {
+      if (e.detail?.id !== clipInstanceId.current) {
+        setIsMuted(true);
+        if (videoRef.current) {
+          videoRef.current.muted = true;
+        }
+      }
+    };
+
+    window.addEventListener('app_clip_unmuted' as any, handleOtherClipUnmuted as EventListener);
+    return () => {
+      window.removeEventListener('app_clip_unmuted' as any, handleOtherClipUnmuted as EventListener);
+    };
+  }, [isClip]);
+
+  // Auto-mute when clip leaves the viewport (scrolling) or when window loses visibility/focus
+  useEffect(() => {
+    if (!isClip) return;
+
+    // Visibility / blur handler
+    const handleVisibilityOrBlur = () => {
+      if (document.hidden) {
+        setIsMuted(true);
+        if (videoRef.current) videoRef.current.muted = true;
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityOrBlur);
+    window.addEventListener('blur', handleVisibilityOrBlur);
+
+    // IntersectionObserver to detect when clip scrolls out of view
+    let observer: IntersectionObserver | null = null;
+    if (containerRef.current && typeof IntersectionObserver !== 'undefined') {
+      observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (!entry.isIntersecting || entry.intersectionRatio < 0.2) {
+              setIsMuted(true);
+              if (videoRef.current) {
+                videoRef.current.muted = true;
+              }
+            }
+          });
+        },
+        { threshold: [0, 0.2] }
+      );
+      observer.observe(containerRef.current);
+    }
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityOrBlur);
+      window.removeEventListener('blur', handleVisibilityOrBlur);
+      if (observer) observer.disconnect();
+    };
+  }, [isClip]);
+
+  const notifyUnmuted = () => {
+    window.dispatchEvent(
+      new CustomEvent('app_clip_unmuted', {
+        detail: { id: clipInstanceId.current }
+      })
+    );
+  };
 
   const togglePlayPause = (e: React.MouseEvent) => {
     if (!allowPausePlay || !videoRef.current) return;
@@ -194,6 +262,7 @@ const MediaAttachmentView: React.FC<{
         videoRef.current.volume = targetVol;
         if (volume === 0) setVolume(0.8);
         setIsMuted(false);
+        notifyUnmuted();
       } else {
         videoRef.current.muted = true;
         setIsMuted(true);
@@ -213,6 +282,7 @@ const MediaAttachmentView: React.FC<{
       if (newVol > 0) {
         videoRef.current.muted = false;
         setIsMuted(false);
+        notifyUnmuted();
       } else {
         videoRef.current.muted = true;
         setIsMuted(true);
@@ -221,7 +291,9 @@ const MediaAttachmentView: React.FC<{
   };
 
   return (
-    <div style={{
+    <div
+      ref={containerRef}
+      style={{
       position: 'relative',
       maxWidth: isSticker ? '140px' : maxWidth,
       maxHeight: maxHeight,

@@ -68,6 +68,7 @@ const KlipyClipCard: React.FC<{
 }> = ({ item, mainUrl, previewUrl, isUnmuted, volume, onToggleSound, onVolumeChange, onSelect }) => {
   const [showVolumeSlider, setShowVolumeSlider] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (videoRef.current) {
@@ -78,6 +79,53 @@ const KlipyClipCard: React.FC<{
       }
     }
   }, [isUnmuted, volume]);
+
+  // When unmuted in KlipyPicker, broadcast to mute any other clip in comments/modals
+  useEffect(() => {
+    if (isUnmuted) {
+      window.dispatchEvent(
+        new CustomEvent('app_clip_unmuted', {
+          detail: { id: `klipy_picker_${item?.id || mainUrl}` }
+        })
+      );
+    }
+  }, [isUnmuted, item?.id, mainUrl]);
+
+  // Auto-mute when clip leaves the viewport (scrolling inside picker) or window loses focus
+  useEffect(() => {
+    if (!isUnmuted) return;
+
+    const handleVisibilityOrBlur = () => {
+      if (document.hidden) {
+        onToggleSound({ stopPropagation: () => {} } as any);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityOrBlur);
+    window.addEventListener('blur', handleVisibilityOrBlur);
+
+    let observer: IntersectionObserver | null = null;
+    if (containerRef.current && typeof IntersectionObserver !== 'undefined') {
+      observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (!entry.isIntersecting || entry.intersectionRatio < 0.2) {
+              if (isUnmuted) {
+                onToggleSound({ stopPropagation: () => {} } as any);
+              }
+            }
+          });
+        },
+        { threshold: [0, 0.2] }
+      );
+      observer.observe(containerRef.current);
+    }
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityOrBlur);
+      window.removeEventListener('blur', handleVisibilityOrBlur);
+      if (observer) observer.disconnect();
+    };
+  }, [isUnmuted, onToggleSound]);
 
   const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     e.stopPropagation();
@@ -91,6 +139,7 @@ const KlipyClipCard: React.FC<{
 
   return (
     <div
+      ref={containerRef}
       onClick={onSelect}
       style={{
         position: 'relative',
