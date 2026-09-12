@@ -2994,7 +2994,15 @@ export const Home: React.FC = () => {
             item={currentLibItem}
             isOwnProfile={true}
             onClose={() => setSelectedItem(null)}
-            onUpdate={() => fetchDashboard(true)}
+            onUpdate={(updatedItem?: any) => {
+              if (updatedItem && updatedItem.id) {
+                setLibraryItems(prev => prev.map(it => it.id === updatedItem.id ? { ...it, ...updatedItem } : it));
+                if (selectedItem && (selectedItem.id === updatedItem.id || selectedItem.external_id === updatedItem.external_id)) {
+                  setSelectedItem((prev: any) => prev ? { ...prev, ...updatedItem } : null);
+                }
+              }
+              fetchDashboard(true);
+            }}
             onOpenItem={(item) => setSelectedItem(item)}
             isFavorite={isFav}
             onToggleFavorite={handleToggleFavorite}

@@ -1453,17 +1453,42 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     if (allKnownEps.length > 0) {
       const newProg: Record<string, boolean> = {};
       allKnownEps.forEach((ep: any) => {
-        const idKey = ep.external_id || (isComic ? `cv_issue_${ep.id}` : (typeof ep.id === 'string' && ep.id.startsWith('tvm-ep-') ? ep.id : `tvm-ep-${ep.id}`));
-        if (idKey) newProg[idKey] = targetCompleted;
+        if (isComic) {
+          const cleanEpId = String(ep.id || ep.external_id || '').replace('cv_issue_', '').replace('cv_', '');
+          const idKey = `cv_issue_${cleanEpId}`;
+          newProg[idKey] = targetCompleted;
+          if (cleanEpId) newProg[cleanEpId] = targetCompleted;
+          if (ep.id) newProg[String(ep.id)] = targetCompleted;
+          if (ep.external_id) newProg[ep.external_id] = targetCompleted;
+
+          const stateToSave = targetCompleted ? {
+            status: 'read',
+            pages_read: ep.page_count || ep.total_pages || 0,
+            total_pages: ep.page_count || ep.total_pages || null
+          } : {
+            status: '',
+            pages_read: 0,
+            total_pages: ep.page_count || ep.total_pages || null
+          };
+          setCachedSeries(`issue_state_cv_issue_${cleanEpId}`, stateToSave);
+          setCachedSeries(`issue_state_${idKey}`, stateToSave);
+          if (ep.external_id) setCachedSeries(`issue_state_${ep.external_id}`, stateToSave);
+        } else {
+          const idKey = ep.external_id || (typeof ep.id === 'string' && ep.id.startsWith('tvm-ep-') ? ep.id : `tvm-ep-${ep.id}`);
+          if (idKey) newProg[idKey] = targetCompleted;
+        }
       });
       setGlobalProgress(prev => ({ ...prev, ...newProg }));
     }
 
     if (!targetCompleted) {
+      if (isComic) setPagesReadVal(0);
       setSelectedItem((prev: any) => prev ? {
         ...prev,
         status: isComic ? 'plan_to_read' : 'plan_to_watch',
-        completed_at: null
+        completed_at: null,
+        last_seen_episode: null,
+        pages_read: isComic ? 0 : prev.pages_read
       } : null);
     }
 
@@ -1488,8 +1513,30 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
           // Explicitly ensure all known and list items default to false unless active in latestProg
           const resetProg: Record<string, boolean> = {};
           allKnownEps.forEach((ep: any) => {
-            const idKey = ep.external_id || (isComic ? `cv_issue_${ep.id}` : (typeof ep.id === 'string' && ep.id.startsWith('tvm-ep-') ? ep.id : `tvm-ep-${ep.id}`));
-            if (idKey) resetProg[idKey] = !!latestProg[idKey];
+            if (isComic) {
+              const cleanEpId = String(ep.id || ep.external_id || '').replace('cv_issue_', '').replace('cv_', '');
+              const idKey = `cv_issue_${cleanEpId}`;
+              const isComp = !!latestProg[idKey] || !!latestProg[cleanEpId] || !!latestProg[String(ep.id)] || (ep.external_id ? !!latestProg[ep.external_id] : false);
+              resetProg[idKey] = isComp;
+              if (cleanEpId) resetProg[cleanEpId] = isComp;
+              if (ep.id) resetProg[String(ep.id)] = isComp;
+              if (ep.external_id) resetProg[ep.external_id] = isComp;
+              const stateToSave = isComp ? {
+                status: 'read',
+                pages_read: ep.page_count || ep.total_pages || 0,
+                total_pages: ep.page_count || ep.total_pages || null
+              } : {
+                status: '',
+                pages_read: 0,
+                total_pages: ep.page_count || ep.total_pages || null
+              };
+              setCachedSeries(`issue_state_cv_issue_${cleanEpId}`, stateToSave);
+              setCachedSeries(`issue_state_${idKey}`, stateToSave);
+              if (ep.external_id) setCachedSeries(`issue_state_${ep.external_id}`, stateToSave);
+            } else {
+              const idKey = ep.external_id || (typeof ep.id === 'string' && ep.id.startsWith('tvm-ep-') ? ep.id : `tvm-ep-${ep.id}`);
+              if (idKey) resetProg[idKey] = !!latestProg[idKey];
+            }
           });
           extIds.forEach((eid: string) => {
             resetProg[eid] = !!latestProg[eid];
@@ -1501,8 +1548,25 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       } else if (!targetCompleted) {
         const resetProg: Record<string, boolean> = {};
         allKnownEps.forEach((ep: any) => {
-          const idKey = ep.external_id || (isComic ? `cv_issue_${ep.id}` : (typeof ep.id === 'string' && ep.id.startsWith('tvm-ep-') ? ep.id : `tvm-ep-${ep.id}`));
-          if (idKey) resetProg[idKey] = false;
+          if (isComic) {
+            const cleanEpId = String(ep.id || ep.external_id || '').replace('cv_issue_', '').replace('cv_', '');
+            const idKey = `cv_issue_${cleanEpId}`;
+            resetProg[idKey] = false;
+            if (cleanEpId) resetProg[cleanEpId] = false;
+            if (ep.id) resetProg[String(ep.id)] = false;
+            if (ep.external_id) resetProg[ep.external_id] = false;
+            const stateToSave = {
+              status: '',
+              pages_read: 0,
+              total_pages: ep.page_count || ep.total_pages || null
+            };
+            setCachedSeries(`issue_state_cv_issue_${cleanEpId}`, stateToSave);
+            setCachedSeries(`issue_state_${idKey}`, stateToSave);
+            if (ep.external_id) setCachedSeries(`issue_state_${ep.external_id}`, stateToSave);
+          } else {
+            const idKey = ep.external_id || (typeof ep.id === 'string' && ep.id.startsWith('tvm-ep-') ? ep.id : `tvm-ep-${ep.id}`);
+            if (idKey) resetProg[idKey] = false;
+          }
         });
         setGlobalProgress(prev => ({ ...prev, ...resetProg }));
       }
@@ -1522,11 +1586,13 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
         }
       }
 
-      setSelectedItem((prev: any) => prev ? {
-        ...prev,
+      const updatedSelected = {
+        ...selectedItem,
         status: nextStatus,
-        completed_at: (nextStatus === 'completed' || nextStatus === 'read') ? (prev.completed_at || new Date().toISOString()) : null
-      } : null);
+        completed_at: (nextStatus === 'completed' || nextStatus === 'read') ? (selectedItem.completed_at || new Date().toISOString()) : null,
+        pages_read: isComic && (nextStatus === 'plan_to_read' || !targetCompleted) ? 0 : selectedItem.pages_read
+      };
+      setSelectedItem(updatedSelected);
 
       if (selectedItem?.id && user?.is_pro) {
         apiClient.get(`/library/${selectedItem.id}/consumption-history`)
@@ -1539,7 +1605,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
           .catch(console.error);
       }
 
-      onUpdate && onUpdate();
+      window.dispatchEvent(new Event('library-updated'));
+      onUpdate && onUpdate(updatedSelected);
     } catch (err) {
       console.error("Bulk toggle all seasons failed", err);
     }
@@ -5263,12 +5330,20 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         const issuesList = (seasonEpisodes[1] && seasonEpisodes[1].length > 0) ? seasonEpisodes[1] : cachedAll;
                         
                         const isAllIssuesRead = (() => {
-                          if (selectedItem?.status === 'read' || selectedItem?.status === 'completed') return true;
-                          if (issuesList.length === 0) return false;
+                          if (issuesList.length === 0) return selectedItem?.status === 'read' || selectedItem?.status === 'completed';
                           return issuesList.every((ep: any) => {
-                            const extId = `cv_issue_${ep.id}`;
+                            const cleanId = String(ep.id || ep.external_id || '').replace('cv_issue_', '').replace('cv_', '');
+                            const extId = `cv_issue_${cleanId}`;
                             if (globalProgress[extId] !== undefined) return !!globalProgress[extId];
-                            const found = (episodes || []).find(x => x.external_id === extId || x.id === ep.id);
+                            if (cleanId && globalProgress[cleanId] !== undefined) return !!globalProgress[cleanId];
+                            if (ep.id && globalProgress[String(ep.id)] !== undefined) return !!globalProgress[String(ep.id)];
+                            if (ep.external_id && globalProgress[ep.external_id] !== undefined) return !!globalProgress[ep.external_id];
+                            const cachedState = getCachedSeries(`issue_state_${extId}`) || getCachedSeries(`issue_state_cv_issue_${cleanId}`);
+                            if (cachedState && cachedState.status !== undefined) return (cachedState.status === 'read' || !!cachedState.is_completed);
+                            const found = (episodes || []).find((x: any) => {
+                              const xClean = String(x.external_id || x.id || '').replace('cv_issue_', '').replace('cv_', '');
+                              return xClean === cleanId || x.external_id === extId || x.id === ep.id;
+                            });
                             return !!found?.is_completed;
                           });
                         })();

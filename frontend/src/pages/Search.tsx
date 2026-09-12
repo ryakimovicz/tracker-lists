@@ -417,7 +417,6 @@ export const Search: React.FC = () => {
   const handleQuickAddToShelf = async (item: SearchResultItem, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     setErrorMsg('');
-    setSuccessMsg('');
     const status = getDefaultStatus(item.item_type);
     try {
       await apiClient.post('/library/', {
@@ -429,9 +428,7 @@ export const Search: React.FC = () => {
         custom_badge: item.badge || null,
         status: status
       });
-      setSuccessMsg(t('searchItemAdded'));
       await loadShelfItems();
-      setTimeout(() => setSuccessMsg(''), 3000);
     } catch (err: any) {
       setErrorMsg(err.response?.data?.detail || 'Failed to add item to your library shelf.');
       setTimeout(() => setErrorMsg(''), 4000);

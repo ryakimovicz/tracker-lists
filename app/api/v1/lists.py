@@ -2268,19 +2268,19 @@ def bulk_toggle_all_seasons(
             
             if history:
                 db.delete(history[0])
-                remaining = history[1:]
-                if remaining:
-                    if progress:
-                        progress.is_completed = True
-                        progress.completed_at = remaining[0].consumed_at
-                else:
-                    if progress:
-                        progress.is_completed = False
-                        progress.completed_at = None
-            else:
-                if progress:
-                    progress.is_completed = False
-                    progress.completed_at = None
+            if progress:
+                progress.is_completed = False
+                progress.completed_at = None
+
+    if not req.completed:
+        # Guarantee all ItemProgress for this tracking list are set to completed = False
+        all_list_items = db.query(ListItem).filter(ListItem.list_id == list_id).all()
+        list_ext_ids = [it.external_id for it in all_list_items if it.external_id]
+        if list_ext_ids:
+            db.query(ItemProgress).filter(
+                ItemProgress.user_id == current_user.id,
+                ItemProgress.external_id.in_(list_ext_ids)
+            ).update({"is_completed": False, "completed_at": None}, synchronize_session=False)
             
     if lib_item:
         completed_val = UserLibraryStatusEnum.READ if is_comic else UserLibraryStatusEnum.COMPLETED
@@ -2341,6 +2341,14 @@ def bulk_toggle_all_seasons(
                 lib_item.status = plan_val
                 lib_item.completed_at = None
                 lib_item.last_seen_episode = None
+                if is_comic:
+                    lib_item.pages_read = 0
+                vol_hist = db.query(ConsumptionHistory).filter(
+                    ConsumptionHistory.user_id == current_user.id,
+                    ConsumptionHistory.external_id == lib_item.external_id
+                ).order_by(ConsumptionHistory.consumed_at.desc()).first()
+                if vol_hist:
+                    db.delete(vol_hist)
         lib_item.updated_at = datetime.now(timezone.utc)
 
     db.commit()

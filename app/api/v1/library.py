@@ -845,9 +845,9 @@ def update_library_item(
             lib_item.completed_at = now_dt
             
             # For movies, books, games: record consumption history on manual complete
-            # For series/anime: individual episodes already record their own consumption history.
+            # For series/anime/comic: individual episodes/issues already record their own consumption history.
             # Only record series consumption history if all aired episodes are genuinely completed
-            if lib_item.item_type not in ("series", "anime"):
+            if lib_item.item_type not in ("series", "anime", "comic") and not lib_item.tracking_list_id:
                 from app.models.consumption import ConsumptionHistory
                 is_user_pro = bool(current_user.is_pro or current_user.is_vip or current_user.is_admin)
                 existing_count = db.query(ConsumptionHistory).filter(
