@@ -2761,12 +2761,13 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     if (!user) return;
     try {
       const res = await apiClient.post(`/reviews/${reviewId}/vote`);
+      const isVoted = res.data.is_voted_by_me ?? res.data.is_voted ?? false;
       setItemReviews(prev => prev.map(r => {
         if (r.id === reviewId) {
           return {
             ...r,
-            vote_count: res.data.vote_count,
-            is_voted_by_me: res.data.is_voted_by_me
+            vote_count: typeof res.data.vote_count === 'number' ? res.data.vote_count : (isVoted ? (r.vote_count || 0) + 1 : Math.max(0, (r.vote_count || 0) - 1)),
+            is_voted_by_me: isVoted
           };
         }
         return r;
