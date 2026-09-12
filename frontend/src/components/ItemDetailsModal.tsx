@@ -1944,7 +1944,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   };
   const lastInitialKeyRef = React.useRef<string>('');
   const hasManuallyToggledSeasonRef = React.useRef<boolean>(false);
-  const lastScrolledEpisodeKeyRef = React.useRef<string | null>(null);
+  const hasUserScrolledSeasonContainerRef = React.useRef<boolean>(false);
+  const hasUserScrolledComicContainerRef = React.useRef<boolean>(false);
 
   const findNextEpisodeCandidate = React.useCallback((
     allEps: any[],
@@ -2132,7 +2133,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     }
     lastInitialKeyRef.current = currentKey;
     hasManuallyToggledSeasonRef.current = false;
-    lastScrolledEpisodeKeyRef.current = null;
+    hasUserScrolledSeasonContainerRef.current = false;
+    hasUserScrolledComicContainerRef.current = false;
     
     const initModal = async (incomingItem: any) => {
       let item = incomingItem;
@@ -3160,7 +3162,6 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   const checkCompletionStatus = async (effectiveListId: number, currentEpisodes: any[]) => {
     const isComic = selectedItem?.item_type === 'comic' || String(selectedItem?.external_id || '').startsWith('cv_vol_');
     const canonicalSeasons = (seasons || []).filter((s: any) => s.season_number > 0 && !s.is_extras);
-    if (canonicalSeasons.length === 0 && !isComic) return;
     const totalEpisodes = canonicalSeasons.reduce((acc: number, s: any) => acc + (s.episode_count || 0), 0);
     const completedEpisodes = currentEpisodes.filter((ep: any) => ep.is_completed && ep.season_number !== 0 && !ep.is_extra).length;
 
@@ -3176,7 +3177,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       : (cachedSeriesData?.status === 'Ended' || selectedItem?.is_ended === true || selectedItem?.series_status === 'Ended');
 
     // Truly finished ONLY if series is ended AND all total episodes of all seasons are completed
-    const isTrulyCompleted = isEnded && totalEpisodes > 0 && completedEpisodes >= totalEpisodes;
+    const isTrulyCompleted = (canonicalSeasons.length > 0 || isComic) && isEnded && totalEpisodes > 0 && completedEpisodes >= totalEpisodes;
 
     if (isTrulyCompleted) {
       const completedStatus = isComic ? 'read' : 'completed';
@@ -3203,8 +3204,16 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       }
     } else {
       // If the series is NOT truly ended/completed (e.g. ongoing series caught up "Al día", or partially watched)
-      // Its status in library should be watching (or reading), NOT completed!
-      if (selectedItem.status === 'completed' || selectedItem.status === 'read' || selectedItem.item_type === 'episode') {
+      // When an episode is toggled:
+      // If completedEpisodes > 0: status is 'watching' (or 'reading').
+      // If completedEpisodes === 0: status is 'plan_to_watch' (or 'plan_to_read').
+      const fallbackStatus = completedEpisodes > 0 ? (isComic ? 'reading' : 'watching') : (isComic ? 'plan_to_read' : 'plan_to_watch');
+      const needsUpdate = selectedItem.item_type === 'episode' || 
+                          selectedItem.status === 'completed' || 
+                          selectedItem.status === 'read' || 
+                          (completedEpisodes > 0 && (selectedItem.status === 'dropped' || selectedItem.status === 'plan_to_watch' || selectedItem.status === 'plan_to_read'));
+
+      if (needsUpdate && selectedItem.status !== fallbackStatus) {
         try {
           let targetId = selectedItem.item_type === 'episode' ? (selectedItem.parent_series?.id || null) : selectedItem.id;
           const targetExtId = selectedItem.parent_series?.external_id || (selectedItem.item_type !== 'episode' ? selectedItem.external_id : null);
@@ -3216,7 +3225,6 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
             }
           }
           if (targetId) {
-            const fallbackStatus = completedEpisodes > 0 ? (isComic ? 'reading' : 'watching') : (isComic ? 'plan_to_read' : 'plan_to_watch');
             await apiClient.put(`/library/${targetId}`, { status: fallbackStatus });
             if (selectedItem.item_type !== 'episode') {
               setSelectedItem((prev: any) => ({
@@ -3226,6 +3234,12 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                 last_seen_episode: completedEpisodes > 0 ? prev?.last_seen_episode : null
               }));
             }
+          } else if (selectedItem.item_type !== 'episode') {
+            setSelectedItem((prev: any) => ({
+              ...prev,
+              status: fallbackStatus,
+              last_seen_episode: completedEpisodes > 0 ? prev?.last_seen_episode : null
+            }));
           }
         } catch (e) {
           console.error("Failed to revert completion status", e);
@@ -3751,6 +3765,9 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
             })
             .catch(console.error);
         }
+      } else if (res.data.is_completed && ['dropped', 'plan_to_watch', 'plan_to_read'].includes(selectedItem?.status)) {
+        const nextSt = isComic ? 'reading' : 'watching';
+        setSelectedItem((prev: any) => prev ? { ...prev, status: nextSt } : null);
       }
       
       await checkCompletionStatus(effectiveListId, updatedList);
@@ -5661,7 +5678,12 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                             const comicNextCandidate = findNextEpisodeCandidate(displayedIssues, episodes, globalProgress, true).nextEp;
 
                             return (
-                              <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '380px', overflowY: 'auto', paddingRight: '0.25rem' }}>
+                              <div 
+                                onWheel={() => { hasUserScrolledComicContainerRef.current = true; }}
+                                onTouchMove={() => { hasUserScrolledComicContainerRef.current = true; }}
+                                onMouseDown={() => { hasUserScrolledComicContainerRef.current = true; }}
+                                style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '380px', overflowY: 'auto', paddingRight: '0.25rem' }}
+                              >
                                 {displayedIssues.map((ep: any) => {
                                   const cleanEpId = String(ep.id || ep.external_id || '').replace('cv_issue_', '').replace('cv_', '');
                                   const extIdKey = `cv_issue_${cleanEpId}`;
@@ -5702,21 +5724,17 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
                                   return (
                                     <div
-                                      key={ep.id}
+                                      key={ep.id || ep.external_id || `cv_${cleanEpId}`}
                                       ref={(el) => {
-                                        if (el && isCandidateNext) {
-                                          const scrollKey = `comic_${selectedItem?.external_id}_${comicNextCandidate.id || comicNextCandidate.issue_number}`;
-                                          if (lastScrolledEpisodeKeyRef.current !== scrollKey) {
-                                            lastScrolledEpisodeKeyRef.current = scrollKey;
-                                            setTimeout(() => {
-                                              const container = el.parentElement;
-                                              if (container) {
-                                                const prevEl = el.previousElementSibling as HTMLElement | null;
-                                                const targetEl = prevEl || el;
-                                                const topPos = Math.max(0, targetEl.offsetTop - 8);
-                                                container.scrollTo({ top: topPos, behavior: 'smooth' });
-                                              }
-                                            }, 80);
+                                        if (el && isCandidateNext && !hasUserScrolledComicContainerRef.current) {
+                                          const container = el.parentElement;
+                                          if (container) {
+                                            const prevEl = el.previousElementSibling as HTMLElement | null;
+                                            const targetEl = prevEl || el;
+                                            const topPos = Math.max(0, targetEl.offsetTop - 8);
+                                            if (Math.abs(container.scrollTop - topPos) > 4) {
+                                              container.scrollTop = topPos;
+                                            }
                                           }
                                         }
                                       }}
@@ -6093,7 +6111,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                               const countUnitLabel = language === 'es' ? 'capítulos' : 'episodes';
 
                               return (
-                                <div key={s.id || s.season_number} style={{ border: '1px solid var(--border-color)', borderRadius: '6px', overflow: 'hidden' }}>
+                                <div key={`season_${s.season_number}`} style={{ border: '1px solid var(--border-color)', borderRadius: '6px', overflow: 'hidden' }}>
                                   <div
                                     role="button"
                                     tabIndex={0}
@@ -6102,6 +6120,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                       if (isSeasonActive) {
                                         setActiveSeason(null);
                                       } else {
+                                        hasUserScrolledSeasonContainerRef.current = false;
                                         setActiveSeason(s.season_number);
                                         handleLoadSeasonEpisodes(selectedItem.external_id, s.season_number);
                                       }
@@ -6236,8 +6255,13 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                     </div>
 
                                     {isSeasonActive && (
-                                       <div style={{ position: 'relative', padding: '0.5rem', background: 'var(--bg-primary)', display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '220px', overflowY: 'auto' }}>
-                                         {isLoadingSeasonEpisodes ? (
+                                       <div 
+                                         onWheel={() => { hasUserScrolledSeasonContainerRef.current = true; }}
+                                         onTouchMove={() => { hasUserScrolledSeasonContainerRef.current = true; }}
+                                         onMouseDown={() => { hasUserScrolledSeasonContainerRef.current = true; }}
+                                         style={{ position: 'relative', padding: '0.5rem', background: 'var(--bg-primary)', display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '220px', overflowY: 'auto' }}
+                                       >
+                                         {isLoadingSeasonEpisodes && displayedSeasonEps.length === 0 ? (
                                            <div style={{ padding: '1rem', textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
                                              {language === 'es' ? 'Cargando contenido...' : 'Loading...'}
                                            </div>
@@ -6286,21 +6310,17 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
                                                return (
                                                <div
-                                                 key={ep.id}
+                                                 key={ep.id || `s${s.season_number}_e${ep.episode_number}`}
                                                  ref={(el) => {
-                                                   if (el && isCandidateNext) {
-                                                     const scrollKey = `${selectedItem?.external_id}_${nextCandidate.id || nextCandidate.episode_number}`;
-                                                     if (lastScrolledEpisodeKeyRef.current !== scrollKey) {
-                                                       lastScrolledEpisodeKeyRef.current = scrollKey;
-                                                       setTimeout(() => {
-                                                         const container = el.parentElement;
-                                                         if (container) {
-                                                           const prevEl = el.previousElementSibling as HTMLElement | null;
-                                                           const targetEl = prevEl || el;
-                                                           const topPos = Math.max(0, targetEl.offsetTop - 8);
-                                                           container.scrollTo({ top: topPos, behavior: 'smooth' });
-                                                         }
-                                                       }, 80);
+                                                   if (el && isCandidateNext && !hasUserScrolledSeasonContainerRef.current) {
+                                                     const container = el.parentElement;
+                                                     if (container) {
+                                                       const prevEl = el.previousElementSibling as HTMLElement | null;
+                                                       const targetEl = prevEl || el;
+                                                       const topPos = Math.max(0, targetEl.offsetTop - 8);
+                                                       if (Math.abs(container.scrollTop - topPos) > 4) {
+                                                         container.scrollTop = topPos;
+                                                       }
                                                      }
                                                    }
                                                  }}
