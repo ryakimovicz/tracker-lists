@@ -307,6 +307,23 @@ const ScrollRow = ({
       )}
       {effectiveRowMode !== 'collapsed' && (
         <div style={{ position: "relative" }}>
+          {/* Left fade click-blocking zone */}
+          {canScrollLeft && (
+            <div 
+              style={{
+                position: "absolute",
+                left: 0,
+                top: 0,
+                bottom: 0,
+                width: "70px",
+                zIndex: 8,
+                pointerEvents: "auto",
+                cursor: "default"
+              }}
+              onClick={(e) => e.stopPropagation()}
+            />
+          )}
+
           <button 
             onClick={() => scroll("left")}
             onMouseEnter={handleMouseEnter}
@@ -367,6 +384,23 @@ const ScrollRow = ({
           >
             <ChevronRight size={20} color="currentColor" />
           </button>
+
+          {/* Right fade click-blocking zone */}
+          {canScrollRight && (
+            <div 
+              style={{
+                position: "absolute",
+                right: 0,
+                top: 0,
+                bottom: 0,
+                width: "70px",
+                zIndex: 8,
+                pointerEvents: "auto",
+                cursor: "default"
+              }}
+              onClick={(e) => e.stopPropagation()}
+            />
+          )}
         </div>
       )}
     </div>
