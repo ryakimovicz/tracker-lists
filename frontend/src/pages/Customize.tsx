@@ -33,7 +33,7 @@ import {
 } from 'lucide-react';
 
 import { PROFILE_THEME_COLORS, getProfileTheme } from '../utils/profileThemes';
-import { DEFAULT_CATEGORY_ORDER, getOrderedCategories } from '../utils/categoryOrder';
+import { DEFAULT_CATEGORY_ORDER, getOrderedCategories, getCategoryIcon, getCategoryLabel } from '../utils/categoryOrder';
 
 import { AvatarSelectorModal } from '../components/AvatarSelectorModal';
 import { BannerSelectorModal } from '../components/BannerSelectorModal';
@@ -939,32 +939,6 @@ export const CustomizePage: React.FC = () => {
               const isFirst = idx === 0;
               const isLast = idx === localCategoryOrder.length - 1;
 
-              const getCategoryIcon = () => {
-                switch (cat) {
-                  case 'movie': return <Film size={17} color={catTextColor} />;
-                  case 'series': return <Tv size={17} color={catTextColor} />;
-                  case 'anime': return <Sparkles size={17} color={catTextColor} />;
-                  case 'book': return <Book size={17} color={catTextColor} />;
-                  case 'comic': return <Book size={17} color={catTextColor} />;
-                  case 'manga': return <Book size={17} color={catTextColor} />;
-                  case 'game': return <Gamepad2 size={17} color={catTextColor} />;
-                  default: return <Film size={17} color={catTextColor} />;
-                }
-              };
-
-              const getCategoryLabel = () => {
-                switch (cat) {
-                  case 'movie': return isEs ? 'Películas' : 'Movies';
-                  case 'series': return isEs ? 'Series' : 'Shows';
-                  case 'anime': return isEs ? 'Animes' : 'Anime';
-                  case 'book': return isEs ? 'Libros' : 'Books';
-                  case 'comic': return isEs ? 'Cómics' : 'Comics';
-                  case 'manga': return isEs ? 'Mangas' : 'Manga';
-                  case 'game': return isEs ? 'Juegos' : 'Games';
-                  default: return cat;
-                }
-              };
-
               const isRowBeingDragged = pointerDrag?.cat === cat;
               const isDropTargetTop = dragOverIndex === idx && !isRowBeingDragged;
 
@@ -1058,10 +1032,10 @@ export const CustomizePage: React.FC = () => {
                         background: catColor,
                         boxShadow: `0 2px 6px ${catColor}40`
                       }}>
-                        {getCategoryIcon()}
+                        {getCategoryIcon(cat, { size: 17, color: catTextColor })}
                       </div>
                       <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                        {getCategoryLabel()}
+                        {getCategoryLabel(cat, isEs, true)}
                       </span>
                     </div>
 

@@ -3,7 +3,7 @@ import { useTranslation } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { apiClient } from '../api/client';
 import { Search, X, Check, Loader2, Image as ImageIcon, Sparkles, Trash2 } from 'lucide-react';
-import { getOrderedCategories } from '../utils/categoryOrder';
+import { getOrderedCategories, getCategoryIcon } from '../utils/categoryOrder';
 
 interface BannerItem {
   title: string;
@@ -429,9 +429,13 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
                       color: isSelected ? (cat === 'all' ? '#ffffff' : catTextColor) : 'var(--text-primary)',
                       boxShadow: isSelected ? `0 0 10px ${catColor}40` : 'none',
                       transition: 'all 0.15s ease',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.35rem'
                     }}
                   >
-                    {getLabel()}
+                    {getCategoryIcon(cat, { size: 13, color: isSelected ? (cat === 'all' ? '#ffffff' : catTextColor) : catColor })}
+                    <span>{getLabel()}</span>
                   </button>
                 );
               })}

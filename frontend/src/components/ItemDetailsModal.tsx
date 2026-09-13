@@ -5532,10 +5532,9 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                   const cacheKeyAll = `${selectedItem?.external_id}_all_episodes`;
                                   const cachedAll = getCachedSeries(cacheKeyAll) || [];
                                   const hasSpecials = cachedAll.some((ep: any) => (ep.is_significant_special || ep.ep_type === 'significant_special') && !ep.is_extra);
-                                  const hasExtras = cachedAll.some((ep: any) => ep.is_extra || ep.ep_type === 'insignificant_special' || ep.season_number === 0);
 
-                                  // If no specials and no extras exist, mark regular seasons directly without asking
-                                  if (!hasSpecials && !hasExtras) {
+                                  // If no specials exist, mark regular seasons directly without asking
+                                  if (!hasSpecials) {
                                     handleToggleAllEpisodes('mark_all', 'seasons_only');
                                   } else {
                                     setPendingSeriesScopeAction('mark_all');
@@ -7810,8 +7809,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                             const cacheKeyAll = `${selectedItem?.external_id}_all_episodes`;
                             const cachedAll = getCachedSeries(cacheKeyAll) || [];
                             const hasSpecials = cachedAll.some((ep: any) => (ep.is_significant_special || ep.ep_type === 'significant_special') && !ep.is_extra);
-                            const hasExtras = cachedAll.some((ep: any) => ep.is_extra || ep.ep_type === 'insignificant_special' || ep.season_number === 0);
-                            if (!hasSpecials && !hasExtras) {
+                            if (!hasSpecials) {
                               await handleToggleAllEpisodes('mark_again', 'seasons_only');
                             } else {
                               setPendingSeriesScopeAction('mark_again');

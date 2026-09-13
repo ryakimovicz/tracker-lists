@@ -460,14 +460,19 @@ h1, h2, h3, h4, h5, h6 {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0.25rem 0.65rem;
-  border-radius: 9999px;
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
   font-size: 0.75rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   border: 1px solid transparent;
   transition: all 0.2s ease;
+}
+
+.tag-badge svg {
+  display: block;
+  stroke: currentColor;
 }
 
 /* Themes handled via CSS variables */

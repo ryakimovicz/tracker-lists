@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Search as SearchIcon, Plus } from 'lucide-react';
 import { apiClient } from '../api/client';
 import { useAuth } from '../context/AuthContext';
-import { sortFilterTabs } from '../utils/categoryOrder';
+import { sortFilterTabs, getCategoryIcon } from '../utils/categoryOrder';
 
 interface SearchPanelProps {
   id: string;
@@ -186,22 +186,30 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
                 { value: 'comic', label: language === 'es' ? 'Cómics' : 'Comics' },
                 { value: 'manga', label: 'Mangas' },
                 { value: 'game', label: language === 'es' ? 'Juegos' : 'Games' }
-              ], user?.category_order).map(tab => (
-                <button
-                  key={tab.value}
-                  type="button"
-                  onClick={() => setActiveSearchTab(tab.value as any)}
-                  style={{
-                    padding: '0.2rem 0.5rem', borderRadius: '15px', border: '1px solid',
-                    borderColor: activeSearchTab === tab.value ? 'var(--accent-primary)' : 'var(--border-color)',
-                    background: activeSearchTab === tab.value ? 'var(--accent-primary)' : 'transparent',
-                    color: activeSearchTab === tab.value ? '#ffffff' : 'var(--text-secondary)',
-                    cursor: 'pointer', fontWeight: 500, fontSize: '0.7rem', whiteSpace: 'nowrap'
-                  }}
-                >
-                  {tab.label}
-                </button>
-              ))}
+              ], user?.category_order).map(tab => {
+                const isSelected = activeSearchTab === tab.value;
+                const tabColor = tab.value === 'all' ? 'var(--accent-primary)' : `var(--color-${tab.value})`;
+                const tabTextColor = tab.value === 'all' ? '#ffffff' : `var(--color-text-${tab.value})`;
+
+                return (
+                  <button
+                    key={tab.value}
+                    type="button"
+                    onClick={() => setActiveSearchTab(tab.value as any)}
+                    style={{
+                      padding: '0.2rem 0.55rem', borderRadius: '15px', border: '1px solid',
+                      borderColor: isSelected ? tabColor : 'var(--border-color)',
+                      background: isSelected ? tabColor : 'transparent',
+                      color: isSelected ? tabTextColor : 'var(--text-secondary)',
+                      cursor: 'pointer', fontWeight: 500, fontSize: '0.72rem', whiteSpace: 'nowrap',
+                      display: 'inline-flex', alignItems: 'center', gap: '0.35rem'
+                    }}
+                  >
+                    {getCategoryIcon(tab.value, { size: 12, color: isSelected ? tabTextColor : tabColor })}
+                    <span>{tab.label}</span>
+                  </button>
+                );
+              })}
             </div>
           )}
 

@@ -16,7 +16,7 @@ import { ProModal } from '../components/ProModal';
 import { ReplaceFavoriteModal } from '../components/ReplaceFavoriteModal';
 import { AdBanner } from '../components/AdBanner';
 import { ConfirmModal } from '../components/ConfirmModal';
-import { getOrderedCategories } from '../utils/categoryOrder';
+import { getOrderedCategories, getCategoryIcon } from '../utils/categoryOrder';
 
 
 import {
@@ -1382,19 +1382,25 @@ export const Profile: React.FC = () => {
                       style={{
                         padding: '0.35rem 0.85rem',
                         fontSize: '0.85rem',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.4rem',
                         textTransform: 'capitalize',
                         '--tab-color': typeColor,
                         '--tab-text': typeTextColor
                       } as React.CSSProperties}
                     >
-                      {type === 'all' ? (language === 'es' ? 'Todo' : 'All') :
-                       type === 'movie' ? (language === 'es' ? 'Películas' : 'Movies') :
-                       type === 'series' ? (language === 'es' ? 'Series' : 'Shows') :
-                       type === 'anime' ? 'Anime' :
-                       type === 'book' ? (language === 'es' ? 'Libros' : 'Books') :
-                       type === 'comic' ? (language === 'es' ? 'Cómics' : 'Comics') :
-                       type === 'manga' ? 'Mangas' :
-                       type === 'game' ? (language === 'es' ? 'Juegos' : 'Games') : type}
+                      {getCategoryIcon(type, { size: 14, color: isSelected ? typeTextColor : typeColor })}
+                      <span>
+                        {type === 'all' ? (language === 'es' ? 'Todo' : 'All') :
+                         type === 'movie' ? (language === 'es' ? 'Películas' : 'Movies') :
+                         type === 'series' ? (language === 'es' ? 'Series' : 'Shows') :
+                         type === 'anime' ? 'Anime' :
+                         type === 'book' ? (language === 'es' ? 'Libros' : 'Books') :
+                         type === 'comic' ? (language === 'es' ? 'Cómics' : 'Comics') :
+                         type === 'manga' ? 'Mangas' :
+                         type === 'game' ? (language === 'es' ? 'Juegos' : 'Games') : type}
+                      </span>
                     </button>
                   );
                 });
@@ -1485,6 +1491,7 @@ export const Profile: React.FC = () => {
 
                               // If filtering by "all":
                               if (mediaFilter === 'all') {
+                                const normType = (item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tvm-ep-')) ? 'series' : item.item_type;
                                 const label = isGame 
                                   ? (specialGameLabel || (language === 'es' ? 'Juego' : 'Game'))
                                   : (item.item_type === 'episode' || item.external_id?.startsWith('tvm-ep-'))
@@ -1494,8 +1501,24 @@ export const Profile: React.FC = () => {
                                   : item.item_type === 'comic' ? (language === 'es' ? 'Cómic' : 'Comic') : item.item_type === 'manga' ? 'Manga' : t('media' + item.item_type.charAt(0).toUpperCase() + item.item_type.slice(1));
 
                                 return (
-                                  <div className={getTagClass(item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tvm-ep-') ? 'series' : item.item_type)} style={{ position: "absolute", top: "0.5rem", left: "0.5rem", padding: "0.15rem 0.45rem", borderRadius: "4px", fontSize: "0.7rem", fontWeight: 600, opacity: 0.9, backdropFilter: 'blur(4px)', zIndex: 1 }}>
-                                    {label}
+                                  <div
+                                    className={getTagClass(normType)}
+                                    style={{
+                                      position: "absolute",
+                                      top: "0.5rem",
+                                      left: "0.5rem",
+                                      padding: "0.2rem 0.35rem",
+                                      borderRadius: "4px",
+                                      display: "inline-flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      opacity: 0.95,
+                                      backdropFilter: 'blur(4px)',
+                                      zIndex: 1
+                                    }}
+                                    title={label}
+                                  >
+                                    {getCategoryIcon(normType, { size: 14, color: 'currentColor' })}
                                   </div>
                                 );
                               }

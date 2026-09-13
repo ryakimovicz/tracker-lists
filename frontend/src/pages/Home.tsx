@@ -10,7 +10,7 @@ import { ReplaceFavoriteModal } from '../components/ReplaceFavoriteModal';
 import { ProModal } from '../components/ProModal';
 import { ChevronLeft, ChevronRight, ChevronDown, ChevronsDown, Check, Play } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { getOrderedCategories, getCategoryLabel } from '../utils/categoryOrder';
+import { getOrderedCategories, getCategoryLabel, getCategoryIcon } from '../utils/categoryOrder';
 import { prefetchMediaDetails } from '../utils/prefetch';
 
 export const getTagClass = (type: string) => {
@@ -81,6 +81,7 @@ const saveMode = (key?: string, mode?: string) => {
 const ScrollRow = ({ 
   children, 
   title, 
+  icon,
   outlineColor, 
   headerExtra,
   itemCount,
@@ -88,6 +89,7 @@ const ScrollRow = ({
 }: { 
   children: React.ReactNode, 
   title?: string, 
+  icon?: React.ReactNode,
   outlineColor?: string, 
   headerExtra?: React.ReactNode,
   itemCount?: number,
@@ -283,6 +285,7 @@ const ScrollRow = ({
                 e.currentTarget.style.transform = "none";
               }}
             >
+              {icon && <span style={{ display: "inline-flex", alignItems: "center" }}>{icon}</span>}
               <span>{title}</span>
               <span style={{ display: "inline-flex", alignItems: "center", color: outlineColor || "var(--accent-primary)" }}>
                 {effectiveRowMode === 'collapsed' ? (
@@ -2610,9 +2613,13 @@ export const Home: React.FC = () => {
                                   color: uItem.themeColor || 'var(--text-secondary)',
                                   border: `1px solid ${uItem.themeColor ? `color-mix(in srgb, ${uItem.themeColor} 40%, transparent)` : 'var(--border-color)'}`,
                                   whiteSpace: 'nowrap',
-                                  flexShrink: 0
+                                  flexShrink: 0,
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.3rem'
                                 }}>
-                                  {catLabel}
+                                  {getCategoryIcon(uItem.item_type, { size: 12, color: uItem.themeColor || 'var(--text-secondary)' })}
+                                  <span>{catLabel}</span>
                                 </div>
                               </div>
                             );
@@ -2697,9 +2704,13 @@ export const Home: React.FC = () => {
                         color: uItem.themeColor || 'var(--text-secondary)',
                         border: `1px solid ${uItem.themeColor ? `color-mix(in srgb, ${uItem.themeColor} 40%, transparent)` : 'var(--border-color)'}`,
                         whiteSpace: 'nowrap',
-                        flexShrink: 0
+                        flexShrink: 0,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.3rem'
                       }}>
-                        {catLabel}
+                        {getCategoryIcon(uItem.item_type, { size: 12, color: uItem.themeColor || 'var(--text-secondary)' })}
+                        <span>{catLabel}</span>
                       </div>
                     </div>
                   );
@@ -2717,6 +2728,7 @@ export const Home: React.FC = () => {
           <ScrollRow 
             key="guides_row"
             title={language === 'es' ? "Guías" : "Guides"} 
+            icon={getCategoryIcon('guide', { size: 18 })}
             outlineColor="var(--color-guide)"
             itemCount={upNextGuides.length}
             storageKey="guides_guides"
@@ -2817,6 +2829,7 @@ export const Home: React.FC = () => {
                 <ScrollRow 
                   key={`${activeTab}_${category}`} 
                   title={getTypeCat(category, true)} 
+                  icon={getCategoryIcon(category, { size: 18 })}
                   outlineColor={`var(--color-${category})`} 
                   headerExtra={headerExtra} 
                   itemCount={catItems.length}

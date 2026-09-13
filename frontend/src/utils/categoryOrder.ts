@@ -1,3 +1,6 @@
+import React from 'react';
+import { Film, Tv, Sparkles, BookOpen, Gamepad2, Book, MessageSquare, MessageCircle, Users } from 'lucide-react';
+
 export const DEFAULT_CATEGORY_ORDER = [
   'movie',
   'series',
@@ -152,3 +155,59 @@ export function getCategoryLabel(type: string, isEs: boolean, plural: boolean = 
     default: return type;
   }
 }
+
+/**
+ * Returns the Lucide icon element for a category.
+ */
+export function getCategoryIcon(
+  type: string,
+  options: { size?: number; color?: string; style?: React.CSSProperties; className?: string } = {}
+): React.ReactElement | null {
+  const { size = 15, color, style, className } = options;
+  const clean = type ? type.toLowerCase().trim() : '';
+
+  const defaultColors: Record<string, string> = {
+    movie: 'var(--color-movie)',
+    series: 'var(--color-series)',
+    anime: 'var(--color-anime)',
+    book: 'var(--color-book)',
+    comic: 'var(--color-comic)',
+    manga: 'var(--color-manga)',
+    game: 'var(--color-game)',
+    guide: 'var(--color-guide)',
+    user: 'var(--color-user, #ec4899)',
+    all: 'currentColor'
+  };
+
+  let effectiveColor = color || defaultColors[clean] || 'currentColor';
+  if (effectiveColor === 'inherit') {
+    effectiveColor = 'currentColor';
+  }
+  const props = { size, color: effectiveColor, style, className };
+
+  switch (clean) {
+    case 'movie':
+      return React.createElement(Film, props);
+    case 'series':
+      return React.createElement(Tv, props);
+    case 'anime':
+      return React.createElement(Sparkles, props);
+    case 'book':
+      return React.createElement(Book, props);
+    case 'comic':
+      return React.createElement(MessageSquare, props);
+    case 'manga':
+      return React.createElement(MessageCircle, props);
+    case 'game':
+      return React.createElement(Gamepad2, props);
+    case 'guide':
+      return React.createElement(BookOpen, props);
+    case 'user':
+      return React.createElement(Users, props);
+    case 'all':
+      return React.createElement(Sparkles, props);
+    default:
+      return null;
+  }
+}
+

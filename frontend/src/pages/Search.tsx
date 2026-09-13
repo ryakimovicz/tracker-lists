@@ -9,10 +9,10 @@ import { MediaPoster } from '../components/MediaPoster';
 import { AdBanner } from '../components/AdBanner';
 import { ReplaceFavoriteModal } from '../components/ReplaceFavoriteModal';
 import { ProModal } from '../components/ProModal';
-import { getOrderedCategories, sortFilterTabs } from '../utils/categoryOrder';
+import { getOrderedCategories, sortFilterTabs, getCategoryIcon } from '../utils/categoryOrder';
 import { prefetchMediaDetails } from '../utils/prefetch';
 
-import { Search as SearchIcon, AlertCircle, CheckCircle, Plus, X, Heart, Star, Users, BookOpen, Package, Puzzle, Sparkles, Gamepad2, Trash2, Flame, TrendingUp, Trophy, Bookmark, Film, Tv, Book, Layers } from 'lucide-react';
+import { Search as SearchIcon, AlertCircle, CheckCircle, Plus, X, Heart, Star, Users, BookOpen, Package, Puzzle, Sparkles, Gamepad2, Trash2, Flame, TrendingUp, Trophy, Bookmark, Film, Tv, Book, MessageSquare, MessageCircle } from 'lucide-react';
 
 interface SearchResultItem {
   external_id: string;
@@ -126,7 +126,18 @@ const ExploreSection = React.memo<ExploreSectionProps>(({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
       {categories.map(({ type, title, items }) => (
-        <HorizontalScroll key={type} title={title} outlineColor={`var(--color-${type})`}>
+        <HorizontalScroll 
+          key={type} 
+          title={
+            <>
+              <span style={{ display: 'inline-flex', alignItems: 'center' }}>
+                {getCategoryIcon(type, { size: 18 })}
+              </span>
+              <span>{title}</span>
+            </>
+          } 
+          outlineColor={`var(--color-${type})`}
+        >
           {items.map((item: any, idx: number) => (
             <div key={idx} className="glass-card" style={{ minWidth: '200px', width: '200px', padding: '1rem', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '0.75rem' }} onClick={() => onOpenItem(item)} onMouseEnter={() => prefetchMediaDetails(item)}>
               <div style={{ position: 'relative', width: '100%', height: '280px', overflow: 'hidden', borderRadius: '8px' }}>
@@ -245,13 +256,13 @@ const ExploreGuidesSection = React.memo<ExploreGuidesSectionProps>(({
       case 'anime':
         return <span key={mt} style={{ display: 'inline-flex', alignItems: 'center' }} title="Anime"><Sparkles size={13} color="var(--color-anime)" /></span>;
       case 'manga':
-        return <span key={mt} style={{ display: 'inline-flex', alignItems: 'center' }} title="Manga"><BookOpen size={13} color="var(--color-manga)" /></span>;
+        return <span key={mt} style={{ display: 'inline-flex', alignItems: 'center' }} title="Manga"><MessageCircle size={13} color="var(--color-manga)" /></span>;
       case 'game':
         return <span key={mt} style={{ display: 'inline-flex', alignItems: 'center' }} title={language === 'es' ? 'Juegos' : 'Games'}><Gamepad2 size={13} color="var(--color-game)" /></span>;
       case 'book':
         return <span key={mt} style={{ display: 'inline-flex', alignItems: 'center' }} title={language === 'es' ? 'Libros' : 'Books'}><Book size={13} color="var(--color-book)" /></span>;
       case 'comic':
-        return <span key={mt} style={{ display: 'inline-flex', alignItems: 'center' }} title={language === 'es' ? 'Cómics' : 'Comics'}><Layers size={13} color="var(--color-comic)" /></span>;
+        return <span key={mt} style={{ display: 'inline-flex', alignItems: 'center' }} title={language === 'es' ? 'Cómics' : 'Comics'}><MessageSquare size={13} color="var(--color-comic)" /></span>;
       default:
         return null;
     }
@@ -1116,11 +1127,15 @@ export const Search: React.FC = () => {
                 style={{
                   padding: '0.35rem 0.85rem',
                   fontSize: '0.85rem',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
                   '--tab-color': tabColor,
                   '--tab-text': tabTextColor
                 } as React.CSSProperties}
               >
-                {tab.label}
+                {getCategoryIcon(tab.value, { size: 14, color: isSelected ? tabTextColor : tabColor })}
+                <span>{tab.label}</span>
               </button>
             );
           })}
@@ -1364,8 +1379,12 @@ export const Search: React.FC = () => {
                             </div>
                           )}
                           {activeTab === 'all' && (
-                            <span className={getTagClass(item.item_type)} style={{ alignSelf: 'flex-start' }}>
-                              {item.item_type === 'comic' ? (language === 'es' ? 'Cómic' : 'Comic') : item.item_type === 'manga' ? 'Manga' : t('media' + item.item_type.charAt(0).toUpperCase() + item.item_type.slice(1))}
+                            <span
+                              className={getTagClass(item.item_type)}
+                              style={{ alignSelf: 'flex-start', padding: '0.2rem 0.35rem', borderRadius: '4px' }}
+                              title={item.item_type === 'comic' ? (language === 'es' ? 'Cómic' : 'Comic') : item.item_type === 'manga' ? 'Manga' : t('media' + item.item_type.charAt(0).toUpperCase() + item.item_type.slice(1))}
+                            >
+                              {getCategoryIcon(item.item_type, { size: 14, color: 'currentColor' })}
                             </span>
                           )}
                         </div>
