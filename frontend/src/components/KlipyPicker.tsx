@@ -432,7 +432,7 @@ export interface KlipyPickerProps {
   initialTab?: 'gifs' | 'stickers' | 'memes' | 'clips';
 }
 
-const KLIPY_API_KEY = import.meta.env.VITE_KLIPY_API_KEY || '2HWcDwQIzsWQZw5KmMgQDlp3acMUswNapO2mT5hQLn4BBChGkV9FOlPsxH9pO5RL';
+const KLIPY_API_KEY = import.meta.env.VITE_KLIPY_API_KEY || '';
 const BASE_URL = 'https://api.klipy.com/api/v1';
 
 export const KlipyPicker: React.FC<KlipyPickerProps> = ({
