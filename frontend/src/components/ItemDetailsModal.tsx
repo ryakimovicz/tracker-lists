@@ -1056,6 +1056,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   const [translatedDesc, setTranslatedDesc] = useState<string | null>(null);
   const [isTranslating, setIsTranslating] = useState(false);
   const [showOriginalDesc, setShowOriginalDesc] = useState(true);
+  const mouseDownOnBackdropRef = useRef(false);
   const [episodes, setEpisodes] = useState<any[]>([]);
   const [seasons, setSeasons] = useState<any[]>([]);
   const [activeSeason, setActiveSeason] = useState<number | null>(null);
@@ -4229,34 +4230,49 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   
   return (
     <div
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) {
+          mouseDownOnBackdropRef.current = true;
+        } else {
+          mouseDownOnBackdropRef.current = false;
+        }
+      }}
+      onMouseUp={(e) => {
+        if (e.target === e.currentTarget && mouseDownOnBackdropRef.current) {
+          onClose();
+        }
+        mouseDownOnBackdropRef.current = false;
+      }}
       style={{
-              position: 'fixed',
-              top: 0, left: 0, right: 0, bottom: 0,
-              background: 'rgba(0, 0, 0, 0.75)',
-              backdropFilter: 'blur(4px)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 2000,
-              ...modalTheme.cssVariables
-            }}
-          >
-            <div
-              className="glass-card"
-              style={{
-                position: 'relative',
-                width: '650px',
-                maxHeight: '90vh',
-                padding: '4rem 2rem 2rem 2rem',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '1.5rem',
-                overflowY: isAnySubModalOpen ? 'hidden' : 'auto',
-                textAlign: 'left',
-                ...modalTheme.modalStyles,
-                ...modalTheme.cssVariables
-              }}
-            >
+        position: 'fixed',
+        top: 0, left: 0, right: 0, bottom: 0,
+        background: 'rgba(0, 0, 0, 0.75)',
+        backdropFilter: 'blur(4px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 2000,
+        ...modalTheme.cssVariables
+      }}
+    >
+      <div
+        className="glass-card"
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          position: 'relative',
+          width: '650px',
+          maxHeight: '90vh',
+          padding: '4rem 2rem 2rem 2rem',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '1.5rem',
+          overflowY: isAnySubModalOpen ? 'hidden' : 'auto',
+          textAlign: 'left',
+          ...modalTheme.modalStyles,
+          ...modalTheme.cssVariables
+        }}
+      >
 
               {/* Back Button (for episode or game history navigation) */}
 
