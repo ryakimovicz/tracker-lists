@@ -38,6 +38,7 @@ def auto_migrate_schema():
                 ("is_pro_cancelled", "BOOLEAN DEFAULT FALSE"),
                 ("auth_provider", "VARCHAR(20) DEFAULT 'local'"),
                 ("category_order", "VARCHAR(200)"),
+                ("profile_color", "VARCHAR(20)"),
             ]
             for col_name, col_type in columns_to_add:
                 if col_name not in existing_cols:
@@ -57,6 +58,8 @@ def auto_migrate_schema():
                 ("total_pages", "INTEGER"),
                 ("tracking_list_id", "INTEGER"),
                 ("is_hundred_percent", "BOOLEAN DEFAULT FALSE"),
+                ("release_date", "VARCHAR(50)"),
+                ("imdb_id", "VARCHAR(100)"),
             ]
             for col_name, col_type in lib_cols_to_add:
                 if col_name not in existing_lib_cols:
@@ -66,6 +69,37 @@ def auto_migrate_schema():
                         logger.info(f"Auto-migration: Added column '{col_name}' to user_library_items table.")
                     except Exception as e:
                         logger.warning(f"Auto-migration: Failed to add column '{col_name}' to user_library_items: {e}")
+
+        if "reading_lists" in inspector.get_table_names():
+            existing_list_cols = {col["name"] for col in inspector.get_columns("reading_lists")}
+            list_cols_to_add = [
+                ("importance_labels", "JSON"),
+                ("section_importances", "JSON"),
+                ("section_descriptions", "JSON"),
+            ]
+            for col_name, col_type in list_cols_to_add:
+                if col_name not in existing_list_cols:
+                    try:
+                        with engine.begin() as conn:
+                            conn.execute(text(f"ALTER TABLE reading_lists ADD COLUMN {col_name} {col_type};"))
+                        logger.info(f"Auto-migration: Added column '{col_name}' to reading_lists table.")
+                    except Exception as e:
+                        logger.warning(f"Auto-migration: Failed to add column '{col_name}' to reading_lists: {e}")
+
+        if "list_items" in inspector.get_table_names():
+            existing_item_cols = {col["name"] for col in inspector.get_columns("list_items")}
+            item_cols_to_add = [
+                ("section", "VARCHAR(100)"),
+                ("importance_rank", "INTEGER"),
+            ]
+            for col_name, col_type in item_cols_to_add:
+                if col_name not in existing_item_cols:
+                    try:
+                        with engine.begin() as conn:
+                            conn.execute(text(f"ALTER TABLE list_items ADD COLUMN {col_name} {col_type};"))
+                        logger.info(f"Auto-migration: Added column '{col_name}' to list_items table.")
+                    except Exception as e:
+                        logger.warning(f"Auto-migration: Failed to add column '{col_name}' to list_items: {e}")
 
         if "consumption_history" in inspector.get_table_names():
             existing_cons_cols = {col["name"] for col in inspector.get_columns("consumption_history")}
@@ -79,20 +113,20 @@ def auto_migrate_schema():
 
         if "media_reviews" in inspector.get_table_names():
             existing_rev_cols = {col["name"] for col in inspector.get_columns("media_reviews")}
-            if "parent_id" not in existing_rev_cols:
-                try:
-                    with engine.begin() as conn:
-                        conn.execute(text("ALTER TABLE media_reviews ADD COLUMN parent_id INTEGER REFERENCES media_reviews(id) ON DELETE CASCADE;"))
-                    logger.info("Auto-migration: Added column 'parent_id' to media_reviews table.")
-                except Exception as e:
-                    logger.warning(f"Auto-migration: Failed to add column 'parent_id' to media_reviews: {e}")
-            if "is_edited" not in existing_rev_cols:
-                try:
-                    with engine.begin() as conn:
-                        conn.execute(text("ALTER TABLE media_reviews ADD COLUMN is_edited DATETIME;"))
-                    logger.info("Auto-migration: Added column 'is_edited' to media_reviews table.")
-                except Exception as e:
-                    logger.warning(f"Auto-migration: Failed to add column 'is_edited' to media_reviews: {e}")
+            rev_cols_to_add = [
+                ("parent_id", "INTEGER"),
+                ("is_edited", "TIMESTAMP"),
+                ("media_url", "VARCHAR(500)"),
+                ("media_type", "VARCHAR(50)"),
+            ]
+            for col_name, col_type in rev_cols_to_add:
+                if col_name not in existing_rev_cols:
+                    try:
+                        with engine.begin() as conn:
+                            conn.execute(text(f"ALTER TABLE media_reviews ADD COLUMN {col_name} {col_type};"))
+                        logger.info(f"Auto-migration: Added column '{col_name}' to media_reviews table.")
+                    except Exception as e:
+                        logger.warning(f"Auto-migration: Failed to add column '{col_name}' to media_reviews: {e}")
             try:
                 with engine.begin() as conn:
                     table_sql_res = conn.execute(text("SELECT sql FROM sqlite_master WHERE type='table' AND name='media_reviews';")).fetchone()
@@ -106,14 +140,17 @@ def auto_migrate_schema():
                                 external_id VARCHAR(100) NOT NULL,
                                 rating INTEGER,
                                 content TEXT,
+                                media_url VARCHAR(500),
+                                media_type VARCHAR(50),
+                                is_edited TIMESTAMP,
                                 created_at DATETIME NOT NULL,
                                 parent_id INTEGER REFERENCES media_reviews_new(id) ON DELETE CASCADE,
                                 FOREIGN KEY(user_id) REFERENCES users (id) ON DELETE CASCADE
                             );
                         """))
                         conn.execute(text("""
-                            INSERT INTO media_reviews_new (id, user_id, item_type, external_id, rating, content, created_at, parent_id)
-                            SELECT id, user_id, item_type, external_id, rating, content, created_at, parent_id FROM media_reviews;
+                            INSERT INTO media_reviews_new (id, user_id, item_type, external_id, rating, content, media_url, media_type, is_edited, created_at, parent_id)
+                            SELECT id, user_id, item_type, external_id, rating, content, media_url, media_type, is_edited, created_at, parent_id FROM media_reviews;
                         """))
                         conn.execute(text("DROP TABLE media_reviews;"))
                         conn.execute(text("ALTER TABLE media_reviews_new RENAME TO media_reviews;"))
