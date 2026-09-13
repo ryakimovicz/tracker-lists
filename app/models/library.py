@@ -33,6 +33,7 @@ class UserLibraryItem(Base):
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
     last_seen_episode = Column(String(250), nullable=True)
     custom_badge = Column(String(50), nullable=True)
+    release_date = Column(String(50), nullable=True)
     pages_read = Column(Integer, default=0, nullable=False)
     total_pages = Column(Integer, nullable=True)
     tracking_list_id = Column(Integer, ForeignKey("reading_lists.id", ondelete="SET NULL"), nullable=True)

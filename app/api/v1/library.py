@@ -132,73 +132,31 @@ def bulk_complete_series_episodes(db: Session, user_id: int, tracking_list_id: i
         return None
 
 def sync_show_episodes_and_get_last_seen(db: Session, user_id: int, tracking_list_id: Optional[int], show_title: str) -> Optional[str]:
+    if not tracking_list_id:
+        return None
     import re
+    # Only look at list items that actually belong to this tracking list!
+    track_items = db.query(ListItem).filter(ListItem.list_id == tracking_list_id).all()
+    if not track_items:
+        return None
+
+    track_item_ids = [ti.id for ti in track_items]
     user_progs = db.query(ItemProgress).filter(
         ItemProgress.user_id == user_id,
+        ItemProgress.list_item_id.in_(track_item_ids),
         ItemProgress.is_completed == True
     ).all()
 
     completed_eps = []
     for prog in user_progs:
-        ep_title = None
-        ext_id = prog.external_id
-        
-        if prog.list_item_id:
-            li = db.query(ListItem).filter(ListItem.id == prog.list_item_id).first()
-            if li:
-                ep_title = li.title
-                ext_id = li.external_id or ext_id
-
-        if not ep_title and ext_id:
-            li = db.query(ListItem).filter(ListItem.external_id == ext_id).first()
-            if li:
-                ep_title = li.title
-
-        if ep_title and (show_title.lower() in ep_title.lower()):
-            match = re.search(r'S(\d+)E(\d+)', ep_title, re.IGNORECASE)
+        li = next((x for x in track_items if x.id == prog.list_item_id), None)
+        if li and li.title:
+            match = re.search(r'S(\d+)E(\d+)', li.title, re.IGNORECASE)
             if match:
                 s_num = int(match.group(1))
                 e_num = int(match.group(2))
                 ep_code = f"S{s_num:02d}E{e_num:02d}"
-                completed_eps.append((s_num, e_num, ep_code, ext_id, ep_title))
-
-                if tracking_list_id:
-                    track_li = db.query(ListItem).filter(
-                        ListItem.list_id == tracking_list_id,
-                        ListItem.external_id == ext_id
-                    ).first()
-                    if not track_li:
-                        count = db.query(ListItem).filter(ListItem.list_id == tracking_list_id).count()
-                        track_li = ListItem(
-                            list_id=tracking_list_id,
-                            order_index=count + 1,
-                            item_type=ItemTypeEnum.SERIES,
-                            external_id=ext_id,
-                            title=ep_title,
-                            section=f"Season {s_num}"
-                        )
-                        db.add(track_li)
-                        db.commit()
-                        db.refresh(track_li)
-
-                    tp = db.query(ItemProgress).filter(
-                        ItemProgress.user_id == user_id,
-                        (ItemProgress.list_item_id == track_li.id) | (ItemProgress.external_id == ext_id)
-                    ).first()
-                    if tp:
-                        tp.list_item_id = track_li.id
-                        tp.is_completed = True
-                    else:
-                        tp = ItemProgress(
-                            user_id=user_id,
-                            list_item_id=track_li.id,
-                            external_id=ext_id,
-                            item_type=ItemTypeEnum.SERIES,
-                            is_completed=True,
-                            completed_at=prog.completed_at or datetime.now(timezone.utc)
-                        )
-                        db.add(tp)
-                    db.commit()
+                completed_eps.append((s_num, e_num, ep_code, li.external_id, li.title))
 
     if not completed_eps:
         return None
@@ -573,6 +531,8 @@ def add_to_library(
             existing.is_hundred_percent = item_in.is_hundred_percent
         if item_in.custom_badge is not None:
             existing.custom_badge = item_in.custom_badge
+        if item_in.release_date is not None:
+            existing.release_date = item_in.release_date
         existing.completed_at = completed_at_val
         if last_title:
             existing.last_seen_episode = last_title
@@ -595,6 +555,7 @@ def add_to_library(
             custom_badge=item_in.custom_badge,
             pages_read=pages_val,
             total_pages=item_in.total_pages,
+            release_date=item_in.release_date,
             tracking_list_id=tracking_list_id
         )
         db.add(new_lib_item)
@@ -795,6 +756,7 @@ def get_library(
             "custom_badge": it.custom_badge,
             "pages_read": it.pages_read or 0,
             "total_pages": it.total_pages,
+            "release_date": it.release_date,
             "tracking_list_id": it.tracking_list_id,
             "times_completed": times_c,
             "last_seen_episode_count": last_ep_cnt
@@ -969,6 +931,8 @@ def update_library_item(
 
     if item_in.custom_badge is not None:
         lib_item.custom_badge = item_in.custom_badge
+    if item_in.release_date is not None:
+        lib_item.release_date = item_in.release_date
     if item_in.pages_read is not None:
         lib_item.pages_read = item_in.pages_read
     if item_in.total_pages is not None:

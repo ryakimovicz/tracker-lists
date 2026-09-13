@@ -426,6 +426,7 @@ export const Search: React.FC = () => {
         image_url: item.image_url,
         imdb_id: item.imdb_id,
         custom_badge: item.badge || null,
+        release_date: item.release_date || null,
         status: status
       });
       await loadShelfItems();

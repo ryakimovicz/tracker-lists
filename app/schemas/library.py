@@ -16,6 +16,7 @@ class LibraryItemCreate(BaseModel):
     custom_badge: Optional[str] = None
     pages_read: Optional[int] = 0
     total_pages: Optional[int] = None
+    release_date: Optional[str] = None
 
 class LibraryItemUpdate(BaseModel):
     status: Optional[UserLibraryStatusEnum] = None
@@ -26,6 +27,7 @@ class LibraryItemUpdate(BaseModel):
     custom_badge: Optional[str] = None
     pages_read: Optional[int] = None
     total_pages: Optional[int] = None
+    release_date: Optional[str] = None
 
 class LibraryItemResponse(BaseModel):
     id: int
@@ -44,6 +46,7 @@ class LibraryItemResponse(BaseModel):
     custom_badge: Optional[str] = None
     pages_read: int
     total_pages: Optional[int] = None
+    release_date: Optional[str] = None
     tracking_list_id: Optional[int] = None
     times_completed: Optional[int] = 1
     last_seen_episode_count: Optional[int] = 1

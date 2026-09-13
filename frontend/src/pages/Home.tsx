@@ -648,12 +648,17 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
 
   const initialCachedList = item.tracking_list_id ? (getCachedSeries(`list_${item.tracking_list_id}`) || []) : [];
   const initialComputed = computeNextCandidate(Array.isArray(initialCachedList) ? initialCachedList : []);
+  const initialSavedNext = getCachedSeries(`next_candidate_${item.id}`);
 
-  const [nextEp, setNextEp] = useState<any>(initialComputed.nextEp);
-  const [isCaughtUp, setIsCaughtUp] = useState<boolean>(initialComputed.isCaughtUp);
+  const initialNextEp = initialComputed.nextEp || initialSavedNext?.nextEp || null;
+  const initialIsCaughtUp = initialComputed.isCaughtUp || initialSavedNext?.isCaughtUp || false;
+  const initialIsLoading = (initialComputed.initialLoad && !initialSavedNext) ? true : false;
+
+  const [nextEp, setNextEp] = useState<any>(initialNextEp);
+  const [isCaughtUp, setIsCaughtUp] = useState<boolean>(initialIsCaughtUp);
   const [trackedEpisodes, setTrackedEpisodes] = useState<any[]>(Array.isArray(initialCachedList) ? initialCachedList : []);
   const [isLoading, setIsLoading] = useState(false);
-  const [isInitialLoad, setIsInitialLoad] = useState(initialComputed.initialLoad);
+  const [isInitialLoad, setIsInitialLoad] = useState<boolean>(initialIsLoading);
 
   const fetchNextEpisode = async () => {
     // Check if we already have a valid candidate from cache to avoid flicker
@@ -663,6 +668,7 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
       setNextEp(syncCandidate.nextEp);
       setIsCaughtUp(false);
       setIsInitialLoad(false);
+      setCachedSeries(`next_candidate_${item.id}`, { nextEp: syncCandidate.nextEp, isCaughtUp: false });
     }
 
     setIsLoading(true);
@@ -715,9 +721,11 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
       if (recomputed.nextEp) {
         setNextEp(recomputed.nextEp);
         setIsCaughtUp(false);
+        setCachedSeries(`next_candidate_${item.id}`, { nextEp: recomputed.nextEp, isCaughtUp: false });
       } else if (recomputed.isCaughtUp) {
         setIsCaughtUp(true);
         setNextEp(null);
+        setCachedSeries(`next_candidate_${item.id}`, { nextEp: null, isCaughtUp: true });
       } else {
         const seriesCacheKey = `series_${item.external_id}`;
         const cachedSeriesData = item.external_id ? getCachedSeries(seriesCacheKey) : null;
@@ -736,6 +744,7 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
           setIsCaughtUp(true);
         }
         setNextEp(null);
+        setCachedSeries(`next_candidate_${item.id}`, { nextEp: null, isCaughtUp: true });
       }
     } catch (e) {
       console.error("Failed to load next episode/issue for card", e);
@@ -1188,7 +1197,9 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
 };
 
 const CompletedSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, themeTextColor }: { item: any, onUpdate: () => void, language: string, onOpenSeries: (item: any) => void, themeColor?: string, themeTextColor?: string }) => {
-  const [seriesTotals, setSeriesTotals] = useState<{ seasons: number; episodes: number; pages?: number } | null>(null);
+  const [seriesTotals, setSeriesTotals] = useState<{ seasons: number; episodes: number; pages?: number } | null>(() => {
+    return getCachedSeries(`totals_${item.id}`) || null;
+  });
   const isComic = item.item_type === 'comic' || String(item.external_id || '').startsWith('cv_vol_');
 
   useEffect(() => {
@@ -1249,11 +1260,13 @@ const CompletedSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColo
           }
 
           if (isMounted) {
-            setSeriesTotals({
+            const totals = {
               seasons: 1,
               episodes: totalIssues,
               pages: totalPagesSum
-            });
+            };
+            setSeriesTotals(totals);
+            setCachedSeries(`totals_${item.id}`, totals);
           }
           return;
         }
@@ -1291,10 +1304,12 @@ const CompletedSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColo
         }
 
         if (isMounted) {
-          setSeriesTotals({
+          const totals = {
             seasons: seasonsCount || 1,
             episodes: totalEps
-          });
+          };
+          setSeriesTotals(totals);
+          setCachedSeries(`totals_${item.id}`, totals);
         }
       } catch (e) {
         console.error("Failed to load series totals for completed card", e);
@@ -1395,11 +1410,33 @@ const CompletedSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColo
 };
 
 const DroppedSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, themeTextColor }: { item: any, onUpdate: () => void, language: string, onOpenSeries: (item: any) => void, themeColor?: string, themeTextColor?: string }) => {
-  const [lastEpInfo, setLastEpInfo] = useState<{ seasonText: string; epName: string } | null>(null);
+  const isComic = item.item_type === 'comic' || String(item.external_id || '').startsWith('cv_vol_');
+
+  const parseInitialLastSeen = () => {
+    if (item.last_seen_episode) {
+      if (isComic) {
+        const issueMatch = item.last_seen_episode.match(/#(\d+(\.\d+)?)/);
+        const issueNum = issueMatch ? issueMatch[1] : null;
+        const seasonText = issueNum ? `#${issueNum}` : (language === 'es' ? 'Número' : 'Issue');
+        const epName = cleanComicIssueName(item.last_seen_episode, issueNum);
+        return { seasonText, epName };
+      } else {
+        const match = item.last_seen_episode.match(/S(\d+)E(\d+)/i);
+        if (match) {
+          const seasonText = language === 'es' ? `T${match[1]} | E${match[2]}` : `S${match[1]} | E${match[2]}`;
+          const nameMatch = item.last_seen_episode.match(/-\s*([^-]+)$/);
+          const epName = nameMatch ? nameMatch[1].trim() : '';
+          return { seasonText, epName };
+        }
+      }
+    }
+    return getCachedSeries(`dropped_last_${item.id}`) || null;
+  };
+
+  const [lastEpInfo, setLastEpInfo] = useState<{ seasonText: string; epName: string } | null>(parseInitialLastSeen);
   const [isLoading, setIsLoading] = useState(false);
 
   const pad = (n: number) => n < 10 ? '0' + n : n;
-  const isComic = item.item_type === 'comic' || String(item.external_id || '').startsWith('cv_vol_');
 
   useEffect(() => {
     let isMounted = true;
@@ -1425,7 +1462,10 @@ const DroppedSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor,
             const issueNum = last.issue_number || last.episode_number || (last.title ? (last.title.match(/#(\d+(\.\d+)?)/)?.[1]) : null);
             const seasonText = issueNum ? `#${issueNum}` : (language === 'es' ? 'Número' : 'Issue');
             const epName = cleanComicIssueName(last.name || last.title || '', issueNum);
-            if (isMounted) setLastEpInfo({ seasonText, epName });
+            if (isMounted) {
+              setLastEpInfo({ seasonText, epName });
+              setCachedSeries(`dropped_last_${item.id}`, { seasonText, epName });
+            }
           } else {
             const sStr = pad(last.season);
             const eStr = pad(last.episode);
@@ -1438,7 +1478,10 @@ const DroppedSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor,
             } else {
               epName = last.title || (language === 'es' ? 'Episodio' : 'Episode');
             }
-            if (isMounted) setLastEpInfo({ seasonText, epName });
+            if (isMounted) {
+              setLastEpInfo({ seasonText, epName });
+              setCachedSeries(`dropped_last_${item.id}`, { seasonText, epName });
+            }
           }
         } else if (item.last_seen_episode) {
           if (isComic) {
