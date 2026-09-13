@@ -4810,8 +4810,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                             background: 'var(--bg-secondary)',
                             border: '1px solid var(--border-color)',
                             borderRadius: '6px',
-                            padding: '0.2rem 0.4rem',
-                            gap: '0.2rem'
+                            padding: '0.25rem 0.55rem',
+                            gap: '0.3rem'
                           }}>
                             <input
                               type="number"
@@ -4835,7 +4835,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                 }
                               }}
                               style={{
-                                width: '55px',
+                                width: '68px',
                                 textAlign: 'center',
                                 background: 'transparent',
                                 border: 'none',
@@ -4880,8 +4880,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                               background: 'var(--bg-secondary)',
                               border: '1px solid var(--border-color)',
                               borderRadius: '6px',
-                              padding: '0.2rem 0.4rem',
-                              gap: '0.2rem'
+                              padding: '0.25rem 0.55rem',
+                              gap: '0.25rem'
                             }}>
                               <input
                                 type="number"
@@ -4911,7 +4911,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                 }}
 
                                 style={{
-                                  width: '46px',
+                                  width: '60px',
                                   textAlign: 'center',
                                   background: 'transparent',
                                   border: 'none',
@@ -4933,8 +4933,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                               background: 'var(--bg-secondary)',
                               border: '1px solid var(--border-color)',
                               borderRadius: '6px',
-                              padding: '0.2rem 0.4rem',
-                              gap: '0.2rem'
+                              padding: '0.25rem 0.55rem',
+                              gap: '0.25rem'
                             }}>
                               <input
                                 type="number"
@@ -4958,7 +4958,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                   }
                                 }}
                                 style={{
-                                  width: '46px',
+                                  width: '60px',
                                   textAlign: 'center',
                                   background: 'transparent',
                                   border: 'none',
@@ -5074,13 +5074,13 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                               background: 'var(--bg-secondary)',
                               border: '1px solid var(--border-color)',
                               borderRadius: '6px',
-                              padding: '0.2rem 0.4rem',
-                              gap: '0.2rem'
+                              padding: '0.25rem 0.55rem',
+                              gap: '0.25rem'
                             }}>
                               <input
                                 type="number"
                                 min={0}
-                                max={999}
+                                max={9999}
                                 disabled={!user}
                                 value={currentHours}
                                 onChange={(e) => handleHoursChange(parseInt(e.target.value) || 0)}
@@ -5090,7 +5090,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                   }
                                 }}
                                 style={{
-                                  width: '32px',
+                                  width: '48px',
                                   textAlign: 'center',
                                   background: 'transparent',
                                   border: 'none',
@@ -5113,8 +5113,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                               background: 'var(--bg-secondary)',
                               border: '1px solid var(--border-color)',
                               borderRadius: '6px',
-                              padding: '0.2rem 0.4rem',
-                              gap: '0.2rem'
+                              padding: '0.25rem 0.55rem',
+                              gap: '0.25rem'
                             }}>
                               <input
                                 type="number"
@@ -5130,7 +5130,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                 }}
 
                                 style={{
-                                  width: '32px',
+                                  width: '38px',
                                   textAlign: 'center',
                                   background: 'transparent',
                                   border: 'none',
