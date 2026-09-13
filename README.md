@@ -2,9 +2,10 @@
   <a href="https://pathd.net">
     <img src="frontend/public/logo-horizontal-transparent.png" alt="Pathd Logo" width="300" />
   </a>
-  <p><strong>La plataforma definitiva para el seguimiento de tu universo multimedia y biblioteca personal</strong></p>
+  <p><strong>La plataforma definitiva para el seguimiento de tu universo multimedia, guías cronológicas y biblioteca personal</strong></p>
 
   <p>
+    <a href="https://pathd.net"><img src="https://img.shields.io/badge/Version-v0.9.7_Beta-f59e0b?style=for-the-badge&logo=rocket" alt="Pathd Version" /></a>
     <a href="https://pathd.net"><img src="https://img.shields.io/badge/Production-Online-10b981?style=for-the-badge&logo=cloudflare" alt="Production Status" /></a>
     <a href="https://react.dev/"><img src="https://img.shields.io/badge/Frontend-React_19_+_TypeScript-61dafb?style=for-the-badge&logo=react" alt="React" /></a>
     <a href="https://fastapi.tiangolo.com/"><img src="https://img.shields.io/badge/Backend-FastAPI-009688?style=for-the-badge&logo=fastapi" alt="FastAPI" /></a>
@@ -12,34 +13,42 @@
   </p>
 </div>
 
-**Pathd** (`pathd.net`) es una plataforma web premium y unificada diseñada para indexar, organizar y hacer seguimiento de tu consumo cultural y entretenimiento en un único lugar: **Películas, Series, Anime, Libros, Cómics, Mangas, Música y Juegos**.
+**Pathd** (`pathd.net`) es una plataforma web unificada de alto rendimiento diseñada para indexar, organizar y hacer seguimiento detallado de tu consumo cultural y entretenimiento en un único lugar: **Películas, Series, Anime, Libros, Cómics, Mangas, Música y Videojuegos**.
 
-Complementada con un potente constructor de **Guías Cronológicas interactivas**, modificaciones de la comunidad (*Mods*), un **Feed Social en tiempo real**, **Sincronización Musical con Last.fm**, y un sistema de diseño inmersivo con estética *Glassmorphism*.
+Cuenta con un potente constructor de **Guías Cronológicas interactivas**, modificaciones de la comunidad (*Mods*), un **Feed Social y Reseñas con soporte multimedia KLIPY**, **Sincronización Musical con Last.fm**, calendario inteligente de próximos lanzamientos y un sistema de diseño inmersivo con estética *Glassmorphism*.
 
 ---
 
 ## ✨ Características Principales
 
 ### 🎯 Todo tu Entretenimiento en un Solo Lugar
-- **Seguimiento Unificado**: Olvídate de usar una app distinta para películas, otra para libros y otra para juegos. Todo tu historial, pendientes y calificaciones conviven en tu estantería personal.
-- **Selectores de Progreso Inteligentes**:
-  - *Series y Anime*: Detección automática del siguiente episodio por ver, calendario de estrenos y botón de marcado rápido.
-  - *Libros, Cómics y Mangas*: Contador interactivo de páginas leídas con porcentaje visual en tiempo real.
-  - *Juegos y Películas*: Registro dinámico de tiempo dedicado (*horas y minutos*).
+- **Seguimiento Unificado**: Olvídate de usar una app distinta para cada formato. Todo tu historial, pendientes, re-consumo y calificaciones conviven en tu estantería personal.
+- **Selectores de Progreso Inteligentes por Formato**:
+  - *Series y Anime*: Detección automática del siguiente episodio por ver, avance con un solo clic, estado "Al día" en emisión y árbol interactivo de temporadas.
+  - *Libros, Cómics y Mangas*: Contador interactivo de páginas leídas, porcentaje en tiempo real, sincronización de grapas/números sueltos dentro de tomos y confirmación de números anteriores.
+  - *Juegos y Películas*: Registro dinámico de tiempo dedicado (*horas y minutos*), soporte para juegos infinitos/continuos y distinciones entre completado estándar y **100% completado**.
+- **Calendario de Próximos Estrenos**:
+  - Pestaña *Próximos* con visualización en *Calendario* mensual persistente y sección *Por Confirmar (TBA)* para obras anunciadas sin fecha exacta.
+  - Persistencia permanente de fechas de estreno (`release_date`) en la base de datos para carga instantánea en 0 ms.
+
+### 🧭 Exploración y Tendencias
+- **Tendencias Globales y por Categoría**: Descubre lo más popular en películas, series, anime, libros, cómics y juegos en una interfaz fluida.
+- **Pestaña de Guías Comunitarias**: Explora colecciones y cronologías recomendadas por la comunidad con métricas de votos, vistas y creadores.
 
 ### ✏️ Creador de Guías Cronológicas & Modificaciones (Mods)
-- **Constructor Multinivel**: Crea el orden perfecto para sagas complejas con secciones, bloques de importancia (1 a 5 estrellas: *Opcional, Recomendado, Obligatorio*) y notas personalizadas.
+- **Constructor Multinivel**: Diseña el orden de visualización o lectura para sagas complejas mediante secciones, bloques de prioridad (1 a 5 estrellas: *Opcional, Recomendado, Obligatorio*) y notas contextuales.
 - **Arrastrar y Soltar (*Drag & Drop*)**: Reordena temporadas, películas y tomos con fluidez.
-- **Sistema de Adiciones Comunitarias**: Los usuarios pueden crear expansiones o listas complementarias sobre guías públicas y adoptarlas con un solo clic.
+- **Sistema de Adiciones Comunitarias (Mods)**: Crea expansiones o listas complementarias sobre guías públicas de otros usuarios y adóptalas con un clic.
 
-### 👥 Comunidad & Social
-- **Feed de Actividad en Tiempo Real**: Descubre qué están viendo, leyendo o jugando las personas que sigues.
-- **Reseñas & Puntuaciones**: Comparte tus opiniones con calificaciones del 1 al 5 y debate en hilos de comentarios.
-- **Música en Vivo (Last.fm)**: Conecta tu cuenta para mostrar en tu perfil la canción que estás escuchando en vivo y tus álbumes más reproducidos de la semana.
+### 👥 Comunidad, Reseñas & KLIPY Multimedia
+- **Feed Social en Tiempo Real**: Visualiza la actividad de los usuarios que sigues, sus cambios de estado y notas.
+- **Reseñas & Puntuaciones**: Califica del 1 al 5 estrellas, redacta críticas y debate en hilos de comentarios.
+- **Integración KLIPY**: Selector multimedia enriquecido integrado en comentarios y reseñas con **GIFs, Stickers, Memes y Clips de Audio**, con buscador persistente, pestañas de favoritos y control global de volumen con auto-silenciado en scroll.
+- **Música en Vivo (Last.fm)**: Vincula tu perfil de Last.fm para mostrar la canción que estás escuchando en tiempo real y tus álbumes más escuchados de la semana.
 
 ### ⚡ Rendimiento Ultrarrápido (0 ms)
-- **Motor de Prefetching Inteligente**: Calentamiento silencioso en segundo plano (*Idle Warmup*) y precarga anticipada al pasar el cursor sobre los enlaces (*Hover Prefetching*).
-- **Búsqueda Multicapa con Caché**: Respuestas inmediatas y búsqueda progresiva con priorización en la categoría activa.
+- **Motor de Prefetching Inteligente**: Calentamiento silencioso en segundo plano (*Idle Warmup*) y precarga anticipada al interactuar con enlaces (*Hover & Touch Prefetching*).
+- **Búsqueda Multicapa con Caché y Debounce**: Barra de búsqueda con limpieza instantánea, filtros por categoría persistentes y caché en memoria y `sessionStorage`.
 
 ---
 
@@ -59,15 +68,16 @@ Complementada con un potente constructor de **Guías Cronológicas interactivas*
 
 ## 🌐 Proveedores de Datos y Atribuciones
 
-Pathd se alimenta e integra con los mejores servicios abiertos y especializados del mundo:
+Pathd se alimenta e integra con los mejores servicios y APIs abiertas del mundo:
 
 - 🎬 **Películas**: [OMDb API](https://www.omdbapi.com/) & [Fanart.tv](https://fanart.tv/)
-- 📺 **Series & Anime**: [TVMaze](https://www.tvmaze.com/)
+- 📺 **Series & Anime**: [TVMaze](https://www.tvmaze.com/) & [AniList GraphQL](https://anilist.co/)
 - 📚 **Libros**: [Google Books](https://developers.google.com/books) & [Open Library](https://openlibrary.org/)
 - 🦸 **Cómics**: [Comic Vine](https://comicvine.gamespot.com/)
-- 🌸 **Mangas & Novelas**: [AniList GraphQL](https://anilist.co/)
+- 🌸 **Mangas & Novelas Ligeras**: [AniList GraphQL](https://anilist.co/)
 - 🎮 **Videojuegos**: [IGDB / Twitch](https://www.igdb.com/)
 - 🎵 **Música & Scrobbling**: [Last.fm](https://www.last.fm/)
+- 🎭 **GIFs, Memes & Clips**: [KLIPY API](https://klipy.co/)
 - 💳 **Pagos Seguros**: [Dodo Payments](https://dodopayments.com/)
 - 💌 **Correos Transaccionales**: [Resend](https://resend.com/)
 
@@ -75,14 +85,14 @@ Pathd se alimenta e integra con los mejores servicios abiertos y especializados 
 
 ## 📚 Documentación Técnica & Código
 
-Si eres desarrollador, buscas auditar la infraestructura o colaborar en el proyecto:
+Si eres desarrollador o deseas auditar la arquitectura:
 
-- 📖 **[Especificación Técnica y Catálogo de API REST](docs/TECHNICAL.md)**: Documentación completa de los más de 60 endpoints, esquema de base de datos y guías de desarrollo local.
-- 🎨 **[Documentación del Frontend (React + Vite)](frontend/README.md)**: Estructura del cliente, tokens de diseño y optimizaciones de rendimiento.
+- 📖 **[Especificación Técnica y Catálogo de API REST](docs/TECHNICAL.md)**: Documentación completa de endpoints, arquitectura, modelos de base de datos y guías de desarrollo local.
+- 🎨 **[Documentación del Frontend (React + Vite)](frontend/README.md)**: Estructura del cliente, tokens de diseño, integración KLIPY y optimizaciones de rendimiento.
 
 ---
 
 <div align="center">
-  <sub>Desarrollado con ❤️ para amantes del cine, las series, la literatura, los videojuegos y la música.</sub><br>
+  <sub>Desarrollado con ❤️ para amantes del cine, las series, el anime, los cómics, la literatura, los videojuegos y la música.</sub><br>
   <sub>© 2026 Pathd (pathd.net). Todos los derechos reservados.</sub>
 </div>

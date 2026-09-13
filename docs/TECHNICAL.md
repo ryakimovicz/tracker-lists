@@ -1,6 +1,6 @@
 # Pathd - Especificación Técnica & Referencia de API ⚡
 
-Documento de referencia para desarrolladores, arquitectura del sistema y catálogo completo de endpoints REST de **Pathd**.
+Documento de referencia para desarrolladores, arquitectura del sistema y catálogo completo de endpoints REST de **Pathd (v0.9.7 Beta)**.
 
 ---
 
@@ -12,23 +12,27 @@ Documento de referencia para desarrolladores, arquitectura del sistema y catálo
 - **Autenticación**: OAuth2 Password Bearer con JWT + cookie HttpOnly segura para rotación de token de refresco
 - **Email Transaccional**: Resend API con dominio personalizado `@pathd.net` y soporte bilingüe (ES/EN)
 - **Pagos y Suscripciones**: Dodo Payments API (Checkout Sessions, Customer Portal y Webhooks de ciclo de vida)
-- **Rate Limiting**: `slowapi` con límites por IP
+- **Rate Limiting**: `slowapi` con límites dinámicos por IP y endpoints protegidos
 - **Caché y Rendimiento**:
-  - In-memory TTL Cache (Novedades de Explorar y Búsqueda global)
+  - In-memory TTL Cache (Explorar, Tendencias y Búsqueda global/individual por tipo)
   - Filtrado dinámico en tiempo real contra `BlockedFranchise` y `BlockedMediaItem`
-- **Tareas en Segundo Plano**: FastAPI `BackgroundTasks` (despacho asíncrono de correos y sincronizaciones)
+  - Persistencia de fechas de lanzamiento (`release_date`) en la tabla `user_library_items` para carga en 0 ms
+- **Tareas en Segundo Plano**: FastAPI `BackgroundTasks` (despacho asíncrono de correos y sincronizaciones de actividad)
 
 ### Frontend
 - **Framework**: React 19 + TypeScript + Vite
 - **Cliente HTTP**: Axios con interceptores para renovación automática de tokens y propagación de idioma (`Accept-Language`)
-- **Estilos**: Vanilla CSS con sistema de diseño basado en variables CSS (**Solar Amber `#f59e0b`** y **Deep Cinema Charcoal `#090d16`**), *Glassmorphism* y tipografía Inter
+- **Estilos**: Vanilla CSS con sistema de diseño modular (**Solar Amber `#f59e0b`** y **Deep Cinema Charcoal `#090d16`**), *Glassmorphism*, colores temáticos por categoría y tipografía Inter
+- **Integraciones Multimedia**:
+  - **KLIPY API**: Selector de contenido enriquecido (**GIFs, Stickers, Memes y Clips de Audio**) para comentarios y reseñas, con persistencia local de favoritos, barra de búsqueda reactiva y auto-silenciado en scroll
 - **Optimización de Rendimiento**:
-  - **Idle Warmup**: Calentamiento automático durante períodos de inactividad de CPU
-  - **Hover & Touch Prefetching**: Anticipación a la navegación en enlaces del Sidebar
+  - **Idle Warmup**: Calentamiento automático de datos durante períodos de inactividad de CPU
+  - **Hover & Touch Prefetching**: Anticipación inteligente al clic en enlaces del Sidebar y tarjetas
   - **Multi-tier Cache**: Caché en memoria + `sessionStorage` para aperturas en 0 ms
+  - **Debounced Search**: Búsqueda reactiva optimizada con limpieza en 1 clic y filtros por categoría permanentes
 
 ### Infraestructura de Despliegue
-- **Frontend SPA**: [Cloudflare Pages](https://pages.cloudflare.com/) (Auto-deploy en push a `main`)
+- **Frontend SPA**: [Cloudflare Pages](https://pages.cloudflare.com/) (Auto-deploy en push a `main` / `dev`)
 - **Backend API**: [Render](https://render.com/) (Web Service FastAPI / Uvicorn con auto-deploy)
 - **Base de Datos**: [Neon.tech](https://neon.tech/) (PostgreSQL Serverless gestionado)
 - **DNS & SSL**: [Cloudflare](https://cloudflare.com/) (`pathd.net`)
@@ -81,15 +85,19 @@ Documento de referencia para desarrolladores, arquitectura del sistema y catálo
 | GET | `/{user_id}/activity` | Historial de actividad pública de otro usuario |
 | GET | `/search?q={query}` | Buscar usuarios por nombre de usuario |
 
-### Búsqueda de Medios (`/api/v1/search`)
+### Búsqueda y Exploración de Medios (`/api/v1/search`)
 | Método | Ruta | Descripción |
 |---|---|---|
 | GET | `/?q={query}&type={type}` | Búsqueda por categoría multimedia específica con caché de 15 min |
 | GET | `/all?q={query}` | Búsqueda global con ranking unificado por tiers y caché en memoria |
-| GET | `/game/{game_id}/relations` | Obtener colecciones, ediciones, DLCs y juego base de un videojuego |
-| GET | `/series/{id}` | Detalle de serie/anime (TVMaze) con temporadas |
+| GET | `/explore/tabs` | Novedades, Tendencias multimedia y Guías comunitarias destacadas |
+| GET | `/game/{game_id}/relations` | Obtener colecciones, ediciones, DLCs, expansiones y juego base (IGDB) |
+| GET | `/comic/volume/{vol_id}` | Detalle de volumen de cómic con metadata de editorial y año (Comic Vine) |
+| GET | `/comic/volume/{vol_id}/issues` | Lista de números / grapas individuales de un volumen de cómic |
+| GET | `/comic/issue/{issue_id}` | Detalle específico de un número / grapa de cómic |
+| GET | `/manga/{manga_id}/relations` | Precuelas, secuelas y spin-offs de un manga (AniList) |
+| GET | `/series/{id}` | Detalle de serie/anime (TVMaze) con temporadas y localización dinámica |
 | GET | `/series/{id}/episodes` | Lista de episodios estructurados por temporada |
-| GET | `/explore/tabs` | Novedades y tendencias con caché de 4 horas y filtrado dinámico de blacklist |
 
 ### Guías Cronológicas (`/api/v1/lists`)
 | Método | Ruta | Descripción |
@@ -117,9 +125,9 @@ Documento de referencia para desarrolladores, arquitectura del sistema y catálo
 ### Estantería Personal (`/api/v1/library`)
 | Método | Ruta | Descripción |
 |---|---|---|
-| POST | `/` | Añadir obra a la estantería personal |
-| GET | `/` | Obtener estantería del usuario autenticado |
-| PUT | `/{library_item_id}` | Actualizar estado, tiempo o páginas leídas de una obra |
+| POST | `/` | Añadir obra a la estantería personal (incluye persistencia de `release_date`) |
+| GET | `/` | Obtener estantería del usuario con desglose de progreso, horas, páginas y badges 100% |
+| PUT | `/{library_item_id}` | Actualizar estado, tiempo, páginas leídas, fecha de estreno o badge 100% |
 | DELETE | `/{library_item_id}` | Eliminar obra de la estantería (con opción de conservar o purgar historial) |
 | POST | `/{library_item_id}/mark-consumed` | Volver a marcar como visto/leído/jugado (Free max 2 / Premium ilimitado) |
 | GET | `/{library_item_id}/consumption-history` | Obtener historial cronológico de fechas de consumo |
@@ -142,11 +150,13 @@ Documento de referencia para desarrolladores, arquitectura del sistema y catálo
 | POST | `/lists/{list_id}/comments/{comment_id}/report` | Reportar un comentario |
 | POST | `/media/report` | Reportar una obra del catálogo por contenido indebido |
 
-### Reseñas (`/api/v1/reviews`)
+### Reseñas y Comentarios Multimedia (`/api/v1/reviews`)
 | Método | Ruta | Descripción |
 |---|---|---|
-| POST | `/{item_type}/{external_id}` | Publicar reseña y calificación (1 a 5 estrellas) |
-| GET | `/{item_type}/{external_id}` | Consultar reseñas de una obra |
+| POST | `/{item_type}/{external_id}` | Publicar o editar reseña y calificación (1 a 5 estrellas) con soporte de comentarios KLIPY |
+| GET | `/{item_type}/{external_id}` | Consultar reseñas de una obra con conteo de votos de la comunidad |
+| POST | `/{review_id}/vote` | Votar / desvotar positivamente (Upvote) una reseña |
+| POST | `/{review_id}/report` | Reportar una reseña por contenido indebido |
 
 ### Modificaciones / Mods (`/api/v1/additions`)
 | Método | Ruta | Descripción |
@@ -228,6 +238,7 @@ uvicorn app.main:app --reload
 ```bash
 cd frontend
 npm install
-npm run dev       # Servidor de desarrollo
+npm run dev       # Servidor de desarrollo con HMR
 npm run build     # Build de producción
 ```
+
