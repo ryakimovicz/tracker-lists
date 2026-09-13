@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
 import { getProfileTheme } from '../utils/profileThemes';
@@ -53,6 +53,41 @@ class ErrorBoundary extends React.Component<{children: any}, {hasError: boolean,
 
 const ModalScrollRow: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const updateScrollState = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const { scrollLeft, scrollWidth, clientWidth } = el;
+    setCanScrollLeft(scrollLeft > 4);
+    setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 4);
+  }, []);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    updateScrollState();
+    const timer = setTimeout(updateScrollState, 50);
+    el.addEventListener('scroll', updateScrollState, { passive: true });
+    window.addEventListener('resize', updateScrollState);
+    return () => {
+      clearTimeout(timer);
+      el.removeEventListener('scroll', updateScrollState);
+      window.removeEventListener('resize', updateScrollState);
+    };
+  }, [updateScrollState, children]);
+
+  const getMaskImage = () => {
+    if (canScrollLeft && canScrollRight) {
+      return 'linear-gradient(to right, transparent 0px, transparent 25px, black 65px, black calc(100% - 65px), transparent calc(100% - 25px), transparent 100%)';
+    } else if (canScrollLeft) {
+      return 'linear-gradient(to right, transparent 0px, transparent 25px, black 65px, black 100%)';
+    } else if (canScrollRight) {
+      return 'linear-gradient(to right, black 0px, black calc(100% - 65px), transparent calc(100% - 25px), transparent 100%)';
+    }
+    return 'none';
+  };
 
   const scroll = (direction: 'left' | 'right') => {
     if (scrollRef.current) {
@@ -63,6 +98,23 @@ const ModalScrollRow: React.FC<{ children: React.ReactNode }> = ({ children }) =
 
   return (
     <div style={{ position: 'relative', width: '100%', display: 'flex', alignItems: 'center' }}>
+      {/* Left fade click-blocking zone */}
+      {canScrollLeft && (
+        <div 
+          style={{
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            bottom: 0,
+            width: '45px',
+            zIndex: 8,
+            pointerEvents: 'auto',
+            cursor: 'default'
+          }}
+          onClick={(e) => e.stopPropagation()}
+        />
+      )}
+
       <button
         type="button"
         onClick={(e) => { e.stopPropagation(); scroll('left'); }}
@@ -71,7 +123,7 @@ const ModalScrollRow: React.FC<{ children: React.ReactNode }> = ({ children }) =
           left: '-8px',
           top: '50%',
           transform: 'translateY(-50%)',
-          zIndex: 5,
+          zIndex: 10,
           background: 'var(--bg-tertiary)',
           border: '1px solid var(--border-color)',
           borderRadius: '50%',
@@ -82,8 +134,13 @@ const ModalScrollRow: React.FC<{ children: React.ReactNode }> = ({ children }) =
           justifyContent: 'center',
           cursor: 'pointer',
           boxShadow: '0 4px 10px rgba(0,0,0,0.5)',
-          color: 'var(--text-primary)'
+          color: 'var(--text-primary)',
+          opacity: canScrollLeft ? 1 : 0,
+          visibility: canScrollLeft ? 'visible' : 'hidden',
+          pointerEvents: canScrollLeft ? 'auto' : 'none',
+          transition: 'all 0.2s ease'
         }}
+        aria-label="Scroll left"
       >
         <ChevronLeft size={18} />
       </button>
@@ -97,7 +154,9 @@ const ModalScrollRow: React.FC<{ children: React.ReactNode }> = ({ children }) =
           scrollbarWidth: 'none',
           msOverflowStyle: 'none',
           width: '100%',
-          padding: '0.25rem 1.25rem'
+          padding: '0.25rem 1.25rem',
+          WebkitMaskImage: getMaskImage(),
+          maskImage: getMaskImage()
         }}
       >
         {children}
@@ -111,7 +170,7 @@ const ModalScrollRow: React.FC<{ children: React.ReactNode }> = ({ children }) =
           right: '-8px',
           top: '50%',
           transform: 'translateY(-50%)',
-          zIndex: 5,
+          zIndex: 10,
           background: 'var(--bg-tertiary)',
           border: '1px solid var(--border-color)',
           borderRadius: '50%',
@@ -122,11 +181,33 @@ const ModalScrollRow: React.FC<{ children: React.ReactNode }> = ({ children }) =
           justifyContent: 'center',
           cursor: 'pointer',
           boxShadow: '0 4px 10px rgba(0,0,0,0.5)',
-          color: 'var(--text-primary)'
+          color: 'var(--text-primary)',
+          opacity: canScrollRight ? 1 : 0,
+          visibility: canScrollRight ? 'visible' : 'hidden',
+          pointerEvents: canScrollRight ? 'auto' : 'none',
+          transition: 'all 0.2s ease'
         }}
+        aria-label="Scroll right"
       >
         <ChevronRight size={18} />
       </button>
+
+      {/* Right fade click-blocking zone */}
+      {canScrollRight && (
+        <div 
+          style={{
+            position: 'absolute',
+            right: 0,
+            top: 0,
+            bottom: 0,
+            width: '45px',
+            zIndex: 8,
+            pointerEvents: 'auto',
+            cursor: 'default'
+          }}
+          onClick={(e) => e.stopPropagation()}
+        />
+      )}
     </div>
   );
 };
