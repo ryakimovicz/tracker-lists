@@ -10,6 +10,7 @@ import { AdBanner } from '../components/AdBanner';
 import { ReplaceFavoriteModal } from '../components/ReplaceFavoriteModal';
 import { ProModal } from '../components/ProModal';
 import { getOrderedCategories, sortFilterTabs } from '../utils/categoryOrder';
+import { prefetchMediaDetails } from '../utils/prefetch';
 
 import { Search as SearchIcon, AlertCircle, CheckCircle, Plus, X, Heart, Star, Users, BookOpen, Package, Puzzle, Sparkles, Gamepad2, Trash2 } from 'lucide-react';
 
@@ -127,7 +128,7 @@ const ExploreSection = React.memo<ExploreSectionProps>(({
       {categories.map(({ type, title, items }) => (
         <HorizontalScroll key={type} title={title} outlineColor={`var(--color-${type})`}>
           {items.map((item: any, idx: number) => (
-            <div key={idx} className="glass-card" style={{ minWidth: '200px', width: '200px', padding: '1rem', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '0.75rem' }} onClick={() => onOpenItem(item)}>
+            <div key={idx} className="glass-card" style={{ minWidth: '200px', width: '200px', padding: '1rem', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '0.75rem' }} onClick={() => onOpenItem(item)} onMouseEnter={() => prefetchMediaDetails(item)}>
               <div style={{ position: 'relative', width: '100%', height: '280px', overflow: 'hidden', borderRadius: '8px' }}>
                 <MediaPoster
                   src={item.image_url}
@@ -364,6 +365,9 @@ export const Search: React.FC = () => {
         params: { q: cleanQuery }
       });
       setResults(response.data);
+      if (Array.isArray(response.data)) {
+        response.data.slice(0, 8).forEach((r: any) => prefetchMediaDetails(r));
+      }
     } catch (err: any) {
       if (err.response?.status === 429) {
         setErrorMsg(t('errRateLimit'));
@@ -418,6 +422,26 @@ export const Search: React.FC = () => {
     if (e) e.stopPropagation();
     setErrorMsg('');
     const status = getDefaultStatus(item.item_type);
+
+    // Optimistic UI update: immediately paint the button as added
+    const tempId = -Date.now();
+    const optimisticItem = {
+      id: tempId,
+      external_id: item.external_id,
+      item_type: item.item_type,
+      title: item.title,
+      image_url: item.image_url,
+      imdb_id: item.imdb_id,
+      custom_badge: item.badge || null,
+      release_date: item.release_date || null,
+      status: status
+    };
+
+    setShelfItems(prev => {
+      const filtered = prev.filter(x => !(x.external_id === item.external_id && x.item_type === item.item_type));
+      return [...filtered, optimisticItem];
+    });
+
     try {
       await apiClient.post('/library/', {
         item_type: item.item_type,
@@ -431,6 +455,8 @@ export const Search: React.FC = () => {
       });
       await loadShelfItems();
     } catch (err: any) {
+      // Revert optimistic state on failure
+      setShelfItems(prev => prev.filter(x => !(x.external_id === item.external_id && x.item_type === item.item_type)));
       setErrorMsg(err.response?.data?.detail || 'Failed to add item to your library shelf.');
       setTimeout(() => setErrorMsg(''), 4000);
     }
@@ -817,7 +843,7 @@ export const Search: React.FC = () => {
               const itemTypeTextColor = `var(--color-text-${item.item_type || 'movie'})`;
 
               return (
-                <div key={`${item.external_id}-${item.item_type}`} className="glass-card" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', cursor: 'pointer', position: 'relative' }} onClick={() => handleOpenItemDetails(item)}>
+                <div key={`${item.external_id}-${item.item_type}`} className="glass-card" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', cursor: 'pointer', position: 'relative' }} onClick={() => handleOpenItemDetails(item)} onMouseEnter={() => prefetchMediaDetails(item)}>
 
                   <div style={{ position: 'relative', width: '100%', height: '260px', borderRadius: '8px', overflow: 'hidden' }}>
                     <MediaPoster
@@ -863,12 +889,17 @@ export const Search: React.FC = () => {
                                                     shelfItem.status !== 'untracked' && 
                                                     Boolean(shelfItem.status || shelfItem.completed_at || shelfItem.last_seen_episode || shelfItem.rating || shelfItem.consumption_count > 0 || shelfItem.total_time_spent > 0);
                                 if (!hasProgress) {
+                                  const previousShelf = shelfItems;
+                                  setShelfItems(prev => prev.filter(x => !(x.external_id === item.external_id && x.item_type === item.item_type)));
                                   try {
-                                    await apiClient.delete(`/library/${shelfItem.id}?delete_history=true`);
+                                    if (shelfItem.id && shelfItem.id > 0) {
+                                      await apiClient.delete(`/library/${shelfItem.id}?delete_history=true`);
+                                    }
                                     setSuccessMsg(language === 'es' ? 'Elemento eliminado de tu estantería.' : 'Item removed from your shelf.');
                                     await loadShelfItems();
                                     setTimeout(() => setSuccessMsg(''), 3000);
                                   } catch (err: any) {
+                                    setShelfItems(previousShelf);
                                     setErrorMsg(err.response?.data?.detail || 'Failed to remove item.');
                                     setTimeout(() => setErrorMsg(''), 4000);
                                   }

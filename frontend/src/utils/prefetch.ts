@@ -1,8 +1,75 @@
 import { apiClient } from '../api/client';
+import { getCachedSeries, setCachedSeries } from './seriesCache';
 
 const CACHE_TTL_MS = 3 * 60 * 1000; // 3 minutes fresh cache
 
 const prefetchTimers: Record<string, number> = {};
+const prefetchedItems = new Set<string>();
+
+/**
+ * Prefetches details and episodes/issues in the background for a media item (series, anime, comic, movie).
+ * When the user opens the modal, the data is already in cache and opens instantly with 0ms delay.
+ */
+export const prefetchMediaDetails = (item: any) => {
+  if (!item || !item.external_id) return;
+  const extId = String(item.external_id);
+  const type = (item.item_type || '').toLowerCase();
+
+  if (prefetchedItems.has(extId)) return;
+  prefetchedItems.add(extId);
+
+  if (type === 'series' || type === 'anime' || extId.startsWith('tvm_') || extId.startsWith('anime_')) {
+    const cacheKeyMeta = `${extId}_metadata`;
+    const cacheKeyAll = `${extId}_all_episodes`;
+
+    if (!getCachedSeries(cacheKeyMeta)) {
+      apiClient.get(`/search/series/${extId}`).then(res => {
+        if (res.data) {
+          const seriesData = res.data || {};
+          let rawSeasons = seriesData.seasons || [];
+          if (rawSeasons.length === 0) {
+            rawSeasons = [{ id: 1, season_number: 1, episode_count: item.latest_episode || 12 }];
+          }
+          const sortedSeasons = [...rawSeasons].sort((a: any, b: any) => {
+            if (a.season_number === 0) return 1;
+            if (b.season_number === 0) return -1;
+            return a.season_number - b.season_number;
+          });
+          setCachedSeries(cacheKeyMeta, { ...seriesData, seasons: sortedSeasons });
+        }
+      }).catch(() => {});
+    }
+
+    if (!getCachedSeries(cacheKeyAll)) {
+      apiClient.get(`/search/series/${extId}/episodes`).then(res => {
+        if (Array.isArray(res.data) && res.data.length > 0) {
+          setCachedSeries(cacheKeyAll, res.data);
+        }
+      }).catch(() => {});
+    }
+  } else if (type === 'comic' || extId.startsWith('cv_vol_')) {
+    const cacheKeyMeta = `${extId}_metadata`;
+    const cacheKeyAll = `${extId}_all_episodes`;
+
+    if (!getCachedSeries(cacheKeyMeta)) {
+      apiClient.get(`/search/comic/volume/${extId}`).then(res => {
+        if (res.data) {
+          const volData = res.data || {};
+          const rawSeasons = volData?.seasons || [{ id: 1, season_number: 1, episode_count: volData.count_of_issues || 1 }];
+          setCachedSeries(cacheKeyMeta, { ...volData, seasons: rawSeasons });
+        }
+      }).catch(() => {});
+    }
+
+    if (!getCachedSeries(cacheKeyAll)) {
+      apiClient.get(`/search/comic/volume/${extId}/issues`).then(res => {
+        if (Array.isArray(res.data) && res.data.length > 0) {
+          setCachedSeries(cacheKeyAll, res.data);
+        }
+      }).catch(() => {});
+    }
+  }
+};
 
 export const prefetchRoute = (route: string) => {
   const now = Date.now();

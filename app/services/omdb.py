@@ -91,7 +91,7 @@ class OMDbService:
             return cls.get_fanart_poster(imdb_id)
             
         def get_omdb_details():
-            if not cls.API_KEY or not imdb_id: return "", None, item.get("Year")
+            if not cls.API_KEY or not imdb_id: return "", None, item.get("Year"), 0.0
             url = f"http://www.omdbapi.com/?i={imdb_id}&plot=full&apikey={cls.API_KEY}"
             try:
                 req = urllib.request.Request(url, headers={"User-Agent": "TrackerLists/1.0"})
@@ -116,16 +116,28 @@ class OMDbService:
                                 formatted_date = dt.strftime("%Y-%m-%d")
                             except Exception:
                                 pass
-                        return (plot if plot and plot != "N/A" else ""), runtime_min, formatted_date
+
+                        # Calculate popularity score from imdbVotes (logarithmic 0-100 scale)
+                        votes_clean = 0
+                        votes_str = data.get("imdbVotes")
+                        if votes_str and votes_str != "N/A":
+                            try:
+                                votes_clean = int(str(votes_str).replace(",", "").strip())
+                            except Exception:
+                                pass
+                        import math
+                        pop_score = min(100.0, round(math.log10(votes_clean + 1) * 15.0, 2)) if votes_clean > 0 else 0.0
+
+                        return (plot if plot and plot != "N/A" else ""), runtime_min, formatted_date, pop_score
             except Exception:
                 pass
-            return "", None, item.get("Year")
+            return "", None, item.get("Year"), 0.0
             
         with concurrent.futures.ThreadPoolExecutor(max_workers=2) as ex:
             f1 = ex.submit(get_fanart)
             f2 = ex.submit(get_omdb_details)
             poster = f1.result()
-            plot, runtime, full_release_date = f2.result()
+            plot, runtime, full_release_date, pop_score = f2.result()
             
         if not poster:
             omdb_poster = item.get("Poster")
@@ -150,6 +162,7 @@ class OMDbService:
             description=plot,
             item_type="movie",
             release_date=full_release_date,
+            popularity=pop_score,
             imdb_id=imdb_id,
             page_count=runtime,
             status="Upcoming" if is_upcoming_movie else None,

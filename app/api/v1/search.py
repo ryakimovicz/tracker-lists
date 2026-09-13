@@ -114,6 +114,13 @@ def rank_search_results(items: List[SearchResultItem], query: str, variations: L
         if getattr(item, "badge", None) == "dlc":
             score -= 300.0
 
+        # For movies: Give full-length feature films a priority boost over minor shorts/clips in general searches
+        if item.item_type == "movie":
+            if item.page_count and item.page_count >= 40:
+                score += 150.0
+            elif item.page_count and item.page_count < 25 and not any(k in query_clean for k in ["short", "corto", "stunt", "making", "behind", "extra", "clip", "escena"]):
+                score -= 100.0
+
         # Popularity bonus (scaled 0-100)
         score += min(item.popularity or 0.0, 100.0)
         return score

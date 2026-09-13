@@ -4,12 +4,14 @@ import { apiClient } from '../api/client';
 import { useTranslation } from '../context/LanguageContext';
 import { getCachedSeries, setCachedSeries } from '../utils/seriesCache';
 import { ItemDetailsModal } from '../components/ItemDetailsModal';
+import { MediaPoster } from '../components/MediaPoster';
 import { AdBanner } from '../components/AdBanner';
 import { ReplaceFavoriteModal } from '../components/ReplaceFavoriteModal';
 import { ProModal } from '../components/ProModal';
 import { ChevronLeft, ChevronRight, ChevronDown, ChevronsDown, Check, Play } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { getOrderedCategories, getCategoryLabel } from '../utils/categoryOrder';
+import { prefetchMediaDetails } from '../utils/prefetch';
 
 export const getTagClass = (type: string) => {
   switch (type) {
@@ -369,6 +371,8 @@ const ScrollRow = ({
 };const CustomCard = ({ 
   title, 
   coverUrl, 
+  itemType,
+  rawItem,
   subtitle1, 
   subtitle2, 
   preSubtitle, 
@@ -385,6 +389,8 @@ const ScrollRow = ({
 }: { 
   title: string; 
   coverUrl?: string; 
+  itemType?: string;
+  rawItem?: any;
   subtitle1?: string; 
   subtitle2?: string; 
   preSubtitle?: string;
@@ -405,6 +411,9 @@ const ScrollRow = ({
   return (
     <div 
       onClick={onClick}
+      onMouseEnter={() => {
+        if (rawItem) prefetchMediaDetails(rawItem);
+      }}
       style={{ 
         minWidth: "180px", maxWidth: "180px", background: "var(--bg-secondary)", 
         border: `1px solid ${themeColor || "var(--border-color)"}`, borderRadius: "12px", 
@@ -443,11 +452,14 @@ const ScrollRow = ({
         )}
       </div>
       <div style={{ width: "100%", height: "240px", background: "var(--bg-tertiary)", position: "relative" }}>
-        {coverUrl ? (
-          <img src={coverUrl} alt={title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-        ) : (
-          <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: "2rem" }}>?</div>
-        )}
+        <MediaPoster
+          src={coverUrl}
+          title={title}
+          itemType={itemType || 'movie'}
+          height="100%"
+          width="100%"
+          borderRadius={0}
+        />
         {coverTopText && (
           <div style={{ position: "absolute", top: 0, left: 0, right: 0, padding: "0.5rem", background: "linear-gradient(to bottom, rgba(0,0,0,0.8), transparent)", color: "#fff", fontSize: "0.85rem", fontWeight: 700, textShadow: "0 1px 3px rgba(0,0,0,0.8)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
             {coverTopText}
@@ -1079,6 +1091,7 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
     <>
       <div 
         onClick={handleCardClick}
+        onMouseEnter={() => prefetchMediaDetails(item)}
         style={{ 
           minWidth: isPoster ? "180px" : "220px",
           maxWidth: isPoster ? "180px" : "220px",
@@ -1106,11 +1119,14 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
         </div>
         
         <div style={{ width: "100%", height: isPoster ? "240px" : "125px", background: "var(--bg-tertiary)", position: "relative" }}>
-          {(isPoster ? item.image_url : coverUrl) ? (
-            <img src={isPoster ? item.image_url : coverUrl} alt={item.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-          ) : (
-            <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: "2rem" }}>?</div>
-          )}
+          <MediaPoster
+            src={isPoster ? item.image_url : coverUrl}
+            title={item.title}
+            itemType={item.item_type || (isComic ? 'comic' : 'series')}
+            height="100%"
+            width="100%"
+            borderRadius={0}
+          />
         </div>
         
         <div style={{ padding: "0.75rem", display: "flex", flexDirection: "column", gap: "0.25rem", flex: 1, minHeight: isPoster ? "2.5rem" : undefined, paddingRight: isPoster ? "75px" : undefined }}>
@@ -1350,6 +1366,7 @@ const CompletedSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColo
   return (
     <div 
       onClick={() => onOpenSeries(item)}
+      onMouseEnter={() => prefetchMediaDetails(item)}
       style={{ 
         minWidth: "180px", maxWidth: "180px", background: "var(--bg-secondary)", 
         border: `1px solid ${themeColor || "var(--border-color)"}`, borderRadius: "12px", 
@@ -1369,11 +1386,14 @@ const CompletedSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColo
       </div>
 
       <div style={{ width: "100%", height: "240px", background: "var(--bg-tertiary)", position: "relative" }}>
-        {item.image_url ? (
-          <img src={item.image_url} alt={item.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-        ) : (
-          <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: "2rem" }}>?</div>
-        )}
+        <MediaPoster
+          src={item.image_url}
+          title={item.title}
+          itemType={item.item_type || (isComic ? 'comic' : 'series')}
+          height="100%"
+          width="100%"
+          borderRadius={0}
+        />
       </div>
       
       <div style={{ padding: "0.75rem", display: "flex", flexDirection: "column", gap: "0.2rem", flex: 1, minHeight: "2.5rem", justifyContent: "center" }}>
@@ -1525,6 +1545,7 @@ const DroppedSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor,
   return (
     <div 
       onClick={() => onOpenSeries(item)}
+      onMouseEnter={() => prefetchMediaDetails(item)}
       style={{ 
         minWidth: "180px", maxWidth: "180px", background: "var(--bg-secondary)", 
         border: `1px solid ${themeColor || "var(--border-color)"}`, borderRadius: "12px", 
@@ -1544,11 +1565,14 @@ const DroppedSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor,
       </div>
 
       <div style={{ width: "100%", height: "240px", background: "var(--bg-tertiary)", position: "relative" }}>
-        {item.image_url ? (
-          <img src={item.image_url} alt={item.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-        ) : (
-          <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: "2rem" }}>?</div>
-        )}
+        <MediaPoster
+          src={item.image_url}
+          title={item.title}
+          itemType={item.item_type || (isComic ? 'comic' : 'series')}
+          height="100%"
+          width="100%"
+          borderRadius={0}
+        />
       </div>
       
       <div style={{ padding: "0.75rem", display: "flex", flexDirection: "column", gap: "0.25rem", flex: 1, minHeight: "2.5rem", paddingRight: "40px" }}>
@@ -2725,6 +2749,7 @@ export const Home: React.FC = () => {
                   key={g.item_id}
                   title={g.list_title}
                   coverUrl={g.image_url}
+                  itemType="guide"
                   preSubtitle={insideTop}
                   themeColor="var(--color-guide)"
                   themeTextColor="var(--color-text-guide)"
@@ -2855,6 +2880,8 @@ export const Home: React.FC = () => {
                           key={item.id}
                           title={item.title}
                           coverUrl={item.image_url}
+                          itemType={item.item_type}
+                          rawItem={item}
                           themeColor={`var(--color-${item.item_type})`}
                           themeTextColor={`var(--color-text-${item.item_type})`}
                           coverBottomText={undefined}
