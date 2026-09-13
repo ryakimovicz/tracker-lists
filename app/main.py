@@ -172,6 +172,28 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+from fastapi.responses import JSONResponse
+from fastapi import Request
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.exception(f"Unhandled exception on {request.method} {request.url.path}: {exc}")
+    origin = request.headers.get("origin", "")
+    allowed_origins = [str(o).strip("/") for o in settings.BACKEND_CORS_ORIGINS] if settings.BACKEND_CORS_ORIGINS else []
+    
+    headers = {}
+    if origin and (origin in allowed_origins or "*" in allowed_origins):
+        headers["Access-Control-Allow-Origin"] = origin
+        headers["Access-Control-Allow-Credentials"] = "true"
+        headers["Access-Control-Allow-Methods"] = "*"
+        headers["Access-Control-Allow-Headers"] = "*"
+
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "An internal server error occurred."},
+        headers=headers
+    )
+
 # CORS Middleware setup
 if settings.BACKEND_CORS_ORIGINS:
     app.add_middleware(
