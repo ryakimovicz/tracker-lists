@@ -1662,12 +1662,22 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
         newStatus = getDefaultStatus(selectedItem.item_type);
       }
     }
-    
+
     if (selectedItem.id) {
       try {
         const res = await apiClient.put(`/library/${selectedItem.id}`, { status: newStatus });
-        setSelectedItem((prev: any) => prev ? { ...prev, status: newStatus, ...res.data } : null);
+        const updatedItem = { ...selectedItem, status: newStatus, ...res.data };
+        setSelectedItem((prev: any) => prev ? updatedItem : null);
         
+        try {
+          const cachedLibStr = sessionStorage.getItem('pathd_lib_cache');
+          if (cachedLibStr) {
+            let cachedLib: any[] = JSON.parse(cachedLibStr);
+            cachedLib = cachedLib.map((it: any) => it.id === selectedItem.id ? { ...it, status: newStatus, ...res.data } : it);
+            sessionStorage.setItem('pathd_lib_cache', JSON.stringify(cachedLib));
+          }
+        } catch (e) {}
+
         if (['completed', 'read'].includes(newStatus) && user?.is_pro) {
           apiClient.get(`/library/${selectedItem.id}/consumption-history`)
             .then(hRes => {
@@ -1678,7 +1688,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
             })
             .catch(console.error);
         }
-        onUpdate && onUpdate();
+        window.dispatchEvent(new Event('library-updated'));
+        onUpdate && onUpdate(updatedItem);
       } catch (e: any) {
         if (e.response?.data?.detail) {
           alert(e.response.data.detail);
@@ -1867,10 +1878,22 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     setShowMenu(false);
     setShowShelfMenu(false);
     try {
+      const removedId = selectedItem.id;
       const url = deleteHistory ? `/library/${selectedItem.id}?delete_history=true` : `/library/${selectedItem.id}`;
       await apiClient.delete(url);
+      
+      try {
+        const cachedLibStr = sessionStorage.getItem('pathd_lib_cache');
+        if (cachedLibStr) {
+          let cachedLib: any[] = JSON.parse(cachedLibStr);
+          cachedLib = cachedLib.filter((it: any) => it.id !== removedId);
+          sessionStorage.setItem('pathd_lib_cache', JSON.stringify(cachedLib));
+        }
+      } catch (e) {}
+
       setSelectedItem(null);
       onClose();
+      window.dispatchEvent(new Event('library-updated'));
       onUpdate && onUpdate();
     } catch (e) {
       console.error(e);
@@ -3259,6 +3282,21 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
           ...prev,
           ...newItem
         }));
+
+        // Optimistically update sessionStorage so Home and Profile have the new item in 0ms
+        try {
+          const cachedLibStr = sessionStorage.getItem('pathd_lib_cache');
+          let cachedLib: any[] = cachedLibStr ? JSON.parse(cachedLibStr) : [];
+          const existsIdx = cachedLib.findIndex((it: any) => it.id === newItem.id || (it.external_id === newItem.external_id && it.item_type === newItem.item_type));
+          if (existsIdx >= 0) {
+            cachedLib[existsIdx] = { ...cachedLib[existsIdx], ...newItem };
+          } else {
+            cachedLib = [newItem, ...cachedLib];
+          }
+          sessionStorage.setItem('pathd_lib_cache', JSON.stringify(cachedLib));
+        } catch (e) {}
+
+        window.dispatchEvent(new Event('library-updated'));
         onUpdate && onUpdate(newItem);
         return newItem;
       } catch (e) {
