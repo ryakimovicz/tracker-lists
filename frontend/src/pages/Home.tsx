@@ -1766,7 +1766,13 @@ export const Home: React.FC = () => {
       return cached ? JSON.parse(cached) : [];
     } catch { return []; }
   });
-  const [upcomingEpisodes, setUpcomingEpisodes] = useState<any[]>([]);
+  const [upcomingEpisodes, setUpcomingEpisodes] = useState<any[]>(() => {
+    try {
+      const cached = sessionStorage.getItem('pathd_upcoming_episodes_cache');
+      return cached ? JSON.parse(cached) : [];
+    } catch { return []; }
+  });
+  const [isSyncingEpisodes, setIsSyncingEpisodes] = useState<boolean>(false);
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [loading, setLoading] = useState(() => {
     try {
@@ -1881,6 +1887,7 @@ export const Home: React.FC = () => {
       })();
 
       if (trackingSeries.length > 0) {
+        setIsSyncingEpisodes(true);
         Promise.allSettled(
           trackingSeries.map(async (item: any) => {
             const cacheKeyAll = `${item.external_id}_all_episodes`;
@@ -2034,12 +2041,17 @@ export const Home: React.FC = () => {
             return false;
           });
           setUpcomingEpisodes(allCollectedFutureEps);
+          try {
+            sessionStorage.setItem('pathd_upcoming_episodes_cache', JSON.stringify(allCollectedFutureEps));
+          } catch (e) {}
           if (changed.length > 0) {
             setLibraryItems([...currentLib]);
             try {
               sessionStorage.setItem('pathd_lib_cache', JSON.stringify(currentLib));
             } catch (e) {}
           }
+        }).finally(() => {
+          setIsSyncingEpisodes(false);
         });
       }
 
@@ -2629,10 +2641,37 @@ export const Home: React.FC = () => {
                     );
                   });
                 })()}
+                {isSyncingEpisodes && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-secondary)', fontSize: '0.85rem', padding: '0.5rem 0' }}>
+                    <div style={{
+                      width: '12px',
+                      height: '12px',
+                      border: '2px solid var(--border-color)',
+                      borderTopColor: 'var(--accent-primary, #6366f1)',
+                      borderRadius: '50%',
+                      animation: 'spin 0.8s linear infinite'
+                    }} />
+                    <span>{language === 'es' ? 'Sincronizando calendario de series...' : 'Syncing series calendar...'}</span>
+                  </div>
+                )}
               </div>
             ) : (
-              <div style={{ color: "var(--text-secondary)", padding: "1rem 0" }}>
-                {language === 'es' ? 'No hay estrenos o episodios próximos en el calendario.' : 'No upcoming releases or episodes in the calendar.'}
+              <div style={{ color: "var(--text-secondary)", padding: "1rem 0", display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                {isSyncingEpisodes ? (
+                  <>
+                    <div style={{
+                      width: '14px',
+                      height: '14px',
+                      border: '2px solid var(--border-color)',
+                      borderTopColor: 'var(--accent-primary, #6366f1)',
+                      borderRadius: '50%',
+                      animation: 'spin 0.8s linear infinite'
+                    }} />
+                    <span>{language === 'es' ? 'Cargando próximos episodios...' : 'Loading upcoming episodes...'}</span>
+                  </>
+                ) : (
+                  <span>{language === 'es' ? 'No hay estrenos o episodios próximos en el calendario.' : 'No upcoming releases or episodes in the calendar.'}</span>
+                )}
               </div>
             )
           ) : (
