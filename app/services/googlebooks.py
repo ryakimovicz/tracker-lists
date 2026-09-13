@@ -294,6 +294,36 @@ class GoogleBooksService:
 
     @staticmethod
     def get_trending_books() -> List[SearchResultItem]:
-        import random
-        queries = ["Bestseller", "Fantasy", "Sci-Fi", "Mystery", "Thriller", "Stephen King", "Brandon Sanderson"]
-        return GoogleBooksService.search_books(random.choice(queries))[:15]
+        import time
+        cache_key = "gb_trending_books_v2"
+        now_ts = time.time()
+        if cache_key in GoogleBooksService._new_books_cache:
+            ts, data = GoogleBooksService._new_books_cache[cache_key]
+            if now_ts - ts < 14400:
+                return data
+
+        results = []
+        queries = ["bestseller fiction", "popular novels 2025", "award winning fiction", "trending fantasy sci-fi"]
+        seen_ids = set()
+        seen_titles = set()
+        
+        for q in queries:
+            try:
+                items = GoogleBooksService.search_books(q, order_by="relevance")
+                for it in items:
+                    norm = (it.title or "").lower().strip()
+                    if it.external_id not in seen_ids and norm not in seen_titles and it.image_url:
+                        seen_ids.add(it.external_id)
+                        seen_titles.add(norm)
+                        results.append(it)
+                    if len(results) >= 24:
+                        break
+            except Exception:
+                continue
+            if len(results) >= 24:
+                break
+                
+        if results:
+            GoogleBooksService._new_books_cache[cache_key] = (now_ts, results)
+        return results
+

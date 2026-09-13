@@ -376,14 +376,49 @@ class OMDbService:
 
     @classmethod
     def get_trending_movies(cls) -> List[SearchResultItem]:
-        queries = ["Dune", "Avatar", "Deadpool", "Oppenheimer", "Spider-Man", "Batman", "Star Wars", "Lord of the Rings", "Avengers"]
-        import random
-        selected = random.sample(queries, min(4, len(queries)))
+        cache_key = "omdb_trending_movies_v2"
+        now_ts = time.time()
+        if cache_key in cls._search_cache:
+            ts, data = cls._search_cache[cache_key]
+            if now_ts - ts < 14400:
+                return data
+
+        queries = ["Dune", "Avatar", "Deadpool", "Oppenheimer", "Spider-Man", "Batman", "Avengers", "Gladiator", "Wicked", "Interstellar"]
         results = []
-        for q in selected:
-            res = cls.search_movies(q)
-            results.extend([m for m in res if m.image_url])
-            if len(results) >= 15:
+        seen_ids = set()
+        seen_titles = set()
+        for q in queries:
+            try:
+                res = cls.search_movies(q)
+                for m in res:
+                    norm = (m.title or "").lower().strip()
+                    if m.external_id not in seen_ids and norm not in seen_titles and m.image_url:
+                        seen_ids.add(m.external_id)
+                        seen_titles.add(norm)
+                        results.append(m)
+                    if len(results) >= 24:
+                        break
+            except Exception:
+                continue
+            if len(results) >= 24:
                 break
-        return results[:15]
+
+        if len(results) < 10:
+            try:
+                new_movies = cls.get_new_movies()
+                for m in new_movies:
+                    norm = (m.title or "").lower().strip()
+                    if m.external_id not in seen_ids and norm not in seen_titles:
+                        seen_ids.add(m.external_id)
+                        seen_titles.add(norm)
+                        results.append(m)
+                    if len(results) >= 24:
+                        break
+            except Exception:
+                pass
+
+        if results:
+            cls._search_cache[cache_key] = (now_ts, results)
+        return results
+
 

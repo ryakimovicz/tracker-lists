@@ -218,10 +218,89 @@ class AnilistService:
                         import re
                         desc = item.get("description") or ""
                         desc = re.sub('<[^<]+?>', '', desc)
-                        results.append(SearchResultItem(external_id=str(item.get("id")), title=title, image_url=image_url, description=desc, item_type="manga", release_date=release_date or None, popularity=float(item.get("averageScore") or 0)))
+                        results.append(SearchResultItem(
+                            external_id=str(item.get("id")),
+                            title=title,
+                            image_url=image_url,
+                            description=desc,
+                            item_type="manga",
+                            release_date=release_date or None,
+                            popularity=float(item.get("averageScore") or 0)
+                        ))
                     return results
         except Exception:
             pass
+        return []
+
+    @staticmethod
+    def get_trending_manga() -> List[SearchResultItem]:
+        import json, urllib.request
+        url = "https://graphql.anilist.co"
+        graphql_query = """
+        query {
+          Page(page: 1, perPage: 30) {
+            media(type: MANGA, sort: [TRENDING_DESC, POPULARITY_DESC], isAdult: false) {
+              id
+              title { romaji english }
+              description
+              coverImage { large }
+              startDate { year month day }
+              seasonYear
+              averageScore
+              popularity
+              genres
+              isAdult
+            }
+          }
+        }
+        """
+        payload = json.dumps({"query": graphql_query}).encode("utf-8")
+        req = urllib.request.Request(url, data=payload, headers=_ANILIST_HEADERS)
+        try:
+            with urllib.request.urlopen(req, timeout=6) as response:
+                if response.status == 200:
+                    data = json.loads(response.read().decode())
+                    media_list = data.get("data", {}).get("Page", {}).get("media", [])
+                    results = []
+                    for item in media_list:
+                        genres = item.get("genres", [])
+                        if item.get("isAdult") or "Hentai" in genres or "Ecchi" in genres:
+                            continue
+                        title_obj = item.get("title", {})
+                        title = title_obj.get("english") or title_obj.get("romaji") or "Untitled Manga"
+                        cover_obj = item.get("coverImage", {})
+                        image_url = cover_obj.get("large")
+                        start_date_obj = item.get("startDate", {}) or {}
+                        year = start_date_obj.get("year") or item.get("seasonYear")
+                        month = start_date_obj.get("month")
+                        day = start_date_obj.get("day")
+                        release_date = ""
+                        if year:
+                            release_date = str(year)
+                            if month:
+                                release_date = f"{year}-{month:02d}"
+                                if day:
+                                    release_date = f"{year}-{month:02d}-{day:02d}"
+                        import re
+                        desc = item.get("description") or ""
+                        desc = re.sub('<[^<]+?>', '', desc)
+                        
+                        from app.core.sfw_filter import is_safe_media_item
+                        if not is_safe_media_item(title, desc):
+                            continue
+
+                        results.append(SearchResultItem(
+                            external_id=str(item.get("id")),
+                            title=title,
+                            image_url=image_url,
+                            description=desc,
+                            item_type="manga",
+                            release_date=release_date or None,
+                            popularity=float(item.get("popularity") or item.get("averageScore") or 0)
+                        ))
+                    return results
+        except Exception as e:
+            print(f"Error fetching trending manga from AniList: {e}")
         return []
 
     @staticmethod

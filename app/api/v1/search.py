@@ -588,12 +588,14 @@ def get_explore_recommendations(
     )
 
 class ExploreTabsResponse(BaseModel):
-    agregado: List[SearchResultItem]
-    nuevo: List[SearchResultItem]
-    descubrir: List[SearchResultItem]
+    agregado: List[SearchResultItem] = []
+    nuevo: List[SearchResultItem] = []
+    tendencias: List[SearchResultItem] = []
+    descubrir: List[SearchResultItem] = []
 
-# In-memory TTL cache for explore new items
+# In-memory TTL cache for explore new & trending items
 _EXPLORE_NUEVO_CACHE: Dict[str, Tuple[float, List[SearchResultItem]]] = {}
+_EXPLORE_TENDENCIAS_CACHE: Dict[str, Tuple[float, List[SearchResultItem]]] = {}
 _EXPLORE_CACHE_TTL = 4 * 3600  # 4 hours
 
 @router.get("/explore/tabs", response_model=ExploreTabsResponse)
@@ -604,6 +606,8 @@ def get_explore_tabs(
     current_user: User = Depends(get_current_user_optional)
 ):
     import time
+    import concurrent.futures
+    now_ts = time.time()
     agregado = []
     
     # 1. Agregado (UserLibraryItem filtered)
@@ -637,73 +641,77 @@ def get_explore_tabs(
             return False
         return True
 
-    # 2. Nuevo (APIs with 4-hour in-memory cache + real-time blacklist dynamic filtering)
-    now_ts = time.time()
-    cache_key = "explore_nuevo_global_v2"
-    if cache_key in _EXPLORE_NUEVO_CACHE:
-        cache_time, cached_items = _EXPLORE_NUEVO_CACHE[cache_key]
-        if now_ts - cache_time < _EXPLORE_CACHE_TTL and len(cached_items) > 0:
-            filtered_cached = [x for x in cached_items if is_item_allowed(x)]
-            return ExploreTabsResponse(
-                agregado=agregado,
-                nuevo=filtered_cached,
-                descubrir=[]
-            )
-
+    # 2. Nuevo (APIs with 4-hour in-memory cache)
+    cache_key_nuevo = "explore_nuevo_global_v3"
     nuevo = []
-    import concurrent.futures
-    
-    def fetch_new_tv():
-        try: return [x for x in TVMazeService.get_new_shows() if is_safe_media_item(x.title, x.description)]
-        except: return []
+    if cache_key_nuevo in _EXPLORE_NUEVO_CACHE:
+        cache_time, cached_items = _EXPLORE_NUEVO_CACHE[cache_key_nuevo]
+        if now_ts - cache_time < _EXPLORE_CACHE_TTL and len(cached_items) > 0:
+            nuevo = [x for x in cached_items if is_item_allowed(x)]
 
-    def fetch_new_anime():
-        try: return [x for x in TVMazeService.get_new_anime() if is_safe_media_item(x.title, x.description)]
-        except: return []
-        
-    def fetch_new_manga():
-        try: return [x for x in AnilistService.get_new_manga() if is_safe_media_item(x.title, x.description)]
-        except: return []
+    # 3. Tendencias (APIs with 4-hour in-memory cache)
+    cache_key_trend = "explore_tendencias_global_v1"
+    tendencias = []
+    if cache_key_trend in _EXPLORE_TENDENCIAS_CACHE:
+        cache_time, cached_items = _EXPLORE_TENDENCIAS_CACHE[cache_key_trend]
+        if now_ts - cache_time < _EXPLORE_CACHE_TTL and len(cached_items) > 0:
+            tendencias = [x for x in cached_items if is_item_allowed(x)]
 
-    def fetch_new_games():
-        try: return [x for x in IGDBService.get_new_games() if is_safe_media_item(x.title, x.description)]
-        except: return []
+    tasks_to_run = []
+    need_nuevo = (len(nuevo) == 0)
+    need_tendencias = (len(tendencias) == 0)
 
-    def fetch_new_movies():
-        try: return [x for x in OMDbService.get_new_movies() if is_safe_media_item(x.title, x.description)]
-        except: return []
+    if need_nuevo or need_tendencias:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=14) as executor:
+            futures_nuevo = {}
+            futures_trend = {}
 
-    def fetch_new_books():
-        try: return [x for x in GoogleBooksService.get_new_books() if is_safe_media_item(x.title, x.description)]
-        except: return []
+            if need_nuevo:
+                futures_nuevo["tv"] = executor.submit(lambda: [x for x in TVMazeService.get_new_shows() if is_safe_media_item(x.title, x.description)])
+                futures_nuevo["anime"] = executor.submit(lambda: [x for x in TVMazeService.get_new_anime() if is_safe_media_item(x.title, x.description)])
+                futures_nuevo["manga"] = executor.submit(lambda: [x for x in AnilistService.get_new_manga() if is_safe_media_item(x.title, x.description)])
+                futures_nuevo["games"] = executor.submit(lambda: [x for x in IGDBService.get_new_games() if is_safe_media_item(x.title, x.description)])
+                futures_nuevo["movies"] = executor.submit(lambda: [x for x in OMDbService.get_new_movies() if is_safe_media_item(x.title, x.description)])
+                futures_nuevo["books"] = executor.submit(lambda: [x for x in GoogleBooksService.get_new_books() if is_safe_media_item(x.title, x.description)])
+                futures_nuevo["comics"] = executor.submit(lambda: [x for x in ComicVineService.get_new_comics() if is_safe_media_item(x.title, x.description)])
 
-    def fetch_new_comics():
-        try: return [x for x in ComicVineService.get_new_comics() if is_safe_media_item(x.title, x.description)]
-        except: return []
+            if need_tendencias:
+                futures_trend["tv"] = executor.submit(lambda: [x for x in TVMazeService.get_trending_series() if is_safe_media_item(x.title, x.description)])
+                futures_trend["anime"] = executor.submit(lambda: [x for x in TVMazeService.get_trending_anime() if is_safe_media_item(x.title, x.description)])
+                futures_trend["manga"] = executor.submit(lambda: [x for x in AnilistService.get_trending_manga() if is_safe_media_item(x.title, x.description)])
+                futures_trend["games"] = executor.submit(lambda: [x for x in IGDBService.get_trending_games() if is_safe_media_item(x.title, x.description)])
+                futures_trend["movies"] = executor.submit(lambda: [x for x in OMDbService.get_trending_movies() if is_safe_media_item(x.title, x.description)])
+                futures_trend["books"] = executor.submit(lambda: [x for x in GoogleBooksService.get_trending_books() if is_safe_media_item(x.title, x.description)])
+                futures_trend["comics"] = executor.submit(lambda: [x for x in ComicVineService.get_trending_comics() if is_safe_media_item(x.title, x.description)])
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=7) as executor:
-        f_ntv = executor.submit(fetch_new_tv)
-        f_nan = executor.submit(fetch_new_anime)
-        f_nmg = executor.submit(fetch_new_manga)
-        f_ngm = executor.submit(fetch_new_games)
-        f_nmv = executor.submit(fetch_new_movies)
-        f_nbk = executor.submit(fetch_new_books)
-        f_ncm = executor.submit(fetch_new_comics)
-        
-        nuevo.extend(f_nmv.result())
-        nuevo.extend(f_ntv.result())
-        nuevo.extend(f_nan.result())
-        nuevo.extend(f_nbk.result())
-        nuevo.extend(f_ncm.result())
-        nuevo.extend(f_nmg.result())
-        nuevo.extend(f_ngm.result())
+            if need_nuevo:
+                fetched_nuevo = []
+                for k, fut in futures_nuevo.items():
+                    try:
+                        res = fut.result()
+                        fetched_nuevo.extend(res)
+                    except Exception as e:
+                        print(f"Error in nuevo task {k}: {e}")
+                if fetched_nuevo:
+                    _EXPLORE_NUEVO_CACHE[cache_key_nuevo] = (now_ts, fetched_nuevo)
+                    nuevo = [x for x in fetched_nuevo if is_item_allowed(x)]
 
-    if len(nuevo) > 0:
-        _EXPLORE_NUEVO_CACHE[cache_key] = (now_ts, nuevo)
+            if need_tendencias:
+                fetched_trend = []
+                for k, fut in futures_trend.items():
+                    try:
+                        res = fut.result()
+                        fetched_trend.extend(res)
+                    except Exception as e:
+                        print(f"Error in tendencias task {k}: {e}")
+                if fetched_trend:
+                    _EXPLORE_TENDENCIAS_CACHE[cache_key_trend] = (now_ts, fetched_trend)
+                    tendencias = [x for x in fetched_trend if is_item_allowed(x)]
 
     return ExploreTabsResponse(
         agregado=agregado,
         nuevo=nuevo,
+        tendencias=tendencias,
         descubrir=[]
     )
 

@@ -119,6 +119,7 @@ const translations: Translations = {
   searchSelectStatus: { en: 'Select Status', es: 'Seleccionar Estado' },
   searchItemAdded: { en: 'Item added to your shelf!', es: '¡Elemento añadido a tu estantería!' },
   exploreNew: { en: "What's New", es: 'Novedades' },
+  exploreTrending: { en: 'Trending', es: 'Tendencias' },
   errRateLimit: { en: 'Too many search requests. Please wait a minute.', es: 'Demasiadas búsquedas. Por favor espera un minuto.' },
   errSearchFailed: { en: 'Search failed. Please try again.', es: 'Error al realizar la búsqueda. Inténtalo de nuevo.' },
 

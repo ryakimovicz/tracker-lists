@@ -2,7 +2,7 @@ import json
 import urllib.request
 import urllib.parse
 import re
-from typing import List
+from typing import List, Dict, Tuple
 from app.core.config import settings
 from app.services.base import SearchResultItem
 from app.core.sfw_filter import is_safe_media_item
@@ -586,8 +586,40 @@ class ComicVineService:
         current_year = datetime.now().year
         return ComicVineService.search_comics(f"Batman {current_year}")[:15]
 
+    _trending_comics_cache: Dict[str, Tuple[float, List[SearchResultItem]]] = {}
+
     @staticmethod
     def get_trending_comics() -> List[SearchResultItem]:
-        import random
-        queries = ["Spider-Man", "X-Men", "Batman", "Superman", "Wolverine", "Avengers"]
-        return ComicVineService.search_comics(random.choice(queries))[:15]
+        import time
+        cache_key = "cv_trending_comics_v2"
+        now_ts = time.time()
+        if cache_key in ComicVineService._trending_comics_cache:
+            ts, data = ComicVineService._trending_comics_cache[cache_key]
+            if now_ts - ts < 14400:
+                return data
+
+        results = []
+        seen_ids = set()
+        seen_titles = set()
+        queries = ["Spider-Man", "Batman", "X-Men", "Avengers", "Superman", "Daredevil", "Wolverine"]
+        
+        for q in queries:
+            try:
+                items = ComicVineService.search_comics(q)
+                for it in items:
+                    norm = (it.title or "").lower().strip()
+                    if it.external_id not in seen_ids and norm not in seen_titles and it.image_url:
+                        seen_ids.add(it.external_id)
+                        seen_titles.add(norm)
+                        results.append(it)
+                    if len(results) >= 24:
+                        break
+            except Exception:
+                continue
+            if len(results) >= 24:
+                break
+
+        if results:
+            ComicVineService._trending_comics_cache[cache_key] = (now_ts, results)
+        return results
+

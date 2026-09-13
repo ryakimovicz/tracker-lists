@@ -518,17 +518,35 @@ class TVMazeService:
         return results
 
     @staticmethod
-    def get_trending_shows() -> List[SearchResultItem]:
-        # TVMaze doesn't have a direct trending endpoint, we can use shows sorted by weight/rating
+    def get_trending_series() -> List[SearchResultItem]:
+        cache_key = "tvmaze_trending_series_v2"
+        now_ts = time.time()
+        if cache_key in TVMazeService._schedule_cache:
+            ts, data = TVMazeService._schedule_cache[cache_key]
+            if now_ts - ts < 14400:  # 4 hours
+                return data
+
         import json, urllib.request
         url = "https://api.tvmaze.com/shows"
         req = urllib.request.Request(url, headers={"User-Agent": "TrackerLists/1.0"})
         results = []
         try:
-            with urllib.request.urlopen(req, timeout=5) as response:
+            with urllib.request.urlopen(req, timeout=6) as response:
                 if response.status == 200:
                     data = json.loads(response.read().decode())
-                    sorted_shows = sorted(data, key=lambda x: x.get("weight", 0), reverse=True)[:15]
+                    series_list = []
+                    for show in data:
+                        network = show.get("network") if isinstance(show.get("network"), dict) else {}
+                        web_channel = show.get("webChannel") if isinstance(show.get("webChannel"), dict) else {}
+                        net_country = (network.get("country") or {}).get("code") if isinstance(network.get("country"), dict) else None
+                        web_country = (web_channel.get("country") or {}).get("code") if isinstance(web_channel.get("country"), dict) else None
+                        country_code = net_country or web_country
+                        genres = show.get("genres") or []
+                        is_anime = (country_code == "JP" and show.get("type") == "Animation") or "Anime" in genres
+                        if not is_anime:
+                            series_list.append(show)
+
+                    sorted_shows = sorted(series_list, key=lambda x: (x.get("weight", 0), (x.get("rating") or {}).get("average") or 0), reverse=True)[:24]
                     for show in sorted_shows:
                         image_data = show.get("image")
                         image_url = image_data.get("original") or image_data.get("medium") if image_data else None
@@ -542,8 +560,76 @@ class TVMazeService:
                             release_date=premiered,
                             popularity=show.get("weight", 0)
                         ))
+                    if results:
+                        TVMazeService._schedule_cache[cache_key] = (now_ts, results)
                     return results
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"Error fetching trending series from TVMaze: {e}")
         return []
+
+    @staticmethod
+    def get_trending_anime() -> List[SearchResultItem]:
+        cache_key = "tvmaze_trending_anime_v2"
+        now_ts = time.time()
+        if cache_key in TVMazeService._schedule_cache:
+            ts, data = TVMazeService._schedule_cache[cache_key]
+            if now_ts - ts < 14400:  # 4 hours
+                return data
+
+        import json, urllib.request, datetime
+        today = datetime.date.today()
+        # Fetch upcoming/recent schedule + shows endpoint to find high weight anime
+        dates = [(today - datetime.timedelta(days=i)).strftime("%Y-%m-%d") for i in range(7)]
+        urls = [
+            "https://api.tvmaze.com/schedule/web",
+            "https://api.tvmaze.com/schedule?country=JP",
+            "https://api.tvmaze.com/shows"
+        ]
+        for d in dates[:3]:
+            urls.append(f"https://api.tvmaze.com/schedule/web?date={d}")
+            urls.append(f"https://api.tvmaze.com/schedule?date={d}&country=JP")
+
+        anime_map = {}
+        for u in urls:
+            try:
+                req = urllib.request.Request(u, headers={"User-Agent": "TrackerLists/1.0"})
+                with urllib.request.urlopen(req, timeout=4) as response:
+                    if response.status == 200:
+                        data = json.loads(response.read().decode())
+                        for item in data:
+                            show = item.get("_embedded", {}).get("show") if "_embedded" in item else item.get("show") or item
+                            if not show or not isinstance(show, dict) or not show.get("id"):
+                                continue
+                            network = show.get("network") or {}
+                            web_channel = show.get("webChannel") or {}
+                            country_code = network.get("country", {}).get("code") or web_channel.get("country", {}).get("code")
+                            genres = show.get("genres") or []
+                            is_anime = (country_code == "JP" and show.get("type") == "Animation") or "Anime" in genres
+                            if is_anime:
+                                sid = show.get("id")
+                                if sid not in anime_map or show.get("weight", 0) > anime_map[sid].get("weight", 0):
+                                    anime_map[sid] = show
+            except Exception:
+                continue
+
+        sorted_anime = sorted(anime_map.values(), key=lambda x: (x.get("weight", 0), (x.get("rating") or {}).get("average") or 0), reverse=True)[:24]
+        results = []
+        for show in sorted_anime:
+            image_data = show.get("image")
+            image_url = image_data.get("original") or image_data.get("medium") if image_data else None
+            premiered = show.get("premiered")
+            results.append(SearchResultItem(
+                external_id=f"tvm_{show.get('id')}",
+                title=show.get("name"),
+                image_url=image_url,
+                description=show.get("summary", ""),
+                item_type="anime",
+                release_date=premiered,
+                popularity=show.get("weight", 0)
+            ))
+
+        if results:
+            TVMazeService._schedule_cache[cache_key] = (now_ts, results)
+        return results
+
 

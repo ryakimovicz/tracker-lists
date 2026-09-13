@@ -12,7 +12,7 @@ import { ProModal } from '../components/ProModal';
 import { getOrderedCategories, sortFilterTabs } from '../utils/categoryOrder';
 import { prefetchMediaDetails } from '../utils/prefetch';
 
-import { Search as SearchIcon, AlertCircle, CheckCircle, Plus, X, Heart, Star, Users, BookOpen, Package, Puzzle, Sparkles, Gamepad2, Trash2 } from 'lucide-react';
+import { Search as SearchIcon, AlertCircle, CheckCircle, Plus, X, Heart, Star, Users, BookOpen, Package, Puzzle, Sparkles, Gamepad2, Trash2, Flame, TrendingUp } from 'lucide-react';
 
 interface SearchResultItem {
   external_id: string;
@@ -213,23 +213,14 @@ export const Search: React.FC = () => {
 
   const [exploreData, setExploreData] = useState<any>(null);
   const [loadingExplore, setLoadingExplore] = useState(false);
+  const [exploreSubTab, setExploreSubTab] = useState<'nuevo' | 'tendencias'>('nuevo');
 
-  const exploreCategories = React.useMemo(() => {
-    const items = exploreData?.nuevo || [];
-    if (items.length === 0) return [];
-
+  const buildCategorizedList = (items: any[]) => {
+    if (!items || items.length === 0) return [];
     const grouped: Record<string, any[]> = {};
     items.forEach((item: any) => {
       if (!grouped[item.item_type]) grouped[item.item_type] = [];
       grouped[item.item_type].push(item);
-    });
-
-    Object.keys(grouped).forEach(key => {
-      grouped[key].sort((a, b) => {
-        if (!a.release_date) return 1;
-        if (!b.release_date) return -1;
-        return new Date(b.release_date).getTime() - new Date(a.release_date).getTime();
-      });
     });
 
     const categoryOrder = getOrderedCategories(user?.category_order);
@@ -244,12 +235,31 @@ export const Search: React.FC = () => {
              type === 'game' ? (language === 'es' ? 'Juegos' : 'Games') : type,
       items: grouped[type] || []
     })).filter(g => g.items.length > 0);
+  };
+
+  const exploreNewCategories = React.useMemo(() => {
+    const items = exploreData?.nuevo || [];
+    const cats = buildCategorizedList(items);
+    cats.forEach(c => {
+      c.items.sort((a, b) => {
+        if (!a.release_date) return 1;
+        if (!b.release_date) return -1;
+        return new Date(b.release_date).getTime() - new Date(a.release_date).getTime();
+      });
+    });
+    return cats;
+  }, [exploreData, language, user?.category_order]);
+
+  const exploreTrendingCategories = React.useMemo(() => {
+    const items = exploreData?.tendencias || [];
+    return buildCategorizedList(items);
   }, [exploreData, language, user?.category_order]);
 
   const filteredExploreCategories = React.useMemo(() => {
-    if (activeTab === 'all') return exploreCategories;
-    return exploreCategories.filter(cat => cat.type === activeTab);
-  }, [exploreCategories, activeTab]);
+    const targetCats = exploreSubTab === 'tendencias' ? exploreTrendingCategories : exploreNewCategories;
+    if (activeTab === 'all') return targetCats;
+    return targetCats.filter(cat => cat.type === activeTab);
+  }, [exploreSubTab, exploreTrendingCategories, exploreNewCategories, activeTab]);
 
   const getCategoryLabel = (cat: string) => {
     switch (cat) {
@@ -851,17 +861,52 @@ export const Search: React.FC = () => {
       {submittedQuery === '' ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', marginTop: '1rem' }}>
           
-          <div style={{ display: "flex", gap: "2rem", borderBottom: "1px solid var(--border-color)", paddingBottom: "0.5rem", position: "relative" }}>
-            <div 
+          <div style={{ display: "flex", alignItems: "center", gap: "1.5rem", borderBottom: "1px solid var(--border-color)", paddingBottom: "0.25rem", position: "relative" }}>
+            <button 
+              onClick={() => setExploreSubTab('nuevo')}
               style={{
-                fontSize: "1.1rem", fontWeight: 600,
-                color: "var(--text-primary)",
-                padding: "0.5rem 0", position: "relative"
+                fontSize: "1.05rem", fontWeight: exploreSubTab === 'nuevo' ? 700 : 500,
+                color: exploreSubTab === 'nuevo' ? "var(--text-primary)" : "var(--text-secondary)",
+                background: "transparent",
+                border: "none",
+                cursor: "pointer",
+                padding: "0.4rem 0.2rem",
+                position: "relative",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.45rem",
+                transition: "all 0.2s ease"
               }}
             >
-              {t('exploreNew')}
-              <div style={{ position: "absolute", bottom: "-0.5rem", left: 0, right: 0, height: "2px", background: "var(--accent-primary)" }} />
-            </div>
+              <Sparkles size={17} color={exploreSubTab === 'nuevo' ? "var(--accent-primary)" : "currentColor"} />
+              <span>{t('exploreNew')}</span>
+              {exploreSubTab === 'nuevo' && (
+                <div style={{ position: "absolute", bottom: "-0.3rem", left: 0, right: 0, height: "2.5px", background: "var(--accent-primary)", borderRadius: "3px" }} />
+              )}
+            </button>
+
+            <button 
+              onClick={() => setExploreSubTab('tendencias')}
+              style={{
+                fontSize: "1.05rem", fontWeight: exploreSubTab === 'tendencias' ? 700 : 500,
+                color: exploreSubTab === 'tendencias' ? "var(--text-primary)" : "var(--text-secondary)",
+                background: "transparent",
+                border: "none",
+                cursor: "pointer",
+                padding: "0.4rem 0.2rem",
+                position: "relative",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.45rem",
+                transition: "all 0.2s ease"
+              }}
+            >
+              <Flame size={17} color={exploreSubTab === 'tendencias' ? "#f97316" : "currentColor"} />
+              <span>{t('exploreTrending')}</span>
+              {exploreSubTab === 'tendencias' && (
+                <div style={{ position: "absolute", bottom: "-0.3rem", left: 0, right: 0, height: "2.5px", background: "#f97316", borderRadius: "3px" }} />
+              )}
+            </button>
           </div>
 
           <ExploreSection
