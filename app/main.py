@@ -127,38 +127,39 @@ def auto_migrate_schema():
                         logger.info(f"Auto-migration: Added column '{col_name}' to media_reviews table.")
                     except Exception as e:
                         logger.warning(f"Auto-migration: Failed to add column '{col_name}' to media_reviews: {e}")
-            try:
-                with engine.begin() as conn:
-                    table_sql_res = conn.execute(text("SELECT sql FROM sqlite_master WHERE type='table' AND name='media_reviews';")).fetchone()
-                    if table_sql_res and "uq_user_item_review" in table_sql_res[0]:
-                        conn.execute(text("PRAGMA foreign_keys=off;"))
-                        conn.execute(text("""
-                            CREATE TABLE media_reviews_new (
-                                id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-                                user_id INTEGER NOT NULL,
-                                item_type VARCHAR(50) NOT NULL,
-                                external_id VARCHAR(100) NOT NULL,
-                                rating INTEGER,
-                                content TEXT,
-                                media_url VARCHAR(500),
-                                media_type VARCHAR(50),
-                                is_edited TIMESTAMP,
-                                created_at DATETIME NOT NULL,
-                                parent_id INTEGER REFERENCES media_reviews_new(id) ON DELETE CASCADE,
-                                FOREIGN KEY(user_id) REFERENCES users (id) ON DELETE CASCADE
-                            );
-                        """))
-                        conn.execute(text("""
-                            INSERT INTO media_reviews_new (id, user_id, item_type, external_id, rating, content, media_url, media_type, is_edited, created_at, parent_id)
-                            SELECT id, user_id, item_type, external_id, rating, content, media_url, media_type, is_edited, created_at, parent_id FROM media_reviews;
-                        """))
-                        conn.execute(text("DROP TABLE media_reviews;"))
-                        conn.execute(text("ALTER TABLE media_reviews_new RENAME TO media_reviews;"))
-                        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_media_reviews_id ON media_reviews (id);"))
-                        conn.execute(text("PRAGMA foreign_keys=on;"))
-                        logger.info("Auto-migration: Rebuilt media_reviews table to drop uq_user_item_review constraint.")
-            except Exception as e:
-                logger.warning(f"Auto-migration: Note on dropping constraint: {e}")
+            if engine.dialect.name == "sqlite":
+                try:
+                    with engine.begin() as conn:
+                        table_sql_res = conn.execute(text("SELECT sql FROM sqlite_master WHERE type='table' AND name='media_reviews';")).fetchone()
+                        if table_sql_res and "uq_user_item_review" in table_sql_res[0]:
+                            conn.execute(text("PRAGMA foreign_keys=off;"))
+                            conn.execute(text("""
+                                CREATE TABLE media_reviews_new (
+                                    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                                    user_id INTEGER NOT NULL,
+                                    item_type VARCHAR(50) NOT NULL,
+                                    external_id VARCHAR(100) NOT NULL,
+                                    rating INTEGER,
+                                    content TEXT,
+                                    media_url VARCHAR(500),
+                                    media_type VARCHAR(50),
+                                    is_edited TIMESTAMP,
+                                    created_at DATETIME NOT NULL,
+                                    parent_id INTEGER REFERENCES media_reviews_new(id) ON DELETE CASCADE,
+                                    FOREIGN KEY(user_id) REFERENCES users (id) ON DELETE CASCADE
+                                );
+                            """))
+                            conn.execute(text("""
+                                INSERT INTO media_reviews_new (id, user_id, item_type, external_id, rating, content, media_url, media_type, is_edited, created_at, parent_id)
+                                SELECT id, user_id, item_type, external_id, rating, content, media_url, media_type, is_edited, created_at, parent_id FROM media_reviews;
+                            """))
+                            conn.execute(text("DROP TABLE media_reviews;"))
+                            conn.execute(text("ALTER TABLE media_reviews_new RENAME TO media_reviews;"))
+                            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_media_reviews_id ON media_reviews (id);"))
+                            conn.execute(text("PRAGMA foreign_keys=on;"))
+                            logger.info("Auto-migration: Rebuilt media_reviews table to drop uq_user_item_review constraint.")
+                except Exception as e:
+                    logger.warning(f"Auto-migration: Note on dropping constraint: {e}")
     except Exception as e:
         logger.error(f"Error during schema inspection migration: {e}")
 
