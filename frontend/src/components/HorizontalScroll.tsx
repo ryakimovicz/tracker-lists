@@ -153,6 +153,23 @@ export const HorizontalScroll: React.FC<HorizontalScrollProps> = ({ children, ti
               {children}
             </div>
 
+            {/* Left fade click-blocking zone */}
+            {canScrollLeft && (
+              <div 
+                style={{
+                  position: "absolute",
+                  left: 0,
+                  top: title ? "3rem" : 0,
+                  bottom: 0,
+                  width: "75px",
+                  zIndex: 8,
+                  pointerEvents: "auto",
+                  cursor: "default"
+                }}
+                onClick={(e) => e.stopPropagation()}
+              />
+            )}
+
             <button 
               onClick={() => scroll("right")}
               onMouseEnter={handleMouseEnter}
@@ -170,6 +187,23 @@ export const HorizontalScroll: React.FC<HorizontalScrollProps> = ({ children, ti
             >
               <ChevronRight size={20} color="currentColor" />
             </button>
+
+            {/* Right fade click-blocking zone */}
+            {canScrollRight && (
+              <div 
+                style={{
+                  position: "absolute",
+                  right: 0,
+                  top: title ? "3rem" : 0,
+                  bottom: 0,
+                  width: "75px",
+                  zIndex: 8,
+                  pointerEvents: "auto",
+                  cursor: "default"
+                }}
+                onClick={(e) => e.stopPropagation()}
+              />
+            )}
           </>
         );
       })()}
