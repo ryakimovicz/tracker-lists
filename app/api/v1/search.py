@@ -43,19 +43,19 @@ def get_query_variations(q: str) -> List[str]:
             if v_norm and v_norm.lower() not in [x.lower() for x in variations]:
                 variations.append(v_norm)
 
-    # 2. Smart auto-completion / prefix expansion
-    if len(clean_q) >= 2:
+    # 2. Smart auto-completion / prefix expansion only for short queries (< 4 chars)
+    if 2 <= len(clean_q) <= 4:
         try:
             url = f'https://suggestqueries.google.com/complete/search?client=firefox&q={urllib.parse.quote(clean_q)}'
             req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
-            with urllib.request.urlopen(req, timeout=1.5) as res:
+            with urllib.request.urlopen(req, timeout=0.4) as res:
                 data = json.loads(res.read().decode())
                 if len(data) > 1 and isinstance(data[1], list):
                     for sug in data[1]:
                         sug_clean = re.sub(r'\s+(reparto|cast|pelicula|trailer|personajes|serie|libros|sin relleno|online|ver|completa|estreno)$', '', sug.strip(), flags=re.IGNORECASE).strip()
                         if sug_clean and len(sug_clean) >= 2 and sug_clean.lower() not in [x.lower() for x in variations]:
                             variations.append(sug_clean)
-                            if len(variations) >= 5:
+                            if len(variations) >= 3:
                                 break
         except Exception:
             pass
@@ -171,6 +171,7 @@ def search_media(
     variations = [v for v in get_query_variations(q) if is_safe_text(v)]
     if not variations:
         return []
+    variations = variations[:3]
 
     combined = []
     seen = set()
@@ -195,17 +196,26 @@ def search_media(
     from app.models.social import BlockedMediaItem
     blocked_ids = {b.external_id for b in db.query(BlockedMediaItem.external_id).all()}
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, len(variations))) as executor:
-        future_to_var = {executor.submit(fetch_var, var): var for var in variations}
-        for future in concurrent.futures.as_completed(future_to_var):
-            try:
-                res = future.result()
-                for r in res:
-                    if r.external_id not in seen and r.external_id not in blocked_ids and is_safe_media_item(r.title, r.description):
-                        seen.add(r.external_id)
-                        combined.append(r)
-            except Exception as e:
-                print(f"Error fetching var {future_to_var[future]}: {e}")
+    # 1. First fetch the primary query
+    primary_results = fetch_var(variations[0])
+    for r in primary_results:
+        if r.external_id not in seen and r.external_id not in blocked_ids and is_safe_media_item(r.title, r.description):
+            seen.add(r.external_id)
+            combined.append(r)
+
+    # 2. Only if few results (< 5) and more variations exist, fetch the remaining variations
+    if len(combined) < 5 and len(variations) > 1:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=len(variations) - 1) as executor:
+            future_to_var = {executor.submit(fetch_var, var): var for var in variations[1:]}
+            for future in concurrent.futures.as_completed(future_to_var):
+                try:
+                    res = future.result()
+                    for r in res:
+                        if r.external_id not in seen and r.external_id not in blocked_ids and is_safe_media_item(r.title, r.description):
+                            seen.add(r.external_id)
+                            combined.append(r)
+                except Exception as e:
+                    print(f"Error fetching var {future_to_var[future]}: {e}")
 
     combined = rank_search_results(combined, q, variations)
     _SEARCH_QUERY_CACHE[cache_key] = (now_ts, combined)

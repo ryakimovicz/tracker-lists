@@ -246,6 +246,26 @@ export const Search: React.FC = () => {
     })).filter(g => g.items.length > 0);
   }, [exploreData, language, user?.category_order]);
 
+  const filteredExploreCategories = React.useMemo(() => {
+    if (activeTab === 'all') return exploreCategories;
+    return exploreCategories.filter(cat => cat.type === activeTab);
+  }, [exploreCategories, activeTab]);
+
+  const getCategoryLabel = (cat: string) => {
+    switch (cat) {
+      case 'movie': return language === 'es' ? 'Películas' : 'Movies';
+      case 'series': return language === 'es' ? 'Series' : 'Shows';
+      case 'anime': return 'Anime';
+      case 'book': return language === 'es' ? 'Libros' : 'Books';
+      case 'comic': return language === 'es' ? 'Cómics' : 'Comics';
+      case 'manga': return 'Mangas';
+      case 'game': return language === 'es' ? 'Juegos' : 'Games';
+      case 'user': return language === 'es' ? 'Usuarios' : 'Users';
+      case 'guide': return language === 'es' ? 'Guías' : 'Guides';
+      default: return language === 'es' ? 'Todo' : 'All';
+    }
+  };
+
   // Shelf tracking states
   const [shelfItems, setShelfItems] = useState<any[]>([]);
   const [itemToRemoveFromShelf, setItemToRemoveFromShelf] = useState<any | null>(null);
@@ -330,8 +350,8 @@ export const Search: React.FC = () => {
     }
   }, [submittedQuery]);
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSearch = async (e?: React.FormEvent, overrideTab?: string) => {
+    if (e) e.preventDefault();
     const cleanQuery = query.trim();
     if (!cleanQuery) {
       setSubmittedQuery('');
@@ -339,34 +359,56 @@ export const Search: React.FC = () => {
       return;
     }
 
+    const currentTab = overrideTab || activeTab;
     setSubmittedQuery(cleanQuery);
     setIsSearching(true);
     setErrorMsg('');
 
     try {
-      // 1. If currently in a specific category tab (e.g. game, movie, book), search it first for ultra-fast instant response!
-      if (activeTab !== 'all' && ['comic', 'book', 'manga', 'game', 'movie', 'anime', 'series'].includes(activeTab)) {
-        apiClient.get('/search/', {
-          params: { q: cleanQuery, type: activeTab }
-        }).then(fastRes => {
-          if (Array.isArray(fastRes.data) && fastRes.data.length > 0) {
-            setResults(prev => {
-              // Merge without duplicates if /search/all hasn't finished yet
-              const existingIds = new Set(prev.map(p => p.external_id));
-              const newItems = fastRes.data.filter((item: SearchResultItem) => !existingIds.has(item.external_id));
-              return [...prev, ...newItems];
-            });
-          }
-        }).catch(() => {});
-      }
+      if (currentTab !== 'all' && ['comic', 'book', 'manga', 'game', 'movie', 'anime', 'series'].includes(currentTab)) {
+        // 1. Fetch only the active category first (Super fast: ~150ms response)
+        const primaryRes = await apiClient.get('/search/', {
+          params: { q: cleanQuery, type: currentTab }
+        });
+        const initialData = Array.isArray(primaryRes.data) ? primaryRes.data : [];
+        setResults(initialData);
+        setIsSearching(false);
+        if (initialData.length > 0) {
+          initialData.slice(0, 8).forEach((r: any) => prefetchMediaDetails(r));
+        }
 
-      // 2. Fetch full global results across all providers in parallel
-      const response = await apiClient.get('/search/all', {
-        params: { q: cleanQuery }
-      });
-      setResults(response.data);
-      if (Array.isArray(response.data)) {
-        response.data.slice(0, 8).forEach((r: any) => prefetchMediaDetails(r));
+        // 2. In background, fetch the rest of categories silently
+        const otherTypes = ['movie', 'series', 'anime', 'game', 'book', 'comic', 'manga'].filter(t => t !== currentTab);
+        Promise.allSettled(
+          otherTypes.map(t => apiClient.get('/search/', { params: { q: cleanQuery, type: t } }))
+        ).then(resultsArr => {
+          setResults(prev => {
+            const existingIds = new Set(prev.map(p => p.external_id));
+            const newItems: SearchResultItem[] = [];
+            resultsArr.forEach(resObj => {
+              if (resObj.status === 'fulfilled' && Array.isArray(resObj.value.data)) {
+                resObj.value.data.forEach((item: SearchResultItem) => {
+                  if (!existingIds.has(item.external_id)) {
+                    existingIds.add(item.external_id);
+                    newItems.push(item);
+                  }
+                });
+              }
+            });
+            return [...prev, ...newItems];
+          });
+        }).catch(() => {});
+
+      } else {
+        // 'all', 'user', or 'guide'
+        const response = await apiClient.get('/search/all', {
+          params: { q: cleanQuery }
+        });
+        setResults(response.data);
+        setIsSearching(false);
+        if (Array.isArray(response.data)) {
+          response.data.slice(0, 8).forEach((r: any) => prefetchMediaDetails(r));
+        }
       }
     } catch (err: any) {
       if (err.response?.status === 429) {
@@ -374,8 +416,28 @@ export const Search: React.FC = () => {
       } else {
         setErrorMsg(t('errSearchFailed'));
       }
-    } finally {
       setIsSearching(false);
+    }
+  };
+
+  const handleTabClick = (tabValue: any) => {
+    setActiveTab(tabValue);
+    // If a search query is already active and we don't have results for this tab yet, fetch on-demand
+    if (submittedQuery && tabValue !== 'all' && ['comic', 'book', 'manga', 'game', 'movie', 'anime', 'series'].includes(tabValue)) {
+      const hasItemsForTab = results.some(r => r.item_type === tabValue);
+      if (!hasItemsForTab) {
+        apiClient.get('/search/', {
+          params: { q: submittedQuery, type: tabValue }
+        }).then(res => {
+          if (Array.isArray(res.data) && res.data.length > 0) {
+            setResults(prev => {
+              const existingIds = new Set(prev.map(p => p.external_id));
+              const newItems = res.data.filter((item: SearchResultItem) => !existingIds.has(item.external_id));
+              return [...prev, ...newItems];
+            });
+          }
+        }).catch(() => {});
+      }
     }
   };
 
@@ -620,7 +682,7 @@ export const Search: React.FC = () => {
     <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '2rem 0', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
       
       {/* Search Header Form */}
-      <section className="glass-card" style={{ padding: '2.5rem', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+      <section className="glass-card" style={{ padding: '2rem 2.5rem', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
         <h2>{t('searchTitle')}</h2>
         
         <form onSubmit={handleSearch} style={{ display: 'flex', gap: '1rem' }}>
@@ -629,7 +691,9 @@ export const Search: React.FC = () => {
               type="text"
               required
               className="input-field"
-              placeholder={t('searchPlaceholder')}
+              placeholder={activeTab === 'all' 
+                ? t('searchPlaceholder')
+                : (language === 'es' ? `Buscar en ${getCategoryLabel(activeTab)}...` : `Search in ${getCategoryLabel(activeTab)}...`)}
               value={query}
               onChange={(e) => {
                 const val = e.target.value;
@@ -648,58 +712,14 @@ export const Search: React.FC = () => {
             {isSearching ? '...' : t('searchButton')}
           </button>
         </form>
-      </section>
 
-      {submittedQuery === '' ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', marginTop: '1rem' }}>
-          
-          <div style={{ display: "flex", gap: "2rem", borderBottom: "1px solid var(--border-color)", paddingBottom: "0.5rem", position: "relative" }}>
-            <div 
-              style={{
-                fontSize: "1.1rem", fontWeight: 600,
-                color: "var(--text-primary)",
-                padding: "0.5rem 0", position: "relative"
-              }}
-            >
-              {t('exploreNew')}
-              <div style={{ position: "absolute", bottom: "-0.5rem", left: 0, right: 0, height: "2px", background: "var(--accent-primary)" }} />
-            </div>
-          </div>
-
-          <ExploreSection
-            loading={loadingExplore}
-            categories={exploreCategories}
-            language={language}
-            currentUser={currentUser}
-            onOpenItem={handleOpenItemDetails}
-            getTagClass={getTagClass}
-          />
-        </div>
-      ) : (
-        <>
-
-      {errorMsg && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', padding: '0.75rem', borderRadius: 8, fontSize: '0.9rem', textAlign: 'left' }}>
-          <AlertCircle size={18} />
-          <span>{errorMsg}</span>
-        </div>
-      )}
-
-      {successMsg && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', padding: '0.75rem', borderRadius: 8, fontSize: '0.9rem', textAlign: 'left' }}>
-          <CheckCircle size={18} />
-          <span>{successMsg}</span>
-        </div>
-      )}
-
-      {/* Horizontal Scrollable Tabs */}
-      {results.length > 0 && (
+        {/* Permanent Category Tabs */}
         <div style={{
           display: 'flex',
           gap: '0.5rem',
           overflowX: 'auto',
-          paddingBottom: '0.75rem',
-          borderBottom: '1px solid var(--border-color)',
+          paddingTop: '0.25rem',
+          paddingBottom: '0.25rem',
           WebkitOverflowScrolling: 'touch'
         }}>
           {sortFilterTabs([
@@ -728,7 +748,7 @@ export const Search: React.FC = () => {
               <button
                 key={tab.value}
                 type="button"
-                onClick={() => setActiveTab(tab.value as any)}
+                onClick={() => handleTabClick(tab.value as any)}
                 className={`profile-category-tab ${isSelected ? 'selected' : ''}`}
                 style={{
                   padding: '0.35rem 0.85rem',
@@ -741,6 +761,48 @@ export const Search: React.FC = () => {
               </button>
             );
           })}
+        </div>
+      </section>
+
+      {submittedQuery === '' ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', marginTop: '1rem' }}>
+          
+          <div style={{ display: "flex", gap: "2rem", borderBottom: "1px solid var(--border-color)", paddingBottom: "0.5rem", position: "relative" }}>
+            <div 
+              style={{
+                fontSize: "1.1rem", fontWeight: 600,
+                color: "var(--text-primary)",
+                padding: "0.5rem 0", position: "relative"
+              }}
+            >
+              {t('exploreNew')}
+              <div style={{ position: "absolute", bottom: "-0.5rem", left: 0, right: 0, height: "2px", background: "var(--accent-primary)" }} />
+            </div>
+          </div>
+
+          <ExploreSection
+            loading={loadingExplore}
+            categories={filteredExploreCategories}
+            language={language}
+            currentUser={currentUser}
+            onOpenItem={handleOpenItemDetails}
+            getTagClass={getTagClass}
+          />
+        </div>
+      ) : (
+        <>
+
+      {errorMsg && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', padding: '0.75rem', borderRadius: 8, fontSize: '0.9rem', textAlign: 'left' }}>
+          <AlertCircle size={18} />
+          <span>{errorMsg}</span>
+        </div>
+      )}
+
+      {successMsg && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', padding: '0.75rem', borderRadius: 8, fontSize: '0.9rem', textAlign: 'left' }}>
+          <CheckCircle size={18} />
+          <span>{successMsg}</span>
         </div>
       )}
 

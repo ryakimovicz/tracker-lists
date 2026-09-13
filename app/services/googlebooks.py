@@ -138,11 +138,19 @@ class GoogleBooksService:
         if not query:
             return []
             
-        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-            future_google = executor.submit(GoogleBooksService.fetch_google_books, query, order_by)
-            future_ol = executor.submit(GoogleBooksService.fetch_open_library, query)
-            google_results = future_google.result()
-            ol_results = future_ol.result()
+        query_clean = query.strip().replace("-", "").replace(" ", "")
+        is_isbn = query_clean.isdigit() and len(query_clean) in (10, 13)
+
+        # 1. Fetch Google Books (ultra-fast: ~150ms)
+        google_results = GoogleBooksService.fetch_google_books(query, order_by)
+        
+        # 2. Only query Open Library if searching an explicit ISBN or if Google Books returned fewer than 2 results
+        ol_results = []
+        if is_isbn or len(google_results) < 2:
+            try:
+                ol_results = GoogleBooksService.fetch_open_library(query)
+            except Exception:
+                ol_results = []
             
         seen_isbns: Set[str] = set()
         merged_results: List[SearchResultItem] = []

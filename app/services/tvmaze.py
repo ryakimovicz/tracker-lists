@@ -19,6 +19,8 @@ _TVMAZE_SERIES_CACHE: Dict[str, tuple[float, dict]] = {}
 _TVMAZE_EPISODES_CACHE: Dict[str, tuple[float, List[dict]]] = {}
 _TVMAZE_CACHE_TTL = 3600 * 12  # 12 hours
 
+import concurrent.futures
+
 class TVMazeService:
     @staticmethod
     def get_show_akas(show_id: int) -> List[dict]:
@@ -91,48 +93,45 @@ class TVMazeService:
         
         results = []
         try:
-            with urllib.request.urlopen(req, timeout=5) as response:
+            with urllib.request.urlopen(req, timeout=4) as response:
                 if response.status == 200:
                     data = json.loads(response.read().decode())
+                    valid_shows = []
                     for item in data:
                         show = item.get("show", {})
-                        
                         raw_show_name = show.get("name") or "Untitled Show"
                         show_summary = show.get("summary") or ""
                         if not is_safe_media_item(raw_show_name, show_summary):
                             continue
 
-                        # TVMaze doesn't have a strict 'anime' genre flag that is 100% reliable,
-                        # but we can filter by language (Japanese) or genres if the user explicitly searched for anime.
                         genres = show.get("genres", [])
                         language = show.get("language", "")
                         
                         if is_anime:
-                            # Strict filter: Must be Animation AND from Japan, or explicitly have Anime genre
                             if "Anime" not in genres and language != "Japanese":
                                 continue
                         else:
-                            # Filter OUT anime if we are searching for series
                             if "Anime" in genres or language == "Japanese":
                                 continue
-                                
-                        # Use medium image if available, else original
+                        valid_shows.append(show)
+
+                    for show in valid_shows:
+                        raw_show_name = show.get("name") or "Untitled Show"
+                        show_summary = show.get("summary") or ""
                         image_data = show.get("image")
-                        image_url = None
-                        if image_data:
-                            image_url = image_data.get("original") or image_data.get("medium")
-                            
+                        image_url = (image_data.get("original") or image_data.get("medium")) if image_data else None
                         premiered = show.get("premiered")
                         release_date = premiered[:4] if premiered else None
-
                         externals = show.get("externals", {})
                         imdb_id = externals.get("imdb")
                         weight = show.get("weight")
                         pop_score = float(weight) if weight is not None else None
-
-                        # Resolve localized title if lang is 'es'
                         show_id_int = show.get("id")
-                        localized_name = TVMazeService.get_localized_title(show_id_int, raw_show_name, lang, country_code) if show_id_int else raw_show_name
+
+                        # If AKAs are already in memory cache, use them; otherwise use raw_show_name instantly
+                        localized_name = raw_show_name
+                        if show_id_int and show_id_int in _TVMAZE_AKAS_CACHE:
+                            localized_name = TVMazeService.get_localized_title(show_id_int, raw_show_name, lang, country_code)
 
                         results.append(
                             SearchResultItem(
