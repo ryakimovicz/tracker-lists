@@ -120,6 +120,12 @@ const translations: Translations = {
   searchItemAdded: { en: 'Item added to your shelf!', es: '¡Elemento añadido a tu estantería!' },
   exploreNew: { en: "What's New", es: 'Novedades' },
   exploreTrending: { en: 'Trending', es: 'Tendencias' },
+  exploreGuides: { en: 'Guides', es: 'Guías' },
+  guidesPopular: { en: 'Most Popular', es: 'Más Populares' },
+  guidesTopRated: { en: 'Top Rated', es: 'Mejor Valoradas' },
+  guidesMostSaved: { en: 'Most Saved', es: 'Más Guardadas' },
+  guidesNew: { en: 'Recently Added', es: 'Nuevas' },
+  guidesWorksCount: { en: 'works', es: 'obras' },
   errRateLimit: { en: 'Too many search requests. Please wait a minute.', es: 'Demasiadas búsquedas. Por favor espera un minuto.' },
   errSearchFailed: { en: 'Search failed. Please try again.', es: 'Error al realizar la búsqueda. Inténtalo de nuevo.' },
 

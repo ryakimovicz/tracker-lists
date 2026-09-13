@@ -12,7 +12,7 @@ import { ProModal } from '../components/ProModal';
 import { getOrderedCategories, sortFilterTabs } from '../utils/categoryOrder';
 import { prefetchMediaDetails } from '../utils/prefetch';
 
-import { Search as SearchIcon, AlertCircle, CheckCircle, Plus, X, Heart, Star, Users, BookOpen, Package, Puzzle, Sparkles, Gamepad2, Trash2, Flame, TrendingUp } from 'lucide-react';
+import { Search as SearchIcon, AlertCircle, CheckCircle, Plus, X, Heart, Star, Users, BookOpen, Package, Puzzle, Sparkles, Gamepad2, Trash2, Flame, TrendingUp, Trophy, Bookmark, Film, Tv, Book, Layers } from 'lucide-react';
 
 interface SearchResultItem {
   external_id: string;
@@ -177,6 +177,247 @@ const ExploreSection = React.memo<ExploreSectionProps>(({
   );
 });
 
+interface ExploreGuidesSectionProps {
+  loading: boolean;
+  guidesData: any;
+  language: string;
+  t: (key: string) => string;
+  navigate: (path: string) => void;
+}
+
+const ExploreGuidesSection = React.memo<ExploreGuidesSectionProps>(({
+  loading,
+  guidesData,
+  language,
+  t,
+  navigate
+}) => {
+  if (loading) {
+    return <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '3rem' }}>{language === 'es' ? 'Cargando guías...' : 'Loading guides...'}</div>;
+  }
+
+  const rows = [
+    { 
+      key: 'populares', 
+      title: t('guidesPopular'), 
+      icon: <Flame size={18} color="#f97316" />, 
+      outlineColor: '#f97316',
+      items: guidesData?.populares || [] 
+    },
+    { 
+      key: 'mejor_valoradas', 
+      title: t('guidesTopRated'), 
+      icon: <Trophy size={18} color="#eab308" />, 
+      outlineColor: '#eab308',
+      items: guidesData?.mejor_valoradas || [] 
+    },
+    { 
+      key: 'mas_guardadas', 
+      title: t('guidesMostSaved'), 
+      icon: <Plus size={18} color="#ec4899" strokeWidth={2.5} />, 
+      outlineColor: '#ec4899',
+      items: guidesData?.mas_guardadas || [] 
+    },
+    { 
+      key: 'nuevas', 
+      title: t('guidesNew'), 
+      icon: <Sparkles size={18} color="var(--accent-primary)" />, 
+      outlineColor: 'var(--accent-primary)',
+      items: guidesData?.nuevas || [] 
+    },
+  ].filter(r => r.items.length > 0);
+
+  if (rows.length === 0) {
+    return (
+      <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '3rem 1rem' }}>
+        <BookOpen size={40} style={{ opacity: 0.4, marginBottom: '0.75rem' }} />
+        <p style={{ margin: 0 }}>{language === 'es' ? 'Aún no hay guías públicas disponibles.' : 'No public guides available yet.'}</p>
+      </div>
+    );
+  }
+
+  const renderMediaIcon = (mt: string) => {
+    switch (mt) {
+      case 'movie':
+        return <span key={mt} style={{ display: 'inline-flex', alignItems: 'center' }} title={language === 'es' ? 'Películas' : 'Movies'}><Film size={13} color="var(--color-movie)" /></span>;
+      case 'series':
+        return <span key={mt} style={{ display: 'inline-flex', alignItems: 'center' }} title={language === 'es' ? 'Series' : 'Shows'}><Tv size={13} color="var(--color-series)" /></span>;
+      case 'anime':
+        return <span key={mt} style={{ display: 'inline-flex', alignItems: 'center' }} title="Anime"><Sparkles size={13} color="var(--color-anime)" /></span>;
+      case 'manga':
+        return <span key={mt} style={{ display: 'inline-flex', alignItems: 'center' }} title="Manga"><BookOpen size={13} color="var(--color-manga)" /></span>;
+      case 'game':
+        return <span key={mt} style={{ display: 'inline-flex', alignItems: 'center' }} title={language === 'es' ? 'Juegos' : 'Games'}><Gamepad2 size={13} color="var(--color-game)" /></span>;
+      case 'book':
+        return <span key={mt} style={{ display: 'inline-flex', alignItems: 'center' }} title={language === 'es' ? 'Libros' : 'Books'}><Book size={13} color="var(--color-book)" /></span>;
+      case 'comic':
+        return <span key={mt} style={{ display: 'inline-flex', alignItems: 'center' }} title={language === 'es' ? 'Cómics' : 'Comics'}><Layers size={13} color="var(--color-comic)" /></span>;
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+      {rows.map(row => (
+        <HorizontalScroll 
+          key={row.key} 
+          title={
+            <>
+              {row.icon}
+              <span>{row.title}</span>
+            </>
+          } 
+          outlineColor={row.outlineColor}
+        >
+          {row.items.map((guide: any) => (
+            <div
+              key={guide.id}
+              className="glass-card"
+              style={{
+                minWidth: '240px',
+                width: '240px',
+                padding: '0.85rem',
+                cursor: 'pointer',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.65rem',
+                borderRadius: '10px',
+                transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+              }}
+              onClick={() => navigate(`/list/${guide.id}`)}
+            >
+              {/* Cover Collage */}
+              <div style={{
+                position: 'relative',
+                width: '100%',
+                height: '140px',
+                borderRadius: '8px',
+                overflow: 'hidden',
+                background: 'linear-gradient(135deg, rgba(255,255,255,0.05), rgba(0,0,0,0.4))',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                {guide.covers && guide.covers.length > 0 ? (
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: guide.covers.length >= 2 ? '1fr 1fr' : '1fr',
+                    gridTemplateRows: guide.covers.length >= 3 ? '1fr 1fr' : '1fr',
+                    width: '100%',
+                    height: '100%',
+                    gap: '2px',
+                    background: '#000'
+                  }}>
+                    {guide.covers.slice(0, 4).map((img: string, cIdx: number) => (
+                      <img
+                        key={cIdx}
+                        src={img}
+                        alt=""
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover'
+                        }}
+                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', color: 'var(--text-secondary)' }}>
+                    <BookOpen size={36} color="var(--color-guide)" />
+                  </div>
+                )}
+
+                {/* Items count overlay */}
+                <div style={{
+                  position: 'absolute',
+                  bottom: '6px',
+                  right: '6px',
+                  background: 'rgba(0,0,0,0.75)',
+                  backdropFilter: 'blur(4px)',
+                  padding: '2px 7px',
+                  borderRadius: '4px',
+                  fontSize: '0.72rem',
+                  fontWeight: 600,
+                  color: '#fff'
+                }}>
+                  {guide.items_count} {t('guidesWorksCount')}
+                </div>
+              </div>
+
+              {/* Title & Creator */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', flexGrow: 1 }}>
+                <h4 style={{
+                  margin: 0,
+                  fontSize: '0.95rem',
+                  fontWeight: 600,
+                  color: 'var(--text-primary)',
+                  display: '-webkit-box',
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: 'vertical',
+                  overflow: 'hidden',
+                  lineHeight: '1.25'
+                }} title={guide.title}>
+                  {guide.title}
+                </h4>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginTop: '0.15rem' }}>
+                  <div style={{
+                    width: '18px',
+                    height: '18px',
+                    borderRadius: '50%',
+                    background: 'var(--accent-primary)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '0.65rem',
+                    fontWeight: 700,
+                    color: '#fff',
+                    overflow: 'hidden',
+                    flexShrink: 0
+                  }}>
+                    {guide.creator_photo_url ? (
+                      <img src={guide.creator_photo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      guide.creator_username?.charAt(0).toUpperCase() || 'P'
+                    )}
+                  </div>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {guide.creator_username}
+                  </span>
+                </div>
+              </div>
+
+              {/* Badges & Metrics Footer */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '0.4rem', marginTop: 'auto' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  {guide.media_types?.map((mt: string) => renderMediaIcon(mt))}
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                  {guide.average_rating != null && (
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '2px', color: '#eab308', fontWeight: 600 }}>
+                      <Star size={12} fill="#eab308" color="#eab308" />
+                      {guide.average_rating}
+                    </span>
+                  )}
+                  {guide.saves_count > 0 && (
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '2px', color: '#ec4899', fontWeight: 600 }} title={language === 'es' ? 'Guardados' : 'Saved'}>
+                      <Plus size={12} strokeWidth={2.5} />
+                      {guide.saves_count}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </HorizontalScroll>
+      ))}
+    </div>
+  );
+});
+
 export const Search: React.FC = () => {
   const { user } = useAuth();
   const { t, language } = useTranslation();
@@ -213,7 +454,9 @@ export const Search: React.FC = () => {
 
   const [exploreData, setExploreData] = useState<any>(null);
   const [loadingExplore, setLoadingExplore] = useState(false);
-  const [exploreSubTab, setExploreSubTab] = useState<'nuevo' | 'tendencias'>('nuevo');
+  const [exploreSubTab, setExploreSubTab] = useState<'nuevo' | 'tendencias' | 'guias'>('nuevo');
+  const [guidesData, setGuidesData] = useState<any>(null);
+  const [loadingGuides, setLoadingGuides] = useState(false);
 
   const buildCategorizedList = (items: any[]) => {
     if (!items || items.length === 0) return [];
@@ -359,6 +602,32 @@ export const Search: React.FC = () => {
       fetchExplore();
     }
   }, [submittedQuery]);
+
+  useEffect(() => {
+    if (submittedQuery === '' && exploreSubTab === 'guias' && !guidesData) {
+      const fetchGuides = async () => {
+        const cachedRaw = sessionStorage.getItem('pathd_guides_explore_cache');
+        if (cachedRaw) {
+          try {
+            const parsed = JSON.parse(cachedRaw);
+            if (parsed) setGuidesData(parsed);
+          } catch (e) {}
+        } else {
+          setLoadingGuides(true);
+        }
+        try {
+          const res = await apiClient.get('/lists/explore');
+          setGuidesData(res.data);
+          sessionStorage.setItem('pathd_guides_explore_cache', JSON.stringify(res.data));
+        } catch (e) {
+          console.error("Failed to load explore guides", e);
+        } finally {
+          setLoadingGuides(false);
+        }
+      };
+      fetchGuides();
+    }
+  }, [submittedQuery, exploreSubTab, guidesData]);
 
   const debounceTimerRef = React.useRef<any>(null);
   const searchRequestIdRef = React.useRef<number>(0);
@@ -907,16 +1176,49 @@ export const Search: React.FC = () => {
                 <div style={{ position: "absolute", bottom: "-0.3rem", left: 0, right: 0, height: "2.5px", background: "#f97316", borderRadius: "3px" }} />
               )}
             </button>
+
+            <button 
+              onClick={() => setExploreSubTab('guias')}
+              style={{
+                fontSize: "1.05rem", fontWeight: exploreSubTab === 'guias' ? 700 : 500,
+                color: exploreSubTab === 'guias' ? "var(--text-primary)" : "var(--text-secondary)",
+                background: "transparent",
+                border: "none",
+                cursor: "pointer",
+                padding: "0.4rem 0.2rem",
+                position: "relative",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.45rem",
+                transition: "all 0.2s ease"
+              }}
+            >
+              <BookOpen size={17} color={exploreSubTab === 'guias' ? "var(--color-guide)" : "currentColor"} />
+              <span>{t('exploreGuides')}</span>
+              {exploreSubTab === 'guias' && (
+                <div style={{ position: "absolute", bottom: "-0.3rem", left: 0, right: 0, height: "2.5px", background: "var(--color-guide)", borderRadius: "3px" }} />
+              )}
+            </button>
           </div>
 
-          <ExploreSection
-            loading={loadingExplore}
-            categories={filteredExploreCategories}
-            language={language}
-            currentUser={currentUser}
-            onOpenItem={handleOpenItemDetails}
-            getTagClass={getTagClass}
-          />
+          {exploreSubTab === 'guias' ? (
+            <ExploreGuidesSection
+              loading={loadingGuides}
+              guidesData={guidesData}
+              language={language}
+              t={t}
+              navigate={navigate}
+            />
+          ) : (
+            <ExploreSection
+              loading={loadingExplore}
+              categories={filteredExploreCategories}
+              language={language}
+              currentUser={currentUser}
+              onOpenItem={handleOpenItemDetails}
+              getTagClass={getTagClass}
+            />
+          )}
         </div>
       ) : (
         <>

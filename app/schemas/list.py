@@ -123,3 +123,25 @@ class BulkToggleAllSeasonsRequest(BaseModel):
     completed: bool
     mark_again: bool = False
 
+class ExploreGuideItem(BaseModel):
+    id: int
+    title: str
+    description: Optional[str] = None
+    created_at: datetime
+    creator_id: Optional[int] = None
+    creator_username: Optional[str] = "Comunidad de Pathd"
+    creator_photo_url: Optional[str] = None
+    items_count: int = 0
+    saves_count: int = 0
+    votes_count: int = 0
+    average_rating: Optional[float] = None
+    covers: List[str] = []
+    media_types: List[str] = []
+
+class ExploreGuidesResponse(BaseModel):
+    populares: List[ExploreGuideItem] = []
+    mejor_valoradas: List[ExploreGuideItem] = []
+    mas_guardadas: List[ExploreGuideItem] = []
+    nuevas: List[ExploreGuideItem] = []
+
+

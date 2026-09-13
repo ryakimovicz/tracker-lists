@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface HorizontalScrollProps {
   children: React.ReactNode;
-  title?: string;
+  title?: React.ReactNode;
   outlineColor?: string;
   className?: string;
 }
@@ -64,7 +64,10 @@ export const HorizontalScroll: React.FC<HorizontalScrollProps> = ({ children, ti
             border: `2px solid ${outlineColor || "var(--border-color)"}`, 
             borderRadius: "8px", 
             padding: "0.2rem 0.75rem", 
-            background: "var(--bg-secondary)" 
+            background: "var(--bg-secondary)",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "0.45rem"
           }}>
             {title}
           </h3>

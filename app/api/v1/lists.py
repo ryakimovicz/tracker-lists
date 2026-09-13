@@ -34,10 +34,111 @@ from app.schemas.list import (
     BulkToggleRequest,
     ToggleSeriesEpisodeRequest,
     BulkToggleSeasonRequest,
-    BulkToggleAllSeasonsRequest
+    BulkToggleAllSeasonsRequest,
+    ExploreGuideItem,
+    ExploreGuidesResponse
 )
 
 router = APIRouter()
+
+# 0. Explore Guides: Populares, Mejor Valoradas, Más Guardadas, Nuevas
+@router.get("/explore", response_model=ExploreGuidesResponse)
+def get_explore_guides(db: Session = Depends(get_db)):
+    # Query all public reading lists
+    lists = db.query(ReadingList).filter(
+        ReadingList.visibility == VisibilityEnum.PUBLIC
+    ).all()
+
+    guide_items = []
+    for l in lists:
+        if len(l.items) < 2:
+            continue
+
+        covers = []
+        media_types = set()
+        for it in l.items:
+            if it.image_url and it.image_url not in covers and len(covers) < 4:
+                covers.append(it.image_url)
+            if it.item_type:
+                m_type = it.item_type.value if hasattr(it.item_type, 'value') else str(it.item_type)
+                media_types.add(m_type)
+
+        votes = l.votes or []
+        saves = l.saved_by_users or []
+        comments = l.comments or []
+
+        votes_count = len(votes)
+        saves_count = len(saves)
+        comments_count = len(comments)
+
+        avg_rating = None
+        if votes_count > 0:
+            avg_rating = round(sum(v.rating for v in votes if v.rating is not None) / votes_count, 1)
+
+        pop_score = (saves_count * 3) + (votes_count * 2) + (comments_count * 2)
+
+        creator_name = l.creator.username if l.creator else "Comunidad de Pathd"
+        creator_photo = getattr(l.creator, 'profile_image_url', None) if l.creator else None
+
+        guide_item = ExploreGuideItem(
+            id=l.id,
+            title=l.title,
+            description=l.description,
+            created_at=l.created_at,
+            creator_id=l.creator_id,
+            creator_username=creator_name,
+            creator_photo_url=creator_photo,
+            items_count=len(l.items),
+            saves_count=saves_count,
+            votes_count=votes_count,
+            average_rating=avg_rating,
+            covers=covers,
+            media_types=sorted(list(media_types))
+        )
+        guide_items.append((guide_item, pop_score, avg_rating or 0, saves_count, l.created_at))
+
+    # 1. Más Populares
+    populares = [
+        item[0] for item in sorted(
+            guide_items,
+            key=lambda x: (x[1], x[3], x[4]),
+            reverse=True
+        )[:20]
+    ]
+
+    # 2. Mejor Valoradas
+    mejor_valoradas = [
+        item[0] for item in sorted(
+            guide_items,
+            key=lambda x: (x[2], x[1], x[3]),
+            reverse=True
+        )[:20]
+    ]
+
+    # 3. Más Guardadas
+    mas_guardadas = [
+        item[0] for item in sorted(
+            guide_items,
+            key=lambda x: (x[3], x[1], x[4]),
+            reverse=True
+        )[:20]
+    ]
+
+    # 4. Nuevas
+    nuevas = [
+        item[0] for item in sorted(
+            guide_items,
+            key=lambda x: x[4],
+            reverse=True
+        )[:20]
+    ]
+
+    return ExploreGuidesResponse(
+        populares=populares,
+        mejor_valoradas=mejor_valoradas,
+        mas_guardadas=mas_guardadas,
+        nuevas=nuevas
+    )
 
 # 1. Feed: Get public lists
 @router.get("/", response_model=List[ReadingListResponse])
