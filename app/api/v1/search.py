@@ -1,4 +1,4 @@
-from typing import List, Dict, Tuple, Any
+from typing import List, Dict, Tuple, Any, Optional
 from fastapi import APIRouter, Query, HTTPException, status, Request, Depends
 from sqlalchemy.orm import Session
 from app.core.database import get_db
@@ -62,10 +62,37 @@ def get_query_variations(q: str) -> List[str]:
 
     return variations
 
-def rank_search_results(items: List[SearchResultItem], query: str, variations: List[str]) -> List[SearchResultItem]:
+def rank_search_results(
+    items: List[SearchResultItem], 
+    query: str, 
+    variations: List[str],
+    category_order: Optional[List[str]] = None
+) -> List[SearchResultItem]:
     query_clean = query.lower().strip()
     query_words = [w for w in query_clean.split() if w]
     var_terms = [v.lower().strip() for v in variations if v.lower().strip() != query_clean]
+
+    # Normalized category order for tie-breaking
+    default_cats = ["movie", "series", "anime", "book", "comic", "manga", "game", "user", "guide"]
+    cat_priority: Dict[str, int] = {}
+    if category_order:
+        for idx, cat in enumerate(category_order):
+            c_clean = str(cat).lower().strip()
+            if c_clean not in cat_priority:
+                cat_priority[c_clean] = idx
+    for cat in default_cats:
+        if cat not in cat_priority:
+            cat_priority[cat] = len(cat_priority)
+
+    def extract_year(item: SearchResultItem) -> int:
+        rd = item.release_date or ""
+        match = re.search(r'\b(19\d\d|20\d\d)\b', rd)
+        if match:
+            return int(match.group(1))
+        title_match = re.search(r'\b(19\d\d|20\d\d)\b', item.title)
+        if title_match:
+            return int(title_match.group(1))
+        return 0
 
     def calculate_score(item: SearchResultItem):
         title_clean = item.title.lower().strip()
@@ -123,6 +150,16 @@ def rank_search_results(items: List[SearchResultItem], query: str, variations: L
 
         # Popularity bonus (scaled 0-100)
         score += min(item.popularity or 0.0, 100.0)
+
+        # Subtle category preference tie-breaker (0 to 10 points bonus based on user preference)
+        cat_idx = cat_priority.get(item.item_type.lower(), 99)
+        score += max(0.0, 10.0 - (cat_idx * 1.0))
+
+        # Subtle year recency tie-breaker (up to 5 points bonus for newer releases)
+        yr = extract_year(item)
+        if yr > 1900:
+            score += min(5.0, max(0.0, (yr - 1980) * 0.1))
+
         return score
 
     items.sort(key=calculate_score, reverse=True)
@@ -313,7 +350,17 @@ def search_all_media(
                         popularity=10.0
                     ))
 
-    combined = rank_search_results(combined, q, variations)
+    user_category_order = None
+    if current_user and current_user.category_order:
+        try:
+            if current_user.category_order.startswith("["):
+                user_category_order = json.loads(current_user.category_order)
+            else:
+                user_category_order = [c.strip() for c in current_user.category_order.split(",") if c.strip()]
+        except Exception:
+            user_category_order = None
+
+    combined = rank_search_results(combined, q, variations, category_order=user_category_order)
     _SEARCH_QUERY_CACHE[cache_key] = (now_ts, combined)
     return combined
 
