@@ -23,6 +23,12 @@ export const AdBanner: React.FC<AdBannerProps> = ({
 
   const isLocalDev = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
+  // Ads are currently disabled until AdSense or sponsors are active
+  const ADS_ENABLED = false;
+  if (!ADS_ENABLED) {
+    return null;
+  }
+
   // Pro / VIP users enjoy an entirely ad-free experience
   if (!isLocalDev && (user?.is_pro || user?.is_vip || user?.is_admin)) {
     return null;

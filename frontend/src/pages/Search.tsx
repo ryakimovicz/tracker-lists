@@ -1256,13 +1256,9 @@ export const Search: React.FC = () => {
       {filteredResults.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1.5rem' }}>
-            {filteredResults.slice(0, visibleCount).map((item, index) => {
-              const shouldShowAdBefore = index === 4 || (index > 4 && (index - 4) % 8 === 0);
+            {filteredResults.slice(0, visibleCount).map((item) => {
               return (
                 <React.Fragment key={`${item.external_id}-${item.item_type}`}>
-                  {shouldShowAdBefore && (
-                    <AdBanner variant="card" style={{ width: '100%', minWidth: 'unset', height: '100%' }} />
-                  )}
                   {(() => {
               if (item.item_type === 'user') {
                 const isFollowing = followingUsers.some(u => String(u.id) === item.external_id);
