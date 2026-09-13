@@ -323,7 +323,7 @@ export const CustomizePage: React.FC = () => {
         display: 'flex',
         flexDirection: 'column',
         gap: '2.5rem',
-        maxWidth: '1000px',
+        maxWidth: '1200px',
         margin: '0 auto',
         padding: '2rem 1rem',
         ...(profile?.is_pro && profile?.profile_color ? activeProfileTheme.cssVariables : {})

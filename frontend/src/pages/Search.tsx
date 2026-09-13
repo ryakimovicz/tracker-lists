@@ -350,16 +350,19 @@ export const Search: React.FC = () => {
     }
   }, [submittedQuery]);
 
-  const handleSearch = async (e?: React.FormEvent, overrideTab?: string) => {
-    if (e) e.preventDefault();
-    const cleanQuery = query.trim();
+  const debounceTimerRef = React.useRef<any>(null);
+  const searchRequestIdRef = React.useRef<number>(0);
+
+  const executeSearch = async (targetQuery: string, currentTab: string) => {
+    const cleanQuery = targetQuery.trim();
     if (!cleanQuery) {
       setSubmittedQuery('');
       setResults([]);
+      setIsSearching(false);
       return;
     }
 
-    const currentTab = overrideTab || activeTab;
+    const currentReqId = ++searchRequestIdRef.current;
     setSubmittedQuery(cleanQuery);
     setIsSearching(true);
     setErrorMsg('');
@@ -370,6 +373,8 @@ export const Search: React.FC = () => {
         const primaryRes = await apiClient.get('/search/', {
           params: { q: cleanQuery, type: currentTab }
         });
+        if (searchRequestIdRef.current !== currentReqId) return;
+
         const initialData = Array.isArray(primaryRes.data) ? primaryRes.data : [];
         setResults(initialData);
         setIsSearching(false);
@@ -382,6 +387,7 @@ export const Search: React.FC = () => {
         Promise.allSettled(
           otherTypes.map(t => apiClient.get('/search/', { params: { q: cleanQuery, type: t } }))
         ).then(resultsArr => {
+          if (searchRequestIdRef.current !== currentReqId) return;
           setResults(prev => {
             const existingIds = new Set(prev.map(p => p.external_id));
             const newItems: SearchResultItem[] = [];
@@ -404,6 +410,7 @@ export const Search: React.FC = () => {
         const response = await apiClient.get('/search/all', {
           params: { q: cleanQuery }
         });
+        if (searchRequestIdRef.current !== currentReqId) return;
         setResults(response.data);
         setIsSearching(false);
         if (Array.isArray(response.data)) {
@@ -411,6 +418,7 @@ export const Search: React.FC = () => {
         }
       }
     } catch (err: any) {
+      if (searchRequestIdRef.current !== currentReqId) return;
       if (err.response?.status === 429) {
         setErrorMsg(t('errRateLimit'));
       } else {
@@ -420,24 +428,53 @@ export const Search: React.FC = () => {
     }
   };
 
+  // Auto-search debounce after 600ms of inactivity if query is at least 3 characters
+  useEffect(() => {
+    const cleanQuery = query.trim();
+
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+
+    if (!cleanQuery) {
+      setSubmittedQuery('');
+      setResults([]);
+      setIsSearching(false);
+      return;
+    }
+
+    if (cleanQuery.length >= 3 && cleanQuery !== submittedQuery) {
+      debounceTimerRef.current = setTimeout(() => {
+        executeSearch(cleanQuery, activeTab);
+      }, 600);
+    }
+
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, [query, activeTab]);
+
+  const handleSearch = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+    executeSearch(query, activeTab);
+  };
+
   const handleTabClick = (tabValue: any) => {
     setActiveTab(tabValue);
-    // If a search query is already active and we don't have results for this tab yet, fetch on-demand
-    if (submittedQuery && tabValue !== 'all' && ['comic', 'book', 'manga', 'game', 'movie', 'anime', 'series'].includes(tabValue)) {
-      const hasItemsForTab = results.some(r => r.item_type === tabValue);
-      if (!hasItemsForTab) {
-        apiClient.get('/search/', {
-          params: { q: submittedQuery, type: tabValue }
-        }).then(res => {
-          if (Array.isArray(res.data) && res.data.length > 0) {
-            setResults(prev => {
-              const existingIds = new Set(prev.map(p => p.external_id));
-              const newItems = res.data.filter((item: SearchResultItem) => !existingIds.has(item.external_id));
-              return [...prev, ...newItems];
-            });
-          }
-        }).catch(() => {});
+    const cleanQuery = query.trim();
+    if (cleanQuery) {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
       }
+      executeSearch(cleanQuery, tabValue);
     }
   };
 
@@ -674,12 +711,23 @@ export const Search: React.FC = () => {
     }
   };
 
+  const handleClearSearch = () => {
+    setQuery('');
+    setSubmittedQuery('');
+    setResults([]);
+    setIsSearching(false);
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+  };
+
   const normType = selectedItem ? (selectedItem.item_type === 'anime' ? 'series' : selectedItem.item_type) : '';
   const currentShelfItem = selectedItem ? shelfItems.find(x => x.external_id === selectedItem.external_id && x.item_type === selectedItem.item_type) : null;
   const isFavorite = Boolean(currentShelfItem?.is_favorite);
 
   return (
-    <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '2rem 0', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+    <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem 0', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
       
       {/* Search Header Form */}
       <section className="glass-card" style={{ padding: '2rem 2.5rem', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
@@ -703,9 +751,45 @@ export const Search: React.FC = () => {
                   setResults([]);
                 }
               }}
-              style={{ paddingLeft: '2.5rem' }}
+              style={{ paddingLeft: '2.5rem', paddingRight: query ? '2.5rem' : '1rem' }}
             />
             <SearchIcon size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)' }} />
+            {query && (
+              <button
+                type="button"
+                onClick={handleClearSearch}
+                title={language === 'es' ? 'Limpiar búsqueda' : 'Clear search'}
+                aria-label={language === 'es' ? 'Limpiar búsqueda' : 'Clear search'}
+                style={{
+                  position: 'absolute',
+                  right: '0.75rem',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '22px',
+                  height: '22px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  color: 'var(--text-muted)',
+                  padding: 0,
+                  transition: 'background 0.2s, color 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.25)';
+                  e.currentTarget.style.color = '#ffffff';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                  e.currentTarget.style.color = 'var(--text-muted)';
+                }}
+              >
+                <X size={14} />
+              </button>
+            )}
           </div>
 
           <button type="submit" disabled={isSearching} className="btn-primary" style={{ padding: '0 2.5rem' }}>

@@ -55,7 +55,7 @@ export const Social: React.FC = () => {
   }
 
   return (
-    <div style={{ maxWidth: '700px', margin: '0 auto', padding: '2rem 1rem', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+    <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem 1rem', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
       
       {/* Feed */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
