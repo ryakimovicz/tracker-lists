@@ -49,6 +49,8 @@ class LibraryItemResponse(BaseModel):
     release_date: Optional[str] = None
     tracking_list_id: Optional[int] = None
     times_completed: Optional[int] = 1
+    times_completed_standard: Optional[int] = 1
+    times_completed_hundred: Optional[int] = 0
     last_seen_episode_count: Optional[int] = 1
     completed_episodes_count: Optional[int] = 0
 

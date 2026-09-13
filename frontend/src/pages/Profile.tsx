@@ -75,6 +75,8 @@ interface LibraryItem {
   total_pages?: number;
   tracking_list_id?: number;
   times_completed?: number;
+  times_completed_standard?: number;
+  times_completed_hundred?: number;
   last_seen_episode_count?: number;
   completed_episodes_count?: number;
   release_date?: string;
@@ -1606,10 +1608,28 @@ export const Profile: React.FC = () => {
                               // Games
                               else if (item.item_type === 'game') {
                                 if (hasEverCompleted) {
-                                  if (item.is_hundred_percent) {
-                                    badges.push({ text: '100%', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.15)', isTrophy: true });
-                                  } else {
-                                    badges.push({ text: language === 'es' ? 'Completado' : 'Completed', color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)' });
+                                  const hundredRuns = item.times_completed_hundred ?? (item.is_hundred_percent ? (item.times_completed || 1) : 0);
+                                  const standardRuns = item.times_completed_standard ?? (item.is_hundred_percent ? 0 : (item.times_completed || 1));
+
+                                  // Standard completions badge
+                                  if (standardRuns > 0) {
+                                    badges.push({
+                                      text: standardRuns > 1 
+                                        ? `${language === 'es' ? 'Completado' : 'Completed'} x${standardRuns}`
+                                        : (language === 'es' ? 'Completado' : 'Completed'),
+                                      color: '#10b981',
+                                      bg: 'rgba(16, 185, 129, 0.15)'
+                                    });
+                                  }
+
+                                  // 100% completions badge
+                                  if (hundredRuns > 0) {
+                                    badges.push({
+                                      text: hundredRuns > 1 ? `100% x${hundredRuns}` : '100%',
+                                      color: '#f59e0b',
+                                      bg: 'rgba(245, 158, 11, 0.15)',
+                                      isTrophy: true
+                                    });
                                   }
                                 } else if (item.status === 'playing') {
                                   badges.push({ text: language === 'es' ? 'Jugando' : 'Playing', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' });
@@ -1734,8 +1754,8 @@ export const Profile: React.FC = () => {
                                 }
                               }
 
-                              // Repeat count badge (e.g. x2, x3) for full completed runs
-                              if (item.times_completed && item.times_completed > 1) {
+                              // Repeat count badge (e.g. x2, x3) for full completed runs on non-game media types
+                              if (item.item_type !== 'game' && item.times_completed && item.times_completed > 1) {
                                 badges.push({
                                   text: `x${item.times_completed}`,
                                   color: 'var(--accent-primary)',

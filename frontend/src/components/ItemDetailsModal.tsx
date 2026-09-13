@@ -1788,17 +1788,20 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
         console.error(e);
       }
     } else {
-      const tracked = await ensureTracked('completed');
+      const tracked = await ensureTracked('completed', true);
       if (tracked && tracked.id) {
-        try {
-          const res = await apiClient.put(`/library/${tracked.id}`, {
-            is_hundred_percent: true
-          });
-          setSelectedItem((prev: any) => prev ? { ...prev, is_hundred_percent: true, ...res.data } : null);
-          onUpdate && onUpdate();
-        } catch (e) {
-          console.error(e);
+        setSelectedItem((prev: any) => prev ? { ...prev, status: 'completed', is_hundred_percent: true, ...tracked } : null);
+        if (user?.is_pro) {
+          apiClient.get(`/library/${tracked.id}/consumption-history`)
+            .then(hRes => {
+              if (hRes.data) {
+                if (hRes.data.history) setConsumptionHistory(hRes.data.history);
+                if (hRes.data.entries) setConsumptionEntries(hRes.data.entries);
+              }
+            })
+            .catch(console.error);
         }
+        onUpdate && onUpdate();
       }
     }
   };
@@ -3218,7 +3221,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   
   const ensureTrackedPromiseRef = React.useRef<Promise<any | null> | null>(null);
 
-  const ensureTracked = async (status: string) => {
+  const ensureTracked = async (status: string, isHundredPercent: boolean = false) => {
     if (selectedItem.tracking_list_id && selectedItem.id) return selectedItem;
     if (ensureTrackedPromiseRef.current) {
       return await ensureTrackedPromiseRef.current;
@@ -3236,7 +3239,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
           custom_badge: selectedItem.badge || selectedItem.custom_badge || null,
           total_pages: totalPagesVal !== '' ? totalPagesVal : (selectedItem.total_pages || selectedItem.page_count || null),
           pages_read: (status === 'read' && totalPagesVal !== '') ? totalPagesVal : (pagesReadVal !== '' ? pagesReadVal : 0),
-          status: status
+          status: status,
+          is_hundred_percent: isHundredPercent
         });
         
         const newItem = res.data;

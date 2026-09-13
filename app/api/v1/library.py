@@ -568,6 +568,30 @@ def add_to_library(
         ).all()
         for loose in loose_items:
             db.delete(loose)
+
+    if completed_at_val and item_in.item_type not in ("series", "anime", "comic") and not tracking_list_id:
+        from app.models.consumption import ConsumptionHistory
+        existing_ch = db.query(ConsumptionHistory).filter(
+            ConsumptionHistory.user_id == current_user.id,
+            ConsumptionHistory.external_id == item_in.external_id
+        ).order_by(ConsumptionHistory.consumed_at.desc()).first()
+        
+        should_record_ch = True
+        if existing_ch and existing_ch.consumed_at:
+            diff_s = (completed_at_val - (existing_ch.consumed_at.replace(tzinfo=timezone.utc) if existing_ch.consumed_at.tzinfo is None else existing_ch.consumed_at)).total_seconds()
+            if diff_s < 60:
+                should_record_ch = False
+                existing_ch.is_hundred_percent = bool(item_in.is_hundred_percent)
+                
+        if should_record_ch:
+            ch = ConsumptionHistory(
+                user_id=current_user.id,
+                item_type=item_in.item_type.value if hasattr(item_in.item_type, 'value') else item_in.item_type,
+                external_id=item_in.external_id,
+                consumed_at=completed_at_val,
+                is_hundred_percent=bool(item_in.is_hundred_percent if item_in.is_hundred_percent is not None else False)
+            )
+            db.add(ch)
             
     db.commit()
     
@@ -620,16 +644,20 @@ def get_library(
     # Batch query consumption history counts for these items
     ext_ids = [it.external_id for it in items if it.external_id]
     counts_map = {}
+    hundred_counts_map = {}
     if ext_ids:
+        from sqlalchemy import case
         counts = db.query(
             ConsumptionHistory.external_id,
-            func.count(ConsumptionHistory.id)
+            func.count(ConsumptionHistory.id),
+            func.sum(case((ConsumptionHistory.is_hundred_percent == True, 1), else_=0))
         ).filter(
             ConsumptionHistory.user_id == target_user_id,
             ConsumptionHistory.external_id.in_(ext_ids)
         ).group_by(ConsumptionHistory.external_id).all()
-        for ext_id, c in counts:
+        for ext_id, c, h_c in counts:
             counts_map[ext_id] = c
+            hundred_counts_map[ext_id] = int(h_c or 0)
 
     # For series, anime, and tracked comic volumes, query episode/issue consumption counts if tracked to get accurate completions and last seen episode/issue count
     series_items = [it for it in items if it.item_type in ("series", "anime", "comic") and it.tracking_list_id]
@@ -720,9 +748,18 @@ def get_library(
         c_val = counts_map.get(it.external_id, 0)
         if it.item_type in ("series", "anime", "comic") and it.tracking_list_id:
             times_c = series_times_map.get(it.external_id, 1 if (it.completed_at or it.status in (UserLibraryStatusEnum.READ, UserLibraryStatusEnum.COMPLETED)) else 0)
+            times_hundred = 0
+            times_standard = times_c
         else:
-            # If item has completed_at but no consumption history yet, treat as 1
-            times_c = max(c_val, 1 if it.completed_at else 0)
+            raw_hundred = hundred_counts_map.get(it.external_id, 0)
+            if c_val == 0 and it.completed_at:
+                times_c = 1
+                times_hundred = 1 if it.is_hundred_percent else 0
+                times_standard = 0 if it.is_hundred_percent else 1
+            else:
+                times_c = max(c_val, 1 if it.completed_at else 0)
+                times_hundred = raw_hundred
+                times_standard = max(times_c - times_hundred, 0)
 
         last_ep_cnt = series_last_ep_count_map.get(it.id, 1) if it.item_type in ("series", "anime", "comic") else 1
 
@@ -761,6 +798,8 @@ def get_library(
             "release_date": it.release_date,
             "tracking_list_id": it.tracking_list_id,
             "times_completed": times_c,
+            "times_completed_standard": times_standard,
+            "times_completed_hundred": times_hundred,
             "last_seen_episode_count": last_ep_cnt,
             "completed_episodes_count": series_completed_eps_count_map.get(it.id, it.pages_read or 0)
         }
@@ -867,23 +906,24 @@ def update_library_item(
 
     if item_in.is_hundred_percent is not None:
         lib_item.is_hundred_percent = item_in.is_hundred_percent
-        # If toggled on/off, update the latest consumption history record if exists, or backfill if completed
-        from app.models.consumption import ConsumptionHistory
-        latest_ch = db.query(ConsumptionHistory).filter(
-            ConsumptionHistory.user_id == current_user.id,
-            ConsumptionHistory.external_id == lib_item.external_id
-        ).order_by(ConsumptionHistory.consumed_at.desc()).first()
-        if latest_ch:
-            latest_ch.is_hundred_percent = bool(item_in.is_hundred_percent)
-        elif lib_item.completed_at:
-            ch_init = ConsumptionHistory(
-                user_id=current_user.id,
-                item_type=lib_item.item_type.value if hasattr(lib_item.item_type, 'value') else lib_item.item_type,
-                external_id=lib_item.external_id,
-                consumed_at=lib_item.completed_at,
-                is_hundred_percent=bool(item_in.is_hundred_percent)
-            )
-            db.add(ch_init)
+        # If status was NOT just set to completed/read in this request (which already added/updated ch), update latest ch
+        if item_in.status not in (UserLibraryStatusEnum.COMPLETED, UserLibraryStatusEnum.READ):
+            from app.models.consumption import ConsumptionHistory
+            latest_ch = db.query(ConsumptionHistory).filter(
+                ConsumptionHistory.user_id == current_user.id,
+                ConsumptionHistory.external_id == lib_item.external_id
+            ).order_by(ConsumptionHistory.consumed_at.desc()).first()
+            if latest_ch:
+                latest_ch.is_hundred_percent = bool(item_in.is_hundred_percent)
+            elif lib_item.completed_at:
+                ch_init = ConsumptionHistory(
+                    user_id=current_user.id,
+                    item_type=lib_item.item_type.value if hasattr(lib_item.item_type, 'value') else lib_item.item_type,
+                    external_id=lib_item.external_id,
+                    consumed_at=lib_item.completed_at,
+                    is_hundred_percent=bool(item_in.is_hundred_percent)
+                )
+                db.add(ch_init)
         
     if item_in.is_favorite is not None:
         if item_in.is_favorite and not lib_item.is_favorite:
