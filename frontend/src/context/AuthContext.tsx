@@ -39,8 +39,28 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<UserProfile | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [user, setUser] = useState<UserProfile | null>(() => {
+    try {
+      const token = localStorage.getItem('access_token');
+      if (!token) return null;
+      const cached = localStorage.getItem('pathd_user_profile');
+      return cached ? JSON.parse(cached) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const [isLoading, setIsLoading] = useState<boolean>(() => {
+    try {
+      const token = localStorage.getItem('access_token');
+      if (!token) return false;
+      const cached = localStorage.getItem('pathd_user_profile');
+      // If we have both token and cached profile, we don't block the UI
+      return !cached;
+    } catch {
+      return false;
+    }
+  });
 
   const refreshProfile = async () => {
     try {
@@ -50,17 +70,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         is_pro: Boolean(resp.data.is_pro || resp.data.is_admin || resp.data.is_vip)
       };
       setUser(userData);
+      try {
+        localStorage.setItem('pathd_user_profile', JSON.stringify(userData));
+      } catch (e) {}
 
       window.dispatchEvent(new CustomEvent('profile-updated', { detail: userData }));
-    } catch (err) {
-      setUser(null);
-      localStorage.removeItem('access_token');
+    } catch (err: any) {
+      // Only clear user on definitive 401 Unauthorized / forbidden auth failures
+      if (err?.response?.status === 401 || err?.response?.status === 403) {
+        setUser(null);
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('pathd_user_profile');
+      }
     } finally {
       setIsLoading(false);
     }
   };
-
-
 
   const login = async (token: string) => {
     localStorage.setItem('access_token', token);
@@ -74,6 +99,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error('Logout request failed:', err);
     } finally {
       localStorage.removeItem('access_token');
+      localStorage.removeItem('pathd_user_profile');
       setUser(null);
     }
   };
@@ -94,6 +120,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const handleLogoutEvent = () => {
       setUser(null);
       localStorage.removeItem('access_token');
+      localStorage.removeItem('pathd_user_profile');
       if (window.location.pathname !== '/login' && window.location.pathname !== '/register') {
         window.location.href = '/login';
       }
@@ -103,14 +130,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => {
       window.removeEventListener('auth-logout', handleLogoutEvent);
     };
-
   }, []);
 
   return (
     <AuthContext.Provider
       value={{
         user,
-        isAuthenticated: !!user,
+        isAuthenticated: !!user || Boolean(localStorage.getItem('access_token')),
         isLoading,
         login,
         logout,

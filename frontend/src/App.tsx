@@ -32,11 +32,13 @@ import { CookieBanner } from './components/CookieBanner';
 import { SuspendedAccountModal } from './components/SuspendedAccountModal';
 import { RightSidebarAd } from './components/RightSidebarAd';
 
+import { PathdLoader } from './components/PathdLoader';
 import { initGlobalPrefetch } from './utils/prefetch';
 import React, { useEffect } from 'react';
 
 function AppRoutes() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
+  const hasToken = Boolean(localStorage.getItem('access_token'));
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -53,7 +55,18 @@ function AppRoutes() {
         <main className="main-content">
           <Routes>
             {/* Conditional homepage depending on authentication status */}
-            <Route path="/" element={isAuthenticated ? <Home /> : <Landing />} />
+            <Route
+              path="/"
+              element={
+                isAuthenticated ? (
+                  <Home />
+                ) : isLoading && hasToken ? (
+                  <PathdLoader fullScreen />
+                ) : (
+                  <Landing />
+                )
+              }
+            />
             <Route path="/recommended" element={<Recommended />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
