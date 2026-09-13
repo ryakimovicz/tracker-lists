@@ -31,9 +31,9 @@
   --color-text-movie: #0F172A;
   --color-series: #FDE047; /* Radiant Lemon Yellow - distinct from amber brand accent */
   --color-text-series: #0F172A;
-  --color-anime: #FB923C;
+  --color-anime: #FF8833;
   --color-text-anime: #0F172A;
-  --color-book: #B45309;
+  --color-book: #A26946; /* Warm Leather / Coffee Brown - distinct from anime orange */
   --color-text-book: #FFFFFF;
   --color-comic: #F87171;
   --color-text-comic: #0F172A;
@@ -84,7 +84,7 @@
   --color-text-series: #0F172A;
   --color-anime: #EA580C;
   --color-text-anime: #FFFFFF;
-  --color-book: #B45309;
+  --color-book: #7C4A27; /* Deep Leather Brown */
   --color-text-book: #FFFFFF;
   --color-comic: #DC2626;
   --color-text-comic: #FFFFFF;
@@ -109,9 +109,9 @@
   --color-text-movie: #0F172A;
   --color-series: #FDE047;
   --color-text-series: #0F172A;
-  --color-anime: #FB923C;
+  --color-anime: #FF8833;
   --color-text-anime: #0F172A;
-  --color-book: #B45309;
+  --color-book: #A26946; /* Warm Leather / Coffee Brown */
   --color-text-book: #FFFFFF;
   --color-comic: #F87171;
   --color-text-comic: #0F172A;

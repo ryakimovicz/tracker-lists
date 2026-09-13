@@ -12,7 +12,7 @@ const LETTERS: LetterConfig[] = [
   { char: 'a', colorVar: 'var(--color-manga)', glow: 'rgba(96, 165, 250, 0.65)' },
   { char: 't', colorVar: 'var(--color-game)', glow: 'rgba(192, 132, 252, 0.65)' },
   { char: 'h', colorVar: 'var(--color-comic)', glow: 'rgba(248, 113, 113, 0.65)' },
-  { char: 'd', colorVar: 'var(--accent-primary)', glow: 'rgba(245, 158, 11, 0.7)' },
+  { char: 'd', colorVar: 'var(--color-anime)', glow: 'rgba(255, 136, 51, 0.65)' },
 ];
 
 export const BrandLogo: React.FC = () => {
