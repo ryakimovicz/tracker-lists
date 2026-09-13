@@ -635,6 +635,7 @@ def get_library(
     series_items = [it for it in items if it.item_type in ("series", "anime", "comic") and it.tracking_list_id]
     series_times_map = {}
     series_last_ep_count_map = {}
+    series_completed_eps_count_map = {}
     if series_items:
         from app.models.list_item import ListItem
         for s_it in series_items:
@@ -671,6 +672,7 @@ def get_library(
                         ItemProgress.is_completed == True
                     ).all()
                     c_titles = [r[0] for r in completed_prog_items if r[0]]
+                    series_completed_eps_count_map[s_it.id] = len(c_titles)
                     if c_titles:
                         import re
                         ep_tups = []
@@ -759,7 +761,8 @@ def get_library(
             "release_date": it.release_date,
             "tracking_list_id": it.tracking_list_id,
             "times_completed": times_c,
-            "last_seen_episode_count": last_ep_cnt
+            "last_seen_episode_count": last_ep_cnt,
+            "completed_episodes_count": series_completed_eps_count_map.get(it.id, it.pages_read or 0)
         }
         res.append(it_dict)
 

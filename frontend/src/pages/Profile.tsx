@@ -76,6 +76,7 @@ interface LibraryItem {
   tracking_list_id?: number;
   times_completed?: number;
   last_seen_episode_count?: number;
+  completed_episodes_count?: number;
   release_date?: string;
 }
 
@@ -1653,8 +1654,26 @@ export const Profile: React.FC = () => {
                                       }
                                       return true;
                                     });
-                                    if (canonicalAired.length > 0 && item.last_seen_episode_count != null && item.last_seen_episode_count >= canonicalAired.length) {
-                                      isUpToDate = true;
+
+                                    const completedCount = item.completed_episodes_count ?? item.pages_read ?? 0;
+                                    if (canonicalAired.length > 0) {
+                                      if (completedCount >= canonicalAired.length && completedCount > 0) {
+                                        isUpToDate = true;
+                                      } else if (item.last_seen_episode) {
+                                        const lastAired = canonicalAired[canonicalAired.length - 1];
+                                        if (lastAired) {
+                                          const lastAiredS = lastAired.season_number ?? 1;
+                                          const lastAiredE = lastAired.episode_number;
+                                          const matchLast = item.last_seen_episode.match(/S(\d+)E(\d+)/i);
+                                          if (matchLast && lastAiredE != null) {
+                                            const seenS = parseInt(matchLast[1], 10);
+                                            const seenE = parseInt(matchLast[2], 10);
+                                            if (seenS > lastAiredS || (seenS === lastAiredS && seenE >= lastAiredE)) {
+                                              isUpToDate = true;
+                                            }
+                                          }
+                                        }
+                                      }
                                     }
                                   }
                                   if (isUpToDate) {
@@ -1695,7 +1714,8 @@ export const Profile: React.FC = () => {
                                         }
                                         return true;
                                       });
-                                      if (releasedIssues.length > 0 && item.last_seen_episode_count != null && item.last_seen_episode_count >= releasedIssues.length) {
+                                      const completedIssues = item.completed_episodes_count ?? item.pages_read ?? 0;
+                                      if (releasedIssues.length > 0 && completedIssues >= releasedIssues.length && completedIssues > 0) {
                                         isUpToDate = true;
                                       }
                                     }

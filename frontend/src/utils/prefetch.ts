@@ -68,6 +68,39 @@ export const prefetchMediaDetails = (item: any) => {
         }
       }).catch(() => {});
     }
+  } else if (type === 'game') {
+    const cacheKeyRel = `game_rel_${extId}`;
+    if (!getCachedSeries(cacheKeyRel)) {
+      apiClient.get(`/search/game/${extId}/relations`).then(res => {
+        if (res.data) setCachedSeries(cacheKeyRel, res.data);
+      }).catch(() => {});
+    }
+  } else if (type === 'manga') {
+    const cacheKeyRel = `manga_rel_${extId}`;
+    if (!getCachedSeries(cacheKeyRel)) {
+      apiClient.get(`/search/manga/${extId}/relations`).then(res => {
+        if (res.data) setCachedSeries(cacheKeyRel, res.data);
+      }).catch(() => {});
+    }
+  } else if (type === 'movie') {
+    if (extId.startsWith('omdb_') && (!item.description || !item.image_url)) {
+      const cacheKeyMovie = `movie_${extId}`;
+      if (!getCachedSeries(cacheKeyMovie)) {
+        apiClient.get(`/search/movies/${extId}`).then(res => {
+          if (res.data) setCachedSeries(cacheKeyMovie, res.data);
+        }).catch(() => {});
+      }
+    }
+  }
+
+  // Also prefetch reviews for the item in background
+  if (type && extId) {
+    const cacheKeyRev = `reviews_${type}_${extId}`;
+    if (!getCachedSeries(cacheKeyRev)) {
+      apiClient.get(`/reviews/${type}/${extId}`).then(res => {
+        if (res.data) setCachedSeries(cacheKeyRev, res.data);
+      }).catch(() => {});
+    }
   }
 };
 

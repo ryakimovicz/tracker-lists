@@ -2608,14 +2608,21 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
         // Fetch game relations (collections, DLCs, editions, base game)
         if (item.item_type === 'game' && item.external_id) {
-          setIsLoadingGameRelations(true);
+          const cachedRel = getCachedSeries(`game_rel_${item.external_id}`);
+          if (cachedRel) {
+            setGameRelations(cachedRel);
+            setIsLoadingGameRelations(false);
+          } else {
+            setIsLoadingGameRelations(true);
+          }
           apiClient.get(`/search/game/${item.external_id}/relations`)
             .then(res => {
               setGameRelations(res.data || null);
+              if (res.data) setCachedSeries(`game_rel_${item.external_id}`, res.data);
             })
             .catch(e => {
               console.error("Failed to load game relations", e);
-              setGameRelations(null);
+              if (!cachedRel) setGameRelations(null);
             })
             .finally(() => setIsLoadingGameRelations(false));
         } else {
@@ -2624,14 +2631,21 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
         // Fetch manga relations (sequels, prequels, spin-offs, side stories)
         if (item.item_type === 'manga' && item.external_id) {
-          setIsLoadingMangaRelations(true);
+          const cachedRel = getCachedSeries(`manga_rel_${item.external_id}`);
+          if (cachedRel) {
+            setMangaRelations(cachedRel);
+            setIsLoadingMangaRelations(false);
+          } else {
+            setIsLoadingMangaRelations(true);
+          }
           apiClient.get(`/search/manga/${item.external_id}/relations`)
             .then(res => {
               setMangaRelations(res.data || null);
+              if (res.data) setCachedSeries(`manga_rel_${item.external_id}`, res.data);
             })
             .catch(e => {
               console.error("Failed to load manga relations", e);
-              setMangaRelations(null);
+              if (!cachedRel) setMangaRelations(null);
             })
             .finally(() => setIsLoadingMangaRelations(false));
         } else {
@@ -2705,35 +2719,62 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
         }
       }
 
-      try {
-        const res = await apiClient.get(`/reviews/${item.item_type}/${item.external_id}`);
-        setItemReviews(res.data);
-        
-        // Find review belonging to the CURRENT logged-in user (not foreign profileId!)
-        const currentUserId = user?.id;
-        if (currentUserId) {
-          const myReview = res.data.find((r: any) => r.user_id === currentUserId);
-          if (myReview) {
-            setUserRating(myReview.rating || 0);
-            setUserComment(myReview.content || '');
-            if (myReview.media_url) {
-              setCommentMedia({
-                url: myReview.media_url,
-                type: myReview.media_type || 'gif',
-                slug: '',
-                title: ''
-              });
-            } else {
-              setCommentMedia(null);
+      // Reviews prefetch & cache resolution
+      if (item.item_type && item.external_id) {
+        const cacheKeyReviews = `reviews_${item.item_type}_${item.external_id}`;
+        const cachedRev = getCachedSeries(cacheKeyReviews);
+        if (cachedRev && Array.isArray(cachedRev)) {
+          setItemReviews(cachedRev);
+          const currentUserId = user?.id;
+          if (currentUserId) {
+            const myReview = cachedRev.find((r: any) => r.user_id === currentUserId);
+            if (myReview) {
+              setUserRating(myReview.rating || 0);
+              setUserComment(myReview.content || '');
+              if (myReview.media_url) {
+                setCommentMedia({
+                  url: myReview.media_url,
+                  type: myReview.media_type || 'gif',
+                  slug: '',
+                  title: ''
+                });
+              } else {
+                setCommentMedia(null);
+              }
             }
-          } else {
-            setUserRating(0);
-            setUserComment('');
-            setCommentMedia(null);
           }
         }
-      } catch(e) {
-        console.error(e);
+
+        apiClient.get(`/reviews/${item.item_type}/${item.external_id}`)
+          .then(res => {
+            if (res.data) {
+              setItemReviews(res.data);
+              setCachedSeries(cacheKeyReviews, res.data);
+              const currentUserId = user?.id;
+              if (currentUserId) {
+                const myReview = res.data.find((r: any) => r.user_id === currentUserId);
+                if (myReview) {
+                  setUserRating(myReview.rating || 0);
+                  setUserComment(myReview.content || '');
+                  if (myReview.media_url) {
+                    setCommentMedia({
+                      url: myReview.media_url,
+                      type: myReview.media_type || 'gif',
+                      slug: '',
+                      title: ''
+                    });
+                  } else {
+                    setCommentMedia(null);
+                  }
+                } else if (!cachedRev) {
+                  setUserRating(0);
+                  setUserComment('');
+                  setCommentMedia(null);
+                }
+              }
+            }
+          })
+          .catch(console.error);
       }
 
       // Fetch consumption history if user is Pro
