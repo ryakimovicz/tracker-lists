@@ -33,9 +33,9 @@ Documento de referencia para desarrolladores, arquitectura del sistema y catálo
 
 ### Infraestructura de Despliegue
 - **Frontend SPA**: [Cloudflare Pages](https://pages.cloudflare.com/) (Auto-deploy en push a `main` / `dev`)
-- **Backend API**: [Render](https://render.com/) (Web Service FastAPI / Uvicorn con auto-deploy)
+- **Backend API**: [Railway](https://railway.com/) (FastAPI / Uvicorn en producción 24/7 en `https://api.pathd.net`)
 - **Base de Datos**: [Neon.tech](https://neon.tech/) (PostgreSQL Serverless gestionado)
-- **DNS & SSL**: [Cloudflare](https://cloudflare.com/) (`pathd.net`)
+- **DNS & SSL**: [Cloudflare](https://cloudflare.com/) (`pathd.net` y `api.pathd.net`)
 - **Correos**: [Resend](https://resend.com/) (`noreply@pathd.net`)
 - **Monitorización**: [UptimeRobot](https://uptimerobot.com/) realizando pings continuos 24/7 a `GET /health`
 
