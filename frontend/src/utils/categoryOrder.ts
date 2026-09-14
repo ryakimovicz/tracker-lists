@@ -1,5 +1,5 @@
 import React from 'react';
-import { Film, Tv, Sparkles, BookOpen, Gamepad2, Book, MessageSquare, MessageCircle, Users } from 'lucide-react';
+import { Film, Tv, Sparkles, BookOpen, Gamepad2, Book, MessageSquare, MessageCircle, Users, Layers } from 'lucide-react';
 
 export const DEFAULT_CATEGORY_ORDER = [
   'movie',
@@ -205,7 +205,7 @@ export function getCategoryIcon(
     case 'user':
       return React.createElement(Users, props);
     case 'all':
-      return React.createElement(Sparkles, props);
+      return React.createElement(Layers, props);
     default:
       return null;
   }
