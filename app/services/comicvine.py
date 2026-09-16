@@ -591,33 +591,73 @@ class ComicVineService:
     @staticmethod
     def get_trending_comics() -> List[SearchResultItem]:
         import time
-        cache_key = "cv_trending_comics_v2"
+        cache_key = "cv_trending_comics_dynamic_v1"
         now_ts = time.time()
         if cache_key in ComicVineService._trending_comics_cache:
             ts, data = ComicVineService._trending_comics_cache[cache_key]
-            if now_ts - ts < 14400:
+            if now_ts - ts < 14400:  # 4 hours cache
                 return data
+
+        api_key = settings.COMIC_VINE_API_KEY
+        if not api_key:
+            return []
 
         results = []
         seen_ids = set()
         seen_titles = set()
-        queries = ["Spider-Man", "Batman", "X-Men", "Avengers", "Superman", "Daredevil", "Wolverine"]
-        
-        for q in queries:
-            try:
-                items = ComicVineService.search_comics(q)
-                for it in items:
-                    norm = (it.title or "").lower().strip()
-                    if it.external_id not in seen_ids and norm not in seen_titles and it.image_url:
-                        seen_ids.add(it.external_id)
+
+        try:
+            # Query Comic Vine volumes sorted by community activity and updates
+            url = f"https://comicvine.gamespot.com/api/volumes/?api_key={api_key}&format=json&sort=date_last_updated:desc&limit=60"
+            req = urllib.request.Request(url, headers={"User-Agent": "TrackerLists/1.0 (contact@pathd.net)"})
+            with urllib.request.urlopen(req, timeout=8) as response:
+                if response.status == 200:
+                    data = json.loads(response.read().decode())
+                    for item in data.get("results", []):
+                        vol_name = (item.get("name") or "").strip()
+                        if not vol_name:
+                            continue
+
+                        norm = vol_name.lower()
+                        if norm in seen_titles:
+                            continue
+
+                        # Filter out non-western comic/manga volumes if any
+                        manga_keywords = ["shonen", "tankobon", "manga", "kodansha", "shueisha"]
+                        if any(k in norm for k in manga_keywords):
+                            continue
+
+                        desc = item.get("deck") or item.get("description") or ""
+                        if not is_safe_media_item(vol_name, desc):
+                            continue
+
+                        image_data = item.get("image", {})
+                        image_url = image_data.get("super_url") or image_data.get("medium_url") or image_data.get("thumb_url")
+                        if not image_url:
+                            continue
+
+                        raw_id = str(item.get("id"))
+                        ext_id = f"cv_vol_{raw_id}"
+                        issue_count = item.get("count_of_issues")
+                        badge_val = f"{issue_count} Números" if issue_count else "Volumen"
+
+                        seen_ids.add(ext_id)
                         seen_titles.add(norm)
-                        results.append(it)
-                    if len(results) >= 24:
-                        break
-            except Exception:
-                continue
-            if len(results) >= 24:
-                break
+                        results.append(SearchResultItem(
+                            external_id=ext_id,
+                            title=vol_name,
+                            image_url=image_url,
+                            description=desc,
+                            item_type="comic",
+                            release_date=str(item.get("start_year")) if item.get("start_year") else None,
+                            page_count=issue_count,
+                            badge=badge_val
+                        ))
+
+                        if len(results) >= 24:
+                            break
+        except Exception as e:
+            print(f"Error fetching dynamic trending comics: {e}")
 
         if results:
             ComicVineService._trending_comics_cache[cache_key] = (now_ts, results)

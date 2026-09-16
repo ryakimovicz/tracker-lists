@@ -99,6 +99,7 @@ const stripHtml = (html: string) => {
 };
 
 interface ExploreSectionProps {
+  subTab?: string;
   loading: boolean;
   categories: Array<{ type: string; title: string; items: any[] }>;
   language: string;
@@ -108,6 +109,7 @@ interface ExploreSectionProps {
 }
 
 const ExploreSection = React.memo<ExploreSectionProps>(({
+  subTab = 'explore',
   loading,
   categories,
   language,
@@ -127,7 +129,7 @@ const ExploreSection = React.memo<ExploreSectionProps>(({
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
       {categories.map(({ type, title, items }) => (
         <HorizontalScroll 
-          key={type} 
+          key={`${subTab}_${type}`} 
           title={
             <>
               <span style={{ display: 'inline-flex', alignItems: 'center' }}>
@@ -591,7 +593,7 @@ export const Search: React.FC = () => {
         if (cachedRaw) {
           try {
             const cachedParsed = JSON.parse(cachedRaw);
-            if (cachedParsed?.nuevo?.length > 0) {
+            if (cachedParsed?.nuevo?.length > 0 || cachedParsed?.tendencias?.length > 0) {
               setExploreData(cachedParsed);
             }
           } catch (e) {}
@@ -1226,6 +1228,7 @@ export const Search: React.FC = () => {
             />
           ) : (
             <ExploreSection
+              subTab={exploreSubTab}
               loading={loadingExplore}
               categories={filteredExploreCategories}
               language={language}

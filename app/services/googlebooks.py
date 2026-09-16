@@ -295,22 +295,65 @@ class GoogleBooksService:
     @staticmethod
     def get_trending_books() -> List[SearchResultItem]:
         import time
-        cache_key = "gb_trending_books_v2"
+        cache_key = "ol_trending_books_daily_v1"
         now_ts = time.time()
         if cache_key in GoogleBooksService._new_books_cache:
             ts, data = GoogleBooksService._new_books_cache[cache_key]
-            if now_ts - ts < 14400:
+            if now_ts - ts < 14400:  # 4 hours cache
                 return data
 
         results = []
-        queries = ["bestseller fiction", "popular novels 2025", "award winning fiction", "trending fantasy sci-fi"]
         seen_ids = set()
         seen_titles = set()
-        
-        for q in queries:
+
+        try:
+            url = "https://openlibrary.org/trending/daily.json?limit=35"
+            req = urllib.request.Request(url, headers={"User-Agent": "TrackerLists/1.0 (contact@pathd.net)"})
+            with urllib.request.urlopen(req, timeout=8) as response:
+                if response.status == 200:
+                    data = json.loads(response.read().decode())
+                    for work in data.get("works", []):
+                        title = work.get("title") or "Untitled Book"
+                        norm = title.lower().strip()
+                        if norm in seen_titles:
+                            continue
+
+                        authors = [a.get("name") for a in work.get("authors", []) if a.get("name")]
+                        author_str = f"Author: {authors[0]}." if authors else ""
+                        first_pub = work.get("first_publish_year")
+                        pub_str = f" First published: {first_pub}." if first_pub else ""
+                        desc = f"{author_str}{pub_str}"
+
+                        if not is_safe_media_item(title, desc):
+                            continue
+
+                        cover_i = work.get("cover_i") or work.get("cover_id")
+                        image_url = f"https://covers.openlibrary.org/b/id/{cover_i}-L.jpg" if cover_i else None
+                        key_raw = str(work.get("key", "")).replace("/works/", "")
+                        ext_id = f"openlibrary-{key_raw}"
+
+                        if ext_id not in seen_ids:
+                            seen_ids.add(ext_id)
+                            seen_titles.add(norm)
+                            results.append(SearchResultItem(
+                                external_id=ext_id,
+                                title=title,
+                                image_url=image_url,
+                                description=desc,
+                                item_type="book",
+                                release_date=str(first_pub) if first_pub else None
+                            ))
+
+                        if len(results) >= 24:
+                            break
+        except Exception as e:
+            print(f"Open Library trending error: {e}")
+
+        # Fallback to Google Books search if Open Library had an issue
+        if len(results) < 10:
             try:
-                items = GoogleBooksService.search_books(q, order_by="relevance")
-                for it in items:
+                fb_items = GoogleBooksService.search_books("bestseller fiction", order_by="relevance")
+                for it in fb_items:
                     norm = (it.title or "").lower().strip()
                     if it.external_id not in seen_ids and norm not in seen_titles and it.image_url:
                         seen_ids.add(it.external_id)
@@ -319,10 +362,8 @@ class GoogleBooksService:
                     if len(results) >= 24:
                         break
             except Exception:
-                continue
-            if len(results) >= 24:
-                break
-                
+                pass
+
         if results:
             GoogleBooksService._new_books_cache[cache_key] = (now_ts, results)
         return results

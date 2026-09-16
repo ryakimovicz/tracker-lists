@@ -435,10 +435,36 @@ class IGDBService:
 
     @classmethod
     def get_trending_games(cls) -> List[SearchResultItem]:
-        import time
-        now = int(time.time())
-        six_months_ago = now - (180 * 86400)
-        body = f'fields id, name, category, game_type, parent_game, cover.image_id, first_release_date, summary, total_rating; where first_release_date > {six_months_ago} & first_release_date < {now} & cover != null & total_rating != null; sort total_rating desc; limit 15;'
-        return cls._execute_query(body)
+        client_id = getattr(settings, "TWITCH_CLIENT_ID", None)
+        token = cls._get_access_token()
+        if not client_id or not token:
+            return []
+
+        try:
+            # Query IGDB real-time popularity primitives (live visits, twitch streams, steam players)
+            body_pop = "fields game_id, value; where popularity_type = 5; sort value desc; limit 35;"
+            req = urllib.request.Request(
+                "https://api.igdb.com/v4/popularity_primitives",
+                data=body_pop.encode("utf-8"),
+                headers={"Client-ID": client_id, "Authorization": f"Bearer {token}", "Accept": "application/json"}
+            )
+            with urllib.request.urlopen(req, timeout=6) as res:
+                if res.status == 200:
+                    pop_data = json.loads(res.read().decode())
+                    gids = [str(p["game_id"]) for p in pop_data if "game_id" in p]
+                    if gids:
+                        body_games = f"fields id, name, category, game_type, parent_game, cover.image_id, first_release_date, summary, total_rating; where id = ({','.join(gids)}) & cover != null; limit 35;"
+                        items = cls._execute_query(body_games)
+                        # Maintain rank order of popularity
+                        id_to_item = {str(item.external_id): item for item in items}
+                        ordered_results = [id_to_item[gid] for gid in gids if gid in id_to_item]
+                        if ordered_results:
+                            return ordered_results[:24]
+        except Exception as e:
+            print(f"IGDB popularity_primitives error: {e}")
+
+        # Fallback query without date restrictions
+        body_fallback = "fields id, name, category, game_type, parent_game, cover.image_id, first_release_date, summary, total_rating; where cover != null & total_rating != null; sort total_rating desc; limit 24;"
+        return cls._execute_query(body_fallback)
 
 

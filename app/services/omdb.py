@@ -376,39 +376,106 @@ class OMDbService:
 
     @classmethod
     def get_trending_movies(cls) -> List[SearchResultItem]:
-        cache_key = "omdb_trending_movies_v2"
+        cache_key = "omdb_trending_movies_wiki_v1"
         now_ts = time.time()
         if cache_key in cls._search_cache:
             ts, data = cls._search_cache[cache_key]
-            if now_ts - ts < 14400:
+            if now_ts - ts < 14400:  # 4 hours cache
                 return data
 
-        queries = ["Dune", "Avatar", "Deadpool", "Oppenheimer", "Spider-Man", "Batman", "Avengers", "Gladiator", "Wicked", "Interstellar"]
-        results = []
+        results: List[SearchResultItem] = []
         seen_ids = set()
         seen_titles = set()
-        for q in queries:
-            try:
-                res = cls.search_movies(q)
-                for m in res:
-                    norm = (m.title or "").lower().strip()
-                    if m.external_id not in seen_ids and norm not in seen_titles and m.image_url:
-                        seen_ids.add(m.external_id)
-                        seen_titles.add(norm)
-                        results.append(m)
-                    if len(results) >= 24:
-                        break
-            except Exception:
-                continue
-            if len(results) >= 24:
-                break
 
-        if len(results) < 10:
+        try:
+            from datetime import datetime, timedelta
+            articles = []
+            for days_ago in [1, 2]:
+                dt = datetime.utcnow() - timedelta(days=days_ago)
+                ymd = dt.strftime("%Y/%m/%d")
+                top_url = f"https://wikimedia.org/api/rest_v1/metrics/pageviews/top/en.wikipedia/all-access/{ymd}"
+                try:
+                    req = urllib.request.Request(top_url, headers={"User-Agent": "TrackerLists/1.0 (contact@pathd.net)"})
+                    with urllib.request.urlopen(req, timeout=6) as resp:
+                        if resp.status == 200:
+                            data = json.loads(resp.read().decode())
+                            items = data.get("items", [{}])[0].get("articles", [])
+                            if items:
+                                articles = items
+                                break
+                except Exception:
+                    continue
+
+            # Filter film article titles
+            film_articles = []
+            for a in articles:
+                art = a.get("article", "")
+                if (re.search(r'_\((?:\d{4}_)?film\)$', art, re.IGNORECASE) or re.search(r'_\([^\)]*film[^\)]*\)$', art, re.IGNORECASE)) and not art.startswith("List_of_") and "filmography" not in art.lower() and "box_office" not in art.lower():
+                    if art not in film_articles:
+                        film_articles.append(art)
+
+            if film_articles:
+                # Query Wikidata entity IDs from Wikipedia pageprops
+                titles_param = "|".join(film_articles[:40])
+                w_url = f"https://en.wikipedia.org/w/api.php?action=query&prop=pageprops&ppprop=wikibase_item&titles={urllib.parse.quote(titles_param)}&format=json"
+                wikibase_items = []
+                try:
+                    req2 = urllib.request.Request(w_url, headers={"User-Agent": "TrackerLists/1.0 (contact@pathd.net)"})
+                    with urllib.request.urlopen(req2, timeout=6) as resp2:
+                        if resp2.status == 200:
+                            data2 = json.loads(resp2.read().decode())
+                            pages = data2.get("query", {}).get("pages", {})
+                            for p in pages.values():
+                                qid = p.get("pageprops", {}).get("wikibase_item")
+                                if qid and qid not in wikibase_items:
+                                    wikibase_items.append(qid)
+                except Exception as e:
+                    print(f"Wikipedia pageprops error: {e}")
+
+                # Query IMDb IDs (P345 claim) from Wikidata
+                imdb_ids = []
+                if wikibase_items:
+                    ids_param = "|".join(wikibase_items[:40])
+                    wb_url = f"https://www.wikidata.org/w/api.php?action=wbgetentities&ids={urllib.parse.quote(ids_param)}&props=claims&format=json"
+                    try:
+                        req3 = urllib.request.Request(wb_url, headers={"User-Agent": "TrackerLists/1.0 (contact@pathd.net)"})
+                        with urllib.request.urlopen(req3, timeout=6) as resp3:
+                            if resp3.status == 200:
+                                wb_data = json.loads(resp3.read().decode())
+                                for entity in wb_data.get("entities", {}).values():
+                                    claims = entity.get("claims", {})
+                                    imdb_claims = claims.get("P345", [])
+                                    if imdb_claims:
+                                        iid = imdb_claims[0].get("mainsnak", {}).get("datavalue", {}).get("value")
+                                        if iid and isinstance(iid, str) and iid.startswith("tt") and iid not in imdb_ids:
+                                            imdb_ids.append(iid)
+                    except Exception as e:
+                        print(f"Wikidata claims error: {e}")
+
+                # Fetch OMDb details for each resolved IMDb ID
+                if imdb_ids:
+                    import concurrent.futures
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as ex:
+                        movie_items = list(ex.map(cls.get_movie_detail, imdb_ids[:28]))
+                        for m in movie_items:
+                            if m and m.image_url and m.title:
+                                norm = m.title.lower().strip()
+                                if m.external_id not in seen_ids and norm not in seen_titles:
+                                    seen_ids.add(m.external_id)
+                                    seen_titles.add(norm)
+                                    results.append(m)
+                                if len(results) >= 24:
+                                    break
+        except Exception as e:
+            print(f"Error fetching trending movies via Wikipedia/Wikidata: {e}")
+
+        # Fallback to new release schedule if Wikipedia Topviews returned too few
+        if len(results) < 12:
             try:
                 new_movies = cls.get_new_movies()
                 for m in new_movies:
                     norm = (m.title or "").lower().strip()
-                    if m.external_id not in seen_ids and norm not in seen_titles:
+                    if m.external_id not in seen_ids and norm not in seen_titles and m.image_url:
                         seen_ids.add(m.external_id)
                         seen_titles.add(norm)
                         results.append(m)
