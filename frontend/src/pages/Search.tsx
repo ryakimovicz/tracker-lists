@@ -532,6 +532,21 @@ export const Search: React.FC = () => {
     }
   };
 
+  const getSingleCategoryLabel = (cat: string) => {
+    switch (cat) {
+      case 'movie': return language === 'es' ? 'Película' : 'Movie';
+      case 'series': return language === 'es' ? 'Serie' : 'Show';
+      case 'anime': return 'Anime';
+      case 'book': return language === 'es' ? 'Libro' : 'Book';
+      case 'comic': return language === 'es' ? 'Cómic' : 'Comic';
+      case 'manga': return 'Manga';
+      case 'game': return language === 'es' ? 'Juego' : 'Game';
+      case 'user': return language === 'es' ? 'Usuario' : 'User';
+      case 'guide': return language === 'es' ? 'Guía' : 'Guide';
+      default: return cat;
+    }
+  };
+
   // Shelf tracking states
   const [shelfItems, setShelfItems] = useState<any[]>([]);
   const [itemToRemoveFromShelf, setItemToRemoveFromShelf] = useState<any | null>(null);
@@ -1380,10 +1395,21 @@ export const Search: React.FC = () => {
                           {activeTab === 'all' && (
                             <span
                               className={getTagClass(item.item_type)}
-                              style={{ alignSelf: 'flex-start', padding: '0.2rem 0.35rem', borderRadius: '4px' }}
-                              title={item.item_type === 'comic' ? (language === 'es' ? 'Cómic' : 'Comic') : item.item_type === 'manga' ? 'Manga' : t('media' + item.item_type.charAt(0).toUpperCase() + item.item_type.slice(1))}
+                              style={{ 
+                                alignSelf: 'flex-start', 
+                                padding: '0.2rem 0.55rem', 
+                                borderRadius: '6px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.35rem',
+                                fontSize: '0.72rem',
+                                fontWeight: 700,
+                                textTransform: 'none',
+                                letterSpacing: 'normal'
+                              }}
                             >
-                              {getCategoryIcon(item.item_type, { size: 14, color: 'currentColor' })}
+                              {getCategoryIcon(item.item_type, { size: 13, color: 'currentColor' })}
+                              <span>{getSingleCategoryLabel(item.item_type)}</span>
                             </span>
                           )}
                         </div>
