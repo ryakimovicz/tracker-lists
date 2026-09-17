@@ -4539,7 +4539,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         type="button"
                         disabled={isUnconsumed && !isFavorite}
                         onClick={() => onToggleFavorite && onToggleFavorite(selectedItem.id, isFavorite)}
-                        className="btn-secondary"
+                        className={`btn-favorite-heart ${isFavorite ? 'is-favorite' : ''}`}
                         title={isUnconsumed && !isFavorite
                           ? (language === 'es' ? 'Empieza a consumir la obra para poder destacarla' : 'Start consuming this item to feature it')
                           : isFavorite
@@ -4547,20 +4547,17 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                           : (language === 'es' ? 'Destacar (Favorito)' : 'Feature (Favorite)')
                         }
                         style={{
-                          padding: '0.45rem',
-                          borderRadius: '50%',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
+                          width: '34px',
+                          height: '34px',
                           cursor: (isUnconsumed && !isFavorite) ? 'not-allowed' : 'pointer',
                           opacity: (isUnconsumed && !isFavorite) ? 0.4 : 1,
-                          color: isFavorite ? 'var(--accent-primary)' : 'var(--text-secondary)',
-                          border: isFavorite ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)',
-                          background: isFavorite ? 'rgba(124, 58, 237, 0.1)' : 'transparent',
+                          color: isFavorite ? 'var(--color-user, #F472B6)' : 'var(--text-secondary)',
+                          border: isFavorite ? '1px solid var(--color-user, #F472B6)' : '1px solid var(--border-color)',
+                          background: isFavorite ? 'rgba(244, 114, 182, 0.12)' : 'rgba(255, 255, 255, 0.05)',
                           transition: 'all 0.2s ease'
                         }}
                       >
-                        <Heart size={18} fill={isFavorite ? 'var(--accent-primary)' : 'none'} />
+                        <Heart size={18} fill={isFavorite ? 'var(--color-user, #F472B6)' : 'none'} />
                       </button>
                     );
                   })()}

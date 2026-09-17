@@ -46,7 +46,11 @@ import {
   ExternalLink,
   HelpCircle,
   Clock,
-  Trophy
+  Trophy,
+  LayoutGrid,
+  List,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 
 import { MusicServiceGuideModal } from '../components/MusicServiceGuideModal';
@@ -233,8 +237,43 @@ export const Profile: React.FC = () => {
 
   // Shelf expansion & pagination states
   const [isShelfExpanded, setIsShelfExpanded] = useState(false);
+  const [shelfViewMode, setShelfViewMode] = useState<'grid' | 'list'>(() => {
+    try {
+      const saved = localStorage.getItem('pathd_shelf_view_mode');
+      return (saved === 'list' || saved === 'grid') ? saved : 'grid';
+    } catch {
+      return 'grid';
+    }
+  });
   const [currentPage, setCurrentPage] = useState(1);
   const [shelfSearchQuery, setShelfSearchQuery] = useState('');
+  const shelfContainerRef = useRef<HTMLDivElement>(null);
+  const [shelfContainerWidth, setShelfContainerWidth] = useState(0);
+
+  useEffect(() => {
+    if (!shelfContainerRef.current) return;
+    const updateWidth = () => {
+      if (shelfContainerRef.current) {
+        setShelfContainerWidth(shelfContainerRef.current.clientWidth);
+      }
+    };
+    updateWidth();
+
+    if (typeof ResizeObserver !== 'undefined') {
+      const ro = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          if (entry.contentRect.width > 0) {
+            setShelfContainerWidth(entry.contentRect.width);
+          }
+        }
+      });
+      ro.observe(shelfContainerRef.current);
+      return () => ro.disconnect();
+    } else {
+      window.addEventListener('resize', updateWidth);
+      return () => window.removeEventListener('resize', updateWidth);
+    }
+  }, []);
 
   // Overlay modal states for shelf items details
   const [selectedItem, setSelectedItem] = useState<any | null>(null);
@@ -1477,7 +1516,10 @@ export const Profile: React.FC = () => {
                   return (
                     <button
                       key={type}
-                      onClick={() => setMediaFilter(type as any)}
+                      onClick={() => {
+                        setMediaFilter(type as any);
+                        setCurrentPage(1);
+                      }}
                       className={`profile-category-tab ${isSelected ? 'selected' : ''}`}
                       style={{
                         padding: '0.35rem 0.85rem',
@@ -1527,140 +1569,765 @@ export const Profile: React.FC = () => {
               {language === 'es' ? 'No hay elementos en esta categoría.' : 'No items found in this category.'}
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-              {/* Expand / Collapse Control */}
-              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                <button
-                  onClick={() => {
-                    setIsShelfExpanded(!isShelfExpanded);
-                    setCurrentPage(1);
-                  }}
-                  className="btn-secondary"
-                  style={{ padding: '0.4rem 1rem', fontSize: '0.85rem' }}
-                >
-                  {isShelfExpanded
-                    ? (language === 'es' ? 'Contraer' : 'Collapse')
-                    : (language === 'es' ? 'Expandir' : 'Expand')
-                  }
-                </button>
-              </div>
-
-              {/* Grid of cards */}
+            <div ref={shelfContainerRef} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              {/* Shelf Header Controls: Mode Toggler (Grid/List) & Expand/Collapse */}
               {(() => {
-                const itemsPerRow = 5;
-                const itemsPerPage = 15;
-                const displayedItems = isShelfExpanded
-                  ? filteredItems.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
-                  : filteredItems.slice(0, itemsPerRow);
+                // Dynamically calculate columns based on container width (with min card size ~165px + 20px gap)
+                // Default to 5 columns if container not measured yet
+                const computedColumns = shelfContainerWidth > 0
+                  ? Math.max(1, Math.floor((shelfContainerWidth + 20) / 185))
+                  : 5;
+                const gridColumns = Math.max(1, computedColumns);
+                const isGrid = shelfViewMode === 'grid';
+                const compactLimit = isGrid ? gridColumns : 4;
+                const itemsPerPage = isShelfExpanded ? (gridColumns * 3) : gridColumns;
+                const totalPages = Math.max(1, Math.ceil(filteredItems.length / itemsPerPage));
+                const safeCurrentPage = Math.min(currentPage, totalPages);
+                const displayedGridItems = filteredItems.slice((safeCurrentPage - 1) * itemsPerPage, safeCurrentPage * itemsPerPage);
 
                 return (
                   <>
-                    <div style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
-                      gap: '1.5rem'
-                    }}>
-                      {displayedItems.map(item => (
-                        <div key={item.id} className="glass-card" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                          <div style={{ position: 'relative', cursor: 'pointer', width: '100%', height: '240px', borderRadius: '8px', overflow: 'hidden' }} onClick={() => handleOpenItemDetails(item)}>
-                            <MediaPoster
-                              src={item.image_url}
-                              title={item.title}
-                              itemType={item.item_type}
-                              height="100%"
-                              width="100%"
-                              borderRadius="8px"
-                            />
-                            
-                            {/* Tag / Category Badge */}
-                            {(() => {
-                              const isGame = item.item_type === 'game';
-                              const rawBadge = (item.custom_badge || '').toLowerCase();
-                              
-                              const getGameBadgeLabel = (b: string) => {
-                                if (b === 'collection' || b === 'pack') return language === 'es' ? 'Colección' : 'Collection';
-                                if (b === 'expansion') return language === 'es' ? 'Expansión' : 'Expansion';
-                                if (b === 'dlc') return 'DLC';
-                                if (b === 'edition') return language === 'es' ? 'Edición' : 'Edition';
-                                if (b === 'remake') return 'Remake';
-                                if (b === 'remaster') return 'Remaster';
-                                return null;
-                              };
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '0.6rem' }}>
+                      {/* View Mode Toggle Buttons */}
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', background: 'var(--bg-secondary)', padding: '0.2rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShelfViewMode('grid');
+                            try { localStorage.setItem('pathd_shelf_view_mode', 'grid'); } catch {}
+                          }}
+                          className={`shelf-view-toggle-btn ${shelfViewMode === 'grid' ? 'active' : ''}`}
+                          title={language === 'es' ? 'Modo Cuadrícula' : 'Grid View'}
+                          aria-label={language === 'es' ? 'Modo Cuadrícula' : 'Grid View'}
+                          style={{ padding: '0.3rem 0.55rem', borderRadius: '6px' }}
+                        >
+                          <LayoutGrid size={16} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShelfViewMode('list');
+                            try { localStorage.setItem('pathd_shelf_view_mode', 'list'); } catch {}
+                          }}
+                          className={`shelf-view-toggle-btn ${shelfViewMode === 'list' ? 'active' : ''}`}
+                          title={language === 'es' ? 'Modo Lista' : 'List View'}
+                          aria-label={language === 'es' ? 'Modo Lista' : 'List View'}
+                          style={{ padding: '0.3rem 0.55rem', borderRadius: '6px' }}
+                        >
+                          <List size={16} />
+                        </button>
+                      </div>
 
-                              const specialGameLabel = isGame ? getGameBadgeLabel(rawBadge) : null;
+                      {/* Expand / Collapse Control - Shown if items exceed compact view limit */}
+                      {filteredItems.length > compactLimit && (
+                        <button
+                          onClick={() => {
+                            setIsShelfExpanded(!isShelfExpanded);
+                            setCurrentPage(1);
+                          }}
+                          className="btn-secondary"
+                          style={{ padding: '0.4rem 1rem', fontSize: '0.85rem' }}
+                        >
+                          {isShelfExpanded
+                            ? (language === 'es' ? 'Contraer' : 'Collapse')
+                            : (language === 'es' ? 'Expandir' : 'Expand')
+                          }
+                        </button>
+                      )}
+                    </div>
 
-                              // If filtering by "all":
-                              if (mediaFilter === 'all') {
-                                const normType = (item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tvm-ep-')) ? 'series' : item.item_type;
-                                const label = isGame 
-                                  ? (specialGameLabel || (language === 'es' ? 'Juego' : 'Game'))
-                                  : (item.item_type === 'episode' || item.external_id?.startsWith('tvm-ep-'))
-                                  ? (language === 'es' ? 'Serie' : 'Show')
-                                  : item.item_type === 'season'
-                                  ? (language === 'es' ? 'Temporada' : 'Season')
-                                  : item.item_type === 'comic' ? (language === 'es' ? 'Cómic' : 'Comic') : item.item_type === 'manga' ? 'Manga' : t('media' + item.item_type.charAt(0).toUpperCase() + item.item_type.slice(1));
+                    {/* Items Container */}
+                    {(() => {
+                      const canPrev = safeCurrentPage > 1;
+                      const canNext = safeCurrentPage < totalPages;
 
-                                return (
-                                  <div
-                                    className={getTagClass(normType)}
-                                    style={{
-                                      position: "absolute",
-                                      top: "0.5rem",
-                                      left: "0.5rem",
-                                      padding: "0.2rem 0.35rem",
-                                      borderRadius: "4px",
-                                      display: "inline-flex",
-                                      alignItems: "center",
-                                      justifyContent: "center",
-                                      opacity: 0.95,
-                                      backdropFilter: 'blur(4px)',
-                                      zIndex: 1
-                                    }}
-                                    title={label}
-                                  >
-                                    {getCategoryIcon(normType, { size: 14, color: 'currentColor' })}
-                                  </div>
-                                );
+                const arrowBtnStyle: React.CSSProperties = {
+                  position: 'absolute',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  zIndex: 10,
+                  background: 'var(--bg-tertiary)',
+                  border: '1.5px solid var(--border-color)',
+                  borderRadius: '50%',
+                  width: '40px',
+                  height: '40px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 10px rgba(0,0,0,0.4)',
+                  color: 'var(--text-primary)',
+                  transition: 'all 0.15s ease'
+                };
+
+                // Helper to render media badges for Grid / List items
+                const renderBadges = (item: LibraryItem) => {
+                  const hasEverCompleted = (item.times_completed && item.times_completed > 0) || !!item.completed_at;
+                  const badges = [];
+
+                  if (item.status === 'dropped') {
+                    badges.push({ text: language === 'es' ? 'Abandonado' : 'Dropped', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.15)' });
+                  } else if (item.status === 'endless') {
+                    badges.push({ text: language === 'es' ? 'Infinito' : 'Endless', color: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.15)' });
+                  } else if (item.item_type === 'game') {
+                    if (hasEverCompleted) {
+                      const hundredRuns = item.times_completed_hundred ?? (item.is_hundred_percent ? (item.times_completed || 1) : 0);
+                      const standardRuns = item.times_completed_standard ?? (item.is_hundred_percent ? 0 : (item.times_completed || 1));
+                      if (standardRuns > 0) {
+                        badges.push({
+                          text: standardRuns > 1 
+                            ? `${language === 'es' ? 'Completado' : 'Completed'} x${standardRuns}`
+                            : (language === 'es' ? 'Completado' : 'Completed'),
+                          color: '#10b981',
+                          bg: 'rgba(16, 185, 129, 0.15)'
+                        });
+                      }
+                      if (hundredRuns > 0) {
+                        badges.push({
+                          text: hundredRuns > 1 ? `100% x${hundredRuns}` : '100%',
+                          color: '#f59e0b',
+                          bg: 'rgba(245, 158, 11, 0.15)',
+                          isTrophy: true
+                        });
+                      }
+                    } else if (item.status === 'playing') {
+                      badges.push({ text: language === 'es' ? 'Jugando' : 'Playing', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' });
+                    }
+                  } else if (item.item_type === 'movie') {
+                    if (hasEverCompleted) {
+                      badges.push({ text: language === 'es' ? 'Visto' : 'Watched', color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)' });
+                    } else if (item.status === 'watching') {
+                      badges.push({ text: language === 'es' ? 'Pausa' : 'Paused', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' });
+                    }
+                  } else if (item.item_type === 'series' || item.item_type === 'anime') {
+                    const cacheKey = `series_${item.external_id}`;
+                    const cached = item.external_id ? (getCachedSeries(cacheKey) || getCachedSeries(`${item.external_id}_metadata`)) : null;
+                    const anyItem = item as any;
+                    const sStatus = cached?.status || anyItem.series_status;
+                    const isEnded = sStatus === 'Ended' || sStatus === 'Finished' || sStatus === 'Canceled' || anyItem.is_ended === true || cached?.is_ended === true || (item.external_id ? seriesEndedMap[item.external_id] === true : false);
+
+                    if (hasEverCompleted || item.status === 'completed') {
+                      if (isEnded) {
+                        badges.push({ text: language === 'es' ? 'Terminada' : 'Completed', color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)' });
+                      } else {
+                        badges.push({ text: language === 'es' ? 'Al día' : 'Up to date', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' });
+                      }
+                    } else if (item.status === 'watching') {
+                      const cacheKeyAll = `${item.external_id}_all_episodes`;
+                      const allEps = item.external_id ? (seriesEpisodesMap[item.external_id] || getCachedSeries(cacheKeyAll)) : null;
+                      let isUpToDate = false;
+                      if (allEps && Array.isArray(allEps) && allEps.length > 0) {
+                        const nowMs = Date.now();
+                        const canonicalAired = allEps.filter((e: any) => {
+                          const isExtra = e.is_extra || e.ep_type === 'insignificant_special' || (e.season_number === 0 && !e.is_significant_special && e.ep_type !== 'significant_special');
+                          if (isExtra) return false;
+                          if (e.airstamp) return new Date(e.airstamp).getTime() <= nowMs;
+                          if (e.airdate || e.air_date) {
+                            const ad = e.airdate || e.air_date;
+                            const at = e.airtime || '00:00';
+                            return new Date(`${ad}T${at}:00Z`).getTime() <= nowMs;
+                          }
+                          return true;
+                        });
+
+                        const completedCount = item.completed_episodes_count ?? item.pages_read ?? 0;
+                        if (canonicalAired.length > 0) {
+                          if (completedCount >= canonicalAired.length && completedCount > 0) {
+                            isUpToDate = true;
+                          } else if (item.last_seen_episode) {
+                            const lastAired = canonicalAired[canonicalAired.length - 1];
+                            if (lastAired) {
+                              const lastAiredS = lastAired.season_number ?? 1;
+                              const lastAiredE = lastAired.episode_number;
+                              const matchLast = item.last_seen_episode.match(/S(\d+)E(\d+)/i);
+                              if (matchLast && lastAiredE != null) {
+                                const seenS = parseInt(matchLast[1], 10);
+                                const seenE = parseInt(matchLast[2], 10);
+                                if (seenS > lastAiredS || (seenS === lastAiredS && seenE >= lastAiredE)) {
+                                  isUpToDate = true;
+                                }
                               }
+                            }
+                          }
+                        }
+                      }
+                      if (isUpToDate) {
+                        badges.push({ text: language === 'es' ? 'Al día' : 'Up to date', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' });
+                      } else {
+                        badges.push({ text: language === 'es' ? 'Viendo' : 'Watching', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' });
+                      }
+                    }
+                  } else if (['book', 'comic', 'manga'].includes(item.item_type)) {
+                    if (item.item_type === 'comic') {
+                      const cleanVolId = String(item.external_id || '').replace('cv_vol_', '').replace('cv_issue_', '').replace('cv_', '');
+                      const volMeta = getCachedSeries(`comic_vol_${item.external_id}`) || getCachedSeries(`${item.external_id}_metadata`) || getCachedSeries(`cv_vol_${cleanVolId}_metadata`) || getCachedSeries(`series_${item.external_id}`);
+                      const anyItem = item as any;
+                      const sStatus = volMeta?.status || anyItem.series_status;
+                      const currentYear = new Date().getFullYear();
+                      const titleYearMatch = item.title ? String(item.title).match(/\b(19\d\d|20\d\d)\b/) : null;
+                      const startYr = parseInt(item.release_date || volMeta?.start_year || volMeta?.first_air_date || (titleYearMatch ? titleYearMatch[1] : '0'));
+                      const isEnded = sStatus === 'Ended' || anyItem.is_ended === true || volMeta?.is_ended === true || (startYr > 0 && startYr < currentYear - 1);
 
-                              // If filtering by specific category (e.g. "game") and it has a special category badge (DLC, Expansión, etc.):
-                              if (isGame && specialGameLabel) {
-                                return (
-                                  <div className="tag-badge tag-game" style={{ position: "absolute", top: "0.5rem", left: "0.5rem", padding: "0.15rem 0.45rem", borderRadius: "4px", fontSize: "0.7rem", fontWeight: 600, opacity: 0.9, backdropFilter: 'blur(4px)', zIndex: 1 }}>
-                                    {specialGameLabel}
-                                  </div>
-                                );
+                      if (hasEverCompleted || item.status === 'completed' || item.status === 'read') {
+                        if (isEnded) {
+                          badges.push({ text: language === 'es' ? 'Leído' : 'Read', color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)' });
+                        } else {
+                          badges.push({ text: language === 'es' ? 'Al día' : 'Up to date', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' });
+                        }
+                      } else if (item.status === 'reading') {
+                        const cleanVolId = String(item.external_id || '').replace('cv_vol_', '').replace('cv_issue_', '').replace('cv_', '');
+                        const allEps = getCachedSeries(`${cleanVolId}_all_episodes`) || getCachedSeries(`cv_vol_${cleanVolId}_all_episodes`) || getCachedSeries(`${item.external_id}_all_episodes`);
+                        let isUpToDate = false;
+                        if (allEps && Array.isArray(allEps) && allEps.length > 0) {
+                          const nowMs = Date.now();
+                          const releasedIssues = allEps.filter((e: any) => {
+                            if (e.air_date || e.airdate) {
+                              const ad = e.air_date || e.airdate;
+                              return new Date(ad).getTime() <= nowMs;
+                            }
+                            return true;
+                          });
+                          const completedIssues = item.completed_episodes_count ?? item.pages_read ?? 0;
+                          if (releasedIssues.length > 0 && completedIssues >= releasedIssues.length && completedIssues > 0) {
+                            isUpToDate = true;
+                          }
+                        }
+                        if (isUpToDate) {
+                          badges.push({ text: language === 'es' ? 'Al día' : 'Up to date', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' });
+                        } else {
+                          badges.push({ text: language === 'es' ? 'Leyendo' : 'Reading', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' });
+                        }
+                      }
+                    } else {
+                      if (hasEverCompleted || item.status === 'completed' || item.status === 'read') {
+                        badges.push({ text: language === 'es' ? 'Leído' : 'Read', color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)' });
+                      } else if (item.status === 'reading') {
+                        badges.push({ text: language === 'es' ? 'Leyendo' : 'Reading', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' });
+                      }
+                    }
+                  }
+
+                  if (item.item_type !== 'game' && item.times_completed && item.times_completed > 1) {
+                    badges.push({
+                      text: `x${item.times_completed}`,
+                      color: 'var(--accent-primary)',
+                      bg: 'rgba(99, 102, 241, 0.15)'
+                    });
+                  }
+
+                  if (badges.length === 0) return null;
+
+                  return (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem', alignItems: 'center' }}>
+                      {badges.map((badge, idx) => (
+                        <span key={idx} style={{
+                          fontSize: '0.72rem',
+                          background: badge.bg,
+                          color: badge.color,
+                          padding: '0.15rem 0.4rem',
+                          borderRadius: '4px',
+                          fontWeight: 600,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.25rem',
+                          lineHeight: 1.2
+                        }}>
+                          {badge.isTrophy && <Trophy size={11} />}
+                          <span>{badge.text}</span>
+                        </span>
+                      ))}
+                    </div>
+                  );
+                };
+
+                return (
+                  <div style={{ position: 'relative', width: '100%' }}>
+                    {/* Grid Mode with Horizontal Side Arrows and Page Indicator */}
+                    {isGrid ? (
+                      <>
+                        {/* Left Arrow Button */}
+                        <button
+                          type="button"
+                          onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                          disabled={!canPrev}
+                          style={{
+                            ...arrowBtnStyle,
+                            left: '-20px',
+                            opacity: canPrev ? 1 : 0,
+                            visibility: canPrev ? 'visible' : 'hidden',
+                            pointerEvents: canPrev ? 'auto' : 'none'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.borderColor = 'var(--accent-primary)';
+                            e.currentTarget.style.transform = 'translateY(-50%) scale(1.05)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.borderColor = 'var(--border-color)';
+                            e.currentTarget.style.transform = 'translateY(-50%)';
+                          }}
+                          title={language === 'es' ? 'Página anterior' : 'Previous page'}
+                          aria-label={language === 'es' ? 'Página anterior' : 'Previous page'}
+                        >
+                          <ChevronLeft size={20} />
+                        </button>
+
+                        {/* Right Arrow Button */}
+                        <button
+                          type="button"
+                          onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                          disabled={!canNext}
+                          style={{
+                            ...arrowBtnStyle,
+                            right: '-20px',
+                            opacity: canNext ? 1 : 0,
+                            visibility: canNext ? 'visible' : 'hidden',
+                            pointerEvents: canNext ? 'auto' : 'none'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.borderColor = 'var(--accent-primary)';
+                            e.currentTarget.style.transform = 'translateY(-50%) scale(1.05)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.borderColor = 'var(--border-color)';
+                            e.currentTarget.style.transform = 'translateY(-50%)';
+                          }}
+                          title={language === 'es' ? 'Página siguiente' : 'Next page'}
+                          aria-label={language === 'es' ? 'Página siguiente' : 'Next page'}
+                        >
+                          <ChevronRight size={20} />
+                        </button>
+
+                        <div style={{
+                          display: 'grid',
+                          gridTemplateColumns: `repeat(${gridColumns}, minmax(0, 1fr))`,
+                          gap: '1.25rem'
+                        }}>
+                          {displayedGridItems.map(item => (
+                            <div key={item.id} className="glass-card" style={{ padding: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                              <div style={{ position: 'relative', cursor: 'pointer', width: '100%', height: '230px', borderRadius: '8px', overflow: 'hidden' }} onClick={() => handleOpenItemDetails(item)}>
+                                <MediaPoster
+                                  src={item.image_url}
+                                  title={item.title}
+                                  itemType={item.item_type}
+                                  height="100%"
+                                  width="100%"
+                                  borderRadius="8px"
+                                />
+                                
+                                {/* Tag / Category Badge */}
+                                {(() => {
+                                  const isGame = item.item_type === 'game';
+                                  const rawBadge = (item.custom_badge || '').toLowerCase();
+                                  
+                                  const getGameBadgeLabel = (b: string) => {
+                                    if (b === 'collection' || b === 'pack') return language === 'es' ? 'Colección' : 'Collection';
+                                    if (b === 'expansion') return language === 'es' ? 'Expansión' : 'Expansion';
+                                    if (b === 'dlc') return 'DLC';
+                                    if (b === 'edition') return language === 'es' ? 'Edición' : 'Edition';
+                                    if (b === 'remake') return 'Remake';
+                                    if (b === 'remaster') return 'Remaster';
+                                    return null;
+                                  };
+
+                                  const specialGameLabel = isGame ? getGameBadgeLabel(rawBadge) : null;
+
+                                  if (mediaFilter === 'all') {
+                                    const normType = (item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tvm-ep-')) ? 'series' : item.item_type;
+                                    const label = isGame 
+                                      ? (specialGameLabel || (language === 'es' ? 'Juego' : 'Game'))
+                                      : (item.item_type === 'episode' || item.external_id?.startsWith('tvm-ep-'))
+                                      ? (language === 'es' ? 'Serie' : 'Show')
+                                      : item.item_type === 'season'
+                                      ? (language === 'es' ? 'Temporada' : 'Season')
+                                      : item.item_type === 'comic' ? (language === 'es' ? 'Cómic' : 'Comic') : item.item_type === 'manga' ? 'Manga' : t('media' + item.item_type.charAt(0).toUpperCase() + item.item_type.slice(1));
+
+                                    return (
+                                      <div
+                                        className={getTagClass(normType)}
+                                        style={{
+                                          position: "absolute",
+                                          top: "0.5rem",
+                                          left: "0.5rem",
+                                          padding: "0.2rem 0.35rem",
+                                          borderRadius: "4px",
+                                          display: "inline-flex",
+                                          alignItems: "center",
+                                          justifyContent: "center",
+                                          opacity: 0.95,
+                                          backdropFilter: 'blur(4px)',
+                                          zIndex: 1
+                                        }}
+                                        title={label}
+                                      >
+                                        {getCategoryIcon(normType, { size: 14, color: 'currentColor' })}
+                                      </div>
+                                    );
+                                  }
+
+                                  if (isGame && specialGameLabel) {
+                                    return (
+                                      <div className="tag-badge tag-game" style={{ position: "absolute", top: "0.5rem", left: "0.5rem", padding: "0.15rem 0.45rem", borderRadius: "4px", fontSize: "0.7rem", fontWeight: 600, opacity: 0.9, backdropFilter: 'blur(4px)', zIndex: 1 }}>
+                                        {specialGameLabel}
+                                      </div>
+                                    );
+                                  }
+
+                                  return null;
+                                })()}
+                                
+                                {/* Favorite Heart Button (Unified Pink) */}
+                                {(() => {
+                                  const isEffectiveFav = displayedFavorites.some(df => df.id === item.id);
+                                  const isDlcOrExpansion = item.item_type === 'game' && ['dlc', 'expansion'].includes(item.badge || item.custom_badge || '');
+                                  const isUnconsumed = !isDlcOrExpansion && ['plan_to_watch', 'plan_to_read', 'plan_to_play'].includes(item.status);
+                                  return (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleToggleFavorite(item.id, isEffectiveFav);
+                                      }}
+                                      className={`btn-favorite-heart ${isEffectiveFav ? 'is-favorite' : ''}`}
+                                      style={{
+                                        position: 'absolute',
+                                        top: '0.5rem',
+                                        right: '0.5rem',
+                                        width: '32px',
+                                        height: '32px',
+                                        cursor: isUnconsumed && !isEffectiveFav ? 'not-allowed' : 'pointer',
+                                        opacity: isUnconsumed && !isEffectiveFav ? 0.35 : 1,
+                                        color: isEffectiveFav ? 'var(--color-user, #F472B6)' : 'var(--text-secondary)'
+                                      }}
+                                      title={isUnconsumed && !isEffectiveFav
+                                        ? (language === 'es' ? 'Empieza a consumir esta obra para poder destacarla' : 'Start consuming this item to feature it')
+                                        : (isEffectiveFav
+                                          ? (language === 'es' ? 'Quitar Destacado' : 'Remove Featured')
+                                          : (language === 'es' ? 'Destacar' : 'Favorite'))
+                                      }
+                                    >
+                                      <Heart size={16} fill={isEffectiveFav ? 'var(--color-user, #F472B6)' : 'none'} />
+                                    </button>
+                                  );
+                                })()}
+
+                              </div>
+                              <div style={{ flex: 1, textAlign: 'left', cursor: 'pointer' }} onClick={() => handleOpenItemDetails(item)}>
+                                {(() => {
+                                  const match = (item.title || '').match(/^(.*?)\s*-\s*S(\d+)E(\d+)(.*)$/i);
+                                  const isEpOrSeason = item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tvm-ep-');
+                                  
+                                  if (isEpOrSeason && match) {
+                                    const series = match[1].trim();
+                                    const s = match[2];
+                                    const e = match[3];
+                                    const epName = match[4].replace(/^\s*-\s*/, '').trim();
+                                    const formattedSE = language === 'es' ? `T${s} | E${e}` : `S${s} | E${e}`;
+                                    return (
+                                      <div style={{ display: 'flex', flexDirection: 'column', marginBottom: '0.25rem' }}>
+                                        <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.title}>{series}</h4>
+                                        <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--accent-primary)', marginTop: '0.1rem' }}>{formattedSE}</span>
+                                        {epName && <span style={{ fontSize: '0.78rem', fontWeight: 500, color: 'var(--text-secondary)', marginTop: '0.1rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{epName}</span>}
+                                      </div>
+                                    );
+                                  }
+                                  
+                                  let displayTitle = item.title;
+                                  if (isEpOrSeason && item.last_seen_episode && item.title.toLowerCase().startsWith(item.last_seen_episode.toLowerCase() + ' - ')) {
+                                    displayTitle = item.title.slice(item.last_seen_episode.length + 3);
+                                  }
+                                  
+                                  return (
+                                    <>
+                                      <h4 style={{ margin: '0 0 0.25rem 0', fontSize: '0.92rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.title}>
+                                        {displayTitle}
+                                      </h4>
+                                      {isEpOrSeason && item.last_seen_episode && (
+                                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500, display: 'block', marginTop: '0.1rem' }}>
+                                          {language === 'es' ? 'Serie: ' : 'Show: '}{item.last_seen_episode}
+                                        </span>
+                                      )}
+                                    </>
+                                  );
+                                })()}
+
+                                {/* Unified Badges System */}
+                                <div style={{ marginTop: '0.25rem' }}>
+                                  {renderBadges(item)}
+                                </div>
+
+                                {/* Followed series / comic volume last completed episode or issue */}
+                                {(item.item_type === 'series' || item.item_type === 'anime' || item.item_type === 'comic') && item.last_seen_episode && (
+                                  <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.3rem', marginTop: '0.35rem' }}>
+                                    {(() => {
+                                      let formatted = item.last_seen_episode;
+                                      if (item.item_type === 'comic') {
+                                        const issueMatch = item.last_seen_episode.match(/#(\d+)/);
+                                        if (issueMatch) {
+                                          formatted = `#${issueMatch[1]}`;
+                                        } else if (item.last_seen_episode.startsWith(item.title)) {
+                                          formatted = item.last_seen_episode.slice(item.title.length).trim() || item.last_seen_episode;
+                                        }
+                                      } else {
+                                        const matchSpecialSeason = item.last_seen_episode.match(/S(\d+)\s*[•·-]\s*\[?Especial\]?/i);
+                                        const matchSpecial = item.last_seen_episode.match(/\[?Especial\]?/i);
+                                        const matchExtra = item.last_seen_episode.match(/Extras?\s*(\d+)?/i);
+                                        const match = item.last_seen_episode.match(/S(\d+)E(\d+)/i);
+
+                                        if (match) {
+                                          const s = String(match[1]).padStart(2, '0');
+                                          const e = String(match[2]).padStart(2, '0');
+                                          formatted = language === 'es' ? `T${s} | E${e}` : `S${s} | E${e}`;
+                                        } else if (matchSpecialSeason) {
+                                          const s = String(matchSpecialSeason[1]).padStart(2, '0');
+                                          formatted = language === 'es' ? `T${s} • Especial` : `S${s} • Special`;
+                                        } else if (matchExtra) {
+                                          const epNum = matchExtra[1];
+                                          formatted = epNum ? `Extra ${epNum}` : 'Extra';
+                                        } else if (matchSpecial) {
+                                          formatted = language === 'es' ? 'Especial' : 'Special';
+                                        }
+                                      }
+
+                                      const seriesRuns = item.times_completed || (item.completed_at ? 1 : 0);
+                                      const epRuns = item.last_seen_episode_count || 1;
+                                      const showEpBadge = epRuns > 1 && epRuns !== seriesRuns;
+
+                                      return (
+                                        <>
+                                          <span>{`${language === 'es' ? 'Último: ' : 'Last: '}${formatted}`}</span>
+                                          {showEpBadge && (
+                                            <span style={{
+                                              fontSize: '0.7rem',
+                                              fontWeight: 700,
+                                              color: 'var(--accent-primary)',
+                                              background: 'rgba(99, 102, 241, 0.15)',
+                                              padding: '0.05rem 0.35rem',
+                                              borderRadius: '4px'
+                                            }}>
+                                              {`x${epRuns}`}
+                                            </span>
+                                          )}
+                                        </>
+                                      );
+                                    })()}
+                                  </span>
+                                )}
+
+                                {/* Movie Duration / Watched Time */}
+                                {item.item_type === 'movie' && (item.pages_read || item.total_pages || 0) > 0 && (
+                                  <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '0.25rem', marginTop: '0.2rem' }}>
+                                    <Clock size={12} />
+                                    {(() => {
+                                      const mins = item.pages_read || item.total_pages || 0;
+                                      const h = Math.floor(mins / 60);
+                                      const m = mins % 60;
+                                      return h > 0 ? `${h}h ${m > 0 ? `${String(m).padStart(2, '0')}m` : '00m'}` : `${m}m`;
+                                    })()}
+                                  </span>
+                                )}
+
+                                {/* Game Hours Played */}
+                                {item.item_type === 'game' && (item.pages_read || 0) > 0 && (
+                                  <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '0.25rem', marginTop: '0.2rem' }}>
+                                    <Clock size={12} />
+                                    {Math.floor((item.pages_read || 0) / 60)}h {String((item.pages_read || 0) % 60).padStart(2, '0')}m
+                                  </span>
+                                )}
+
+                                {/* Book / Comic / Manga Pages Read */}
+                                {['book', 'comic', 'manga'].includes(item.item_type) && (!item.tracking_list_id && !item.last_seen_episode) && ((item.pages_read || 0) > 0 || (item.total_pages || 0) > 0) && (
+                                  <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '0.25rem', marginTop: '0.2rem' }}>
+                                    <BookOpen size={12} />
+                                    {(() => {
+                                      const read = item.pages_read || 0;
+                                      const total = item.total_pages || 0;
+                                      if (item.status === 'read' || item.status === 'completed') {
+                                        const count = total > 0 ? total : read;
+                                        return `${count} ${language === 'es' ? (count === 1 ? 'pág.' : 'págs.') : (count === 1 ? 'page' : 'pages')}`;
+                                      }
+                                      if (read > 0 && total > 0) {
+                                        return `${read} / ${total} ${language === 'es' ? 'págs.' : 'pages'}`;
+                                      }
+                                      const count = read > 0 ? read : total;
+                                      return `${count} ${language === 'es' ? (count === 1 ? 'pág.' : 'págs.') : (count === 1 ? 'page' : 'pages')}`;
+                                    })()}
+                                  </span>
+                                )}
+
+                                {/* Formatted Date */}
+                                {(item.completed_at || item.updated_at) && (
+                                  <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontStyle: 'italic', display: 'block', marginTop: '0.3rem' }}>
+                                    {formatDate(new Date(item.completed_at || item.updated_at || new Date()))}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Bottom Page Indicator for Grid Mode */}
+                        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginTop: '1.25rem' }}>
+                          <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
+                            {language === 'es'
+                              ? `Página ${safeCurrentPage} de ${totalPages}`
+                              : `Page ${safeCurrentPage} of ${totalPages}`
+                            }
+                          </span>
+                        </div>
+                      </>
+                    ) : (
+                      /* List Mode: Scrollable container without horizontal side arrow buttons */
+                      <div style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.65rem',
+                        height: isShelfExpanded ? '1154px' : '398px',
+                        maxHeight: isShelfExpanded ? '1154px' : '398px',
+                        overflowY: 'auto',
+                        paddingRight: '0.35rem'
+                      }}>
+                        {filteredItems.map(item => {
+                          const isEffectiveFav = displayedFavorites.some(df => df.id === item.id);
+                          const isDlcOrExpansion = item.item_type === 'game' && ['dlc', 'expansion'].includes(item.badge || item.custom_badge || '');
+                          const isUnconsumed = !isDlcOrExpansion && ['plan_to_watch', 'plan_to_read', 'plan_to_play'].includes(item.status);
+
+                          // Prepare title & episode formatted strings
+                          const match = (item.title || '').match(/^(.*?)\s*-\s*S(\d+)E(\d+)(.*)$/i);
+                          const isEpOrSeason = item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tvm-ep-');
+                          let displayTitle = item.title;
+                          let episodeSubtext = '';
+                          if (isEpOrSeason && match) {
+                            displayTitle = match[1].trim();
+                            const s = match[2];
+                            const e = match[3];
+                            const epName = match[4].replace(/^\s*-\s*/, '').trim();
+                            const formattedSE = language === 'es' ? `T${s} | E${e}` : `S${s} | E${e}`;
+                            episodeSubtext = epName ? `${formattedSE} - ${epName}` : formattedSE;
+                          } else if (isEpOrSeason && item.last_seen_episode && item.title.toLowerCase().startsWith(item.last_seen_episode.toLowerCase() + ' - ')) {
+                            displayTitle = item.title.slice(item.last_seen_episode.length + 3);
+                          }
+
+                          // Prepare metadata snippet for Line 2
+                          let metadataSnippet: React.ReactNode = null;
+                          if (item.item_type === 'movie' && (item.pages_read || item.total_pages || 0) > 0) {
+                            const mins = item.pages_read || item.total_pages || 0;
+                            const h = Math.floor(mins / 60);
+                            const m = mins % 60;
+                            metadataSnippet = (
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                                <Clock size={12} />
+                                {h > 0 ? `${h}h ${m > 0 ? `${String(m).padStart(2, '0')}m` : '00m'}` : `${m}m`}
+                              </span>
+                            );
+                          } else if (item.item_type === 'game' && (item.pages_read || 0) > 0) {
+                            metadataSnippet = (
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                                <Clock size={12} />
+                                {Math.floor((item.pages_read || 0) / 60)}h {String((item.pages_read || 0) % 60).padStart(2, '0')}m
+                              </span>
+                            );
+                          } else if ((item.item_type === 'series' || item.item_type === 'anime' || item.item_type === 'comic') && item.last_seen_episode) {
+                            let formatted = item.last_seen_episode;
+                            if (item.item_type === 'comic') {
+                              const issueMatch = item.last_seen_episode.match(/#(\d+)/);
+                              if (issueMatch) formatted = `#${issueMatch[1]}`;
+                              else if (item.last_seen_episode.startsWith(item.title)) formatted = item.last_seen_episode.slice(item.title.length).trim() || item.last_seen_episode;
+                            } else {
+                              const matchSE = item.last_seen_episode.match(/S(\d+)E(\d+)/i);
+                              if (matchSE) {
+                                const s = String(matchSE[1]).padStart(2, '0');
+                                const e = String(matchSE[2]).padStart(2, '0');
+                                formatted = language === 'es' ? `T${s} | E${e}` : `S${s} | E${e}`;
                               }
+                            }
+                            metadataSnippet = (
+                              <span>{`${language === 'es' ? 'Último: ' : 'Last: '}${formatted}`}</span>
+                            );
+                          } else if (['book', 'comic', 'manga'].includes(item.item_type) && (!item.tracking_list_id && !item.last_seen_episode) && ((item.pages_read || 0) > 0 || (item.total_pages || 0) > 0)) {
+                            const read = item.pages_read || 0;
+                            const total = item.total_pages || 0;
+                            const label = (item.status === 'read' || item.status === 'completed')
+                              ? `${total > 0 ? total : read} ${language === 'es' ? 'págs.' : 'pages'}`
+                              : (read > 0 && total > 0)
+                              ? `${read} / ${total} ${language === 'es' ? 'págs.' : 'pages'}`
+                              : `${read > 0 ? read : total} ${language === 'es' ? 'págs.' : 'pages'}`;
+                            metadataSnippet = (
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                                <BookOpen size={12} />
+                                {label}
+                              </span>
+                            );
+                          }
 
-                              return null;
-                            })()}
-                            
-                            {(() => {
-                              const isEffectiveFav = displayedFavorites.some(df => df.id === item.id);
-                              const isDlcOrExpansion = item.item_type === 'game' && ['dlc', 'expansion'].includes(item.badge || item.custom_badge || '');
-                              const isUnconsumed = !isDlcOrExpansion && ['plan_to_watch', 'plan_to_read', 'plan_to_play'].includes(item.status);
-                              return (
+                          return (
+                            <div
+                              key={item.id}
+                              className="shelf-list-item-row"
+                              onClick={() => handleOpenItemDetails(item)}
+                            >
+                              {/* Left: Poster thumbnail */}
+                              <div style={{ width: '44px', height: '62px', borderRadius: '6px', overflow: 'hidden', flexShrink: 0 }}>
+                                <MediaPoster
+                                  src={item.image_url}
+                                  title={item.title}
+                                  itemType={item.item_type}
+                                  height="100%"
+                                  width="100%"
+                                  borderRadius="6px"
+                                />
+                              </div>
+
+                              {/* Center: 2 Lines of info */}
+                              <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.25rem', textAlign: 'left' }}>
+                                {/* Line 1: Title + category badge if 'all' + status badges on right */}
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0, flex: 1 }}>
+                                    <span style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={item.title}>
+                                      {displayTitle}
+                                    </span>
+                                    {mediaFilter === 'all' && (
+                                      <span
+                                        className={getTagClass((item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tvm-ep-')) ? 'series' : item.item_type)}
+                                        style={{ padding: '0.15rem 0.35rem', borderRadius: '4px', fontSize: '0.7rem', display: 'inline-flex', alignItems: 'center' }}
+                                      >
+                                        {getCategoryIcon((item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tvm-ep-')) ? 'series' : item.item_type, { size: 12, color: 'currentColor' })}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div style={{ flexShrink: 0 }}>
+                                    {renderBadges(item)}
+                                  </div>
+                                </div>
+
+                                {/* Line 2: Media metadata on left, date on right */}
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {episodeSubtext && (
+                                      <span style={{ color: 'var(--accent-primary)', fontWeight: 500 }}>
+                                        {episodeSubtext}
+                                      </span>
+                                    )}
+                                    {metadataSnippet}
+                                  </div>
+                                  {(item.completed_at || item.updated_at) && (
+                                    <span style={{ fontSize: '0.72rem', fontStyle: 'italic', flexShrink: 0 }}>
+                                      {formatDate(new Date(item.completed_at || item.updated_at || new Date()))}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Right: Favorite Heart button */}
+                              <div style={{ flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
                                 <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleToggleFavorite(item.id, isEffectiveFav);
-                                  }}
+                                  type="button"
+                                  onClick={() => handleToggleFavorite(item.id, isEffectiveFav)}
+                                  className={`btn-favorite-heart ${isEffectiveFav ? 'is-favorite' : ''}`}
                                   style={{
-                                    position: 'absolute',
-                                    top: '0.5rem',
-                                    right: '0.5rem',
-                                    background: 'rgba(9, 9, 12, 0.75)',
-                                    border: 'none',
-                                    borderRadius: '50%',
                                     width: '32px',
                                     height: '32px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
                                     cursor: isUnconsumed && !isEffectiveFav ? 'not-allowed' : 'pointer',
                                     opacity: isUnconsumed && !isEffectiveFav ? 0.35 : 1,
-                                    color: isEffectiveFav ? 'var(--accent-primary)' : 'var(--text-secondary)',
-                                    transition: 'transform 0.2s ease'
+                                    color: isEffectiveFav ? 'var(--color-user, #F472B6)' : 'var(--text-secondary)'
                                   }}
                                   title={isUnconsumed && !isEffectiveFav
                                     ? (language === 'es' ? 'Empieza a consumir esta obra para poder destacarla' : 'Start consuming this item to feature it')
@@ -1669,392 +2336,24 @@ export const Profile: React.FC = () => {
                                       : (language === 'es' ? 'Destacar' : 'Favorite'))
                                   }
                                 >
-                                  <Heart size={16} fill={isEffectiveFav ? 'var(--accent-primary)' : 'none'} />
+                                  <Heart size={16} fill={isEffectiveFav ? 'var(--color-user, #F472B6)' : 'none'} />
                                 </button>
-                              );
-                            })()}
-
-                          </div>
-                          <div style={{ flex: 1, textAlign: 'left', cursor: 'pointer' }} onClick={() => handleOpenItemDetails(item)}>
-                            {(() => {
-                              const match = (item.title || '').match(/^(.*?)\s*-\s*S(\d+)E(\d+)(.*)$/i);
-                              const isEpOrSeason = item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tvm-ep-');
-                              
-                              if (isEpOrSeason && match) {
-                                const series = match[1].trim();
-                                const s = match[2];
-                                const e = match[3];
-                                const epName = match[4].replace(/^\s*-\s*/, '').trim();
-                                const formattedSE = language === 'es' ? `T${s} | E${e}` : `S${s} | E${e}`;
-                                return (
-                                  <div style={{ display: 'flex', flexDirection: 'column', marginBottom: '0.25rem' }}>
-                                    <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.title}>{series}</h4>
-                                    <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--accent-primary)', marginTop: '0.1rem' }}>{formattedSE}</span>
-                                    {epName && <span style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-secondary)', marginTop: '0.1rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{epName}</span>}
-                                  </div>
-                                );
-                              }
-                              
-                              let displayTitle = item.title;
-                              if (isEpOrSeason && item.last_seen_episode && item.title.toLowerCase().startsWith(item.last_seen_episode.toLowerCase() + ' - ')) {
-                                displayTitle = item.title.slice(item.last_seen_episode.length + 3);
-                              }
-                              
-                              return (
-                                <>
-                                  <h4 style={{ margin: '0 0 0.25rem 0', fontSize: '0.95rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.title}>
-                                    {displayTitle}
-                                  </h4>
-                                  {isEpOrSeason && item.last_seen_episode && (
-                                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500, display: 'block', marginTop: '0.1rem' }}>
-                                      {language === 'es' ? 'Serie: ' : 'Show: '}{item.last_seen_episode}
-                                    </span>
-                                  )}
-                                </>
-                              );
-                            })()}
-
-                            {/* Unified Badges System (under title) */}
-                            {(() => {
-                              const isUnitEpisode = item.item_type === 'episode' || item.external_id?.startsWith('tvm-ep-') || !!(item.title || '').match(/^(.*?)\s*-\s*S(\d+)E(\d+)(.*)$/i);
-                                                      const badges = [];
-                              const hasEverCompleted = (item.times_completed && item.times_completed > 0) || !!item.completed_at;
-                              
-                              // Dropped (All)
-                              if (item.status === 'dropped') {
-                                badges.push({ text: language === 'es' ? 'Abandonado' : 'Dropped', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.15)' });
-                              }
-                              // Endless (Games)
-                              else if (item.status === 'endless') {
-                                badges.push({ text: language === 'es' ? 'Infinito' : 'Endless', color: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.15)' });
-                              }
-                              // Games
-                              else if (item.item_type === 'game') {
-                                if (hasEverCompleted) {
-                                  const hundredRuns = item.times_completed_hundred ?? (item.is_hundred_percent ? (item.times_completed || 1) : 0);
-                                  const standardRuns = item.times_completed_standard ?? (item.is_hundred_percent ? 0 : (item.times_completed || 1));
-
-                                  // Standard completions badge
-                                  if (standardRuns > 0) {
-                                    badges.push({
-                                      text: standardRuns > 1 
-                                        ? `${language === 'es' ? 'Completado' : 'Completed'} x${standardRuns}`
-                                        : (language === 'es' ? 'Completado' : 'Completed'),
-                                      color: '#10b981',
-                                      bg: 'rgba(16, 185, 129, 0.15)'
-                                    });
-                                  }
-
-                                  // 100% completions badge
-                                  if (hundredRuns > 0) {
-                                    badges.push({
-                                      text: hundredRuns > 1 ? `100% x${hundredRuns}` : '100%',
-                                      color: '#f59e0b',
-                                      bg: 'rgba(245, 158, 11, 0.15)',
-                                      isTrophy: true
-                                    });
-                                  }
-                                } else if (item.status === 'playing') {
-                                  badges.push({ text: language === 'es' ? 'Jugando' : 'Playing', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' });
-                                }
-                              }
-                              // Movies
-                              else if (item.item_type === 'movie') {
-                                if (hasEverCompleted) {
-                                  badges.push({ text: language === 'es' ? 'Visto' : 'Watched', color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)' });
-                                } else if (item.status === 'watching') {
-                                  badges.push({ text: language === 'es' ? 'Pausa' : 'Paused', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' });
-                                }
-                              }
-                              // Series / Anime
-                              else if (item.item_type === 'series' || item.item_type === 'anime') {
-                                const cacheKey = `series_${item.external_id}`;
-                                const cached = item.external_id ? (getCachedSeries(cacheKey) || getCachedSeries(`${item.external_id}_metadata`)) : null;
-                                const anyItem = item as any;
-                                const sStatus = cached?.status || anyItem.series_status;
-                                const isEnded = sStatus === 'Ended' || sStatus === 'Finished' || sStatus === 'Canceled' || anyItem.is_ended === true || cached?.is_ended === true || (item.external_id ? seriesEndedMap[item.external_id] === true : false);
-
-                                if (hasEverCompleted || item.status === 'completed') {
-                                  if (isEnded) {
-                                    badges.push({ text: language === 'es' ? 'Terminada' : 'Completed', color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)' });
-                                  } else {
-                                    badges.push({ text: language === 'es' ? 'Al día' : 'Up to date', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' });
-                                  }
-                                } else if (item.status === 'watching') {
-                                  const cacheKeyAll = `${item.external_id}_all_episodes`;
-                                  const allEps = item.external_id ? (seriesEpisodesMap[item.external_id] || getCachedSeries(cacheKeyAll)) : null;
-                                  let isUpToDate = false;
-                                  if (allEps && Array.isArray(allEps) && allEps.length > 0) {
-                                    const nowMs = Date.now();
-                                    const canonicalAired = allEps.filter((e: any) => {
-                                      const isExtra = e.is_extra || e.ep_type === 'insignificant_special' || (e.season_number === 0 && !e.is_significant_special && e.ep_type !== 'significant_special');
-                                      if (isExtra) return false;
-                                      if (e.airstamp) return new Date(e.airstamp).getTime() <= nowMs;
-                                      if (e.airdate || e.air_date) {
-                                        const ad = e.airdate || e.air_date;
-                                        const at = e.airtime || '00:00';
-                                        return new Date(`${ad}T${at}:00Z`).getTime() <= nowMs;
-                                      }
-                                      return true;
-                                    });
-
-                                    const completedCount = item.completed_episodes_count ?? item.pages_read ?? 0;
-                                    if (canonicalAired.length > 0) {
-                                      if (completedCount >= canonicalAired.length && completedCount > 0) {
-                                        isUpToDate = true;
-                                      } else if (item.last_seen_episode) {
-                                        const lastAired = canonicalAired[canonicalAired.length - 1];
-                                        if (lastAired) {
-                                          const lastAiredS = lastAired.season_number ?? 1;
-                                          const lastAiredE = lastAired.episode_number;
-                                          const matchLast = item.last_seen_episode.match(/S(\d+)E(\d+)/i);
-                                          if (matchLast && lastAiredE != null) {
-                                            const seenS = parseInt(matchLast[1], 10);
-                                            const seenE = parseInt(matchLast[2], 10);
-                                            if (seenS > lastAiredS || (seenS === lastAiredS && seenE >= lastAiredE)) {
-                                              isUpToDate = true;
-                                            }
-                                          }
-                                        }
-                                      }
-                                    }
-                                  }
-                                  if (isUpToDate) {
-                                    badges.push({ text: language === 'es' ? 'Al día' : 'Up to date', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' });
-                                  } else {
-                                    badges.push({ text: language === 'es' ? 'Viendo' : 'Watching', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' });
-                                  }
-                                }
-                              }
-                              // Reading (Books, Comics, Manga)
-                              else if (['book', 'comic', 'manga'].includes(item.item_type)) {
-                                if (item.item_type === 'comic') {
-                                  const cleanVolId = String(item.external_id || '').replace('cv_vol_', '').replace('cv_issue_', '').replace('cv_', '');
-                                  const volMeta = getCachedSeries(`comic_vol_${item.external_id}`) || getCachedSeries(`${item.external_id}_metadata`) || getCachedSeries(`cv_vol_${cleanVolId}_metadata`) || getCachedSeries(`series_${item.external_id}`);
-                                  const anyItem = item as any;
-                                  const sStatus = volMeta?.status || anyItem.series_status;
-                                  const currentYear = new Date().getFullYear();
-                                  const titleYearMatch = item.title ? String(item.title).match(/\b(19\d\d|20\d\d)\b/) : null;
-                                  const startYr = parseInt(item.release_date || volMeta?.start_year || volMeta?.first_air_date || (titleYearMatch ? titleYearMatch[1] : '0'));
-                                  const isEnded = sStatus === 'Ended' || anyItem.is_ended === true || volMeta?.is_ended === true || (startYr > 0 && startYr < currentYear - 1);
-
-                                  if (hasEverCompleted || item.status === 'completed' || item.status === 'read') {
-                                    if (isEnded) {
-                                      badges.push({ text: language === 'es' ? 'Leído' : 'Read', color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)' });
-                                    } else {
-                                      badges.push({ text: language === 'es' ? 'Al día' : 'Up to date', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' });
-                                    }
-                                  } else if (item.status === 'reading') {
-                                    const cleanVolId = String(item.external_id || '').replace('cv_vol_', '').replace('cv_issue_', '').replace('cv_', '');
-                                    const allEps = getCachedSeries(`${cleanVolId}_all_episodes`) || getCachedSeries(`cv_vol_${cleanVolId}_all_episodes`) || getCachedSeries(`${item.external_id}_all_episodes`);
-                                    let isUpToDate = false;
-                                    if (allEps && Array.isArray(allEps) && allEps.length > 0) {
-                                      const nowMs = Date.now();
-                                      const releasedIssues = allEps.filter((e: any) => {
-                                        if (e.air_date || e.airdate) {
-                                          const ad = e.air_date || e.airdate;
-                                          return new Date(ad).getTime() <= nowMs;
-                                        }
-                                        return true;
-                                      });
-                                      const completedIssues = item.completed_episodes_count ?? item.pages_read ?? 0;
-                                      if (releasedIssues.length > 0 && completedIssues >= releasedIssues.length && completedIssues > 0) {
-                                        isUpToDate = true;
-                                      }
-                                    }
-                                    if (isUpToDate) {
-                                      badges.push({ text: language === 'es' ? 'Al día' : 'Up to date', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' });
-                                    } else {
-                                      badges.push({ text: language === 'es' ? 'Leyendo' : 'Reading', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' });
-                                    }
-                                  }
-                                } else {
-                                  if (hasEverCompleted || item.status === 'completed' || item.status === 'read') {
-                                    badges.push({ text: language === 'es' ? 'Leído' : 'Read', color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)' });
-                                  } else if (item.status === 'reading') {
-                                    badges.push({ text: language === 'es' ? 'Leyendo' : 'Reading', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' });
-                                  }
-                                }
-                              }
-
-                              // Repeat count badge (e.g. x2, x3) for full completed runs on non-game media types
-                              if (item.item_type !== 'game' && item.times_completed && item.times_completed > 1) {
-                                badges.push({
-                                  text: `x${item.times_completed}`,
-                                  color: 'var(--accent-primary)',
-                                  bg: 'rgba(99, 102, 241, 0.15)'
-                                });
-                              }
-
-                              if (badges.length === 0) return null;
-
-                              return (
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem', marginTop: '0.25rem' }}>
-                                  {badges.map((badge, idx) => (
-                                    <span key={idx} style={{
-                                      fontSize: '0.72rem',
-                                      background: badge.bg,
-                                      color: badge.color,
-                                      padding: '0.15rem 0.4rem',
-                                      borderRadius: '4px',
-                                      fontWeight: 600,
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: '0.25rem'
-                                    }}>
-                                      {badge.isTrophy && <Trophy size={11} />}
-                                      <span>{badge.text}</span>
-                                    </span>
-                                  ))}
-                                </div>
-                              );
-                            })()}
-
-                            {/* Followed series / comic volume last completed episode or issue */}
-                            {(item.item_type === 'series' || item.item_type === 'anime' || item.item_type === 'comic') && item.last_seen_episode && (
-                              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.3rem', marginTop: '0.35rem' }}>
-                                {(() => {
-                                  let formatted = item.last_seen_episode;
-                                  if (item.item_type === 'comic') {
-                                    // If title has #1 or similar, extract or format nicely
-                                    const issueMatch = item.last_seen_episode.match(/#(\d+)/);
-                                    if (issueMatch) {
-                                      formatted = `#${issueMatch[1]}`;
-                                    } else if (item.last_seen_episode.startsWith(item.title)) {
-                                      formatted = item.last_seen_episode.slice(item.title.length).trim() || item.last_seen_episode;
-                                    }
-                                  } else {
-                                    const matchSpecialSeason = item.last_seen_episode.match(/S(\d+)\s*[•·-]\s*\[?Especial\]?/i);
-                                    const matchSpecial = item.last_seen_episode.match(/\[?Especial\]?/i);
-                                    const matchExtra = item.last_seen_episode.match(/Extras?\s*(\d+)?/i);
-                                    const match = item.last_seen_episode.match(/S(\d+)E(\d+)/i);
-
-                                    if (match) {
-                                      const s = String(match[1]).padStart(2, '0');
-                                      const e = String(match[2]).padStart(2, '0');
-                                      formatted = language === 'es' ? `T${s} | E${e}` : `S${s} | E${e}`;
-                                    } else if (matchSpecialSeason) {
-                                      const s = String(matchSpecialSeason[1]).padStart(2, '0');
-                                      formatted = language === 'es' ? `T${s} • Especial` : `S${s} • Special`;
-                                    } else if (matchExtra) {
-                                      const epNum = matchExtra[1];
-                                      formatted = epNum ? `Extra ${epNum}` : 'Extra';
-                                    } else if (matchSpecial) {
-                                      formatted = language === 'es' ? 'Especial' : 'Special';
-                                    }
-                                  }
-
-                                  const seriesRuns = item.times_completed || (item.completed_at ? 1 : 0);
-                                  const epRuns = item.last_seen_episode_count || 1;
-                                  const showEpBadge = epRuns > 1 && epRuns !== seriesRuns;
-
-                                  return (
-                                    <>
-                                      <span>{`${language === 'es' ? 'Último: ' : 'Last: '}${formatted}`}</span>
-                                      {showEpBadge && (
-                                        <span style={{
-                                          fontSize: '0.7rem',
-                                          fontWeight: 700,
-                                          color: 'var(--accent-primary)',
-                                          background: 'rgba(99, 102, 241, 0.15)',
-                                          padding: '0.05rem 0.35rem',
-                                          borderRadius: '4px'
-                                        }}>
-                                          {`x${epRuns}`}
-                                        </span>
-                                      )}
-                                    </>
-                                  );
-                                })()}
-                              </span>
-                            )}
-
-                            {/* Movie Duration / Watched Time */}
-                            {item.item_type === 'movie' && (item.pages_read || item.total_pages || 0) > 0 && (
-                              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '0.25rem', marginTop: '0.2rem' }}>
-                                <Clock size={12} />
-                                {(() => {
-                                  const mins = item.pages_read || item.total_pages || 0;
-                                  const h = Math.floor(mins / 60);
-                                  const m = mins % 60;
-                                  return h > 0 ? `${h}h ${m > 0 ? `${String(m).padStart(2, '0')}m` : '00m'}` : `${m}m`;
-                                })()}
-                              </span>
-                            )}
-
-                            {/* Game Hours Played */}
-                            {item.item_type === 'game' && (item.pages_read || 0) > 0 && (
-                              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '0.25rem', marginTop: '0.2rem' }}>
-                                <Clock size={12} />
-                                {Math.floor((item.pages_read || 0) / 60)}h {String((item.pages_read || 0) % 60).padStart(2, '0')}m
-                              </span>
-                            )}
-
-                            {/* Book / Comic / Manga Pages Read (hide pages for tracked comic volumes with issues) */}
-                            {['book', 'comic', 'manga'].includes(item.item_type) && (!item.tracking_list_id && !item.last_seen_episode) && ((item.pages_read || 0) > 0 || (item.total_pages || 0) > 0) && (
-                              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '0.25rem', marginTop: '0.2rem' }}>
-                                <BookOpen size={12} />
-                                {(() => {
-                                  const read = item.pages_read || 0;
-                                  const total = item.total_pages || 0;
-                                  if (item.status === 'read' || item.status === 'completed') {
-                                    const count = total > 0 ? total : read;
-                                    return `${count} ${language === 'es' ? (count === 1 ? 'pág.' : 'págs.') : (count === 1 ? 'page' : 'pages')}`;
-                                  }
-                                  if (read > 0 && total > 0) {
-                                    return `${read} / ${total} ${language === 'es' ? 'págs.' : 'pages'}`;
-                                  }
-                                  const count = read > 0 ? read : total;
-                                  return `${count} ${language === 'es' ? (count === 1 ? 'pág.' : 'págs.') : (count === 1 ? 'page' : 'pages')}`;
-                                })()}
-                              </span>
-                            )}
-
-                            {/* Formatted Date */}
-                            {(item.completed_at || item.updated_at) && (
-                              <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontStyle: 'italic', display: 'block', marginTop: '0.3rem' }}>
-                                {formatDate(new Date(item.completed_at || item.updated_at || new Date()))}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Pagination controls */}
-                    {isShelfExpanded && filteredItems.length > itemsPerPage && (
-                      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '1rem', marginTop: '1rem' }}>
-                        <button
-                          onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                          className="btn-secondary"
-                          disabled={currentPage === 1}
-                          style={{ padding: '0.35rem 0.75rem', fontSize: '0.82rem' }}
-                        >
-                          {language === 'es' ? 'Anterior' : 'Previous'}
-                        </button>
-                        <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-                          {language === 'es'
-                            ? `Página ${currentPage} de ${Math.ceil(filteredItems.length / itemsPerPage)}`
-                            : `Page ${currentPage} of ${Math.ceil(filteredItems.length / itemsPerPage)}`
-                          }
-                        </span>
-                        <button
-                          onClick={() => setCurrentPage(prev => Math.min(prev + 1, Math.ceil(filteredItems.length / itemsPerPage)))}
-                          className="btn-secondary"
-                          disabled={currentPage * itemsPerPage >= filteredItems.length}
-                          style={{ padding: '0.35rem 0.75rem', fontSize: '0.82rem' }}
-                        >
-                          {language === 'es' ? 'Siguiente' : 'Next'}
-                        </button>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
-                  </>
+                  </div>
                 );
               })()}
-            </div>
-          )}
-        </div>
-      )}
+            </>
+          );
+        })()}
+      </div>
+    )}
+  </div>
+)}
 
       {activeTab === 'guides' && profile && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', textAlign: 'left' }}>
@@ -2219,8 +2518,8 @@ export const Profile: React.FC = () => {
                   onClick={() => handleOpenItemDetails(item)}
                   style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', position: 'relative', cursor: 'pointer' }}
                 >
-                  <div style={{ position: 'absolute', top: '1.5rem', right: '1.5rem', background: 'rgba(124,58,237,0.9)', padding: '0.3rem', borderRadius: '50%', display: 'flex', zIndex: 2 }}>
-                    <Heart size={16} fill="white" color="white" />
+                  <div style={{ position: 'absolute', top: '1.5rem', right: '1.5rem', background: 'var(--color-user, #F472B6)', padding: '0.35rem', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2, boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
+                    <Heart size={15} fill="white" color="white" />
                   </div>
                   <MediaPoster
                     src={item.image_url}

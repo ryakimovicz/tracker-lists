@@ -603,3 +603,71 @@ h1, h2, h3, h4, h5, h6 {
   transform: scale(1.1);
 }
 
+/* Shelf View Mode Toggler */
+.shelf-view-toggle-btn {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  border-radius: 8px;
+  padding: 0.4rem 0.6rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.shelf-view-toggle-btn:hover {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+
+.shelf-view-toggle-btn.active {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+  color: #ffffff;
+}
+
+/* Unified Pink Favorite Heart Button */
+.btn-favorite-heart {
+  background: rgba(9, 9, 12, 0.75);
+  border: 1px solid transparent;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-favorite-heart:hover:not(:disabled) {
+  color: var(--color-user, #F472B6) !important;
+  border-color: var(--color-user, #F472B6) !important;
+  transform: scale(1.1);
+}
+
+.btn-favorite-heart.is-favorite {
+  color: var(--color-user, #F472B6) !important;
+  border-color: var(--color-user, #F472B6) !important;
+}
+
+/* Shelf List Item Row Hover */
+.shelf-list-item-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.65rem 1rem;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-color);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.shelf-list-item-row:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
+}
+
