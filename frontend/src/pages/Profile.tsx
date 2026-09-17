@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useSearchParams, useParams, Link } from 'react-router-dom';
 import { useTranslation } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
@@ -54,7 +54,15 @@ import {
   ChevronDown,
   ChevronUp,
   ChevronsDown,
-  ChevronsUp
+  ChevronsUp,
+  Plus,
+  Film,
+  Tv,
+  Gamepad2,
+  Book,
+  MessageSquare,
+  MessageCircle,
+  Sparkles
 } from 'lucide-react';
 
 import { MusicServiceGuideModal } from '../components/MusicServiceGuideModal';
@@ -243,6 +251,8 @@ export const Profile: React.FC = () => {
   const [isShelfExpanded, setIsShelfExpanded] = useState(false);
   const [isCreatedGuidesExpanded, setIsCreatedGuidesExpanded] = useState(false);
   const [isSavedGuidesExpanded, setIsSavedGuidesExpanded] = useState(false);
+  const [createdGuidesPage, setCreatedGuidesPage] = useState(1);
+  const [savedGuidesPage, setSavedGuidesPage] = useState(1);
   const [shelfViewMode, setShelfViewMode] = useState<'grid' | 'list'>(() => {
     try {
       const saved = localStorage.getItem('pathd_shelf_view_mode');
@@ -254,13 +264,42 @@ export const Profile: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [shelfSearchQuery, setShelfSearchQuery] = useState('');
   const shelfContainerRef = useRef<HTMLDivElement>(null);
+  const shelfScrollRef = useRef<HTMLDivElement>(null);
+  const [canShelfScrollLeft, setCanShelfScrollLeft] = useState(false);
+  const [canShelfScrollRight, setCanShelfScrollRight] = useState(false);
   const [shelfContainerWidth, setShelfContainerWidth] = useState(0);
+  const guidesContainerRef = useRef<HTMLDivElement>(null);
+  const [guidesContainerWidth, setGuidesContainerWidth] = useState(0);
+
+  const updateShelfScrollState = useCallback(() => {
+    const el = shelfScrollRef.current;
+    if (!el) return;
+    const { scrollLeft, scrollWidth, clientWidth } = el;
+    setCanShelfScrollLeft(scrollLeft > 4);
+    setCanShelfScrollRight(scrollLeft < scrollWidth - clientWidth - 4);
+  }, []);
 
   useEffect(() => {
-    if (!shelfContainerRef.current) return;
+    const el = shelfScrollRef.current;
+    if (!el) return;
+    updateShelfScrollState();
+    const timer = setTimeout(updateShelfScrollState, 50);
+    el.addEventListener('scroll', updateShelfScrollState, { passive: true });
+    window.addEventListener('resize', updateShelfScrollState);
+    return () => {
+      clearTimeout(timer);
+      el.removeEventListener('scroll', updateShelfScrollState);
+      window.removeEventListener('resize', updateShelfScrollState);
+    };
+  }, [updateShelfScrollState, isShelfExpanded, shelfViewMode, libraryItems, shelfSearchQuery]);
+
+  useEffect(() => {
     const updateWidth = () => {
       if (shelfContainerRef.current) {
         setShelfContainerWidth(shelfContainerRef.current.clientWidth);
+      }
+      if (guidesContainerRef.current) {
+        setGuidesContainerWidth(guidesContainerRef.current.clientWidth);
       }
     };
     updateWidth();
@@ -269,11 +308,17 @@ export const Profile: React.FC = () => {
       const ro = new ResizeObserver((entries) => {
         for (const entry of entries) {
           if (entry.contentRect.width > 0) {
-            setShelfContainerWidth(entry.contentRect.width);
+            if (entry.target === shelfContainerRef.current) {
+              setShelfContainerWidth(entry.contentRect.width);
+            }
+            if (entry.target === guidesContainerRef.current) {
+              setGuidesContainerWidth(entry.contentRect.width);
+            }
           }
         }
       });
-      ro.observe(shelfContainerRef.current);
+      if (shelfContainerRef.current) ro.observe(shelfContainerRef.current);
+      if (guidesContainerRef.current) ro.observe(guidesContainerRef.current);
       return () => ro.disconnect();
     } else {
       window.addEventListener('resize', updateWidth);
@@ -1595,18 +1640,34 @@ export const Profile: React.FC = () => {
             <div ref={shelfContainerRef} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
               {/* Shelf Header Controls: Mode Toggler (Grid/List) & Expand/Collapse */}
               {(() => {
-                // Dynamically calculate columns based on container width (with min card size ~165px + 20px gap)
-                // Default to 5 columns if container not measured yet
-                const computedColumns = shelfContainerWidth > 0
-                  ? Math.max(1, Math.floor((shelfContainerWidth + 20) / 185))
-                  : 5;
-                const gridColumns = Math.max(1, computedColumns);
                 const isGrid = shelfViewMode === 'grid';
-                const compactLimit = isGrid ? gridColumns : 4;
-                const itemsPerPage = isShelfExpanded ? (gridColumns * 3) : gridColumns;
-                const totalPages = Math.max(1, Math.ceil(filteredItems.length / itemsPerPage));
-                const safeCurrentPage = Math.min(currentPage, totalPages);
-                const displayedGridItems = filteredItems.slice((safeCurrentPage - 1) * itemsPerPage, safeCurrentPage * itemsPerPage);
+                // Available width accounting for 45px padding on each side (90px total)
+                // Each shelf card is ~180px wide with a 16px (1rem) gap
+                const availableWidth = Math.max(0, shelfContainerWidth - 90);
+                const maxVisibleInOneRow = Math.max(1, Math.floor((availableWidth + 16) / 196));
+                const canExpandMore = isGrid ? (filteredItems.length > maxVisibleInOneRow) : (filteredItems.length > 4);
+
+                const isTwoRows = isGrid && isShelfExpanded;
+                const isTwoRowsByColumn = isTwoRows && filteredItems.length > 2 * maxVisibleInOneRow;
+                const isTwoRowsByRow = isTwoRows && filteredItems.length <= 2 * maxVisibleInOneRow;
+
+                const getMaskImage = () => {
+                  if (canShelfScrollLeft && canShelfScrollRight) {
+                    return 'linear-gradient(to right, transparent 0px, transparent 45px, black 95px, black calc(100% - 95px), transparent calc(100% - 45px), transparent 100%)';
+                  } else if (canShelfScrollLeft) {
+                    return 'linear-gradient(to right, transparent 0px, transparent 45px, black 95px, black 100%)';
+                  } else if (canShelfScrollRight) {
+                    return 'linear-gradient(to right, black 0px, black calc(100% - 95px), transparent calc(100% - 45px), transparent 100%)';
+                  }
+                  return 'none';
+                };
+
+                const scrollShelf = (direction: 'left' | 'right') => {
+                  if (shelfScrollRef.current) {
+                    const scrollAmount = isShelfExpanded ? 360 : 300;
+                    shelfScrollRef.current.scrollBy({ left: direction === 'left' ? -scrollAmount : scrollAmount, behavior: 'smooth' });
+                  }
+                };
 
                 return (
                   <>
@@ -1642,12 +1703,11 @@ export const Profile: React.FC = () => {
                       </div>
 
                       {/* Expand / Collapse Control - Shown if items exceed compact view limit */}
-                      {filteredItems.length > compactLimit && (
+                      {canExpandMore && (
                         <button
                           type="button"
                           onClick={() => {
                             setIsShelfExpanded(!isShelfExpanded);
-                            setCurrentPage(1);
                           }}
                           className="shelf-view-toggle-btn"
                           title={isShelfExpanded
@@ -1667,10 +1727,7 @@ export const Profile: React.FC = () => {
 
                     {/* Items Container */}
                     {(() => {
-                      const canPrev = safeCurrentPage > 1;
-                      const canNext = safeCurrentPage < totalPages;
-
-                const arrowBtnStyle: React.CSSProperties = {
+                const buttonBaseStyle: React.CSSProperties = {
                   position: 'absolute',
                   top: '50%',
                   transform: 'translateY(-50%)',
@@ -1684,9 +1741,28 @@ export const Profile: React.FC = () => {
                   alignItems: 'center',
                   justifyContent: 'center',
                   cursor: 'pointer',
-                  boxShadow: '0 4px 10px rgba(0,0,0,0.4)',
+                  boxShadow: '0 4px 6px rgba(0,0,0,0.3)',
                   color: 'var(--text-primary)',
-                  transition: 'all 0.15s ease'
+                  transition: 'border-color 0.15s ease, background 0.1s ease, color 0.1s ease, transform 0.1s ease, opacity 0.2s ease, visibility 0.2s ease'
+                };
+
+                const handleMouseEnterBtn = (e: React.MouseEvent<HTMLButtonElement>) => {
+                  e.currentTarget.style.borderColor = 'var(--accent-primary)';
+                };
+                const handleMouseLeaveBtn = (e: React.MouseEvent<HTMLButtonElement>) => {
+                  e.currentTarget.style.borderColor = 'var(--border-color)';
+                  e.currentTarget.style.background = 'var(--bg-tertiary)';
+                  e.currentTarget.style.color = 'var(--text-primary)';
+                };
+                const handleMouseDownBtn = (e: React.MouseEvent<HTMLButtonElement>) => {
+                  e.currentTarget.style.background = 'var(--accent-primary)';
+                  e.currentTarget.style.borderColor = 'var(--accent-primary)';
+                  e.currentTarget.style.color = 'var(--bg-primary)';
+                };
+                const handleMouseUpBtn = (e: React.MouseEvent<HTMLButtonElement>) => {
+                  e.currentTarget.style.background = 'var(--bg-tertiary)';
+                  e.currentTarget.style.borderColor = 'var(--accent-primary)';
+                  e.currentTarget.style.color = 'var(--text-primary)';
                 };
 
                 // Helper to render media badges for Grid / List items
@@ -1871,68 +1947,82 @@ export const Profile: React.FC = () => {
 
                 return (
                   <div style={{ position: 'relative', width: '100%' }}>
-                    {/* Grid Mode with Horizontal Side Arrows and Page Indicator */}
+                    {/* Grid Mode with Horizontal Smooth Scrolling, Gradient Masks & Click Blocking Zones */}
                     {isGrid ? (
-                      <>
+                      <div style={{ position: 'relative' }}>
+                        {/* Left fade click-blocking zone */}
+                        {canShelfScrollLeft && (
+                          <div
+                            style={{
+                              position: 'absolute',
+                              left: 0,
+                              top: 0,
+                              bottom: 0,
+                              width: '70px',
+                              zIndex: 8,
+                              pointerEvents: 'auto',
+                              cursor: 'default'
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        )}
+
                         {/* Left Arrow Button */}
                         <button
                           type="button"
-                          onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                          disabled={!canPrev}
+                          onClick={() => scrollShelf('left')}
+                          onMouseEnter={handleMouseEnterBtn}
+                          onMouseLeave={handleMouseLeaveBtn}
+                          onMouseDown={handleMouseDownBtn}
+                          onMouseUp={handleMouseUpBtn}
                           style={{
-                            ...arrowBtnStyle,
-                            left: '-20px',
-                            opacity: canPrev ? 1 : 0,
-                            visibility: canPrev ? 'visible' : 'hidden',
-                            pointerEvents: canPrev ? 'auto' : 'none'
+                            ...buttonBaseStyle,
+                            left: '0px',
+                            opacity: canShelfScrollLeft ? 1 : 0,
+                            visibility: canShelfScrollLeft ? 'visible' : 'hidden',
+                            pointerEvents: canShelfScrollLeft ? 'auto' : 'none'
                           }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.borderColor = 'var(--accent-primary)';
-                            e.currentTarget.style.transform = 'translateY(-50%) scale(1.05)';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.borderColor = 'var(--border-color)';
-                            e.currentTarget.style.transform = 'translateY(-50%)';
-                          }}
-                          title={language === 'es' ? 'Página anterior' : 'Previous page'}
-                          aria-label={language === 'es' ? 'Página anterior' : 'Previous page'}
+                          aria-label={language === 'es' ? 'Desplazar a la izquierda' : 'Scroll left'}
                         >
-                          <ChevronLeft size={20} />
+                          <ChevronLeft size={20} color="currentColor" />
                         </button>
 
-                        {/* Right Arrow Button */}
-                        <button
-                          type="button"
-                          onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                          disabled={!canNext}
+                        <div
+                          ref={shelfScrollRef}
                           style={{
-                            ...arrowBtnStyle,
-                            right: '-20px',
-                            opacity: canNext ? 1 : 0,
-                            visibility: canNext ? 'visible' : 'hidden',
-                            pointerEvents: canNext ? 'auto' : 'none'
+                            display: isTwoRows ? 'grid' : 'flex',
+                            gridTemplateColumns: isTwoRowsByRow ? `repeat(${maxVisibleInOneRow}, max-content)` : undefined,
+                            gridTemplateRows: isTwoRows ? 'repeat(2, auto)' : undefined,
+                            gridAutoFlow: isTwoRows ? (isTwoRowsByColumn ? 'column' : 'row') : undefined,
+                            gridAutoColumns: isTwoRowsByColumn ? 'max-content' : undefined,
+                            justifyContent: 'start',
+                            alignContent: 'start',
+                            gap: '1rem',
+                            overflowX: 'auto',
+                            scrollbarWidth: 'none',
+                            msOverflowStyle: 'none',
+                            paddingTop: '8px',
+                            paddingBottom: '1rem',
+                            paddingLeft: '45px',
+                            paddingRight: '45px',
+                            WebkitMaskImage: getMaskImage(),
+                            maskImage: getMaskImage()
                           }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.borderColor = 'var(--accent-primary)';
-                            e.currentTarget.style.transform = 'translateY(-50%) scale(1.05)';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.borderColor = 'var(--border-color)';
-                            e.currentTarget.style.transform = 'translateY(-50%)';
-                          }}
-                          title={language === 'es' ? 'Página siguiente' : 'Next page'}
-                          aria-label={language === 'es' ? 'Página siguiente' : 'Next page'}
                         >
-                          <ChevronRight size={20} />
-                        </button>
-
-                        <div style={{
-                          display: 'grid',
-                          gridTemplateColumns: `repeat(${gridColumns}, minmax(0, 1fr))`,
-                          gap: '1.25rem'
-                        }}>
-                          {displayedGridItems.map(item => (
-                            <div key={item.id} className="glass-card" style={{ padding: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                          {filteredItems.map(item => (
+                            <div
+                              key={item.id}
+                              className="glass-card"
+                              style={{
+                                minWidth: '185px',
+                                maxWidth: '185px',
+                                padding: '0.85rem',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '0.65rem',
+                                flexShrink: 0
+                              }}
+                            >
                               <div style={{ position: 'relative', cursor: 'pointer', width: '100%', height: '230px', borderRadius: '8px', overflow: 'hidden' }} onClick={() => handleOpenItemDetails(item)}>
                                 <MediaPoster
                                   src={item.image_url}
@@ -2193,24 +2283,51 @@ export const Profile: React.FC = () => {
                           ))}
                         </div>
 
-                        {/* Bottom Page Indicator for Grid Mode */}
-                        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginTop: '1.25rem' }}>
-                          <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
-                            {language === 'es'
-                              ? `Página ${safeCurrentPage} de ${totalPages}`
-                              : `Page ${safeCurrentPage} of ${totalPages}`
-                            }
-                          </span>
-                        </div>
-                      </>
+                        {/* Right Arrow Button */}
+                        <button
+                          type="button"
+                          onClick={() => scrollShelf('right')}
+                          onMouseEnter={handleMouseEnterBtn}
+                          onMouseLeave={handleMouseLeaveBtn}
+                          onMouseDown={handleMouseDownBtn}
+                          onMouseUp={handleMouseUpBtn}
+                          style={{
+                            ...buttonBaseStyle,
+                            right: '0px',
+                            opacity: canShelfScrollRight ? 1 : 0,
+                            visibility: canShelfScrollRight ? 'visible' : 'hidden',
+                            pointerEvents: canShelfScrollRight ? 'auto' : 'none'
+                          }}
+                          aria-label={language === 'es' ? 'Desplazar a la derecha' : 'Scroll right'}
+                        >
+                          <ChevronRight size={20} color="currentColor" />
+                        </button>
+
+                        {/* Right fade click-blocking zone */}
+                        {canShelfScrollRight && (
+                          <div
+                            style={{
+                              position: 'absolute',
+                              right: 0,
+                              top: 0,
+                              bottom: 0,
+                              width: '70px',
+                              zIndex: 8,
+                              pointerEvents: 'auto',
+                              cursor: 'default'
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        )}
+                      </div>
                     ) : (
                       /* List Mode: Scrollable container without horizontal side arrow buttons */
                       <div style={{
                         display: 'flex',
                         flexDirection: 'column',
                         gap: '0.65rem',
-                        height: isShelfExpanded ? '1154px' : '398px',
-                        maxHeight: isShelfExpanded ? '1154px' : '398px',
+                        height: isShelfExpanded ? '774px' : '398px',
+                        maxHeight: isShelfExpanded ? '774px' : '398px',
                         overflowY: 'auto',
                         paddingRight: '0.35rem'
                       }}>
@@ -2385,50 +2502,125 @@ export const Profile: React.FC = () => {
 )}
 
       {activeTab === 'guides' && profile && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', textAlign: 'left' }}>
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h3 style={{ margin: 0 }}>{language === 'es' ? 'Guías Creadas' : 'Created Guides'}</h3>
-              {profile.created_lists.length > 3 && (
-                <button
-                  type="button"
-                  onClick={() => setIsCreatedGuidesExpanded(!isCreatedGuidesExpanded)}
-                  className="shelf-view-toggle-btn"
-                  title={isCreatedGuidesExpanded
-                    ? (language === 'es' ? 'Contraer' : 'Collapse')
-                    : (language === 'es' ? 'Expandir' : 'Expand')
-                  }
-                  aria-label={isCreatedGuidesExpanded
-                    ? (language === 'es' ? 'Contraer' : 'Collapse')
-                    : (language === 'es' ? 'Expandir' : 'Expand')
-                  }
-                  style={{ padding: '0.3rem 0.55rem', borderRadius: '6px' }}
+        <div ref={guidesContainerRef} style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem', textAlign: 'left' }}>
+          {(() => {
+            // Calculate dynamic columns for guides cards (min-width ~240px + 20px gap)
+            const computedColumns = guidesContainerWidth > 0
+              ? Math.max(1, Math.floor((guidesContainerWidth + 20) / 260))
+              : 4;
+            const guideCols = Math.max(1, computedColumns);
+
+            const renderGuideMediaIcon = (mt: string) => {
+              switch (mt) {
+                case 'movie':
+                  return <span key={mt} style={{ display: 'inline-flex', alignItems: 'center' }} title={language === 'es' ? 'Películas' : 'Movies'}><Film size={13} color="var(--color-movie)" /></span>;
+                case 'series':
+                  return <span key={mt} style={{ display: 'inline-flex', alignItems: 'center' }} title={language === 'es' ? 'Series' : 'Shows'}><Tv size={13} color="var(--color-series)" /></span>;
+                case 'anime':
+                  return <span key={mt} style={{ display: 'inline-flex', alignItems: 'center' }} title="Anime"><Sparkles size={13} color="var(--color-anime)" /></span>;
+                case 'manga':
+                  return <span key={mt} style={{ display: 'inline-flex', alignItems: 'center' }} title="Manga"><MessageCircle size={13} color="var(--color-manga)" /></span>;
+                case 'game':
+                  return <span key={mt} style={{ display: 'inline-flex', alignItems: 'center' }} title={language === 'es' ? 'Juegos' : 'Games'}><Gamepad2 size={13} color="var(--color-game)" /></span>;
+                case 'book':
+                  return <span key={mt} style={{ display: 'inline-flex', alignItems: 'center' }} title={language === 'es' ? 'Libros' : 'Books'}><Book size={13} color="var(--color-book)" /></span>;
+                case 'comic':
+                  return <span key={mt} style={{ display: 'inline-flex', alignItems: 'center' }} title={language === 'es' ? 'Cómics' : 'Comics'}><MessageSquare size={13} color="var(--color-comic)" /></span>;
+                default:
+                  return null;
+              }
+            };
+
+            const arrowBtnStyle: React.CSSProperties = {
+              position: 'absolute',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              zIndex: 10,
+              background: 'var(--bg-tertiary)',
+              border: '1.5px solid var(--border-color)',
+              borderRadius: '50%',
+              width: '40px',
+              height: '40px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              boxShadow: '0 4px 10px rgba(0,0,0,0.4)',
+              color: 'var(--text-primary)',
+              transition: 'all 0.15s ease'
+            };
+
+            // Helper to render a single guide card
+            const renderGuideCard = (list: any, isSaved: boolean) => {
+              return (
+                <div
+                  key={list.id}
+                  className="glass-card"
+                  style={{
+                    padding: '0.85rem',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.65rem',
+                    borderRadius: '12px',
+                    position: 'relative'
+                  }}
                 >
-                  {isCreatedGuidesExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                </button>
-              )}
-            </div>
-            {profile.created_lists.length === 0 ? (
-              <p style={{ color: 'var(--text-secondary)' }}>
-                {language === 'es' ? 'Aún no has creado ninguna guía.' : 'You have not created any guides yet.'}
-              </p>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                {(isCreatedGuidesExpanded ? profile.created_lists : profile.created_lists.slice(0, 3)).map((list: any) => (
-                  <div key={list.id} className="glass-card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <div>
-                        <h4 style={{ margin: 0, fontSize: '1.15rem' }}>{list.title}</h4>
-                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: '0.25rem 0 0 0' }}>{list.description}</p>
+                  {/* Cover Collage */}
+                  <div
+                    style={{
+                      position: 'relative',
+                      width: '100%',
+                      height: '140px',
+                      borderRadius: '8px',
+                      overflow: 'hidden',
+                      background: 'linear-gradient(135deg, rgba(255,255,255,0.05), rgba(0,0,0,0.4))',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer'
+                    }}
+                    onClick={() => handleOpenGuide(list.id)}
+                  >
+                    {list.covers && list.covers.length > 0 ? (
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: list.covers.length >= 2 ? '1fr 1fr' : '1fr',
+                        gridTemplateRows: list.covers.length >= 3 ? '1fr 1fr' : '1fr',
+                        width: '100%',
+                        height: '100%',
+                        gap: '2px',
+                        background: '#000'
+                      }}>
+                        {list.covers.slice(0, 4).map((img: string, cIdx: number) => (
+                          <img
+                            key={cIdx}
+                            src={img}
+                            alt=""
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                          />
+                        ))}
                       </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', color: 'var(--text-secondary)' }}>
+                        <BookOpen size={36} color="var(--color-guide, #2DD4BF)" />
+                      </div>
+                    )}
+
+                    {/* Visibility badge overlay (top-left) */}
+                    {!isSaved && (
                       <span style={{
-                        fontSize: '0.75rem',
-                        padding: '0.2rem 0.5rem',
+                        position: 'absolute',
+                        top: '6px',
+                        left: '6px',
+                        fontSize: '0.7rem',
+                        padding: '0.15rem 0.45rem',
                         borderRadius: '4px',
-                        background: list.visibility === 'draft' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(124, 58, 237, 0.1)',
-                        color: list.visibility === 'draft' ? '#f59e0b' : 'var(--accent-primary)',
-                        fontWeight: 600,
-                        textTransform: 'capitalize'
+                        background: list.visibility === 'draft' ? 'rgba(245, 158, 11, 0.9)' : list.visibility === 'private' ? 'rgba(15, 23, 42, 0.85)' : 'rgba(45, 212, 191, 0.9)',
+                        color: list.visibility === 'draft' ? '#0f172a' : '#ffffff',
+                        fontWeight: 700,
+                        backdropFilter: 'blur(4px)',
+                        zIndex: 2
                       }}>
                         {list.visibility === 'draft'
                           ? (language === 'es' ? 'Borrador' : 'Draft')
@@ -2438,109 +2630,364 @@ export const Profile: React.FC = () => {
                             )
                         }
                       </span>
-                      {list.can_edit === false && (
-                        <span style={{
-                          fontSize: '0.75rem',
-                          padding: '0.2rem 0.5rem',
-                          borderRadius: '4px',
-                          background: 'rgba(245, 158, 11, 0.15)',
-                          color: '#f59e0b',
-                          fontWeight: 600,
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '0.3rem'
-                        }}>
-                          <Lock size={12} /> {language === 'es' ? 'Solo Lectura' : 'Read-Only'}
-                        </span>
-                      )}
-                    </div>
+                    )}
 
-                    <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
-                      <button onClick={() => handleOpenGuide(list.id)} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', padding: '0.35rem 0.75rem' }}>
-                        <Eye size={14} /> {language === 'es' ? 'Ver' : 'View'}
-                      </button>
-                      {isOwnProfile && (
-                        <>
-                          <button 
-                            onClick={() => {
-                              if (list.can_edit !== false) {
-                                navigate(`/create?edit=${list.id}`);
-                              } else {
-                                setShowProModal(true);
-                              }
-                            }} 
-                            className="btn-secondary" 
-                            style={{ 
-                              display: 'flex', 
-                              alignItems: 'center', 
-                              gap: '0.4rem', 
-                              fontSize: '0.82rem', 
-                              padding: '0.35rem 0.75rem',
-                              color: list.can_edit === false ? '#f59e0b' : 'inherit',
-                              borderColor: list.can_edit === false ? 'rgba(245, 158, 11, 0.3)' : 'var(--border-color)'
-                            }}
-                          >
-                            {list.can_edit === false ? <Lock size={14} /> : <Edit size={14} />} {language === 'es' ? 'Editar' : 'Edit'}
-                          </button>
-                          <button onClick={() => handleDeleteGuide(list.id)} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', padding: '0.35rem 0.75rem', color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.2)' }}>
-                            <Trash2 size={14} /> {language === 'es' ? 'Eliminar' : 'Delete'}
-                          </button>
-                        </>
-                      )}
-                    </div>
+                    {/* Items count overlay (bottom-right) */}
+                    {(list.items_count != null || (list.items && Array.isArray(list.items))) && (
+                      <div style={{
+                        position: 'absolute',
+                        bottom: '6px',
+                        right: '6px',
+                        background: 'rgba(0,0,0,0.75)',
+                        backdropFilter: 'blur(4px)',
+                        padding: '2px 7px',
+                        borderRadius: '4px',
+                        fontSize: '0.72rem',
+                        fontWeight: 600,
+                        color: '#fff',
+                        zIndex: 2
+                      }}>
+                        {list.items_count ?? list.items?.length ?? 0} {t('guidesWorksCount')}
+                      </div>
+                    )}
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
 
-          <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h3 style={{ margin: 0 }}>{language === 'es' ? 'Guías Guardadas' : 'Saved Guides'}</h3>
-              {profile.saved_lists.length > 3 && (
-                <button
-                  type="button"
-                  onClick={() => setIsSavedGuidesExpanded(!isSavedGuidesExpanded)}
-                  className="shelf-view-toggle-btn"
-                  title={isSavedGuidesExpanded
-                    ? (language === 'es' ? 'Contraer' : 'Collapse')
-                    : (language === 'es' ? 'Expandir' : 'Expand')
-                  }
-                  aria-label={isSavedGuidesExpanded
-                    ? (language === 'es' ? 'Contraer' : 'Collapse')
-                    : (language === 'es' ? 'Expandir' : 'Expand')
-                  }
-                  style={{ padding: '0.3rem 0.55rem', borderRadius: '6px' }}
-                >
-                  {isSavedGuidesExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                </button>
-              )}
-            </div>
-            {profile.saved_lists.length === 0 ? (
-              <p style={{ color: 'var(--text-secondary)' }}>
-                {language === 'es' ? 'Aún no tienes guías guardadas.' : 'You have no saved guides yet.'}
-              </p>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                {(isSavedGuidesExpanded ? profile.saved_lists : profile.saved_lists.slice(0, 3)).map((list: any) => (
-                  <div key={list.id} className="glass-card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <div>
-                        <h4 style={{ margin: 0, fontSize: '1.15rem' }}>{list.title}</h4>
-                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: '0.25rem 0 0 0' }}>{list.description}</p>
+                  {/* Title & Description */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', flexGrow: 1 }}>
+                    <h4
+                      style={{
+                        margin: 0,
+                        fontSize: '0.95rem',
+                        fontWeight: 600,
+                        color: 'var(--text-primary)',
+                        display: '-webkit-box',
+                        WebkitLineClamp: 1,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                        cursor: 'pointer'
+                      }}
+                      title={list.title}
+                      onClick={() => handleOpenGuide(list.id)}
+                    >
+                      {list.title}
+                    </h4>
+
+                    {list.description && (
+                      <p style={{
+                        color: 'var(--text-secondary)',
+                        fontSize: '0.8rem',
+                        margin: 0,
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                        lineHeight: 1.3
+                      }}>
+                        {list.description}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Media Types & Rating Header */}
+                  {list.media_types && list.media_types.length > 0 && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                      {list.media_types.map((mt: string) => renderGuideMediaIcon(mt))}
+                    </div>
+                  )}
+
+                  {/* Actions Footer */}
+                  <div style={{
+                    display: 'flex',
+                    gap: '0.4rem',
+                    alignItems: 'center',
+                    justifyContent: 'flex-start',
+                    borderTop: '1px solid var(--border-color)',
+                    paddingTop: '0.5rem',
+                    marginTop: 'auto'
+                  }}>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenGuide(list.id)}
+                      className="btn-secondary"
+                      style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.78rem', padding: '0.3rem 0.6rem', flex: 1, justifyContent: 'center' }}
+                    >
+                      <Eye size={13} /> {language === 'es' ? 'Ver' : 'View'}
+                    </button>
+                    {!isSaved && isOwnProfile && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (list.can_edit !== false) {
+                              navigate(`/create?edit=${list.id}`);
+                            } else {
+                              setShowProModal(true);
+                            }
+                          }}
+                          className="btn-secondary"
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.3rem',
+                            fontSize: '0.78rem',
+                            padding: '0.3rem 0.6rem',
+                            color: list.can_edit === false ? '#f59e0b' : 'inherit',
+                            borderColor: list.can_edit === false ? 'rgba(245, 158, 11, 0.3)' : 'var(--border-color)'
+                          }}
+                          title={language === 'es' ? 'Editar' : 'Edit'}
+                        >
+                          {list.can_edit === false ? <Lock size={13} /> : <Edit size={13} />}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteGuide(list.id)}
+                          className="btn-secondary"
+                          style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.78rem', padding: '0.3rem 0.6rem', color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.2)' }}
+                          title={language === 'es' ? 'Eliminar' : 'Delete'}
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            };
+
+            // Created Guides pagination
+            const createdItemsPerPage = isCreatedGuidesExpanded ? (guideCols * 3) : guideCols;
+            const createdTotalPages = Math.max(1, Math.ceil(profile.created_lists.length / createdItemsPerPage));
+            const safeCreatedPage = Math.min(createdGuidesPage, createdTotalPages);
+            const displayedCreatedGuides = profile.created_lists.slice((safeCreatedPage - 1) * createdItemsPerPage, safeCreatedPage * createdItemsPerPage);
+            const canCreatedPrev = safeCreatedPage > 1;
+            const canCreatedNext = safeCreatedPage < createdTotalPages;
+
+            // Saved Guides pagination
+            const savedItemsPerPage = isSavedGuidesExpanded ? (guideCols * 3) : guideCols;
+            const savedTotalPages = Math.max(1, Math.ceil(profile.saved_lists.length / savedItemsPerPage));
+            const safeSavedPage = Math.min(savedGuidesPage, savedTotalPages);
+            const displayedSavedGuides = profile.saved_lists.slice((safeSavedPage - 1) * savedItemsPerPage, safeSavedPage * savedItemsPerPage);
+            const canSavedPrev = safeSavedPage > 1;
+            const canSavedNext = safeSavedPage < savedTotalPages;
+
+            return (
+              <>
+                {/* 1. Created Guides Section */}
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+                    <h3 style={{ margin: 0 }}>{language === 'es' ? 'Guías Creadas' : 'Created Guides'}</h3>
+                    {profile.created_lists.length > guideCols && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsCreatedGuidesExpanded(!isCreatedGuidesExpanded);
+                          setCreatedGuidesPage(1);
+                        }}
+                        className="shelf-view-toggle-btn"
+                        title={isCreatedGuidesExpanded
+                          ? (language === 'es' ? 'Contraer' : 'Collapse')
+                          : (language === 'es' ? 'Expandir' : 'Expand')
+                        }
+                        aria-label={isCreatedGuidesExpanded
+                          ? (language === 'es' ? 'Contraer' : 'Collapse')
+                          : (language === 'es' ? 'Expandir' : 'Expand')
+                        }
+                        style={{ padding: '0.3rem 0.55rem', borderRadius: '6px' }}
+                      >
+                        {isCreatedGuidesExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                      </button>
+                    )}
+                  </div>
+
+                  {profile.created_lists.length === 0 ? (
+                    <div className="glass-card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                      {language === 'es' ? 'Aún no has creado ninguna guía.' : 'You have not created any guides yet.'}
+                    </div>
+                  ) : (
+                    <div style={{ position: 'relative', width: '100%' }}>
+                      {/* Left Arrow Button */}
+                      <button
+                        type="button"
+                        onClick={() => setCreatedGuidesPage(prev => Math.max(prev - 1, 1))}
+                        disabled={!canCreatedPrev}
+                        style={{
+                          ...arrowBtnStyle,
+                          left: '-20px',
+                          opacity: canCreatedPrev ? 1 : 0,
+                          visibility: canCreatedPrev ? 'visible' : 'hidden',
+                          pointerEvents: canCreatedPrev ? 'auto' : 'none'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.borderColor = 'var(--color-guide, #2DD4BF)';
+                          e.currentTarget.style.transform = 'translateY(-50%) scale(1.05)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.borderColor = 'var(--border-color)';
+                          e.currentTarget.style.transform = 'translateY(-50%)';
+                        }}
+                        title={language === 'es' ? 'Página anterior' : 'Previous page'}
+                        aria-label={language === 'es' ? 'Página anterior' : 'Previous page'}
+                      >
+                        <ChevronLeft size={20} />
+                      </button>
+
+                      {/* Right Arrow Button */}
+                      <button
+                        type="button"
+                        onClick={() => setCreatedGuidesPage(prev => Math.min(prev + 1, createdTotalPages))}
+                        disabled={!canCreatedNext}
+                        style={{
+                          ...arrowBtnStyle,
+                          right: '-20px',
+                          opacity: canCreatedNext ? 1 : 0,
+                          visibility: canCreatedNext ? 'visible' : 'hidden',
+                          pointerEvents: canCreatedNext ? 'auto' : 'none'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.borderColor = 'var(--color-guide, #2DD4BF)';
+                          e.currentTarget.style.transform = 'translateY(-50%) scale(1.05)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.borderColor = 'var(--border-color)';
+                          e.currentTarget.style.transform = 'translateY(-50%)';
+                        }}
+                        title={language === 'es' ? 'Página siguiente' : 'Next page'}
+                        aria-label={language === 'es' ? 'Página siguiente' : 'Next page'}
+                      >
+                        <ChevronRight size={20} />
+                      </button>
+
+                      {/* Cards Grid */}
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: `repeat(${guideCols}, minmax(0, 1fr))`,
+                        gap: '1.25rem'
+                      }}>
+                        {displayedCreatedGuides.map(list => renderGuideCard(list, false))}
+                      </div>
+
+                      {/* Bottom Page Indicator */}
+                      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginTop: '1.25rem' }}>
+                        <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
+                          {language === 'es'
+                            ? `Página ${safeCreatedPage} de ${createdTotalPages}`
+                            : `Page ${safeCreatedPage} of ${createdTotalPages}`
+                          }
+                        </span>
                       </div>
                     </div>
+                  )}
+                </div>
 
-                    <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
-                      <button onClick={() => handleOpenGuide(list.id)} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', padding: '0.35rem 0.75rem' }}>
-                        <Eye size={14} /> {language === 'es' ? 'Ver' : 'View'}
+                {/* 2. Saved Guides Section */}
+                <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '2rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+                    <h3 style={{ margin: 0 }}>{language === 'es' ? 'Guías Guardadas' : 'Saved Guides'}</h3>
+                    {profile.saved_lists.length > guideCols && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsSavedGuidesExpanded(!isSavedGuidesExpanded);
+                          setSavedGuidesPage(1);
+                        }}
+                        className="shelf-view-toggle-btn"
+                        title={isSavedGuidesExpanded
+                          ? (language === 'es' ? 'Contraer' : 'Collapse')
+                          : (language === 'es' ? 'Expandir' : 'Expand')
+                        }
+                        aria-label={isSavedGuidesExpanded
+                          ? (language === 'es' ? 'Contraer' : 'Collapse')
+                          : (language === 'es' ? 'Expandir' : 'Expand')
+                        }
+                        style={{ padding: '0.3rem 0.55rem', borderRadius: '6px' }}
+                      >
+                        {isSavedGuidesExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                       </button>
-                    </div>
+                    )}
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
+
+                  {profile.saved_lists.length === 0 ? (
+                    <div className="glass-card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                      {language === 'es' ? 'Aún no tienes guías guardadas.' : 'You have no saved guides yet.'}
+                    </div>
+                  ) : (
+                    <div style={{ position: 'relative', width: '100%' }}>
+                      {/* Left Arrow Button */}
+                      <button
+                        type="button"
+                        onClick={() => setSavedGuidesPage(prev => Math.max(prev - 1, 1))}
+                        disabled={!canSavedPrev}
+                        style={{
+                          ...arrowBtnStyle,
+                          left: '-20px',
+                          opacity: canSavedPrev ? 1 : 0,
+                          visibility: canSavedPrev ? 'visible' : 'hidden',
+                          pointerEvents: canSavedPrev ? 'auto' : 'none'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.borderColor = 'var(--color-guide, #2DD4BF)';
+                          e.currentTarget.style.transform = 'translateY(-50%) scale(1.05)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.borderColor = 'var(--border-color)';
+                          e.currentTarget.style.transform = 'translateY(-50%)';
+                        }}
+                        title={language === 'es' ? 'Página anterior' : 'Previous page'}
+                        aria-label={language === 'es' ? 'Página anterior' : 'Previous page'}
+                      >
+                        <ChevronLeft size={20} />
+                      </button>
+
+                      {/* Right Arrow Button */}
+                      <button
+                        type="button"
+                        onClick={() => setSavedGuidesPage(prev => Math.min(prev + 1, savedTotalPages))}
+                        disabled={!canSavedNext}
+                        style={{
+                          ...arrowBtnStyle,
+                          right: '-20px',
+                          opacity: canSavedNext ? 1 : 0,
+                          visibility: canSavedNext ? 'visible' : 'hidden',
+                          pointerEvents: canSavedNext ? 'auto' : 'none'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.borderColor = 'var(--color-guide, #2DD4BF)';
+                          e.currentTarget.style.transform = 'translateY(-50%) scale(1.05)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.borderColor = 'var(--border-color)';
+                          e.currentTarget.style.transform = 'translateY(-50%)';
+                        }}
+                        title={language === 'es' ? 'Página siguiente' : 'Next page'}
+                        aria-label={language === 'es' ? 'Página siguiente' : 'Next page'}
+                      >
+                        <ChevronRight size={20} />
+                      </button>
+
+                      {/* Cards Grid */}
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: `repeat(${guideCols}, minmax(0, 1fr))`,
+                        gap: '1.25rem'
+                      }}>
+                        {displayedSavedGuides.map(list => renderGuideCard(list, true))}
+                      </div>
+
+                      {/* Bottom Page Indicator */}
+                      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginTop: '1.25rem' }}>
+                        <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
+                          {language === 'es'
+                            ? `Página ${safeSavedPage} de ${savedTotalPages}`
+                            : `Page ${safeSavedPage} of ${savedTotalPages}`
+                          }
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </>
+            );
+          })()}
         </div>
       )}
 
