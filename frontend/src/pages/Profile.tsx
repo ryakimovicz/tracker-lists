@@ -50,7 +50,11 @@ import {
   LayoutGrid,
   List,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  ChevronDown,
+  ChevronUp,
+  ChevronsDown,
+  ChevronsUp
 } from 'lucide-react';
 
 import { MusicServiceGuideModal } from '../components/MusicServiceGuideModal';
@@ -237,6 +241,8 @@ export const Profile: React.FC = () => {
 
   // Shelf expansion & pagination states
   const [isShelfExpanded, setIsShelfExpanded] = useState(false);
+  const [isCreatedGuidesExpanded, setIsCreatedGuidesExpanded] = useState(false);
+  const [isSavedGuidesExpanded, setIsSavedGuidesExpanded] = useState(false);
   const [shelfViewMode, setShelfViewMode] = useState<'grid' | 'list'>(() => {
     try {
       const saved = localStorage.getItem('pathd_shelf_view_mode');
@@ -1638,17 +1644,23 @@ export const Profile: React.FC = () => {
                       {/* Expand / Collapse Control - Shown if items exceed compact view limit */}
                       {filteredItems.length > compactLimit && (
                         <button
+                          type="button"
                           onClick={() => {
                             setIsShelfExpanded(!isShelfExpanded);
                             setCurrentPage(1);
                           }}
-                          className="btn-secondary"
-                          style={{ padding: '0.4rem 1rem', fontSize: '0.85rem' }}
-                        >
-                          {isShelfExpanded
+                          className="shelf-view-toggle-btn"
+                          title={isShelfExpanded
                             ? (language === 'es' ? 'Contraer' : 'Collapse')
                             : (language === 'es' ? 'Expandir' : 'Expand')
                           }
+                          aria-label={isShelfExpanded
+                            ? (language === 'es' ? 'Contraer' : 'Collapse')
+                            : (language === 'es' ? 'Expandir' : 'Expand')
+                          }
+                          style={{ padding: '0.3rem 0.55rem', borderRadius: '6px' }}
+                        >
+                          {isShelfExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                         </button>
                       )}
                     </div>
@@ -2375,14 +2387,34 @@ export const Profile: React.FC = () => {
       {activeTab === 'guides' && profile && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', textAlign: 'left' }}>
           <div>
-            <h3>{language === 'es' ? 'Guías Creadas' : 'Created Guides'}</h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3 style={{ margin: 0 }}>{language === 'es' ? 'Guías Creadas' : 'Created Guides'}</h3>
+              {profile.created_lists.length > 3 && (
+                <button
+                  type="button"
+                  onClick={() => setIsCreatedGuidesExpanded(!isCreatedGuidesExpanded)}
+                  className="shelf-view-toggle-btn"
+                  title={isCreatedGuidesExpanded
+                    ? (language === 'es' ? 'Contraer' : 'Collapse')
+                    : (language === 'es' ? 'Expandir' : 'Expand')
+                  }
+                  aria-label={isCreatedGuidesExpanded
+                    ? (language === 'es' ? 'Contraer' : 'Collapse')
+                    : (language === 'es' ? 'Expandir' : 'Expand')
+                  }
+                  style={{ padding: '0.3rem 0.55rem', borderRadius: '6px' }}
+                >
+                  {isCreatedGuidesExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                </button>
+              )}
+            </div>
             {profile.created_lists.length === 0 ? (
               <p style={{ color: 'var(--text-secondary)' }}>
                 {language === 'es' ? 'Aún no has creado ninguna guía.' : 'You have not created any guides yet.'}
               </p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                {profile.created_lists.map((list: any) => (
+                {(isCreatedGuidesExpanded ? profile.created_lists : profile.created_lists.slice(0, 3)).map((list: any) => (
                   <div key={list.id} className="glass-card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                       <div>
@@ -2458,20 +2490,39 @@ export const Profile: React.FC = () => {
                     </div>
                   </div>
                 ))}
-
               </div>
             )}
           </div>
 
           <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem' }}>
-            <h3>{language === 'es' ? 'Guías Guardadas' : 'Saved Guides'}</h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3 style={{ margin: 0 }}>{language === 'es' ? 'Guías Guardadas' : 'Saved Guides'}</h3>
+              {profile.saved_lists.length > 3 && (
+                <button
+                  type="button"
+                  onClick={() => setIsSavedGuidesExpanded(!isSavedGuidesExpanded)}
+                  className="shelf-view-toggle-btn"
+                  title={isSavedGuidesExpanded
+                    ? (language === 'es' ? 'Contraer' : 'Collapse')
+                    : (language === 'es' ? 'Expandir' : 'Expand')
+                  }
+                  aria-label={isSavedGuidesExpanded
+                    ? (language === 'es' ? 'Contraer' : 'Collapse')
+                    : (language === 'es' ? 'Expandir' : 'Expand')
+                  }
+                  style={{ padding: '0.3rem 0.55rem', borderRadius: '6px' }}
+                >
+                  {isSavedGuidesExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                </button>
+              )}
+            </div>
             {profile.saved_lists.length === 0 ? (
               <p style={{ color: 'var(--text-secondary)' }}>
                 {language === 'es' ? 'Aún no tienes guías guardadas.' : 'You have no saved guides yet.'}
               </p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                {profile.saved_lists.map((list: any) => (
+                {(isSavedGuidesExpanded ? profile.saved_lists : profile.saved_lists.slice(0, 3)).map((list: any) => (
                   <div key={list.id} className="glass-card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                       <div>
