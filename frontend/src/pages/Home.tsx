@@ -13,6 +13,7 @@ import { ChevronLeft, ChevronRight, ChevronDown, ChevronsDown, Check, Play } fro
 import { useAuth } from '../context/AuthContext';
 import { getOrderedCategories, getCategoryLabel, getCategoryIcon } from '../utils/categoryOrder';
 import { prefetchMediaDetails } from '../utils/prefetch';
+import { useContinuousScroll } from '../hooks/useContinuousScroll';
 
 export const getTagClass = (type: string) => {
   switch (type) {
@@ -208,12 +209,10 @@ const ScrollRow = ({
     }
   };
 
-  const scroll = (direction: "left" | "right") => {
-    if (scrollRef.current) {
-      const scrollAmount = effectiveRowMode === 'two-rows' ? 360 : 300;
-      scrollRef.current.scrollBy({ left: direction === "left" ? -scrollAmount : scrollAmount, behavior: "smooth" });
-    }
-  };
+  const { startScrolling, stopScrolling, handleClick } = useContinuousScroll(
+    scrollRef,
+    effectiveRowMode === 'two-rows' ? 360 : 300
+  );
 
   const catColor = outlineColor || "var(--accent-primary)";
   const buttonBaseStyle: React.CSSProperties = {
@@ -242,16 +241,25 @@ const ScrollRow = ({
     e.currentTarget.style.borderColor = "var(--border-color)";
     e.currentTarget.style.background = "var(--bg-tertiary)";
     e.currentTarget.style.color = "var(--text-primary)";
+    stopScrolling();
   };
-  const handleMouseDown = (e: React.MouseEvent<HTMLButtonElement>) => {
+  const handleMouseDownLeft = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.currentTarget.style.background = catColor;
     e.currentTarget.style.borderColor = catColor;
     e.currentTarget.style.color = "var(--bg-primary)";
+    startScrolling("left");
+  };
+  const handleMouseDownRight = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.currentTarget.style.background = catColor;
+    e.currentTarget.style.borderColor = catColor;
+    e.currentTarget.style.color = "var(--bg-primary)";
+    startScrolling("right");
   };
   const handleMouseUp = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.currentTarget.style.background = "var(--bg-tertiary)";
     e.currentTarget.style.borderColor = catColor;
     e.currentTarget.style.color = "var(--text-primary)";
+    stopScrolling();
   };
 
   return (
@@ -326,11 +334,15 @@ const ScrollRow = ({
           )}
 
           <button 
-            onClick={() => scroll("left")}
+            type="button"
+            onClick={() => handleClick("left", effectiveRowMode === 'two-rows' ? 360 : 300)}
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
-            onMouseDown={handleMouseDown}
+            onMouseDown={handleMouseDownLeft}
             onMouseUp={handleMouseUp}
+            onTouchStart={() => startScrolling("left")}
+            onTouchEnd={stopScrolling}
+            onTouchCancel={stopScrolling}
             style={{ 
               ...buttonBaseStyle, 
               left: "0px",
@@ -369,11 +381,15 @@ const ScrollRow = ({
           </div>
 
           <button 
-            onClick={() => scroll("right")}
+            type="button"
+            onClick={() => handleClick("right", effectiveRowMode === 'two-rows' ? 360 : 300)}
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
-            onMouseDown={handleMouseDown}
+            onMouseDown={handleMouseDownRight}
             onMouseUp={handleMouseUp}
+            onTouchStart={() => startScrolling("right")}
+            onTouchEnd={stopScrolling}
+            onTouchCancel={stopScrolling}
             style={{ 
               ...buttonBaseStyle, 
               right: "0px",

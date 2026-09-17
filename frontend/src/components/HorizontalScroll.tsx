@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { useContinuousScroll } from '../hooks/useContinuousScroll';
 
 interface HorizontalScrollProps {
   children: React.ReactNode;
@@ -12,6 +13,7 @@ export const HorizontalScroll: React.FC<HorizontalScrollProps> = ({ children, ti
   const scrollRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
+  const { startScrolling, stopScrolling, handleClick } = useContinuousScroll(scrollRef, 350);
 
   const updateScrollState = useCallback(() => {
     const el = scrollRef.current;
@@ -44,13 +46,6 @@ export const HorizontalScroll: React.FC<HorizontalScrollProps> = ({ children, ti
       return 'linear-gradient(to right, black 0px, black calc(100% - 110px), transparent calc(100% - 55px), transparent 100%)';
     }
     return 'none';
-  };
-
-  const scroll = (direction: "left" | "right") => {
-    if (scrollRef.current) {
-      const scrollAmount = 350;
-      scrollRef.current.scrollBy({ left: direction === "left" ? -scrollAmount : scrollAmount, behavior: "smooth" });
-    }
   };
 
   return (
@@ -102,26 +97,40 @@ export const HorizontalScroll: React.FC<HorizontalScrollProps> = ({ children, ti
           e.currentTarget.style.borderColor = "var(--border-color)";
           e.currentTarget.style.background = "var(--bg-tertiary)";
           e.currentTarget.style.color = "var(--text-primary)";
+          stopScrolling();
         };
         const handleMouseDown = (e: React.MouseEvent<HTMLButtonElement>) => {
           e.currentTarget.style.background = catColor;
           e.currentTarget.style.borderColor = catColor;
           e.currentTarget.style.color = "var(--bg-primary)";
+          startScrolling("left");
         };
         const handleMouseUp = (e: React.MouseEvent<HTMLButtonElement>) => {
           e.currentTarget.style.background = "var(--bg-tertiary)";
           e.currentTarget.style.borderColor = catColor;
           e.currentTarget.style.color = "var(--text-primary)";
+          stopScrolling();
+        };
+
+        const handleMouseDownRight = (e: React.MouseEvent<HTMLButtonElement>) => {
+          e.currentTarget.style.background = catColor;
+          e.currentTarget.style.borderColor = catColor;
+          e.currentTarget.style.color = "var(--bg-primary)";
+          startScrolling("right");
         };
 
         return (
           <>
             <button 
-              onClick={() => scroll("left")}
+              type="button"
+              onClick={() => handleClick("left")}
               onMouseEnter={handleMouseEnter}
               onMouseLeave={handleMouseLeave}
               onMouseDown={handleMouseDown}
               onMouseUp={handleMouseUp}
+              onTouchStart={() => startScrolling("left")}
+              onTouchEnd={stopScrolling}
+              onTouchCancel={stopScrolling}
               style={{ 
                 ...buttonBaseStyle, 
                 left: "10px",
@@ -171,11 +180,15 @@ export const HorizontalScroll: React.FC<HorizontalScrollProps> = ({ children, ti
             )}
 
             <button 
-              onClick={() => scroll("right")}
+              type="button"
+              onClick={() => handleClick("right")}
               onMouseEnter={handleMouseEnter}
               onMouseLeave={handleMouseLeave}
-              onMouseDown={handleMouseDown}
+              onMouseDown={handleMouseDownRight}
               onMouseUp={handleMouseUp}
+              onTouchStart={() => startScrolling("right")}
+              onTouchEnd={stopScrolling}
+              onTouchCancel={stopScrolling}
               style={{ 
                 ...buttonBaseStyle, 
                 right: "10px",

@@ -18,6 +18,7 @@ import { AdBanner } from '../components/AdBanner';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { PathdLoader } from '../components/PathdLoader';
 import { getOrderedCategories, getCategoryIcon } from '../utils/categoryOrder';
+import { useContinuousScroll } from '../hooks/useContinuousScroll';
 
 
 import {
@@ -267,6 +268,7 @@ export const Profile: React.FC = () => {
   const [isSavedGuidesExpanded, setIsSavedGuidesExpanded] = useState(false);
   const [createdGuidesPage, setCreatedGuidesPage] = useState(1);
   const [savedGuidesPage, setSavedGuidesPage] = useState(1);
+  const [favoritesPage, setFavoritesPage] = useState(1);
   const [shelfViewMode, setShelfViewMode] = useState<'grid' | 'list'>(() => {
     try {
       const saved = localStorage.getItem('pathd_shelf_view_mode');
@@ -283,7 +285,6 @@ export const Profile: React.FC = () => {
   const [canShelfScrollLeft, setCanShelfScrollLeft] = useState(false);
   const [canShelfScrollRight, setCanShelfScrollRight] = useState(false);
   const [shelfContainerWidth, setShelfContainerWidth] = useState(0);
-  const [shelfScrollLeft, setShelfScrollLeft] = useState(0);
 
   const guidesContainerRef = useRef<HTMLDivElement>(null);
   const [guidesContainerWidth, setGuidesContainerWidth] = useState(0);
@@ -291,12 +292,10 @@ export const Profile: React.FC = () => {
   const createdGuidesScrollRef = useRef<HTMLDivElement>(null);
   const [canCreatedGuidesScrollLeft, setCanCreatedGuidesScrollLeft] = useState(false);
   const [canCreatedGuidesScrollRight, setCanCreatedGuidesScrollRight] = useState(false);
-  const [createdScrollLeft, setCreatedScrollLeft] = useState(0);
 
   const savedGuidesScrollRef = useRef<HTMLDivElement>(null);
   const [canSavedGuidesScrollLeft, setCanSavedGuidesScrollLeft] = useState(false);
   const [canSavedGuidesScrollRight, setCanSavedGuidesScrollRight] = useState(false);
-  const [savedScrollLeft, setSavedScrollLeft] = useState(0);
 
   const [isFavoritesExpanded, setIsFavoritesExpanded] = useState(false);
   const [favoritesViewMode, setFavoritesViewMode] = useState<'grid' | 'list'>(() => {
@@ -313,42 +312,71 @@ export const Profile: React.FC = () => {
   const [canFavoritesScrollLeft, setCanFavoritesScrollLeft] = useState(false);
   const [canFavoritesScrollRight, setCanFavoritesScrollRight] = useState(false);
   const [favoritesContainerWidth, setFavoritesContainerWidth] = useState(0);
-  const [favoritesScrollLeft, setFavoritesScrollLeft] = useState(0);
+
+  const shelfContinuousScroll = useContinuousScroll(shelfScrollRef, isShelfExpanded ? 360 : 300);
+  const createdContinuousScroll = useContinuousScroll(createdGuidesScrollRef, isCreatedGuidesExpanded ? 480 : 360);
+  const savedContinuousScroll = useContinuousScroll(savedGuidesScrollRef, isSavedGuidesExpanded ? 480 : 360);
+  const favoritesContinuousScroll = useContinuousScroll(favoritesScrollRef, isFavoritesExpanded ? 360 : 300);
 
   const updateShelfScrollState = useCallback(() => {
     const el = shelfScrollRef.current;
     if (!el) return;
     const { scrollLeft, scrollWidth, clientWidth } = el;
-    setCanShelfScrollLeft(scrollLeft > 4);
-    setCanShelfScrollRight(scrollLeft < scrollWidth - clientWidth - 4);
-    setShelfScrollLeft(scrollLeft);
+    const canLeft = scrollLeft > 4;
+    const canRight = scrollLeft < scrollWidth - clientWidth - 4;
+    setCanShelfScrollLeft(prev => (prev !== canLeft ? canLeft : prev));
+    setCanShelfScrollRight(prev => (prev !== canRight ? canRight : prev));
   }, []);
 
   const updateCreatedGuidesScrollState = useCallback(() => {
     const el = createdGuidesScrollRef.current;
     if (!el) return;
     const { scrollLeft, scrollWidth, clientWidth } = el;
-    setCanCreatedGuidesScrollLeft(scrollLeft > 4);
-    setCanCreatedGuidesScrollRight(scrollLeft < scrollWidth - clientWidth - 4);
-    setCreatedScrollLeft(scrollLeft);
+    const canLeft = scrollLeft > 4;
+    const canRight = scrollLeft < scrollWidth - clientWidth - 4;
+    setCanCreatedGuidesScrollLeft(prev => (prev !== canLeft ? canLeft : prev));
+    setCanCreatedGuidesScrollRight(prev => (prev !== canRight ? canRight : prev));
+
+    const containerWidth = guidesContainerRef.current?.clientWidth || clientWidth;
+    const availableWidth = Math.max(0, containerWidth - 90);
+    const maxGuidesInOneRow = Math.max(1, Math.floor((availableWidth + 16) / 276));
+    const col = Math.round(scrollLeft / 276);
+    const page = Math.max(1, Math.floor(col / maxGuidesInOneRow) + 1);
+    setCreatedGuidesPage(prev => (prev !== page ? page : prev));
   }, []);
 
   const updateSavedGuidesScrollState = useCallback(() => {
     const el = savedGuidesScrollRef.current;
     if (!el) return;
     const { scrollLeft, scrollWidth, clientWidth } = el;
-    setCanSavedGuidesScrollLeft(scrollLeft > 4);
-    setCanSavedGuidesScrollRight(scrollLeft < scrollWidth - clientWidth - 4);
-    setSavedScrollLeft(scrollLeft);
+    const canLeft = scrollLeft > 4;
+    const canRight = scrollLeft < scrollWidth - clientWidth - 4;
+    setCanSavedGuidesScrollLeft(prev => (prev !== canLeft ? canLeft : prev));
+    setCanSavedGuidesScrollRight(prev => (prev !== canRight ? canRight : prev));
+
+    const containerWidth = guidesContainerRef.current?.clientWidth || clientWidth;
+    const availableWidth = Math.max(0, containerWidth - 90);
+    const maxGuidesInOneRow = Math.max(1, Math.floor((availableWidth + 16) / 276));
+    const col = Math.round(scrollLeft / 276);
+    const page = Math.max(1, Math.floor(col / maxGuidesInOneRow) + 1);
+    setSavedGuidesPage(prev => (prev !== page ? page : prev));
   }, []);
 
   const updateFavoritesScrollState = useCallback(() => {
     const el = favoritesScrollRef.current;
     if (!el) return;
     const { scrollLeft, scrollWidth, clientWidth } = el;
-    setCanFavoritesScrollLeft(scrollLeft > 4);
-    setCanFavoritesScrollRight(scrollLeft < scrollWidth - clientWidth - 4);
-    setFavoritesScrollLeft(scrollLeft);
+    const canLeft = scrollLeft > 4;
+    const canRight = scrollLeft < scrollWidth - clientWidth - 4;
+    setCanFavoritesScrollLeft(prev => (prev !== canLeft ? canLeft : prev));
+    setCanFavoritesScrollRight(prev => (prev !== canRight ? canRight : prev));
+
+    const containerWidth = favoritesContainerRef.current?.clientWidth || clientWidth;
+    const availableWidth = Math.max(0, containerWidth - 90);
+    const maxVisibleInOneRow = Math.max(1, Math.floor((availableWidth + 16) / 196));
+    const col = Math.round(scrollLeft / 201);
+    const page = Math.max(1, Math.floor(col / maxVisibleInOneRow) + 1);
+    setFavoritesPage(prev => (prev !== page ? page : prev));
   }, []);
 
   const handleToggleShelfExpanded = useCallback(() => {
@@ -2085,12 +2113,6 @@ export const Profile: React.FC = () => {
                 const isTwoRowsByColumn = isTwoRows && filteredItems.length > 2 * maxVisibleInOneRow;
                 const isTwoRowsByRow = isTwoRows && filteredItems.length <= 2 * maxVisibleInOneRow;
 
-                // Shelf pagination calculation
-                const totalShelfCols = isTwoRows ? Math.ceil(filteredItems.length / 2) : filteredItems.length;
-                const totalShelfPages = Math.max(1, Math.ceil(totalShelfCols / maxVisibleInOneRow));
-                const currentShelfCol = Math.round(shelfScrollLeft / 201);
-                const currentShelfPage = Math.min(totalShelfPages, Math.max(1, Math.floor(currentShelfCol / maxVisibleInOneRow) + 1));
-
                 const getMaskImage = () => {
                   if (canShelfScrollLeft && canShelfScrollRight) {
                     return 'linear-gradient(to right, transparent 0px, transparent 45px, black 95px, black calc(100% - 95px), transparent calc(100% - 45px), transparent 100%)';
@@ -2100,13 +2122,6 @@ export const Profile: React.FC = () => {
                     return 'linear-gradient(to right, black 0px, black calc(100% - 95px), transparent calc(100% - 45px), transparent 100%)';
                   }
                   return 'none';
-                };
-
-                const scrollShelf = (direction: 'left' | 'right') => {
-                  if (shelfScrollRef.current) {
-                    const scrollAmount = isShelfExpanded ? 360 : 300;
-                    shelfScrollRef.current.scrollBy({ left: direction === 'left' ? -scrollAmount : scrollAmount, behavior: 'smooth' });
-                  }
                 };
 
                 return (
@@ -2402,11 +2417,23 @@ export const Profile: React.FC = () => {
                         {/* Left Arrow Button */}
                         <button
                           type="button"
-                          onClick={() => scrollShelf('left')}
+                          onClick={() => shelfContinuousScroll.handleClick('left', isShelfExpanded ? 360 : 300)}
                           onMouseEnter={handleMouseEnterBtn}
-                          onMouseLeave={handleMouseLeaveBtn}
-                          onMouseDown={handleMouseDownBtn}
-                          onMouseUp={handleMouseUpBtn}
+                          onMouseLeave={(e) => {
+                            handleMouseLeaveBtn(e);
+                            shelfContinuousScroll.stopScrolling();
+                          }}
+                          onMouseDown={(e) => {
+                            handleMouseDownBtn(e);
+                            shelfContinuousScroll.startScrolling('left');
+                          }}
+                          onMouseUp={(e) => {
+                            handleMouseUpBtn(e);
+                            shelfContinuousScroll.stopScrolling();
+                          }}
+                          onTouchStart={() => shelfContinuousScroll.startScrolling('left')}
+                          onTouchEnd={shelfContinuousScroll.stopScrolling}
+                          onTouchCancel={shelfContinuousScroll.stopScrolling}
                           style={{
                             ...buttonBaseStyle,
                             left: '0px',
@@ -2718,11 +2745,23 @@ export const Profile: React.FC = () => {
                         {/* Right Arrow Button */}
                         <button
                           type="button"
-                          onClick={() => scrollShelf('right')}
+                          onClick={() => shelfContinuousScroll.handleClick('right', isShelfExpanded ? 360 : 300)}
                           onMouseEnter={handleMouseEnterBtn}
-                          onMouseLeave={handleMouseLeaveBtn}
-                          onMouseDown={handleMouseDownBtn}
-                          onMouseUp={handleMouseUpBtn}
+                          onMouseLeave={(e) => {
+                            handleMouseLeaveBtn(e);
+                            shelfContinuousScroll.stopScrolling();
+                          }}
+                          onMouseDown={(e) => {
+                            handleMouseDownBtn(e);
+                            shelfContinuousScroll.startScrolling('right');
+                          }}
+                          onMouseUp={(e) => {
+                            handleMouseUpBtn(e);
+                            shelfContinuousScroll.stopScrolling();
+                          }}
+                          onTouchStart={() => shelfContinuousScroll.startScrolling('right')}
+                          onTouchEnd={shelfContinuousScroll.stopScrolling}
+                          onTouchCancel={shelfContinuousScroll.stopScrolling}
                           style={{
                             ...buttonBaseStyle,
                             right: '0px',
@@ -2750,13 +2789,6 @@ export const Profile: React.FC = () => {
                             }}
                             onClick={(e) => e.stopPropagation()}
                           />
-                        )}
-
-                        {/* Shelf Page indicator */}
-                        {totalShelfPages > 1 && (
-                          <div style={{ textAlign: 'center', marginTop: '0.75rem', fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
-                            {language === 'es' ? `Página ${currentShelfPage} de ${totalShelfPages}` : `Page ${currentShelfPage} of ${totalShelfPages}`}
-                          </div>
                         )}
                       </div>
                     ) : (
@@ -3209,8 +3241,7 @@ export const Profile: React.FC = () => {
             // Created Guides pagination
             const totalCreatedCols = isCreatedTwoRows ? Math.ceil(profile.created_lists.length / 2) : profile.created_lists.length;
             const totalCreatedPages = Math.max(1, Math.ceil(totalCreatedCols / maxGuidesInOneRow));
-            const currentCreatedCol = Math.round(createdScrollLeft / 276);
-            const currentCreatedPage = Math.min(totalCreatedPages, Math.max(1, Math.floor(currentCreatedCol / maxGuidesInOneRow) + 1));
+            const currentCreatedPage = Math.min(totalCreatedPages, Math.max(1, createdGuidesPage));
 
             const canExpandSaved = profile.saved_lists.length > maxGuidesInOneRow;
             const isSavedTwoRows = isSavedGuidesExpanded;
@@ -3220,8 +3251,7 @@ export const Profile: React.FC = () => {
             // Saved Guides pagination
             const totalSavedCols = isSavedTwoRows ? Math.ceil(profile.saved_lists.length / 2) : profile.saved_lists.length;
             const totalSavedPages = Math.max(1, Math.ceil(totalSavedCols / maxGuidesInOneRow));
-            const currentSavedCol = Math.round(savedScrollLeft / 276);
-            const currentSavedPage = Math.min(totalSavedPages, Math.max(1, Math.floor(currentSavedCol / maxGuidesInOneRow) + 1));
+            const currentSavedPage = Math.min(totalSavedPages, Math.max(1, savedGuidesPage));
 
             const getCreatedMaskImage = () => {
               if (canCreatedGuidesScrollLeft && canCreatedGuidesScrollRight) {
@@ -3243,20 +3273,6 @@ export const Profile: React.FC = () => {
                 return 'linear-gradient(to right, black 0px, black calc(100% - 95px), transparent calc(100% - 45px), transparent 100%)';
               }
               return 'none';
-            };
-
-            const scrollCreated = (direction: 'left' | 'right') => {
-              if (createdGuidesScrollRef.current) {
-                const scrollAmount = isCreatedGuidesExpanded ? 480 : 360;
-                createdGuidesScrollRef.current.scrollBy({ left: direction === 'left' ? -scrollAmount : scrollAmount, behavior: 'smooth' });
-              }
-            };
-
-            const scrollSaved = (direction: 'left' | 'right') => {
-              if (savedGuidesScrollRef.current) {
-                const scrollAmount = isSavedGuidesExpanded ? 480 : 360;
-                savedGuidesScrollRef.current.scrollBy({ left: direction === 'left' ? -scrollAmount : scrollAmount, behavior: 'smooth' });
-              }
             };
 
             const guideBtnBaseStyle: React.CSSProperties = {
@@ -3364,11 +3380,23 @@ export const Profile: React.FC = () => {
                       {/* Left Arrow Button */}
                       <button
                         type="button"
-                        onClick={() => scrollCreated('left')}
+                        onClick={() => createdContinuousScroll.handleClick('left', isCreatedGuidesExpanded ? 480 : 360)}
                         onMouseEnter={handleMouseEnterGuideBtn}
-                        onMouseLeave={handleMouseLeaveGuideBtn}
-                        onMouseDown={handleMouseDownGuideBtn}
-                        onMouseUp={handleMouseUpGuideBtn}
+                        onMouseLeave={(e) => {
+                          handleMouseLeaveGuideBtn(e);
+                          createdContinuousScroll.stopScrolling();
+                        }}
+                        onMouseDown={(e) => {
+                          handleMouseDownGuideBtn(e);
+                          createdContinuousScroll.startScrolling('left');
+                        }}
+                        onMouseUp={(e) => {
+                          handleMouseUpGuideBtn(e);
+                          createdContinuousScroll.stopScrolling();
+                        }}
+                        onTouchStart={() => createdContinuousScroll.startScrolling('left')}
+                        onTouchEnd={createdContinuousScroll.stopScrolling}
+                        onTouchCancel={createdContinuousScroll.stopScrolling}
                         style={{
                           ...guideBtnBaseStyle,
                           left: '0px',
@@ -3414,11 +3442,23 @@ export const Profile: React.FC = () => {
                       {/* Right Arrow Button */}
                       <button
                         type="button"
-                        onClick={() => scrollCreated('right')}
+                        onClick={() => createdContinuousScroll.handleClick('right', isCreatedGuidesExpanded ? 480 : 360)}
                         onMouseEnter={handleMouseEnterGuideBtn}
-                        onMouseLeave={handleMouseLeaveGuideBtn}
-                        onMouseDown={handleMouseDownGuideBtn}
-                        onMouseUp={handleMouseUpGuideBtn}
+                        onMouseLeave={(e) => {
+                          handleMouseLeaveGuideBtn(e);
+                          createdContinuousScroll.stopScrolling();
+                        }}
+                        onMouseDown={(e) => {
+                          handleMouseDownGuideBtn(e);
+                          createdContinuousScroll.startScrolling('right');
+                        }}
+                        onMouseUp={(e) => {
+                          handleMouseUpGuideBtn(e);
+                          createdContinuousScroll.stopScrolling();
+                        }}
+                        onTouchStart={() => createdContinuousScroll.startScrolling('right')}
+                        onTouchEnd={createdContinuousScroll.stopScrolling}
+                        onTouchCancel={createdContinuousScroll.stopScrolling}
                         style={{
                           ...guideBtnBaseStyle,
                           right: '0px',
@@ -3523,11 +3563,23 @@ export const Profile: React.FC = () => {
                       {/* Left Arrow Button */}
                       <button
                         type="button"
-                        onClick={() => scrollSaved('left')}
+                        onClick={() => savedContinuousScroll.handleClick('left', isSavedGuidesExpanded ? 480 : 360)}
                         onMouseEnter={handleMouseEnterGuideBtn}
-                        onMouseLeave={handleMouseLeaveGuideBtn}
-                        onMouseDown={handleMouseDownGuideBtn}
-                        onMouseUp={handleMouseUpGuideBtn}
+                        onMouseLeave={(e) => {
+                          handleMouseLeaveGuideBtn(e);
+                          savedContinuousScroll.stopScrolling();
+                        }}
+                        onMouseDown={(e) => {
+                          handleMouseDownGuideBtn(e);
+                          savedContinuousScroll.startScrolling('left');
+                        }}
+                        onMouseUp={(e) => {
+                          handleMouseUpGuideBtn(e);
+                          savedContinuousScroll.stopScrolling();
+                        }}
+                        onTouchStart={() => savedContinuousScroll.startScrolling('left')}
+                        onTouchEnd={savedContinuousScroll.stopScrolling}
+                        onTouchCancel={savedContinuousScroll.stopScrolling}
                         style={{
                           ...guideBtnBaseStyle,
                           left: '0px',
@@ -3573,11 +3625,23 @@ export const Profile: React.FC = () => {
                       {/* Right Arrow Button */}
                       <button
                         type="button"
-                        onClick={() => scrollSaved('right')}
+                        onClick={() => savedContinuousScroll.handleClick('right', isSavedGuidesExpanded ? 480 : 360)}
                         onMouseEnter={handleMouseEnterGuideBtn}
-                        onMouseLeave={handleMouseLeaveGuideBtn}
-                        onMouseDown={handleMouseDownGuideBtn}
-                        onMouseUp={handleMouseUpGuideBtn}
+                        onMouseLeave={(e) => {
+                          handleMouseLeaveGuideBtn(e);
+                          savedContinuousScroll.stopScrolling();
+                        }}
+                        onMouseDown={(e) => {
+                          handleMouseDownGuideBtn(e);
+                          savedContinuousScroll.startScrolling('right');
+                        }}
+                        onMouseUp={(e) => {
+                          handleMouseUpGuideBtn(e);
+                          savedContinuousScroll.stopScrolling();
+                        }}
+                        onTouchStart={() => savedContinuousScroll.startScrolling('right')}
+                        onTouchEnd={savedContinuousScroll.stopScrolling}
+                        onTouchCancel={savedContinuousScroll.stopScrolling}
                         style={{
                           ...guideBtnBaseStyle,
                           right: '0px',
@@ -3730,8 +3794,7 @@ export const Profile: React.FC = () => {
             // Favorites pagination
             const totalFavoritesCols = isTwoRows ? Math.ceil(filteredFavorites.length / 2) : filteredFavorites.length;
             const totalFavoritesPages = Math.max(1, Math.ceil(totalFavoritesCols / maxVisibleInOneRow));
-            const currentFavCol = Math.round(favoritesScrollLeft / 201);
-            const currentFavoritesPage = Math.min(totalFavoritesPages, Math.max(1, Math.floor(currentFavCol / maxVisibleInOneRow) + 1));
+            const currentFavoritesPage = Math.min(totalFavoritesPages, Math.max(1, favoritesPage));
 
             const getFavoritesMaskImage = () => {
               if (canFavoritesScrollLeft && canFavoritesScrollRight) {
@@ -3742,13 +3805,6 @@ export const Profile: React.FC = () => {
                 return 'linear-gradient(to right, black 0px, black calc(100% - 95px), transparent calc(100% - 45px), transparent 100%)';
               }
               return 'none';
-            };
-
-            const scrollFavorites = (direction: 'left' | 'right') => {
-              if (favoritesScrollRef.current) {
-                const scrollAmount = isFavoritesExpanded ? 360 : 300;
-                favoritesScrollRef.current.scrollBy({ left: direction === 'left' ? -scrollAmount : scrollAmount, behavior: 'smooth' });
-              }
             };
 
             const favBtnBaseStyle: React.CSSProperties = {
@@ -3954,11 +4010,23 @@ export const Profile: React.FC = () => {
                     {/* Left Arrow Button */}
                     <button
                       type="button"
-                      onClick={() => scrollFavorites('left')}
+                      onClick={() => favoritesContinuousScroll.handleClick('left', isFavoritesExpanded ? 360 : 300)}
                       onMouseEnter={handleMouseEnterFavBtn}
-                      onMouseLeave={handleMouseLeaveFavBtn}
-                      onMouseDown={handleMouseDownFavBtn}
-                      onMouseUp={handleMouseUpFavBtn}
+                      onMouseLeave={(e) => {
+                        handleMouseLeaveFavBtn(e);
+                        favoritesContinuousScroll.stopScrolling();
+                      }}
+                      onMouseDown={(e) => {
+                        handleMouseDownFavBtn(e);
+                        favoritesContinuousScroll.startScrolling('left');
+                      }}
+                      onMouseUp={(e) => {
+                        handleMouseUpFavBtn(e);
+                        favoritesContinuousScroll.stopScrolling();
+                      }}
+                      onTouchStart={() => favoritesContinuousScroll.startScrolling('left')}
+                      onTouchEnd={favoritesContinuousScroll.stopScrolling}
+                      onTouchCancel={favoritesContinuousScroll.stopScrolling}
                       style={{
                         ...favBtnBaseStyle,
                         left: '0px',
@@ -4150,11 +4218,23 @@ export const Profile: React.FC = () => {
                     {/* Right Arrow Button */}
                     <button
                       type="button"
-                      onClick={() => scrollFavorites('right')}
+                      onClick={() => favoritesContinuousScroll.handleClick('right', isFavoritesExpanded ? 360 : 300)}
                       onMouseEnter={handleMouseEnterFavBtn}
-                      onMouseLeave={handleMouseLeaveFavBtn}
-                      onMouseDown={handleMouseDownFavBtn}
-                      onMouseUp={handleMouseUpFavBtn}
+                      onMouseLeave={(e) => {
+                        handleMouseLeaveFavBtn(e);
+                        favoritesContinuousScroll.stopScrolling();
+                      }}
+                      onMouseDown={(e) => {
+                        handleMouseDownFavBtn(e);
+                        favoritesContinuousScroll.startScrolling('right');
+                      }}
+                      onMouseUp={(e) => {
+                        handleMouseUpFavBtn(e);
+                        favoritesContinuousScroll.stopScrolling();
+                      }}
+                      onTouchStart={() => favoritesContinuousScroll.startScrolling('right')}
+                      onTouchEnd={favoritesContinuousScroll.stopScrolling}
+                      onTouchCancel={favoritesContinuousScroll.stopScrolling}
                       style={{
                         ...favBtnBaseStyle,
                         right: '0px',
