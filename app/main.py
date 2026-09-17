@@ -60,6 +60,7 @@ def auto_migrate_schema():
                 ("is_hundred_percent", "BOOLEAN DEFAULT FALSE"),
                 ("release_date", "VARCHAR(50)"),
                 ("imdb_id", "VARCHAR(100)"),
+                ("favorited_at", "TIMESTAMP"),
             ]
             for col_name, col_type in lib_cols_to_add:
                 if col_name not in existing_lib_cols:

@@ -81,6 +81,7 @@ interface LibraryItem {
   imdb_id?: string;
   status: string;
   is_favorite: boolean;
+  favorited_at?: string;
   is_hundred_percent?: boolean;
   created_at: string;
   completed_at?: string;
@@ -660,7 +661,19 @@ export const Profile: React.FC = () => {
   const [seriesEpisodesMap, setSeriesEpisodesMap] = useState<Record<string, any[]>>({});
                         
   // Favorites state (local highlight mock for UX polish)
-  const [favorites, setFavorites] = useState<LibraryItem[]>([]);
+  const [favorites, setFavorites] = useState<LibraryItem[]>(() => {
+    if (!targetUserIdentifier) {
+      try {
+        const cached = sessionStorage.getItem('pathd_lib_cache');
+        return cached ? JSON.parse(cached).filter((i: LibraryItem) => i.is_favorite) : [];
+      } catch { return []; }
+    } else {
+      try {
+        const cached = sessionStorage.getItem(`pathd_user_lib_${targetUserIdentifier.toLowerCase()}`);
+        return cached ? JSON.parse(cached).filter((i: LibraryItem) => i.is_favorite) : [];
+      } catch { return []; }
+    }
+  });
 
   // Only display extra favorites beyond 1-per-category if user has active Pro, sorted newest first
   const displayedFavorites = React.useMemo(() => {
@@ -679,9 +692,9 @@ export const Profile: React.FC = () => {
         })();
 
     return [...list].sort((a, b) => {
-      const dateA = new Date(a.updated_at || a.completed_at || a.created_at || 0).getTime();
-      const dateB = new Date(b.updated_at || b.completed_at || b.created_at || 0).getTime();
-      return dateB - dateA;
+      const timeA = a.favorited_at ? new Date(a.favorited_at).getTime() : new Date(a.updated_at || a.completed_at || a.created_at || 0).getTime();
+      const timeB = b.favorited_at ? new Date(b.favorited_at).getTime() : new Date(b.updated_at || b.completed_at || b.created_at || 0).getTime();
+      return timeB - timeA;
     });
   }, [favorites, profile?.is_pro]);
 
@@ -800,11 +813,16 @@ export const Profile: React.FC = () => {
         const cachedLib = sessionStorage.getItem(`pathd_user_lib_${targetUserIdentifier.toLowerCase()}`);
         if (cachedUser) {
           setProfile(JSON.parse(cachedUser));
-          if (cachedLib) setLibraryItems(JSON.parse(cachedLib));
+          if (cachedLib) {
+            const parsedLib = JSON.parse(cachedLib);
+            setLibraryItems(parsedLib);
+            setFavorites(parsedLib.filter((i: LibraryItem) => i.is_favorite));
+          }
           setLoading(false);
         } else {
           setProfile(null);
           setLibraryItems([]);
+          setFavorites([]);
           setLoading(true);
         }
       } catch {
@@ -816,11 +834,16 @@ export const Profile: React.FC = () => {
         const cachedLib = sessionStorage.getItem('pathd_lib_cache');
         if (cachedMe) {
           setProfile(JSON.parse(cachedMe));
-          if (cachedLib) setLibraryItems(JSON.parse(cachedLib));
+          if (cachedLib) {
+            const parsedLib = JSON.parse(cachedLib);
+            setLibraryItems(parsedLib);
+            setFavorites(parsedLib.filter((i: LibraryItem) => i.is_favorite));
+          }
           setLoading(false);
         } else {
           setProfile(null);
           setLibraryItems([]);
+          setFavorites([]);
           setLoading(true);
         }
       } catch {
@@ -1173,17 +1196,17 @@ export const Profile: React.FC = () => {
     }
 
     try {
+      const nowIso = new Date().toISOString();
       await apiClient.put(`/library/${itemId}`, { is_favorite: !currentFav });
-      setLibraryItems(prev => prev.map(item => item.id === itemId ? { ...item, is_favorite: !currentFav } : item));
+      setLibraryItems(prev => prev.map(item => item.id === itemId ? { ...item, is_favorite: !currentFav, favorited_at: !currentFav ? nowIso : undefined } : item));
       
       setFavorites(prev => {
         if (!currentFav) {
-          return [...prev, { ...targetItem, is_favorite: true }];
+          return [...prev, { ...targetItem, is_favorite: true, favorited_at: nowIso }];
         } else {
           return prev.filter(li => li.id !== itemId);
         }
       });
-      window.dispatchEvent(new Event('library-updated'));
 
       // Refresh activities
       const targetActivityUrl = userIdParam ? `/users/${userIdParam}/activity` : '/users/me/activity';
@@ -1200,20 +1223,21 @@ export const Profile: React.FC = () => {
     if (!newItemObj) return;
 
     try {
+      const nowIso = new Date().toISOString();
       // 1. Unfavorite the old item
       await apiClient.put(`/library/${itemToReplaceId}`, { is_favorite: false });
       // 2. Favorite the new item
       await apiClient.put(`/library/${newItemId}`, { is_favorite: true });
 
       setLibraryItems(prev => prev.map(item => {
-        if (item.id === itemToReplaceId) return { ...item, is_favorite: false };
-        if (item.id === newItemId) return { ...item, is_favorite: true };
+        if (item.id === itemToReplaceId) return { ...item, is_favorite: false, favorited_at: undefined };
+        if (item.id === newItemId) return { ...item, is_favorite: true, favorited_at: nowIso };
         return item;
       }));
 
       setFavorites(prev => {
         const filtered = prev.filter(li => li.id !== itemToReplaceId && li.id !== newItemId);
-        return [...filtered, { ...newItemObj, is_favorite: true }];
+        return [...filtered, { ...newItemObj, is_favorite: true, favorited_at: nowIso }];
       });
 
       setSuccessMsg(language === 'es' ? 'Obra destacada actualizada correctamente.' : 'Featured item updated successfully.');

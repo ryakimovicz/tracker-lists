@@ -39,6 +39,7 @@ class LibraryItemResponse(BaseModel):
     image_url: Optional[str] = None
     status: UserLibraryStatusEnum
     is_favorite: bool = False
+    favorited_at: Optional[datetime] = None
     is_hundred_percent: bool = False
     completed_at: Optional[datetime] = None
     updated_at: datetime

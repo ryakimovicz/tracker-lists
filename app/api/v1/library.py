@@ -549,6 +549,7 @@ def add_to_library(
             image_url=item_in.image_url,
             status=status_val,
             is_favorite=item_in.is_favorite if item_in.is_favorite is not None else False,
+            favorited_at=datetime.now(timezone.utc) if item_in.is_favorite else None,
             is_hundred_percent=item_in.is_hundred_percent if item_in.is_hundred_percent is not None else False,
             completed_at=completed_at_val,
             last_seen_episode=last_title,
@@ -788,6 +789,7 @@ def get_library(
             "image_url": it.image_url,
             "status": it.status,
             "is_favorite": it.is_favorite,
+            "favorited_at": it.favorited_at,
             "is_hundred_percent": it.is_hundred_percent,
             "completed_at": it.completed_at,
             "updated_at": it.updated_at,
@@ -956,8 +958,10 @@ def update_library_item(
                     old_fav.is_favorite = False
                     
         lib_item.is_favorite = item_in.is_favorite
-
-        lib_item.updated_at = datetime.now(timezone.utc)
+        if item_in.is_favorite:
+            lib_item.favorited_at = datetime.now(timezone.utc)
+        else:
+            lib_item.favorited_at = None
         
         # Record activity log
         activity = UserActivityLog(
