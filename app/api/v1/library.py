@@ -11,7 +11,7 @@ from app.models.list import ReadingList, VisibilityEnum
 from app.models.list_item import ListItem, ItemTypeEnum
 from app.models.library import UserLibraryItem, UserLibraryStatusEnum
 from app.models.item_progress import ItemProgress
-from app.schemas.library import LibraryItemCreate, LibraryItemUpdate, LibraryItemResponse
+from app.schemas.library import LibraryItemCreate, LibraryItemUpdate, LibraryItemResponse, ReorderFavoritesRequest
 from app.services.tvmaze import TVMazeService
 from app.models.activity import UserActivityLog
 
@@ -550,6 +550,7 @@ def add_to_library(
             status=status_val,
             is_favorite=item_in.is_favorite if item_in.is_favorite is not None else False,
             favorited_at=datetime.now(timezone.utc) if item_in.is_favorite else None,
+            favorite_order=0 if item_in.is_favorite else 0,
             is_hundred_percent=item_in.is_hundred_percent if item_in.is_hundred_percent is not None else False,
             completed_at=completed_at_val,
             last_seen_episode=last_title,
@@ -559,6 +560,11 @@ def add_to_library(
             release_date=item_in.release_date,
             tracking_list_id=tracking_list_id
         )
+        if item_in.is_favorite:
+            db.query(UserLibraryItem).filter(
+                UserLibraryItem.user_id == current_user.id,
+                UserLibraryItem.is_favorite == True
+            ).update({UserLibraryItem.favorite_order: UserLibraryItem.favorite_order + 1}, synchronize_session=False)
         db.add(new_lib_item)
     
     if item_in.item_type in ("series", "anime"):
@@ -790,6 +796,7 @@ def get_library(
             "status": it.status,
             "is_favorite": it.is_favorite,
             "favorited_at": it.favorited_at,
+            "favorite_order": it.favorite_order if it.favorite_order is not None else 0,
             "is_hundred_percent": it.is_hundred_percent,
             "completed_at": it.completed_at,
             "updated_at": it.updated_at,
@@ -808,6 +815,23 @@ def get_library(
         res.append(it_dict)
 
     return res
+
+@router.put("/favorites/reorder")
+def reorder_favorites(
+    req: ReorderFavoritesRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    items = db.query(UserLibraryItem).filter(
+        UserLibraryItem.user_id == current_user.id,
+        UserLibraryItem.id.in_(req.item_ids)
+    ).all()
+    item_map = {it.id: it for it in items}
+    for idx, item_id in enumerate(req.item_ids):
+        if item_id in item_map:
+            item_map[item_id].favorite_order = idx
+    db.commit()
+    return {"status": "success", "reordered_count": len(req.item_ids)}
 
 @router.put("/{library_item_id}", response_model=LibraryItemResponse)
 def update_library_item(
@@ -960,6 +984,13 @@ def update_library_item(
         lib_item.is_favorite = item_in.is_favorite
         if item_in.is_favorite:
             lib_item.favorited_at = datetime.now(timezone.utc)
+            lib_item.favorite_order = 0
+            # Shift existing favorites so the new favorite is at index 0
+            db.query(UserLibraryItem).filter(
+                UserLibraryItem.user_id == current_user.id,
+                UserLibraryItem.is_favorite == True,
+                UserLibraryItem.id != lib_item.id
+            ).update({UserLibraryItem.favorite_order: UserLibraryItem.favorite_order + 1}, synchronize_session=False)
         else:
             lib_item.favorited_at = None
         

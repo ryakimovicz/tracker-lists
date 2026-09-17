@@ -11,6 +11,7 @@ class LibraryItemCreate(BaseModel):
     image_url: Optional[str] = None
     status: UserLibraryStatusEnum = UserLibraryStatusEnum.PLAN_TO_READ
     is_favorite: Optional[bool] = False
+    favorite_order: Optional[int] = 0
     is_hundred_percent: Optional[bool] = False
     completed_at: Optional[datetime] = None
     custom_badge: Optional[str] = None
@@ -21,6 +22,7 @@ class LibraryItemCreate(BaseModel):
 class LibraryItemUpdate(BaseModel):
     status: Optional[UserLibraryStatusEnum] = None
     is_favorite: Optional[bool] = None
+    favorite_order: Optional[int] = None
     is_hundred_percent: Optional[bool] = None
     completed_at: Optional[datetime] = None
     last_seen_episode: Optional[str] = None
@@ -40,6 +42,7 @@ class LibraryItemResponse(BaseModel):
     status: UserLibraryStatusEnum
     is_favorite: bool = False
     favorited_at: Optional[datetime] = None
+    favorite_order: Optional[int] = 0
     is_hundred_percent: bool = False
     completed_at: Optional[datetime] = None
     updated_at: datetime
@@ -57,3 +60,6 @@ class LibraryItemResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class ReorderFavoritesRequest(BaseModel):
+    item_ids: list[int]

@@ -83,6 +83,7 @@ interface LibraryItem {
   status: string;
   is_favorite: boolean;
   favorited_at?: string;
+  favorite_order?: number;
   is_hundred_percent?: boolean;
   created_at: string;
   completed_at?: string;
@@ -602,46 +603,61 @@ export const Profile: React.FC = () => {
   }, [shelfViewMode, isShelfExpanded, updateShelfScrollState]);
 
   useEffect(() => {
+    if (activeTab !== 'shelf') return;
     const el = shelfScrollRef.current;
     if (!el) return;
     updateShelfScrollState();
-    const timer = setTimeout(updateShelfScrollState, 50);
+    const raf = requestAnimationFrame(updateShelfScrollState);
+    const timer1 = setTimeout(updateShelfScrollState, 50);
+    const timer2 = setTimeout(updateShelfScrollState, 150);
     el.addEventListener('scroll', updateShelfScrollState, { passive: true });
     window.addEventListener('resize', updateShelfScrollState);
     return () => {
-      clearTimeout(timer);
+      cancelAnimationFrame(raf);
+      clearTimeout(timer1);
+      clearTimeout(timer2);
       el.removeEventListener('scroll', updateShelfScrollState);
       window.removeEventListener('resize', updateShelfScrollState);
     };
-  }, [updateShelfScrollState, isShelfExpanded, shelfViewMode, libraryItems, shelfSearchQuery]);
+  }, [updateShelfScrollState, activeTab, isShelfExpanded, shelfViewMode, libraryItems, shelfSearchQuery]);
 
   useEffect(() => {
+    if (activeTab !== 'guides') return;
     const el = createdGuidesScrollRef.current;
     if (!el) return;
     updateCreatedGuidesScrollState();
-    const timer = setTimeout(updateCreatedGuidesScrollState, 50);
+    const raf = requestAnimationFrame(updateCreatedGuidesScrollState);
+    const timer1 = setTimeout(updateCreatedGuidesScrollState, 50);
+    const timer2 = setTimeout(updateCreatedGuidesScrollState, 150);
     el.addEventListener('scroll', updateCreatedGuidesScrollState, { passive: true });
     window.addEventListener('resize', updateCreatedGuidesScrollState);
     return () => {
-      clearTimeout(timer);
+      cancelAnimationFrame(raf);
+      clearTimeout(timer1);
+      clearTimeout(timer2);
       el.removeEventListener('scroll', updateCreatedGuidesScrollState);
       window.removeEventListener('resize', updateCreatedGuidesScrollState);
     };
-  }, [updateCreatedGuidesScrollState, isCreatedGuidesExpanded, profile?.created_lists]);
+  }, [updateCreatedGuidesScrollState, activeTab, isCreatedGuidesExpanded, profile?.created_lists]);
 
   useEffect(() => {
+    if (activeTab !== 'guides') return;
     const el = savedGuidesScrollRef.current;
     if (!el) return;
     updateSavedGuidesScrollState();
-    const timer = setTimeout(updateSavedGuidesScrollState, 50);
+    const raf = requestAnimationFrame(updateSavedGuidesScrollState);
+    const timer1 = setTimeout(updateSavedGuidesScrollState, 50);
+    const timer2 = setTimeout(updateSavedGuidesScrollState, 150);
     el.addEventListener('scroll', updateSavedGuidesScrollState, { passive: true });
     window.addEventListener('resize', updateSavedGuidesScrollState);
     return () => {
-      clearTimeout(timer);
+      cancelAnimationFrame(raf);
+      clearTimeout(timer1);
+      clearTimeout(timer2);
       el.removeEventListener('scroll', updateSavedGuidesScrollState);
       window.removeEventListener('resize', updateSavedGuidesScrollState);
     };
-  }, [updateSavedGuidesScrollState, isSavedGuidesExpanded, profile?.saved_lists]);
+  }, [updateSavedGuidesScrollState, activeTab, isSavedGuidesExpanded, profile?.saved_lists]);
 
   useEffect(() => {
     const updateWidth = () => {
@@ -703,7 +719,7 @@ export const Profile: React.FC = () => {
     }
   });
 
-  // Only display extra favorites beyond 1-per-category if user has active Pro, sorted newest first
+  // Only display extra favorites beyond 1-per-category if user has active Pro, sorted by custom order then newest
   const displayedFavorites = React.useMemo(() => {
     const list = profile?.is_pro
       ? favorites
@@ -720,25 +736,228 @@ export const Profile: React.FC = () => {
         })();
 
     return [...list].sort((a, b) => {
+      const orderA = a.favorite_order ?? 0;
+      const orderB = b.favorite_order ?? 0;
+      if (orderA !== orderB) {
+        return orderA - orderB;
+      }
       const timeA = a.favorited_at ? new Date(a.favorited_at).getTime() : new Date(a.updated_at || a.completed_at || a.created_at || 0).getTime();
       const timeB = b.favorited_at ? new Date(b.favorited_at).getTime() : new Date(b.updated_at || b.completed_at || b.created_at || 0).getTime();
       return timeB - timeA;
     });
   }, [favorites, profile?.is_pro]);
 
+  // Favorites Drag and Drop reordering states & edge scroller
+  interface FavPointerDrag {
+    item: LibraryItem;
+    sourceIndex: number;
+    startX: number;
+    startY: number;
+    currentX: number;
+    currentY: number;
+    isDragging: boolean;
+  }
+
+  const [favPointerDrag, setFavPointerDrag] = useState<FavPointerDrag | null>(null);
+  const favPointerDragRef = useRef<FavPointerDrag | null>(null);
+  favPointerDragRef.current = favPointerDrag;
+
+  const [favDragOverIndex, setFavDragOverIndex] = useState<number | null>(null);
+  const favDragOverIndexRef = useRef<number | null>(null);
+  favDragOverIndexRef.current = favDragOverIndex;
+
+  const favJustDraggedRef = useRef<boolean>(false);
+  const favEdgeScrollIntervalRef = useRef<any>(null);
+
+  const stopFavEdgeScroll = useCallback(() => {
+    if (favEdgeScrollIntervalRef.current) {
+      clearInterval(favEdgeScrollIntervalRef.current);
+      favEdgeScrollIntervalRef.current = null;
+    }
+  }, []);
+
+  const startFavEdgeScroll = useCallback((direction: 'left' | 'right', speed: number) => {
+    stopFavEdgeScroll();
+    favEdgeScrollIntervalRef.current = setInterval(() => {
+      if (favoritesScrollRef.current) {
+        favoritesScrollRef.current.scrollLeft += (direction === 'left' ? -speed : speed);
+        updateFavoritesScrollState();
+      }
+    }, 16);
+  }, [stopFavEdgeScroll, updateFavoritesScrollState]);
+
+  const handleFavEdgeScrollCheck = useCallback((clientX: number) => {
+    const el = favoritesScrollRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const edgeZone = 80;
+
+    if (clientX < rect.left + edgeZone && clientX >= rect.left - 40) {
+      const distanceIntoEdge = Math.max(1, (rect.left + edgeZone) - clientX);
+      const speed = Math.min(18, Math.max(4, Math.round((distanceIntoEdge / edgeZone) * 16)));
+      startFavEdgeScroll('left', speed);
+    } else if (clientX > rect.right - edgeZone && clientX <= rect.right + 40) {
+      const distanceIntoEdge = Math.max(1, clientX - (rect.right - edgeZone));
+      const speed = Math.min(18, Math.max(4, Math.round((distanceIntoEdge / edgeZone) * 16)));
+      startFavEdgeScroll('right', speed);
+    } else {
+      stopFavEdgeScroll();
+    }
+  }, [startFavEdgeScroll, stopFavEdgeScroll]);
+
   useEffect(() => {
+    if (!favPointerDrag) return;
+
+    const handlePointerMove = (e: PointerEvent) => {
+      const currentDrag = favPointerDragRef.current;
+      if (!currentDrag) return;
+
+      const dist = Math.hypot(e.clientX - currentDrag.startX, e.clientY - currentDrag.startY);
+      const isDraggingNow = currentDrag.isDragging || dist > 6;
+
+      if (isDraggingNow) {
+        favJustDraggedRef.current = true;
+        document.body.style.userSelect = 'none';
+        document.body.style.cursor = 'grabbing';
+        handleFavEdgeScrollCheck(e.clientX);
+
+        // Find drop index across rendered cards
+        const container = favoritesScrollRef.current;
+        if (container) {
+          const cards = Array.from(container.querySelectorAll<HTMLElement>('[data-fav-card-idx]'));
+          if (cards.length > 0) {
+            let closestIdx = -1;
+            let closestDist = Infinity;
+            let insertBefore = true;
+
+            for (const card of cards) {
+              const cardIdx = parseInt(card.getAttribute('data-fav-card-idx') || '0', 10);
+              const rect = card.getBoundingClientRect();
+              const centerX = rect.left + rect.width / 2;
+              const centerY = rect.top + rect.height / 2;
+              const d = Math.hypot(e.clientX - centerX, e.clientY - centerY);
+
+              if (d < closestDist) {
+                closestDist = d;
+                closestIdx = cardIdx;
+                insertBefore = e.clientX < centerX;
+              }
+            }
+
+            if (closestIdx !== -1) {
+              const targetIdx = insertBefore ? closestIdx : closestIdx + 1;
+              setFavDragOverIndex(prev => (prev === targetIdx ? prev : targetIdx));
+            }
+          }
+        }
+      }
+
+      setFavPointerDrag(prev => prev ? {
+        ...prev,
+        currentX: e.clientX,
+        currentY: e.clientY,
+        isDragging: isDraggingNow
+      } : null);
+    };
+
+    const handlePointerUp = () => {
+      stopFavEdgeScroll();
+      const currentDrag = favPointerDragRef.current;
+      const targetOverIdx = favDragOverIndexRef.current;
+
+      if (currentDrag && currentDrag.isDragging && targetOverIdx !== null) {
+        let finalTargetIdx = targetOverIdx;
+        if (currentDrag.sourceIndex < finalTargetIdx) {
+          finalTargetIdx -= 1;
+        }
+
+        if (finalTargetIdx !== currentDrag.sourceIndex) {
+          const reordered = [...displayedFavorites];
+          const [moved] = reordered.splice(currentDrag.sourceIndex, 1);
+          reordered.splice(Math.max(0, Math.min(finalTargetIdx, reordered.length)), 0, moved);
+
+          const updated = reordered.map((item, index) => ({
+            ...item,
+            favorite_order: index
+          }));
+
+          setFavorites(updated);
+          setLibraryItems(prev => prev.map(li => {
+            const f = updated.find(u => u.id === li.id);
+            return f ? { ...li, favorite_order: f.favorite_order } : li;
+          }));
+
+          try {
+            if (!targetUserIdentifier) {
+              sessionStorage.setItem('pathd_lib_cache', JSON.stringify(
+                (libraryItems || []).map(li => {
+                  const f = updated.find(u => u.id === li.id);
+                  return f ? { ...li, favorite_order: f.favorite_order } : li;
+                })
+              ));
+            }
+          } catch {}
+
+          const item_ids = updated.map(item => item.id);
+          apiClient.put('/library/favorites/reorder', { item_ids }).catch(err => {
+            console.error('Failed to save favorites order', err);
+          });
+        }
+      }
+
+      setTimeout(() => {
+        favJustDraggedRef.current = false;
+      }, 120);
+
+      setFavPointerDrag(null);
+      setFavDragOverIndex(null);
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+    };
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('pointercancel', handlePointerUp);
+
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('pointercancel', handlePointerUp);
+      stopFavEdgeScroll();
+    };
+  }, [favPointerDrag !== null, displayedFavorites, libraryItems, targetUserIdentifier, stopFavEdgeScroll, handleFavEdgeScrollCheck]);
+
+  useEffect(() => {
+    if (activeTab !== 'favorites') return;
     const el = favoritesScrollRef.current;
     if (!el) return;
     updateFavoritesScrollState();
-    const timer = setTimeout(updateFavoritesScrollState, 50);
+    const raf = requestAnimationFrame(updateFavoritesScrollState);
+    const timer1 = setTimeout(updateFavoritesScrollState, 50);
+    const timer2 = setTimeout(updateFavoritesScrollState, 150);
     el.addEventListener('scroll', updateFavoritesScrollState, { passive: true });
     window.addEventListener('resize', updateFavoritesScrollState);
+
+    let resizeObserver: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(() => {
+        updateFavoritesScrollState();
+      });
+      resizeObserver.observe(el);
+      if (favoritesContainerRef.current) {
+        resizeObserver.observe(favoritesContainerRef.current);
+      }
+    }
+
     return () => {
-      clearTimeout(timer);
+      cancelAnimationFrame(raf);
+      clearTimeout(timer1);
+      clearTimeout(timer2);
       el.removeEventListener('scroll', updateFavoritesScrollState);
       window.removeEventListener('resize', updateFavoritesScrollState);
+      if (resizeObserver) resizeObserver.disconnect();
     };
-  }, [updateFavoritesScrollState, isFavoritesExpanded, favoritesViewMode, displayedFavorites, favoritesMediaFilter]);
+  }, [updateFavoritesScrollState, activeTab, isFavoritesExpanded, favoritesViewMode, displayedFavorites, favoritesMediaFilter]);
 
   // Last.fm states
   const [nowPlaying, setNowPlaying] = useState<any>(null);
@@ -1226,11 +1445,30 @@ export const Profile: React.FC = () => {
     try {
       const nowIso = new Date().toISOString();
       await apiClient.put(`/library/${itemId}`, { is_favorite: !currentFav });
-      setLibraryItems(prev => prev.map(item => item.id === itemId ? { ...item, is_favorite: !currentFav, favorited_at: !currentFav ? nowIso : undefined } : item));
+      
+      setLibraryItems(prev => {
+        if (!currentFav) {
+          return prev.map(item => {
+            if (item.id === itemId) {
+              return { ...item, is_favorite: true, favorited_at: nowIso, favorite_order: 0 };
+            }
+            if (item.is_favorite) {
+              return { ...item, favorite_order: (item.favorite_order ?? 0) + 1 };
+            }
+            return item;
+          });
+        } else {
+          return prev.map(item => item.id === itemId ? { ...item, is_favorite: false, favorited_at: undefined } : item);
+        }
+      });
       
       setFavorites(prev => {
         if (!currentFav) {
-          return [...prev, { ...targetItem, is_favorite: true, favorited_at: nowIso }];
+          const shifted = prev.map(li => ({
+            ...li,
+            favorite_order: (li.favorite_order ?? 0) + 1
+          }));
+          return [{ ...targetItem, is_favorite: true, favorited_at: nowIso, favorite_order: 0 }, ...shifted];
         } else {
           return prev.filter(li => li.id !== itemId);
         }
@@ -1257,15 +1495,28 @@ export const Profile: React.FC = () => {
       // 2. Favorite the new item
       await apiClient.put(`/library/${newItemId}`, { is_favorite: true });
 
-      setLibraryItems(prev => prev.map(item => {
-        if (item.id === itemToReplaceId) return { ...item, is_favorite: false, favorited_at: undefined };
-        if (item.id === newItemId) return { ...item, is_favorite: true, favorited_at: nowIso };
-        return item;
-      }));
+      setLibraryItems(prev => {
+        return prev.map(item => {
+          if (item.id === itemToReplaceId) {
+            return { ...item, is_favorite: false, favorited_at: undefined };
+          }
+          if (item.id === newItemId) {
+            return { ...item, is_favorite: true, favorited_at: nowIso, favorite_order: 0 };
+          }
+          if (item.is_favorite) {
+            return { ...item, favorite_order: (item.favorite_order ?? 0) + 1 };
+          }
+          return item;
+        });
+      });
 
       setFavorites(prev => {
         const filtered = prev.filter(li => li.id !== itemToReplaceId && li.id !== newItemId);
-        return [...filtered, { ...newItemObj, is_favorite: true, favorited_at: nowIso }];
+        const shifted = filtered.map(li => ({
+          ...li,
+          favorite_order: (li.favorite_order ?? 0) + 1
+        }));
+        return [{ ...newItemObj, is_favorite: true, favorited_at: nowIso, favorite_order: 0 }, ...shifted];
       });
 
       setSuccessMsg(language === 'es' ? 'Obra destacada actualizada correctamente.' : 'Featured item updated successfully.');
@@ -4062,157 +4313,242 @@ export const Profile: React.FC = () => {
                         maskImage: getFavoritesMaskImage()
                       }}
                     >
-                      {filteredFavorites.map(item => (
-                        <div
-                          key={item.id}
-                          className="glass-card"
-                          style={{
-                            minWidth: '185px',
-                            maxWidth: '185px',
-                            padding: '0.85rem',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '0.65rem',
-                            flexShrink: 0
-                          }}
-                        >
-                          <div style={{ position: 'relative', cursor: 'pointer', width: '100%', height: '230px', borderRadius: '8px', overflow: 'hidden' }} onClick={() => handleOpenItemDetails(item)}>
-                            <MediaPoster
-                              src={item.image_url}
-                              title={item.title}
-                              itemType={item.item_type}
-                              height="100%"
-                              width="100%"
-                              borderRadius="8px"
-                            />
+                      {filteredFavorites.map((item, idx) => {
+                        const canReorderFavorites = isOwnProfile && favoritesMediaFilter === 'all' && isGrid;
+                        const isBeingDragged = favPointerDrag?.isDragging && favPointerDrag.item.id === item.id;
+                        const isDropTargetBefore = favPointerDrag?.isDragging && favDragOverIndex === idx && favPointerDrag.sourceIndex !== idx && favPointerDrag.sourceIndex !== idx - 1;
+                        const isDropTargetAfterLast = favPointerDrag?.isDragging && idx === filteredFavorites.length - 1 && favDragOverIndex === filteredFavorites.length && favPointerDrag.sourceIndex !== filteredFavorites.length - 1;
 
-                            {/* Tag / Category Badge */}
-                            {(() => {
-                              const isGame = item.item_type === 'game';
-                              const rawBadge = (item.custom_badge || '').toLowerCase();
-                              const getGameBadgeLabel = (b: string) => {
-                                if (b === 'collection' || b === 'pack') return language === 'es' ? 'Colección' : 'Collection';
-                                if (b === 'expansion') return language === 'es' ? 'Expansión' : 'Expansion';
-                                if (b === 'dlc') return 'DLC';
-                                if (b === 'edition') return language === 'es' ? 'Edición' : 'Edition';
-                                if (b === 'remake') return 'Remake';
-                                if (b === 'remaster') return 'Remaster';
-                                return null;
-                              };
-                              const specialGameLabel = isGame ? getGameBadgeLabel(rawBadge) : null;
-                              if (favoritesMediaFilter === 'all') {
-                                const normType = (item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tvm-ep-')) ? 'series' : item.item_type;
-                                const label = isGame
-                                  ? (specialGameLabel || (language === 'es' ? 'Juego' : 'Game'))
-                                  : (item.item_type === 'episode' || item.external_id?.startsWith('tvm-ep-'))
-                                  ? (language === 'es' ? 'Serie' : 'Show')
-                                  : item.item_type === 'season'
-                                  ? (language === 'es' ? 'Temporada' : 'Season')
-                                  : item.item_type === 'comic' ? (language === 'es' ? 'Cómic' : 'Comic') : item.item_type === 'manga' ? 'Manga' : t('media' + item.item_type.charAt(0).toUpperCase() + item.item_type.slice(1));
-                                return (
-                                  <div
-                                    className={getTagClass(normType)}
-                                    style={{
-                                      position: "absolute",
-                                      top: "0.5rem",
-                                      left: "0.5rem",
-                                      padding: "0.2rem 0.35rem",
-                                      borderRadius: "4px",
-                                      display: "inline-flex",
-                                      alignItems: "center",
-                                      justifyContent: "center",
-                                      opacity: 0.95,
-                                      backdropFilter: 'blur(4px)',
-                                      zIndex: 1
-                                    }}
-                                    title={label}
-                                  >
-                                    {getCategoryIcon(normType, { size: 14, color: 'currentColor' })}
-                                  </div>
-                                );
-                              }
-                              if (isGame && specialGameLabel) {
-                                return (
-                                  <div className="tag-badge tag-game" style={{ position: "absolute", top: "0.5rem", left: "0.5rem", padding: "0.15rem 0.45rem", borderRadius: "4px", fontSize: "0.7rem", fontWeight: 600, opacity: 0.9, backdropFilter: 'blur(4px)', zIndex: 1 }}>
-                                    {specialGameLabel}
-                                  </div>
-                                );
-                              }
-                              return null;
-                            })()}
+                        const dropPlaceholder = (
+                          <div
+                            key={`fav-drop-placeholder-${idx}`}
+                            style={{
+                              minWidth: '185px',
+                              maxWidth: '185px',
+                              height: '320px',
+                              borderRadius: '12px',
+                              border: '2px dashed var(--color-user, #F472B6)',
+                              background: 'rgba(244, 114, 182, 0.08)',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '0.5rem',
+                              color: 'var(--color-user, #F472B6)',
+                              fontSize: '0.85rem',
+                              fontWeight: 600,
+                              flexShrink: 0,
+                              transition: 'all 0.2s ease',
+                              boxShadow: '0 0 16px rgba(244, 114, 182, 0.2)'
+                            }}
+                          >
+                            <Sparkles size={22} className="animate-pulse" />
+                            <span>{language === 'es' ? 'Soltar aquí' : 'Drop here'}</span>
+                          </div>
+                        );
 
-                            {/* Favorite Heart Button */}
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleToggleFavorite(item.id, true);
+                        return (
+                          <React.Fragment key={item.id}>
+                            {isDropTargetBefore && dropPlaceholder}
+                            <div
+                              data-fav-card-idx={idx}
+                              data-fav-card-id={item.id}
+                              className="glass-card"
+                              draggable={false}
+                              onDragStart={(e) => e.preventDefault()}
+                              onPointerDown={(e) => {
+                                if (e.button !== 0 || !canReorderFavorites) return;
+                                const target = e.target as HTMLElement;
+                                if (target.closest('button') || target.closest('a')) return;
+                                setFavPointerDrag({
+                                  item,
+                                  sourceIndex: idx,
+                                  startX: e.clientX,
+                                  startY: e.clientY,
+                                  currentX: e.clientX,
+                                  currentY: e.clientY,
+                                  isDragging: false
+                                });
                               }}
-                              className="btn-favorite-heart is-favorite"
                               style={{
-                                position: 'absolute',
-                                top: '0.5rem',
-                                right: '0.5rem',
-                                width: '32px',
-                                height: '32px',
-                                cursor: 'pointer',
-                                color: 'var(--color-user, #F472B6)'
-                              }}
-                              title={language === 'es' ? 'Quitar Destacado' : 'Remove Featured'}
+                                minWidth: '185px',
+                                maxWidth: '185px',
+                                padding: '0.85rem',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '0.65rem',
+                                flexShrink: 0,
+                                opacity: isBeingDragged ? 0.35 : 1,
+                                cursor: canReorderFavorites ? (favPointerDrag?.isDragging ? 'grabbing' : 'grab') : undefined,
+                                userSelect: 'none',
+                                WebkitUserDrag: 'none',
+                                touchAction: canReorderFavorites ? 'none' : 'auto',
+                                transition: 'opacity 0.2s ease, transform 0.2s ease'
+                              } as React.CSSProperties}
                             >
-                              <Heart size={16} fill="var(--color-user, #F472B6)" />
-                            </button>
-                          </div>
+                              <div
+                                draggable={false}
+                                onDragStart={(e) => e.preventDefault()}
+                                style={{
+                                  position: 'relative',
+                                  cursor: canReorderFavorites ? (favPointerDrag?.isDragging ? 'grabbing' : 'grab') : 'pointer',
+                                  width: '100%',
+                                  height: '230px',
+                                  borderRadius: '8px',
+                                  overflow: 'hidden',
+                                  userSelect: 'none',
+                                  WebkitUserDrag: 'none'
+                                } as React.CSSProperties}
+                                onClick={() => {
+                                  if (favJustDraggedRef.current || favPointerDragRef.current?.isDragging) return;
+                                  handleOpenItemDetails(item);
+                                }}
+                              >
+                                <MediaPoster
+                                  src={item.image_url}
+                                  title={item.title}
+                                  itemType={item.item_type}
+                                  height="100%"
+                                  width="100%"
+                                  borderRadius="8px"
+                                />
 
-                          <div style={{ flex: 1, textAlign: 'left', cursor: 'pointer' }} onClick={() => handleOpenItemDetails(item)}>
-                            {(() => {
-                              const match = (item.title || '').match(/^(.*?)\s*-\s*S(\d+)E(\d+)(.*)$/i);
-                              const isEpOrSeason = item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tvm-ep-');
-                              if (isEpOrSeason && match) {
-                                const series = match[1].trim();
-                                const s = match[2];
-                                const e = match[3];
-                                const epName = match[4].replace(/^\s*-\s*/, '').trim();
-                                const formattedSE = language === 'es' ? `T${s} | E${e}` : `S${s} | E${e}`;
-                                return (
-                                  <div style={{ display: 'flex', flexDirection: 'column', marginBottom: '0.25rem' }}>
-                                    <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.title}>{series}</h4>
-                                    <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--accent-primary)', marginTop: '0.1rem' }}>{formattedSE}</span>
-                                    {epName && <span style={{ fontSize: '0.78rem', fontWeight: 500, color: 'var(--text-secondary)', marginTop: '0.1rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{epName}</span>}
-                                  </div>
-                                );
-                              }
-                              let displayTitle = item.title;
-                              if (isEpOrSeason && item.last_seen_episode && item.title.toLowerCase().startsWith(item.last_seen_episode.toLowerCase() + ' - ')) {
-                                displayTitle = item.title.slice(item.last_seen_episode.length + 3);
-                              }
-                              return (
-                                <>
-                                  <h4 style={{ margin: '0 0 0.25rem 0', fontSize: '0.92rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.title}>
-                                    {displayTitle}
-                                  </h4>
-                                  {isEpOrSeason && item.last_seen_episode && (
-                                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500, display: 'block', marginTop: '0.1rem' }}>
-                                      {language === 'es' ? 'Serie: ' : 'Show: '}{item.last_seen_episode}
-                                    </span>
-                                  )}
-                                </>
-                              );
-                            })()}
+                                {/* Tag / Category Badge */}
+                                {(() => {
+                                  const isGame = item.item_type === 'game';
+                                  const rawBadge = (item.custom_badge || '').toLowerCase();
+                                  const getGameBadgeLabel = (b: string) => {
+                                    if (b === 'collection' || b === 'pack') return language === 'es' ? 'Colección' : 'Collection';
+                                    if (b === 'expansion') return language === 'es' ? 'Expansión' : 'Expansion';
+                                    if (b === 'dlc') return 'DLC';
+                                    if (b === 'edition') return language === 'es' ? 'Edición' : 'Edition';
+                                    if (b === 'remake') return 'Remake';
+                                    if (b === 'remaster') return 'Remaster';
+                                    return null;
+                                  };
+                                  const specialGameLabel = isGame ? getGameBadgeLabel(rawBadge) : null;
+                                  if (favoritesMediaFilter === 'all') {
+                                    const normType = (item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tvm-ep-')) ? 'series' : item.item_type;
+                                    const label = isGame
+                                      ? (specialGameLabel || (language === 'es' ? 'Juego' : 'Game'))
+                                      : (item.item_type === 'episode' || item.external_id?.startsWith('tvm-ep-'))
+                                      ? (language === 'es' ? 'Serie' : 'Show')
+                                      : item.item_type === 'season'
+                                      ? (language === 'es' ? 'Temporada' : 'Season')
+                                      : item.item_type === 'comic' ? (language === 'es' ? 'Cómic' : 'Comic') : item.item_type === 'manga' ? 'Manga' : t('media' + item.item_type.charAt(0).toUpperCase() + item.item_type.slice(1));
+                                    return (
+                                      <div
+                                        className={getTagClass(normType)}
+                                        style={{
+                                          position: "absolute",
+                                          top: "0.5rem",
+                                          left: "0.5rem",
+                                          padding: "0.2rem 0.35rem",
+                                          borderRadius: "4px",
+                                          display: "inline-flex",
+                                          alignItems: "center",
+                                          justifyContent: "center",
+                                          opacity: 0.95,
+                                          backdropFilter: 'blur(4px)',
+                                          zIndex: 1
+                                        }}
+                                        title={label}
+                                      >
+                                        {getCategoryIcon(normType, { size: 14, color: 'currentColor' })}
+                                      </div>
+                                    );
+                                  }
+                                  if (isGame && specialGameLabel) {
+                                    return (
+                                      <div className="tag-badge tag-game" style={{ position: "absolute", top: "0.5rem", left: "0.5rem", padding: "0.15rem 0.45rem", borderRadius: "4px", fontSize: "0.7rem", fontWeight: 600, opacity: 0.9, backdropFilter: 'blur(4px)', zIndex: 1 }}>
+                                        {specialGameLabel}
+                                      </div>
+                                    );
+                                  }
+                                  return null;
+                                })()}
 
-                            {/* Unified Badges System */}
-                            <div style={{ marginTop: '0.25rem' }}>
-                              {renderFavoriteBadges(item)}
+                                {/* Favorite Heart Button */}
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleToggleFavorite(item.id, true);
+                                  }}
+                                  className="btn-favorite-heart is-favorite"
+                                  style={{
+                                    position: 'absolute',
+                                    top: '0.5rem',
+                                    right: '0.5rem',
+                                    width: '32px',
+                                    height: '32px',
+                                    cursor: 'pointer',
+                                    color: 'var(--color-user, #F472B6)'
+                                  }}
+                                  title={language === 'es' ? 'Quitar Destacado' : 'Remove Featured'}
+                                >
+                                  <Heart size={16} fill="var(--color-user, #F472B6)" />
+                                </button>
+                              </div>
+
+                              <div
+                                style={{ flex: 1, textAlign: 'left', cursor: canReorderFavorites ? (favPointerDrag?.isDragging ? 'grabbing' : 'grab') : 'pointer' }}
+                                onClick={() => {
+                                  if (favJustDraggedRef.current || favPointerDragRef.current?.isDragging) return;
+                                  handleOpenItemDetails(item);
+                                }}
+                              >
+                                {(() => {
+                                  const match = (item.title || '').match(/^(.*?)\s*-\s*S(\d+)E(\d+)(.*)$/i);
+                                  const isEpOrSeason = item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tvm-ep-');
+                                  if (isEpOrSeason && match) {
+                                    const series = match[1].trim();
+                                    const s = match[2];
+                                    const e = match[3];
+                                    const epName = match[4].replace(/^\s*-\s*/, '').trim();
+                                    const formattedSE = language === 'es' ? `T${s} | E${e}` : `S${s} | E${e}`;
+                                    return (
+                                      <div style={{ display: 'flex', flexDirection: 'column', marginBottom: '0.25rem' }}>
+                                        <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.title}>{series}</h4>
+                                        <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--accent-primary)', marginTop: '0.1rem' }}>{formattedSE}</span>
+                                        {epName && <span style={{ fontSize: '0.78rem', fontWeight: 500, color: 'var(--text-secondary)', marginTop: '0.1rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{epName}</span>}
+                                      </div>
+                                    );
+                                  }
+                                  let displayTitle = item.title;
+                                  if (isEpOrSeason && item.last_seen_episode && item.title.toLowerCase().startsWith(item.last_seen_episode.toLowerCase() + ' - ')) {
+                                    displayTitle = item.title.slice(item.last_seen_episode.length + 3);
+                                  }
+                                  return (
+                                    <>
+                                      <h4 style={{ margin: '0 0 0.25rem 0', fontSize: '0.92rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.title}>
+                                        {displayTitle}
+                                      </h4>
+                                      {isEpOrSeason && item.last_seen_episode && (
+                                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500, display: 'block', marginTop: '0.1rem' }}>
+                                          {language === 'es' ? 'Serie: ' : 'Show: '}{item.last_seen_episode}
+                                        </span>
+                                      )}
+                                    </>
+                                  );
+                                })()}
+
+                                {/* Unified Badges System */}
+                                <div style={{ marginTop: '0.25rem' }}>
+                                  {renderFavoriteBadges(item)}
+                                </div>
+
+                                {/* Formatted Date */}
+                                {(item.completed_at || item.updated_at) && (
+                                  <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontStyle: 'italic', display: 'block', marginTop: '0.3rem' }}>
+                                    {formatDate(new Date(item.completed_at || item.updated_at || new Date()))}
+                                  </span>
+                                )}
+                              </div>
                             </div>
-
-                            {/* Formatted Date */}
-                            {(item.completed_at || item.updated_at) && (
-                              <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontStyle: 'italic', display: 'block', marginTop: '0.3rem' }}>
-                                {formatDate(new Date(item.completed_at || item.updated_at || new Date()))}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      ))}
+                            {isDropTargetAfterLast && dropPlaceholder}
+                          </React.Fragment>
+                        );
+                      })}
                     </div>
 
                     {/* Right Arrow Button */}
@@ -4262,13 +4598,6 @@ export const Profile: React.FC = () => {
                         }}
                         onClick={(e) => e.stopPropagation()}
                       />
-                    )}
-
-                    {/* Favorites Page indicator */}
-                    {totalFavoritesPages > 1 && (
-                      <div style={{ textAlign: 'center', marginTop: '0.75rem', fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
-                        {language === 'es' ? `Página ${currentFavoritesPage} de ${totalFavoritesPages}` : `Page ${currentFavoritesPage} of ${totalFavoritesPages}`}
-                      </div>
                     )}
                   </div>
                 ) : (
@@ -4381,6 +4710,47 @@ export const Profile: React.FC = () => {
               </>
             );
           })()}
+
+          {/* Floating Drag Preview Follower */}
+          {favPointerDrag && favPointerDrag.isDragging && (
+            <div
+              style={{
+                position: 'fixed',
+                left: favPointerDrag.currentX + 14,
+                top: favPointerDrag.currentY + 14,
+                zIndex: 99999,
+                pointerEvents: 'none',
+                opacity: 0.95,
+                transform: 'scale(1.03)',
+                boxShadow: '0 12px 30px rgba(0,0,0,0.5)',
+                borderRadius: '10px',
+                overflow: 'hidden',
+                border: '1.5px solid var(--color-user, #F472B6)',
+                background: 'var(--bg-secondary)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.6rem',
+                padding: '0.4rem 0.75rem',
+                maxWidth: '240px'
+              }}
+            >
+              {favPointerDrag.item.image_url && (
+                <img
+                  src={favPointerDrag.item.image_url}
+                  alt=""
+                  style={{ width: '28px', height: '40px', objectFit: 'cover', borderRadius: '4px', flexShrink: 0 }}
+                />
+              )}
+              <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {favPointerDrag.item.title}
+                </span>
+                <span style={{ fontSize: '0.7rem', color: 'var(--color-user, #F472B6)', fontWeight: 600 }}>
+                  {language === 'es' ? 'Moviendo destacado' : 'Moving favorite'}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

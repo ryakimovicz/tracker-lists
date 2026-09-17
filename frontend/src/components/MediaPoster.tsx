@@ -125,6 +125,8 @@ export const MediaPoster: React.FC<MediaPosterProps> = ({
       <img
         src={src!}
         alt={title}
+        draggable={false}
+        onDragStart={(e) => e.preventDefault()}
         onError={() => setImgError(true)}
         style={{
           width,
@@ -135,8 +137,10 @@ export const MediaPoster: React.FC<MediaPosterProps> = ({
           filter: 'none',
           transition: 'transform 0.2s',
           display: 'block',
+          userSelect: 'none',
+          WebkitUserDrag: 'none',
           ...style
-        }}
+        } as React.CSSProperties}
       />
     );
   }

@@ -29,6 +29,7 @@ class UserLibraryItem(Base):
     status = Column(Enum(UserLibraryStatusEnum), default=UserLibraryStatusEnum.PLAN_TO_READ, nullable=False)
     is_favorite = Column(Boolean, default=False, nullable=False)
     favorited_at = Column(DateTime(timezone=True), nullable=True)
+    favorite_order = Column(Integer, default=0, nullable=True)
     is_hundred_percent = Column(Boolean, default=False, nullable=False)
     completed_at = Column(DateTime(timezone=True), nullable=True)
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
