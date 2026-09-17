@@ -590,7 +590,7 @@ export const Profile: React.FC = () => {
 
   const handleLastFmLogin = () => {
     const currentOrigin = window.location.origin;
-    window.location.href = `http://www.last.fm/api/auth/?api_key=de5acce61bdd8b3e4bd181ebce8a69e8&cb=${encodeURIComponent(`${currentOrigin}/profile`)}`;
+    window.location.href = `https://www.last.fm/api/auth/?api_key=de5acce61bdd8b3e4bd181ebce8a69e8&cb=${encodeURIComponent(`${currentOrigin}/profile`)}`;
   };
 
   const handleLastFmDisconnect = () => {

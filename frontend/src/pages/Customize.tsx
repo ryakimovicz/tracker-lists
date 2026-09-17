@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
@@ -47,6 +47,8 @@ export const CustomizePage: React.FC = () => {
   const { language, t } = useTranslation();
   const { theme } = useTheme();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const tokenProcessed = useRef(false);
   const isEs = language === 'es';
   const isLight = theme === 'light';
 
@@ -276,9 +278,45 @@ export const CustomizePage: React.FC = () => {
     }
   };
 
+  useEffect(() => {
+    const token = searchParams.get('token');
+    if (token && !tokenProcessed.current) {
+      tokenProcessed.current = true;
+      connectLastFm(token);
+    }
+  }, [searchParams]);
+
+  const connectLastFm = async (token: string) => {
+    try {
+      await apiClient.post(`/users/me/lastfm/connect?token=${token}`);
+      await refreshProfile();
+      setLastfmMsg({
+        type: 'success',
+        text: isEs ? 'Conectado a Last.fm exitosamente.' : 'Connected to Last.fm successfully.',
+      });
+      navigate('/customize', { replace: true });
+      const userRes = await apiClient.get('/users/me');
+      setProfile(userRes.data);
+      if (userRes.data.lastfm_username) {
+        try {
+          const npRes = await apiClient.get(`/users/${userRes.data.id}/music/now-playing`);
+          setNowPlaying(npRes.data || null);
+        } catch (e) {}
+      }
+      setTimeout(() => setLastfmMsg(null), 3000);
+    } catch (err: any) {
+      setLastfmMsg({
+        type: 'error',
+        text: err.response?.data?.detail || (isEs ? 'Error al conectar con Last.fm.' : 'Error connecting to Last.fm.'),
+      });
+      navigate('/customize', { replace: true });
+      setTimeout(() => setLastfmMsg(null), 3000);
+    }
+  };
+
   const handleLastFmLogin = () => {
     const currentOrigin = window.location.origin;
-    window.location.href = `http://www.last.fm/api/auth/?api_key=de5acce61bdd8b3e4bd181ebce8a69e8&cb=${encodeURIComponent(`${currentOrigin}/customize`)}`;
+    window.location.href = `https://www.last.fm/api/auth/?api_key=de5acce61bdd8b3e4bd181ebce8a69e8&cb=${encodeURIComponent(`${currentOrigin}/customize`)}`;
   };
 
   const executeDisconnectLastFm = async () => {
