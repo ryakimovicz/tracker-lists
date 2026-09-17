@@ -265,6 +265,7 @@ export const Profile: React.FC = () => {
   const [nowPlaying, setNowPlaying] = useState<any>(null);
   const [topAlbums, setTopAlbums] = useState<any[]>([]);
   const [isConnectingLastFm, setIsConnectingLastFm] = useState(false);
+  const [isLastFmLoading, setIsLastFmLoading] = useState<boolean>(false);
   const [lastFmTokenInput, setLastFmTokenInput] = useState('');
 
   // Followers & Following floating modal states
@@ -509,6 +510,7 @@ export const Profile: React.FC = () => {
       // 4. Fetch Last.fm data in background if connected
       const targetLastfmUser = profileRes.data.lastfm_username;
       if (targetLastfmUser) {
+        setIsLastFmLoading(true);
         const targetNpUrl = `/users/${targetId}/music/now-playing`;
         const targetTaUrl = `/users/${targetId}/music/top-albums`;
         Promise.allSettled([
@@ -520,10 +522,13 @@ export const Profile: React.FC = () => {
         }).catch(() => {
           setNowPlaying(null);
           setTopAlbums([]);
+        }).finally(() => {
+          setIsLastFmLoading(false);
         });
       } else {
         setNowPlaying(null);
         setTopAlbums([]);
+        setIsLastFmLoading(false);
       }
       
     } catch (err: any) {
@@ -970,6 +975,7 @@ export const Profile: React.FC = () => {
             padding: '2.5rem',
             borderRadius: '20px',
             overflow: 'hidden',
+            minHeight: '220px',
             border: profile.is_pro && profile.banner_url ? '1px solid rgba(255, 255, 255, 0.12)' : undefined,
             boxShadow: profile.is_pro && profile.banner_url ? '0 12px 30px rgba(0, 0, 0, 0.4)' : undefined,
           }}
@@ -1211,25 +1217,119 @@ export const Profile: React.FC = () => {
               <span><strong>{visualLibraryItems.length}</strong> {language === 'es' ? 'En Estantería' : 'On Shelf'}</span>
             </div>
             
-            {/* Now Playing Widget */}
-            {nowPlaying && (
-              <div style={{ marginTop: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem', background: 'rgba(255, 255, 255, 0.05)', padding: '0.75rem 1rem', borderRadius: '12px', border: '1px solid var(--border-color)', width: 'fit-content' }}>
-                <div style={{ width: '50px', height: '50px', borderRadius: '8px', overflow: 'hidden', background: '#333' }}>
-                  {nowPlaying.image && <img src={nowPlaying.image} alt="Album Art" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    {nowPlaying.is_playing ? (
-                      <><span style={{ display: 'inline-block', width: '8px', height: '8px', background: '#10b981', borderRadius: '50%', animation: 'pulse 2s infinite' }} /> {language === 'es' ? 'Escuchando ahora' : 'Now Playing'}</>
-                    ) : (
-                      language === 'es' ? 'Última canción escuchada' : 'Last Played'
-                    )}
-                  </span>
-                  <a href={nowPlaying.url} target="_blank" rel="noopener noreferrer" style={{ margin: '0.2rem 0 0.1rem 0', fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-primary)', textDecoration: 'none' }}>
-                    {nowPlaying.name}
-                  </a>
-                  <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{nowPlaying.artist}</span>
-                </div>
+            {/* Now Playing / Last.fm Widget */}
+            {Boolean(profile?.lastfm_username) && (
+              <div 
+                style={{ 
+                  marginTop: '1.25rem', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '1rem', 
+                  background: 'rgba(255, 255, 255, 0.05)', 
+                  backdropFilter: 'blur(8px)',
+                  padding: '0.65rem 1rem', 
+                  borderRadius: '12px', 
+                  border: '1px solid var(--border-color)', 
+                  width: 'fit-content',
+                  maxWidth: '100%',
+                  height: '76px',
+                  minHeight: '76px',
+                  maxHeight: '76px',
+                  boxSizing: 'border-box'
+                }}
+              >
+                {isLastFmLoading && !nowPlaying ? (
+                  // Animated equalizer skeleton (Exact same 3-row layout and 48px box as loaded state)
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', width: '100%' }}>
+                    <div style={{ width: '48px', height: '48px', borderRadius: '8px', background: 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-end', gap: '3px', height: '22px' }}>
+                        <style>{`
+                          @keyframes eqWave {
+                            0%, 100% { height: 5px; }
+                            50% { height: 20px; }
+                          }
+                        `}</style>
+                        <span style={{ width: '3.5px', background: profileTheme.accent, opacity: 1, borderRadius: '2px', animation: 'eqWave 1s ease-in-out infinite', animationDelay: '0s' }} />
+                        <span style={{ width: '3.5px', background: profileTheme.accent, opacity: 0.85, borderRadius: '2px', animation: 'eqWave 1s ease-in-out infinite', animationDelay: '0.2s' }} />
+                        <span style={{ width: '3.5px', background: profileTheme.accent, opacity: 0.7, borderRadius: '2px', animation: 'eqWave 1s ease-in-out infinite', animationDelay: '0.4s' }} />
+                        <span style={{ width: '3.5px', background: profileTheme.accent, opacity: 0.55, borderRadius: '2px', animation: 'eqWave 1s ease-in-out infinite', animationDelay: '0.15s' }} />
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', minWidth: '180px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: profileTheme.accent, opacity: 0.7, animation: 'pulse 2s infinite' }} />
+                        <div style={{ width: '85px', height: '9px', borderRadius: '4px', background: 'rgba(255,255,255,0.12)', animation: 'pulse 1.5s infinite' }} />
+                      </div>
+                      <div style={{ width: '170px', height: '13px', borderRadius: '4px', background: 'rgba(255,255,255,0.18)', animation: 'pulse 1.5s infinite' }} />
+                      <div style={{ width: '105px', height: '10px', borderRadius: '4px', background: 'rgba(255,255,255,0.10)', animation: 'pulse 1.5s infinite' }} />
+                    </div>
+                  </div>
+                ) : nowPlaying ? (
+                  <>
+                    <div style={{ width: '48px', height: '48px', borderRadius: '8px', overflow: 'hidden', background: '#222', flexShrink: 0 }}>
+                      {nowPlaying.image ? (
+                        <img src={nowPlaying.image} alt="Album Art" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      ) : (
+                        <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
+                          <Music size={20} />
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '0.4rem', lineHeight: 1.2 }}>
+                        {nowPlaying.is_playing ? (
+                          <>
+                            <span style={{ display: 'inline-block', width: '7px', height: '7px', background: '#10b981', borderRadius: '50%', animation: 'pulse 2s infinite' }} />
+                            {language === 'es' ? 'Escuchando ahora' : 'Now Playing'}
+                          </>
+                        ) : (
+                          language === 'es' ? 'Última canción escuchada' : 'Last Played'
+                        )}
+                      </span>
+                      <a 
+                        href={nowPlaying.url} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        style={{ 
+                          margin: '0.15rem 0', 
+                          fontSize: '0.92rem', 
+                          fontWeight: 600, 
+                          color: 'var(--text-primary)', 
+                          textDecoration: 'none',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          maxWidth: '260px',
+                          lineHeight: 1.2
+                        }}
+                        title={nowPlaying.name}
+                      >
+                        {nowPlaying.name}
+                      </a>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '260px', lineHeight: 1.2 }}>
+                        {nowPlaying.artist}
+                      </span>
+                    </div>
+                  </>
+                ) : (
+                  // Idle connected badge
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: profileTheme.border, display: 'flex', alignItems: 'center', justifyContent: 'center', color: profileTheme.accent }}>
+                      <Music size={18} />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase' }}>Last.fm</span>
+                      <a 
+                        href={`https://www.last.fm/user/${profile.lastfm_username}`} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        style={{ fontSize: '0.85rem', color: 'var(--text-primary)', fontWeight: 500, textDecoration: 'none' }}
+                      >
+                        @{profile.lastfm_username}
+                      </a>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
