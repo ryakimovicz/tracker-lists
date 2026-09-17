@@ -1416,79 +1416,96 @@ export const Profile: React.FC = () => {
       <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', gap: '1.5rem' }}>
         <button
           onClick={() => setActiveTab('shelf')}
-          className="btn-secondary"
+          className={`profile-tab-btn ${activeTab === 'shelf' ? 'active' : ''}`}
           style={{
-            background: 'transparent',
-            border: 'none',
-            borderBottom: activeTab === 'shelf' ? '2px solid var(--accent-primary)' : 'none',
-            color: activeTab === 'shelf' ? 'var(--text-primary)' : 'var(--text-secondary)',
-            fontWeight: activeTab === 'shelf' ? 600 : 400,
-            borderRadius: 0,
-            padding: '0.75rem 0.5rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem'
-          }}
+            '--tab-color': 'var(--accent-primary)'
+          } as React.CSSProperties}
         >
-          <Grid size={18} /> {language === 'es' ? 'Estantería' : 'My Shelf'}
+          {activeTab === 'shelf' ? (
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+              {/* Row 1 */}
+              <rect x="3" y="3" width="4.5" height="4.5" rx="1" />
+              <rect x="9.75" y="3" width="4.5" height="4.5" rx="1" />
+              <rect x="16.5" y="3" width="4.5" height="4.5" rx="1" />
+              {/* Row 2 */}
+              <rect x="3" y="9.75" width="4.5" height="4.5" rx="1" />
+              <rect x="9.75" y="9.75" width="4.5" height="4.5" rx="1" />
+              <rect x="16.5" y="9.75" width="4.5" height="4.5" rx="1" />
+              {/* Row 3 */}
+              <rect x="3" y="16.5" width="4.5" height="4.5" rx="1" />
+              <rect x="9.75" y="16.5" width="4.5" height="4.5" rx="1" />
+              <rect x="16.5" y="16.5" width="4.5" height="4.5" rx="1" />
+            </svg>
+          ) : (
+            <Grid size={18} strokeWidth={1.8} />
+          )}
+          <span>{language === 'es' ? 'Estantería' : 'My Shelf'}</span>
         </button>
 
         <button
           onClick={() => setActiveTab('guides')}
-          className="btn-secondary"
+          className={`profile-tab-btn ${activeTab === 'guides' ? 'active' : ''}`}
           style={{
-            background: 'transparent',
-            border: 'none',
-            borderBottom: activeTab === 'guides' ? '2px solid var(--accent-primary)' : 'none',
-            color: activeTab === 'guides' ? 'var(--text-primary)' : 'var(--text-secondary)',
-            fontWeight: activeTab === 'guides' ? 600 : 400,
-            borderRadius: 0,
-            padding: '0.75rem 0.5rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem'
-          }}
+            '--tab-color': 'var(--color-guide, #2DD4BF)'
+          } as React.CSSProperties}
         >
-          <BookOpen size={18} /> {language === 'es' ? 'Mis Guías' : 'My Guides'}
+          {activeTab === 'guides' ? (
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              {/* Single unified filled open book path with pronounced filled bottom spine tip */}
+              <path
+                d="M2 3h6a4 4 0 0 1 4 4v14.5a3 3 0 0 0-3-3.5H2zm20 0h-6a4 4 0 0 0-4 4v14.5a3 3 0 0 1 3-3.5h7z"
+                fill="currentColor"
+                stroke="currentColor"
+                strokeWidth="1.2"
+              />
+              {/* Inner fold line ending before the bottom point so the bottom tip stays fully solid */}
+              <line x1="12" y1="7" x2="12" y2="18.5" stroke="var(--bg-primary, #090d16)" strokeWidth="1.6" />
+            </svg>
+          ) : (
+            <BookOpen size={18} strokeWidth={1.8} />
+          )}
+          <span>{language === 'es' ? 'Mis Guías' : 'My Guides'}</span>
         </button>
 
         <button
           onClick={() => setActiveTab('favorites')}
-          className="btn-secondary"
+          className={`profile-tab-btn ${activeTab === 'favorites' ? 'active' : ''}`}
           style={{
-            background: 'transparent',
-            border: 'none',
-            borderBottom: activeTab === 'favorites' ? '2px solid var(--accent-primary)' : 'none',
-            color: activeTab === 'favorites' ? 'var(--text-primary)' : 'var(--text-secondary)',
-            fontWeight: activeTab === 'favorites' ? 600 : 400,
-            borderRadius: 0,
-            padding: '0.75rem 0.5rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem'
-          }}
+            '--tab-color': '#F472B6'
+          } as React.CSSProperties}
         >
-          <Heart size={18} /> {language === 'es' ? 'Destacados' : 'Favorites'}
+          <Heart size={18} fill={activeTab === 'favorites' ? 'currentColor' : 'none'} strokeWidth={activeTab === 'favorites' ? 2 : 1.8} /> {language === 'es' ? 'Destacados' : 'Favorites'}
         </button>
 
         {Boolean(profile?.lastfm_username) && (
           <button
             onClick={() => setActiveTab('music')}
-            className="btn-secondary"
+            className={`profile-tab-btn ${activeTab === 'music' ? 'active' : ''}`}
             style={{
-              background: 'transparent',
-              border: 'none',
-              borderBottom: activeTab === 'music' ? '2px solid var(--accent-primary)' : 'none',
-              color: activeTab === 'music' ? 'var(--text-primary)' : 'var(--text-secondary)',
-              fontWeight: activeTab === 'music' ? 600 : 400,
-              borderRadius: 0,
-              padding: '0.75rem 0.5rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem'
-            }}
+              '--tab-color': 'var(--color-music, #1DB954)'
+            } as React.CSSProperties}
           >
-            <Music size={18} /> {language === 'es' ? 'Música' : 'Music'}
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={activeTab === 'music' ? 2.2 : 1.8}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M9 18V5l12-2v13" />
+              <circle cx="6" cy="18" r="3" fill={activeTab === 'music' ? 'currentColor' : 'none'} />
+              <circle cx="18" cy="16" r="3" fill={activeTab === 'music' ? 'currentColor' : 'none'} />
+            </svg>
+            <span>{language === 'es' ? 'Música' : 'Music'}</span>
           </button>
         )}
       </div>

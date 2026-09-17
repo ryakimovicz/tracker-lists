@@ -45,6 +45,8 @@
   --color-text-guide: #0F172A;
   --color-user: #F472B6;
   --color-text-user: #0F172A;
+  --color-music: #1DB954;
+  --color-text-music: #FFFFFF;
 
   /* Scrollbar Theme Tokens (Dark Mode Default) */
   --scrollbar-thumb: rgba(255, 255, 255, 0.16);
@@ -96,6 +98,8 @@
   --color-text-guide: #FFFFFF;
   --color-user: #DB2777;
   --color-text-user: #FFFFFF;
+  --color-music: #15803D;
+  --color-text-music: #FFFFFF;
 }
 
 [data-theme="dark"] {
@@ -123,6 +127,8 @@
   --color-text-guide: #0F172A;
   --color-user: #F472B6;
   --color-text-user: #0F172A;
+  --color-music: #1DB954;
+  --color-text-music: #FFFFFF;
 }
 
 /* Global Reset & Base */
@@ -626,6 +632,35 @@ h1, h2, h3, h4, h5, h6 {
   background: var(--accent-primary);
   border-color: var(--accent-primary);
   color: #ffffff;
+}
+
+/* Profile Tabs Styling */
+.profile-tab-btn {
+  background: transparent !important;
+  border: none !important;
+  border-bottom: 2px solid transparent !important;
+  color: var(--text-secondary) !important;
+  font-weight: 400;
+  border-radius: 0 !important;
+  padding: 0.75rem 0.5rem !important;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+  font-size: 0.95rem;
+}
+
+.profile-tab-btn:hover {
+  color: var(--tab-color, var(--accent-primary)) !important;
+  background: transparent !important;
+}
+
+.profile-tab-btn.active {
+  color: var(--tab-color, var(--accent-primary)) !important;
+  border-bottom-color: var(--tab-color, var(--accent-primary)) !important;
+  font-weight: 600;
+  background: transparent !important;
 }
 
 /* Unified Pink Favorite Heart Button */
