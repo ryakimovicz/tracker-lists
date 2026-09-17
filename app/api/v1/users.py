@@ -345,7 +345,7 @@ def get_user_up_next(
                     elif item.external_id.startswith('tvm-ep-'):
                         pass # handled if needed
                 if clean_show_id and clean_show_id.isdigit():
-                    loc_name = tvmaze_service.get_show_localized_name(int(clean_show_id), lang=client_lang, country=client_country)
+                    loc_name = TVMazeService.get_localized_title(int(clean_show_id), item.title or '', lang=client_lang, country_code=client_country)
                     if loc_name:
                         item_title_val = loc_name
             
@@ -858,7 +858,7 @@ def get_user_activity(
         if act.item_type == 'series' and act.external_id and act.external_id.startswith('tvm_'):
             clean_show_id = act.external_id.replace('tvm_', '')
             if clean_show_id.isdigit():
-                loc_name = tvmaze_service.get_show_localized_name(int(clean_show_id), lang=client_lang, country=client_country)
+                loc_name = TVMazeService.get_localized_title(int(clean_show_id), act.item_title or '', lang=client_lang, country_code=client_country)
                 if loc_name:
                     final_title = loc_name
         

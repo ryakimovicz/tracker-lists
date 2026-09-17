@@ -473,7 +473,7 @@ def get_followed_activity_feed(
         if r.item_type == 'series' and r.external_id and r.external_id.startswith('tvm_'):
             clean_show_id = r.external_id.replace('tvm_', '')
             if clean_show_id.isdigit():
-                loc_name = tvmaze_service.get_show_localized_name(int(clean_show_id), lang=client_lang, country=client_country)
+                loc_name = TVMazeService.get_localized_title(int(clean_show_id), r.item_title or '', lang=client_lang, country_code=client_country)
                 if loc_name:
                     final_title = loc_name
 

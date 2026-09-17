@@ -16,6 +16,7 @@ import { ProModal } from '../components/ProModal';
 import { ReplaceFavoriteModal } from '../components/ReplaceFavoriteModal';
 import { AdBanner } from '../components/AdBanner';
 import { ConfirmModal } from '../components/ConfirmModal';
+import { PathdLoader } from '../components/PathdLoader';
 import { getOrderedCategories, getCategoryIcon } from '../utils/categoryOrder';
 
 
@@ -172,8 +173,12 @@ export const Profile: React.FC = () => {
         const cached = sessionStorage.getItem('pathd_me_cache');
         return cached ? JSON.parse(cached) : null;
       } catch { return null; }
+    } else {
+      try {
+        const cached = sessionStorage.getItem(`pathd_user_cache_${targetUserIdentifier.toLowerCase()}`);
+        return cached ? JSON.parse(cached) : null;
+      } catch { return null; }
     }
-    return null;
   });
 
   const [libraryItems, setLibraryItems] = useState<LibraryItem[]>(() => {
@@ -182,8 +187,12 @@ export const Profile: React.FC = () => {
         const cached = sessionStorage.getItem('pathd_lib_cache');
         return cached ? JSON.parse(cached) : [];
       } catch { return []; }
+    } else {
+      try {
+        const cached = sessionStorage.getItem(`pathd_user_lib_${targetUserIdentifier.toLowerCase()}`);
+        return cached ? JSON.parse(cached) : [];
+      } catch { return []; }
     }
-    return [];
   });
   const [activeTab, setActiveTab] = useState<'shelf' | 'guides' | 'favorites' | 'music'>('shelf');
   const [mediaFilter, setMediaFilter] = useState<'all' | 'movie' | 'series' | 'anime' | 'book' | 'comic' | 'manga' | 'game'>('all');
@@ -194,8 +203,11 @@ export const Profile: React.FC = () => {
       try {
         return !sessionStorage.getItem('pathd_me_cache');
       } catch { return true; }
+    } else {
+      try {
+        return !sessionStorage.getItem(`pathd_user_cache_${targetUserIdentifier.toLowerCase()}`);
+      } catch { return true; }
     }
-    return true;
   });
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
@@ -265,11 +277,20 @@ export const Profile: React.FC = () => {
   const [shelfSearchQuery, setShelfSearchQuery] = useState('');
   const shelfContainerRef = useRef<HTMLDivElement>(null);
   const shelfScrollRef = useRef<HTMLDivElement>(null);
+  const shelfListScrollRef = useRef<HTMLDivElement>(null);
   const [canShelfScrollLeft, setCanShelfScrollLeft] = useState(false);
   const [canShelfScrollRight, setCanShelfScrollRight] = useState(false);
   const [shelfContainerWidth, setShelfContainerWidth] = useState(0);
   const guidesContainerRef = useRef<HTMLDivElement>(null);
   const [guidesContainerWidth, setGuidesContainerWidth] = useState(0);
+
+  const createdGuidesScrollRef = useRef<HTMLDivElement>(null);
+  const [canCreatedGuidesScrollLeft, setCanCreatedGuidesScrollLeft] = useState(false);
+  const [canCreatedGuidesScrollRight, setCanCreatedGuidesScrollRight] = useState(false);
+
+  const savedGuidesScrollRef = useRef<HTMLDivElement>(null);
+  const [canSavedGuidesScrollLeft, setCanSavedGuidesScrollLeft] = useState(false);
+  const [canSavedGuidesScrollRight, setCanSavedGuidesScrollRight] = useState(false);
 
   const updateShelfScrollState = useCallback(() => {
     const el = shelfScrollRef.current;
@@ -278,6 +299,156 @@ export const Profile: React.FC = () => {
     setCanShelfScrollLeft(scrollLeft > 4);
     setCanShelfScrollRight(scrollLeft < scrollWidth - clientWidth - 4);
   }, []);
+
+  const updateCreatedGuidesScrollState = useCallback(() => {
+    const el = createdGuidesScrollRef.current;
+    if (!el) return;
+    const { scrollLeft, scrollWidth, clientWidth } = el;
+    setCanCreatedGuidesScrollLeft(scrollLeft > 4);
+    setCanCreatedGuidesScrollRight(scrollLeft < scrollWidth - clientWidth - 4);
+  }, []);
+
+  const updateSavedGuidesScrollState = useCallback(() => {
+    const el = savedGuidesScrollRef.current;
+    if (!el) return;
+    const { scrollLeft, scrollWidth, clientWidth } = el;
+    setCanSavedGuidesScrollLeft(scrollLeft > 4);
+    setCanSavedGuidesScrollRight(scrollLeft < scrollWidth - clientWidth - 4);
+  }, []);
+
+  const handleToggleShelfExpanded = useCallback(() => {
+    const el = shelfScrollRef.current;
+    if (el && shelfViewMode === 'grid') {
+      const currentScrollLeft = el.scrollLeft;
+      const colWidth = 201; // 185px card + 16px gap
+      const isExpanding = !isShelfExpanded;
+      const targetScrollLeft = isExpanding
+        ? Math.floor((currentScrollLeft / colWidth) / 2) * colWidth
+        : Math.floor(currentScrollLeft / colWidth) * 2 * colWidth;
+
+      setIsShelfExpanded(isExpanding);
+      requestAnimationFrame(() => {
+        if (shelfScrollRef.current) {
+          shelfScrollRef.current.scrollLeft = targetScrollLeft;
+          updateShelfScrollState();
+        }
+      });
+    } else {
+      setIsShelfExpanded(!isShelfExpanded);
+    }
+  }, [isShelfExpanded, shelfViewMode, updateShelfScrollState]);
+
+  const handleToggleCreatedGuidesExpanded = useCallback(() => {
+    const el = createdGuidesScrollRef.current;
+    if (el) {
+      const currentScrollLeft = el.scrollLeft;
+      const colWidth = 276; // 260px card + 16px gap
+      const isExpanding = !isCreatedGuidesExpanded;
+      const targetScrollLeft = isExpanding
+        ? Math.floor((currentScrollLeft / colWidth) / 2) * colWidth
+        : Math.floor(currentScrollLeft / colWidth) * 2 * colWidth;
+
+      setIsCreatedGuidesExpanded(isExpanding);
+      requestAnimationFrame(() => {
+        if (createdGuidesScrollRef.current) {
+          createdGuidesScrollRef.current.scrollLeft = targetScrollLeft;
+          updateCreatedGuidesScrollState();
+        }
+      });
+    } else {
+      setIsCreatedGuidesExpanded(!isCreatedGuidesExpanded);
+    }
+  }, [isCreatedGuidesExpanded, updateCreatedGuidesScrollState]);
+
+  const handleToggleSavedGuidesExpanded = useCallback(() => {
+    const el = savedGuidesScrollRef.current;
+    if (el) {
+      const currentScrollLeft = el.scrollLeft;
+      const colWidth = 276; // 260px card + 16px gap
+      const isExpanding = !isSavedGuidesExpanded;
+      const targetScrollLeft = isExpanding
+        ? Math.floor((currentScrollLeft / colWidth) / 2) * colWidth
+        : Math.floor(currentScrollLeft / colWidth) * 2 * colWidth;
+
+      setIsSavedGuidesExpanded(isExpanding);
+      requestAnimationFrame(() => {
+        if (savedGuidesScrollRef.current) {
+          savedGuidesScrollRef.current.scrollLeft = targetScrollLeft;
+          updateSavedGuidesScrollState();
+        }
+      });
+    } else {
+      setIsSavedGuidesExpanded(!isSavedGuidesExpanded);
+    }
+  }, [isSavedGuidesExpanded, updateSavedGuidesScrollState]);
+
+  const handleSetShelfViewMode = useCallback((newMode: 'grid' | 'list') => {
+    if (newMode === shelfViewMode) return;
+
+    let targetIndex = 0;
+    if (shelfViewMode === 'grid') {
+      // Transitioning Grid -> List: find leftmost visible item
+      const el = shelfScrollRef.current;
+      if (el) {
+        const sl = el.scrollLeft;
+        const colWidth = 201; // 185px + 16px
+        if (!isShelfExpanded) {
+          targetIndex = Math.max(0, Math.round(sl / colWidth));
+        } else {
+          const col = Math.max(0, Math.floor(sl / colWidth));
+          targetIndex = col * 2;
+        }
+      }
+    } else {
+      // Transitioning List -> Grid: find topmost visible item
+      const listEl = shelfListScrollRef.current;
+      if (listEl) {
+        const st = listEl.scrollTop;
+        const children = Array.from(listEl.children) as HTMLElement[];
+        if (children.length > 0) {
+          let found = 0;
+          for (let i = 0; i < children.length; i++) {
+            if (children[i].offsetTop + children[i].offsetHeight / 2 >= st) {
+              found = i;
+              break;
+            }
+          }
+          targetIndex = found;
+        } else {
+          targetIndex = Math.max(0, Math.round(st / 78));
+        }
+      }
+    }
+
+    setShelfViewMode(newMode);
+    try { localStorage.setItem('pathd_shelf_view_mode', newMode); } catch {}
+
+    requestAnimationFrame(() => {
+      if (newMode === 'list') {
+        const listEl = shelfListScrollRef.current;
+        if (listEl) {
+          const children = listEl.children;
+          if (children && children.length > 0 && children[targetIndex]) {
+            const firstChild = children[0] as HTMLElement;
+            const targetChild = children[targetIndex] as HTMLElement;
+            listEl.scrollTop = targetChild.offsetTop - firstChild.offsetTop;
+          } else {
+            listEl.scrollTop = targetIndex * 78;
+          }
+        }
+      } else {
+        const el = shelfScrollRef.current;
+        if (el) {
+          const colWidth = 201;
+          const targetScrollLeft = isShelfExpanded
+            ? Math.floor(targetIndex / 2) * colWidth
+            : targetIndex * colWidth;
+          el.scrollLeft = targetScrollLeft;
+          updateShelfScrollState();
+        }
+      }
+    });
+  }, [shelfViewMode, isShelfExpanded, updateShelfScrollState]);
 
   useEffect(() => {
     const el = shelfScrollRef.current;
@@ -292,6 +463,34 @@ export const Profile: React.FC = () => {
       window.removeEventListener('resize', updateShelfScrollState);
     };
   }, [updateShelfScrollState, isShelfExpanded, shelfViewMode, libraryItems, shelfSearchQuery]);
+
+  useEffect(() => {
+    const el = createdGuidesScrollRef.current;
+    if (!el) return;
+    updateCreatedGuidesScrollState();
+    const timer = setTimeout(updateCreatedGuidesScrollState, 50);
+    el.addEventListener('scroll', updateCreatedGuidesScrollState, { passive: true });
+    window.addEventListener('resize', updateCreatedGuidesScrollState);
+    return () => {
+      clearTimeout(timer);
+      el.removeEventListener('scroll', updateCreatedGuidesScrollState);
+      window.removeEventListener('resize', updateCreatedGuidesScrollState);
+    };
+  }, [updateCreatedGuidesScrollState, isCreatedGuidesExpanded, profile?.created_lists]);
+
+  useEffect(() => {
+    const el = savedGuidesScrollRef.current;
+    if (!el) return;
+    updateSavedGuidesScrollState();
+    const timer = setTimeout(updateSavedGuidesScrollState, 50);
+    el.addEventListener('scroll', updateSavedGuidesScrollState, { passive: true });
+    window.addEventListener('resize', updateSavedGuidesScrollState);
+    return () => {
+      clearTimeout(timer);
+      el.removeEventListener('scroll', updateSavedGuidesScrollState);
+      window.removeEventListener('resize', updateSavedGuidesScrollState);
+    };
+  }, [updateSavedGuidesScrollState, isSavedGuidesExpanded, profile?.saved_lists]);
 
   useEffect(() => {
     const updateWidth = () => {
@@ -444,6 +643,42 @@ export const Profile: React.FC = () => {
 
   useEffect(() => {
     setShowFollowModal(false);
+
+    // Populate from cache immediately if available to eliminate layout shift / loading delays
+    if (targetUserIdentifier) {
+      try {
+        const cachedUser = sessionStorage.getItem(`pathd_user_cache_${targetUserIdentifier.toLowerCase()}`);
+        const cachedLib = sessionStorage.getItem(`pathd_user_lib_${targetUserIdentifier.toLowerCase()}`);
+        if (cachedUser) {
+          setProfile(JSON.parse(cachedUser));
+          if (cachedLib) setLibraryItems(JSON.parse(cachedLib));
+          setLoading(false);
+        } else {
+          setProfile(null);
+          setLibraryItems([]);
+          setLoading(true);
+        }
+      } catch {
+        setLoading(true);
+      }
+    } else {
+      try {
+        const cachedMe = sessionStorage.getItem('pathd_me_cache');
+        const cachedLib = sessionStorage.getItem('pathd_lib_cache');
+        if (cachedMe) {
+          setProfile(JSON.parse(cachedMe));
+          if (cachedLib) setLibraryItems(JSON.parse(cachedLib));
+          setLoading(false);
+        } else {
+          setProfile(null);
+          setLibraryItems([]);
+          setLoading(true);
+        }
+      } catch {
+        setLoading(true);
+      }
+    }
+
     fetchProfileAndLibrary();
 
     const handleProfileUpdate = () => {
@@ -484,6 +719,13 @@ export const Profile: React.FC = () => {
         try {
           sessionStorage.setItem('pathd_me_cache', JSON.stringify(profileRes.data));
         } catch (e) {}
+      } else {
+        try {
+          sessionStorage.setItem(`pathd_user_cache_${targetUserIdentifier.toLowerCase()}`, JSON.stringify(profileRes.data));
+          if (profileRes.data.username) {
+            sessionStorage.setItem(`pathd_user_cache_${profileRes.data.username.toLowerCase()}`, JSON.stringify(profileRes.data));
+          }
+        } catch (e) {}
       }
 
       const targetId = profileRes.data.id;
@@ -509,6 +751,13 @@ export const Profile: React.FC = () => {
           rogueIssues.forEach((item: LibraryItem) => {
             apiClient.delete(`/library/${item.id}`).catch(() => {});
           });
+        } catch (e) {}
+      } else {
+        try {
+          sessionStorage.setItem(`pathd_user_lib_${targetUserIdentifier.toLowerCase()}`, JSON.stringify(rawLibItems));
+          if (profileRes.data.username) {
+            sessionStorage.setItem(`pathd_user_lib_${profileRes.data.username.toLowerCase()}`, JSON.stringify(rawLibItems));
+          }
         } catch (e) {}
       }
 
@@ -1004,7 +1253,19 @@ export const Profile: React.FC = () => {
   });
 
   if (loading) {
-    return <div style={{ textAlign: 'center', padding: '3rem' }}>Cargando información...</div>;
+    return (
+      <div 
+        style={{ 
+          minHeight: '65vh', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center',
+          padding: '3rem 1rem'
+        }}
+      >
+        <PathdLoader size="large" message={language === 'es' ? 'Cargando perfil...' : 'Loading profile...'} />
+      </div>
+    );
   }
 
   const profileTheme = getProfileTheme(profile?.profile_color, isLight);
@@ -1676,10 +1937,7 @@ export const Profile: React.FC = () => {
                       <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', background: 'var(--bg-secondary)', padding: '0.2rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
                         <button
                           type="button"
-                          onClick={() => {
-                            setShelfViewMode('grid');
-                            try { localStorage.setItem('pathd_shelf_view_mode', 'grid'); } catch {}
-                          }}
+                          onClick={() => handleSetShelfViewMode('grid')}
                           className={`shelf-view-toggle-btn ${shelfViewMode === 'grid' ? 'active' : ''}`}
                           title={language === 'es' ? 'Modo Cuadrícula' : 'Grid View'}
                           aria-label={language === 'es' ? 'Modo Cuadrícula' : 'Grid View'}
@@ -1689,10 +1947,7 @@ export const Profile: React.FC = () => {
                         </button>
                         <button
                           type="button"
-                          onClick={() => {
-                            setShelfViewMode('list');
-                            try { localStorage.setItem('pathd_shelf_view_mode', 'list'); } catch {}
-                          }}
+                          onClick={() => handleSetShelfViewMode('list')}
                           className={`shelf-view-toggle-btn ${shelfViewMode === 'list' ? 'active' : ''}`}
                           title={language === 'es' ? 'Modo Lista' : 'List View'}
                           aria-label={language === 'es' ? 'Modo Lista' : 'List View'}
@@ -1706,9 +1961,7 @@ export const Profile: React.FC = () => {
                       {canExpandMore && (
                         <button
                           type="button"
-                          onClick={() => {
-                            setIsShelfExpanded(!isShelfExpanded);
-                          }}
+                          onClick={handleToggleShelfExpanded}
                           className="shelf-view-toggle-btn"
                           title={isShelfExpanded
                             ? (language === 'es' ? 'Contraer' : 'Collapse')
@@ -2322,15 +2575,18 @@ export const Profile: React.FC = () => {
                       </div>
                     ) : (
                       /* List Mode: Scrollable container without horizontal side arrow buttons */
-                      <div style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '0.65rem',
-                        height: isShelfExpanded ? '774px' : '398px',
-                        maxHeight: isShelfExpanded ? '774px' : '398px',
-                        overflowY: 'auto',
-                        paddingRight: '0.35rem'
-                      }}>
+                      <div
+                        ref={shelfListScrollRef}
+                        style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '0.65rem',
+                          height: isShelfExpanded ? '774px' : '398px',
+                          maxHeight: isShelfExpanded ? '774px' : '398px',
+                          overflowY: 'auto',
+                          paddingRight: '0.35rem'
+                        }}
+                      >
                         {filteredItems.map(item => {
                           const isEffectiveFav = displayedFavorites.some(df => df.id === item.id);
                           const isDlcOrExpansion = item.item_type === 'game' && ['dlc', 'expansion'].includes(item.badge || item.custom_badge || '');
@@ -2754,35 +3010,120 @@ export const Profile: React.FC = () => {
               );
             };
 
-            // Created Guides pagination
-            const createdItemsPerPage = isCreatedGuidesExpanded ? (guideCols * 3) : guideCols;
-            const createdTotalPages = Math.max(1, Math.ceil(profile.created_lists.length / createdItemsPerPage));
-            const safeCreatedPage = Math.min(createdGuidesPage, createdTotalPages);
-            const displayedCreatedGuides = profile.created_lists.slice((safeCreatedPage - 1) * createdItemsPerPage, safeCreatedPage * createdItemsPerPage);
-            const canCreatedPrev = safeCreatedPage > 1;
-            const canCreatedNext = safeCreatedPage < createdTotalPages;
+            // Available width accounting for 45px padding on each side (90px total)
+            // Guide card is minWidth 260px, maxWidth 260px with 1rem gap
+            const availableGuidesWidth = Math.max(0, guidesContainerWidth - 90);
+            const maxGuidesInOneRow = Math.max(1, Math.floor((availableGuidesWidth + 16) / 276));
 
-            // Saved Guides pagination
-            const savedItemsPerPage = isSavedGuidesExpanded ? (guideCols * 3) : guideCols;
-            const savedTotalPages = Math.max(1, Math.ceil(profile.saved_lists.length / savedItemsPerPage));
-            const safeSavedPage = Math.min(savedGuidesPage, savedTotalPages);
-            const displayedSavedGuides = profile.saved_lists.slice((safeSavedPage - 1) * savedItemsPerPage, safeSavedPage * savedItemsPerPage);
-            const canSavedPrev = safeSavedPage > 1;
-            const canSavedNext = safeSavedPage < savedTotalPages;
+            const canExpandCreated = profile.created_lists.length > maxGuidesInOneRow;
+            const isCreatedTwoRows = isCreatedGuidesExpanded;
+            const isCreatedTwoRowsByColumn = isCreatedTwoRows && profile.created_lists.length > 2 * maxGuidesInOneRow;
+            const isCreatedTwoRowsByRow = isCreatedTwoRows && profile.created_lists.length <= 2 * maxGuidesInOneRow;
+
+            const canExpandSaved = profile.saved_lists.length > maxGuidesInOneRow;
+            const isSavedTwoRows = isSavedGuidesExpanded;
+            const isSavedTwoRowsByColumn = isSavedTwoRows && profile.saved_lists.length > 2 * maxGuidesInOneRow;
+            const isSavedTwoRowsByRow = isSavedTwoRows && profile.saved_lists.length <= 2 * maxGuidesInOneRow;
+
+            const getCreatedMaskImage = () => {
+              if (canCreatedGuidesScrollLeft && canCreatedGuidesScrollRight) {
+                return 'linear-gradient(to right, transparent 0px, transparent 45px, black 95px, black calc(100% - 95px), transparent calc(100% - 45px), transparent 100%)';
+              } else if (canCreatedGuidesScrollLeft) {
+                return 'linear-gradient(to right, transparent 0px, transparent 45px, black 95px, black 100%)';
+              } else if (canCreatedGuidesScrollRight) {
+                return 'linear-gradient(to right, black 0px, black calc(100% - 95px), transparent calc(100% - 45px), transparent 100%)';
+              }
+              return 'none';
+            };
+
+            const getSavedMaskImage = () => {
+              if (canSavedGuidesScrollLeft && canSavedGuidesScrollRight) {
+                return 'linear-gradient(to right, transparent 0px, transparent 45px, black 95px, black calc(100% - 95px), transparent calc(100% - 45px), transparent 100%)';
+              } else if (canSavedGuidesScrollLeft) {
+                return 'linear-gradient(to right, transparent 0px, transparent 45px, black 95px, black 100%)';
+              } else if (canSavedGuidesScrollRight) {
+                return 'linear-gradient(to right, black 0px, black calc(100% - 95px), transparent calc(100% - 45px), transparent 100%)';
+              }
+              return 'none';
+            };
+
+            const scrollCreated = (direction: 'left' | 'right') => {
+              if (createdGuidesScrollRef.current) {
+                const scrollAmount = isCreatedGuidesExpanded ? 480 : 360;
+                createdGuidesScrollRef.current.scrollBy({ left: direction === 'left' ? -scrollAmount : scrollAmount, behavior: 'smooth' });
+              }
+            };
+
+            const scrollSaved = (direction: 'left' | 'right') => {
+              if (savedGuidesScrollRef.current) {
+                const scrollAmount = isSavedGuidesExpanded ? 480 : 360;
+                savedGuidesScrollRef.current.scrollBy({ left: direction === 'left' ? -scrollAmount : scrollAmount, behavior: 'smooth' });
+              }
+            };
+
+            const guideBtnBaseStyle: React.CSSProperties = {
+              position: 'absolute',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              zIndex: 10,
+              background: 'var(--bg-tertiary)',
+              border: '1.5px solid var(--border-color)',
+              borderRadius: '50%',
+              width: '40px',
+              height: '40px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              boxShadow: '0 4px 6px rgba(0,0,0,0.3)',
+              color: 'var(--text-primary)',
+              transition: 'border-color 0.15s ease, background 0.1s ease, color 0.1s ease, transform 0.1s ease, opacity 0.2s ease, visibility 0.2s ease'
+            };
+
+            const handleMouseEnterGuideBtn = (e: React.MouseEvent<HTMLButtonElement>) => {
+              e.currentTarget.style.borderColor = 'var(--color-guide, #2DD4BF)';
+            };
+            const handleMouseLeaveGuideBtn = (e: React.MouseEvent<HTMLButtonElement>) => {
+              e.currentTarget.style.borderColor = 'var(--border-color)';
+              e.currentTarget.style.background = 'var(--bg-tertiary)';
+              e.currentTarget.style.color = 'var(--text-primary)';
+            };
+            const handleMouseDownGuideBtn = (e: React.MouseEvent<HTMLButtonElement>) => {
+              e.currentTarget.style.background = 'var(--color-guide, #2DD4BF)';
+              e.currentTarget.style.borderColor = 'var(--color-guide, #2DD4BF)';
+              e.currentTarget.style.color = '#0f172a';
+            };
+            const handleMouseUpGuideBtn = (e: React.MouseEvent<HTMLButtonElement>) => {
+              e.currentTarget.style.background = 'var(--bg-tertiary)';
+              e.currentTarget.style.borderColor = 'var(--color-guide, #2DD4BF)';
+              e.currentTarget.style.color = 'var(--text-primary)';
+            };
 
             return (
               <>
                 {/* 1. Created Guides Section */}
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-                    <h3 style={{ margin: 0 }}>{language === 'es' ? 'Guías Creadas' : 'Created Guides'}</h3>
-                    {profile.created_lists.length > guideCols && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                      <h3 style={{ margin: 0 }}>{language === 'es' ? 'Guías Creadas' : 'Created Guides'}</h3>
+                      <span
+                        style={{
+                          fontSize: '0.8rem',
+                          fontWeight: 700,
+                          padding: '0.15rem 0.55rem',
+                          borderRadius: '12px',
+                          background: 'rgba(45, 212, 191, 0.15)',
+                          color: 'var(--color-guide, #2DD4BF)',
+                          border: '1px solid rgba(45, 212, 191, 0.3)'
+                        }}
+                      >
+                        {profile.created_lists.length}
+                      </span>
+                    </div>
+                    {canExpandCreated && (
                       <button
                         type="button"
-                        onClick={() => {
-                          setIsCreatedGuidesExpanded(!isCreatedGuidesExpanded);
-                          setCreatedGuidesPage(1);
-                        }}
+                        onClick={handleToggleCreatedGuidesExpanded}
                         className="shelf-view-toggle-btn"
                         title={isCreatedGuidesExpanded
                           ? (language === 'es' ? 'Contraer' : 'Collapse')
@@ -2805,76 +3146,109 @@ export const Profile: React.FC = () => {
                     </div>
                   ) : (
                     <div style={{ position: 'relative', width: '100%' }}>
+                      {/* Left fade click-blocking zone */}
+                      {canCreatedGuidesScrollLeft && (
+                        <div
+                          style={{
+                            position: 'absolute',
+                            left: 0,
+                            top: 0,
+                            bottom: 0,
+                            width: '70px',
+                            zIndex: 8,
+                            pointerEvents: 'auto',
+                            cursor: 'default'
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      )}
+
                       {/* Left Arrow Button */}
                       <button
                         type="button"
-                        onClick={() => setCreatedGuidesPage(prev => Math.max(prev - 1, 1))}
-                        disabled={!canCreatedPrev}
+                        onClick={() => scrollCreated('left')}
+                        onMouseEnter={handleMouseEnterGuideBtn}
+                        onMouseLeave={handleMouseLeaveGuideBtn}
+                        onMouseDown={handleMouseDownGuideBtn}
+                        onMouseUp={handleMouseUpGuideBtn}
                         style={{
-                          ...arrowBtnStyle,
-                          left: '-20px',
-                          opacity: canCreatedPrev ? 1 : 0,
-                          visibility: canCreatedPrev ? 'visible' : 'hidden',
-                          pointerEvents: canCreatedPrev ? 'auto' : 'none'
+                          ...guideBtnBaseStyle,
+                          left: '0px',
+                          opacity: canCreatedGuidesScrollLeft ? 1 : 0,
+                          visibility: canCreatedGuidesScrollLeft ? 'visible' : 'hidden',
+                          pointerEvents: canCreatedGuidesScrollLeft ? 'auto' : 'none'
                         }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.borderColor = 'var(--color-guide, #2DD4BF)';
-                          e.currentTarget.style.transform = 'translateY(-50%) scale(1.05)';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.borderColor = 'var(--border-color)';
-                          e.currentTarget.style.transform = 'translateY(-50%)';
-                        }}
-                        title={language === 'es' ? 'Página anterior' : 'Previous page'}
-                        aria-label={language === 'es' ? 'Página anterior' : 'Previous page'}
+                        aria-label={language === 'es' ? 'Desplazar a la izquierda' : 'Scroll left'}
                       >
-                        <ChevronLeft size={20} />
+                        <ChevronLeft size={20} color="currentColor" />
                       </button>
+
+                      {/* Cards Scroll Container */}
+                      <div
+                        ref={createdGuidesScrollRef}
+                        style={{
+                          display: isCreatedTwoRows ? 'grid' : 'flex',
+                          gridTemplateColumns: isCreatedTwoRowsByRow ? `repeat(${maxGuidesInOneRow}, max-content)` : undefined,
+                          gridTemplateRows: isCreatedTwoRows ? 'repeat(2, auto)' : undefined,
+                          gridAutoFlow: isCreatedTwoRows ? (isCreatedTwoRowsByColumn ? 'column' : 'row') : undefined,
+                          gridAutoColumns: isCreatedTwoRowsByColumn ? 'max-content' : undefined,
+                          justifyContent: 'start',
+                          alignContent: 'start',
+                          gap: '1rem',
+                          overflowX: 'auto',
+                          scrollbarWidth: 'none',
+                          msOverflowStyle: 'none',
+                          paddingTop: '8px',
+                          paddingBottom: '1rem',
+                          paddingLeft: '45px',
+                          paddingRight: '45px',
+                          WebkitMaskImage: getCreatedMaskImage(),
+                          maskImage: getCreatedMaskImage()
+                        }}
+                      >
+                        {profile.created_lists.map(list => (
+                          <div key={list.id} style={{ minWidth: '260px', maxWidth: '260px', flexShrink: 0 }}>
+                            {renderGuideCard(list, false)}
+                          </div>
+                        ))}
+                      </div>
 
                       {/* Right Arrow Button */}
                       <button
                         type="button"
-                        onClick={() => setCreatedGuidesPage(prev => Math.min(prev + 1, createdTotalPages))}
-                        disabled={!canCreatedNext}
+                        onClick={() => scrollCreated('right')}
+                        onMouseEnter={handleMouseEnterGuideBtn}
+                        onMouseLeave={handleMouseLeaveGuideBtn}
+                        onMouseDown={handleMouseDownGuideBtn}
+                        onMouseUp={handleMouseUpGuideBtn}
                         style={{
-                          ...arrowBtnStyle,
-                          right: '-20px',
-                          opacity: canCreatedNext ? 1 : 0,
-                          visibility: canCreatedNext ? 'visible' : 'hidden',
-                          pointerEvents: canCreatedNext ? 'auto' : 'none'
+                          ...guideBtnBaseStyle,
+                          right: '0px',
+                          opacity: canCreatedGuidesScrollRight ? 1 : 0,
+                          visibility: canCreatedGuidesScrollRight ? 'visible' : 'hidden',
+                          pointerEvents: canCreatedGuidesScrollRight ? 'auto' : 'none'
                         }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.borderColor = 'var(--color-guide, #2DD4BF)';
-                          e.currentTarget.style.transform = 'translateY(-50%) scale(1.05)';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.borderColor = 'var(--border-color)';
-                          e.currentTarget.style.transform = 'translateY(-50%)';
-                        }}
-                        title={language === 'es' ? 'Página siguiente' : 'Next page'}
-                        aria-label={language === 'es' ? 'Página siguiente' : 'Next page'}
+                        aria-label={language === 'es' ? 'Desplazar a la derecha' : 'Scroll right'}
                       >
-                        <ChevronRight size={20} />
+                        <ChevronRight size={20} color="currentColor" />
                       </button>
 
-                      {/* Cards Grid */}
-                      <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: `repeat(${guideCols}, minmax(0, 1fr))`,
-                        gap: '1.25rem'
-                      }}>
-                        {displayedCreatedGuides.map(list => renderGuideCard(list, false))}
-                      </div>
-
-                      {/* Bottom Page Indicator */}
-                      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginTop: '1.25rem' }}>
-                        <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
-                          {language === 'es'
-                            ? `Página ${safeCreatedPage} de ${createdTotalPages}`
-                            : `Page ${safeCreatedPage} of ${createdTotalPages}`
-                          }
-                        </span>
-                      </div>
+                      {/* Right fade click-blocking zone */}
+                      {canCreatedGuidesScrollRight && (
+                        <div
+                          style={{
+                            position: 'absolute',
+                            right: 0,
+                            top: 0,
+                            bottom: 0,
+                            width: '70px',
+                            zIndex: 8,
+                            pointerEvents: 'auto',
+                            cursor: 'default'
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      )}
                     </div>
                   )}
                 </div>
@@ -2882,14 +3256,26 @@ export const Profile: React.FC = () => {
                 {/* 2. Saved Guides Section */}
                 <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '2rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-                    <h3 style={{ margin: 0 }}>{language === 'es' ? 'Guías Guardadas' : 'Saved Guides'}</h3>
-                    {profile.saved_lists.length > guideCols && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                      <h3 style={{ margin: 0 }}>{language === 'es' ? 'Guías Guardadas' : 'Saved Guides'}</h3>
+                      <span
+                        style={{
+                          fontSize: '0.8rem',
+                          fontWeight: 700,
+                          padding: '0.15rem 0.55rem',
+                          borderRadius: '12px',
+                          background: 'rgba(45, 212, 191, 0.15)',
+                          color: 'var(--color-guide, #2DD4BF)',
+                          border: '1px solid rgba(45, 212, 191, 0.3)'
+                        }}
+                      >
+                        {profile.saved_lists.length}
+                      </span>
+                    </div>
+                    {canExpandSaved && (
                       <button
                         type="button"
-                        onClick={() => {
-                          setIsSavedGuidesExpanded(!isSavedGuidesExpanded);
-                          setSavedGuidesPage(1);
-                        }}
+                        onClick={handleToggleSavedGuidesExpanded}
                         className="shelf-view-toggle-btn"
                         title={isSavedGuidesExpanded
                           ? (language === 'es' ? 'Contraer' : 'Collapse')
@@ -2912,76 +3298,109 @@ export const Profile: React.FC = () => {
                     </div>
                   ) : (
                     <div style={{ position: 'relative', width: '100%' }}>
+                      {/* Left fade click-blocking zone */}
+                      {canSavedGuidesScrollLeft && (
+                        <div
+                          style={{
+                            position: 'absolute',
+                            left: 0,
+                            top: 0,
+                            bottom: 0,
+                            width: '70px',
+                            zIndex: 8,
+                            pointerEvents: 'auto',
+                            cursor: 'default'
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      )}
+
                       {/* Left Arrow Button */}
                       <button
                         type="button"
-                        onClick={() => setSavedGuidesPage(prev => Math.max(prev - 1, 1))}
-                        disabled={!canSavedPrev}
+                        onClick={() => scrollSaved('left')}
+                        onMouseEnter={handleMouseEnterGuideBtn}
+                        onMouseLeave={handleMouseLeaveGuideBtn}
+                        onMouseDown={handleMouseDownGuideBtn}
+                        onMouseUp={handleMouseUpGuideBtn}
                         style={{
-                          ...arrowBtnStyle,
-                          left: '-20px',
-                          opacity: canSavedPrev ? 1 : 0,
-                          visibility: canSavedPrev ? 'visible' : 'hidden',
-                          pointerEvents: canSavedPrev ? 'auto' : 'none'
+                          ...guideBtnBaseStyle,
+                          left: '0px',
+                          opacity: canSavedGuidesScrollLeft ? 1 : 0,
+                          visibility: canSavedGuidesScrollLeft ? 'visible' : 'hidden',
+                          pointerEvents: canSavedGuidesScrollLeft ? 'auto' : 'none'
                         }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.borderColor = 'var(--color-guide, #2DD4BF)';
-                          e.currentTarget.style.transform = 'translateY(-50%) scale(1.05)';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.borderColor = 'var(--border-color)';
-                          e.currentTarget.style.transform = 'translateY(-50%)';
-                        }}
-                        title={language === 'es' ? 'Página anterior' : 'Previous page'}
-                        aria-label={language === 'es' ? 'Página anterior' : 'Previous page'}
+                        aria-label={language === 'es' ? 'Desplazar a la izquierda' : 'Scroll left'}
                       >
-                        <ChevronLeft size={20} />
+                        <ChevronLeft size={20} color="currentColor" />
                       </button>
+
+                      {/* Cards Scroll Container */}
+                      <div
+                        ref={savedGuidesScrollRef}
+                        style={{
+                          display: isSavedTwoRows ? 'grid' : 'flex',
+                          gridTemplateColumns: isSavedTwoRowsByRow ? `repeat(${maxGuidesInOneRow}, max-content)` : undefined,
+                          gridTemplateRows: isSavedTwoRows ? 'repeat(2, auto)' : undefined,
+                          gridAutoFlow: isSavedTwoRows ? (isSavedTwoRowsByColumn ? 'column' : 'row') : undefined,
+                          gridAutoColumns: isSavedTwoRowsByColumn ? 'max-content' : undefined,
+                          justifyContent: 'start',
+                          alignContent: 'start',
+                          gap: '1rem',
+                          overflowX: 'auto',
+                          scrollbarWidth: 'none',
+                          msOverflowStyle: 'none',
+                          paddingTop: '8px',
+                          paddingBottom: '1rem',
+                          paddingLeft: '45px',
+                          paddingRight: '45px',
+                          WebkitMaskImage: getSavedMaskImage(),
+                          maskImage: getSavedMaskImage()
+                        }}
+                      >
+                        {profile.saved_lists.map(list => (
+                          <div key={list.id} style={{ minWidth: '260px', maxWidth: '260px', flexShrink: 0 }}>
+                            {renderGuideCard(list, true)}
+                          </div>
+                        ))}
+                      </div>
 
                       {/* Right Arrow Button */}
                       <button
                         type="button"
-                        onClick={() => setSavedGuidesPage(prev => Math.min(prev + 1, savedTotalPages))}
-                        disabled={!canSavedNext}
+                        onClick={() => scrollSaved('right')}
+                        onMouseEnter={handleMouseEnterGuideBtn}
+                        onMouseLeave={handleMouseLeaveGuideBtn}
+                        onMouseDown={handleMouseDownGuideBtn}
+                        onMouseUp={handleMouseUpGuideBtn}
                         style={{
-                          ...arrowBtnStyle,
-                          right: '-20px',
-                          opacity: canSavedNext ? 1 : 0,
-                          visibility: canSavedNext ? 'visible' : 'hidden',
-                          pointerEvents: canSavedNext ? 'auto' : 'none'
+                          ...guideBtnBaseStyle,
+                          right: '0px',
+                          opacity: canSavedGuidesScrollRight ? 1 : 0,
+                          visibility: canSavedGuidesScrollRight ? 'visible' : 'hidden',
+                          pointerEvents: canSavedGuidesScrollRight ? 'auto' : 'none'
                         }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.borderColor = 'var(--color-guide, #2DD4BF)';
-                          e.currentTarget.style.transform = 'translateY(-50%) scale(1.05)';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.borderColor = 'var(--border-color)';
-                          e.currentTarget.style.transform = 'translateY(-50%)';
-                        }}
-                        title={language === 'es' ? 'Página siguiente' : 'Next page'}
-                        aria-label={language === 'es' ? 'Página siguiente' : 'Next page'}
+                        aria-label={language === 'es' ? 'Desplazar a la derecha' : 'Scroll right'}
                       >
-                        <ChevronRight size={20} />
+                        <ChevronRight size={20} color="currentColor" />
                       </button>
 
-                      {/* Cards Grid */}
-                      <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: `repeat(${guideCols}, minmax(0, 1fr))`,
-                        gap: '1.25rem'
-                      }}>
-                        {displayedSavedGuides.map(list => renderGuideCard(list, true))}
-                      </div>
-
-                      {/* Bottom Page Indicator */}
-                      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginTop: '1.25rem' }}>
-                        <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
-                          {language === 'es'
-                            ? `Página ${safeSavedPage} de ${savedTotalPages}`
-                            : `Page ${safeSavedPage} of ${savedTotalPages}`
-                          }
-                        </span>
-                      </div>
+                      {/* Right fade click-blocking zone */}
+                      {canSavedGuidesScrollRight && (
+                        <div
+                          style={{
+                            position: 'absolute',
+                            right: 0,
+                            top: 0,
+                            bottom: 0,
+                            width: '70px',
+                            zIndex: 8,
+                            pointerEvents: 'auto',
+                            cursor: 'default'
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      )}
                     </div>
                   )}
                 </div>
