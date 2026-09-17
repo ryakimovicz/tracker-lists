@@ -92,14 +92,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await refreshProfile();
   };
 
+  const clearStoredData = () => {
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('pathd_user_profile');
+    localStorage.removeItem('pathd_lib_cache');
+    localStorage.removeItem('pathd_upnext_cache');
+    localStorage.removeItem('pathd_updates_cache');
+    localStorage.removeItem('pathd_upcoming_episodes_cache');
+    sessionStorage.removeItem('pathd_lib_cache');
+    sessionStorage.removeItem('pathd_upnext_cache');
+    sessionStorage.removeItem('pathd_updates_cache');
+    sessionStorage.removeItem('pathd_upcoming_episodes_cache');
+  };
+
   const logout = async () => {
     try {
       await apiClient.post('/auth/logout');
     } catch (err) {
       console.error('Logout request failed:', err);
     } finally {
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('pathd_user_profile');
+      clearStoredData();
       setUser(null);
     }
   };
@@ -119,8 +131,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Listen for logout events dispatched by Axios interceptor on refresh failure
     const handleLogoutEvent = () => {
       setUser(null);
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('pathd_user_profile');
+      clearStoredData();
       if (window.location.pathname !== '/login' && window.location.pathname !== '/register') {
         window.location.href = '/login';
       }

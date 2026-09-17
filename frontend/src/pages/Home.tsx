@@ -8,6 +8,7 @@ import { MediaPoster } from '../components/MediaPoster';
 import { AdBanner } from '../components/AdBanner';
 import { ReplaceFavoriteModal } from '../components/ReplaceFavoriteModal';
 import { ProModal } from '../components/ProModal';
+import { PathdLoader } from '../components/PathdLoader';
 import { ChevronLeft, ChevronRight, ChevronDown, ChevronsDown, Check, Play } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { getOrderedCategories, getCategoryLabel, getCategoryIcon } from '../utils/categoryOrder';
@@ -1784,25 +1785,25 @@ export const Home: React.FC = () => {
   
   const [libraryItems, setLibraryItems] = useState<any[]>(() => {
     try {
-      const cached = sessionStorage.getItem('pathd_lib_cache');
+      const cached = localStorage.getItem('pathd_lib_cache') || sessionStorage.getItem('pathd_lib_cache');
       return cached ? JSON.parse(cached) : [];
     } catch { return []; }
   });
   const [upNextGuides, setUpNextGuides] = useState<any[]>(() => {
     try {
-      const cached = sessionStorage.getItem('pathd_upnext_cache');
+      const cached = localStorage.getItem('pathd_upnext_cache') || sessionStorage.getItem('pathd_upnext_cache');
       return cached ? JSON.parse(cached)?.guides || [] : [];
     } catch { return []; }
   });
   const [guideUpdates, setGuideUpdates] = useState<any[]>(() => {
     try {
-      const cached = sessionStorage.getItem('pathd_updates_cache');
+      const cached = localStorage.getItem('pathd_updates_cache') || sessionStorage.getItem('pathd_updates_cache');
       return cached ? JSON.parse(cached) : [];
     } catch { return []; }
   });
   const [upcomingEpisodes, setUpcomingEpisodes] = useState<any[]>(() => {
     try {
-      const cached = sessionStorage.getItem('pathd_upcoming_episodes_cache');
+      const cached = localStorage.getItem('pathd_upcoming_episodes_cache') || sessionStorage.getItem('pathd_upcoming_episodes_cache');
       return cached ? JSON.parse(cached) : [];
     } catch { return []; }
   });
@@ -1810,11 +1811,14 @@ export const Home: React.FC = () => {
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [loading, setLoading] = useState(() => {
     try {
-      return !sessionStorage.getItem('pathd_lib_cache');
+      const cached = localStorage.getItem('pathd_lib_cache') || sessionStorage.getItem('pathd_lib_cache');
+      return !cached;
     } catch { return true; }
   });
   const [gameFilter, setGameFilter] = useState<"playing" | "endless">("playing");
   const [upcomingFilter, setUpcomingFilter] = useState<"calendar" | "tba">("calendar");
+
+  const lastFetchRef = useRef<number>(Date.now());
 
   // Replace Favorite Modal State & Pro Modal
   const [replaceModalState, setReplaceModalState] = useState<{
@@ -1842,15 +1846,17 @@ export const Home: React.FC = () => {
 
       let currentLib = libRes.status === 'fulfilled' ? (libRes.value.data || []) : [];
       
-      // Render the dashboard immediately and cache in sessionStorage
+      // Render the dashboard immediately and cache in localStorage & sessionStorage
       setLibraryItems(currentLib);
       try {
+        localStorage.setItem('pathd_lib_cache', JSON.stringify(currentLib));
         sessionStorage.setItem('pathd_lib_cache', JSON.stringify(currentLib));
       } catch (e) {}
 
       if (upNextRes.status === 'fulfilled' && upNextRes.value.data?.guides) {
         setUpNextGuides(upNextRes.value.data.guides);
         try {
+          localStorage.setItem('pathd_upnext_cache', JSON.stringify(upNextRes.value.data));
           sessionStorage.setItem('pathd_upnext_cache', JSON.stringify(upNextRes.value.data));
         } catch (e) {}
       }
@@ -1858,6 +1864,7 @@ export const Home: React.FC = () => {
       if (updatesRes.status === 'fulfilled' && updatesRes.value.data) {
         setGuideUpdates(updatesRes.value.data);
         try {
+          localStorage.setItem('pathd_updates_cache', JSON.stringify(updatesRes.value.data));
           sessionStorage.setItem('pathd_updates_cache', JSON.stringify(updatesRes.value.data));
         } catch (e) {}
       }
@@ -2076,11 +2083,13 @@ export const Home: React.FC = () => {
           });
           setUpcomingEpisodes(allCollectedFutureEps);
           try {
+            localStorage.setItem('pathd_upcoming_episodes_cache', JSON.stringify(allCollectedFutureEps));
             sessionStorage.setItem('pathd_upcoming_episodes_cache', JSON.stringify(allCollectedFutureEps));
           } catch (e) {}
           if (changed.length > 0) {
             setLibraryItems([...currentLib]);
             try {
+              localStorage.setItem('pathd_lib_cache', JSON.stringify(currentLib));
               sessionStorage.setItem('pathd_lib_cache', JSON.stringify(currentLib));
             } catch (e) {}
           }
@@ -2092,12 +2101,14 @@ export const Home: React.FC = () => {
     } catch (err) {
       console.error("Failed to load dashboard", err);
     } finally {
+      lastFetchRef.current = Date.now();
       if (!silent) setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchDashboard(false);
+    // If cached items exist, load silently in background without showing blocking spinner
+    fetchDashboard(libraryItems.length > 0);
 
     const handleLibraryUpdate = () => {
       fetchDashboard(true);
@@ -2105,11 +2116,26 @@ export const Home: React.FC = () => {
     const handleLanguageUpdate = () => {
       fetchDashboard(false);
     };
+
+    // Auto-sync when returning to the tab/window from another device
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === 'visible') {
+        if (Date.now() - lastFetchRef.current > 20000) {
+          fetchDashboard(true);
+        }
+      }
+    };
+
     window.addEventListener('library-updated', handleLibraryUpdate);
     window.addEventListener('language-updated', handleLanguageUpdate);
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    window.addEventListener('focus', handleVisibilityOrFocus);
+
     return () => {
       window.removeEventListener('library-updated', handleLibraryUpdate);
       window.removeEventListener('language-updated', handleLanguageUpdate);
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+      window.removeEventListener('focus', handleVisibilityOrFocus);
     };
   }, [language]);
 
@@ -2153,7 +2179,11 @@ export const Home: React.FC = () => {
   };
 
   if (loading) {
-    return <div style={{ padding: "2rem", textAlign: "center", color: "var(--text-secondary)" }}>Cargando Inicio...</div>;
+    return (
+      <div style={{ minHeight: "60vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <PathdLoader message={language === 'es' ? 'Cargando Inicio...' : 'Loading Home...'} />
+      </div>
+    );
   }
 
   const startOfTodayMs = new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate()).getTime();
