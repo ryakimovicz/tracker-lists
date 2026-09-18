@@ -2462,7 +2462,8 @@ export const Home: React.FC = () => {
         display: "flex", 
         gap: "1.75rem", 
         borderBottom: "1px solid var(--border-color)", 
-        paddingBottom: "0.5rem", 
+        paddingBottom: "0.75rem", 
+        marginBottom: "1.75rem",
         position: "sticky", 
         top: 0, 
         zIndex: 20, 
@@ -2486,7 +2487,7 @@ export const Home: React.FC = () => {
               }}
             >
               {labels[tab]}
-              {isActive && <div style={{ position: "absolute", bottom: "-0.5rem", left: 0, right: 0, height: "2px", background: "var(--accent-primary)" }} />}
+              {isActive && <div style={{ position: "absolute", bottom: "-0.75rem", left: 0, right: 0, height: "2px", background: "var(--accent-primary)" }} />}
             </div>
           );
         })}
