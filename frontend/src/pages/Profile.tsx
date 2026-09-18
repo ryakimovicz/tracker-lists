@@ -201,6 +201,7 @@ export const Profile: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'shelf' | 'guides' | 'favorites' | 'music'>('shelf');
   const [mediaFilter, setMediaFilter] = useState<'all' | 'movie' | 'series' | 'anime' | 'book' | 'comic' | 'manga' | 'game'>('all');
   const [favoritesMediaFilter, setFavoritesMediaFilter] = useState<'all' | 'movie' | 'series' | 'anime' | 'book' | 'comic' | 'manga' | 'game'>('all');
+  const [showReorderTooltip, setShowReorderTooltip] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [loading, setLoading] = useState(() => {
@@ -3975,22 +3976,8 @@ export const Profile: React.FC = () => {
       )}
 
       {activeTab === 'favorites' && (
-        <div ref={favoritesContainerRef} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', textAlign: 'left' }}>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', width: '100%' }}>
-            <span style={{
-              fontSize: '0.8rem',
-              fontWeight: 600,
-              padding: '0.35rem 0.75rem',
-              borderRadius: '20px',
-              background: 'rgba(244, 114, 182, 0.15)',
-              color: 'var(--color-user, #F472B6)',
-              border: '1px solid rgba(244, 114, 182, 0.3)'
-            }}>
-              {displayedFavorites.length} / {profile?.is_pro ? '70' : '7'} {language === 'es' ? 'destacados' : 'featured'}
-            </span>
-          </div>
-
-          {/* Favorites Category Filter Selectors */}
+        <div ref={favoritesContainerRef} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', textAlign: 'left' }}>
+          {/* Favorites Category Filter Selectors - Top row */}
           {displayedFavorites.length > 0 && (
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
               {(() => {
@@ -4229,50 +4216,137 @@ export const Profile: React.FC = () => {
 
             return (
               <>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '0.6rem' }}>
-                  {/* View Mode Toggle Buttons */}
-                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', background: 'var(--bg-secondary)', padding: '0.2rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                    <button
-                      type="button"
-                      onClick={() => handleSetFavoritesViewMode('grid')}
-                      className={`shelf-view-toggle-btn ${favoritesViewMode === 'grid' ? 'active' : ''}`}
-                      title={language === 'es' ? 'Modo Cuadrícula' : 'Grid View'}
-                      aria-label={language === 'es' ? 'Modo Cuadrícula' : 'Grid View'}
-                      style={{ padding: '0.3rem 0.55rem', borderRadius: '6px' }}
-                    >
-                      <LayoutGrid size={16} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleSetFavoritesViewMode('list')}
-                      className={`shelf-view-toggle-btn ${favoritesViewMode === 'list' ? 'active' : ''}`}
-                      title={language === 'es' ? 'Modo Lista' : 'List View'}
-                      aria-label={language === 'es' ? 'Modo Lista' : 'List View'}
-                      style={{ padding: '0.3rem 0.55rem', borderRadius: '6px' }}
-                    >
-                      <List size={16} />
-                    </button>
+                {/* Controls row: Counter + Reorder Tooltip on left, View/Expand buttons on right */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', width: '100%' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                    <span style={{
+                      fontSize: '0.8rem',
+                      fontWeight: 600,
+                      padding: '0.35rem 0.75rem',
+                      borderRadius: '20px',
+                      background: 'rgba(244, 114, 182, 0.15)',
+                      color: 'var(--color-user, #F472B6)',
+                      border: '1px solid rgba(244, 114, 182, 0.3)'
+                    }}>
+                      {displayedFavorites.length} / {profile?.is_pro ? '70' : '7'} {language === 'es' ? 'destacados' : 'featured'}
+                    </span>
+
+                    {isOwnProfile && favoritesMediaFilter === 'all' && displayedFavorites.length > 1 && (
+                      <div 
+                        style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}
+                        onMouseEnter={() => setShowReorderTooltip(true)}
+                        onMouseLeave={() => setShowReorderTooltip(false)}
+                        onFocus={() => setShowReorderTooltip(true)}
+                        onBlur={() => setShowReorderTooltip(false)}
+                      >
+                        <div
+                          tabIndex={0}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: '24px',
+                            height: '24px',
+                            borderRadius: '50%',
+                            color: showReorderTooltip ? 'var(--color-user, #F472B6)' : 'var(--text-muted)',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                            outline: 'none',
+                            background: showReorderTooltip ? 'rgba(244, 114, 182, 0.12)' : 'rgba(255, 255, 255, 0.04)',
+                            border: showReorderTooltip ? '1px solid rgba(244, 114, 182, 0.4)' : '1px solid var(--border-color)'
+                          }}
+                        >
+                          <HelpCircle size={14} />
+                        </div>
+
+                        {showReorderTooltip && (
+                          <div
+                            style={{
+                              position: 'absolute',
+                              top: 'calc(100% + 10px)',
+                              left: '50%',
+                              transform: 'translateX(-50%)',
+                              background: 'rgba(15, 18, 28, 0.94)',
+                              backdropFilter: 'blur(16px)',
+                              WebkitBackdropFilter: 'blur(16px)',
+                              border: '1px solid rgba(255, 255, 255, 0.12)',
+                              color: 'var(--text-primary)',
+                              padding: '0.45rem 0.8rem',
+                              borderRadius: '8px',
+                              fontSize: '0.78rem',
+                              fontWeight: 500,
+                              whiteSpace: 'nowrap',
+                              pointerEvents: 'none',
+                              boxShadow: '0 8px 24px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.4)',
+                              zIndex: 40
+                            }}
+                          >
+                            {/* Upward pointer arrow */}
+                            <div
+                              style={{
+                                position: 'absolute',
+                                top: '-5px',
+                                left: '50%',
+                                transform: 'translateX(-50%) rotate(45deg)',
+                                width: '8px',
+                                height: '8px',
+                                background: 'rgba(15, 18, 28, 0.94)',
+                                borderLeft: '1px solid rgba(255, 255, 255, 0.12)',
+                                borderTop: '1px solid rgba(255, 255, 255, 0.12)'
+                              }}
+                            />
+                            {language === 'es' ? 'Arrastrá una obra para reordenar tus destacados' : 'Drag an item to reorder your featured favorites'}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
 
-                  {/* Expand / Collapse Control */}
-                  {canExpandMore && (
-                    <button
-                      type="button"
-                      onClick={handleToggleFavoritesExpanded}
-                      className="shelf-view-toggle-btn"
-                      title={isFavoritesExpanded
-                        ? (language === 'es' ? 'Contraer' : 'Collapse')
-                        : (language === 'es' ? 'Expandir' : 'Expand')
-                      }
-                      aria-label={isFavoritesExpanded
-                        ? (language === 'es' ? 'Contraer' : 'Collapse')
-                        : (language === 'es' ? 'Expandir' : 'Expand')
-                      }
-                      style={{ padding: '0.3rem 0.55rem', borderRadius: '6px' }}
-                    >
-                      {isFavoritesExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                    </button>
-                  )}
+                  {/* View Mode Toggle Buttons & Expand */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', background: 'var(--bg-secondary)', padding: '0.2rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                      <button
+                        type="button"
+                        onClick={() => handleSetFavoritesViewMode('grid')}
+                        className={`shelf-view-toggle-btn ${favoritesViewMode === 'grid' ? 'active' : ''}`}
+                        title={language === 'es' ? 'Modo Cuadrícula' : 'Grid View'}
+                        aria-label={language === 'es' ? 'Modo Cuadrícula' : 'Grid View'}
+                        style={{ padding: '0.3rem 0.55rem', borderRadius: '6px' }}
+                      >
+                        <LayoutGrid size={16} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSetFavoritesViewMode('list')}
+                        className={`shelf-view-toggle-btn ${favoritesViewMode === 'list' ? 'active' : ''}`}
+                        title={language === 'es' ? 'Modo Lista' : 'List View'}
+                        aria-label={language === 'es' ? 'Modo Lista' : 'List View'}
+                        style={{ padding: '0.3rem 0.55rem', borderRadius: '6px' }}
+                      >
+                        <List size={16} />
+                      </button>
+                    </div>
+
+                    {/* Expand / Collapse Control */}
+                    {canExpandMore && (
+                      <button
+                        type="button"
+                        onClick={handleToggleFavoritesExpanded}
+                        className="shelf-view-toggle-btn"
+                        title={isFavoritesExpanded
+                          ? (language === 'es' ? 'Contraer' : 'Collapse')
+                          : (language === 'es' ? 'Expandir' : 'Expand')
+                        }
+                        aria-label={isFavoritesExpanded
+                          ? (language === 'es' ? 'Contraer' : 'Collapse')
+                          : (language === 'es' ? 'Expandir' : 'Expand')
+                        }
+                        style={{ padding: '0.3rem 0.55rem', borderRadius: '6px' }}
+                      >
+                        {isFavoritesExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {isGrid ? (
