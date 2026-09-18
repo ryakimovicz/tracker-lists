@@ -64,7 +64,8 @@ import {
   Book,
   MessageSquare,
   MessageCircle,
-  Sparkles
+  Sparkles,
+  ArrowDownToLine
 } from 'lucide-react';
 
 import { MusicServiceGuideModal } from '../components/MusicServiceGuideModal';
@@ -776,34 +777,59 @@ export const Profile: React.FC = () => {
     }
   }, []);
 
-  const startFavEdgeScroll = useCallback((direction: 'left' | 'right', speed: number) => {
+  const startFavEdgeScroll = useCallback((direction: 'left' | 'right' | 'up' | 'down', speed: number) => {
     stopFavEdgeScroll();
     favEdgeScrollIntervalRef.current = setInterval(() => {
-      if (favoritesScrollRef.current) {
-        favoritesScrollRef.current.scrollLeft += (direction === 'left' ? -speed : speed);
-        updateFavoritesScrollState();
+      if (favoritesViewMode === 'list') {
+        if (favoritesListScrollRef.current) {
+          favoritesListScrollRef.current.scrollTop += (direction === 'up' ? -speed : speed);
+        }
+      } else {
+        if (favoritesScrollRef.current) {
+          favoritesScrollRef.current.scrollLeft += (direction === 'left' ? -speed : speed);
+          updateFavoritesScrollState();
+        }
       }
     }, 16);
-  }, [stopFavEdgeScroll, updateFavoritesScrollState]);
+  }, [stopFavEdgeScroll, updateFavoritesScrollState, favoritesViewMode]);
 
-  const handleFavEdgeScrollCheck = useCallback((clientX: number) => {
-    const el = favoritesScrollRef.current;
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
-    const edgeZone = 80;
+  const handleFavEdgeScrollCheck = useCallback((clientX: number, clientY: number) => {
+    if (favoritesViewMode === 'list') {
+      const el = favoritesListScrollRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const edgeZone = 60;
 
-    if (clientX < rect.left + edgeZone && clientX >= rect.left - 40) {
-      const distanceIntoEdge = Math.max(1, (rect.left + edgeZone) - clientX);
-      const speed = Math.min(18, Math.max(4, Math.round((distanceIntoEdge / edgeZone) * 16)));
-      startFavEdgeScroll('left', speed);
-    } else if (clientX > rect.right - edgeZone && clientX <= rect.right + 40) {
-      const distanceIntoEdge = Math.max(1, clientX - (rect.right - edgeZone));
-      const speed = Math.min(18, Math.max(4, Math.round((distanceIntoEdge / edgeZone) * 16)));
-      startFavEdgeScroll('right', speed);
+      if (clientY < rect.top + edgeZone && clientY >= rect.top - 30) {
+        const distanceIntoEdge = Math.max(1, (rect.top + edgeZone) - clientY);
+        const speed = Math.min(18, Math.max(4, Math.round((distanceIntoEdge / edgeZone) * 16)));
+        startFavEdgeScroll('up', speed);
+      } else if (clientY > rect.bottom - edgeZone && clientY <= rect.bottom + 30) {
+        const distanceIntoEdge = Math.max(1, clientY - (rect.bottom - edgeZone));
+        const speed = Math.min(18, Math.max(4, Math.round((distanceIntoEdge / edgeZone) * 16)));
+        startFavEdgeScroll('down', speed);
+      } else {
+        stopFavEdgeScroll();
+      }
     } else {
-      stopFavEdgeScroll();
+      const el = favoritesScrollRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const edgeZone = 80;
+
+      if (clientX < rect.left + edgeZone && clientX >= rect.left - 40) {
+        const distanceIntoEdge = Math.max(1, (rect.left + edgeZone) - clientX);
+        const speed = Math.min(18, Math.max(4, Math.round((distanceIntoEdge / edgeZone) * 16)));
+        startFavEdgeScroll('left', speed);
+      } else if (clientX > rect.right - edgeZone && clientX <= rect.right + 40) {
+        const distanceIntoEdge = Math.max(1, clientX - (rect.right - edgeZone));
+        const speed = Math.min(18, Math.max(4, Math.round((distanceIntoEdge / edgeZone) * 16)));
+        startFavEdgeScroll('right', speed);
+      } else {
+        stopFavEdgeScroll();
+      }
     }
-  }, [startFavEdgeScroll, stopFavEdgeScroll]);
+  }, [startFavEdgeScroll, stopFavEdgeScroll, favoritesViewMode]);
 
   useEffect(() => {
     if (!favPointerDrag) return;
@@ -819,10 +845,10 @@ export const Profile: React.FC = () => {
         favJustDraggedRef.current = true;
         document.body.style.userSelect = 'none';
         document.body.style.cursor = 'grabbing';
-        handleFavEdgeScrollCheck(e.clientX);
+        handleFavEdgeScrollCheck(e.clientX, e.clientY);
 
-        // Find drop index across rendered cards
-        const container = favoritesScrollRef.current;
+        // Find drop index across rendered cards / list rows
+        const container = favoritesViewMode === 'list' ? favoritesListScrollRef.current : favoritesScrollRef.current;
         if (container) {
           const cards = Array.from(container.querySelectorAll<HTMLElement>('[data-fav-card-idx]'));
           if (cards.length > 0) {
@@ -833,14 +859,25 @@ export const Profile: React.FC = () => {
             for (const card of cards) {
               const cardIdx = parseInt(card.getAttribute('data-fav-card-idx') || '0', 10);
               const rect = card.getBoundingClientRect();
-              const centerX = rect.left + rect.width / 2;
-              const centerY = rect.top + rect.height / 2;
-              const d = Math.hypot(e.clientX - centerX, e.clientY - centerY);
 
-              if (d < closestDist) {
-                closestDist = d;
-                closestIdx = cardIdx;
-                insertBefore = e.clientX < centerX;
+              if (favoritesViewMode === 'list') {
+                const centerY = rect.top + rect.height / 2;
+                const d = Math.abs(e.clientY - centerY);
+                if (d < closestDist) {
+                  closestDist = d;
+                  closestIdx = cardIdx;
+                  insertBefore = e.clientY < centerY;
+                }
+              } else {
+                const centerX = rect.left + rect.width / 2;
+                const centerY = rect.top + rect.height / 2;
+                const d = Math.hypot(e.clientX - centerX, e.clientY - centerY);
+
+                if (d < closestDist) {
+                  closestDist = d;
+                  closestIdx = cardIdx;
+                  insertBefore = e.clientX < centerX;
+                }
               }
             }
 
@@ -4314,7 +4351,7 @@ export const Profile: React.FC = () => {
                       }}
                     >
                       {filteredFavorites.map((item, idx) => {
-                        const canReorderFavorites = isOwnProfile && favoritesMediaFilter === 'all' && isGrid;
+                        const canReorderFavorites = isOwnProfile && favoritesMediaFilter === 'all';
                         const isBeingDragged = favPointerDrag?.isDragging && favPointerDrag.item.id === item.id;
                         const isDropTargetBefore = favPointerDrag?.isDragging && favDragOverIndex === idx && favPointerDrag.sourceIndex !== idx && favPointerDrag.sourceIndex !== idx - 1;
                         const isDropTargetAfterLast = favPointerDrag?.isDragging && idx === filteredFavorites.length - 1 && favDragOverIndex === filteredFavorites.length && favPointerDrag.sourceIndex !== filteredFavorites.length - 1;
@@ -4342,7 +4379,7 @@ export const Profile: React.FC = () => {
                               boxShadow: '0 0 16px rgba(244, 114, 182, 0.2)'
                             }}
                           >
-                            <Sparkles size={22} className="animate-pulse" />
+                            <ArrowDownToLine size={24} className="animate-bounce" />
                             <span>{language === 'es' ? 'Soltar aquí' : 'Drop here'}</span>
                           </div>
                         );
@@ -4614,7 +4651,37 @@ export const Profile: React.FC = () => {
                       paddingRight: '0.35rem'
                     }}
                   >
-                    {filteredFavorites.map(item => {
+                    {filteredFavorites.map((item, idx) => {
+                      const canReorderFavorites = isOwnProfile && favoritesMediaFilter === 'all';
+                      const isBeingDragged = favPointerDrag?.isDragging && favPointerDrag.item.id === item.id;
+                      const isDropTargetBefore = favPointerDrag?.isDragging && favDragOverIndex === idx && favPointerDrag.sourceIndex !== idx && favPointerDrag.sourceIndex !== idx - 1;
+                      const isDropTargetAfterLast = favPointerDrag?.isDragging && idx === filteredFavorites.length - 1 && favDragOverIndex === filteredFavorites.length && favPointerDrag.sourceIndex !== filteredFavorites.length - 1;
+
+                      const dropListPlaceholder = (
+                        <div
+                          key={`fav-drop-list-placeholder-${idx}`}
+                          style={{
+                            height: '62px',
+                            borderRadius: '8px',
+                            border: '2px dashed var(--color-user, #F472B6)',
+                            background: 'rgba(244, 114, 182, 0.08)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '0.5rem',
+                            color: 'var(--color-user, #F472B6)',
+                            fontSize: '0.85rem',
+                            fontWeight: 600,
+                            flexShrink: 0,
+                            transition: 'all 0.2s ease',
+                            boxShadow: '0 0 16px rgba(244, 114, 182, 0.2)'
+                          }}
+                        >
+                          <ArrowDownToLine size={20} className="animate-bounce" />
+                          <span>{language === 'es' ? 'Soltar aquí' : 'Drop here'}</span>
+                        </div>
+                      );
+
                       const match = (item.title || '').match(/^(.*?)\s*-\s*S(\d+)E(\d+)(.*)$/i);
                       const isEpOrSeason = item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tvm-ep-');
                       let displayTitle = item.title;
@@ -4631,78 +4698,122 @@ export const Profile: React.FC = () => {
                       }
 
                       return (
-                        <div
-                          key={item.id}
-                          className="shelf-list-item-row"
-                          onClick={() => handleOpenItemDetails(item)}
-                        >
-                          {/* Left: Poster thumbnail */}
-                          <div style={{ width: '44px', height: '62px', borderRadius: '6px', overflow: 'hidden', flexShrink: 0 }}>
-                            <MediaPoster
-                              src={item.image_url}
-                              title={item.title}
-                              itemType={item.item_type}
-                              height="100%"
-                              width="100%"
-                              borderRadius="6px"
-                            />
-                          </div>
-
-                          {/* Center: 2 Lines of info */}
-                          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.25rem', textAlign: 'left' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0, flex: 1 }}>
-                                <span style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={item.title}>
-                                  {displayTitle}
-                                </span>
-                                {favoritesMediaFilter === 'all' && (
-                                  <span
-                                    className={getTagClass((item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tvm-ep-')) ? 'series' : item.item_type)}
-                                    style={{ padding: '0.15rem 0.35rem', borderRadius: '4px', fontSize: '0.7rem', display: 'inline-flex', alignItems: 'center' }}
-                                  >
-                                    {getCategoryIcon((item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tvm-ep-')) ? 'series' : item.item_type, { size: 12, color: 'currentColor' })}
-                                  </span>
-                                )}
-                              </div>
-                              <div style={{ flexShrink: 0 }}>
-                                {renderFavoriteBadges(item)}
-                              </div>
-                            </div>
-
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {episodeSubtext && (
-                                  <span style={{ color: 'var(--accent-primary)', fontWeight: 500 }}>
-                                    {episodeSubtext}
-                                  </span>
-                                )}
-                              </div>
-                              {(item.completed_at || item.updated_at) && (
-                                <span style={{ fontSize: '0.72rem', fontStyle: 'italic', flexShrink: 0 }}>
-                                  {formatDate(new Date(item.completed_at || item.updated_at || new Date()))}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Right: Favorite Heart button */}
-                          <div style={{ flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
-                            <button
-                              type="button"
-                              onClick={() => handleToggleFavorite(item.id, true)}
-                              className="btn-favorite-heart is-favorite"
+                        <React.Fragment key={item.id}>
+                          {isDropTargetBefore && dropListPlaceholder}
+                          <div
+                            data-fav-card-idx={idx}
+                            data-fav-card-id={item.id}
+                            className="shelf-list-item-row"
+                            draggable={false}
+                            onDragStart={(e) => e.preventDefault()}
+                            onPointerDown={(e) => {
+                              if (e.button !== 0 || !canReorderFavorites) return;
+                              const target = e.target as HTMLElement;
+                              if (target.closest('button') || target.closest('a')) return;
+                              setFavPointerDrag({
+                                item,
+                                sourceIndex: idx,
+                                startX: e.clientX,
+                                startY: e.clientY,
+                                currentX: e.clientX,
+                                currentY: e.clientY,
+                                isDragging: false
+                              });
+                            }}
+                            onClick={() => {
+                              if (favJustDraggedRef.current || favPointerDragRef.current?.isDragging) return;
+                              handleOpenItemDetails(item);
+                            }}
+                            style={{
+                              opacity: isBeingDragged ? 0.35 : 1,
+                              cursor: canReorderFavorites ? (favPointerDrag?.isDragging ? 'grabbing' : 'grab') : 'pointer',
+                              userSelect: 'none',
+                              WebkitUserDrag: 'none',
+                              touchAction: canReorderFavorites ? 'none' : 'auto',
+                              transition: 'opacity 0.2s ease, transform 0.2s ease'
+                            } as React.CSSProperties}
+                          >
+                            {/* Left: Poster thumbnail */}
+                            <div
+                              draggable={false}
+                              onDragStart={(e) => e.preventDefault()}
                               style={{
-                                width: '32px',
-                                height: '32px',
-                                cursor: 'pointer',
-                                color: 'var(--color-user, #F472B6)'
-                              }}
-                              title={language === 'es' ? 'Quitar Destacado' : 'Remove Featured'}
+                                width: '44px',
+                                height: '62px',
+                                borderRadius: '6px',
+                                overflow: 'hidden',
+                                flexShrink: 0,
+                                userSelect: 'none',
+                                WebkitUserDrag: 'none'
+                              } as React.CSSProperties}
                             >
-                              <Heart size={16} fill="var(--color-user, #F472B6)" />
-                            </button>
+                              <MediaPoster
+                                src={item.image_url}
+                                title={item.title}
+                                itemType={item.item_type}
+                                height="100%"
+                                width="100%"
+                                borderRadius="6px"
+                              />
+                            </div>
+
+                            {/* Center: 2 Lines of info */}
+                            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.25rem', textAlign: 'left' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0, flex: 1 }}>
+                                  <span style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={item.title}>
+                                    {displayTitle}
+                                  </span>
+                                  {favoritesMediaFilter === 'all' && (
+                                    <span
+                                      className={getTagClass((item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tvm-ep-')) ? 'series' : item.item_type)}
+                                      style={{ padding: '0.15rem 0.35rem', borderRadius: '4px', fontSize: '0.7rem', display: 'inline-flex', alignItems: 'center' }}
+                                    >
+                                      {getCategoryIcon((item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tvm-ep-')) ? 'series' : item.item_type, { size: 12, color: 'currentColor' })}
+                                    </span>
+                                  )}
+                                </div>
+                                <div style={{ flexShrink: 0 }}>
+                                  {renderFavoriteBadges(item)}
+                                </div>
+                              </div>
+
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {episodeSubtext && (
+                                    <span style={{ color: 'var(--accent-primary)', fontWeight: 500 }}>
+                                      {episodeSubtext}
+                                    </span>
+                                  )}
+                                </div>
+                                {(item.completed_at || item.updated_at) && (
+                                  <span style={{ fontSize: '0.72rem', fontStyle: 'italic', flexShrink: 0 }}>
+                                    {formatDate(new Date(item.completed_at || item.updated_at || new Date()))}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Right: Favorite Heart button */}
+                            <div style={{ flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
+                              <button
+                                type="button"
+                                onClick={() => handleToggleFavorite(item.id, true)}
+                                className="btn-favorite-heart is-favorite"
+                                style={{
+                                  width: '32px',
+                                  height: '32px',
+                                  cursor: 'pointer',
+                                  color: 'var(--color-user, #F472B6)'
+                                }}
+                                title={language === 'es' ? 'Quitar Destacado' : 'Remove Featured'}
+                              >
+                                <Heart size={16} fill="var(--color-user, #F472B6)" />
+                              </button>
+                            </div>
                           </div>
-                        </div>
+                          {isDropTargetAfterLast && dropListPlaceholder}
+                        </React.Fragment>
                       );
                     })}
                   </div>
