@@ -2,12 +2,12 @@ import { useRef, useCallback, useEffect } from 'react';
 
 export function useContinuousScroll(
   scrollRef: React.RefObject<HTMLDivElement | null>,
-  defaultStep: number = 300,
-  speedPxPerFrame: number = 15
+  defaultStep: number = 350,
+  speedPxPerFrame: number = 14
 ) {
   const isHoldingRef = useRef(false);
   const rafIdRef = useRef<number | null>(null);
-  const startTimeRef = useRef<number>(0);
+  const holdTimeoutRef = useRef<any>(null);
   const defaultStepRef = useRef(defaultStep);
   const speedRef = useRef(speedPxPerFrame);
 
@@ -15,6 +15,10 @@ export function useContinuousScroll(
   speedRef.current = speedPxPerFrame;
 
   const stopScrolling = useCallback(() => {
+    if (holdTimeoutRef.current) {
+      clearTimeout(holdTimeoutRef.current);
+      holdTimeoutRef.current = null;
+    }
     if (rafIdRef.current) {
       cancelAnimationFrame(rafIdRef.current);
       rafIdRef.current = null;
@@ -24,25 +28,23 @@ export function useContinuousScroll(
   const startScrolling = useCallback((direction: 'left' | 'right', customSpeed?: number) => {
     stopScrolling();
     isHoldingRef.current = false;
-    startTimeRef.current = performance.now();
 
     const baseSpeed = customSpeed ?? speedRef.current;
     const dir = direction === 'left' ? -1 : 1;
 
-    const loop = () => {
-      const elapsed = performance.now() - startTimeRef.current;
-      if (elapsed > 160) {
-        isHoldingRef.current = true;
-      }
+    // Only start continuous RAF scrolling after holding beyond 180ms
+    holdTimeoutRef.current = setTimeout(() => {
+      isHoldingRef.current = true;
 
-      if (scrollRef.current) {
-        const speedMultiplier = elapsed < 100 ? 0.6 : 1.0;
-        scrollRef.current.scrollLeft += dir * baseSpeed * speedMultiplier;
-      }
+      const loop = () => {
+        if (scrollRef.current) {
+          scrollRef.current.scrollLeft += dir * baseSpeed;
+        }
+        rafIdRef.current = requestAnimationFrame(loop);
+      };
+
       rafIdRef.current = requestAnimationFrame(loop);
-    };
-
-    rafIdRef.current = requestAnimationFrame(loop);
+    }, 180);
   }, [scrollRef, stopScrolling]);
 
   const handleClick = useCallback((direction: 'left' | 'right', customStep?: number) => {
@@ -50,7 +52,7 @@ export function useContinuousScroll(
     stopScrolling();
     isHoldingRef.current = false;
 
-    // If it was just a quick click (released before hold threshold), perform full stepped scroll
+    // If it was just a quick click (not a sustained hold), execute the step scroll
     if (!wasHolding && scrollRef.current) {
       const step = customStep ?? defaultStepRef.current;
       scrollRef.current.scrollBy({
@@ -60,9 +62,11 @@ export function useContinuousScroll(
     }
   }, [scrollRef, stopScrolling]);
 
-  // Clean up on unmount ONLY to prevent cancellation during parent re-renders
   useEffect(() => {
     return () => {
+      if (holdTimeoutRef.current) {
+        clearTimeout(holdTimeoutRef.current);
+      }
       if (rafIdRef.current) {
         cancelAnimationFrame(rafIdRef.current);
       }
