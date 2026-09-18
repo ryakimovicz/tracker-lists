@@ -15,9 +15,11 @@ class LastFMService:
     # In-memory fast cache
     _cache_now_playing: Dict[str, tuple] = {}  # key -> (timestamp, data)
     _cache_top_albums: Dict[str, tuple] = {}   # key -> (timestamp, data)
+    _cache_top_artists: Dict[str, tuple] = {}  # key -> (timestamp, data)
+    _cache_top_tracks: Dict[str, tuple] = {}   # key -> (timestamp, data)
 
     NOW_PLAYING_TTL = 15   # 15 seconds cache for live scrobbles
-    TOP_ALBUMS_TTL = 300   # 5 minutes cache for top albums
+    TOP_MUSIC_TTL = 300    # 5 minutes cache for top stats
 
     @classmethod
     def _generate_signature(cls, params: dict) -> str:
@@ -110,29 +112,30 @@ class LastFMService:
                         return result
         except Exception as e:
             print(f"LastFM NowPlaying Error for {username}: {e}")
-            # If network error but we have stale cache, return it rather than failing
             if cache_key in cls._cache_now_playing:
                 return cls._cache_now_playing[cache_key][1]
         return None
 
     @classmethod
-    def get_top_albums(cls, username: str, limit: int = 5) -> List[Dict[str, Any]]:
-        """Gets the user's top albums for the last 7 days with caching"""
+    def get_top_albums(cls, username: str, period: str = "7day", limit: int = 10) -> List[Dict[str, Any]]:
+        """Gets the user's top albums for a given period (7day, 1month, overall)"""
         if not cls.API_KEY or not username:
             return []
 
-        cache_key = f"{username.strip().lower()}_{limit}"
+        valid_periods = {"7day", "1month", "overall"}
+        period_clean = period if period in valid_periods else "7day"
+        cache_key = f"{username.strip().lower()}_{period_clean}_{limit}"
         now = time.time()
         if cache_key in cls._cache_top_albums:
             cached_time, cached_data = cls._cache_top_albums[cache_key]
-            if now - cached_time < cls.TOP_ALBUMS_TTL:
+            if now - cached_time < cls.TOP_MUSIC_TTL:
                 return cached_data
 
         params = {
             "method": "user.getTopAlbums",
             "user": username,
             "api_key": cls.API_KEY,
-            "period": "7day",
+            "period": period_clean,
             "limit": str(limit),
             "format": "json"
         }
@@ -167,3 +170,112 @@ class LastFMService:
             if cache_key in cls._cache_top_albums:
                 return cls._cache_top_albums[cache_key][1]
         return albums
+
+    @classmethod
+    def get_top_artists(cls, username: str, period: str = "7day", limit: int = 10) -> List[Dict[str, Any]]:
+        """Gets the user's top artists for a given period (7day, 1month, overall)"""
+        if not cls.API_KEY or not username:
+            return []
+
+        valid_periods = {"7day", "1month", "overall"}
+        period_clean = period if period in valid_periods else "7day"
+        cache_key = f"{username.strip().lower()}_{period_clean}_{limit}"
+        now = time.time()
+        if cache_key in cls._cache_top_artists:
+            cached_time, cached_data = cls._cache_top_artists[cache_key]
+            if now - cached_time < cls.TOP_MUSIC_TTL:
+                return cached_data
+
+        params = {
+            "method": "user.getTopArtists",
+            "user": username,
+            "api_key": cls.API_KEY,
+            "period": period_clean,
+            "limit": str(limit),
+            "format": "json"
+        }
+        
+        url = f"{cls.BASE_URL}?{urllib.parse.urlencode(params)}"
+        headers = {"User-Agent": "PathdApp/1.0 (https://pathd.net)"}
+        req = urllib.request.Request(url, headers=headers)
+        
+        artists = []
+        try:
+            with urllib.request.urlopen(req, timeout=4) as response:
+                if response.status == 200:
+                    data = json.loads(response.read().decode())
+                    top_artists = data.get("topartists", {}).get("artist", [])
+                    for artist in top_artists:
+                        image = ""
+                        for img in artist.get("image", []):
+                            if img.get("size") == "extralarge" or img.get("size") == "large":
+                                image = img.get("#text")
+                        
+                        artists.append({
+                            "name": artist.get("name"),
+                            "playcount": artist.get("playcount"),
+                            "image": image,
+                            "url": artist.get("url")
+                        })
+                    cls._cache_top_artists[cache_key] = (now, artists)
+                    return artists
+        except Exception as e:
+            print(f"LastFM TopArtists Error for {username}: {e}")
+            if cache_key in cls._cache_top_artists:
+                return cls._cache_top_artists[cache_key][1]
+        return artists
+
+    @classmethod
+    def get_top_tracks(cls, username: str, period: str = "7day", limit: int = 10) -> List[Dict[str, Any]]:
+        """Gets the user's top tracks for a given period (7day, 1month, overall)"""
+        if not cls.API_KEY or not username:
+            return []
+
+        valid_periods = {"7day", "1month", "overall"}
+        period_clean = period if period in valid_periods else "7day"
+        cache_key = f"{username.strip().lower()}_{period_clean}_{limit}"
+        now = time.time()
+        if cache_key in cls._cache_top_tracks:
+            cached_time, cached_data = cls._cache_top_tracks[cache_key]
+            if now - cached_time < cls.TOP_MUSIC_TTL:
+                return cached_data
+
+        params = {
+            "method": "user.getTopTracks",
+            "user": username,
+            "api_key": cls.API_KEY,
+            "period": period_clean,
+            "limit": str(limit),
+            "format": "json"
+        }
+        
+        url = f"{cls.BASE_URL}?{urllib.parse.urlencode(params)}"
+        headers = {"User-Agent": "PathdApp/1.0 (https://pathd.net)"}
+        req = urllib.request.Request(url, headers=headers)
+        
+        tracks = []
+        try:
+            with urllib.request.urlopen(req, timeout=4) as response:
+                if response.status == 200:
+                    data = json.loads(response.read().decode())
+                    top_tracks = data.get("toptracks", {}).get("track", [])
+                    for track in top_tracks:
+                        image = ""
+                        for img in track.get("image", []):
+                            if img.get("size") == "extralarge" or img.get("size") == "large":
+                                image = img.get("#text")
+                        
+                        tracks.append({
+                            "name": track.get("name"),
+                            "artist": track.get("artist", {}).get("name"),
+                            "playcount": track.get("playcount"),
+                            "image": image,
+                            "url": track.get("url")
+                        })
+                    cls._cache_top_tracks[cache_key] = (now, tracks)
+                    return tracks
+        except Exception as e:
+            print(f"LastFM TopTracks Error for {username}: {e}")
+            if cache_key in cls._cache_top_tracks:
+                return cls._cache_top_tracks[cache_key][1]
+        return tracks

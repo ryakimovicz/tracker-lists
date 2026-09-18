@@ -169,10 +169,22 @@ def get_now_playing(current_user: User = Depends(get_current_user)):
     return LastFMService.get_now_playing(current_user.lastfm_username)
 
 @router.get("/me/music/top-albums")
-def get_top_albums(current_user: User = Depends(get_current_user)):
+def get_top_albums(period: str = "7day", current_user: User = Depends(get_current_user)):
     if not current_user.lastfm_username:
         return []
-    return LastFMService.get_top_albums(current_user.lastfm_username)
+    return LastFMService.get_top_albums(current_user.lastfm_username, period=period)
+
+@router.get("/me/music/top-artists")
+def get_top_artists(period: str = "7day", current_user: User = Depends(get_current_user)):
+    if not current_user.lastfm_username:
+        return []
+    return LastFMService.get_top_artists(current_user.lastfm_username, period=period)
+
+@router.get("/me/music/top-tracks")
+def get_top_tracks(period: str = "7day", current_user: User = Depends(get_current_user)):
+    if not current_user.lastfm_username:
+        return []
+    return LastFMService.get_top_tracks(current_user.lastfm_username, period=period)
 
 @router.get("/{user_id}/music/now-playing")
 def get_user_now_playing(user_id: int, db: Session = Depends(get_db)):
@@ -182,11 +194,25 @@ def get_user_now_playing(user_id: int, db: Session = Depends(get_db)):
     return LastFMService.get_now_playing(user.lastfm_username)
 
 @router.get("/{user_id}/music/top-albums")
-def get_user_top_albums(user_id: int, db: Session = Depends(get_db)):
+def get_user_top_albums(user_id: int, period: str = "7day", db: Session = Depends(get_db)):
     user = db.query(User).filter(User.id == user_id).first()
     if not user or not user.lastfm_username:
         return []
-    return LastFMService.get_top_albums(user.lastfm_username)
+    return LastFMService.get_top_albums(user.lastfm_username, period=period)
+
+@router.get("/{user_id}/music/top-artists")
+def get_user_top_artists(user_id: int, period: str = "7day", db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user or not user.lastfm_username:
+        return []
+    return LastFMService.get_top_artists(user.lastfm_username, period=period)
+
+@router.get("/{user_id}/music/top-tracks")
+def get_user_top_tracks(user_id: int, period: str = "7day", db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user or not user.lastfm_username:
+        return []
+    return LastFMService.get_top_tracks(user.lastfm_username, period=period)
 
 @router.get("/me/up-next", response_model=UpNextResponse)
 def get_user_up_next(

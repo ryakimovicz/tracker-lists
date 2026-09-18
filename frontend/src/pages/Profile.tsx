@@ -65,7 +65,12 @@ import {
   MessageSquare,
   MessageCircle,
   Sparkles,
-  ArrowDownToLine
+  ArrowDownToLine,
+  Disc,
+  Mic,
+  Headphones,
+  Infinity as InfinityIcon,
+  CalendarDays
 } from 'lucide-react';
 
 import { MusicServiceGuideModal } from '../components/MusicServiceGuideModal';
@@ -1000,6 +1005,10 @@ export const Profile: React.FC = () => {
   // Last.fm states
   const [nowPlaying, setNowPlaying] = useState<any>(null);
   const [topAlbums, setTopAlbums] = useState<any[]>([]);
+  const [musicType, setMusicType] = useState<'albums' | 'artists' | 'tracks'>('albums');
+  const [musicPeriod, setMusicPeriod] = useState<'7day' | '1month' | 'overall'>('7day');
+  const [musicItems, setMusicItems] = useState<any[]>([]);
+  const [isMusicDataLoading, setIsMusicDataLoading] = useState<boolean>(false);
   const [isConnectingLastFm, setIsConnectingLastFm] = useState(false);
   const [isLastFmLoading, setIsLastFmLoading] = useState<boolean>(false);
   const [lastFmTokenInput, setLastFmTokenInput] = useState('');
@@ -1388,6 +1397,30 @@ export const Profile: React.FC = () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [profile?.lastfm_username, profile?.id]);
+
+  // Fetch dynamic music data according to selected type and period
+  useEffect(() => {
+    if (!profile?.lastfm_username || !profile?.id || activeTab !== 'music') return;
+
+    const targetId = profile.id;
+    let endpoint = 'top-albums';
+    if (musicType === 'artists') endpoint = 'top-artists';
+    if (musicType === 'tracks') endpoint = 'top-tracks';
+
+    const url = `/users/${targetId}/music/${endpoint}?period=${musicPeriod}`;
+
+    setIsMusicDataLoading(true);
+    apiClient.get(url)
+      .then(res => {
+        setMusicItems(Array.isArray(res.data) ? res.data : []);
+      })
+      .catch(() => {
+        setMusicItems([]);
+      })
+      .finally(() => {
+        setIsMusicDataLoading(false);
+      });
+  }, [profile?.lastfm_username, profile?.id, activeTab, musicType, musicPeriod]);
 
   const handleLastFmLogin = () => {
     const currentOrigin = window.location.origin;
@@ -4940,13 +4973,88 @@ export const Profile: React.FC = () => {
 
 
       {activeTab === 'music' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', textAlign: 'left' }}>
-          <h3>{language === 'es' ? 'Estantería Musical (Últimos 7 días)' : 'Music Shelf (Last 7 days)'}</h3>
-          {topAlbums.length === 0 ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', textAlign: 'left' }}>
+          {/* Top Row: Content Type Selector (Left) and Period Selector (Right) */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.85rem' }}>
+            {/* Type selector: Álbumes, Artistas, Canciones */}
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              {[
+                { id: 'albums', label: language === 'es' ? 'Álbumes' : 'Albums', icon: Disc },
+                { id: 'artists', label: language === 'es' ? 'Artistas' : 'Artists', icon: Mic },
+                { id: 'tracks', label: language === 'es' ? 'Canciones' : 'Tracks', icon: Headphones }
+              ].map(tab => {
+                const isSelected = musicType === tab.id;
+                const IconComp = tab.icon;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setMusicType(tab.id as any)}
+                    className={`profile-category-tab ${isSelected ? 'selected' : ''}`}
+                    style={{
+                      padding: '0.35rem 0.85rem',
+                      fontSize: '0.85rem',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.45rem',
+                      '--tab-color': 'var(--color-music, #1DB954)',
+                      '--tab-text': '#ffffff'
+                    } as React.CSSProperties}
+                  >
+                    <IconComp size={14} color={isSelected ? '#ffffff' : 'var(--color-music, #1DB954)'} />
+                    <span>{tab.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Period selector: 7 días, 1 mes, Siempre */}
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', background: 'var(--bg-secondary)', padding: '0.2rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+              {[
+                { id: '7day', label: language === 'es' ? '7 días' : '7 days', icon: Clock },
+                { id: '1month', label: language === 'es' ? '1 mes' : '1 month', icon: CalendarDays },
+                { id: 'overall', label: language === 'es' ? 'Siempre' : 'All time', icon: InfinityIcon }
+              ].map(p => {
+                const isSelected = musicPeriod === p.id;
+                const PeriodIcon = p.icon;
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => setMusicPeriod(p.id as any)}
+                    className={`shelf-view-toggle-btn ${isSelected ? 'active' : ''}`}
+                    style={{
+                      padding: '0.3rem 0.65rem',
+                      borderRadius: '6px',
+                      fontSize: '0.78rem',
+                      fontWeight: isSelected ? 600 : 500,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.35rem',
+                      border: 'none',
+                      background: isSelected ? 'var(--color-music, #1DB954)' : 'transparent',
+                      color: isSelected ? '#ffffff' : 'var(--text-secondary)'
+                    }}
+                  >
+                    <PeriodIcon size={13} />
+                    <span>{p.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {isMusicDataLoading ? (
+            <div style={{ padding: '3rem 1rem', display: 'flex', justifyContent: 'center' }}>
+              <PathdLoader size="medium" message={language === 'es' ? 'Cargando música...' : 'Loading music...'} />
+            </div>
+          ) : musicItems.length === 0 ? (
             <div className="glass-card" style={{ padding: '3rem 2rem', textAlign: 'center', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
               <Music size={32} color="#ef4444" style={{ opacity: 0.8 }} />
               <div style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                {language === 'es' ? 'No hay álbumes escuchados en los últimos 7 días.' : 'No albums played in the last 7 days.'}
+                {musicType === 'albums' && (language === 'es' ? 'No hay álbumes escuchados en este período.' : 'No albums played in this period.')}
+                {musicType === 'artists' && (language === 'es' ? 'No hay artistas escuchados en este período.' : 'No artists played in this period.')}
+                {musicType === 'tracks' && (language === 'es' ? 'No hay canciones escuchadas en este período.' : 'No tracks played in this period.')}
               </div>
               <p style={{ margin: 0, fontSize: '0.85rem', maxWidth: '450px', lineHeight: '1.45' }}>
                 {isOwnProfile
@@ -4978,32 +5086,124 @@ export const Profile: React.FC = () => {
               )}
             </div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '2rem' }}>
-              {topAlbums.map((album, i) => (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(195px, 1fr))', gap: '1.5rem' }}>
+              {musicItems.map((item, i) => (
                 <div
-                  key={`${album.name}-${i}`}
+                  key={`${item.name}-${i}`}
                   className="glass-card"
-                  style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}
+                  style={{
+                    padding: '1rem',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.75rem',
+                    position: 'relative',
+                    overflow: 'hidden',
+                    transition: 'transform 0.2s ease, border-color 0.2s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-3px)';
+                    e.currentTarget.style.borderColor = 'rgba(29, 185, 84, 0.4)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.borderColor = 'var(--border-color)';
+                  }}
                 >
-                  <div style={{ width: '100%', aspectRatio: '1/1', borderRadius: '8px', overflow: 'hidden' }}>
-                    <MediaPoster
-                      src={album.image}
-                      title={album.name}
-                      itemType="music"
-                      height="100%"
-                      width="100%"
-                      borderRadius="8px"
-                    />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <a href={album.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
-                      <h4 style={{ margin: '0 0 0.25rem 0', color: 'var(--text-primary)' }}>{album.name}</h4>
-                    </a>
-                    <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{album.artist}</span>
-                  </div>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 600, background: 'rgba(124, 58, 237, 0.1)', color: 'var(--accent-primary)', padding: '0.2rem 0.5rem', borderRadius: '4px', width: 'fit-content' }}>
-                    {album.playcount} {language === 'es' ? 'reproducciones' : 'plays'}
+                  {/* Position badge */}
+                  <span style={{
+                    position: 'absolute',
+                    top: '0.6rem',
+                    left: '0.6rem',
+                    zIndex: 2,
+                    background: 'rgba(0, 0, 0, 0.75)',
+                    color: '#ffffff',
+                    fontSize: '0.72rem',
+                    fontWeight: 700,
+                    padding: '0.15rem 0.45rem',
+                    borderRadius: '6px',
+                    backdropFilter: 'blur(4px)'
+                  }}>
+                    #{i + 1}
                   </span>
+
+                  {/* Artwork / Poster / Avatar */}
+                  <div style={{
+                    width: '100%',
+                    aspectRatio: '1/1',
+                    borderRadius: musicType === 'artists' ? '50%' : '8px',
+                    overflow: 'hidden',
+                    background: 'var(--bg-tertiary)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: musicType === 'artists' ? '0.5rem auto 0 auto' : '0',
+                    maxWidth: musicType === 'artists' ? '140px' : '100%',
+                    boxShadow: musicType === 'artists' ? '0 4px 12px rgba(0,0,0,0.3)' : undefined
+                  }}>
+                    {item.image ? (
+                      <img
+                        src={item.image}
+                        alt={item.name}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', color: 'var(--color-music, #1DB954)', opacity: 0.6 }}>
+                        {musicType === 'artists' ? <Mic size={36} /> : musicType === 'tracks' ? <Headphones size={36} /> : <Disc size={36} />}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Text details */}
+                  <div style={{ flex: 1, minWidth: 0, textAlign: musicType === 'artists' ? 'center' : 'left' }}>
+                    <a
+                      href={item.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ textDecoration: 'none' }}
+                      title={item.name}
+                    >
+                      <h4 style={{
+                        margin: '0 0 0.2rem 0',
+                        color: 'var(--text-primary)',
+                        fontSize: '0.95rem',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis'
+                      }}>
+                        {item.name}
+                      </h4>
+                    </a>
+                    {item.artist && (
+                      <span style={{
+                        fontSize: '0.82rem',
+                        color: 'var(--text-secondary)',
+                        display: 'block',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis'
+                      }} title={item.artist}>
+                        {item.artist}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Playcount Badge */}
+                  <div style={{ display: 'flex', justifyContent: musicType === 'artists' ? 'center' : 'flex-start' }}>
+                    <span style={{
+                      fontSize: '0.72rem',
+                      fontWeight: 600,
+                      background: 'rgba(29, 185, 84, 0.12)',
+                      color: 'var(--color-music, #1DB954)',
+                      padding: '0.2rem 0.55rem',
+                      borderRadius: '4px',
+                      border: '1px solid rgba(29, 185, 84, 0.25)'
+                    }}>
+                      {item.playcount} {language === 'es' ? 'reproducciones' : 'plays'}
+                    </span>
+                  </div>
                 </div>
               ))}
             </div>
