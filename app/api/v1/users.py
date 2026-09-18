@@ -1,3 +1,4 @@
+import time
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
 from fastapi import APIRouter, Depends, Query, HTTPException, status, Request
@@ -29,6 +30,9 @@ from app.schemas.auth import PasswordChangeRequest, UsernameUpdateRequest
 
 router = APIRouter()
 tvmaze_service = TVMazeService()
+
+_cache_music_rankings: Dict[str, tuple] = {}
+RANKINGS_CACHE_TTL = 300  # 5 minutes cache for Pathd community rankings
 
 def check_user_is_pro(user: User) -> bool:
     if not user:
@@ -213,6 +217,160 @@ def get_user_top_tracks(user_id: int, period: str = "7day", db: Session = Depend
     if not user or not user.lastfm_username:
         return []
     return LastFMService.get_top_tracks(user.lastfm_username, period=period)
+
+@router.get("/music/details")
+def get_music_item_details(
+    type: str = Query(..., description="Type of music item: 'artist', 'album', or 'track'"),
+    artist: str = Query(..., description="Artist name"),
+    name: Optional[str] = Query("", description="Album or track name (required for album/track)"),
+    period: str = Query("7day", description="Ranking period: '7day', '1month', or 'overall'"),
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db)
+):
+    clean_type = type.strip().lower()
+    clean_artist = artist.strip()
+    clean_name = (name or "").strip()
+    clean_period = period if period in {"7day", "1month", "overall"} else "7day"
+
+    # 1. Fetch item metadata
+    details = None
+    if clean_type == "artist":
+        details = LastFMService.get_artist_details(clean_artist)
+    elif clean_type == "album":
+        details = LastFMService.get_album_details(clean_artist, clean_name)
+    elif clean_type == "track":
+        details = LastFMService.get_track_details(clean_artist, clean_name)
+
+    if not details:
+        # Construct fallback structure if Last.fm had network issue
+        details = {
+            "type": clean_type,
+            "name": clean_name or clean_artist,
+            "artist": clean_artist,
+            "image": "",
+            "bio": "",
+            "tags": [],
+            "listeners": "0",
+            "playcount": "0"
+        }
+
+    # 2. Compute or retrieve cached Pathd community listeners rankings for all 3 periods ('7day', '1month', 'overall')
+    periods = ["7day", "1month", "overall"]
+    artist_norm = clean_artist.lower()
+    item_norm = clean_name.lower()
+    rank_cache_key = f"{clean_type}_{artist_norm}_{item_norm}"
+
+    now_ts = time.time()
+    period_entries_by_period = {}
+
+    if rank_cache_key in _cache_music_rankings:
+        cache_ts, cached_entries = _cache_music_rankings[rank_cache_key]
+        if now_ts - cache_ts < RANKINGS_CACHE_TTL:
+            period_entries_by_period = cached_entries
+
+    if not period_entries_by_period:
+        users_with_lastfm = db.query(User).filter(
+            User.lastfm_username.isnot(None),
+            User.lastfm_username != "",
+            User.is_suspended == False
+        ).all()
+
+        import concurrent.futures
+
+        def fetch_all_user_data(u: User):
+            user_counts = {}
+            for p in periods:
+                cnt = 0
+                if p == "overall":
+                    cnt = LastFMService.get_user_item_playcount(u.lastfm_username, clean_type, clean_artist, clean_name)
+                else:
+                    if clean_type == "artist":
+                        top_items = LastFMService.get_top_artists(u.lastfm_username, period=p, limit=50, enrich_images=False)
+                        for item in top_items:
+                            if item.get("name", "").strip().lower() == artist_norm:
+                                cnt = int(item.get("playcount") or 0)
+                                break
+                    elif clean_type == "album":
+                        top_items = LastFMService.get_top_albums(u.lastfm_username, period=p, limit=50, enrich_images=False)
+                        for item in top_items:
+                            if item.get("name", "").strip().lower() == item_norm and (not artist_norm or item.get("artist", "").strip().lower() == artist_norm):
+                                cnt = int(item.get("playcount") or 0)
+                                break
+                    elif clean_type == "track":
+                        top_items = LastFMService.get_top_tracks(u.lastfm_username, period=p, limit=50, enrich_images=False)
+                        for item in top_items:
+                            if item.get("name", "").strip().lower() == item_norm and (not artist_norm or item.get("artist", "").strip().lower() == artist_norm):
+                                cnt = int(item.get("playcount") or 0)
+                                break
+                user_counts[p] = cnt
+            return (u, user_counts)
+
+        user_data_list = []
+        if users_with_lastfm:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+                user_data_list = list(executor.map(fetch_all_user_data, users_with_lastfm))
+
+        for p in periods:
+            period_entries = []
+            for u, counts in user_data_list:
+                cnt = counts.get(p, 0)
+                if cnt > 0:
+                    period_entries.append({
+                        "user_id": u.id,
+                        "username": u.username,
+                        "photo_url": u.photo_url,
+                        "profile_color": u.profile_color,
+                        "is_pro": check_user_is_pro(u),
+                        "is_vip": bool(u.is_vip),
+                        "playcount": cnt
+                    })
+
+            # Sort descending by playcount
+            period_entries.sort(key=lambda x: x["playcount"], reverse=True)
+            for idx, entry in enumerate(period_entries):
+                entry["rank"] = idx + 1
+            period_entries_by_period[p] = period_entries
+
+        _cache_music_rankings[rank_cache_key] = (now_ts, period_entries_by_period)
+
+    rankings_by_period = {}
+    for p in periods:
+        period_entries = period_entries_by_period.get(p, [])
+        top_10 = period_entries[:10]
+
+        current_user_rank_entry = None
+        if current_user and current_user.lastfm_username:
+            user_in_full = next((e for e in period_entries if e["user_id"] == current_user.id), None)
+            if user_in_full:
+                if user_in_full["rank"] > 10:
+                    current_user_rank_entry = user_in_full
+            else:
+                current_user_rank_entry = {
+                    "user_id": current_user.id,
+                    "username": current_user.username,
+                    "photo_url": current_user.photo_url,
+                    "profile_color": current_user.profile_color,
+                    "is_pro": check_user_is_pro(current_user),
+                    "is_vip": bool(current_user.is_vip),
+                    "playcount": 0,
+                    "rank": None
+                }
+
+        rankings_by_period[p] = {
+            "ranking": top_10,
+            "total_listeners": len(period_entries),
+            "current_user_rank": current_user_rank_entry
+        }
+
+    default_period_data = rankings_by_period.get(clean_period, rankings_by_period["7day"])
+
+    return {
+        "details": details,
+        "ranking": default_period_data["ranking"],
+        "total_listeners": default_period_data["total_listeners"],
+        "current_user_rank": default_period_data["current_user_rank"],
+        "rankings": rankings_by_period
+    }
 
 @router.get("/me/up-next", response_model=UpNextResponse)
 def get_user_up_next(

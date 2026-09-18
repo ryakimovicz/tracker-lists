@@ -2143,17 +2143,15 @@ export const Home: React.FC = () => {
     };
 
     window.addEventListener('library-updated', handleLibraryUpdate);
-    window.addEventListener('language-updated', handleLanguageUpdate);
     document.addEventListener('visibilitychange', handleVisibilityOrFocus);
     window.addEventListener('focus', handleVisibilityOrFocus);
 
     return () => {
       window.removeEventListener('library-updated', handleLibraryUpdate);
-      window.removeEventListener('language-updated', handleLanguageUpdate);
       document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
       window.removeEventListener('focus', handleVisibilityOrFocus);
     };
-  }, [language]);
+  }, []);
 
   const handleStartConsuming = async (e: React.MouseEvent, item: any) => {
     e.stopPropagation();

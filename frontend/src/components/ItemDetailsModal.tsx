@@ -213,7 +213,9 @@ const ModalScrollRow: React.FC<{ children: React.ReactNode }> = ({ children }) =
 };
 
 export const ItemDetailsModal: React.FC<ItemDetailsModalProps> = (props) => {
-  return <ErrorBoundary><ItemDetailsModalInner {...props} /></ErrorBoundary>;
+  if (!props.item) return null;
+  const itemKey = props.item.id || props.item.external_id || `${props.item.title}_${props.item.item_type}` || 'active_modal_item';
+  return <ErrorBoundary><ItemDetailsModalInner key={itemKey} {...props} /></ErrorBoundary>;
 };
 
 const MediaAttachmentView: React.FC<{

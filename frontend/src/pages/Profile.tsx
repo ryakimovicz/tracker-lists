@@ -74,6 +74,8 @@ import {
 } from 'lucide-react';
 
 import { MusicServiceGuideModal } from '../components/MusicServiceGuideModal';
+import { MusicDetailsModal } from '../components/MusicDetailsModal';
+import { batchPrefetchMusicItems, prefetchMusicDetails } from '../utils/musicPrefetch';
 
 
 
@@ -262,7 +264,7 @@ export const Profile: React.FC = () => {
         console.error('Error verifying payment:', err);
       });
     }
-  }, [searchParams, language]);
+  }, [searchParams]);
 
 
 
@@ -1005,13 +1007,24 @@ export const Profile: React.FC = () => {
   // Last.fm states
   const [nowPlaying, setNowPlaying] = useState<any>(null);
   const [topAlbums, setTopAlbums] = useState<any[]>([]);
-  const [musicType, setMusicType] = useState<'albums' | 'artists' | 'tracks'>('albums');
+  const [musicType, setMusicType] = useState<'artists' | 'albums' | 'tracks'>('artists');
   const [musicPeriod, setMusicPeriod] = useState<'7day' | '1month' | 'overall'>('7day');
   const [musicItems, setMusicItems] = useState<any[]>([]);
   const [isMusicDataLoading, setIsMusicDataLoading] = useState<boolean>(false);
   const [isConnectingLastFm, setIsConnectingLastFm] = useState(false);
   const [isLastFmLoading, setIsLastFmLoading] = useState<boolean>(false);
   const [lastFmTokenInput, setLastFmTokenInput] = useState('');
+  const [musicDetailsModal, setMusicDetailsModal] = useState<{
+    isOpen: boolean;
+    type: 'artist' | 'album' | 'track';
+    artist: string;
+    name?: string;
+    image?: string;
+  }>({
+    isOpen: false,
+    type: 'track',
+    artist: ''
+  });
 
   // Followers & Following floating modal states
   const [showFollowModal, setShowFollowModal] = useState(false);
@@ -1150,19 +1163,14 @@ export const Profile: React.FC = () => {
     const handleProfileUpdate = () => {
       fetchProfileAndLibrary();
     };
-    const handleLanguageUpdate = () => {
-      fetchProfileAndLibrary();
-    };
 
     window.addEventListener('profile-updated', handleProfileUpdate);
     window.addEventListener('library-updated', handleProfileUpdate);
-    window.addEventListener('language-updated', handleLanguageUpdate);
     return () => {
       window.removeEventListener('profile-updated', handleProfileUpdate);
       window.removeEventListener('library-updated', handleProfileUpdate);
-      window.removeEventListener('language-updated', handleLanguageUpdate);
     };
-  }, [usernameParam, userIdParam, language]);
+  }, [usernameParam, userIdParam]);
 
 
   const fetchProfileAndLibrary = async () => {
@@ -1312,18 +1320,42 @@ export const Profile: React.FC = () => {
         });
       }
 
-      // 4. Fetch Last.fm data in background if connected
+      // 4. Fetch Last.fm data and prefetch top music in background if connected
       const targetLastfmUser = profileRes.data.lastfm_username;
       if (targetLastfmUser) {
         setIsLastFmLoading(true);
         const targetNpUrl = `/users/${targetId}/music/now-playing`;
         const targetTaUrl = `/users/${targetId}/music/top-albums`;
+        const targetArtistsUrl = `/users/${targetId}/music/top-artists?period=7day`;
+        const targetTracksUrl = `/users/${targetId}/music/top-tracks?period=7day`;
+        
         Promise.allSettled([
           apiClient.get(targetNpUrl),
-          apiClient.get(targetTaUrl)
-        ]).then(([npRes, taRes]) => {
-          setNowPlaying(npRes.status === 'fulfilled' ? npRes.value.data : null);
-          setTopAlbums(taRes.status === 'fulfilled' ? (taRes.value.data || []) : []);
+          apiClient.get(targetTaUrl),
+          apiClient.get(targetArtistsUrl),
+          apiClient.get(targetTracksUrl)
+        ]).then(([npRes, taRes, tartRes, ttrRes]) => {
+          const npData = npRes.status === 'fulfilled' ? npRes.value.data : null;
+          const taData = taRes.status === 'fulfilled' ? (taRes.value.data || []) : [];
+          const tartData = tartRes.status === 'fulfilled' ? (tartRes.value.data || []) : [];
+          const ttrData = ttrRes.status === 'fulfilled' ? (ttrRes.value.data || []) : [];
+          
+          setNowPlaying(npData);
+          setTopAlbums(taData);
+
+          // Populate music cache in background for 7day default
+          musicCacheRef.current[`${targetId}_albums_7day`] = taData;
+          musicCacheRef.current[`${targetId}_artists_7day`] = tartData;
+          musicCacheRef.current[`${targetId}_tracks_7day`] = ttrData;
+
+          // If current tab is music or if musicItems is empty, set current view items
+          if (musicType === 'artists' && tartData.length > 0) {
+            setMusicItems(tartData);
+          } else if (musicType === 'albums' && taData.length > 0) {
+            setMusicItems(taData);
+          } else if (musicType === 'tracks' && ttrData.length > 0) {
+            setMusicItems(ttrData);
+          }
         }).catch(() => {
           setNowPlaying(null);
           setTopAlbums([]);
@@ -1398,28 +1430,87 @@ export const Profile: React.FC = () => {
     };
   }, [profile?.lastfm_username, profile?.id]);
 
-  // Fetch dynamic music data according to selected type and period
+  const musicCacheRef = useRef<Record<string, any[]>>({});
+
+  // Fetch dynamic music data according to selected type and period with client cache
   useEffect(() => {
-    if (!profile?.lastfm_username || !profile?.id || activeTab !== 'music') return;
+    if (!profile?.lastfm_username || !profile?.id) return;
 
     const targetId = profile.id;
     let endpoint = 'top-albums';
     if (musicType === 'artists') endpoint = 'top-artists';
     if (musicType === 'tracks') endpoint = 'top-tracks';
 
+    const cacheKey = `${targetId}_${musicType}_${musicPeriod}`;
+    if (musicCacheRef.current[cacheKey]) {
+      const cachedItems = musicCacheRef.current[cacheKey];
+      setMusicItems(cachedItems);
+      setIsMusicDataLoading(false);
+
+      // Stagger prefetch details for top visible items in background
+      const prefetchList = cachedItems.slice(0, 8).map(item => ({
+        type: (musicType === 'artists' ? 'artist' : musicType === 'albums' ? 'album' : 'track') as 'artist' | 'album' | 'track',
+        artist: musicType === 'artists' ? item.name : item.artist,
+        name: musicType === 'artists' ? undefined : item.name
+      }));
+      batchPrefetchMusicItems(prefetchList, 8, 250);
+    } else {
+      if (activeTab === 'music') {
+        setIsMusicDataLoading(true);
+      }
+    }
+
     const url = `/users/${targetId}/music/${endpoint}?period=${musicPeriod}`;
 
-    setIsMusicDataLoading(true);
+    let isMounted = true;
     apiClient.get(url)
       .then(res => {
-        setMusicItems(Array.isArray(res.data) ? res.data : []);
+        if (!isMounted) return;
+        const items = Array.isArray(res.data) ? res.data : [];
+        musicCacheRef.current[cacheKey] = items;
+        setMusicItems(items);
+
+        // Stagger prefetch details for top visible items in background
+        const prefetchList = items.slice(0, 8).map(item => ({
+          type: (musicType === 'artists' ? 'artist' : musicType === 'albums' ? 'album' : 'track') as 'artist' | 'album' | 'track',
+          artist: musicType === 'artists' ? item.name : item.artist,
+          name: musicType === 'artists' ? undefined : item.name
+        }));
+        batchPrefetchMusicItems(prefetchList, 8, 250);
       })
       .catch(() => {
-        setMusicItems([]);
+        if (!isMounted) return;
+        if (!musicCacheRef.current[cacheKey]) {
+          setMusicItems([]);
+        }
       })
       .finally(() => {
-        setIsMusicDataLoading(false);
+        if (isMounted) {
+          setIsMusicDataLoading(false);
+        }
       });
+
+    // Background prefetch the other periods for this category so switching 7day -> 1month -> overall is instantaneous
+    const otherPeriods = (['7day', '1month', 'overall'] as const).filter(p => p !== musicPeriod);
+    otherPeriods.forEach((otherP, idx) => {
+      const otherKey = `${targetId}_${musicType}_${otherP}`;
+      if (!musicCacheRef.current[otherKey]) {
+        setTimeout(() => {
+          if (!isMounted) return;
+          apiClient.get(`/users/${targetId}/music/${endpoint}?period=${otherP}`)
+            .then(res => {
+              if (Array.isArray(res.data)) {
+                musicCacheRef.current[otherKey] = res.data;
+              }
+            })
+            .catch(() => {});
+        }, (idx + 1) * 350);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+    };
   }, [profile?.lastfm_username, profile?.id, activeTab, musicType, musicPeriod]);
 
   const handleLastFmLogin = () => {
@@ -2109,7 +2200,32 @@ export const Profile: React.FC = () => {
                   height: '76px',
                   minHeight: '76px',
                   maxHeight: '76px',
-                  boxSizing: 'border-box'
+                  boxSizing: 'border-box',
+                  cursor: nowPlaying ? 'pointer' : 'default',
+                  transition: 'all 0.2s ease'
+                }}
+                onClick={() => {
+                  if (nowPlaying) {
+                    setMusicDetailsModal({
+                      isOpen: true,
+                      type: 'track',
+                      artist: nowPlaying.artist,
+                      name: nowPlaying.name,
+                      image: nowPlaying.image
+                    });
+                  }
+                }}
+                onMouseEnter={(e) => {
+                  if (nowPlaying) {
+                    e.currentTarget.style.borderColor = 'rgba(29, 185, 84, 0.5)';
+                    e.currentTarget.style.background = 'rgba(29, 185, 84, 0.08)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (nowPlaying) {
+                    e.currentTarget.style.borderColor = 'var(--border-color)';
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                  }
                 }}
               >
                 {isLastFmLoading && !nowPlaying ? (
@@ -2160,16 +2276,12 @@ export const Profile: React.FC = () => {
                           language === 'es' ? 'Última canción escuchada' : 'Last Played'
                         )}
                       </span>
-                      <a 
-                        href={nowPlaying.url} 
-                        target="_blank" 
-                        rel="noopener noreferrer" 
+                      <div 
                         style={{ 
                           margin: '0.15rem 0', 
                           fontSize: '0.92rem', 
                           fontWeight: 600, 
                           color: 'var(--text-primary)', 
-                          textDecoration: 'none',
                           whiteSpace: 'nowrap',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
@@ -2179,7 +2291,7 @@ export const Profile: React.FC = () => {
                         title={nowPlaying.name}
                       >
                         {nowPlaying.name}
-                      </a>
+                      </div>
                       <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '260px', lineHeight: 1.2 }}>
                         {nowPlaying.artist}
                       </span>
@@ -2193,14 +2305,11 @@ export const Profile: React.FC = () => {
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                       <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase' }}>Last.fm</span>
-                      <a 
-                        href={`https://www.last.fm/user/${profile.lastfm_username}`} 
-                        target="_blank" 
-                        rel="noopener noreferrer" 
-                        style={{ fontSize: '0.85rem', color: 'var(--text-primary)', fontWeight: 500, textDecoration: 'none' }}
+                      <span 
+                        style={{ fontSize: '0.85rem', color: 'var(--text-primary)', fontWeight: 500 }}
                       >
                         @{profile.lastfm_username}
-                      </a>
+                      </span>
                     </div>
                   </div>
                 )}
@@ -4976,11 +5085,11 @@ export const Profile: React.FC = () => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', textAlign: 'left' }}>
           {/* Top Row: Content Type Selector (Left) and Period Selector (Right) */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.85rem' }}>
-            {/* Type selector: Álbumes, Artistas, Canciones */}
+            {/* Type selector: Artistas, Álbumes, Canciones */}
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
               {[
-                { id: 'albums', label: language === 'es' ? 'Álbumes' : 'Albums', icon: Disc },
                 { id: 'artists', label: language === 'es' ? 'Artistas' : 'Artists', icon: Mic },
+                { id: 'albums', label: language === 'es' ? 'Álbumes' : 'Albums', icon: Disc },
                 { id: 'tracks', label: language === 'es' ? 'Canciones' : 'Tracks', icon: Headphones }
               ].map(tab => {
                 const isSelected = musicType === tab.id;
@@ -5087,85 +5196,96 @@ export const Profile: React.FC = () => {
             </div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(195px, 1fr))', gap: '1.5rem' }}>
-              {musicItems.map((item, i) => (
-                <div
-                  key={`${item.name}-${i}`}
-                  className="glass-card"
-                  style={{
-                    padding: '1rem',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '0.75rem',
-                    position: 'relative',
-                    overflow: 'hidden',
-                    transition: 'transform 0.2s ease, border-color 0.2s ease'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-3px)';
-                    e.currentTarget.style.borderColor = 'rgba(29, 185, 84, 0.4)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.borderColor = 'var(--border-color)';
-                  }}
-                >
-                  {/* Position badge */}
-                  <span style={{
-                    position: 'absolute',
-                    top: '0.6rem',
-                    left: '0.6rem',
-                    zIndex: 2,
-                    background: 'rgba(0, 0, 0, 0.75)',
-                    color: '#ffffff',
-                    fontSize: '0.72rem',
-                    fontWeight: 700,
-                    padding: '0.15rem 0.45rem',
-                    borderRadius: '6px',
-                    backdropFilter: 'blur(4px)'
-                  }}>
-                    #{i + 1}
-                  </span>
+              {musicItems.map((item, i) => {
+                const itemArtist = musicType === 'artists' ? item.name : item.artist;
+                const itemName = musicType === 'artists' ? undefined : item.name;
+                const modalItemType = musicType === 'albums' ? 'album' : musicType === 'artists' ? 'artist' : 'track';
 
-                  {/* Artwork / Poster / Avatar */}
-                  <div style={{
-                    width: '100%',
-                    aspectRatio: '1/1',
-                    borderRadius: musicType === 'artists' ? '50%' : '8px',
-                    overflow: 'hidden',
-                    background: 'var(--bg-tertiary)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    margin: musicType === 'artists' ? '0.5rem auto 0 auto' : '0',
-                    maxWidth: musicType === 'artists' ? '140px' : '100%',
-                    boxShadow: musicType === 'artists' ? '0 4px 12px rgba(0,0,0,0.3)' : undefined
-                  }}>
-                    {item.image ? (
-                      <img
-                        src={item.image}
-                        alt={item.name}
-                        referrerPolicy="no-referrer"
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none';
-                        }}
-                      />
-                    ) : (
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', color: 'var(--color-music, #1DB954)', opacity: 0.6 }}>
-                        {musicType === 'artists' ? <Mic size={36} /> : musicType === 'tracks' ? <Headphones size={36} /> : <Disc size={36} />}
-                      </div>
-                    )}
-                  </div>
+                return (
+                  <div
+                    key={`${item.name}-${i}`}
+                    className="glass-card"
+                    onClick={() => {
+                      setMusicDetailsModal({
+                        isOpen: true,
+                        type: modalItemType,
+                        artist: itemArtist,
+                        name: itemName,
+                        image: item.image
+                      });
+                    }}
+                    style={{
+                      padding: '1rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.75rem',
+                      position: 'relative',
+                      overflow: 'hidden',
+                      cursor: 'pointer',
+                      transition: 'transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-4px)';
+                      e.currentTarget.style.borderColor = 'rgba(29, 185, 84, 0.5)';
+                      e.currentTarget.style.boxShadow = '0 8px 24px rgba(29, 185, 84, 0.15)';
+                      prefetchMusicDetails(modalItemType, itemArtist, itemName);
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.borderColor = 'var(--border-color)';
+                      e.currentTarget.style.boxShadow = 'none';
+                    }}
+                  >
+                    {/* Position badge */}
+                    <span style={{
+                      position: 'absolute',
+                      top: '0.6rem',
+                      left: '0.6rem',
+                      zIndex: 2,
+                      background: 'rgba(0, 0, 0, 0.75)',
+                      color: '#ffffff',
+                      fontSize: '0.72rem',
+                      fontWeight: 700,
+                      padding: '0.15rem 0.45rem',
+                      borderRadius: '6px',
+                      backdropFilter: 'blur(4px)'
+                    }}>
+                      #{i + 1}
+                    </span>
 
-                  {/* Text details */}
-                  <div style={{ flex: 1, minWidth: 0, textAlign: musicType === 'artists' ? 'center' : 'left' }}>
-                    <a
-                      href={item.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{ textDecoration: 'none' }}
-                      title={item.name}
-                    >
+                    {/* Artwork / Poster / Avatar */}
+                    <div style={{
+                      width: '100%',
+                      aspectRatio: '1/1',
+                      borderRadius: musicType === 'artists' ? '50%' : '8px',
+                      overflow: 'hidden',
+                      background: 'var(--bg-tertiary)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      margin: musicType === 'artists' ? '0.5rem auto 0 auto' : '0',
+                      maxWidth: musicType === 'artists' ? '140px' : '100%',
+                      boxShadow: musicType === 'artists' ? '0 4px 12px rgba(0,0,0,0.3)' : undefined
+                    }}>
+                      {item.image ? (
+                        <img
+                          src={item.image}
+                          alt={item.name}
+                          referrerPolicy="no-referrer"
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', color: 'var(--color-music, #1DB954)', opacity: 0.6 }}>
+                          {musicType === 'artists' ? <Mic size={36} /> : musicType === 'tracks' ? <Headphones size={36} /> : <Disc size={36} />}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Text details */}
+                    <div style={{ flex: 1, minWidth: 0, textAlign: musicType === 'artists' ? 'center' : 'left' }}>
                       <h4 style={{
                         margin: '0 0 0.2rem 0',
                         color: 'var(--text-primary)',
@@ -5173,40 +5293,40 @@ export const Profile: React.FC = () => {
                         whiteSpace: 'nowrap',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis'
-                      }}>
+                      }} title={item.name}>
                         {item.name}
                       </h4>
-                    </a>
-                    {item.artist && (
-                      <span style={{
-                        fontSize: '0.82rem',
-                        color: 'var(--text-secondary)',
-                        display: 'block',
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis'
-                      }} title={item.artist}>
-                        {item.artist}
-                      </span>
-                    )}
-                  </div>
+                      {item.artist && (
+                        <span style={{
+                          fontSize: '0.82rem',
+                          color: 'var(--text-secondary)',
+                          display: 'block',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis'
+                        }} title={item.artist}>
+                          {item.artist}
+                        </span>
+                      )}
+                    </div>
 
-                  {/* Playcount Badge */}
-                  <div style={{ display: 'flex', justifyContent: musicType === 'artists' ? 'center' : 'flex-start' }}>
-                    <span style={{
-                      fontSize: '0.72rem',
-                      fontWeight: 600,
-                      background: 'rgba(29, 185, 84, 0.12)',
-                      color: 'var(--color-music, #1DB954)',
-                      padding: '0.2rem 0.55rem',
-                      borderRadius: '4px',
-                      border: '1px solid rgba(29, 185, 84, 0.25)'
-                    }}>
-                      {item.playcount} {language === 'es' ? 'reproducciones' : 'plays'}
-                    </span>
+                    {/* Playcount Badge */}
+                    <div style={{ display: 'flex', justifyContent: musicType === 'artists' ? 'center' : 'flex-start' }}>
+                      <span style={{
+                        fontSize: '0.72rem',
+                        fontWeight: 600,
+                        background: 'rgba(29, 185, 84, 0.12)',
+                        color: 'var(--color-music, #1DB954)',
+                        padding: '0.2rem 0.55rem',
+                        borderRadius: '4px',
+                        border: '1px solid rgba(29, 185, 84, 0.25)'
+                      }}>
+                        {item.playcount} {language === 'es' ? 'reproducciones' : 'plays'}
+                      </span>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -5687,6 +5807,16 @@ export const Profile: React.FC = () => {
       <MusicServiceGuideModal
         isOpen={showMusicGuideModal}
         onClose={() => setShowMusicGuideModal(false)}
+      />
+
+      {/* Music Item Details Modal */}
+      <MusicDetailsModal
+        isOpen={musicDetailsModal.isOpen}
+        onClose={() => setMusicDetailsModal(prev => ({ ...prev, isOpen: false }))}
+        type={musicDetailsModal.type}
+        artist={musicDetailsModal.artist}
+        name={musicDetailsModal.name}
+        initialImage={musicDetailsModal.image}
       />
     </div>
   );

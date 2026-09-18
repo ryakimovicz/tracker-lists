@@ -13,6 +13,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# Trigger reload for fresh service caches
 Base.metadata.create_all(bind=engine)
 
 def auto_migrate_schema():

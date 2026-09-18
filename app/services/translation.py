@@ -22,33 +22,70 @@ def get_or_create_translation(db: Session, text: str, target_lang: str = 'es') -
         TranslationCache.target_language == target_lang
     ).first()
     
-    if cached:
+    if cached and cached.translated_text and cached.translated_text.strip() != text.strip():
         return cached.translated_text
         
+    translated = ""
+
+    # Strategy 1: clients5.google.com (Fast, reliable, doesn't hit 429)
     try:
-        # Translate using Google Translate backend via deep-translator
-        # Source is auto-detected
-        translator = GoogleTranslator(source='auto', target=target_lang)
-        
-        # deep-translator has a 5000 chars limit per chunk, so we split if necessary
-        # However, for descriptions, it's rarely > 5000 chars.
-        if len(text) > 4900:
-            # We could chunk it, but for a simple description this is enough
-            translated = translator.translate(text[:4900])
-        else:
-            translated = translator.translate(text)
-            
-        # Save to cache
-        new_cache = TranslationCache(
-            text_hash=text_hash,
-            translated_text=translated,
-            target_language=target_lang
-        )
-        db.add(new_cache)
-        db.commit()
-        
-        return translated
+        import urllib.request
+        import urllib.parse
+        import json
+        clean_text = text[:4500]
+        url = f"https://clients5.google.com/translate_a/t?client=dict-chrome-ex&sl=auto&tl={urllib.parse.quote(target_lang)}&q={urllib.parse.quote(clean_text)}"
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
+        with urllib.request.urlopen(req, timeout=5) as res:
+            if res.status == 200:
+                data = json.loads(res.read().decode('utf-8'))
+                if isinstance(data, list):
+                    if len(data) > 0 and isinstance(data[0], list) and len(data[0]) > 0:
+                        translated = data[0][0]
+                    elif len(data) > 0 and isinstance(data[0], str):
+                        translated = data[0]
     except Exception as e:
-        print(f"Translation error: {e}")
-        # If translation fails, return original text
+        pass
+
+    # Strategy 2: deep-translator
+    if not translated or translated.strip() == text.strip():
+        try:
+            translator = GoogleTranslator(source='auto', target=target_lang)
+            translated = translator.translate(text[:4500])
+        except Exception:
+            pass
+
+    # Strategy 3: translate.googleapis.com (gtx)
+    if not translated or translated.strip() == text.strip():
+        try:
+            import urllib.request
+            import urllib.parse
+            import json
+            url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl={urllib.parse.quote(target_lang)}&dt=t&q={urllib.parse.quote(text[:4500])}"
+            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
+            with urllib.request.urlopen(req, timeout=5) as res:
+                if res.status == 200:
+                    data = json.loads(res.read().decode('utf-8'))
+                    if data and isinstance(data, list) and len(data) > 0 and isinstance(data[0], list):
+                        translated = "".join([part[0] for part in data[0] if part and isinstance(part, list) and len(part) > 0 and part[0]])
+        except Exception:
+            pass
+
+    if not translated or translated.strip() == text.strip():
         return text
+
+    # Save valid translation to cache (or update existing)
+    try:
+        if cached:
+            cached.translated_text = translated
+        else:
+            new_cache = TranslationCache(
+                text_hash=text_hash,
+                translated_text=translated,
+                target_language=target_lang
+            )
+            db.add(new_cache)
+        db.commit()
+    except Exception:
+        db.rollback()
+        
+    return translated

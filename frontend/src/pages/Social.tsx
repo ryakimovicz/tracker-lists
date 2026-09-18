@@ -40,15 +40,7 @@ export const Social: React.FC = () => {
       }
     };
     fetchSocial();
-
-    const handleLanguageUpdate = () => {
-      fetchSocial();
-    };
-    window.addEventListener('language-updated', handleLanguageUpdate);
-    return () => {
-      window.removeEventListener('language-updated', handleLanguageUpdate);
-    };
-  }, [language]);
+  }, []);
 
   if (loading) {
     return <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>Cargando actividad...</div>;
