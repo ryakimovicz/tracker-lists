@@ -171,9 +171,67 @@ class LastFMService:
                 return cls._cache_top_albums[cache_key][1]
         return albums
 
+    # Image enrichment cache: query -> image_url
+    _cache_artist_images: Dict[str, str] = {}
+    _cache_track_images: Dict[str, str] = {}
+
+    @classmethod
+    def _fetch_artist_image(cls, artist_name: str) -> str:
+        """Fetches artist picture from Deezer API as fallback"""
+        if not artist_name:
+            return ""
+        key = artist_name.strip().lower()
+        if key in cls._cache_artist_images:
+            return cls._cache_artist_images[key]
+        try:
+            q = urllib.parse.quote(artist_name.strip())
+            url = f"https://api.deezer.com/search/artist?q={q}&limit=1"
+            headers = {"User-Agent": "PathdApp/1.0"}
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req, timeout=3) as response:
+                if response.status == 200:
+                    data = json.loads(response.read().decode())
+                    artists = data.get("data", [])
+                    if artists:
+                        img = artists[0].get("picture_xl") or artists[0].get("picture_big") or artists[0].get("picture_medium") or ""
+                        cls._cache_artist_images[key] = img
+                        return img
+        except Exception:
+            pass
+        cls._cache_artist_images[key] = ""
+        return ""
+
+    @classmethod
+    def _fetch_track_image(cls, track_name: str, artist_name: str) -> str:
+        """Fetches track cover artwork from Deezer API as fallback"""
+        if not track_name:
+            return ""
+        query_str = f"{artist_name} {track_name}".strip() if artist_name else track_name.strip()
+        key = query_str.lower()
+        if key in cls._cache_track_images:
+            return cls._cache_track_images[key]
+        try:
+            q = urllib.parse.quote(query_str)
+            url = f"https://api.deezer.com/search/track?q={q}&limit=1"
+            headers = {"User-Agent": "PathdApp/1.0"}
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req, timeout=3) as response:
+                if response.status == 200:
+                    data = json.loads(response.read().decode())
+                    tracks = data.get("data", [])
+                    if tracks:
+                        album = tracks[0].get("album", {})
+                        img = album.get("cover_xl") or album.get("cover_big") or album.get("cover_medium") or ""
+                        cls._cache_track_images[key] = img
+                        return img
+        except Exception:
+            pass
+        cls._cache_track_images[key] = ""
+        return ""
+
     @classmethod
     def get_top_artists(cls, username: str, period: str = "7day", limit: int = 10) -> List[Dict[str, Any]]:
-        """Gets the user's top artists for a given period (7day, 1month, overall)"""
+        """Gets the user's top artists for a given period (7day, 1month, overall) with fallback image enrichment"""
         if not cls.API_KEY or not username:
             return []
 
@@ -211,8 +269,13 @@ class LastFMService:
                             if img.get("size") == "extralarge" or img.get("size") == "large":
                                 image = img.get("#text")
                         
+                        artist_name = artist.get("name", "")
+                        # Enrich image if LastFM provided empty image
+                        if not image and artist_name:
+                            image = cls._fetch_artist_image(artist_name)
+
                         artists.append({
-                            "name": artist.get("name"),
+                            "name": artist_name,
                             "playcount": artist.get("playcount"),
                             "image": image,
                             "url": artist.get("url")
@@ -227,7 +290,7 @@ class LastFMService:
 
     @classmethod
     def get_top_tracks(cls, username: str, period: str = "7day", limit: int = 10) -> List[Dict[str, Any]]:
-        """Gets the user's top tracks for a given period (7day, 1month, overall)"""
+        """Gets the user's top tracks for a given period (7day, 1month, overall) with fallback image enrichment"""
         if not cls.API_KEY or not username:
             return []
 
@@ -265,9 +328,16 @@ class LastFMService:
                             if img.get("size") == "extralarge" or img.get("size") == "large":
                                 image = img.get("#text")
                         
+                        track_name = track.get("name", "")
+                        artist_name = track.get("artist", {}).get("name", "")
+
+                        # Enrich image if LastFM provided empty image
+                        if not image and track_name:
+                            image = cls._fetch_track_image(track_name, artist_name)
+
                         tracks.append({
-                            "name": track.get("name"),
-                            "artist": track.get("artist", {}).get("name"),
+                            "name": track_name,
+                            "artist": artist_name,
                             "playcount": track.get("playcount"),
                             "image": image,
                             "url": track.get("url")
