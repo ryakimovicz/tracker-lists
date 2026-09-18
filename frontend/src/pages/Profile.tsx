@@ -2414,7 +2414,7 @@ export const Profile: React.FC = () => {
           ) : (
             <BookOpen size={18} strokeWidth={1.8} />
           )}
-          <span>{language === 'es' ? 'Mis Guías' : 'My Guides'}</span>
+          <span>{language === 'es' ? 'Guías' : 'Guides'}</span>
         </button>
 
         <button
