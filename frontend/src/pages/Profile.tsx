@@ -3975,9 +3975,8 @@ export const Profile: React.FC = () => {
       )}
 
       {activeTab === 'favorites' && (
-        <div ref={favoritesContainerRef} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', textAlign: 'left' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-            <h3 style={{ margin: 0 }}>{language === 'es' ? 'Mis Obras Destacadas' : 'My Featured Favorites'}</h3>
+        <div ref={favoritesContainerRef} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', textAlign: 'left' }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', width: '100%' }}>
             <span style={{
               fontSize: '0.8rem',
               fontWeight: 600,
