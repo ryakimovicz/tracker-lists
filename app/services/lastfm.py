@@ -116,6 +116,102 @@ class LastFMService:
                 return cls._cache_now_playing[cache_key][1]
         return None
 
+    # Image enrichment cache: query -> image_url
+    _cache_artist_images: Dict[str, str] = {}
+    _cache_track_images: Dict[str, str] = {}
+    _cache_album_images: Dict[str, str] = {}
+
+    @classmethod
+    def _is_placeholder_or_empty(cls, img_url: Optional[str]) -> bool:
+        """Returns True if the image URL is empty or LastFM's generic placeholder star/asset"""
+        if not img_url or not isinstance(img_url, str) or not img_url.strip():
+            return True
+        # Known Last.fm placeholder hash & defaults
+        if "2a96cbd8b46e442fc41c2b86b821562f" in img_url or "default_album" in img_url or "default_artist" in img_url:
+            return True
+        return False
+
+    @classmethod
+    def _fetch_artist_image(cls, artist_name: str) -> str:
+        """Fetches artist picture from Deezer API as fallback"""
+        if not artist_name:
+            return ""
+        key = artist_name.strip().lower()
+        if key in cls._cache_artist_images:
+            return cls._cache_artist_images[key]
+        try:
+            q = urllib.parse.quote(artist_name.strip())
+            url = f"https://api.deezer.com/search/artist?q={q}&limit=1"
+            headers = {"User-Agent": "PathdApp/1.0"}
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req, timeout=3) as response:
+                if response.status == 200:
+                    data = json.loads(response.read().decode())
+                    artists = data.get("data", [])
+                    if artists:
+                        img = artists[0].get("picture_xl") or artists[0].get("picture_big") or artists[0].get("picture_medium") or ""
+                        cls._cache_artist_images[key] = img
+                        return img
+        except Exception:
+            pass
+        cls._cache_artist_images[key] = ""
+        return ""
+
+    @classmethod
+    def _fetch_track_image(cls, track_name: str, artist_name: str) -> str:
+        """Fetches track cover artwork (from its album) via Deezer API as fallback"""
+        if not track_name:
+            return ""
+        query_str = f"{artist_name} {track_name}".strip() if artist_name else track_name.strip()
+        key = query_str.lower()
+        if key in cls._cache_track_images:
+            return cls._cache_track_images[key]
+        try:
+            q = urllib.parse.quote(query_str)
+            url = f"https://api.deezer.com/search/track?q={q}&limit=1"
+            headers = {"User-Agent": "PathdApp/1.0"}
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req, timeout=3) as response:
+                if response.status == 200:
+                    data = json.loads(response.read().decode())
+                    tracks = data.get("data", [])
+                    if tracks:
+                        album = tracks[0].get("album", {})
+                        img = album.get("cover_xl") or album.get("cover_big") or album.get("cover_medium") or ""
+                        cls._cache_track_images[key] = img
+                        return img
+        except Exception:
+            pass
+        cls._cache_track_images[key] = ""
+        return ""
+
+    @classmethod
+    def _fetch_album_image(cls, album_name: str, artist_name: str) -> str:
+        """Fetches album cover artwork from Deezer API as fallback"""
+        if not album_name:
+            return ""
+        query_str = f"{artist_name} {album_name}".strip() if artist_name else album_name.strip()
+        key = query_str.lower()
+        if key in cls._cache_album_images:
+            return cls._cache_album_images[key]
+        try:
+            q = urllib.parse.quote(query_str)
+            url = f"https://api.deezer.com/search/album?q={q}&limit=1"
+            headers = {"User-Agent": "PathdApp/1.0"}
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req, timeout=3) as response:
+                if response.status == 200:
+                    data = json.loads(response.read().decode())
+                    albums = data.get("data", [])
+                    if albums:
+                        img = albums[0].get("cover_xl") or albums[0].get("cover_big") or albums[0].get("cover_medium") or ""
+                        cls._cache_album_images[key] = img
+                        return img
+        except Exception:
+            pass
+        cls._cache_album_images[key] = ""
+        return ""
+
     @classmethod
     def get_top_albums(cls, username: str, period: str = "7day", limit: int = 10) -> List[Dict[str, Any]]:
         """Gets the user's top albums for a given period (7day, 1month, overall)"""
@@ -156,9 +252,14 @@ class LastFMService:
                             if img.get("size") == "extralarge" or img.get("size") == "large":
                                 image = img.get("#text")
                         
+                        album_name = album.get("name", "")
+                        artist_name = album.get("artist", {}).get("name", "")
+                        if cls._is_placeholder_or_empty(image) and album_name:
+                            image = cls._fetch_album_image(album_name, artist_name)
+
                         albums.append({
-                            "name": album.get("name"),
-                            "artist": album.get("artist", {}).get("name"),
+                            "name": album_name,
+                            "artist": artist_name,
                             "playcount": album.get("playcount"),
                             "image": image,
                             "url": album.get("url")
@@ -170,64 +271,6 @@ class LastFMService:
             if cache_key in cls._cache_top_albums:
                 return cls._cache_top_albums[cache_key][1]
         return albums
-
-    # Image enrichment cache: query -> image_url
-    _cache_artist_images: Dict[str, str] = {}
-    _cache_track_images: Dict[str, str] = {}
-
-    @classmethod
-    def _fetch_artist_image(cls, artist_name: str) -> str:
-        """Fetches artist picture from Deezer API as fallback"""
-        if not artist_name:
-            return ""
-        key = artist_name.strip().lower()
-        if key in cls._cache_artist_images:
-            return cls._cache_artist_images[key]
-        try:
-            q = urllib.parse.quote(artist_name.strip())
-            url = f"https://api.deezer.com/search/artist?q={q}&limit=1"
-            headers = {"User-Agent": "PathdApp/1.0"}
-            req = urllib.request.Request(url, headers=headers)
-            with urllib.request.urlopen(req, timeout=3) as response:
-                if response.status == 200:
-                    data = json.loads(response.read().decode())
-                    artists = data.get("data", [])
-                    if artists:
-                        img = artists[0].get("picture_xl") or artists[0].get("picture_big") or artists[0].get("picture_medium") or ""
-                        cls._cache_artist_images[key] = img
-                        return img
-        except Exception:
-            pass
-        cls._cache_artist_images[key] = ""
-        return ""
-
-    @classmethod
-    def _fetch_track_image(cls, track_name: str, artist_name: str) -> str:
-        """Fetches track cover artwork from Deezer API as fallback"""
-        if not track_name:
-            return ""
-        query_str = f"{artist_name} {track_name}".strip() if artist_name else track_name.strip()
-        key = query_str.lower()
-        if key in cls._cache_track_images:
-            return cls._cache_track_images[key]
-        try:
-            q = urllib.parse.quote(query_str)
-            url = f"https://api.deezer.com/search/track?q={q}&limit=1"
-            headers = {"User-Agent": "PathdApp/1.0"}
-            req = urllib.request.Request(url, headers=headers)
-            with urllib.request.urlopen(req, timeout=3) as response:
-                if response.status == 200:
-                    data = json.loads(response.read().decode())
-                    tracks = data.get("data", [])
-                    if tracks:
-                        album = tracks[0].get("album", {})
-                        img = album.get("cover_xl") or album.get("cover_big") or album.get("cover_medium") or ""
-                        cls._cache_track_images[key] = img
-                        return img
-        except Exception:
-            pass
-        cls._cache_track_images[key] = ""
-        return ""
 
     @classmethod
     def get_top_artists(cls, username: str, period: str = "7day", limit: int = 10) -> List[Dict[str, Any]]:
@@ -270,8 +313,8 @@ class LastFMService:
                                 image = img.get("#text")
                         
                         artist_name = artist.get("name", "")
-                        # Enrich image if LastFM provided empty image
-                        if not image and artist_name:
+                        # Enrich image if LastFM provided empty or placeholder image
+                        if cls._is_placeholder_or_empty(image) and artist_name:
                             image = cls._fetch_artist_image(artist_name)
 
                         artists.append({
@@ -331,8 +374,8 @@ class LastFMService:
                         track_name = track.get("name", "")
                         artist_name = track.get("artist", {}).get("name", "")
 
-                        # Enrich image if LastFM provided empty image
-                        if not image and track_name:
+                        # Enrich image if LastFM provided empty or placeholder image
+                        if cls._is_placeholder_or_empty(image) and track_name:
                             image = cls._fetch_track_image(track_name, artist_name)
 
                         tracks.append({

@@ -5144,6 +5144,7 @@ export const Profile: React.FC = () => {
                       <img
                         src={item.image}
                         alt={item.name}
+                        referrerPolicy="no-referrer"
                         style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                         onError={(e) => {
                           e.currentTarget.style.display = 'none';
