@@ -44,10 +44,18 @@ def rate_list(
         ListVote.list_id == list_id
     ).first()
 
+    from app.services.activity_service import ActivityService
+
     if rating_in.rating is None or rating_in.rating <= 0:
         if vote:
             db.delete(vote)
             db.commit()
+            ActivityService.delete_activity(
+                db=db,
+                user_id=current_user.id,
+                activity_type="guide_rated",
+                list_id=list_id
+            )
     else:
         if vote:
             vote.rating = rating_in.rating
@@ -55,7 +63,9 @@ def rate_list(
             vote = ListVote(user_id=current_user.id, list_id=list_id, rating=rating_in.rating)
             db.add(vote)
         
-        activity = UserActivityLog(
+        db.commit()
+        ActivityService.record_activity(
+            db=db,
             user_id=current_user.id,
             activity_type="guide_rated",
             item_title=reading_list.title,
@@ -63,8 +73,6 @@ def rate_list(
             list_id=reading_list.id,
             details=str(rating_in.rating)
         )
-        db.add(activity)
-        db.commit()
 
     all_votes = db.query(ListVote).filter(ListVote.list_id == list_id, ListVote.rating != None).all()
     total = len(all_votes)
@@ -185,19 +193,21 @@ def add_comment(
         content=comment_in.content
     )
     db.add(new_comment)
-    
-    # Record activity log
-    activity = UserActivityLog(
-            user_id=current_user.id,
-            activity_type="guide_commented",
-            item_title=reading_list.title,
-            item_type="guide",
-            list_id=reading_list.id,
-            details=comment_in.content[:100]
-        )
-    db.add(activity)
     db.commit()
     db.refresh(new_comment)
+
+    # Record activity log
+    from app.services.activity_service import ActivityService
+    ActivityService.record_activity(
+        db=db,
+        user_id=current_user.id,
+        activity_type="guide_commented",
+        item_title=reading_list.title,
+        item_type="guide",
+        list_id=reading_list.id,
+        entity_id=str(new_comment.id),
+        details=comment_in.content[:100]
+    )
     
     return CommentResponse(
         id=new_comment.id,
@@ -268,6 +278,14 @@ def delete_comment(
         
     db.delete(comment)
     db.commit()
+
+    from app.services.activity_service import ActivityService
+    ActivityService.delete_activity(
+        db=db,
+        user_id=comment.user_id,
+        activity_type="guide_commented",
+        entity_id=str(comment_id)
+    )
     return None
 
 @router.post("/lists/{list_id}/comments/{comment_id}/vote", status_code=status.HTTP_200_OK)
@@ -337,14 +355,32 @@ def toggle_follow_user(
         Follow.followed_id == user_id
     ).first()
     
+    from app.services.activity_service import ActivityService
+
     if follow:
         db.delete(follow)
         db.commit()
+        ActivityService.delete_activity(
+            db=db,
+            user_id=current_user.id,
+            activity_type="user_followed",
+            entity_id=str(user_id)
+        )
         return {"following": False}
     else:
         new_follow = Follow(follower_id=current_user.id, followed_id=user_id)
         db.add(new_follow)
         db.commit()
+        ActivityService.record_activity(
+            db=db,
+            user_id=current_user.id,
+            activity_type="user_followed",
+            item_title=target_user.username,
+            item_type="user",
+            entity_id=str(user_id),
+            image_url=target_user.photo_url,
+            details="followed"
+        )
         return {"following": True}
 
 @router.get("/users/{user_id}/followers", response_model=List[UserResponse])

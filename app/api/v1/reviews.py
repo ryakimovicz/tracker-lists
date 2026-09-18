@@ -147,13 +147,34 @@ def delete_review_or_comment(
     if review.user_id != current_user.id and not current_user.is_admin:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to delete this comment")
 
+    from app.services.activity_service import ActivityService
+
     # If it is a top-level review that still has a star rating, keep the rating but clear the comment text
     if review.parent_id is None and review.rating is not None and review.rating > 0:
         review.content = None
         db.commit()
+        # Remove the review text activity log, keeping rating if any
+        ActivityService.delete_activity(
+            db=db,
+            user_id=review.user_id,
+            activity_type="item_reviewed",
+            entity_id=str(review_id)
+        )
     else:
         db.delete(review)
         db.commit()
+        ActivityService.delete_activity(
+            db=db,
+            user_id=review.user_id,
+            activity_type="item_reviewed",
+            entity_id=str(review_id)
+        )
+        ActivityService.delete_activity(
+            db=db,
+            user_id=review.user_id,
+            activity_type="item_rated",
+            entity_id=str(review_id)
+        )
     return None
 
 @router.get("/{item_type}/{external_id}", response_model=List[MediaReviewResponse])
@@ -257,18 +278,21 @@ def create_or_update_review(
         )
         db.add(reply_review)
 
-        if review_in.content and review_in.content.strip():
-            activity_comment = UserActivityLog(
-                user_id=current_user.id,
-                activity_type="item_commented",
-                item_title=resolved_title,
-                item_type=item_type_lower,
-                details=review_in.content[:100]
-            )
-            db.add(activity_comment)
-
         db.commit()
         db.refresh(reply_review)
+
+        if review_in.content and review_in.content.strip():
+            from app.services.activity_service import ActivityService
+            ActivityService.record_activity(
+                db=db,
+                user_id=current_user.id,
+                activity_type="item_reviewed",
+                item_title=resolved_title,
+                item_type=item_type_lower,
+                external_id=external_id,
+                entity_id=str(reply_review.id),
+                details=review_in.content[:100]
+            )
 
         return MediaReviewResponse(
             id=reply_review.id,
@@ -332,28 +356,34 @@ def create_or_update_review(
         )
         db.add(review)
 
+    db.commit()
+    db.refresh(review)
+
+    from app.services.activity_service import ActivityService
+
     if review_in.rating is not None and review_in.rating > 0:
-        activity_rating = UserActivityLog(
+        ActivityService.record_activity(
+            db=db,
             user_id=current_user.id,
             activity_type="item_rated",
             item_title=resolved_title,
             item_type=item_type_lower,
+            external_id=external_id,
+            entity_id=str(review.id),
             details=str(review_in.rating)
         )
-        db.add(activity_rating)
 
     if review_in.content and review_in.content.strip():
-        activity_comment = UserActivityLog(
+        ActivityService.record_activity(
+            db=db,
             user_id=current_user.id,
-            activity_type="item_commented",
+            activity_type="item_reviewed",
             item_title=resolved_title,
             item_type=item_type_lower,
+            external_id=external_id,
+            entity_id=str(review.id),
             details=review_in.content[:100]
         )
-        db.add(activity_comment)
-
-    db.commit()
-    db.refresh(review)
 
     # Return with mapped fields
     votes_count = db.query(MediaReviewVote).filter(MediaReviewVote.review_id == review.id).count()

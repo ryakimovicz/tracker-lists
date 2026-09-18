@@ -80,13 +80,27 @@ export const Social: React.FC = () => {
 
             let actionText = "realizó una acción en";
             
-            if (item.activity_type.startsWith("shelf_")) actionText = "actualizó su estantería con";
-            if (item.activity_type === "shelf_add") actionText = "agregó a su biblioteca";
-            if (item.activity_type === "shelf_favorite") actionText = "marcó como favorito a";
-            if (item.activity_type === "item_completed") { actionText = "marcó como completado"; }
-            if (item.activity_type === "guide_created") { actionText = "creó una nueva guía"; }
-            if (item.activity_type === "guide_followed") { actionText = "empezó a seguir la guía"; }
-            if (item.activity_type === "item_added") { actionText = "agregó un elemento a la guía"; }
+            if (item.activity_type === "account_created") actionText = "creó su cuenta en Pathd";
+            else if (item.activity_type === "avatar_changed") actionText = "actualizó su foto de perfil";
+            else if (item.activity_type === "banner_changed") actionText = "actualizó su portada de perfil";
+            else if (item.activity_type === "background_changed") actionText = "actualizó su fondo de perfil";
+            else if (item.activity_type === "username_changed") actionText = "cambió su nombre de usuario";
+            else if (item.activity_type === "lastfm_connected") actionText = "conectó su cuenta de Last.fm";
+            else if (item.activity_type === "item_added_to_library" || item.activity_type === "shelf_add") actionText = "agregó a su biblioteca";
+            else if (item.activity_type === "item_favorited" || item.activity_type === "shelf_favorite") actionText = "destacó en su perfil a";
+            else if (item.activity_type === "user_followed") actionText = "comenzó a seguir a";
+            else if (item.activity_type === "item_rated") actionText = `calificó con ${item.details || ''}★ a`;
+            else if (item.activity_type === "guide_rated") actionText = `calificó con ${item.details || ''}★ la guía`;
+            else if (item.activity_type === "item_reviewed") actionText = "escribió una reseña en";
+            else if (item.activity_type === "guide_commented") actionText = "comentó en la guía";
+            else if (item.activity_type === "social_commented") actionText = "comentó en";
+            else if (item.activity_type === "guide_review_commented") actionText = "comentó en la reseña de";
+            else if (item.activity_type === "guide_created") actionText = "creó una nueva guía:";
+            else if (item.activity_type === "guide_edited") actionText = "editó la guía:";
+            else if (item.activity_type === "guide_followed") actionText = "empezó a seguir la guía:";
+            else if (item.activity_type === "item_status_changed" || item.activity_type === "item_completed") {
+              actionText = "actualizó su progreso en";
+            }
             
             return (
             <div 

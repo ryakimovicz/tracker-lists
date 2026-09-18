@@ -114,6 +114,22 @@ def auto_migrate_schema():
                 except Exception as e:
                     logger.warning(f"Auto-migration: Failed to add column 'is_hundred_percent' to consumption_history: {e}")
 
+        if "user_activity_logs" in inspector.get_table_names():
+            existing_act_cols = {col["name"] for col in inspector.get_columns("user_activity_logs")}
+            act_cols_to_add = [
+                ("entity_id", "VARCHAR(100)"),
+                ("metadata_json", "VARCHAR(2000)"),
+                ("updated_at", "TIMESTAMP"),
+            ]
+            for col_name, col_type in act_cols_to_add:
+                if col_name not in existing_act_cols:
+                    try:
+                        with engine.begin() as conn:
+                            conn.execute(text(f"ALTER TABLE user_activity_logs ADD COLUMN {col_name} {col_type};"))
+                        logger.info(f"Auto-migration: Added column '{col_name}' to user_activity_logs table.")
+                    except Exception as e:
+                        logger.warning(f"Auto-migration: Failed to add column '{col_name}' to user_activity_logs: {e}")
+
         if "media_reviews" in inspector.get_table_names():
             existing_rev_cols = {col["name"] for col in inspector.get_columns("media_reviews")}
             rev_cols_to_add = [

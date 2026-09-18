@@ -195,18 +195,19 @@ def create_list(
     # Automatically follow/save the newly created guide for the creator
     saved = SavedList(user_id=current_user.id, list_id=new_list.id)
     db.add(saved)
+    db.commit()
 
     # Record activity log
-    activity = UserActivityLog(
-            user_id=current_user.id,
-            activity_type="guide_created",
-            item_title=new_list.title,
-            item_type="guide",
-            list_id=new_list.id,
-            details="created"
-        )
-    db.add(activity)
-    db.commit()
+    from app.services.activity_service import ActivityService
+    ActivityService.record_activity(
+        db=db,
+        user_id=current_user.id,
+        activity_type="guide_created",
+        item_title=new_list.title,
+        item_type="guide",
+        list_id=new_list.id,
+        details="created"
+    )
 
     return new_list
 
@@ -541,83 +542,18 @@ def update_list(
     db.commit()
     db.refresh(reading_list)
 
-    # Log activity only on explicit publish or title change
-    title_changed = "title" in update_data and old_title != update_data["title"]
-    visibility_changed = "visibility" in update_data and old_visibility != update_data["visibility"]
-    
-    if title_changed or visibility_changed:
-        act_type = "guide_updated"
-        if old_visibility == VisibilityEnum.DRAFT and reading_list.visibility in (VisibilityEnum.PUBLIC, VisibilityEnum.PRIVATE):
-            act_type = "guide_published"
+    from app.services.activity_service import ActivityService
 
-        activity = UserActivityLog(
-            user_id=current_user.id,
-            activity_type=act_type,
-            item_title=reading_list.title,
-            item_type="guide",
-            list_id=reading_list.id,
-            details="published" if act_type == "guide_published" else "updated"
-        )
-        db.add(activity)
-        
-    if "section_descriptions" in update_data:
-        new_flow = update_data["section_descriptions"].get("flow", [])
-        edited_title = reading_list.title
-        edited_type = "block"
-        edited_id = ""
-        block_changed = False
-        
-        def extract_elements(flow):
-            els = {}
-            for el in flow:
-                if "id" in el:
-                    els[el["id"]] = el
-                if "subblocks" in el:
-                    for sub in el["subblocks"]:
-                        if "id" in sub:
-                            els[sub["id"]] = sub
-            return els
-            
-        old_els = extract_elements(old_flow)
-        new_els = extract_elements(new_flow)
-        
-        for el_id, new_el in reversed(list(new_els.items())):
-            if el_id not in old_els:
-                edited_title = new_el.get("title") or ""
-                edited_type = new_el.get("type", "block")
-                edited_id = el_id
-                block_changed = True
-                break
-            else:
-                old_el_no_items = {k: v for k, v in old_els[el_id].items() if k != 'items'}
-                new_el_no_items = {k: v for k, v in new_el.items() if k != 'items'}
-                if old_el_no_items != new_el_no_items:
-                    edited_title = new_el.get("title") or ""
-                    edited_type = new_el.get("type", "block")
-                    edited_id = el_id
-                    block_changed = True
-                    break
-                
-        if not block_changed and len(old_els) != len(new_els):
-            # A block was removed
-            edited_title = ""
-            edited_type = "block"
-            block_changed = True
-            
-        if block_changed:
-            activity_title = f"type:{edited_type}|id:{edited_id}|title:{edited_title}" if edited_title != reading_list.title else reading_list.title
-
-            activity_block = UserActivityLog(
-                user_id=current_user.id,
-                activity_type="block_edited",
-                item_title=activity_title,
-                item_type="guide",
-                list_id=reading_list.id,
-                details=f"list_id:{reading_list.id}"
-            )
-            db.add(activity_block)
-        
-    db.commit()
+    # Record guide_edited activity
+    ActivityService.record_activity(
+        db=db,
+        user_id=current_user.id,
+        activity_type="guide_edited",
+        item_title=reading_list.title,
+        item_type="guide",
+        list_id=reading_list.id,
+        details="edited"
+    )
 
     return reading_list
 
@@ -639,16 +575,12 @@ def delete_list(
             detail="Solo el creador puede eliminar esta guía"
         )
         
-    # Record activity log before deletion
-    activity = UserActivityLog(
-        user_id=current_user.id,
-        activity_type="guide_deleted",
-        item_title=reading_list.title,
-        item_type="guide",
-        list_id=reading_list.id,
-        details="deleted"
+    # Clean up all activities related to this guide
+    from app.services.activity_service import ActivityService
+    ActivityService.delete_activity(
+        db=db,
+        list_id=list_id
     )
-    db.add(activity)
 
     # Check if other users are following this guide
     other_followers = db.query(SavedList).filter(
@@ -831,18 +763,20 @@ def save_list_to_library(
 
     saved = SavedList(user_id=current_user.id, list_id=list_id)
     db.add(saved)
+    db.commit()
 
     # Record activity log
-    activity = UserActivityLog(
-            user_id=current_user.id,
-            activity_type="guide_followed",
-            item_title=reading_list.title,
-            item_type="guide",
-            list_id=reading_list.id,
-            details="followed"
-        )
-    db.add(activity)
-    db.commit()
+    from app.services.activity_service import ActivityService
+    ActivityService.record_activity(
+        db=db,
+        user_id=current_user.id,
+        activity_type="guide_followed",
+        item_title=reading_list.title,
+        item_type="guide",
+        list_id=reading_list.id,
+        details="followed"
+    )
+
     return {"message": "List saved to library successfully"}
 
 # 9. Unsave list
@@ -872,17 +806,15 @@ def unsave_list_from_library(
             db.delete(reading_list)
             db.commit()
 
-    # Record activity log
-    activity = UserActivityLog(
+    # Remove the guide_followed activity log
+    from app.services.activity_service import ActivityService
+    ActivityService.delete_activity(
+        db=db,
         user_id=current_user.id,
-        activity_type="guide_unfollowed",
-        item_title=list_title,
-        item_type="guide",
-        list_id=list_id,
-        details="unfollowed"
+        activity_type="guide_followed",
+        list_id=list_id
     )
-    db.add(activity)
-    db.commit()
+
     return {"message": "List removed from library successfully"}
 
 # 10. Toggle item progress completion status
@@ -1140,17 +1072,27 @@ def toggle_item_progress(
         )
         db.add(ch)
         
-        # Record activity log
-        activity = UserActivityLog(
+        # Record activity log with progress metadata
+        from app.services.activity_service import ActivityService
+        t_str = item.item_type.value if hasattr(item.item_type, 'value') else str(item.item_type)
+        ActivityService.record_activity(
+            db=db,
             user_id=current_user.id,
-            activity_type="item_completed",
+            activity_type="item_status_changed",
             item_title=item.title,
-            item_type=item.item_type.value if hasattr(item.item_type, 'value') else item.item_type,
+            item_type=t_str,
             external_id=item.external_id,
             image_url=item.image_url,
-            details="completed"
+            details="completed",
+            metadata={
+                "status": "completed",
+                "item_type": t_str,
+                "current_progress": item.title,
+                "last_seen_episode": item.title,
+                "show_name": show_name,
+                "is_single_episode": bool(item.external_id and item.external_id.startswith("tvm-ep-"))
+            }
         )
-        db.add(activity)
         
     db.commit()
     return {
@@ -1166,6 +1108,7 @@ def bulk_toggle_items_progress(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    from app.services.activity_service import ActivityService
     for item_id in req_body.item_ids:
         item = db.query(ListItem).filter(ListItem.id == item_id, ListItem.list_id == list_id).first()
         if not item:
@@ -1212,17 +1155,25 @@ def bulk_toggle_items_progress(
         if req_body.completed:
             auto_add_to_library(db, current_user.id, item)
             
-            # Record activity log
-            activity = UserActivityLog(
-            user_id=current_user.id,
-            activity_type="item_completed",
-            item_title=item.title,
-            item_type=item.item_type,
-            external_id=item.external_id,
-            image_url=item.image_url,
-            details="completed"
-        )
-            db.add(activity)
+            # Record activity log with progress metadata
+            t_str = item.item_type.value if hasattr(item.item_type, 'value') else str(item.item_type)
+            ActivityService.record_activity(
+                db=db,
+                user_id=current_user.id,
+                activity_type="item_status_changed",
+                item_title=item.title,
+                item_type=t_str,
+                external_id=item.external_id,
+                image_url=item.image_url,
+                details="completed",
+                metadata={
+                    "status": "completed",
+                    "item_type": t_str,
+                    "current_progress": item.title,
+                    "last_seen_episode": item.title,
+                    "is_single_episode": bool(item.external_id and item.external_id.startswith("tvm-ep-"))
+                }
+            )
             
     db.commit()
     return {"status": "success"}

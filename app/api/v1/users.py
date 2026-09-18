@@ -154,6 +154,15 @@ def connect_lastfm(
     current_user.lastfm_username = session_data["name"]
     current_user.lastfm_session_key = session_data["key"]
     db.commit()
+
+    from app.services.activity_service import ActivityService
+    ActivityService.record_activity(
+        db=db,
+        user_id=current_user.id,
+        activity_type="lastfm_connected",
+        details=session_data["name"]
+    )
+
     return {"message": "Last.fm connected successfully", "username": session_data["name"]}
 
 @router.delete("/me/lastfm/disconnect")
@@ -164,6 +173,14 @@ def disconnect_lastfm(
     current_user.lastfm_username = None
     current_user.lastfm_session_key = None
     db.commit()
+
+    from app.services.activity_service import ActivityService
+    ActivityService.delete_activity(
+        db=db,
+        user_id=current_user.id,
+        activity_type="lastfm_connected"
+    )
+
     return {"message": "Last.fm disconnected successfully"}
 
 @router.get("/me/music/now-playing")
@@ -617,6 +634,15 @@ def update_username(
     current_user.username = clean_username
     db.commit()
     db.refresh(current_user)
+
+    from app.services.activity_service import ActivityService
+    ActivityService.record_activity(
+        db=db,
+        user_id=current_user.id,
+        activity_type="username_changed",
+        details=clean_username
+    )
+
     return current_user
 
 
@@ -654,6 +680,17 @@ def update_avatar(
     current_user.photo_url = req.photo_url
     db.commit()
     db.refresh(current_user)
+
+    if req.photo_url:
+        from app.services.activity_service import ActivityService
+        ActivityService.record_activity(
+            db=db,
+            user_id=current_user.id,
+            activity_type="avatar_changed",
+            image_url=req.photo_url,
+            details="avatar_changed"
+        )
+
     return current_user
 
 
@@ -689,6 +726,17 @@ def update_banner(
     current_user.banner_url = req.banner_url
     db.commit()
     db.refresh(current_user)
+
+    if req.banner_url:
+        from app.services.activity_service import ActivityService
+        ActivityService.record_activity(
+            db=db,
+            user_id=current_user.id,
+            activity_type="banner_changed",
+            image_url=req.banner_url,
+            details="banner_changed"
+        )
+
     return current_user
 
 
@@ -706,6 +754,17 @@ def update_background(
     current_user.background_url = req.background_url
     db.commit()
     db.refresh(current_user)
+
+    if req.background_url:
+        from app.services.activity_service import ActivityService
+        ActivityService.record_activity(
+            db=db,
+            user_id=current_user.id,
+            activity_type="background_changed",
+            image_url=req.background_url,
+            details="background_changed"
+        )
+
     return current_user
 
 class ColorUpdateRequest(BaseModel):
@@ -851,67 +910,6 @@ def delete_account(
     db.commit()
     return None
 
-
-@router.get("/me/activity")
-def get_my_activity(
-    limit: int = 15,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    activities = db.query(UserActivityLog).filter(
-        UserActivityLog.user_id == current_user.id
-    ).order_by(UserActivityLog.created_at.desc()).limit(limit).all()
-    
-    return [
-        {
-            "id": act.id,
-            "activity_type": act.activity_type,
-            "item_title": act.item_title,
-            "item_type": act.item_type,
-            "details": act.details,
-            "created_at": act.created_at
-        }
-        for act in activities
-    ]
-
-@router.get("/me/feed/guides-updates")
-def get_guides_updates(
-    limit: int = 15,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    saved_list_ids = db.query(SavedList.list_id).filter(SavedList.user_id == current_user.id)
-    saved_ids_set = {r[0] for r in saved_list_ids.all()}
-    
-    activities = db.query(UserActivityLog).filter(
-        UserActivityLog.activity_type.in_(['item_added', 'item_removed', 'item_moved', 'block_edited'])
-    ).order_by(UserActivityLog.created_at.desc()).limit(100).all()
-    
-    result = []
-    for a in activities:
-        if a.details and a.details.startswith('list_id:'):
-            try:
-                lid = int(a.details.split(':')[1])
-                if lid in saved_ids_set:
-                    rlist = db.query(ReadingList).filter(ReadingList.id == lid).first()
-                    result.append({
-                        'id': a.id,
-                        'user_id': a.user_id,
-                        'username': a.user.username if a.user else 'Unknown',
-                        'photo_url': a.user.photo_url if a.user else None,
-                        'activity_type': a.activity_type,
-                        'item_title': a.item_title,
-                        'item_type': a.item_type,
-                        'list_id': lid,
-                        'list_title': rlist.title if rlist else 'Unknown',
-                        'created_at': a.created_at
-                    })
-                    if len(result) >= limit:
-                        break
-            except Exception:
-                pass
-    return result
-
 @router.get("/profile/{user_identifier}", response_model=UserDashboardResponse)
 def get_any_user_profile(
     user_identifier: str,
@@ -1019,6 +1017,116 @@ def dismiss_admin_warning(
     return {"message": "Warning dismissed"}
 
 
+@router.get("/me/activity")
+def get_my_activity(
+    limit: int = 15,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    activities = db.query(UserActivityLog).filter(
+        UserActivityLog.user_id == current_user.id
+    ).order_by(UserActivityLog.created_at.desc()).limit(limit).all()
+    
+    return [
+        {
+            "id": act.id,
+            "activity_type": act.activity_type,
+            "item_title": act.item_title,
+            "item_type": act.item_type,
+            "external_id": act.external_id,
+            "list_id": act.list_id,
+            "image_url": act.image_url,
+            "details": act.details,
+            "entity_id": act.entity_id,
+            "metadata_json": act.metadata_json,
+            "created_at": act.created_at,
+            "updated_at": act.updated_at
+        }
+        for act in activities
+    ]
+
+@router.get("/me/feed/guides-updates")
+def get_guides_updates(
+    limit: int = 15,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    # Fetch latest guide edits for followed guides
+    followed_list_ids = [
+        s.list_id for s in db.query(SavedList.list_id).filter(SavedList.user_id == current_user.id).all()
+    ]
+    
+    if not followed_list_ids:
+        return []
+        
+    activities = db.query(UserActivityLog).filter(
+        UserActivityLog.list_id.in_(followed_list_ids),
+        UserActivityLog.activity_type.in_(['guide_edited', 'guide_created'])
+    ).order_by(UserActivityLog.created_at.desc()).limit(100).all()
+    
+    guide_updates_map = {}
+    
+    for a in activities:
+        lid = a.list_id
+        if lid not in guide_updates_map:
+            reading_list = db.query(ReadingList).filter(ReadingList.id == lid).first()
+            if reading_list:
+                creator = db.query(User).filter(User.id == reading_list.creator_id).first()
+                guide_updates_map[lid] = {
+                    'list_id': lid,
+                    'guide_title': reading_list.title,
+                    'creator_name': creator.username if creator else 'Pathd User',
+                    'creator_photo': creator.photo_url if creator else None,
+                    'created_at': reading_list.created_at,
+                    'updates': []
+                }
+        if lid in guide_updates_map:
+            guide_updates_map[lid]['updates'].append({
+                'id': a.id,
+                'activity_type': a.activity_type,
+                'item_title': a.item_title,
+                'item_type': a.item_type,
+                'details': a.details,
+                'created_at': a.created_at
+            })
+            
+    return list(guide_updates_map.values())[:limit]
+
+@router.get("/me/feed/following-updates")
+def get_following_updates(
+    limit: int = 15,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    # Fetch latest guides created by followed users
+    followed_user_ids = [
+        f.followed_id for f in db.query(Follow.followed_id).filter(Follow.follower_id == current_user.id).all()
+    ]
+    
+    if not followed_user_ids:
+        return []
+        
+    lists = db.query(ReadingList).filter(
+        ReadingList.creator_id.in_(followed_user_ids),
+        ReadingList.visibility == VisibilityEnum.PUBLIC
+    ).order_by(ReadingList.created_at.desc()).limit(limit).all()
+    
+    results = []
+    for l in lists:
+        creator = db.query(User).filter(User.id == l.creator_id).first()
+        results.append({
+            'list_id': l.id,
+            'title': l.title,
+            'description': l.description,
+            'creator_id': l.creator_id,
+            'creator_name': creator.username if creator else 'Pathd User',
+            'creator_photo': creator.photo_url if creator else None,
+            'created_at': l.created_at,
+            'items_count': len(l.items)
+        })
+        
+    return results
+
 
 @router.get("/{user_id}/activity")
 def get_user_activity(
@@ -1051,8 +1159,14 @@ def get_user_activity(
             "activity_type": act.activity_type,
             "item_title": final_title,
             "item_type": act.item_type,
+            "external_id": act.external_id,
+            "list_id": act.list_id,
+            "image_url": act.image_url,
             "details": act.details,
-            "created_at": act.created_at
+            "entity_id": act.entity_id,
+            "metadata_json": act.metadata_json,
+            "created_at": act.created_at,
+            "updated_at": act.updated_at
         })
     return res
 

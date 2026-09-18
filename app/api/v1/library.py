@@ -601,21 +601,21 @@ def add_to_library(
             db.add(ch)
             
     db.commit()
-    
-    # Record activity log
-    activity = UserActivityLog(
-            user_id=current_user.id,
-        activity_type="shelf_add",
+    db.refresh(new_lib_item)
+
+    # Record activity log: item_added_to_library
+    from app.services.activity_service import ActivityService
+    ActivityService.record_activity(
+        db=db,
+        user_id=current_user.id,
+        activity_type="item_added_to_library",
         item_title=item_in.title,
-        item_type=item_in.item_type,
+        item_type=item_in.item_type.value if hasattr(item_in.item_type, "value") else str(item_in.item_type),
         external_id=item_in.external_id,
         image_url=item_in.image_url,
         details=item_in.status.value if hasattr(item_in.status, "value") else str(item_in.status)
     )
-    db.add(activity)
     
-    db.commit()
-    db.refresh(new_lib_item)
     return new_lib_item
 
 @router.get("/", response_model=List[LibraryItemResponse])
@@ -918,17 +918,31 @@ def update_library_item(
             
         lib_item.updated_at = datetime.now(timezone.utc)
         
-        # Record activity log
-        activity = UserActivityLog(
+        # Record activity log with structured metadata
+        from app.services.activity_service import ActivityService
+        t_str = lib_item.item_type.value if hasattr(lib_item.item_type, 'value') else str(lib_item.item_type)
+        stat_str = item_in.status.value if hasattr(item_in.status, "value") else str(item_in.status)
+
+        act_meta = {
+            "status": stat_str,
+            "is_hundred_percent": bool(item_in.is_hundred_percent if item_in.is_hundred_percent is not None else lib_item.is_hundred_percent),
+            "pages_read": lib_item.pages_read or 0,
+            "total_pages": lib_item.total_pages or 0,
+            "last_seen_episode": lib_item.last_seen_episode,
+            "item_type": t_str
+        }
+
+        ActivityService.record_activity(
+            db=db,
             user_id=current_user.id,
-            activity_type="shelf_status",
+            activity_type="item_status_changed",
             item_title=lib_item.title,
-            item_type=lib_item.item_type,
+            item_type=t_str,
             external_id=lib_item.external_id,
             image_url=lib_item.image_url,
-            details=item_in.status.value if hasattr(item_in.status, "value") else str(item_in.status)
+            details=stat_str,
+            metadata=act_meta
         )
-        db.add(activity)
 
     if item_in.is_hundred_percent is not None:
         lib_item.is_hundred_percent = item_in.is_hundred_percent
@@ -982,6 +996,9 @@ def update_library_item(
                     old_fav.is_favorite = False
                     
         lib_item.is_favorite = item_in.is_favorite
+        from app.services.activity_service import ActivityService
+        t_str = lib_item.item_type.value if hasattr(lib_item.item_type, 'value') else str(lib_item.item_type)
+
         if item_in.is_favorite:
             lib_item.favorited_at = datetime.now(timezone.utc)
             lib_item.favorite_order = 0
@@ -991,21 +1008,27 @@ def update_library_item(
                 UserLibraryItem.is_favorite == True,
                 UserLibraryItem.id != lib_item.id
             ).update({UserLibraryItem.favorite_order: UserLibraryItem.favorite_order + 1}, synchronize_session=False)
+
+            # Record activity log
+            ActivityService.record_activity(
+                db=db,
+                user_id=current_user.id,
+                activity_type="item_favorited",
+                item_title=lib_item.title,
+                item_type=t_str,
+                external_id=lib_item.external_id,
+                image_url=lib_item.image_url,
+                details="favorited"
+            )
         else:
             lib_item.favorited_at = None
-        
-        # Record activity log
-        activity = UserActivityLog(
-            user_id=current_user.id,
-            activity_type="shelf_favorite",
-            item_title=lib_item.title,
-            item_type=lib_item.item_type,
-            external_id=lib_item.external_id,
-            image_url=lib_item.image_url,
-            details="starred" if item_in.is_favorite else "unstarred"
-        )
-        db.add(activity)
-
+            # Reversible cleanup when unfavorited
+            ActivityService.delete_activity(
+                db=db,
+                user_id=current_user.id,
+                activity_type="item_favorited",
+                external_id=lib_item.external_id
+            )
 
     if item_in.custom_badge is not None:
         lib_item.custom_badge = item_in.custom_badge
@@ -1025,16 +1048,31 @@ def update_library_item(
             lib_item.status = UserLibraryStatusEnum.WATCHING
         else:
             lib_item.status = UserLibraryStatusEnum.READING
-        activity = UserActivityLog(
+
+        from app.services.activity_service import ActivityService
+        t_str = lib_item.item_type.value if hasattr(lib_item.item_type, 'value') else str(lib_item.item_type)
+        stat_str = lib_item.status.value if hasattr(lib_item.status, "value") else str(lib_item.status)
+
+        act_meta = {
+            "status": stat_str,
+            "is_hundred_percent": bool(lib_item.is_hundred_percent),
+            "pages_read": lib_item.pages_read or 0,
+            "total_pages": lib_item.total_pages or 0,
+            "last_seen_episode": lib_item.last_seen_episode,
+            "item_type": t_str
+        }
+
+        ActivityService.record_activity(
+            db=db,
             user_id=current_user.id,
-            activity_type="shelf_status",
+            activity_type="item_status_changed",
             item_title=lib_item.title,
-            item_type=lib_item.item_type,
+            item_type=t_str,
             external_id=lib_item.external_id,
             image_url=lib_item.image_url,
-            details=lib_item.status.value
+            details=stat_str,
+            metadata=act_meta
         )
-        db.add(activity)
 
     db.commit()
     db.refresh(lib_item)
@@ -1062,20 +1100,16 @@ def delete_from_library(
             detail="Library item not found"
         )
         
-    # Record activity log
-    activity = UserActivityLog(
-        user_id=current_user.id,
-        activity_type="shelf_remove",
-        item_title=lib_item.title,
-        item_type=lib_item.item_type,
-        external_id=lib_item.external_id,
-        image_url=lib_item.image_url,
-        details="removed"
-    )
-    db.add(activity)
-
     ext_id = lib_item.external_id
     tracking_list_id = lib_item.tracking_list_id
+
+    # Clean up activities for this library item (reversible cleanup)
+    from app.services.activity_service import ActivityService
+    ActivityService.delete_activity(
+        db=db,
+        user_id=current_user.id,
+        external_id=ext_id
+    )
 
     # If delete_history is requested, completely wipe progress, consumption history, and reviews
     if delete_history:

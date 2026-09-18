@@ -5345,7 +5345,7 @@ export const Profile: React.FC = () => {
             <div className="glass-card" style={{ padding: '1rem', display: 'flex', gap: '1rem', alignItems: 'center', fontSize: '0.9rem' }}>
               <CheckCircle size={16} color="#10b981" />
               <div>
-                <span>{language === 'es' ? 'Creaste tu cuenta de Pathd.' : 'Created your Pathd account.'}</span>
+                <span>{language === 'es' ? 'Se creó la cuenta de Pathd.' : 'Pathd account created.'}</span>
                 <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginLeft: '1rem' }}>
                   {profile ? formatDate(new Date(profile.created_at)) : formatDate(new Date())}
                 </span>
@@ -5353,11 +5353,23 @@ export const Profile: React.FC = () => {
             </div>
           ) : (
             activities.map((act) => {
+              const parseMeta = () => {
+                if (!act.metadata_json) return {};
+                try {
+                  return typeof act.metadata_json === 'string' ? JSON.parse(act.metadata_json) : act.metadata_json;
+                } catch (e) {
+                  return {};
+                }
+              };
+              const meta = parseMeta();
+              const count = meta.count || 1;
+
               const getStatusLabel = (status: string) => {
                 const all = [
                   { value: 'plan_to_play', label: language === 'es' ? 'Por Jugar' : 'Plan to Play' },
                   { value: 'playing', label: language === 'es' ? 'Jugando' : 'Playing' },
-                  { value: 'completed', label: language === 'es' ? 'Terminado / Visto' : 'Completed / Watched' },
+                  { value: 'completed', label: language === 'es' ? 'Completado' : 'Completed' },
+                  { value: 'endless', label: language === 'es' ? 'Infinito' : 'Endless' },
                   { value: 'dropped', label: language === 'es' ? 'Abandonado' : 'Dropped' },
                   { value: 'plan_to_watch', label: language === 'es' ? 'Por Ver' : 'Plan to Watch' },
                   { value: 'watching', label: language === 'es' ? 'Viendo' : 'Watching' },
@@ -5369,87 +5381,247 @@ export const Profile: React.FC = () => {
               };
 
               let msg = '';
-              if (act.activity_type === 'shelf_add') {
-                msg = language === 'es' 
-                  ? `Agregaste "${act.item_title}" a tu estantería como "${getStatusLabel(act.details)}".`
-                  : `Added "${act.item_title}" to shelf as "${getStatusLabel(act.details)}".`;
-              } else if (act.activity_type === 'shelf_remove') {
-                msg = language === 'es'
-                  ? `Eliminaste "${act.item_title}" de tu estantería.`
-                  : `Removed "${act.item_title}" from your shelf.`;
-              } else if (act.activity_type === 'shelf_status') {
-                msg = language === 'es'
-                  ? `Cambiaste el estado de "${act.item_title}" a "${getStatusLabel(act.details)}".`
-                  : `Changed status of "${act.item_title}" to "${getStatusLabel(act.details)}".`;
-              } else if (act.activity_type === 'shelf_favorite') {
-                msg = language === 'es'
-                  ? (act.details === 'starred' ? `Destacaste "${act.item_title}".` : `Quitaste de destacados a "${act.item_title}".`)
-                  : (act.details === 'starred' ? `Featured "${act.item_title}".` : `Removed "${act.item_title}" from featured.`);
-              } else if (act.activity_type === 'item_completed') {
-                msg = language === 'es'
-                  ? `Marcaste "${act.item_title}" como completado.`
-                  : `Marked "${act.item_title}" as completed.`;
-              } else if (act.activity_type === 'guide_created') {
-                msg = language === 'es'
-                  ? `Creaste una nueva guía: "${act.item_title}".`
-                  : `Created a new guide: "${act.item_title}".`;
-              } else if (act.activity_type === 'guide_published') {
-                msg = language === 'es'
-                  ? `Publicaste la guía: "${act.item_title}".`
-                  : `Published the guide: "${act.item_title}".`;
-              } else if (act.activity_type === 'guide_deleted') {
-                msg = language === 'es'
-                  ? `Eliminaste la guía: "${act.item_title}".`
-                  : `Deleted the guide: "${act.item_title}".`;
-              } else if (act.activity_type === 'guide_followed') {
-                msg = language === 'es'
-                  ? `Comenzaste a seguir la guía: "${act.item_title}".`
-                  : `Started following the guide: "${act.item_title}".`;
-              } else if (act.activity_type === 'guide_unfollowed') {
-                msg = language === 'es'
-                  ? `Dejaste de seguir la guía: "${act.item_title}".`
-                  : `Stopped following the guide: "${act.item_title}".`;
-              } else if (act.activity_type === 'item_reviewed' || act.activity_type === 'item_rated') {
-                msg = language === 'es'
-                  ? `Reseñaste o valoraste "${act.item_title}".`
-                  : `Reviewed or rated "${act.item_title}".`;
-              } else if (act.activity_type === 'item_added') {
-                msg = language === 'es'
-                  ? `Agregaste "${act.item_title}" a una guía.`
-                  : `Added "${act.item_title}" to a guide.`;
-              } else if (act.activity_type === 'item_removed') {
-                msg = language === 'es'
-                  ? `Eliminaste "${act.item_title}" de una guía.`
-                  : `Removed "${act.item_title}" from a guide.`;
-              } else if (act.activity_type === 'item_moved') {
-                msg = language === 'es'
-                  ? `Moviste "${act.item_title}" en una guía.`
-                  : `Moved "${act.item_title}" in a guide.`;
-              } else if (act.activity_type === 'block_edited') {
-                if (act.item_title === "un bloque") {
-                  msg = language === 'es' ? `Editaste un bloque en una guía.` : `Edited a block in a guide.`;
-                } else if (act.item_title.startsWith("type:")) {
-                  const typeMatch = act.item_title.match(/type:([^|]*)(?:\|id:([^|]*))?\|title:(.*)/);
-                  if (typeMatch) {
-                    const elType = typeMatch[1];
-                    const elTitle = typeMatch[3];
-                    let typeName = language === 'es' ? 'un bloque' : 'a block';
-                    if (elType === 'section') typeName = language === 'es' ? 'una sección' : 'a section';
-                    else if (elType === 'subblock') typeName = language === 'es' ? 'un sub-bloque' : 'a sub-block';
-                    
-                    if (elTitle) {
-                      msg = language === 'es' ? `Editaste ${typeName === 'una sección' ? 'la sección' : typeName === 'un sub-bloque' ? 'el sub-bloque' : 'el bloque'} '${elTitle}' en una guía.` : `Edited the ${elType} '${elTitle}' in a guide.`;
+              const title = act.item_title || '';
+              const itemType = (act.item_type || meta.item_type || '').toLowerCase();
+
+              switch (act.activity_type) {
+                case 'account_created':
+                  msg = language === 'es' ? 'Se creó la cuenta de Pathd.' : 'Pathd account created.';
+                  break;
+
+                case 'avatar_changed':
+                  msg = language === 'es' ? 'Se actualizó la foto de perfil.' : 'Profile avatar updated.';
+                  break;
+
+                case 'banner_changed':
+                  msg = language === 'es' ? 'Se actualizó la portada de perfil.' : 'Profile banner updated.';
+                  break;
+
+                case 'background_changed':
+                  msg = language === 'es' ? 'Se actualizó el fondo de perfil.' : 'Profile background updated.';
+                  break;
+
+                case 'username_changed':
+                  msg = language === 'es' 
+                    ? `Se cambió el nombre de usuario a "${act.details || title}".`
+                    : `Username changed to "${act.details || title}".`;
+                  break;
+
+                case 'lastfm_connected':
+                  msg = language === 'es'
+                    ? `Se conectó la cuenta de Last.fm (${act.details || 'usuario'}).`
+                    : `Connected Last.fm account (${act.details || 'user'}).`;
+                  break;
+
+                case 'item_added_to_library':
+                case 'shelf_add':
+                  msg = language === 'es'
+                    ? `Se agregó "${title}" a la biblioteca.`
+                    : `Added "${title}" to library.`;
+                  break;
+
+                case 'item_status_changed':
+                case 'shelf_status':
+                case 'item_completed':
+                case 'item_progress': {
+                  const status = meta.status || act.details || '';
+                  const pages = meta.pages_read || 0;
+                  const totalPages = meta.total_pages || 0;
+                  const lastSeen = meta.last_seen_episode || '';
+
+                  if (count > 1) {
+                    if (itemType === 'series' || itemType === 'anime') {
+                      msg = language === 'es'
+                        ? `Se vieron ${count} episodios de "${title}".`
+                        : `Watched ${count} episodes of "${title}".`;
+                    } else if (itemType === 'book' || itemType === 'manga') {
+                      msg = language === 'es'
+                        ? `Se avanzaron páginas en "${title}" (${pages}${totalPages ? ` / ${totalPages}` : ''} págs).`
+                        : `Progressed pages in "${title}" (${pages}${totalPages ? ` / ${totalPages}` : ''} pages).`;
                     } else {
-                      msg = language === 'es' ? `Editaste ${typeName} sin título en una guía.` : `Edited an untitled ${elType} in a guide.`;
+                      msg = language === 'es'
+                        ? `Se registró progreso ${count} veces en "${title}".`
+                        : `Logged progress ${count} times on "${title}".`;
+                    }
+                  } else if (itemType === 'movie') {
+                    if (status === 'completed' || status === 'read') {
+                      msg = language === 'es' ? `Se marcó "${title}" como Visto.` : `Marked "${title}" as Watched.`;
+                    } else if (status === 'dropped') {
+                      msg = language === 'es' ? `Se abandonó la película "${title}".` : `Dropped movie "${title}".`;
+                    } else if (status === 'watching') {
+                      msg = language === 'es' ? `Se comenzó a ver "${title}".` : `Started watching "${title}".`;
+                    } else {
+                      msg = language === 'es' ? `Se cambió el estado de "${title}" a ${getStatusLabel(status)}.` : `Changed status of "${title}" to ${getStatusLabel(status)}.`;
+                    }
+                  } else if (itemType === 'series' || itemType === 'anime' || itemType === 'episode') {
+                    const isEpisode = meta.is_single_episode || (act.external_id && act.external_id.startsWith('tvm-ep-')) || Boolean(lastSeen && /S\d+E\d+/i.test(lastSeen)) || Boolean(title && /S\d+E\d+/i.test(title));
+                    
+                    const formatEpisodeString = (rawText: string, showHint?: string) => {
+                      // Match patterns like "Show Name - S01E02 - Episode Title" or "S01E02 - Episode Title" or "S01E02"
+                      const match = rawText.match(/^(?:(.*?)\s*-\s*)?S(\d+)E(\d+)(?:\s*-\s*(.*))?$/i);
+                      if (match) {
+                        const extractedShow = (match[1] || showHint || '').trim();
+                        const sNum = parseInt(match[2], 10);
+                        const eNum = parseInt(match[3], 10);
+                        const epName = (match[4] || '').trim();
+                        const seasonPrefix = language === 'es' ? 'T' : 'S';
+                        const codeStr = `${seasonPrefix}${sNum < 10 ? '0' : ''}${sNum} | E${eNum < 10 ? '0' : ''}${eNum}`;
+                        const epPart = epName ? `${codeStr} (${epName})` : codeStr;
+                        const finalShow = extractedShow || showHint;
+                        if (finalShow) {
+                          return language === 'es'
+                            ? `el ${epPart} de la serie '${finalShow}'`
+                            : `${epPart} from '${finalShow}'`;
+                        }
+                        return epPart;
+                      }
+                      return rawText;
+                    };
+
+                    if (isEpisode) {
+                      const epSource = lastSeen || title;
+                      const formattedEp = formatEpisodeString(epSource, meta.show_name);
+                      msg = language === 'es'
+                        ? `Se vio ${formattedEp.startsWith('el ') ? formattedEp : `el ${formattedEp}`}.`
+                        : `Watched ${formattedEp}.`;
+                    } else if (status === 'completed') {
+                      msg = language === 'es' ? `Se terminó la serie "${title}".` : `Completed series "${title}".`;
+                    } else if (status === 'dropped') {
+                      msg = language === 'es'
+                        ? `Se abandonó la serie "${title}"${lastSeen ? ` (último: ${lastSeen})` : ''}.`
+                        : `Dropped series "${title}"${lastSeen ? ` (last: ${lastSeen})` : ''}.`;
+                    } else if (lastSeen) {
+                      const formattedEp = formatEpisodeString(lastSeen, meta.show_name || title);
+                      msg = language === 'es'
+                        ? `Se vio ${formattedEp.startsWith('el ') ? formattedEp : `el ${formattedEp}`}.`
+                        : `Watched ${formattedEp}.`;
+                    } else {
+                      msg = language === 'es'
+                        ? `Se marcó "${title}" como ${getStatusLabel(status)}.`
+                        : `Marked "${title}" as ${getStatusLabel(status)}.`;
+                    }
+                  } else if (itemType === 'book' || itemType === 'manga') {
+                    if (status === 'read' || status === 'completed') {
+                      msg = language === 'es'
+                        ? `Se leyó "${title}"${totalPages ? ` (${totalPages} págs)` : ''}.`
+                        : `Read "${title}"${totalPages ? ` (${totalPages} pages)` : ''}.`;
+                    } else if (status === 'dropped') {
+                      msg = language === 'es'
+                        ? `Se abandonó "${title}"${pages ? ` en la pág. ${pages}` : ''}.`
+                        : `Dropped "${title}"${pages ? ` on page ${pages}` : ''}.`;
+                    } else if (pages > 0) {
+                      msg = language === 'es'
+                        ? `Se leyeron páginas de "${title}" (pág. ${pages}${totalPages ? ` de ${totalPages}` : ''}).`
+                        : `Reading "${title}" (page ${pages}${totalPages ? ` of ${totalPages}` : ''}).`;
+                    } else {
+                      msg = language === 'es'
+                        ? `Se marcó "${title}" como ${getStatusLabel(status)}.`
+                        : `Marked "${title}" as ${getStatusLabel(status)}.`;
+                    }
+                  } else if (itemType === 'comic') {
+                    if (status === 'read' || status === 'completed') {
+                      msg = language === 'es' ? `Se leyó "${title}".` : `Read "${title}".`;
+                    } else if (status === 'dropped') {
+                      msg = language === 'es'
+                        ? `Se abandonó el cómic "${title}"${lastSeen ? ` (${lastSeen})` : ''}.`
+                        : `Dropped comic "${title}"${lastSeen ? ` (${lastSeen})` : ''}.`;
+                    } else if (lastSeen) {
+                      msg = language === 'es' ? `Se leyó "${lastSeen}" de "${title}".` : `Read "${lastSeen}" of "${title}".`;
+                    } else {
+                      msg = language === 'es' ? `Se marcó "${title}" como ${getStatusLabel(status)}.` : `Marked "${title}" as ${getStatusLabel(status)}.`;
+                    }
+                  } else if (itemType === 'game') {
+                    if (meta.is_hundred_percent) {
+                      msg = language === 'es' ? `Se completó al 100% "${title}".` : `Completed 100% of "${title}".`;
+                    } else if (status === 'completed') {
+                      msg = language === 'es' ? `Se completó el juego "${title}".` : `Completed game "${title}".`;
+                    } else if (status === 'endless') {
+                      msg = language === 'es' ? `Se marcó "${title}" como Infinito.` : `Marked "${title}" as Endless.`;
+                    } else if (status === 'dropped') {
+                      msg = language === 'es' ? `Se abandonó el juego "${title}".` : `Dropped game "${title}".`;
+                    } else if (status === 'playing') {
+                      msg = language === 'es' ? `Se comenzó a jugar a "${title}".` : `Started playing "${title}".`;
+                    } else {
+                      msg = language === 'es' ? `Se cambió el estado de "${title}" a ${getStatusLabel(status)}.` : `Changed status of "${title}" to ${getStatusLabel(status)}.`;
                     }
                   } else {
-                    msg = language === 'es' ? `Editaste un bloque en una guía.` : `Edited a block in a guide.`;
+                    msg = language === 'es'
+                      ? `Se marcó "${title}" como ${getStatusLabel(status)}.`
+                      : `Marked "${title}" as ${getStatusLabel(status)}.`;
                   }
-                } else {
-                  msg = language === 'es' ? `Editaste el bloque '${act.item_title}' en una guía.` : `Edited the block '${act.item_title}' in a guide.`;
+                  break;
                 }
-              } else {
-                msg = `${act.activity_type} - ${act.item_title}`;
+
+                case 'guide_created':
+                  msg = language === 'es'
+                    ? `Se creó la guía "${title}".`
+                    : `Created guide "${title}".`;
+                  break;
+
+                case 'guide_edited':
+                  msg = language === 'es'
+                    ? `Se editó la guía "${title}".`
+                    : `Edited guide "${title}".`;
+                  break;
+
+                case 'guide_followed':
+                  msg = language === 'es'
+                    ? `Se comenzó a seguir la guía "${title}".`
+                    : `Started following guide "${title}".`;
+                  break;
+
+                case 'item_favorited':
+                case 'shelf_favorite':
+                  msg = language === 'es'
+                    ? `Se destacó "${title}".`
+                    : `Featured "${title}".`;
+                  break;
+
+                case 'user_followed':
+                  msg = language === 'es'
+                    ? `Se comenzó a seguir a @${title}.`
+                    : `Started following @${title}.`;
+                  break;
+
+                case 'item_rated':
+                  msg = language === 'es'
+                    ? `Se calificó "${title}" con ${act.details}★.`
+                    : `Rated "${title}" with ${act.details}★.`;
+                  break;
+
+                case 'guide_rated':
+                  msg = language === 'es'
+                    ? `Se calificó la guía "${title}" con ${act.details}★.`
+                    : `Rated guide "${title}" with ${act.details}★.`;
+                  break;
+
+                case 'item_reviewed':
+                  msg = language === 'es'
+                    ? `Se escribió una reseña en "${title}".`
+                    : `Reviewed "${title}".`;
+                  break;
+
+                case 'guide_commented':
+                  msg = language === 'es'
+                    ? `Se comentó en la guía "${title}".`
+                    : `Commented on guide "${title}".`;
+                  break;
+
+                case 'social_commented':
+                  msg = language === 'es'
+                    ? `Se comentó en la Actividad Social.`
+                    : `Commented on Social Activity.`;
+                  break;
+
+                case 'guide_review_commented':
+                  msg = language === 'es'
+                    ? `Se comentó en la reseña de una guía.`
+                    : `Commented on a guide review.`;
+                  break;
+
+                default:
+                  msg = title ? `${act.activity_type} - ${title}` : act.activity_type;
+                  break;
               }
 
               return (

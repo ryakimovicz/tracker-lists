@@ -126,6 +126,15 @@ def register(
     db.commit()
     db.refresh(new_user)
 
+    # Record activity log for account creation
+    from app.services.activity_service import ActivityService
+    ActivityService.record_activity(
+        db=db,
+        user_id=new_user.id,
+        activity_type="account_created",
+        details="account_created"
+    )
+
     lang = (request.headers.get("accept-language") or "es")[:2].lower()
 
     # Send verification email asynchronously
@@ -397,6 +406,14 @@ def google_auth(
         db.add(user)
         db.commit()
         db.refresh(user)
+
+        from app.services.activity_service import ActivityService
+        ActivityService.record_activity(
+            db=db,
+            user_id=user.id,
+            activity_type="account_created",
+            details="account_created"
+        )
     else:
         if not user.is_verified:
             user.is_verified = True
