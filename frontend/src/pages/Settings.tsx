@@ -688,7 +688,7 @@ export const SettingsPage: React.FC = () => {
           marginBottom: '0.5rem'
         }}>
           <img src="/logo-transparent.svg" alt="Pathd" style={{ width: 16, height: 16 }} />
-          Pathd v0.9.7 Beta
+          Pathd v0.9.8 Beta
         </div>
         <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>
           {isEs ? 'Seguimiento Multimedia Todo en Uno y Guías' : 'All-in-One Media Tracker & Guides'}

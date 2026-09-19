@@ -177,6 +177,6 @@ function App() {
   );
 }
 
-// App Version: Pathd v0.9.7 Beta
+// App Version: Pathd v0.9.8 Beta
 export default App;
 

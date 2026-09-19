@@ -1,6 +1,6 @@
 # Pathd - Especificación Técnica & Referencia de API ⚡
 
-Documento de referencia para desarrolladores, arquitectura del sistema y catálogo completo de endpoints REST de **Pathd (v0.9.7 Beta)**.
+Documento de referencia para desarrolladores, arquitectura del sistema y catálogo completo de endpoints REST de **Pathd (v0.9.8 Beta)**.
 
 ---
 
@@ -74,13 +74,21 @@ Documento de referencia para desarrolladores, arquitectura del sistema y catálo
 | PUT | `/me/color` | Actualizar color temático de perfil (Premium) |
 | PUT | `/me/category-order` | Guardar orden personalizado de categorías (Premium) |
 | DELETE | `/me` | Eliminar cuenta definitivamente |
-| GET | `/me/activity` | Historial de actividad personal |
+| GET | `/me/activity` | Historial de actividad personal con batching inteligente de 24h |
 | GET | `/me/up-next` | Próximos ítems pendientes en guías seguidas y listas |
 | GET | `/me/feed/guides-updates` | Actualizaciones recientes de guías seguidas |
+| GET | `/me/feed/following-updates` | Actualizaciones recientes de usuarios seguidos |
 | POST | `/me/lastfm/connect` | Conectar cuenta de Last.fm |
 | DELETE | `/me/lastfm/disconnect` | Desconectar cuenta de Last.fm |
-| GET | `/me/music/now-playing` | Canción en reproducción en vivo |
-| GET | `/me/music/top-albums` | Álbumes más escuchados de la semana |
+| GET | `/me/music/now-playing` | Canción en reproducción en vivo del usuario autenticado |
+| GET | `/me/music/top-albums` | Álbumes más escuchados (7 días, 1 mes, histórico) |
+| GET | `/me/music/top-artists` | Artistas más escuchados (7 días, 1 mes, histórico) |
+| GET | `/me/music/top-tracks` | Canciones más escuchadas (7 días, 1 mes, histórico) |
+| GET | `/{user_id}/music/now-playing` | Canción en reproducción en vivo de un usuario público |
+| GET | `/{user_id}/music/top-albums` | Álbumes más escuchados de un usuario público |
+| GET | `/{user_id}/music/top-artists` | Artistas más escuchados de un usuario público |
+| GET | `/{user_id}/music/top-tracks` | Canciones más escuchadas de un usuario público |
+| GET | `/music/details` | Detalle enriquecido de álbum, artista o track (Last.fm, MusicBrainz, Deezer, Discogs) |
 | GET | `/profile/{user_id}` | Perfil público de otro usuario |
 | GET | `/{user_id}/activity` | Historial de actividad pública de otro usuario |
 | GET | `/search?q={query}` | Buscar usuarios por nombre de usuario |
@@ -127,7 +135,8 @@ Documento de referencia para desarrolladores, arquitectura del sistema y catálo
 |---|---|---|
 | POST | `/` | Añadir obra a la estantería personal (incluye persistencia de `release_date`) |
 | GET | `/` | Obtener estantería del usuario con desglose de progreso, horas, páginas y badges 100% |
-| PUT | `/{library_item_id}` | Actualizar estado, tiempo, páginas leídas, fecha de estreno o badge 100% |
+| PUT | `/{library_item_id}` | Actualizar estado, tiempo, páginas leídas, fecha de estreno, destacado o badge 100% |
+| PUT | `/favorites/reorder` | Persistir orden personalizado de obras destacadas en perfil (`favorite_order`) |
 | DELETE | `/{library_item_id}` | Eliminar obra de la estantería (con opción de conservar o purgar historial) |
 | POST | `/{library_item_id}/mark-consumed` | Volver a marcar como visto/leído/jugado (Free max 2 / Premium ilimitado) |
 | GET | `/{library_item_id}/consumption-history` | Obtener historial cronológico de fechas de consumo |

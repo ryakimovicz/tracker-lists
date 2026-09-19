@@ -5,7 +5,7 @@
   <p><strong>La plataforma definitiva para el seguimiento de tu universo multimedia, guías cronológicas y biblioteca personal</strong></p>
 
   <p>
-    <a href="https://pathd.net"><img src="https://img.shields.io/badge/Version-v0.9.7_Beta-f59e0b?style=for-the-badge&logo=rocket" alt="Pathd Version" /></a>
+    <a href="https://pathd.net"><img src="https://img.shields.io/badge/Version-v0.9.8_Beta-f59e0b?style=for-the-badge&logo=rocket" alt="Pathd Version" /></a>
     <a href="https://pathd.net"><img src="https://img.shields.io/badge/Production-Online-10b981?style=for-the-badge&logo=cloudflare" alt="Production Status" /></a>
     <a href="https://react.dev/"><img src="https://img.shields.io/badge/Frontend-React_19_+_TypeScript-61dafb?style=for-the-badge&logo=react" alt="React" /></a>
     <a href="https://fastapi.tiangolo.com/"><img src="https://img.shields.io/badge/Backend-FastAPI-009688?style=for-the-badge&logo=fastapi" alt="FastAPI" /></a>
@@ -31,24 +31,35 @@ Cuenta con un potente constructor de **Guías Cronológicas interactivas**, modi
   - Pestaña *Próximos* con visualización en *Calendario* mensual persistente y sección *Por Confirmar (TBA)* para obras anunciadas sin fecha exacta.
   - Persistencia permanente de fechas de estreno (`release_date`) en la base de datos para carga instantánea en 0 ms.
 
-### 🧭 Exploración y Tendencias
+### 🧭 Exploración, Tendencias y Destacados
 - **Tendencias Globales y por Categoría**: Descubre lo más popular en películas, series, anime, libros, cómics y juegos en una interfaz fluida.
 - **Pestaña de Guías Comunitarias**: Explora colecciones y cronologías recomendadas por la comunidad con métricas de votos, vistas y creadores.
+- **Vitrina de Obras Destacadas en Perfil**:
+  - Selección de hasta 7 (Free) o 70 (Pro) favoritos con filtros por tipo de obra y vistas en *Grid* o *Lista*.
+  - Reordenamiento visual mediante **Arrastrar y Soltar (*Drag & Drop*)** y persistencia cronológica (`favorited_at` / `favorite_order`).
+  - Navegación lateral con soporte para desplazamiento continuo (*Hold-to-Scroll*) y visualización fluida de 1 o 2 filas.
 
 ### ✏️ Creador de Guías Cronológicas & Modificaciones (Mods)
 - **Constructor Multinivel**: Diseña el orden de visualización o lectura para sagas complejas mediante secciones, bloques de prioridad (1 a 5 estrellas: *Opcional, Recomendado, Obligatorio*) y notas contextuales.
 - **Arrastrar y Soltar (*Drag & Drop*)**: Reordena temporadas, películas y tomos con fluidez.
 - **Sistema de Adiciones Comunitarias (Mods)**: Crea expansiones o listas complementarias sobre guías públicas de otros usuarios y adóptalas con un clic.
 
-### 👥 Comunidad, Reseñas & KLIPY Multimedia
-- **Feed Social en Tiempo Real**: Visualiza la actividad de los usuarios que sigues, sus cambios de estado y notas.
+### 👥 Comunidad, Reseñas, Actividad & KLIPY Multimedia
+- **Feed Social y Actividad Estandarizada**:
+  - Historial de actividad personal y público con agrupación inteligente por ventana de 24 horas (*24h batching*) para evitar saturación en avances de episodios, páginas y sesiones de juego.
+  - Sincronización y limpieza reversible automática al desmarcar o eliminar obras.
 - **Reseñas & Puntuaciones**: Califica del 1 al 5 estrellas, redacta críticas y debate en hilos de comentarios.
 - **Integración KLIPY**: Selector multimedia enriquecido integrado en comentarios y reseñas con **GIFs, Stickers, Memes y Clips de Audio**, con buscador persistente, pestañas de favoritos y control global de volumen con auto-silenciado en scroll.
-- **Música en Vivo (Last.fm)**: Vincula tu perfil de Last.fm para mostrar la canción que estás escuchando en tiempo real y tus álbumes más escuchados de la semana.
+- **Suite Musical Completa (Last.fm)**:
+  - Vincula tu cuenta de Last.fm con soporte para Spotify, Apple Music, YouTube Music y Deezer.
+  - Canción en reproducción en vivo con ecualizador animado adaptativo al tema de color de tu perfil.
+  - Tops semanales, mensuales e históricos de artistas, álbumes y canciones.
+  - Enriquecimiento de portadas HD multifuente (*Last.fm, Deezer, MusicBrainz, Discogs*) y modal interactivo de detalles de álbumes y pistas con tracklist completo.
 
 ### ⚡ Rendimiento Ultrarrápido (0 ms)
 - **Motor de Prefetching Inteligente**: Calentamiento silencioso en segundo plano (*Idle Warmup*) y precarga anticipada al interactuar con enlaces (*Hover & Touch Prefetching*).
 - **Búsqueda Multicapa con Caché y Debounce**: Barra de búsqueda con limpieza instantánea, filtros por categoría persistentes y caché en memoria y `sessionStorage`.
+- **Navegación Continua en Carruseles**: Desplazamiento fluido con soporte de clic único (paso fijo) o pulsación sostenida (*Smooth Continuous Scrolling*) y máscaras de gradiente.
 
 ---
 
