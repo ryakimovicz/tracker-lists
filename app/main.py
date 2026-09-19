@@ -129,6 +129,13 @@ def auto_migrate_schema():
                         logger.info(f"Auto-migration: Added column '{col_name}' to user_activity_logs table.")
                     except Exception as e:
                         logger.warning(f"Auto-migration: Failed to add column '{col_name}' to user_activity_logs: {e}")
+            if engine.dialect.name == "postgresql":
+                try:
+                    with engine.begin() as conn:
+                        conn.execute(text("ALTER TABLE user_activity_logs ALTER COLUMN details TYPE VARCHAR(500);"))
+                    logger.info("Auto-migration: Altered user_activity_logs.details to VARCHAR(500).")
+                except Exception as e:
+                    logger.warning(f"Auto-migration: Failed to alter details column length: {e}")
 
         if "media_reviews" in inspector.get_table_names():
             existing_rev_cols = {col["name"] for col in inspector.get_columns("media_reviews")}
