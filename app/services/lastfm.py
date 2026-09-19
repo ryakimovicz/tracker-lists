@@ -167,7 +167,7 @@ class LastFMService:
             req = urllib.request.Request(url, headers=headers)
             with urllib.request.urlopen(req, timeout=3) as response:
                 if response.status == 200:
-                    data = json.loads(response.read().decode())
+                    data = json.loads(response.read().decode('utf-8', errors='replace'))
                     raw_tracks = data.get("toptracks", {}).get("track", [])
                     return [t.get("name") for t in raw_tracks if t.get("name")]
         except Exception:
@@ -199,7 +199,7 @@ class LastFMService:
                 req = urllib.request.Request(f"https://itunes.apple.com/search?term={q}&entity=song&limit=5", headers={"User-Agent": "PathdApp/1.0"})
                 with urllib.request.urlopen(req, timeout=3) as res:
                     if res.status == 200:
-                        data = json.loads(res.read().decode())
+                        data = json.loads(res.read().decode('utf-8', errors='replace'))
                         for s in data.get("results", []):
                             cand_art = re.sub(r'[^a-zA-Z0-9]', '', strip_acc(s.get("artistName", ""))).lower()
                             if cand_art == norm_target:
@@ -234,7 +234,7 @@ class LastFMService:
             req = urllib.request.Request(url, headers=headers)
             with urllib.request.urlopen(req, timeout=3) as response:
                 if response.status == 200:
-                    data = json.loads(response.read().decode())
+                    data = json.loads(response.read().decode('utf-8', errors='replace'))
                     raw_candidates = data.get("data", [])
 
                     lfm_tracks = cls._get_lastfm_artist_top_tracks(artist_name)
@@ -252,7 +252,7 @@ class LastFMService:
                                 treq = urllib.request.Request(f"https://api.deezer.com/search/track?q={tq}&limit=5", headers={"User-Agent": "PathdApp/1.0"})
                                 with urllib.request.urlopen(treq, timeout=2) as tres:
                                     if tres.status == 200:
-                                        tdata = json.loads(tres.read().decode())
+                                        tdata = json.loads(tres.read().decode('utf-8', errors='replace'))
                                         for t_item in tdata.get("data", []):
                                             if t_item.get("artist"):
                                                 raw_candidates.append(t_item["artist"])
@@ -310,7 +310,7 @@ class LastFMService:
                             try:
                                 treq = urllib.request.Request(f"https://api.deezer.com/artist/{cand_id}/top?limit=15", headers={"User-Agent": "PathdApp/1.0"})
                                 with urllib.request.urlopen(treq, timeout=1.5) as tres:
-                                    td = json.loads(tres.read().decode())
+                                    td = json.loads(tres.read().decode('utf-8', errors='replace'))
                                     deezer_tracks = [clean_trk(t.get("title", "")) for t in td.get("data", [])]
                                     for lt in lfm_tracks_norm:
                                         if any(lt == dt or (len(lt) >= 4 and (lt in dt or dt in lt)) for dt in deezer_tracks if dt):
@@ -378,7 +378,7 @@ class LastFMService:
             req = urllib.request.Request(url, headers=headers)
             with urllib.request.urlopen(req, timeout=3) as response:
                 if response.status == 200:
-                    data = json.loads(response.read().decode())
+                    data = json.loads(response.read().decode('utf-8', errors='replace'))
                     tracks = data.get("data", [])
                     if tracks:
                         matched_track = None
@@ -420,7 +420,7 @@ class LastFMService:
             req = urllib.request.Request(url, headers=headers)
             with urllib.request.urlopen(req, timeout=3) as response:
                 if response.status == 200:
-                    data = json.loads(response.read().decode())
+                    data = json.loads(response.read().decode('utf-8', errors='replace'))
                     albums = data.get("data", [])
                     if albums:
                         matched_album = None
@@ -473,7 +473,7 @@ class LastFMService:
         try:
             with urllib.request.urlopen(req, timeout=4) as response:
                 if response.status == 200:
-                    data = json.loads(response.read().decode())
+                    data = json.loads(response.read().decode('utf-8', errors='replace'))
                     raw_albums = data.get("topalbums", {}).get("album", [])
                     if isinstance(raw_albums, dict):
                         raw_albums = [raw_albums]
@@ -543,7 +543,7 @@ class LastFMService:
         try:
             with urllib.request.urlopen(req, timeout=4) as response:
                 if response.status == 200:
-                    data = json.loads(response.read().decode())
+                    data = json.loads(response.read().decode('utf-8', errors='replace'))
                     raw_artists = data.get("topartists", {}).get("artist", [])
                     if isinstance(raw_artists, dict):
                         raw_artists = [raw_artists]
@@ -611,7 +611,7 @@ class LastFMService:
         try:
             with urllib.request.urlopen(req, timeout=4) as response:
                 if response.status == 200:
-                    data = json.loads(response.read().decode())
+                    data = json.loads(response.read().decode('utf-8', errors='replace'))
                     raw_tracks = data.get("toptracks", {}).get("track", [])
                     if isinstance(raw_tracks, dict):
                         raw_tracks = [raw_tracks]
@@ -690,7 +690,7 @@ class LastFMService:
                     req = urllib.request.Request(url, headers={"User-Agent": "PathdApp/1.0 (contact@pathd.net)"})
                     with urllib.request.urlopen(req, timeout=3) as res:
                         if res.status == 200:
-                            d = json.loads(res.read().decode())
+                            d = json.loads(res.read().decode('utf-8', errors='replace'))
                             extract = d.get("extract")
                             if extract and len(extract) > 40:
                                 return extract.strip()
@@ -703,7 +703,7 @@ class LastFMService:
                 req = urllib.request.Request(url, headers={"User-Agent": "PathdApp/1.0 (contact@pathd.net)"})
                 with urllib.request.urlopen(req, timeout=3) as res:
                     if res.status == 200:
-                        d = json.loads(res.read().decode())
+                        d = json.loads(res.read().decode('utf-8', errors='replace'))
                         results = d.get("query", {}).get("search", [])
                         for r in results[:3]:
                             title = r.get("title")
@@ -715,7 +715,7 @@ class LastFMService:
                             try:
                                 with urllib.request.urlopen(s_req, timeout=3) as s_res:
                                     if s_res.status == 200:
-                                        s_d = json.loads(s_res.read().decode())
+                                        s_d = json.loads(s_res.read().decode('utf-8', errors='replace'))
                                         extract = s_d.get("extract")
                                         if extract and any(k in extract.lower() for k in ["rapero", "cantante", "músic", "álbum", "disco", "cancion", "band", "artist", "singer", "rapper", "mc"]):
                                             return extract.strip()
@@ -743,7 +743,7 @@ class LastFMService:
             req = urllib.request.Request(url, headers=headers)
             with urllib.request.urlopen(req, timeout=4) as res:
                 if res.status == 200:
-                    d = json.loads(res.read().decode())
+                    d = json.loads(res.read().decode('utf-8', errors='replace'))
                     albums = d.get("topalbums", {}).get("album", [])
                     results = []
                     seen = set()
@@ -793,7 +793,7 @@ class LastFMService:
                 req_alb = urllib.request.Request(f"https://api.deezer.com/artist/{artist_id}/albums?limit=100", headers={"User-Agent": "PathdApp/1.0"})
                 with urllib.request.urlopen(req_alb, timeout=5) as a_res:
                     if a_res.status == 200:
-                        alb_data = json.loads(a_res.read().decode())
+                        alb_data = json.loads(a_res.read().decode('utf-8', errors='replace'))
                         raw_albums = alb_data.get("data", [])
                         seen_titles = set()
                         for a in raw_albums:
@@ -1039,7 +1039,7 @@ class LastFMService:
         try:
             with urllib.request.urlopen(req, timeout=5) as response:
                 if response.status == 200:
-                    data = json.loads(response.read().decode())
+                    data = json.loads(response.read().decode('utf-8', errors='replace'))
                     artist = data.get("artist", {})
                     if artist:
                         name = artist.get("name", artist_name)
@@ -1106,7 +1106,7 @@ class LastFMService:
         try:
             with urllib.request.urlopen(req, timeout=5) as response:
                 if response.status == 200:
-                    data = json.loads(response.read().decode())
+                    data = json.loads(response.read().decode('utf-8', errors='replace'))
                     album = data.get("album", {})
                     if album:
                         name = album.get("name", album_name)
@@ -1188,7 +1188,7 @@ class LastFMService:
         try:
             with urllib.request.urlopen(req, timeout=5) as response:
                 if response.status == 200:
-                    data = json.loads(response.read().decode())
+                    data = json.loads(response.read().decode('utf-8', errors='replace'))
                     track = data.get("track", {})
                     if track:
                         name = track.get("name", track_name)
@@ -1265,7 +1265,7 @@ class LastFMService:
         try:
             with urllib.request.urlopen(req, timeout=4) as response:
                 if response.status == 200:
-                    data = json.loads(response.read().decode())
+                    data = json.loads(response.read().decode('utf-8', errors='replace'))
                     count_val = 0
                     if item_type == "artist":
                         count_val = int(data.get("artist", {}).get("stats", {}).get("userplaycount") or 0)
