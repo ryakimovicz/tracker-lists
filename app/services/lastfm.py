@@ -301,20 +301,7 @@ class LastFMService(metaclass=LastFMMeta):
                     if not viable:
                         return None
 
-                    # If only 1 viable candidate or exact match with high fan count
-                    if len(viable) == 1:
-                        cls._cache_artist_deezer[key] = viable[0]
-                        return viable[0]
-
-                    # If there are multiple viable candidates, sort by exactness and popularity
-                    exact_matches = [c for c in viable if re.sub(r'[^a-zA-Z0-9]', '', strip_acc(c.get("name", ""))).lower() == norm_target]
-                    if exact_matches:
-                        exact_matches.sort(key=lambda c: c.get("nb_fan", 0) or 0, reverse=True)
-                        winner = exact_matches[0]
-                        cls._cache_artist_deezer[key] = winner
-                        return winner
-
-                    # Parallel check for candidate tracks
+                    # Parallel check for candidate tracks and complete metadata
                     def evaluate_candidate(cand):
                         cand_id = cand.get("id")
                         cand_clean = strip_acc(cand.get("name", "")).strip()
@@ -322,27 +309,40 @@ class LastFMService(metaclass=LastFMMeta):
                         is_exact = 1 if (cand_clean == norm_clean or cand_name_norm == norm_target) else 0
 
                         overlap = 0
-                        if lfm_tracks_norm and cand_id:
-                            try:
-                                treq = urllib.request.Request(f"https://api.deezer.com/artist/{cand_id}/top?limit=15", headers={"User-Agent": "PathdApp/1.0"})
-                                with urllib.request.urlopen(treq, timeout=1.5) as tres:
-                                    td = json.loads(tres.read().decode('utf-8', errors='replace'))
-                                    deezer_tracks = [clean_trk(t.get("title", "")) for t in td.get("data", [])]
-                                    for lt in lfm_tracks_norm:
-                                        if any(lt == dt or (len(lt) >= 4 and (lt in dt or dt in lt)) for dt in deezer_tracks if dt):
-                                            overlap += 1
-                            except Exception:
-                                pass
+                        full_artist_info = dict(cand)
+                        if cand_id:
+                            # 1. Check top track overlap against Last.fm top tracks
+                            if lfm_tracks_norm:
+                                try:
+                                    treq = urllib.request.Request(f"https://api.deezer.com/artist/{cand_id}/top?limit=15", headers={"User-Agent": "PathdApp/1.0"})
+                                    with urllib.request.urlopen(treq, timeout=2.0) as tres:
+                                        td = json.loads(tres.read().decode('utf-8', errors='replace'))
+                                        deezer_tracks = [clean_trk(t.get("title", "")) for t in td.get("data", [])]
+                                        for lt in lfm_tracks_norm:
+                                            if any(lt == dt or (len(lt) >= 4 and (lt in dt or dt in lt)) for dt in deezer_tracks if dt):
+                                                overlap += 1
+                                except Exception:
+                                    pass
 
-                        fans = cand.get("nb_fan", 0) or 0
-                        return (1 if overlap > 0 else 0, overlap, is_exact, fans, cand)
+                            # 2. Fetch full artist info if nb_fan or high-res pictures are missing
+                            if full_artist_info.get("nb_fan") is None or not full_artist_info.get("picture_xl"):
+                                try:
+                                    areq = urllib.request.Request(f"https://api.deezer.com/artist/{cand_id}", headers={"User-Agent": "PathdApp/1.0"})
+                                    with urllib.request.urlopen(areq, timeout=2.0) as ares:
+                                        ad = json.loads(ares.read().decode('utf-8', errors='replace'))
+                                        full_artist_info.update(ad)
+                                except Exception:
+                                    pass
+
+                        fans = full_artist_info.get("nb_fan", 0) or 0
+                        return (overlap, is_exact, fans, full_artist_info)
 
                     import concurrent.futures
-                    with concurrent.futures.ThreadPoolExecutor(max_workers=6) as pool:
-                        scored = list(pool.map(evaluate_candidate, viable[:6]))
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+                        scored = list(pool.map(evaluate_candidate, viable[:8]))
 
-                    scored.sort(key=lambda x: (x[0], x[1], x[2], x[3]), reverse=True)
-                    winner = scored[0][4]
+                    scored.sort(key=lambda x: (x[0], x[1], x[2]), reverse=True)
+                    winner = scored[0][3]
                     cls._cache_artist_deezer[key] = winner
                     return winner
         except Exception:
