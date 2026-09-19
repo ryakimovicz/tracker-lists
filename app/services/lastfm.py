@@ -271,13 +271,24 @@ class LastFMService:
                     if not viable:
                         viable = [c for c in candidates if re.sub(r'[^a-zA-Z0-9]', '', strip_acc(c.get("name", ""))).lower() == norm_target]
 
+                    if not viable and raw_candidates:
+                        viable = raw_candidates[:5]
+
                     if not viable:
                         return None
 
-                    # If only 1 viable candidate
+                    # If only 1 viable candidate or exact match with high fan count
                     if len(viable) == 1:
                         cls._cache_artist_deezer[key] = viable[0]
                         return viable[0]
+
+                    # If there are multiple viable candidates, sort by exactness and popularity
+                    exact_matches = [c for c in viable if re.sub(r'[^a-zA-Z0-9]', '', strip_acc(c.get("name", ""))).lower() == norm_target]
+                    if exact_matches:
+                        exact_matches.sort(key=lambda c: c.get("nb_fan", 0) or 0, reverse=True)
+                        winner = exact_matches[0]
+                        cls._cache_artist_deezer[key] = winner
+                        return winner
 
                     # Parallel check for candidate tracks
                     def evaluate_candidate(cand):
@@ -289,8 +300,8 @@ class LastFMService:
                         overlap = 0
                         if lfm_tracks_norm and cand_id:
                             try:
-                                treq = urllib.request.Request(f"https://api.deezer.com/artist/{cand_id}/top?limit=25", headers={"User-Agent": "PathdApp/1.0"})
-                                with urllib.request.urlopen(treq, timeout=2) as tres:
+                                treq = urllib.request.Request(f"https://api.deezer.com/artist/{cand_id}/top?limit=15", headers={"User-Agent": "PathdApp/1.0"})
+                                with urllib.request.urlopen(treq, timeout=1.5) as tres:
                                     td = json.loads(tres.read().decode())
                                     deezer_tracks = [clean_trk(t.get("title", "")) for t in td.get("data", [])]
                                     for lt in lfm_tracks_norm:
@@ -303,8 +314,8 @@ class LastFMService:
                         return (1 if overlap > 0 else 0, overlap, is_exact, fans, cand)
 
                     import concurrent.futures
-                    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
-                        scored = list(pool.map(evaluate_candidate, viable))
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=6) as pool:
+                        scored = list(pool.map(evaluate_candidate, viable[:6]))
 
                     scored.sort(key=lambda x: (x[0], x[1], x[2], x[3]), reverse=True)
                     winner = scored[0][4]
@@ -455,25 +466,35 @@ class LastFMService:
             with urllib.request.urlopen(req, timeout=4) as response:
                 if response.status == 200:
                     data = json.loads(response.read().decode())
-                    top_albums = data.get("topalbums", {}).get("album", [])
-                    for idx, album in enumerate(top_albums):
+                    raw_albums = data.get("topalbums", {}).get("album", [])
+                    if isinstance(raw_albums, dict):
+                        raw_albums = [raw_albums]
+                    elif not isinstance(raw_albums, list):
+                        raw_albums = []
+
+                    def enrich_one_album(album):
                         image = ""
                         for img in album.get("image", []):
                             if img.get("size") == "extralarge" or img.get("size") == "large":
                                 image = img.get("#text")
                         
                         album_name = album.get("name", "")
-                        artist_name = album.get("artist", {}).get("name", "")
-                        if enrich_images and idx < 15 and cls._is_placeholder_or_empty(image) and album_name:
+                        artist_name = album.get("artist", {}).get("name", "") if isinstance(album.get("artist"), dict) else str(album.get("artist") or "")
+                        if enrich_images and cls._is_placeholder_or_empty(image) and album_name:
                             image = cls._fetch_album_image(album_name, artist_name)
 
-                        albums.append({
+                        return {
                             "name": album_name,
                             "artist": artist_name,
                             "playcount": album.get("playcount"),
                             "image": image,
                             "url": album.get("url")
-                        })
+                        }
+
+                    import concurrent.futures
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as pool:
+                        albums = list(pool.map(enrich_one_album, raw_albums[:limit]))
+
                     cls._cache_top_albums[cache_key] = (now, albums)
                     return albums
         except Exception as e:
@@ -515,24 +536,33 @@ class LastFMService:
             with urllib.request.urlopen(req, timeout=4) as response:
                 if response.status == 200:
                     data = json.loads(response.read().decode())
-                    top_artists = data.get("topartists", {}).get("artist", [])
-                    for idx, artist in enumerate(top_artists):
+                    raw_artists = data.get("topartists", {}).get("artist", [])
+                    if isinstance(raw_artists, dict):
+                        raw_artists = [raw_artists]
+                    elif not isinstance(raw_artists, list):
+                        raw_artists = []
+
+                    def enrich_one_artist(artist):
                         image = ""
                         for img in artist.get("image", []):
                             if img.get("size") == "extralarge" or img.get("size") == "large":
                                 image = img.get("#text")
                         
                         artist_name = artist.get("name", "")
-                        # Enrich image if LastFM provided empty or placeholder image
-                        if enrich_images and idx < 15 and cls._is_placeholder_or_empty(image) and artist_name:
+                        if enrich_images and cls._is_placeholder_or_empty(image) and artist_name:
                             image = cls._fetch_artist_image(artist_name)
 
-                        artists.append({
+                        return {
                             "name": artist_name,
                             "playcount": artist.get("playcount"),
                             "image": image,
                             "url": artist.get("url")
-                        })
+                        }
+
+                    import concurrent.futures
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as pool:
+                        artists = list(pool.map(enrich_one_artist, raw_artists[:limit]))
+
                     cls._cache_top_artists[cache_key] = (now, artists)
                     return artists
         except Exception as e:
@@ -574,27 +604,36 @@ class LastFMService:
             with urllib.request.urlopen(req, timeout=4) as response:
                 if response.status == 200:
                     data = json.loads(response.read().decode())
-                    top_tracks = data.get("toptracks", {}).get("track", [])
-                    for idx, track in enumerate(top_tracks):
+                    raw_tracks = data.get("toptracks", {}).get("track", [])
+                    if isinstance(raw_tracks, dict):
+                        raw_tracks = [raw_tracks]
+                    elif not isinstance(raw_tracks, list):
+                        raw_tracks = []
+
+                    def enrich_one_track(track):
                         image = ""
                         for img in track.get("image", []):
                             if img.get("size") == "extralarge" or img.get("size") == "large":
                                 image = img.get("#text")
                         
                         track_name = track.get("name", "")
-                        artist_name = track.get("artist", {}).get("name", "")
+                        artist_name = track.get("artist", {}).get("name", "") if isinstance(track.get("artist"), dict) else str(track.get("artist") or "")
 
-                        # Enrich image if LastFM provided empty or placeholder image
-                        if enrich_images and idx < 15 and cls._is_placeholder_or_empty(image) and track_name:
+                        if enrich_images and cls._is_placeholder_or_empty(image) and track_name:
                             image = cls._fetch_track_image(track_name, artist_name)
 
-                        tracks.append({
+                        return {
                             "name": track_name,
                             "artist": artist_name,
                             "playcount": track.get("playcount"),
                             "image": image,
                             "url": track.get("url")
-                        })
+                        }
+
+                    import concurrent.futures
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as pool:
+                        tracks = list(pool.map(enrich_one_track, raw_tracks[:limit]))
+
                     cls._cache_top_tracks[cache_key] = (now, tracks)
                     return tracks
         except Exception as e:
