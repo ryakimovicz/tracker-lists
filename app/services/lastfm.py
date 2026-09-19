@@ -13,7 +13,7 @@ from app.core.config import settings
 class LastFMService:
     API_KEY = settings.LASTFM_API_KEY
     SHARED_SECRET = settings.LASTFM_SHARED_SECRET
-    BASE_URL = "http://ws.audioscrobbler.com/2.0/"
+    BASE_URL = "https://ws.audioscrobbler.com/2.0/"
 
     # In-memory fast cache
     _cache_now_playing: Dict[str, tuple] = {}  # key -> (timestamp, data)
@@ -38,8 +38,11 @@ class LastFMService:
         return f"https://www.last.fm/api/auth/?api_key={cls.API_KEY}&cb=http://localhost:5173/profile"
 
     @classmethod
-    def get_session(cls, token: str) -> Optional[Dict[str, str]]:
-        """Exchanges an auth token for a session key"""
+    def get_session(cls, token: str) -> Optional[Dict[str, Any]]:
+        """Exchanges an authorized request token for a Last.fm Web Services session key"""
+        if not cls.API_KEY or not cls.SHARED_SECRET:
+            return None
+
         params = {
             "method": "auth.getSession",
             "api_key": cls.API_KEY,
@@ -54,7 +57,7 @@ class LastFMService:
         try:
             with urllib.request.urlopen(url, timeout=5) as response:
                 if response.status == 200:
-                    data = json.loads(response.read().decode())
+                    data = json.loads(response.read().decode('utf-8', errors='replace'))
                     if "session" in data:
                         return {
                             "name": data["session"]["name"],
@@ -92,8 +95,13 @@ class LastFMService:
         try:
             with urllib.request.urlopen(req, timeout=4) as response:
                 if response.status == 200:
-                    data = json.loads(response.read().decode())
+                    data = json.loads(response.read().decode('utf-8', errors='replace'))
                     tracks = data.get("recenttracks", {}).get("track", [])
+                    if isinstance(tracks, dict):
+                        tracks = [tracks]
+                    elif not isinstance(tracks, list):
+                        tracks = []
+
                     if tracks:
                         track = tracks[0]
                         is_playing = track.get("@attr", {}).get("nowplaying", "false") == "true"
@@ -105,8 +113,8 @@ class LastFMService:
                         
                         result = {
                             "name": track.get("name"),
-                            "artist": track.get("artist", {}).get("#text"),
-                            "album": track.get("album", {}).get("#text"),
+                            "artist": track.get("artist", {}).get("#text") if isinstance(track.get("artist"), dict) else str(track.get("artist") or ""),
+                            "album": track.get("album", {}).get("#text") if isinstance(track.get("album"), dict) else str(track.get("album") or ""),
                             "image": image,
                             "is_playing": is_playing,
                             "url": track.get("url")

@@ -1346,9 +1346,9 @@ export const Profile: React.FC = () => {
           setTopAlbums(taData);
 
           // Populate music cache in background for 7day default
-          musicCacheRef.current[`${targetId}_albums_7day`] = taData;
-          musicCacheRef.current[`${targetId}_artists_7day`] = tartData;
-          musicCacheRef.current[`${targetId}_tracks_7day`] = ttrData;
+          if (taData && taData.length > 0) musicCacheRef.current[`${targetId}_albums_7day`] = taData;
+          if (tartData && tartData.length > 0) musicCacheRef.current[`${targetId}_artists_7day`] = tartData;
+          if (ttrData && ttrData.length > 0) musicCacheRef.current[`${targetId}_tracks_7day`] = ttrData;
 
           // If current tab is music or if musicItems is empty, set current view items
           if (musicType === 'artists' && tartData.length > 0) {
@@ -1444,7 +1444,7 @@ export const Profile: React.FC = () => {
     if (musicType === 'tracks') endpoint = 'top-tracks';
 
     const cacheKey = `${targetId}_${musicType}_${musicPeriod}`;
-    if (musicCacheRef.current[cacheKey]) {
+    if (musicCacheRef.current[cacheKey] && musicCacheRef.current[cacheKey].length > 0) {
       const cachedItems = musicCacheRef.current[cacheKey];
       setMusicItems(cachedItems);
       setIsMusicDataLoading(false);
@@ -1469,7 +1469,9 @@ export const Profile: React.FC = () => {
       .then(res => {
         if (!isMounted) return;
         const items = Array.isArray(res.data) ? res.data : [];
-        musicCacheRef.current[cacheKey] = items;
+        if (items.length > 0) {
+          musicCacheRef.current[cacheKey] = items;
+        }
         setMusicItems(items);
 
         // Stagger prefetch details for top visible items in background
@@ -1482,7 +1484,7 @@ export const Profile: React.FC = () => {
       })
       .catch(() => {
         if (!isMounted) return;
-        if (!musicCacheRef.current[cacheKey]) {
+        if (!musicCacheRef.current[cacheKey] || musicCacheRef.current[cacheKey].length === 0) {
           setMusicItems([]);
         }
       })
@@ -1496,7 +1498,7 @@ export const Profile: React.FC = () => {
     const otherPeriods = (['7day', '1month', 'overall'] as const).filter(p => p !== musicPeriod);
     otherPeriods.forEach((otherP, idx) => {
       const otherKey = `${targetId}_${musicType}_${otherP}`;
-      if (!musicCacheRef.current[otherKey]) {
+      if (!musicCacheRef.current[otherKey] || musicCacheRef.current[otherKey].length === 0) {
         setTimeout(() => {
           if (!isMounted) return;
           apiClient.get(`/users/${targetId}/music/${endpoint}?period=${otherP}`)
