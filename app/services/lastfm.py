@@ -10,10 +10,25 @@ import concurrent.futures
 from typing import Optional, Dict, Any, List
 from app.core.config import settings
 
-class LastFMService:
-    API_KEY = settings.LASTFM_API_KEY
-    SHARED_SECRET = settings.LASTFM_SHARED_SECRET
+class LastFMMeta(type):
+    @property
+    def API_KEY(cls) -> str:
+        return os.getenv("LASTFM_API_KEY") or settings.LASTFM_API_KEY or ""
+
+    @property
+    def SHARED_SECRET(cls) -> str:
+        return os.getenv("LASTFM_SHARED_SECRET") or settings.LASTFM_SHARED_SECRET or ""
+
+class LastFMService(metaclass=LastFMMeta):
     BASE_URL = "https://ws.audioscrobbler.com/2.0/"
+
+    @classmethod
+    def get_api_key(cls) -> str:
+        return os.getenv("LASTFM_API_KEY") or settings.LASTFM_API_KEY or ""
+
+    @classmethod
+    def get_shared_secret(cls) -> str:
+        return os.getenv("LASTFM_SHARED_SECRET") or settings.LASTFM_SHARED_SECRET or ""
 
     # In-memory fast cache
     _cache_now_playing: Dict[str, tuple] = {}  # key -> (timestamp, data)
@@ -29,23 +44,25 @@ class LastFMService:
         """Generates Last.fm API signature"""
         sorted_keys = sorted([k for k in params.keys() if k != 'format' and k != 'callback'])
         sig_str = "".join([f"{k}{params[k]}" for k in sorted_keys])
-        sig_str += cls.SHARED_SECRET
+        sig_str += cls.get_shared_secret()
         return hashlib.md5(sig_str.encode('utf-8')).hexdigest()
 
     @classmethod
     def get_auth_url(cls, token: str = None) -> str:
         """Returns the URL the user should be redirected to for authorization"""
-        return f"https://www.last.fm/api/auth/?api_key={cls.API_KEY}&cb=http://localhost:5173/profile"
+        return f"https://www.last.fm/api/auth/?api_key={cls.get_api_key()}&cb=http://localhost:5173/profile"
 
     @classmethod
     def get_session(cls, token: str) -> Optional[Dict[str, Any]]:
         """Exchanges an authorized request token for a Last.fm Web Services session key"""
-        if not cls.API_KEY or not cls.SHARED_SECRET:
+        api_key = cls.get_api_key()
+        shared_secret = cls.get_shared_secret()
+        if not api_key or not shared_secret:
             return None
 
         params = {
             "method": "auth.getSession",
-            "api_key": cls.API_KEY,
+            "api_key": api_key,
             "token": token
         }
         params["api_sig"] = cls._generate_signature(params)
@@ -132,7 +149,6 @@ class LastFMService:
     _cache_track_images: Dict[str, str] = {}
     _cache_album_images: Dict[str, str] = {}
 
-    @classmethod
     @classmethod
     def _is_placeholder_or_empty(cls, img_url: Optional[str]) -> bool:
         """Returns True if the image URL is empty or LastFM/Deezer's generic placeholder star/asset"""
@@ -471,7 +487,7 @@ class LastFMService:
         
         albums = []
         try:
-            with urllib.request.urlopen(req, timeout=4) as response:
+            with urllib.request.urlopen(req, timeout=8) as response:
                 if response.status == 200:
                     data = json.loads(response.read().decode('utf-8', errors='replace'))
                     raw_albums = data.get("topalbums", {}).get("album", [])
@@ -489,7 +505,12 @@ class LastFMService:
                         album_name = album.get("name", "")
                         artist_name = album.get("artist", {}).get("name", "") if isinstance(album.get("artist"), dict) else str(album.get("artist") or "")
                         if enrich_images and cls._is_placeholder_or_empty(image) and album_name:
-                            image = cls._fetch_album_image(album_name, artist_name)
+                            try:
+                                enriched_img = cls._fetch_album_image(album_name, artist_name)
+                                if enriched_img:
+                                    image = enriched_img
+                            except Exception:
+                                pass
 
                         return {
                             "name": album_name,
@@ -541,7 +562,7 @@ class LastFMService:
         
         artists = []
         try:
-            with urllib.request.urlopen(req, timeout=4) as response:
+            with urllib.request.urlopen(req, timeout=8) as response:
                 if response.status == 200:
                     data = json.loads(response.read().decode('utf-8', errors='replace'))
                     raw_artists = data.get("topartists", {}).get("artist", [])
@@ -558,7 +579,12 @@ class LastFMService:
                         
                         artist_name = artist.get("name", "")
                         if enrich_images and cls._is_placeholder_or_empty(image) and artist_name:
-                            image = cls._fetch_artist_image(artist_name)
+                            try:
+                                enriched_img = cls._fetch_artist_image(artist_name)
+                                if enriched_img:
+                                    image = enriched_img
+                            except Exception:
+                                pass
 
                         return {
                             "name": artist_name,
@@ -609,7 +635,7 @@ class LastFMService:
         
         tracks = []
         try:
-            with urllib.request.urlopen(req, timeout=4) as response:
+            with urllib.request.urlopen(req, timeout=8) as response:
                 if response.status == 200:
                     data = json.loads(response.read().decode('utf-8', errors='replace'))
                     raw_tracks = data.get("toptracks", {}).get("track", [])
@@ -628,7 +654,12 @@ class LastFMService:
                         artist_name = track.get("artist", {}).get("name", "") if isinstance(track.get("artist"), dict) else str(track.get("artist") or "")
 
                         if enrich_images and cls._is_placeholder_or_empty(image) and track_name:
-                            image = cls._fetch_track_image(track_name, artist_name)
+                            try:
+                                enriched_img = cls._fetch_track_image(track_name, artist_name)
+                                if enriched_img:
+                                    image = enriched_img
+                            except Exception:
+                                pass
 
                         return {
                             "name": track_name,
