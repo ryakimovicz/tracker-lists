@@ -628,7 +628,7 @@ export const Profile: React.FC = () => {
       el.removeEventListener('scroll', updateShelfScrollState);
       window.removeEventListener('resize', updateShelfScrollState);
     };
-  }, [updateShelfScrollState, activeTab, isShelfExpanded, shelfViewMode, libraryItems, shelfSearchQuery]);
+  }, [updateShelfScrollState, activeTab, isShelfExpanded, shelfViewMode, libraryItems, shelfSearchQuery, mediaFilter]);
 
   useEffect(() => {
     if (activeTab !== 'guides') return;
@@ -667,6 +667,8 @@ export const Profile: React.FC = () => {
       window.removeEventListener('resize', updateSavedGuidesScrollState);
     };
   }, [updateSavedGuidesScrollState, activeTab, isSavedGuidesExpanded, profile?.saved_lists]);
+
+
 
   useEffect(() => {
     const updateWidth = () => {
@@ -2879,6 +2881,7 @@ export const Profile: React.FC = () => {
 
                         <div
                           ref={shelfScrollRef}
+                          onScroll={updateShelfScrollState}
                           style={{
                             display: isTwoRows ? 'grid' : 'flex',
                             gridTemplateColumns: isTwoRowsByRow ? `repeat(${maxVisibleInOneRow}, max-content)` : undefined,
@@ -3843,6 +3846,7 @@ export const Profile: React.FC = () => {
                       {/* Cards Scroll Container */}
                       <div
                         ref={createdGuidesScrollRef}
+                        onScroll={updateCreatedGuidesScrollState}
                         style={{
                           display: isCreatedTwoRows ? 'grid' : 'flex',
                           gridTemplateColumns: isCreatedTwoRowsByRow ? `repeat(${maxGuidesInOneRow}, max-content)` : undefined,
@@ -4026,6 +4030,7 @@ export const Profile: React.FC = () => {
                       {/* Cards Scroll Container */}
                       <div
                         ref={savedGuidesScrollRef}
+                        onScroll={updateSavedGuidesScrollState}
                         style={{
                           display: isSavedTwoRows ? 'grid' : 'flex',
                           gridTemplateColumns: isSavedTwoRowsByRow ? `repeat(${maxGuidesInOneRow}, max-content)` : undefined,
@@ -4545,6 +4550,7 @@ export const Profile: React.FC = () => {
                     {/* Cards Scroll Container */}
                     <div
                       ref={favoritesScrollRef}
+                      onScroll={updateFavoritesScrollState}
                       style={{
                         display: isTwoRows ? 'grid' : 'flex',
                         gridTemplateColumns: isTwoRowsByRow ? `repeat(${maxVisibleInOneRow}, max-content)` : undefined,
