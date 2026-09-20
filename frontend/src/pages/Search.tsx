@@ -11,6 +11,7 @@ import { ReplaceFavoriteModal } from '../components/ReplaceFavoriteModal';
 import { ProModal } from '../components/ProModal';
 import { getOrderedCategories, sortFilterTabs, getCategoryIcon } from '../utils/categoryOrder';
 import { prefetchMediaDetails } from '../utils/prefetch';
+import { removeCachedSeries, clearCachedSeriesMatching } from '../utils/seriesCache';
 
 import { Search as SearchIcon, AlertCircle, CheckCircle, Plus, X, Heart, Star, Users, BookOpen, Package, Puzzle, Sparkles, Gamepad2, Trash2, Flame, TrendingUp, Trophy, Bookmark, Film, Tv, Book, MessageSquare, MessageCircle } from 'lucide-react';
 
@@ -873,12 +874,30 @@ export const Search: React.FC = () => {
     try {
       const url = deleteHistory ? `/library/${itemToRemoveFromShelf.id}?delete_history=true` : `/library/${itemToRemoveFromShelf.id}`;
       await apiClient.delete(url);
+
+      if (deleteHistory) {
+        const cleanId = String(itemToRemoveFromShelf.external_id || itemToRemoveFromShelf.id || '').replace('cv_vol_', '').replace('cv_issue_', '').replace('cv_', '').replace('tvm-ep-', '').replace('tvm_', '');
+        clearCachedSeriesMatching(`issue_state_`);
+        if (cleanId) {
+          removeCachedSeries(`comic_vol_${cleanId}`);
+          removeCachedSeries(`series_${cleanId}`);
+          removeCachedSeries(`${cleanId}_all_episodes`);
+          removeCachedSeries(`${cleanId}_all_episodes_v2`);
+          removeCachedSeries(`${cleanId}_metadata`);
+        }
+        if (itemToRemoveFromShelf.tracking_list_id) {
+          removeCachedSeries(`list_${itemToRemoveFromShelf.tracking_list_id}`);
+        }
+      }
+
       setSuccessMsg(deleteHistory
         ? (language === 'es' ? 'Elemento y su historial eliminados por completo.' : 'Item and all history deleted completely.')
         : (language === 'es' ? 'Elemento eliminado de tu estantería (historial conservado).' : 'Item removed from your shelf (history preserved).')
       );
       setItemToRemoveFromShelf(null);
       await loadShelfItems();
+      window.dispatchEvent(new CustomEvent('progress-updated', { detail: { deletedExternalId: itemToRemoveFromShelf.external_id, deleteHistory } }));
+      window.dispatchEvent(new Event('library-updated'));
       setTimeout(() => setSuccessMsg(''), 3500);
     } catch (err: any) {
       setErrorMsg(err.response?.data?.detail || 'Failed to remove item.');
@@ -1431,6 +1450,20 @@ export const Search: React.FC = () => {
                                   try {
                                     if (shelfItem.id && shelfItem.id > 0) {
                                       await apiClient.delete(`/library/${shelfItem.id}?delete_history=true`);
+                                      const cleanId = String(shelfItem.external_id || shelfItem.id || '').replace('cv_vol_', '').replace('cv_issue_', '').replace('cv_', '').replace('tvm-ep-', '').replace('tvm_', '');
+                                      clearCachedSeriesMatching(`issue_state_`);
+                                      if (cleanId) {
+                                        removeCachedSeries(`comic_vol_${cleanId}`);
+                                        removeCachedSeries(`series_${cleanId}`);
+                                        removeCachedSeries(`${cleanId}_all_episodes`);
+                                        removeCachedSeries(`${cleanId}_all_episodes_v2`);
+                                        removeCachedSeries(`${cleanId}_metadata`);
+                                      }
+                                      if (shelfItem.tracking_list_id) {
+                                        removeCachedSeries(`list_${shelfItem.tracking_list_id}`);
+                                      }
+                                      window.dispatchEvent(new CustomEvent('progress-updated', { detail: { deletedExternalId: shelfItem.external_id, deleteHistory: true } }));
+                                      window.dispatchEvent(new Event('library-updated'));
                                     }
                                     setSuccessMsg(language === 'es' ? 'Elemento eliminado de tu estantería.' : 'Item removed from your shelf.');
                                     await loadShelfItems();

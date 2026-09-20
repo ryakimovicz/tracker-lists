@@ -1113,42 +1113,99 @@ def delete_from_library(
 
     # If delete_history is requested, completely wipe progress, consumption history, and reviews
     if delete_history:
-        # Delete consumption history for this item
-        if ext_id:
-            db.query(ConsumptionHistory).filter(
-                ConsumptionHistory.user_id == current_user.id,
-                ConsumptionHistory.external_id == ext_id
-            ).delete()
-            # Also delete reviews if any
-            db.query(MediaReview).filter(
-                MediaReview.user_id == current_user.id,
-                MediaReview.external_id == ext_id
-            ).delete()
-            # Delete direct ItemProgress
-            db.query(ItemProgress).filter(
-                ItemProgress.user_id == current_user.id,
-                ItemProgress.external_id == ext_id
-            ).delete()
+        ext_ids_to_wipe = set()
+        item_ids_to_wipe = set()
 
-        # If it was a series/anime with a private tracking list, wipe all episode progress & history
+        if ext_id:
+            ext_ids_to_wipe.add(ext_id)
+            clean_ext = str(ext_id).replace("cv_vol_", "").replace("cv_issue_", "").replace("tvm-ep-", "").replace("tvm_", "").replace("4050-", "").replace("4000-", "")
+            if clean_ext:
+                ext_ids_to_wipe.add(clean_ext)
+                ext_ids_to_wipe.add(f"cv_vol_{clean_ext}")
+                ext_ids_to_wipe.add(f"4050-{clean_ext}")
+                ext_ids_to_wipe.add(f"tvm_{clean_ext}")
+
+        # If it was a comic volume, fetch all issues to wipe their history & progress
+        if item_type == "comic" or (ext_id and ("cv_vol_" in str(ext_id) or "4050-" in str(ext_id))):
+            try:
+                from app.services.comicvine import ComicVineService
+                cv_issues = ComicVineService.get_comic_volume_issues(ext_id)
+                if cv_issues:
+                    for iss in cv_issues:
+                        i_id = iss.get("id")
+                        if i_id:
+                            str_id = str(i_id).replace("cv_issue_", "").replace("4000-", "")
+                            ext_ids_to_wipe.add(f"cv_issue_{str_id}")
+                            ext_ids_to_wipe.add(f"4000-{str_id}")
+                            ext_ids_to_wipe.add(str_id)
+                        if iss.get("external_id"):
+                            ext_ids_to_wipe.add(str(iss.get("external_id")))
+            except Exception as e:
+                print(f"Error fetching comic issues to wipe history: {e}")
+
+        # If it was a series/anime, fetch all episodes to wipe their history & progress
+        elif item_type in ["series", "anime"] or (ext_id and ("tvm" in str(ext_id))):
+            try:
+                from app.services.tvmaze import TVMazeService
+                tvm_eps = TVMazeService.get_all_episodes(ext_id)
+                if tvm_eps:
+                    for ep in tvm_eps:
+                        e_id = ep.get("id")
+                        if e_id:
+                            str_id = str(e_id).replace("tvm-ep-", "")
+                            ext_ids_to_wipe.add(f"tvm-ep-{str_id}")
+                            ext_ids_to_wipe.add(str_id)
+                        if ep.get("external_id"):
+                            ext_ids_to_wipe.add(str(ep.get("external_id")))
+            except Exception as e:
+                print(f"Error fetching series episodes to wipe history: {e}")
+
+        # If it was linked to a private tracking list, collect all its items
         if tracking_list_id:
             list_items = db.query(ListItem).filter(ListItem.list_id == tracking_list_id).all()
-            ep_ext_ids = [it.external_id for it in list_items if it.external_id]
-            ep_item_ids = [it.id for it in list_items]
-            if ep_ext_ids:
-                db.query(ItemProgress).filter(
-                    ItemProgress.user_id == current_user.id,
-                    ItemProgress.external_id.in_(ep_ext_ids)
-                ).delete(synchronize_session=False)
-                db.query(ConsumptionHistory).filter(
-                    ConsumptionHistory.user_id == current_user.id,
-                    ConsumptionHistory.external_id.in_(ep_ext_ids)
-                ).delete(synchronize_session=False)
-            if ep_item_ids:
-                db.query(ItemProgress).filter(
-                    ItemProgress.user_id == current_user.id,
-                    ItemProgress.list_item_id.in_(ep_item_ids)
-                ).delete(synchronize_session=False)
+            for it in list_items:
+                item_ids_to_wipe.add(it.id)
+                if it.external_id:
+                    ext_ids_to_wipe.add(it.external_id)
+                    clean_it = str(it.external_id).replace("cv_issue_", "").replace("tvm-ep-", "")
+                    ext_ids_to_wipe.add(clean_it)
+                    if it.external_id.startswith("cv_issue_"):
+                        ext_ids_to_wipe.add(f"4000-{clean_it}")
+                    elif it.external_id.startswith("tvm-ep-"):
+                        ext_ids_to_wipe.add(f"tvm-ep-{clean_it}")
+
+        # Wipe ItemProgress, ConsumptionHistory, and MediaReview
+        if ext_ids_to_wipe:
+            ext_list = list(ext_ids_to_wipe)
+            db.query(ItemProgress).filter(
+                ItemProgress.user_id == current_user.id,
+                ItemProgress.external_id.in_(ext_list)
+            ).delete(synchronize_session=False)
+            db.query(ConsumptionHistory).filter(
+                ConsumptionHistory.user_id == current_user.id,
+                ConsumptionHistory.external_id.in_(ext_list)
+            ).delete(synchronize_session=False)
+            db.query(MediaReview).filter(
+                MediaReview.user_id == current_user.id,
+                MediaReview.external_id.in_(ext_list)
+            ).delete(synchronize_session=False)
+            # Delete loose episode/issue cards from library if any
+            db.query(UserLibraryItem).filter(
+                UserLibraryItem.user_id == current_user.id,
+                UserLibraryItem.external_id.in_(ext_list),
+                UserLibraryItem.id != lib_item.id
+            ).delete(synchronize_session=False)
+
+        if item_ids_to_wipe:
+            it_list = list(item_ids_to_wipe)
+            db.query(ItemProgress).filter(
+                ItemProgress.user_id == current_user.id,
+                ItemProgress.list_item_id.in_(it_list)
+            ).delete(synchronize_session=False)
+            db.query(ConsumptionHistory).filter(
+                ConsumptionHistory.user_id == current_user.id,
+                ConsumptionHistory.list_item_id.in_(it_list)
+            ).delete(synchronize_session=False)
 
     # Only delete the associated tracking list if delete_history is True
     if delete_history and tracking_list_id:

@@ -93,6 +93,41 @@ export const setCachedSeries = (key: string, data: any) => {
   }
 };
 
+export const removeCachedSeries = (key: string) => {
+  const languages = ['es', 'en'];
+  languages.forEach(lang => {
+    const fullKey = `${lang}_${key}`;
+    memoryCache.delete(fullKey);
+    try {
+      localStorage.removeItem(`series_cache_v2_${fullKey}`);
+    } catch (e) {}
+  });
+};
+
+export const clearCachedSeriesMatching = (pattern: RegExp | string) => {
+  // Clear from memoryCache
+  for (const k of Array.from(memoryCache.keys())) {
+    const match = typeof pattern === 'string' ? k.includes(pattern) : pattern.test(k);
+    if (match) {
+      memoryCache.delete(k);
+    }
+  }
+  // Clear from localStorage
+  try {
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k) {
+        const match = typeof pattern === 'string' ? k.includes(pattern) : pattern.test(k);
+        if (match) {
+          keysToRemove.push(k);
+        }
+      }
+    }
+    keysToRemove.forEach(k => localStorage.removeItem(k));
+  } catch (e) {}
+};
+
 /**
  * Returns the localized title of a media item if available in the cache (e.g. 'El Mentalista' for Spanish, 'The Mentalist' for English),
  * fallback to the item's stored title.
@@ -119,4 +154,5 @@ export const getLocalizedDisplayTitle = (item: any): string => {
 
   return item.title || item.name || '';
 };
+
 

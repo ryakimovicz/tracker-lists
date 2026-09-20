@@ -8,7 +8,7 @@ import { Star, Heart, X, Flag, CheckCircle, Check, CheckCheck, Plus, MoreVertica
 
 
 
-import { getCachedSeries, setCachedSeries } from '../utils/seriesCache';
+import { getCachedSeries, setCachedSeries, removeCachedSeries, clearCachedSeriesMatching } from '../utils/seriesCache';
 import { useAuth } from '../context/AuthContext';
 import { KlipyPicker } from './KlipyPicker';
 import type { SelectedKlipyMedia } from './KlipyPicker';
@@ -1975,8 +1975,28 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
         }
       } catch (e) {}
 
+      if (deleteHistory) {
+        const cleanId = String(selectedItem.external_id || selectedItem.id || '').replace('cv_vol_', '').replace('cv_issue_', '').replace('cv_', '').replace('tvm-ep-', '').replace('tvm_', '');
+        clearCachedSeriesMatching(`issue_state_`);
+        if (cleanId) {
+          removeCachedSeries(`comic_vol_${cleanId}`);
+          removeCachedSeries(`series_${cleanId}`);
+          removeCachedSeries(`${cleanId}_all_episodes`);
+          removeCachedSeries(`${cleanId}_all_episodes_v2`);
+          removeCachedSeries(`${cleanId}_metadata`);
+        }
+        if (selectedItem.tracking_list_id) {
+          removeCachedSeries(`list_${selectedItem.tracking_list_id}`);
+        }
+        setGlobalProgress({});
+        setEpisodes([]);
+        setSeasonEpisodes({});
+        setPagesReadVal(0);
+      }
+
       setSelectedItem(null);
       onClose();
+      window.dispatchEvent(new CustomEvent('progress-updated', { detail: { deletedExternalId: selectedItem.external_id, deleteHistory } }));
       window.dispatchEvent(new Event('library-updated'));
       onUpdate && onUpdate();
     } catch (e) {
@@ -2202,7 +2222,10 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
         const cleanId = String(ep.id || ep.external_id || '').replace('cv_issue_', '').replace('cv_', '');
         const extIdKey = `cv_issue_${cleanId}`;
         const cachedState = getCachedSeries(`issue_state_${extIdKey}`) || getCachedSeries(`issue_state_cv_issue_${cleanId}`);
-        if (currentProgress[extIdKey] || currentProgress[cleanId] || (cachedState && (cachedState.status === 'read' || cachedState.is_completed))) {
+        const hasExplicitProgress = (extIdKey in currentProgress) || (cleanId in currentProgress);
+        if (hasExplicitProgress) {
+          if (currentProgress[extIdKey] || currentProgress[cleanId]) return 1;
+        } else if (cachedState && (cachedState.status === 'read' || cachedState.is_completed)) {
           return 1;
         }
         const t = (trackedList || []).find((x: any) => {
@@ -2214,8 +2237,9 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
       const cleanTvmId = String(ep.id).replace('tvm-ep-', '');
       const extIdKey = `tvm-ep-${cleanTvmId}`;
-      if (currentProgress[extIdKey] || currentProgress[cleanTvmId]) {
-        return 1;
+      const hasExplicitProgress = (extIdKey in currentProgress) || (cleanTvmId in currentProgress);
+      if (hasExplicitProgress) {
+        if (currentProgress[extIdKey] || currentProgress[cleanTvmId]) return 1;
       }
       const t = (trackedList || []).find((x: any) => {
         const tCleanTvmId = String(x.external_id || '').replace('tvm-ep-', '');
@@ -2295,8 +2319,21 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   useEffect(() => {
     const originalStyle = window.getComputedStyle(document.body).overflow;
     document.body.style.overflow = 'hidden';
+
+    const handleProgUpdated = (e: any) => {
+      const detail = e.detail;
+      if (detail && detail.deleteHistory) {
+        setGlobalProgress({});
+        setEpisodes([]);
+        setSeasonEpisodes({});
+        setPagesReadVal(0);
+      }
+    };
+    window.addEventListener('progress-updated', handleProgUpdated);
+
     return () => {
       document.body.style.overflow = originalStyle;
+      window.removeEventListener('progress-updated', handleProgUpdated);
     };
   }, []);
 
@@ -2325,6 +2362,9 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       setHasInteractedWithTime(false);
       setItemReviews([]);
       setDescExpanded(false);
+      setGlobalProgress({});
+      setEpisodes([]);
+      setSeasonEpisodes({});
 
       const isActualEpisode = Boolean(
         (item.external_id && (item.external_id.startsWith('tvm-ep-') || item.external_id.startsWith('cv_issue_'))) ||
@@ -5983,7 +6023,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                   });
 
                                   const cachedIssueState = getCachedSeries(`issue_state_${extIdKey}`) || getCachedSeries(`issue_state_cv_issue_${cleanEpId}`);
-                                  const isCompleted = !!globalProgress[extIdKey] || !!globalProgress[cleanEpId] || (cachedIssueState && (cachedIssueState.status === 'read' || cachedIssueState.is_completed)) || !!dbEp?.is_completed || !!dbEp?.completed_at;
+                                  const hasExplicitProg = (extIdKey in globalProgress) || (cleanEpId in globalProgress);
+                                  const isCompleted = (hasExplicitProg ? (!!globalProgress[extIdKey] || !!globalProgress[cleanEpId]) : (cachedIssueState && (cachedIssueState.status === 'read' || cachedIssueState.is_completed))) || !!dbEp?.is_completed || !!dbEp?.completed_at;
 
                                   return (
                                     <div
@@ -6186,8 +6227,9 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                 });
 
                                 const cachedIssueState = isComic ? (getCachedSeries(`issue_state_${extIdKey}`) || getCachedSeries(`issue_state_cv_issue_${cleanEpId}`)) : null;
+                                const hasExplicitProg = (extIdKey in globalProgress) || (cleanEpId in globalProgress);
                                 const isCompleted = isComic
-                                  ? (!!globalProgress[extIdKey] || !!globalProgress[cleanEpId] || (cachedIssueState && (cachedIssueState.status === 'read' || cachedIssueState.is_completed)) || !!dbEp?.is_completed || !!dbEp?.completed_at)
+                                  ? ((hasExplicitProg ? (!!globalProgress[extIdKey] || !!globalProgress[cleanEpId]) : (cachedIssueState && (cachedIssueState.status === 'read' || cachedIssueState.is_completed))) || !!dbEp?.is_completed || !!dbEp?.completed_at)
                                   : (!!globalProgress[extIdKey] || !!dbEp?.is_completed);
 
                                 return (
@@ -6564,8 +6606,9 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                                });
 
                                                const cachedIssueState = isComic ? (getCachedSeries(`issue_state_${extIdKey}`) || getCachedSeries(`issue_state_cv_issue_${cleanEpId}`)) : null;
+                                               const hasExplicitProg = (extIdKey in globalProgress) || (cleanEpId in globalProgress);
                                                const isCompleted = isComic
-                                                 ? (!!globalProgress[extIdKey] || !!globalProgress[cleanEpId] || (cachedIssueState && (cachedIssueState.status === 'read' || cachedIssueState.is_completed)) || !!dbEp?.is_completed || !!dbEp?.completed_at)
+                                                 ? ((hasExplicitProg ? (!!globalProgress[extIdKey] || !!globalProgress[cleanEpId]) : (cachedIssueState && (cachedIssueState.status === 'read' || cachedIssueState.is_completed))) || !!dbEp?.is_completed || !!dbEp?.completed_at)
                                                  : (!!globalProgress[extIdKey] || !!dbEp?.is_completed);
 
                                                const isSpecial = ep.is_significant_special || ep.ep_type === 'significant_special' || (ep.episode_number == null && !ep.is_extra && ep.season_number > 0);
