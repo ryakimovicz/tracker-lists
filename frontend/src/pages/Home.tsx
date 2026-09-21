@@ -3072,79 +3072,124 @@ export const Home: React.FC = () => {
 
           <h3 style={{ fontSize: "1.2rem", marginBottom: "0.5rem", fontWeight: 600 }}>{language === 'es' ? 'Novedades en guías seguidas' : 'Updates in followed guides'}</h3>
           <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-            {guideUpdates.length > 0 ? guideUpdates.map(update => {
-              let text = "";
-              if (update.activity_type === "item_added") text = `agrego ${update.item_title} a`;
-              else if (update.activity_type === "item_removed") text = `elimino ${update.item_title} de`;
-              else if (update.activity_type === "item_moved") text = `movio ${update.item_title} en`;
-              else if (update.activity_type === "block_edited") {
-                if (update.item_title === update.list_title || update.item_title === "un bloque") {
-                  text = language === 'es' ? `edito un bloque de` : `edited a block in`;
-                } else if (update.item_title.startsWith("type:")) {
-                  const typeMatch = update.item_title.match(/type:([^|]*)(?:\|id:([^|]*))?\|title:(.*)/);
-                  if (typeMatch) {
-                    const elType = typeMatch[1];
-                    const elTitle = typeMatch[3];
-                    
-                    let typeName = language === 'es' ? 'un bloque' : 'a block';
-                    if (elType === 'section') typeName = language === 'es' ? 'una sección' : 'a section';
-                    else if (elType === 'subblock') typeName = language === 'es' ? 'un sub-bloque' : 'a sub-block';
-                    
-                    if (elTitle) {
-                      text = language === 'es' ? `edito ${typeName === 'una sección' ? 'la sección' : typeName === 'un sub-bloque' ? 'el sub-bloque' : 'el bloque'} '${elTitle}' de` : `edited the ${elType} '${elTitle}' in`;
-                    } else {
-                      text = language === 'es' ? `edito ${typeName} sin título en` : `edited an untitled ${elType} in`;
+            {(() => {
+              const normalizedUpdates: any[] = [];
+              if (Array.isArray(guideUpdates)) {
+                for (const u of guideUpdates) {
+                  if (u && Array.isArray(u.updates) && u.updates.length > 0) {
+                    for (const sub of u.updates) {
+                      normalizedUpdates.push({
+                        id: sub.id || `${u.list_id}-${sub.created_at}`,
+                        username: sub.username || u.creator_name || u.username || (language === 'es' ? 'Usuario' : 'User'),
+                        photo_url: sub.photo_url || u.creator_photo || u.photo_url,
+                        activity_type: sub.activity_type || 'guide_edited',
+                        item_title: sub.item_title || u.guide_title || u.list_title || '',
+                        item_type: sub.item_type || 'guide',
+                        list_id: u.list_id,
+                        list_title: u.guide_title || u.list_title || '',
+                        created_at: sub.created_at || u.created_at
+                      });
                     }
-                  } else {
-                    text = language === 'es' ? `edito un bloque de` : `edited a block in`;
+                  } else if (u) {
+                    normalizedUpdates.push({
+                      ...u,
+                      username: u.username || u.creator_name || (language === 'es' ? 'Usuario' : 'User'),
+                      photo_url: u.photo_url || u.creator_photo || null,
+                      list_title: u.list_title || u.guide_title || ''
+                    });
                   }
-                } else {
-                  text = language === 'es' ? `edito el bloque '${update.item_title}' de` : `edited the block '${update.item_title}' in`;
                 }
               }
-              
-              return (
-                <div 
-                  key={update.id} 
-                  className="feed-update-card"
-                  onClick={() => {
-                    let hash = "";
-                    if (update.activity_type === "block_edited" && update.item_title.startsWith("type:")) {
-                      const m = update.item_title.match(/type:([^|]*)(?:\|id:([^|]*))?\|title:(.*)/);
-                      if (m && m[2]) hash = `#${m[2]}`;
+
+              if (normalizedUpdates.length === 0) {
+                return (
+                  <div style={{ color: "var(--text-secondary)" }}>{language === 'es' ? 'No hay novedades recientes.' : 'No recent updates.'}</div>
+                );
+              }
+
+              return normalizedUpdates.map(update => {
+                const userName = update.username || update.creator_name || (language === 'es' ? 'Usuario' : 'User');
+                const userInitial = (userName.charAt(0) || 'U').toUpperCase();
+                const photoUrl = update.photo_url || update.creator_photo;
+                const listTitle = update.list_title || update.guide_title || '';
+                const itemTitle = update.item_title || listTitle;
+
+                let text = "";
+                if (update.activity_type === "item_added") text = language === 'es' ? `agregó ${itemTitle} a` : `added ${itemTitle} to`;
+                else if (update.activity_type === "item_removed") text = language === 'es' ? `eliminó ${itemTitle} de` : `removed ${itemTitle} from`;
+                else if (update.activity_type === "item_moved") text = language === 'es' ? `movió ${itemTitle} en` : `moved ${itemTitle} in`;
+                else if (update.activity_type === "guide_created") text = language === 'es' ? `creó la guía` : `created the guide`;
+                else if (update.activity_type === "guide_edited") text = language === 'es' ? `actualizó la guía` : `updated the guide`;
+                else if (update.activity_type === "guide_published") text = language === 'es' ? `publicó la guía` : `published the guide`;
+                else if (update.activity_type === "block_edited") {
+                  if (itemTitle === listTitle || itemTitle === "un bloque" || !itemTitle) {
+                    text = language === 'es' ? `editó un bloque de` : `edited a block in`;
+                  } else if (itemTitle.startsWith("type:")) {
+                    const typeMatch = itemTitle.match(/type:([^|]*)(?:\|id:([^|]*))?\|title:(.*)/);
+                    if (typeMatch) {
+                      const elType = typeMatch[1];
+                      const elTitle = typeMatch[3];
+                      
+                      let typeName = language === 'es' ? 'un bloque' : 'a block';
+                      if (elType === 'section') typeName = language === 'es' ? 'una sección' : 'a section';
+                      else if (elType === 'subblock') typeName = language === 'es' ? 'un sub-bloque' : 'a sub-block';
+                      
+                      if (elTitle) {
+                        text = language === 'es' ? `editó ${typeName === 'una sección' ? 'la sección' : typeName === 'un sub-bloque' ? 'el sub-bloque' : 'el bloque'} '${elTitle}' de` : `edited the ${elType} '${elTitle}' in`;
+                      } else {
+                        text = language === 'es' ? `editó ${typeName} sin título en` : `edited an untitled ${elType} in`;
+                      }
+                    } else {
+                      text = language === 'es' ? `editó un bloque de` : `edited a block in`;
                     }
-                    navigate(`/guide/${update.list_id}${hash}`);
-                  }}
-                  style={{ background: "var(--bg-secondary)", padding: "1rem", borderRadius: "8px", border: "1px solid var(--border-color)", display: "flex", alignItems: "center", gap: "1rem", cursor: "pointer", transition: "transform 0.2s ease, box-shadow 0.2s ease" }}
-                >
-                  <div
-                    onClick={(e) => { e.stopPropagation(); navigate(`/user/${encodeURIComponent(update.username)}`); }}
-                    style={{ cursor: "pointer" }}
-                    className="feed-update-user-link"
+                  } else {
+                    text = language === 'es' ? `editó el bloque '${itemTitle}' de` : `edited the block '${itemTitle}' in`;
+                  }
+                } else {
+                  text = language === 'es' ? `actualizó la guía` : `updated the guide`;
+                }
+                
+                return (
+                  <div 
+                    key={update.id} 
+                    className="feed-update-card"
+                    onClick={() => {
+                      let hash = "";
+                      if (update.activity_type === "block_edited" && itemTitle.startsWith("type:")) {
+                        const m = itemTitle.match(/type:([^|]*)(?:\|id:([^|]*))?\|title:(.*)/);
+                        if (m && m[2]) hash = `#${m[2]}`;
+                      }
+                      navigate(`/guide/${update.list_id}${hash}`);
+                    }}
+                    style={{ background: "var(--bg-secondary)", padding: "1rem", borderRadius: "8px", border: "1px solid var(--border-color)", display: "flex", alignItems: "center", gap: "1rem", cursor: "pointer", transition: "transform 0.2s ease, box-shadow 0.2s ease" }}
                   >
-                    {update.photo_url ? (
-                      <img src={update.photo_url} alt={update.username} style={{ width: 40, height: 40, borderRadius: "50%", objectFit: "cover" }} />
-                    ) : (
-                      <div style={{ width: 40, height: 40, borderRadius: "50%", background: "var(--bg-tertiary)", display: "flex", alignItems: "center", justifyContent: "center" }}>{update.username.charAt(0).toUpperCase()}</div>
-                    )}
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: "0.95rem" }}>
-                      <span 
-                        className="feed-update-user-link"
-                        onClick={(e) => { e.stopPropagation(); navigate(`/user/${encodeURIComponent(update.username)}`); }}
-                        style={{ fontWeight: 600, cursor: "pointer", transition: "color 0.2s ease" }}
-                      >{update.username}</span> {text} <span className="feed-update-guide" style={{ fontStyle: "italic", transition: "color 0.2s ease" }}>{update.list_title}</span>
+                    <div
+                      onClick={(e) => { e.stopPropagation(); if (userName) navigate(`/user/${encodeURIComponent(userName)}`); }}
+                      style={{ cursor: "pointer" }}
+                      className="feed-update-user-link"
+                    >
+                      {photoUrl ? (
+                        <img src={photoUrl} alt={userName} style={{ width: 40, height: 40, borderRadius: "50%", objectFit: "cover" }} />
+                      ) : (
+                        <div style={{ width: 40, height: 40, borderRadius: "50%", background: "var(--bg-tertiary)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 600 }}>{userInitial}</div>
+                      )}
                     </div>
-                    <div style={{ fontSize: "0.8rem", color: "var(--text-secondary)", marginTop: "0.25rem" }}>
-                      {new Date(update.created_at).toLocaleDateString()}
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: "0.95rem" }}>
+                        <span 
+                          className="feed-update-user-link"
+                          onClick={(e) => { e.stopPropagation(); if (userName) navigate(`/user/${encodeURIComponent(userName)}`); }}
+                          style={{ fontWeight: 600, cursor: "pointer", transition: "color 0.2s ease" }}
+                        >{userName}</span> {text} <span className="feed-update-guide" style={{ fontStyle: "italic", transition: "color 0.2s ease" }}>{listTitle}</span>
+                      </div>
+                      <div style={{ fontSize: "0.8rem", color: "var(--text-secondary)", marginTop: "0.25rem" }}>
+                        {update.created_at ? new Date(update.created_at).toLocaleDateString() : ''}
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            }) : (
-              <div style={{ color: "var(--text-secondary)" }}>{language === 'es' ? 'No hay novedades recientes.' : 'No recent updates.'}</div>
-            )}
+                );
+              });
+            })()}
           </div>
         </>
       )}

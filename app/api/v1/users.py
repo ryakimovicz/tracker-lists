@@ -2,7 +2,7 @@ import time
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
 from fastapi import APIRouter, Depends, Query, HTTPException, status, Request
-from sqlalchemy import text, func
+from sqlalchemy import text, func, or_
 from sqlalchemy.orm import Session
 
 
@@ -1063,46 +1063,78 @@ def get_guides_updates(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    # Fetch latest guide edits for followed guides
+    # Fetch followed list IDs
     followed_list_ids = [
         s.list_id for s in db.query(SavedList.list_id).filter(SavedList.user_id == current_user.id).all()
     ]
     
     if not followed_list_ids:
         return []
-        
+
+    guide_activity_types = [
+        'item_added', 'item_removed', 'item_moved', 'block_edited',
+        'guide_edited', 'guide_created', 'guide_published'
+    ]
+
+    details_patterns = [f"list_id:{lid}" for lid in followed_list_ids]
+
     activities = db.query(UserActivityLog).filter(
-        UserActivityLog.list_id.in_(followed_list_ids),
-        UserActivityLog.activity_type.in_(['guide_edited', 'guide_created'])
+        UserActivityLog.activity_type.in_(guide_activity_types),
+        or_(
+            UserActivityLog.list_id.in_(followed_list_ids),
+            UserActivityLog.details.in_(details_patterns)
+        )
     ).order_by(UserActivityLog.created_at.desc()).limit(100).all()
-    
-    guide_updates_map = {}
-    
+
+    # Pre-fetch reading lists and creators
+    reading_lists = {
+        rl.id: rl for rl in db.query(ReadingList).filter(ReadingList.id.in_(followed_list_ids)).all()
+    }
+    creator_ids = {rl.creator_id for rl in reading_lists.values() if rl.creator_id}
+    act_user_ids = {a.user_id for a in activities if a.user_id}
+    all_user_ids = creator_ids.union(act_user_ids)
+    users_by_id = {
+        u.id: u for u in db.query(User).filter(User.id.in_(all_user_ids)).all()
+    }
+
+    results = []
     for a in activities:
         lid = a.list_id
-        if lid not in guide_updates_map:
-            reading_list = db.query(ReadingList).filter(ReadingList.id == lid).first()
-            if reading_list:
-                creator = db.query(User).filter(User.id == reading_list.creator_id).first()
-                guide_updates_map[lid] = {
-                    'list_id': lid,
-                    'guide_title': reading_list.title,
-                    'creator_name': creator.username if creator else 'Pathd User',
-                    'creator_photo': creator.photo_url if creator else None,
-                    'created_at': reading_list.created_at,
-                    'updates': []
-                }
-        if lid in guide_updates_map:
-            guide_updates_map[lid]['updates'].append({
-                'id': a.id,
-                'activity_type': a.activity_type,
-                'item_title': a.item_title,
-                'item_type': a.item_type,
-                'details': a.details,
-                'created_at': a.created_at
-            })
-            
-    return list(guide_updates_map.values())[:limit]
+        if not lid and a.details and "list_id:" in a.details:
+            try:
+                lid = int(a.details.split("list_id:")[1].strip())
+            except Exception:
+                pass
+        
+        rl = reading_lists.get(lid)
+        if not rl:
+            continue
+
+        user = users_by_id.get(a.user_id) or users_by_id.get(rl.creator_id)
+        username = user.username if user else "Usuario"
+        photo_url = user.photo_url if user else None
+
+        results.append({
+            'id': a.id,
+            'user_id': a.user_id or rl.creator_id,
+            'username': username,
+            'photo_url': photo_url,
+            'creator_name': username,
+            'creator_photo': photo_url,
+            'activity_type': a.activity_type,
+            'item_title': a.item_title or rl.title,
+            'item_type': a.item_type or "guide",
+            'list_id': rl.id,
+            'list_title': rl.title,
+            'guide_title': rl.title,
+            'details': a.details,
+            'created_at': a.created_at.isoformat() if a.created_at else None
+        })
+
+        if len(results) >= limit:
+            break
+
+    return results
 
 @router.get("/me/feed/following-updates")
 def get_following_updates(

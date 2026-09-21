@@ -3506,13 +3506,12 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
     if (isComic) {
       const comicIssueCount =
+        volMeta?.count_of_issues ||
+        selectedItem?.count_of_issues ||
+        volMeta?.total_issues ||
+        selectedItem?.total_issues ||
         (Array.isArray(cachedAll) && cachedAll.length > 0 ? cachedAll.length : 0) ||
         (seasonEpisodes && seasonEpisodes[1] && seasonEpisodes[1].length > 0 ? seasonEpisodes[1].length : 0) ||
-        volMeta?.count_of_issues ||
-        volMeta?.page_count ||
-        volMeta?.total_issues ||
-        selectedItem?.count_of_issues ||
-        selectedItem?.page_count ||
         (totalEpisodes > 1 ? totalEpisodes : 0);
       if (comicIssueCount > 0) {
         totalEpisodes = comicIssueCount;
@@ -3543,7 +3542,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       : (cachedSeriesData?.status === 'Ended' || selectedItem?.is_ended === true || selectedItem?.series_status === 'Ended');
 
     // Truly finished ONLY if series is ended AND all total episodes of all seasons are completed (must have totalEpisodes > 0)
-    const isTrulyCompleted = (canonicalSeasons.length > 0 || isComic) && isEnded && totalEpisodes > 0 && completedEpisodes >= totalEpisodes;
+    const knownVolIssues = isComic ? (volMeta?.count_of_issues || selectedItem?.count_of_issues || volMeta?.total_issues || selectedItem?.total_issues) : null;
+    const isTrulyCompleted = (canonicalSeasons.length > 0 || isComic) && isEnded && totalEpisodes > 0 && completedEpisodes >= totalEpisodes && (!knownVolIssues || completedEpisodes >= knownVolIssues);
 
     if (isTrulyCompleted) {
       const completedStatus = isComic ? 'read' : 'completed';
@@ -4081,7 +4081,9 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
         }
       });
       setGlobalProgress(prev => ({ ...prev, ...extProgMap }));
-      await checkCompletionStatus(effectiveListId, updatedList);
+      if (returnedStatus === 'read' || returnedStatus === 'completed' || !returnedStatus) {
+        await checkCompletionStatus(effectiveListId, updatedList);
+      }
 
       const targetStatus = returnedStatus || (isComic ? 'reading' : 'watching');
       const updatedSelected = {

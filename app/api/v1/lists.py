@@ -669,6 +669,7 @@ def add_item_to_list(
         item_title=new_item.title,
         item_type=new_item.item_type,
         external_id=new_item.external_id,
+        list_id=list_id,
         image_url=new_item.image_url,
         details=f"list_id:{list_id}"
     )
@@ -719,6 +720,7 @@ def delete_item_from_list(
         item_title=item.title,
         item_type=item.item_type,
         external_id=item.external_id,
+        list_id=list_id,
         image_url=item.image_url,
         details=f"list_id:{list_id}"
     )
@@ -1256,6 +1258,7 @@ def import_tv_items(
             activity_type="item_added",
             item_title=series.get("name") or "Untitled Series",
             item_type="series",
+            list_id=list_id,
             details=f"list_id:{list_id}"
         )
         db.add(activity)
@@ -1297,6 +1300,7 @@ def import_tv_items(
                 activity_type="item_added",
                 item_title=title,
                 item_type="series",
+                list_id=list_id,
                 details=f"list_id:{list_id}"
             )
             db.add(activity)
@@ -1338,6 +1342,7 @@ def import_tv_items(
             activity_type="item_added",
             item_title=title,
             item_type="series",
+            list_id=list_id,
             details=f"list_id:{list_id}"
         )
         db.add(activity)
@@ -1397,6 +1402,7 @@ def update_list_item(
             item_title=item.title,
             item_type=item.item_type,
             external_id=item.external_id,
+            list_id=list_id,
             image_url=item.image_url,
             details=f"list_id:{list_id}"
         )
