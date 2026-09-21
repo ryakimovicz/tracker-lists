@@ -2233,253 +2233,266 @@ def bulk_toggle_all_seasons(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    reading_list = db.query(ReadingList).filter(ReadingList.id == list_id).first()
-    if not reading_list:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="List not found")
-    
-    has_access = (reading_list.creator_id == current_user.id or getattr(current_user, 'is_admin', False))
-    if not has_access:
-        tracking_lib_item = db.query(UserLibraryItem).filter(
+    try:
+        reading_list = db.query(ReadingList).filter(ReadingList.id == list_id).first()
+        if not reading_list:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="List not found")
+        
+        has_access = (reading_list.creator_id == current_user.id or getattr(current_user, 'is_admin', False))
+        if not has_access:
+            tracking_lib_item = db.query(UserLibraryItem).filter(
+                UserLibraryItem.user_id == current_user.id,
+                UserLibraryItem.tracking_list_id == list_id
+            ).first()
+            if tracking_lib_item:
+                has_access = True
+                if reading_list.creator_id != current_user.id:
+                    reading_list.creator_id = current_user.id
+                    db.commit()
+                    
+        if not has_access:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+
+        lib_item = db.query(UserLibraryItem).filter(
             UserLibraryItem.user_id == current_user.id,
             UserLibraryItem.tracking_list_id == list_id
         ).first()
-        if tracking_lib_item:
-            has_access = True
-            if reading_list.creator_id != current_user.id:
-                reading_list.creator_id = current_user.id
-                db.commit()
-                
-    if not has_access:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
-
-    lib_item = db.query(UserLibraryItem).filter(
-        UserLibraryItem.user_id == current_user.id,
-        UserLibraryItem.tracking_list_id == list_id
-    ).first()
-    
-    series_title = lib_item.title if lib_item else "Series"
-    is_comic = (lib_item and lib_item.item_type == "comic")
-    
-    # Resolve all episodes list (fetch directly if not supplied)
-    episodes_list = req.episodes
-    if not episodes_list:
-        if lib_item and lib_item.external_id:
-            try:
-                if is_comic:
-                    from app.services.comicvine import ComicVineService
-                    episodes_list = ComicVineService.get_comic_volume_issues(lib_item.external_id) or []
-                else:
-                    clean_id = lib_item.external_id
-                    if clean_id.startswith('tvm_'):
-                        clean_id = clean_id.replace('tvm_', '')
-                    series_id = int(clean_id)
-                    episodes_list = TVMazeService.get_all_episodes(str(series_id)) or []
-            except Exception as e:
-                print(f"Failed to fetch all episodes for bulk toggle in backend: {e}")
-                episodes_list = []
-        else:
-            episodes_list = []
-
-    # Get initial item count to increment index in memory
-    item_count = db.query(ListItem).filter(ListItem.list_id == list_id).count()
-    seen_ext_ids = set()
-
-    for ep in episodes_list:
-        ep_id = ep.get('id')
-        if not ep_id:
-            continue
-        raw_ep_str = str(ep_id)
-        if is_comic or raw_ep_str.startswith('cv_') or raw_ep_str.startswith('cv-'):
-            ext_id = raw_ep_str if raw_ep_str.startswith('cv_issue_') else f"cv_issue_{raw_ep_str.replace('cv_vol_', '').replace('cv_', '')}"
-            media_item_type = ItemTypeEnum.COMIC
-            sec_name = "Volumen"
-        else:
-            ext_id = f"tvm-ep-{ep_id}"
-            media_item_type = ItemTypeEnum.SERIES
-            sec_name = f"Season {ep.get('season_number', 1)}"
-
-        if ext_id in seen_ext_ids:
-            continue
-        seen_ext_ids.add(ext_id)
-
-        item = db.query(ListItem).filter(
-            ListItem.list_id == list_id,
-            ListItem.external_id == ext_id
-        ).first()
         
-        season_num = ep.get('season_number', 1)
-        ep_num = ep.get('episode_number')
-        ep_name = ep.get('name') or 'Untitled'
-        is_extra_ep = ep.get('is_extra') or ep.get('ep_type') == 'insignificant_special' or season_num == 0
-        is_special_ep = ep.get('is_significant_special') or ep.get('ep_type') == 'significant_special'
+        series_title = lib_item.title if lib_item else "Series"
+        is_comic = (lib_item and lib_item.item_type == "comic")
         
-        if media_item_type == ItemTypeEnum.COMIC:
-            ep_title = f"{series_title} {ep_name}" if not ep_name.startswith(series_title) else ep_name
-            section_name = "Volumen"
-        elif is_extra_ep:
-            ep_title = f"{series_title} - Extra {ep_num or 1} - {ep_name}"
-            section_name = "Extras"
-        elif is_special_ep or ep_num is None:
-            ep_title = f"{series_title} - [Especial] - {ep_name}"
-            section_name = f"Season {season_num}" if season_num > 0 else "Specials"
-        else:
-            ep_title = f"{series_title} - S{season_num:02d}E{ep_num:02d} - {ep_name}"
-            section_name = f"Season {season_num}"
-        
-        if not item:
-            item_count += 1
-            item = ListItem(
-                list_id=list_id,
-                order_index=item_count,
-                item_type=media_item_type,
-                external_id=ext_id,
-                title=ep_title,
-                image_url=ep.get('still_path') or ep.get('image_url') if (ep.get('still_path') or ep.get('image_url')) else None,
-                custom_notes=json.dumps({"description": ep.get('overview') or "", "release_date": ep.get('air_date') or None}),
-                section=section_name
-            )
-            db.add(item)
-            db.flush()
-            
-        progress = db.query(ItemProgress).filter(
-            ItemProgress.user_id == current_user.id,
-            (ItemProgress.external_id == ext_id) | (ItemProgress.list_item_id == item.id)
-        ).first()
-        
-        now_dt = datetime.now(timezone.utc)
-        media_type_str = media_item_type.value if hasattr(media_item_type, 'value') else str(media_item_type)
-        if req.completed:
-            was_already_completed = progress.is_completed if progress else False
-            if progress:
-                progress.is_completed = True
-                progress.external_id = ext_id
-                progress.list_item_id = item.id
-                progress.item_type = media_type_str
-                if not was_already_completed or req.mark_again:
-                    progress.completed_at = now_dt
-            else:
-                progress = ItemProgress(
-                    user_id=current_user.id,
-                    item_type=media_type_str,
-                    external_id=ext_id,
-                    list_item_id=item.id,
-                    is_completed=True,
-                    is_skipped=False,
-                    completed_at=now_dt
-                )
-                db.add(progress)
-
-            # Record ConsumptionHistory only if not previously completed or if explicitly doing mark_again
-            if not was_already_completed or req.mark_again:
-                ch = ConsumptionHistory(
-                    user_id=current_user.id,
-                    item_type=item.item_type.value if hasattr(item.item_type, 'value') else str(item.item_type),
-                    external_id=ext_id,
-                    list_item_id=item.id,
-                    consumed_at=now_dt
-                )
-                db.add(ch)
-        else:
-            # Unwatch: remove latest consumption history entry
-            history = db.query(ConsumptionHistory).filter(
-                ConsumptionHistory.user_id == current_user.id,
-                ConsumptionHistory.external_id == ext_id
-            ).order_by(ConsumptionHistory.consumed_at.desc()).all()
-            
-            if history:
-                db.delete(history[0])
-            if progress:
-                progress.is_completed = False
-                progress.completed_at = None
-
-    if not req.completed:
-        # Guarantee all ItemProgress for this tracking list are set to completed = False
-        all_list_items = db.query(ListItem).filter(ListItem.list_id == list_id).all()
-        list_ext_ids = [it.external_id for it in all_list_items if it.external_id]
-        if list_ext_ids:
-            db.query(ItemProgress).filter(
-                ItemProgress.user_id == current_user.id,
-                ItemProgress.external_id.in_(list_ext_ids)
-            ).update({"is_completed": False, "completed_at": None}, synchronize_session=False)
-            
-    if lib_item:
-        completed_val = UserLibraryStatusEnum.READ if is_comic else UserLibraryStatusEnum.COMPLETED
-        in_prog_val = UserLibraryStatusEnum.READING if is_comic else UserLibraryStatusEnum.WATCHING
-        plan_val = UserLibraryStatusEnum.PLAN_TO_READ if is_comic else UserLibraryStatusEnum.PLAN_TO_WATCH
-
-        if req.completed:
-            lib_item.status = completed_val
-            lib_item.completed_at = datetime.now(timezone.utc)
-            # Set last seen episode to the last completed episode in list
-            completed_items = db.query(ListItem.title).join(ItemProgress, ItemProgress.external_id == ListItem.external_id).filter(
-                ListItem.list_id == list_id,
-                ItemProgress.user_id == current_user.id,
-                ItemProgress.is_completed == True
-            ).all()
-            completed_titles = [r[0] for r in completed_items if r[0]]
-            if completed_titles:
-                import re
-                if is_comic:
-                    def parse_issue_num(t):
-                        m = re.search(r'#(\d+(\.\d+)?)', t)
-                        return float(m.group(1)) if m else -1.0
-                    sorted_titles = sorted(completed_titles, key=parse_issue_num)
-                    lib_item.last_seen_episode = sorted_titles[-1]
-                else:
-                    ep_tuples = []
-                    for t in completed_titles:
-                        m = re.search(r'S(\d+)E(\d+)', t, re.IGNORECASE)
-                        if m:
-                            ep_tuples.append((int(m.group(1)), int(m.group(2)), t))
-                    if ep_tuples:
-                        ep_tuples.sort(key=lambda x: (x[0], x[1]))
-                        lib_item.last_seen_episode = ep_tuples[-1][2]
+        # Resolve all episodes list (fetch directly if not supplied)
+        episodes_list = req.episodes
+        if not episodes_list:
+            if lib_item and lib_item.external_id:
+                try:
+                    if is_comic:
+                        from app.services.comicvine import ComicVineService
+                        episodes_list = ComicVineService.get_comic_volume_issues(lib_item.external_id) or []
                     else:
-                        lib_item.last_seen_episode = completed_titles[-1]
-        else:
-            # Check if all episodes are still completed, or some, or none
-            total_eps_count = db.query(ListItem).filter(ListItem.list_id == list_id).count()
-            completed_eps_count = db.query(ItemProgress).join(ListItem, ItemProgress.external_id == ListItem.external_id).filter(
-                ItemProgress.user_id == current_user.id,
-                ListItem.list_id == list_id,
-                ItemProgress.is_completed == True
-            ).count()
-
-            if completed_eps_count >= total_eps_count and total_eps_count > 0:
-                # All episodes still have prior completed viewings! Keep completed
-                lib_item.status = completed_val
-                last_completed = db.query(ItemProgress).join(ListItem, ItemProgress.external_id == ListItem.external_id).filter(
-                    ItemProgress.user_id == current_user.id,
-                    ListItem.list_id == list_id,
-                    ItemProgress.is_completed == True
-                ).order_by(ItemProgress.completed_at.desc()).first()
-                lib_item.completed_at = last_completed.completed_at if last_completed else datetime.now(timezone.utc)
-            elif completed_eps_count > 0:
-                lib_item.status = in_prog_val
-                lib_item.completed_at = None
-                last_completed = db.query(ListItem).join(ItemProgress, ItemProgress.external_id == ListItem.external_id).filter(
-                    ListItem.list_id == list_id,
-                    ItemProgress.user_id == current_user.id,
-                    ItemProgress.is_completed == True
-                ).order_by(ListItem.id.desc()).first()
-                if last_completed:
-                    lib_item.last_seen_episode = last_completed.title
+                        clean_id = lib_item.external_id
+                        if clean_id.startswith('tvm_'):
+                            clean_id = clean_id.replace('tvm_', '')
+                        series_id = int(clean_id)
+                        episodes_list = TVMazeService.get_all_episodes(str(series_id)) or []
+                except Exception as e:
+                    print(f"Failed to fetch all episodes for bulk toggle in backend: {e}")
+                    episodes_list = []
             else:
-                lib_item.status = plan_val
-                lib_item.completed_at = None
-                lib_item.last_seen_episode = None
-                if is_comic:
-                    lib_item.pages_read = 0
-                vol_hist = db.query(ConsumptionHistory).filter(
-                    ConsumptionHistory.user_id == current_user.id,
-                    ConsumptionHistory.external_id == lib_item.external_id
-                ).order_by(ConsumptionHistory.consumed_at.desc()).first()
-                if vol_hist:
-                    db.delete(vol_hist)
-        lib_item.updated_at = datetime.now(timezone.utc)
+                episodes_list = []
 
-    db.commit()
-    return {"message": "All seasons progress toggled successfully", "status": lib_item.status.value if (lib_item and hasattr(lib_item.status, 'value')) else (lib_item.status if lib_item else "completed")}
+        # Get initial item count to increment index in memory
+        item_count = db.query(ListItem).filter(ListItem.list_id == list_id).count()
+        seen_ext_ids = set()
+
+        for ep in episodes_list:
+            ep_id = ep.get('id')
+            if not ep_id:
+                continue
+            raw_ep_str = str(ep_id)
+            if is_comic or raw_ep_str.startswith('cv_') or raw_ep_str.startswith('cv-'):
+                ext_id = raw_ep_str if raw_ep_str.startswith('cv_issue_') else f"cv_issue_{raw_ep_str.replace('cv_vol_', '').replace('cv_', '')}"
+                media_item_type = ItemTypeEnum.COMIC
+                sec_name = "Volumen"
+            else:
+                ext_id = f"tvm-ep-{ep_id}"
+                media_item_type = ItemTypeEnum.SERIES
+                sec_name = f"Season {ep.get('season_number', 1)}"
+
+            if ext_id in seen_ext_ids:
+                continue
+            seen_ext_ids.add(ext_id)
+
+            item = db.query(ListItem).filter(
+                ListItem.list_id == list_id,
+                ListItem.external_id == ext_id
+            ).first()
+            
+            season_num = ep.get('season_number', 1)
+            ep_num = ep.get('episode_number')
+            ep_name = ep.get('name') or 'Untitled'
+            is_extra_ep = ep.get('is_extra') or ep.get('ep_type') == 'insignificant_special' or season_num == 0
+            is_special_ep = ep.get('is_significant_special') or ep.get('ep_type') == 'significant_special'
+            
+            if media_item_type == ItemTypeEnum.COMIC:
+                ep_title = f"{series_title} {ep_name}" if not ep_name.startswith(series_title) else ep_name
+                section_name = "Volumen"
+            elif is_extra_ep:
+                ep_title = f"{series_title} - Extra {ep_num or 1} - {ep_name}"
+                section_name = "Extras"
+            elif is_special_ep or ep_num is None:
+                ep_title = f"{series_title} - [Especial] - {ep_name}"
+                section_name = f"Season {season_num}" if season_num > 0 else "Specials"
+            else:
+                ep_title = f"{series_title} - S{season_num:02d}E{ep_num:02d} - {ep_name}"
+                section_name = f"Season {season_num}"
+            
+            if not item:
+                item_count += 1
+                item = ListItem(
+                    list_id=list_id,
+                    order_index=item_count,
+                    item_type=media_item_type,
+                    external_id=ext_id,
+                    title=ep_title,
+                    image_url=ep.get('still_path') or ep.get('image_url') if (ep.get('still_path') or ep.get('image_url')) else None,
+                    custom_notes=json.dumps({"description": ep.get('overview') or "", "release_date": ep.get('air_date') or None}),
+                    section=section_name
+                )
+                db.add(item)
+                db.flush()
+                
+            progress = db.query(ItemProgress).filter(
+                ItemProgress.user_id == current_user.id,
+                (ItemProgress.external_id == ext_id) | (ItemProgress.list_item_id == item.id)
+            ).first()
+            
+            now_dt = datetime.now(timezone.utc)
+            media_type_str = media_item_type.value if hasattr(media_item_type, 'value') else str(media_item_type)
+            if req.completed:
+                was_already_completed = progress.is_completed if progress else False
+                if progress:
+                    progress.is_completed = True
+                    progress.external_id = ext_id
+                    progress.list_item_id = item.id
+                    progress.item_type = media_type_str
+                    if not was_already_completed or req.mark_again:
+                        progress.completed_at = now_dt
+                else:
+                    progress = ItemProgress(
+                        user_id=current_user.id,
+                        item_type=media_type_str,
+                        external_id=ext_id,
+                        list_item_id=item.id,
+                        is_completed=True,
+                        is_skipped=False,
+                        completed_at=now_dt
+                    )
+                    db.add(progress)
+
+                # Record ConsumptionHistory only if not previously completed or if explicitly doing mark_again
+                if not was_already_completed or req.mark_again:
+                    ch = ConsumptionHistory(
+                        user_id=current_user.id,
+                        item_type=media_type_str,
+                        external_id=ext_id,
+                        list_item_id=item.id,
+                        consumed_at=now_dt
+                    )
+                    db.add(ch)
+            else:
+                # Unwatch: remove latest consumption history entry
+                history = db.query(ConsumptionHistory).filter(
+                    ConsumptionHistory.user_id == current_user.id,
+                    ConsumptionHistory.external_id == ext_id
+                ).order_by(ConsumptionHistory.consumed_at.desc()).all()
+                
+                if history:
+                    db.delete(history[0])
+                if progress:
+                    progress.is_completed = False
+                    progress.completed_at = None
+
+        if not req.completed:
+            # Guarantee all ItemProgress for this tracking list are set to completed = False
+            all_list_items = db.query(ListItem).filter(ListItem.list_id == list_id).all()
+            list_ext_ids = [it.external_id for it in all_list_items if it.external_id]
+            if list_ext_ids:
+                db.query(ItemProgress).filter(
+                    ItemProgress.user_id == current_user.id,
+                    ItemProgress.external_id.in_(list_ext_ids)
+                ).update({"is_completed": False, "completed_at": None}, synchronize_session=False)
+                
+        if lib_item:
+            completed_val = UserLibraryStatusEnum.READ if is_comic else UserLibraryStatusEnum.COMPLETED
+            in_prog_val = UserLibraryStatusEnum.READING if is_comic else UserLibraryStatusEnum.WATCHING
+            plan_val = UserLibraryStatusEnum.PLAN_TO_READ if is_comic else UserLibraryStatusEnum.PLAN_TO_WATCH
+
+            if req.completed:
+                lib_item.status = completed_val
+                lib_item.completed_at = datetime.now(timezone.utc)
+                if is_comic and lib_item.total_pages:
+                    lib_item.pages_read = lib_item.total_pages
+                # Set last seen episode to the last completed episode in list
+                completed_items = db.query(ListItem.title).join(ItemProgress, ItemProgress.external_id == ListItem.external_id).filter(
+                    ListItem.list_id == list_id,
+                    ItemProgress.user_id == current_user.id,
+                    ItemProgress.is_completed == True
+                ).all()
+                completed_titles = [r[0] for r in completed_items if r[0]]
+                if completed_titles:
+                    import re
+                    if is_comic:
+                        def parse_issue_num(t):
+                            m = re.search(r'#(\d+(\.\d+)?)', t)
+                            return float(m.group(1)) if m else -1.0
+                        sorted_titles = sorted(completed_titles, key=parse_issue_num)
+                        lib_item.last_seen_episode = sorted_titles[-1]
+                    else:
+                        ep_tuples = []
+                        for t in completed_titles:
+                            m = re.search(r'S(\d+)E(\d+)', t, re.IGNORECASE)
+                            if m:
+                                ep_tuples.append((int(m.group(1)), int(m.group(2)), t))
+                        if ep_tuples:
+                            ep_tuples.sort(key=lambda x: (x[0], x[1]))
+                            lib_item.last_seen_episode = ep_tuples[-1][2]
+                        else:
+                            lib_item.last_seen_episode = completed_titles[-1]
+            else:
+                # Check if all episodes are still completed, or some, or none
+                total_eps_count = db.query(ListItem).filter(ListItem.list_id == list_id).count()
+                completed_eps_count = db.query(ItemProgress).join(ListItem, ItemProgress.external_id == ListItem.external_id).filter(
+                    ItemProgress.user_id == current_user.id,
+                    ListItem.list_id == list_id,
+                    ItemProgress.is_completed == True
+                ).count()
+
+                if completed_eps_count >= total_eps_count and total_eps_count > 0:
+                    # All episodes still have prior completed viewings! Keep completed
+                    lib_item.status = completed_val
+                    last_completed = db.query(ItemProgress).join(ListItem, ItemProgress.external_id == ListItem.external_id).filter(
+                        ItemProgress.user_id == current_user.id,
+                        ListItem.list_id == list_id,
+                        ItemProgress.is_completed == True
+                    ).order_by(ItemProgress.completed_at.desc()).first()
+                    lib_item.completed_at = last_completed.completed_at if last_completed else datetime.now(timezone.utc)
+                elif completed_eps_count > 0:
+                    lib_item.status = in_prog_val
+                    lib_item.completed_at = None
+                    last_completed = db.query(ListItem).join(ItemProgress, ItemProgress.external_id == ListItem.external_id).filter(
+                        ListItem.list_id == list_id,
+                        ItemProgress.user_id == current_user.id,
+                        ItemProgress.is_completed == True
+                    ).order_by(ListItem.id.desc()).first()
+                    if last_completed:
+                        lib_item.last_seen_episode = last_completed.title
+                else:
+                    lib_item.status = plan_val
+                    lib_item.completed_at = None
+                    lib_item.last_seen_episode = None
+                    if is_comic:
+                        lib_item.pages_read = 0
+                    vol_hist = db.query(ConsumptionHistory).filter(
+                        ConsumptionHistory.user_id == current_user.id,
+                        ConsumptionHistory.external_id == lib_item.external_id
+                    ).order_by(ConsumptionHistory.consumed_at.desc()).first()
+                    if vol_hist:
+                        db.delete(vol_hist)
+            lib_item.updated_at = datetime.now(timezone.utc)
+
+        db.commit()
+        return {"message": "All seasons progress toggled successfully", "status": lib_item.status.value if (lib_item and hasattr(lib_item.status, 'value')) else (lib_item.status if lib_item else "completed")}
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.exception(f"Error in bulk_toggle_all_seasons for list {list_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Bulk toggle all seasons failed: {str(e)}"
+        )
 
 
 class BulkToggleEpisodesRequest(BaseModel):

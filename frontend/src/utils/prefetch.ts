@@ -97,7 +97,10 @@ export const prefetchMediaDetails = (item: any) => {
       if (!getCachedSeries(cacheKeyMovie)) {
         apiClient.get(`/search/movies/${extId}`).then(res => {
           if (res.data) setCachedSeries(cacheKeyMovie, res.data);
-        }).catch(() => {});
+        }).catch(() => {
+          // Store empty fallback so it does not retry failed external prefetch
+          setCachedSeries(cacheKeyMovie, item || {});
+        });
       }
     }
   }
