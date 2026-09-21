@@ -700,7 +700,10 @@ def get_library(
                 if list_eps:
                     from app.models.item_progress import ItemProgress
                     completed_prog_items = db.query(ListItem.title).join(
-                        ItemProgress, ItemProgress.external_id == ListItem.external_id
+                        ItemProgress,
+                        (ItemProgress.list_item_id == ListItem.id) |
+                        (ItemProgress.external_id == ListItem.external_id) |
+                        (ItemProgress.external_id == func.replace(ListItem.external_id, 'cv_issue_', ''))
                     ).filter(
                         ListItem.list_id == s_it.tracking_list_id,
                         ItemProgress.user_id == target_user_id,
@@ -710,16 +713,23 @@ def get_library(
                     series_completed_eps_count_map[s_it.id] = len(c_titles)
                     if c_titles:
                         import re
-                        ep_tups = []
-                        for t_str in c_titles:
-                            m_ep = re.search(r'S(\d+)E(\d+)', t_str, re.IGNORECASE)
-                            if m_ep:
-                                ep_tups.append((int(m_ep.group(1)), int(m_ep.group(2)), t_str))
-                        if ep_tups:
-                            ep_tups.sort(key=lambda x: (x[0], x[1]))
-                            s_it.last_seen_episode = ep_tups[-1][2]
+                        if s_it.item_type == "comic":
+                            def parse_issue_num(t):
+                                m = re.search(r'#(\d+(\.\d+)?)', t)
+                                return float(m.group(1)) if m else -1.0
+                            sorted_c_titles = sorted(c_titles, key=parse_issue_num)
+                            s_it.last_seen_episode = sorted_c_titles[-1]
                         else:
-                            s_it.last_seen_episode = c_titles[-1]
+                            ep_tups = []
+                            for t_str in c_titles:
+                                m_ep = re.search(r'S(\d+)E(\d+)', t_str, re.IGNORECASE)
+                                if m_ep:
+                                    ep_tups.append((int(m_ep.group(1)), int(m_ep.group(2)), t_str))
+                            if ep_tups:
+                                ep_tups.sort(key=lambda x: (x[0], x[1]))
+                                s_it.last_seen_episode = ep_tups[-1][2]
+                            else:
+                                s_it.last_seen_episode = c_titles[-1]
                     else:
                         s_it.last_seen_episode = None
 

@@ -2088,14 +2088,14 @@ def bulk_toggle_season(
 
             processed_eps.append((ext_id, item, media_item_type))
 
-        # Query all existing ItemProgress by user_id and all variations of external IDs / list_item_ids
+        # Query all existing ItemProgress for the user across all relevant identifiers
         all_ext_variations = set(seen_ext_ids)
         for eid in seen_ext_ids:
-            all_ext_variations.add(eid.replace("cv_issue_", "").replace("tvm-ep-", ""))
-            if not eid.startswith("cv_issue_"):
-                all_ext_variations.add(f"cv_issue_{eid}")
-            if not eid.startswith("tvm-ep-"):
-                all_ext_variations.add(f"tvm-ep_{eid}")
+            clean = eid.replace("cv_issue_", "").replace("tvm-ep-", "").replace("cv_", "").replace("cv-", "")
+            all_ext_variations.add(clean)
+            all_ext_variations.add(f"cv_issue_{clean}")
+            all_ext_variations.add(f"cv_{clean}")
+            all_ext_variations.add(f"tvm-ep-{clean}")
         
         target_ext_ids = list(all_ext_variations)
         target_item_ids = [it.id for it in list_items_by_ext.values() if it.id]
@@ -2110,18 +2110,29 @@ def bulk_toggle_season(
         for p in user_progs:
             if p.external_id:
                 progs_by_ext[p.external_id] = p
-                clean_p_ext = p.external_id.replace("cv_issue_", "").replace("tvm-ep-", "")
+                clean_p_ext = p.external_id.replace("cv_issue_", "").replace("tvm-ep-", "").replace("cv_", "").replace("cv-", "")
                 progs_by_ext[clean_p_ext] = p
                 progs_by_ext[f"cv_issue_{clean_p_ext}"] = p
+                progs_by_ext[f"cv_{clean_p_ext}"] = p
+                progs_by_ext[f"tvm-ep-{clean_p_ext}"] = p
             if p.list_item_id:
                 progs_by_item_id[p.list_item_id] = p
 
         now_dt = datetime.now(timezone.utc)
 
         for ext_id, item, media_item_type in processed_eps:
-            clean_ext = ext_id.replace("cv_issue_", "").replace("tvm-ep-", "")
+            clean_ext = ext_id.replace("cv_issue_", "").replace("tvm-ep-", "").replace("cv_", "").replace("cv-", "")
             progress = progs_by_ext.get(ext_id) or progs_by_ext.get(clean_ext) or progs_by_item_id.get(item.id)
             media_type_str = (media_item_type.value if hasattr(media_item_type, 'value') else str(media_item_type)).lower()
+
+            if not progress:
+                progress = db.query(ItemProgress).filter(
+                    ItemProgress.user_id == current_user.id,
+                    (
+                        (ItemProgress.list_item_id == item.id) |
+                        (ItemProgress.external_id.in_([ext_id, clean_ext, f"cv_issue_{clean_ext}", f"cv_{clean_ext}", f"tvm-ep-{clean_ext}"]))
+                    )
+                ).first()
 
             if req.completed:
                 was_already_completed = progress.is_completed if progress else False
@@ -2143,9 +2154,11 @@ def bulk_toggle_season(
                         completed_at=now_dt
                     )
                     db.add(progress)
-                    progs_by_ext[ext_id] = progress
-                    progs_by_ext[clean_ext] = progress
-                    progs_by_item_id[item.id] = progress
+                    db.flush()
+                
+                progs_by_ext[ext_id] = progress
+                progs_by_ext[clean_ext] = progress
+                progs_by_item_id[item.id] = progress
                 
                 # Record ConsumptionHistory only if not previously completed or if explicitly doing mark_again
                 if not was_already_completed or req.mark_again:
@@ -2183,14 +2196,24 @@ def bulk_toggle_season(
         db.commit()
         
         if lib_item:
-            completed_episodes_count = db.query(ItemProgress).join(ListItem, ItemProgress.external_id == ListItem.external_id).filter(
+            completed_episodes_count = db.query(ItemProgress).join(
+                ListItem,
+                (ItemProgress.list_item_id == ListItem.id) |
+                (ItemProgress.external_id == ListItem.external_id) |
+                (ItemProgress.external_id == func.replace(ListItem.external_id, 'cv_issue_', ''))
+            ).filter(
                 ItemProgress.user_id == current_user.id,
                 ListItem.list_id == list_id,
                 ItemProgress.is_completed == True
             ).count()
             
             if completed_episodes_count > 0:
-                completed_items = db.query(ListItem.title).join(ItemProgress, ItemProgress.external_id == ListItem.external_id).filter(
+                completed_items = db.query(ListItem.title).join(
+                    ItemProgress,
+                    (ItemProgress.list_item_id == ListItem.id) |
+                    (ItemProgress.external_id == ListItem.external_id) |
+                    (ItemProgress.external_id == func.replace(ListItem.external_id, 'cv_issue_', ''))
+                ).filter(
                     ListItem.list_id == list_id,
                     ItemProgress.user_id == current_user.id,
                     ItemProgress.is_completed == True
@@ -2398,14 +2421,14 @@ def bulk_toggle_all_seasons(
 
             processed_eps.append((ext_id, item, media_item_type))
 
-        # Query all existing ItemProgress by user_id and all variations of external IDs / list_item_ids
+        # Query all existing ItemProgress for the user across all relevant identifiers
         all_ext_variations = set(seen_ext_ids)
         for eid in seen_ext_ids:
-            all_ext_variations.add(eid.replace("cv_issue_", "").replace("tvm-ep-", ""))
-            if not eid.startswith("cv_issue_"):
-                all_ext_variations.add(f"cv_issue_{eid}")
-            if not eid.startswith("tvm-ep-"):
-                all_ext_variations.add(f"tvm-ep_{eid}")
+            clean = eid.replace("cv_issue_", "").replace("tvm-ep-", "").replace("cv_", "").replace("cv-", "")
+            all_ext_variations.add(clean)
+            all_ext_variations.add(f"cv_issue_{clean}")
+            all_ext_variations.add(f"cv_{clean}")
+            all_ext_variations.add(f"tvm-ep-{clean}")
 
         target_ext_ids = list(all_ext_variations)
         target_item_ids = [it.id for it in list_items_by_ext.values() if it.id]
@@ -2420,18 +2443,30 @@ def bulk_toggle_all_seasons(
         for p in user_progs:
             if p.external_id:
                 progs_by_ext[p.external_id] = p
-                clean_p_ext = p.external_id.replace("cv_issue_", "").replace("tvm-ep-", "")
+                clean_p_ext = p.external_id.replace("cv_issue_", "").replace("tvm-ep-", "").replace("cv_", "").replace("cv-", "")
                 progs_by_ext[clean_p_ext] = p
                 progs_by_ext[f"cv_issue_{clean_p_ext}"] = p
+                progs_by_ext[f"cv_{clean_p_ext}"] = p
+                progs_by_ext[f"tvm-ep-{clean_p_ext}"] = p
             if p.list_item_id:
                 progs_by_item_id[p.list_item_id] = p
 
         now_dt = datetime.now(timezone.utc)
 
         for ext_id, item, media_item_type in processed_eps:
-            clean_ext = ext_id.replace("cv_issue_", "").replace("tvm-ep-", "")
+            clean_ext = ext_id.replace("cv_issue_", "").replace("tvm-ep-", "").replace("cv_", "").replace("cv-", "")
             progress = progs_by_ext.get(ext_id) or progs_by_ext.get(clean_ext) or progs_by_item_id.get(item.id)
             media_type_str = (media_item_type.value if hasattr(media_item_type, 'value') else str(media_item_type)).lower()
+
+            if not progress:
+                # Double-check database directly before attempting insert to prevent race or missed variation
+                progress = db.query(ItemProgress).filter(
+                    ItemProgress.user_id == current_user.id,
+                    (
+                        (ItemProgress.list_item_id == item.id) |
+                        (ItemProgress.external_id.in_([ext_id, clean_ext, f"cv_issue_{clean_ext}", f"cv_{clean_ext}", f"tvm-ep-{clean_ext}"]))
+                    )
+                ).first()
 
             if req.completed:
                 was_already_completed = progress.is_completed if progress else False
@@ -2453,9 +2488,11 @@ def bulk_toggle_all_seasons(
                         completed_at=now_dt
                     )
                     db.add(progress)
-                    progs_by_ext[ext_id] = progress
-                    progs_by_ext[clean_ext] = progress
-                    progs_by_item_id[item.id] = progress
+                    db.flush()
+                
+                progs_by_ext[ext_id] = progress
+                progs_by_ext[clean_ext] = progress
+                progs_by_item_id[item.id] = progress
 
                 # Record ConsumptionHistory only if not previously completed or if explicitly doing mark_again
                 if not was_already_completed or req.mark_again:
@@ -2502,7 +2539,12 @@ def bulk_toggle_all_seasons(
                     lib_item.pages_read = lib_item.total_pages
                 
                 # Set last seen episode to the last completed episode in list
-                completed_items = db.query(ListItem.title).join(ItemProgress, ItemProgress.external_id == ListItem.external_id).filter(
+                completed_items = db.query(ListItem.title).join(
+                    ItemProgress,
+                    (ItemProgress.list_item_id == ListItem.id) |
+                    (ItemProgress.external_id == ListItem.external_id) |
+                    (ItemProgress.external_id == func.replace(ListItem.external_id, 'cv_issue_', ''))
+                ).filter(
                     ListItem.list_id == list_id,
                     ItemProgress.user_id == current_user.id,
                     ItemProgress.is_completed == True
@@ -2530,7 +2572,12 @@ def bulk_toggle_all_seasons(
             else:
                 # Check if all episodes are still completed, or some, or none
                 total_eps_count = db.query(ListItem).filter(ListItem.list_id == list_id).count()
-                completed_eps_count = db.query(ItemProgress).join(ListItem, ItemProgress.external_id == ListItem.external_id).filter(
+                completed_eps_count = db.query(ItemProgress).join(
+                    ListItem,
+                    (ItemProgress.list_item_id == ListItem.id) |
+                    (ItemProgress.external_id == ListItem.external_id) |
+                    (ItemProgress.external_id == func.replace(ListItem.external_id, 'cv_issue_', ''))
+                ).filter(
                     ItemProgress.user_id == current_user.id,
                     ListItem.list_id == list_id,
                     ItemProgress.is_completed == True
@@ -2539,7 +2586,12 @@ def bulk_toggle_all_seasons(
                 if completed_eps_count >= total_eps_count and total_eps_count > 0:
                     # All episodes still have prior completed viewings! Keep completed
                     lib_item.status = completed_val
-                    last_completed = db.query(ItemProgress).join(ListItem, ItemProgress.external_id == ListItem.external_id).filter(
+                    last_completed = db.query(ItemProgress).join(
+                        ListItem,
+                        (ItemProgress.list_item_id == ListItem.id) |
+                        (ItemProgress.external_id == ListItem.external_id) |
+                        (ItemProgress.external_id == func.replace(ListItem.external_id, 'cv_issue_', ''))
+                    ).filter(
                         ItemProgress.user_id == current_user.id,
                         ListItem.list_id == list_id,
                         ItemProgress.is_completed == True
@@ -2548,7 +2600,12 @@ def bulk_toggle_all_seasons(
                 elif completed_eps_count > 0:
                     lib_item.status = in_prog_val
                     lib_item.completed_at = None
-                    last_completed = db.query(ListItem).join(ItemProgress, ItemProgress.external_id == ListItem.external_id).filter(
+                    last_completed = db.query(ListItem).join(
+                        ItemProgress,
+                        (ItemProgress.list_item_id == ListItem.id) |
+                        (ItemProgress.external_id == ListItem.external_id) |
+                        (ItemProgress.external_id == func.replace(ListItem.external_id, 'cv_issue_', ''))
+                    ).filter(
                         ListItem.list_id == list_id,
                         ItemProgress.user_id == current_user.id,
                         ItemProgress.is_completed == True
@@ -2674,11 +2731,11 @@ def bulk_toggle_episodes(
 
         all_ext_variations = set(seen_ext_ids)
         for eid in seen_ext_ids:
-            all_ext_variations.add(eid.replace("cv_issue_", "").replace("tvm-ep-", ""))
-            if not eid.startswith("cv_issue_"):
-                all_ext_variations.add(f"cv_issue_{eid}")
-            if not eid.startswith("tvm-ep-"):
-                all_ext_variations.add(f"tvm-ep_{eid}")
+            clean = eid.replace("cv_issue_", "").replace("tvm-ep-", "").replace("cv_", "").replace("cv-", "")
+            all_ext_variations.add(clean)
+            all_ext_variations.add(f"cv_issue_{clean}")
+            all_ext_variations.add(f"cv_{clean}")
+            all_ext_variations.add(f"tvm-ep-{clean}")
 
         target_ext_ids = list(all_ext_variations)
         target_item_ids = [it.id for it in list_items_by_ext.values() if it.id]
@@ -2693,17 +2750,28 @@ def bulk_toggle_episodes(
         for p in user_progs:
             if p.external_id:
                 progs_by_ext[p.external_id] = p
-                clean_p_ext = p.external_id.replace("cv_issue_", "").replace("tvm-ep-", "")
+                clean_p_ext = p.external_id.replace("cv_issue_", "").replace("tvm-ep-", "").replace("cv_", "").replace("cv-", "")
                 progs_by_ext[clean_p_ext] = p
                 progs_by_ext[f"cv_issue_{clean_p_ext}"] = p
+                progs_by_ext[f"cv_{clean_p_ext}"] = p
+                progs_by_ext[f"tvm-ep-{clean_p_ext}"] = p
             if p.list_item_id:
                 progs_by_item_id[p.list_item_id] = p
 
         for ext_id, item, media_item_type in processed_eps:
-            clean_ext = ext_id.replace("cv_issue_", "").replace("tvm-ep-", "")
+            clean_ext = ext_id.replace("cv_issue_", "").replace("tvm-ep-", "").replace("cv_", "").replace("cv-", "")
             progress = progs_by_ext.get(ext_id) or progs_by_ext.get(clean_ext) or progs_by_item_id.get(item.id)
             media_type_str = (media_item_type.value if hasattr(media_item_type, 'value') else str(media_item_type)).lower()
             
+            if not progress:
+                progress = db.query(ItemProgress).filter(
+                    ItemProgress.user_id == current_user.id,
+                    (
+                        (ItemProgress.list_item_id == item.id) |
+                        (ItemProgress.external_id.in_([ext_id, clean_ext, f"cv_issue_{clean_ext}", f"cv_{clean_ext}", f"tvm-ep-{clean_ext}"]))
+                    )
+                ).first()
+
             if req.completed:
                 was_already_completed = progress.is_completed if progress else False
                 if progress:
@@ -2723,9 +2791,11 @@ def bulk_toggle_episodes(
                         completed_at=now_dt
                     )
                     db.add(progress)
-                    progs_by_ext[ext_id] = progress
-                    progs_by_ext[clean_ext] = progress
-                    progs_by_item_id[item.id] = progress
+                    db.flush()
+                
+                progs_by_ext[ext_id] = progress
+                progs_by_ext[clean_ext] = progress
+                progs_by_item_id[item.id] = progress
 
                 if not was_already_completed:
                     ch = ConsumptionHistory(
@@ -2760,7 +2830,10 @@ def bulk_toggle_episodes(
                             pass
 
                     completed_count = db.query(ListItem).join(
-                        ItemProgress, ItemProgress.external_id == ListItem.external_id
+                        ItemProgress,
+                        (ItemProgress.list_item_id == ListItem.id) |
+                        (ItemProgress.external_id == ListItem.external_id) |
+                        (ItemProgress.external_id == func.replace(ListItem.external_id, 'cv_issue_', ''))
                     ).filter(
                         ListItem.list_id == list_id,
                         ItemProgress.user_id == current_user.id,
@@ -2777,7 +2850,10 @@ def bulk_toggle_episodes(
                         lib_item.completed_at = None
 
                     completed_items = db.query(ListItem.title).join(
-                        ItemProgress, ItemProgress.external_id == ListItem.external_id
+                        ItemProgress,
+                        (ItemProgress.list_item_id == ListItem.id) |
+                        (ItemProgress.external_id == ListItem.external_id) |
+                        (ItemProgress.external_id == func.replace(ListItem.external_id, 'cv_issue_', ''))
                     ).filter(
                         ListItem.list_id == list_id,
                         ItemProgress.user_id == current_user.id,
