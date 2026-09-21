@@ -1684,6 +1684,21 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       };
       setSelectedItem(updatedSelected);
 
+      // Optimistically update sessionStorage so Home and Profile have the updated status immediately
+      try {
+        const cachedLibStr = sessionStorage.getItem('pathd_lib_cache');
+        if (cachedLibStr) {
+          let cachedLib: any[] = JSON.parse(cachedLibStr);
+          const existsIdx = cachedLib.findIndex((it: any) => (updatedSelected.id && it.id === updatedSelected.id) || (it.external_id === updatedSelected.external_id && it.item_type === updatedSelected.item_type));
+          if (existsIdx >= 0) {
+            cachedLib[existsIdx] = { ...cachedLib[existsIdx], ...updatedSelected };
+          } else if (updatedSelected.id) {
+            cachedLib = [updatedSelected, ...cachedLib];
+          }
+          sessionStorage.setItem('pathd_lib_cache', JSON.stringify(cachedLib));
+        }
+      } catch (e) {}
+
       const targetId = updatedSelected.id;
       if (targetId && user?.is_pro) {
         apiClient.get(`/library/${targetId}/consumption-history`)
