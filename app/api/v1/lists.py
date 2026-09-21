@@ -2144,21 +2144,38 @@ def bulk_toggle_season(
                     if not was_already_completed or req.mark_again:
                         progress.completed_at = now_dt
                 else:
-                    progress = ItemProgress(
-                        user_id=current_user.id,
-                        item_type=media_type_str,
-                        external_id=ext_id,
-                        list_item_id=item.id,
-                        is_completed=True,
-                        is_skipped=False,
-                        completed_at=now_dt
-                    )
-                    db.add(progress)
-                    db.flush()
+                    try:
+                        with db.begin_nested():
+                            progress = ItemProgress(
+                                user_id=current_user.id,
+                                item_type=media_type_str,
+                                external_id=ext_id,
+                                list_item_id=item.id,
+                                is_completed=True,
+                                is_skipped=False,
+                                completed_at=now_dt
+                            )
+                            db.add(progress)
+                            db.flush()
+                    except Exception:
+                        progress = db.query(ItemProgress).filter(
+                            ItemProgress.user_id == current_user.id,
+                            (
+                                (ItemProgress.list_item_id == item.id) |
+                                (ItemProgress.external_id.in_([ext_id, clean_ext, f"cv_issue_{clean_ext}", f"cv_{clean_ext}", f"tvm-ep-{clean_ext}"]))
+                            )
+                        ).first()
+                        if progress:
+                            progress.is_completed = True
+                            progress.external_id = ext_id
+                            progress.list_item_id = item.id
+                            progress.item_type = media_type_str
+                            progress.completed_at = now_dt
                 
-                progs_by_ext[ext_id] = progress
-                progs_by_ext[clean_ext] = progress
-                progs_by_item_id[item.id] = progress
+                if progress:
+                    progs_by_ext[ext_id] = progress
+                    progs_by_ext[clean_ext] = progress
+                    progs_by_item_id[item.id] = progress
                 
                 # Record ConsumptionHistory only if not previously completed or if explicitly doing mark_again
                 if not was_already_completed or req.mark_again:
@@ -2478,21 +2495,38 @@ def bulk_toggle_all_seasons(
                     if not was_already_completed or req.mark_again:
                         progress.completed_at = now_dt
                 else:
-                    progress = ItemProgress(
-                        user_id=current_user.id,
-                        item_type=media_type_str,
-                        external_id=ext_id,
-                        list_item_id=item.id,
-                        is_completed=True,
-                        is_skipped=False,
-                        completed_at=now_dt
-                    )
-                    db.add(progress)
-                    db.flush()
+                    try:
+                        with db.begin_nested():
+                            progress = ItemProgress(
+                                user_id=current_user.id,
+                                item_type=media_type_str,
+                                external_id=ext_id,
+                                list_item_id=item.id,
+                                is_completed=True,
+                                is_skipped=False,
+                                completed_at=now_dt
+                            )
+                            db.add(progress)
+                            db.flush()
+                    except Exception:
+                        progress = db.query(ItemProgress).filter(
+                            ItemProgress.user_id == current_user.id,
+                            (
+                                (ItemProgress.list_item_id == item.id) |
+                                (ItemProgress.external_id.in_([ext_id, clean_ext, f"cv_issue_{clean_ext}", f"cv_{clean_ext}", f"tvm-ep-{clean_ext}"]))
+                            )
+                        ).first()
+                        if progress:
+                            progress.is_completed = True
+                            progress.external_id = ext_id
+                            progress.list_item_id = item.id
+                            progress.item_type = media_type_str
+                            progress.completed_at = now_dt
                 
-                progs_by_ext[ext_id] = progress
-                progs_by_ext[clean_ext] = progress
-                progs_by_item_id[item.id] = progress
+                if progress:
+                    progs_by_ext[ext_id] = progress
+                    progs_by_ext[clean_ext] = progress
+                    progs_by_item_id[item.id] = progress
 
                 # Record ConsumptionHistory only if not previously completed or if explicitly doing mark_again
                 if not was_already_completed or req.mark_again:
@@ -2781,21 +2815,38 @@ def bulk_toggle_episodes(
                     progress.item_type = media_type_str
                     progress.completed_at = now_dt
                 else:
-                    progress = ItemProgress(
-                        user_id=current_user.id,
-                        item_type=media_type_str,
-                        external_id=ext_id,
-                        list_item_id=item.id,
-                        is_completed=True,
-                        is_skipped=False,
-                        completed_at=now_dt
-                    )
-                    db.add(progress)
-                    db.flush()
+                    try:
+                        with db.begin_nested():
+                            progress = ItemProgress(
+                                user_id=current_user.id,
+                                item_type=media_type_str,
+                                external_id=ext_id,
+                                list_item_id=item.id,
+                                is_completed=True,
+                                is_skipped=False,
+                                completed_at=now_dt
+                            )
+                            db.add(progress)
+                            db.flush()
+                    except Exception:
+                        progress = db.query(ItemProgress).filter(
+                            ItemProgress.user_id == current_user.id,
+                            (
+                                (ItemProgress.list_item_id == item.id) |
+                                (ItemProgress.external_id.in_([ext_id, clean_ext, f"cv_issue_{clean_ext}", f"cv_{clean_ext}", f"tvm-ep-{clean_ext}"]))
+                            )
+                        ).first()
+                        if progress:
+                            progress.is_completed = True
+                            progress.external_id = ext_id
+                            progress.list_item_id = item.id
+                            progress.item_type = media_type_str
+                            progress.completed_at = now_dt
                 
-                progs_by_ext[ext_id] = progress
-                progs_by_ext[clean_ext] = progress
-                progs_by_item_id[item.id] = progress
+                if progress:
+                    progs_by_ext[ext_id] = progress
+                    progs_by_ext[clean_ext] = progress
+                    progs_by_item_id[item.id] = progress
 
                 if not was_already_completed:
                     ch = ConsumptionHistory(
