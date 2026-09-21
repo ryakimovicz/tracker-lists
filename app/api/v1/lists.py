@@ -1150,7 +1150,7 @@ def bulk_toggle_items_progress(
             if item.external_id:
                 progress = ItemProgress(
                     user_id=current_user.id,
-                    item_type=item.item_type,
+                    item_type=item.item_type.value if hasattr(item.item_type, 'value') else str(item.item_type),
                     external_id=item.external_id,
                     list_item_id=item_id,
                     is_completed=req_body.completed,
@@ -1442,7 +1442,7 @@ def toggle_item_skip(
         if item.external_id:
             progress = ItemProgress(
                 user_id=current_user.id,
-                item_type=item.item_type,
+                item_type=item.item_type.value if hasattr(item.item_type, 'value') else str(item.item_type),
                 external_id=item.external_id,
                 list_item_id=item_id,
                 is_completed=False,
@@ -1523,7 +1523,7 @@ def bulk_section_action(
                 if item.external_id:
                     new_rec = ItemProgress(
                         user_id=current_user.id,
-                        item_type=item.item_type,
+                        item_type=item.item_type.value if hasattr(item.item_type, 'value') else str(item.item_type),
                         external_id=item.external_id,
                         list_item_id=item.id,
                         is_completed=False,
@@ -1552,7 +1552,7 @@ def bulk_section_action(
                 if item.external_id:
                     new_rec = ItemProgress(
                         user_id=current_user.id,
-                        item_type=item.item_type,
+                        item_type=item.item_type.value if hasattr(item.item_type, 'value') else str(item.item_type),
                         external_id=item.external_id,
                         list_item_id=item.id,
                         is_completed=True,
@@ -1817,7 +1817,7 @@ def toggle_series_episode(
             
         progress = ItemProgress(
             user_id=current_user.id,
-            item_type=media_item_type,
+            item_type=media_item_type.value if hasattr(media_item_type, 'value') else str(media_item_type),
             external_id=ext_id,
             list_item_id=item.id,
             is_completed=True,
@@ -2004,17 +2004,22 @@ def bulk_toggle_season(
     ).first()
     
     series_title = lib_item.title if lib_item else "Series"
+    is_comic = (lib_item and lib_item.item_type == "comic")
     
     # Resolve episodes list (fetch directly if not supplied)
     episodes_list = req.episodes
     if not episodes_list:
         if lib_item and lib_item.external_id:
             try:
-                clean_id = lib_item.external_id
-                if clean_id.startswith('tvm_'):
-                    clean_id = clean_id.replace('tvm_', '')
-                series_id = int(clean_id)
-                episodes_list = TVMazeService.get_season_episodes(series_id, req.season_number) or []
+                if is_comic:
+                    from app.services.comicvine import ComicVineService
+                    episodes_list = ComicVineService.get_comic_volume_issues(lib_item.external_id) or []
+                else:
+                    clean_id = lib_item.external_id
+                    if clean_id.startswith('tvm_'):
+                        clean_id = clean_id.replace('tvm_', '')
+                    series_id = int(clean_id)
+                    episodes_list = TVMazeService.get_season_episodes(series_id, req.season_number) or []
             except Exception as e:
                 print(f"Failed to fetch episodes for bulk toggle in backend: {e}")
                 episodes_list = []
@@ -2026,8 +2031,8 @@ def bulk_toggle_season(
 
     for ep in episodes_list:
         raw_id = str(ep.get('id'))
-        if raw_id.startswith('cv_') or raw_id.startswith('cv-') or (lib_item and lib_item.item_type == 'comic'):
-            ext_id = raw_id if raw_id.startswith("cv_issue_") else f"cv_issue_{raw_id.replace('cv_', '')}"
+        if raw_id.startswith('cv_') or raw_id.startswith('cv-') or is_comic:
+            ext_id = raw_id if raw_id.startswith("cv_issue_") else f"cv_issue_{raw_id.replace('cv_vol_', '').replace('cv_', '')}"
             media_item_type = ItemTypeEnum.COMIC
         else:
             ext_id = f"tvm-ep-{raw_id}"
@@ -2074,20 +2079,24 @@ def bulk_toggle_season(
             
         progress = db.query(ItemProgress).filter(
             ItemProgress.user_id == current_user.id,
-            ItemProgress.external_id == ext_id
+            (ItemProgress.external_id == ext_id) | (ItemProgress.list_item_id == item.id)
         ).first()
         
         now_dt = datetime.now(timezone.utc)
+        media_type_str = media_item_type.value if hasattr(media_item_type, 'value') else str(media_item_type)
         if req.completed:
             was_already_completed = progress.is_completed if progress else False
             if progress:
                 progress.is_completed = True
+                progress.external_id = ext_id
+                progress.list_item_id = item.id
+                progress.item_type = media_type_str
                 if not was_already_completed or req.mark_again:
                     progress.completed_at = now_dt
             else:
                 progress = ItemProgress(
                     user_id=current_user.id,
-                    item_type=media_item_type,
+                    item_type=media_type_str,
                     external_id=ext_id,
                     list_item_id=item.id,
                     is_completed=True,
@@ -2100,7 +2109,7 @@ def bulk_toggle_season(
             if not was_already_completed or req.mark_again:
                 ch = ConsumptionHistory(
                     user_id=current_user.id,
-                    item_type=item.item_type.value if hasattr(item.item_type, 'value') else item.item_type,
+                    item_type=item.item_type.value if hasattr(item.item_type, 'value') else str(item.item_type),
                     external_id=ext_id,
                     list_item_id=item.id,
                     consumed_at=now_dt
@@ -2132,24 +2141,43 @@ def bulk_toggle_season(
     db.commit()
     
     if lib_item:
-        completed_episodes_count = db.query(ItemProgress).join(ListItem).filter(
+        completed_episodes_count = db.query(ItemProgress).join(ListItem, ItemProgress.external_id == ListItem.external_id).filter(
             ItemProgress.user_id == current_user.id,
             ListItem.list_id == list_id,
             ItemProgress.is_completed == True
         ).count()
         
         if completed_episodes_count > 0:
-            last_completed = db.query(ListItem).join(ItemProgress).filter(
+            completed_items = db.query(ListItem.title).join(ItemProgress, ItemProgress.external_id == ListItem.external_id).filter(
                 ListItem.list_id == list_id,
                 ItemProgress.user_id == current_user.id,
                 ItemProgress.is_completed == True
-            ).order_by(ListItem.id.desc()).first()
-            if last_completed:
-                lib_item.last_seen_episode = last_completed.title
+            ).all()
+            completed_titles = [r[0] for r in completed_items if r[0]]
+            if completed_titles:
+                import re
+                if is_comic:
+                    def parse_issue_num(t):
+                        m = re.search(r'#(\d+(\.\d+)?)', t)
+                        return float(m.group(1)) if m else -1.0
+                    sorted_titles = sorted(completed_titles, key=parse_issue_num)
+                    lib_item.last_seen_episode = sorted_titles[-1]
+                else:
+                    ep_tuples = []
+                    for t in completed_titles:
+                        m = re.search(r'S(\d+)E(\d+)', t, re.IGNORECASE)
+                        if m:
+                            ep_tuples.append((int(m.group(1)), int(m.group(2)), t))
+                    if ep_tuples:
+                        ep_tuples.sort(key=lambda x: (x[0], x[1]))
+                        lib_item.last_seen_episode = ep_tuples[-1][2]
+                    else:
+                        lib_item.last_seen_episode = completed_titles[-1]
+
             lib_item.updated_at = datetime.now(timezone.utc)
             db.commit()
         else:
-            lib_item.status = UserLibraryStatusEnum.PLAN_TO_WATCH
+            lib_item.status = UserLibraryStatusEnum.PLAN_TO_READ if is_comic else UserLibraryStatusEnum.PLAN_TO_WATCH
             lib_item.completed_at = None
             lib_item.last_seen_episode = None
             lib_item.updated_at = datetime.now(timezone.utc)
@@ -2158,7 +2186,7 @@ def bulk_toggle_season(
         def check_series_completion(user_id, list_id, lib_item_id, ext_id):
             import app.core.database
             with app.core.database.SessionLocal() as session:
-                completed_eps = session.query(ItemProgress).join(ListItem).filter(
+                completed_eps = session.query(ItemProgress).join(ListItem, ItemProgress.external_id == ListItem.external_id).filter(
                     ItemProgress.user_id == user_id,
                     ListItem.list_id == list_id,
                     ItemProgress.is_completed == True
@@ -2166,18 +2194,30 @@ def bulk_toggle_season(
                 
                 if completed_eps > 0:
                     try:
-                        series_id = int(ext_id)
-                        series_detail = TVMazeService.get_series_detail(series_id)
-                        total_episodes = series_detail.get("number_of_episodes") or 99999
                         lib_it = session.query(UserLibraryItem).filter(UserLibraryItem.id == lib_item_id).first()
-                        if lib_it:
+                        if not lib_it:
+                            return
+                        if lib_it.item_type == "comic":
+                            from app.services.comicvine import ComicVineService
+                            cv_issues = ComicVineService.get_comic_volume_issues(ext_id)
+                            total_episodes = len(cv_issues) if cv_issues else 99999
+                            if completed_eps >= total_episodes:
+                                lib_it.status = UserLibraryStatusEnum.READ
+                                lib_it.completed_at = datetime.now(timezone.utc)
+                            else:
+                                lib_it.status = UserLibraryStatusEnum.READING
+                                lib_it.completed_at = None
+                        else:
+                            series_id = int(str(ext_id).replace('tvm_', ''))
+                            series_detail = TVMazeService.get_series_detail(series_id)
+                            total_episodes = series_detail.get("number_of_episodes") or 99999
                             if completed_eps >= total_episodes:
                                 lib_it.status = UserLibraryStatusEnum.COMPLETED
                                 lib_it.completed_at = datetime.now(timezone.utc)
                             else:
                                 lib_it.status = UserLibraryStatusEnum.WATCHING
                                 lib_it.completed_at = None
-                            session.commit()
+                        session.commit()
                     except Exception as e:
                         print(f"Background check completion error: {e}")
         
@@ -2225,11 +2265,15 @@ def bulk_toggle_all_seasons(
     if not episodes_list:
         if lib_item and lib_item.external_id:
             try:
-                clean_id = lib_item.external_id
-                if clean_id.startswith('tvm_'):
-                    clean_id = clean_id.replace('tvm_', '')
-                series_id = int(clean_id)
-                episodes_list = TVMazeService.get_all_episodes(str(series_id)) or []
+                if is_comic:
+                    from app.services.comicvine import ComicVineService
+                    episodes_list = ComicVineService.get_comic_volume_issues(lib_item.external_id) or []
+                else:
+                    clean_id = lib_item.external_id
+                    if clean_id.startswith('tvm_'):
+                        clean_id = clean_id.replace('tvm_', '')
+                    series_id = int(clean_id)
+                    episodes_list = TVMazeService.get_all_episodes(str(series_id)) or []
             except Exception as e:
                 print(f"Failed to fetch all episodes for bulk toggle in backend: {e}")
                 episodes_list = []
@@ -2294,20 +2338,24 @@ def bulk_toggle_all_seasons(
             
         progress = db.query(ItemProgress).filter(
             ItemProgress.user_id == current_user.id,
-            ItemProgress.external_id == ext_id
+            (ItemProgress.external_id == ext_id) | (ItemProgress.list_item_id == item.id)
         ).first()
         
         now_dt = datetime.now(timezone.utc)
+        media_type_str = media_item_type.value if hasattr(media_item_type, 'value') else str(media_item_type)
         if req.completed:
             was_already_completed = progress.is_completed if progress else False
             if progress:
                 progress.is_completed = True
+                progress.external_id = ext_id
+                progress.list_item_id = item.id
+                progress.item_type = media_type_str
                 if not was_already_completed or req.mark_again:
                     progress.completed_at = now_dt
             else:
                 progress = ItemProgress(
                     user_id=current_user.id,
-                    item_type=media_item_type,
+                    item_type=media_type_str,
                     external_id=ext_id,
                     list_item_id=item.id,
                     is_completed=True,
@@ -2320,7 +2368,7 @@ def bulk_toggle_all_seasons(
             if not was_already_completed or req.mark_again:
                 ch = ConsumptionHistory(
                     user_id=current_user.id,
-                    item_type=item.item_type.value if hasattr(item.item_type, 'value') else item.item_type,
+                    item_type=item.item_type.value if hasattr(item.item_type, 'value') else str(item.item_type),
                     external_id=ext_id,
                     list_item_id=item.id,
                     consumed_at=now_dt
@@ -2366,20 +2414,27 @@ def bulk_toggle_all_seasons(
             completed_titles = [r[0] for r in completed_items if r[0]]
             if completed_titles:
                 import re
-                ep_tuples = []
-                for t in completed_titles:
-                    m = re.search(r'S(\d+)E(\d+)', t, re.IGNORECASE)
-                    if m:
-                        ep_tuples.append((int(m.group(1)), int(m.group(2)), t))
-                if ep_tuples:
-                    ep_tuples.sort(key=lambda x: (x[0], x[1]))
-                    lib_item.last_seen_episode = ep_tuples[-1][2]
+                if is_comic:
+                    def parse_issue_num(t):
+                        m = re.search(r'#(\d+(\.\d+)?)', t)
+                        return float(m.group(1)) if m else -1.0
+                    sorted_titles = sorted(completed_titles, key=parse_issue_num)
+                    lib_item.last_seen_episode = sorted_titles[-1]
                 else:
-                    lib_item.last_seen_episode = completed_titles[-1]
+                    ep_tuples = []
+                    for t in completed_titles:
+                        m = re.search(r'S(\d+)E(\d+)', t, re.IGNORECASE)
+                        if m:
+                            ep_tuples.append((int(m.group(1)), int(m.group(2)), t))
+                    if ep_tuples:
+                        ep_tuples.sort(key=lambda x: (x[0], x[1]))
+                        lib_item.last_seen_episode = ep_tuples[-1][2]
+                    else:
+                        lib_item.last_seen_episode = completed_titles[-1]
         else:
             # Check if all episodes are still completed, or some, or none
             total_eps_count = db.query(ListItem).filter(ListItem.list_id == list_id).count()
-            completed_eps_count = db.query(ItemProgress).join(ListItem).filter(
+            completed_eps_count = db.query(ItemProgress).join(ListItem, ItemProgress.external_id == ListItem.external_id).filter(
                 ItemProgress.user_id == current_user.id,
                 ListItem.list_id == list_id,
                 ItemProgress.is_completed == True
@@ -2388,7 +2443,7 @@ def bulk_toggle_all_seasons(
             if completed_eps_count >= total_eps_count and total_eps_count > 0:
                 # All episodes still have prior completed viewings! Keep completed
                 lib_item.status = completed_val
-                last_completed = db.query(ItemProgress).join(ListItem).filter(
+                last_completed = db.query(ItemProgress).join(ListItem, ItemProgress.external_id == ListItem.external_id).filter(
                     ItemProgress.user_id == current_user.id,
                     ListItem.list_id == list_id,
                     ItemProgress.is_completed == True
@@ -2397,7 +2452,7 @@ def bulk_toggle_all_seasons(
             elif completed_eps_count > 0:
                 lib_item.status = in_prog_val
                 lib_item.completed_at = None
-                last_completed = db.query(ListItem).join(ItemProgress).filter(
+                last_completed = db.query(ListItem).join(ItemProgress, ItemProgress.external_id == ListItem.external_id).filter(
                     ListItem.list_id == list_id,
                     ItemProgress.user_id == current_user.id,
                     ItemProgress.is_completed == True
@@ -2503,17 +2558,21 @@ def bulk_toggle_episodes(
 
         progress = db.query(ItemProgress).filter(
             ItemProgress.user_id == current_user.id,
-            ItemProgress.external_id == ext_id
+            (ItemProgress.external_id == ext_id) | (ItemProgress.list_item_id == item.id)
         ).first()
 
+        media_type_str = media_item_type.value if hasattr(media_item_type, 'value') else str(media_item_type)
         if req.completed:
             if progress:
                 progress.is_completed = True
+                progress.external_id = ext_id
+                progress.list_item_id = item.id
+                progress.item_type = media_type_str
                 progress.completed_at = now_dt
             else:
                 progress = ItemProgress(
                     user_id=current_user.id,
-                    item_type=media_item_type,
+                    item_type=media_type_str,
                     external_id=ext_id,
                     list_item_id=item.id,
                     is_completed=True,
@@ -2524,7 +2583,7 @@ def bulk_toggle_episodes(
 
             ch = ConsumptionHistory(
                 user_id=current_user.id,
-                item_type=item.item_type.value if hasattr(item.item_type, 'value') else item.item_type,
+                item_type=item.item_type.value if hasattr(item.item_type, 'value') else str(item.item_type),
                 external_id=ext_id,
                 list_item_id=item.id,
                 consumed_at=now_dt
