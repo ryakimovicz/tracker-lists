@@ -208,7 +208,8 @@ const MusicDetailsModalInner: React.FC<MusicDetailsModalProps> = ({
 
   const displayTitle = (currentType === 'artist' ? (details?.name || activeItem.artist) : (details?.name || activeItem.name || activeItem.artist));
   const displayArtist = (currentType === 'artist' ? null : (details?.artist || activeItem.artist));
-  const displayImage = details?.image || activeItem.image;
+  const rawDisplayImage = details?.image || activeItem.image;
+  const displayImage = rawDisplayImage && !rawDisplayImage.includes('2a96cbd8b46e442fc41c2b86b821562f') && !rawDisplayImage.includes('d41d8cd98f00b204e9800998ecf8427e') ? rawDisplayImage : '';
 
   const formatDuration = (msOrSec: number | string | undefined) => {
     if (!msOrSec) return null;
@@ -465,13 +466,22 @@ const MusicDetailsModalInner: React.FC<MusicDetailsModalProps> = ({
                   style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                   onError={(e) => {
                     e.currentTarget.style.display = 'none';
+                    const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                    if (fallback) fallback.style.display = 'flex';
                   }}
                 />
-              ) : (
-                <div style={{ color: 'var(--color-music, #1DB954)', opacity: 0.6 }}>
-                  {currentType === 'artist' ? <Mic size={48} /> : currentType === 'album' ? <Disc size={48} /> : <Headphones size={48} />}
-                </div>
-              )}
+              ) : null}
+              <div style={{
+                display: displayImage ? 'none' : 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '100%',
+                height: '100%',
+                color: 'var(--color-music, #1DB954)',
+                opacity: 0.6
+              }}>
+                {currentType === 'artist' ? <Mic size={48} /> : currentType === 'album' ? <Disc size={48} /> : <Headphones size={48} />}
+              </div>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', minWidth: 0, flex: 1 }}>
@@ -825,19 +835,29 @@ const MusicDetailsModalInner: React.FC<MusicDetailsModalProps> = ({
                         title={`${albumItem.title} (${albumItem.year || ''})`}
                       >
                         <div style={{ width: '100%', height: '120px', minHeight: '120px', maxHeight: '120px', borderRadius: '6px', overflow: 'hidden', background: '#222', flexShrink: 0 }}>
-                          {albumItem.cover ? (
+                          {albumItem.cover && !albumItem.cover.includes('2a96cbd8b46e442fc41c2b86b821562f') && !albumItem.cover.includes('d41d8cd98f00b204e9800998ecf8427e') ? (
                             <img
                               src={albumItem.cover}
                               alt={albumItem.title}
                               referrerPolicy="no-referrer"
                               style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                              onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none';
+                                const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                                if (fallback) fallback.style.display = 'flex';
+                              }}
                             />
-                          ) : (
-                            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
-                              <Disc size={24} />
-                            </div>
-                          )}
+                          ) : null}
+                          <div style={{
+                            width: '100%',
+                            height: '100%',
+                            display: (albumItem.cover && !albumItem.cover.includes('2a96cbd8b46e442fc41c2b86b821562f') && !albumItem.cover.includes('d41d8cd98f00b204e9800998ecf8427e')) ? 'none' : 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: 'var(--text-muted)'
+                          }}>
+                            <Disc size={24} />
+                          </div>
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', flex: 1, marginTop: '0.45rem', minWidth: 0, gap: '0.25rem' }}>
                           <span style={{

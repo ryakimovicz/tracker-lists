@@ -162,33 +162,53 @@ class LastFMService(metaclass=LastFMMeta):
             return True
         return False
 
-    _cache_artist_deezer: Dict[str, Dict[str, Any]] = {} # artist_clean -> deezer_artist_dict
+    _cache_artist_deezer: Dict[str, tuple] = {} # artist_clean -> (timestamp, deezer_artist_dict)
+    _cache_lfm_artist_tracks: Dict[str, tuple] = {} # artist_clean -> (timestamp, list_of_tracks)
 
     @classmethod
     def _get_lastfm_artist_top_tracks(cls, artist_name: str) -> List[str]:
-        """Fetches top tracks from Last.fm to cross-reference against Deezer candidates"""
+        """Fetches top tracks from Last.fm to cross-reference against Deezer candidates with caching and accent fallback"""
         if not cls.API_KEY or not artist_name:
             return []
-        try:
-            params = {
-                "method": "artist.getTopTracks",
-                "artist": artist_name.strip(),
-                "api_key": cls.API_KEY,
-                "limit": "6",
-                "format": "json",
-                "autocorrect": "1"
-            }
-            url = f"{cls.BASE_URL}?{urllib.parse.urlencode(params)}"
-            headers = {"User-Agent": "PathdApp/1.0 (https://pathd.net)"}
-            req = urllib.request.Request(url, headers=headers)
-            with urllib.request.urlopen(req, timeout=3) as response:
-                if response.status == 200:
-                    data = json.loads(response.read().decode('utf-8', errors='replace'))
-                    raw_tracks = data.get("toptracks", {}).get("track", [])
-                    return [t.get("name") for t in raw_tracks if t.get("name")]
-        except Exception:
-            pass
-        return []
+        key = artist_name.strip().lower()
+        now = time.time()
+        if key in cls._cache_lfm_artist_tracks:
+            ts, data = cls._cache_lfm_artist_tracks[key]
+            if now - ts < cls.DISCO_TTL:
+                return data
+
+        tracks = []
+        clean_target = artist_name.strip()
+        names_to_try = [clean_target]
+        unacc = cls._strip_acc(clean_target)
+        if unacc and unacc != clean_target:
+            names_to_try.append(unacc)
+
+        for name_candidate in names_to_try:
+            try:
+                params = {
+                    "method": "artist.getTopTracks",
+                    "artist": name_candidate,
+                    "api_key": cls.API_KEY,
+                    "limit": "8",
+                    "format": "json",
+                    "autocorrect": "1"
+                }
+                url = f"{cls.BASE_URL}?{urllib.parse.urlencode(params)}"
+                headers = {"User-Agent": "PathdApp/1.0 (https://pathd.net)"}
+                req = urllib.request.Request(url, headers=headers)
+                with urllib.request.urlopen(req, timeout=4.5) as response:
+                    if response.status == 200:
+                        data = json.loads(response.read().decode('utf-8', errors='replace'))
+                        raw_tracks = data.get("toptracks", {}).get("track", [])
+                        tracks = [t.get("name") for t in raw_tracks if t.get("name")]
+                        if tracks:
+                            break
+            except Exception:
+                pass
+
+        cls._cache_lfm_artist_tracks[key] = (now, tracks)
+        return tracks
 
     @classmethod
     def _fetch_itunes_artwork(cls, artist_name: str, item_name: str = "") -> str:
@@ -213,12 +233,12 @@ class LastFMService(metaclass=LastFMMeta):
             for term in search_terms:
                 q = urllib.parse.quote(term)
                 req = urllib.request.Request(f"https://itunes.apple.com/search?term={q}&entity=song&limit=5", headers={"User-Agent": "PathdApp/1.0"})
-                with urllib.request.urlopen(req, timeout=3) as res:
+                with urllib.request.urlopen(req, timeout=3.5) as res:
                     if res.status == 200:
                         data = json.loads(res.read().decode('utf-8', errors='replace'))
                         for s in data.get("results", []):
                             cand_art = re.sub(r'[^a-zA-Z0-9]', '', strip_acc(s.get("artistName", ""))).lower()
-                            if cand_art == norm_target:
+                            if cand_art == norm_target or (len(norm_target) >= 4 and (norm_target in cand_art or cand_art in norm_target)):
                                 artwork = s.get("artworkUrl100", "")
                                 if artwork:
                                     return artwork.replace("100x100bb", "600x600bb")
@@ -232,8 +252,11 @@ class LastFMService(metaclass=LastFMMeta):
         if not artist_name:
             return None
         key = artist_name.strip().lower()
+        now = time.time()
         if key in cls._cache_artist_deezer:
-            return cls._cache_artist_deezer[key]
+            ts, cached_artist = cls._cache_artist_deezer[key]
+            if now - ts < cls.DISCO_TTL:
+                return cached_artist
 
         try:
             import re
@@ -248,7 +271,7 @@ class LastFMService(metaclass=LastFMMeta):
             url = f"https://api.deezer.com/search/artist?q={q}&limit=15"
             headers = {"User-Agent": "PathdApp/1.0"}
             req = urllib.request.Request(url, headers=headers)
-            with urllib.request.urlopen(req, timeout=3) as response:
+            with urllib.request.urlopen(req, timeout=3.5) as response:
                 if response.status == 200:
                     data = json.loads(response.read().decode('utf-8', errors='replace'))
                     raw_candidates = data.get("data", [])
@@ -266,7 +289,7 @@ class LastFMService(metaclass=LastFMMeta):
                             tq = urllib.parse.quote(f"{clean_name} {clean_t_title}")
                             try:
                                 treq = urllib.request.Request(f"https://api.deezer.com/search/track?q={tq}&limit=5", headers={"User-Agent": "PathdApp/1.0"})
-                                with urllib.request.urlopen(treq, timeout=2) as tres:
+                                with urllib.request.urlopen(treq, timeout=2.5) as tres:
                                     if tres.status == 200:
                                         tdata = json.loads(tres.read().decode('utf-8', errors='replace'))
                                         for t_item in tdata.get("data", []):
@@ -278,8 +301,19 @@ class LastFMService(metaclass=LastFMMeta):
                     if not raw_candidates:
                         return None
 
-                    # Deduplicate candidates by ID
-                    candidates_dict = {c["id"]: c for c in raw_candidates if c.get("id")}
+                    # Deduplicate candidates by ID, preserving nb_fan / nb_album / pictures
+                    candidates_dict: Dict[int, Dict[str, Any]] = {}
+                    for c in raw_candidates:
+                        cid = c.get("id")
+                        if not cid:
+                            continue
+                        if cid not in candidates_dict:
+                            candidates_dict[cid] = dict(c)
+                        else:
+                            for field in ["nb_fan", "nb_album", "picture_xl", "picture_big", "picture_medium"]:
+                                if c.get(field) and not candidates_dict[cid].get(field):
+                                    candidates_dict[cid][field] = c[field]
+
                     candidates = list(candidates_dict.values())
 
                     # Filter candidates whose name without accents is exact match or exact word match
@@ -287,9 +321,9 @@ class LastFMService(metaclass=LastFMMeta):
                     for c in candidates:
                         c_clean = strip_acc(c.get("name", "")).strip()
                         c_norm = re.sub(r'[^a-zA-Z0-9]', '', c_clean).lower()
-                        if c_clean == norm_clean or c_norm == norm_target:
+                        if c_clean.lower() == norm_clean.lower() or c_norm == norm_target:
                             viable.append(c)
-                        elif len(norm_target) >= 4 and (c_clean.startswith(norm_clean) or norm_clean.startswith(c_clean)):
+                        elif len(norm_target) >= 4 and (c_clean.lower().startswith(norm_clean.lower()) or norm_clean.lower().startswith(c_clean.lower())):
                             viable.append(c)
 
                     if not viable:
@@ -304,9 +338,11 @@ class LastFMService(metaclass=LastFMMeta):
                     # Parallel check for candidate tracks and complete metadata
                     def evaluate_candidate(cand):
                         cand_id = cand.get("id")
-                        cand_clean = strip_acc(cand.get("name", "")).strip()
+                        cand_name = cand.get("name", "")
+                        cand_clean = strip_acc(cand_name).strip()
                         cand_name_norm = re.sub(r'[^a-zA-Z0-9]', '', cand_clean).lower()
-                        is_exact = 1 if (cand_clean == norm_clean or cand_name_norm == norm_target) else 0
+                        is_exact = 1 if (cand_clean.lower() == norm_clean.lower() or cand_name_norm == norm_target) else 0
+                        has_exact_accents = 1 if cand_name.strip() == clean_name else 0
 
                         overlap = 0
                         full_artist_info = dict(cand)
@@ -315,7 +351,7 @@ class LastFMService(metaclass=LastFMMeta):
                             if lfm_tracks_norm:
                                 try:
                                     treq = urllib.request.Request(f"https://api.deezer.com/artist/{cand_id}/top?limit=15", headers={"User-Agent": "PathdApp/1.0"})
-                                    with urllib.request.urlopen(treq, timeout=2.0) as tres:
+                                    with urllib.request.urlopen(treq, timeout=2.5) as tres:
                                         td = json.loads(tres.read().decode('utf-8', errors='replace'))
                                         deezer_tracks = [clean_trk(t.get("title", "")) for t in td.get("data", [])]
                                         for lt in lfm_tracks_norm:
@@ -328,22 +364,25 @@ class LastFMService(metaclass=LastFMMeta):
                             if full_artist_info.get("nb_fan") is None or not full_artist_info.get("picture_xl"):
                                 try:
                                     areq = urllib.request.Request(f"https://api.deezer.com/artist/{cand_id}", headers={"User-Agent": "PathdApp/1.0"})
-                                    with urllib.request.urlopen(areq, timeout=2.0) as ares:
+                                    with urllib.request.urlopen(areq, timeout=2.5) as ares:
                                         ad = json.loads(ares.read().decode('utf-8', errors='replace'))
-                                        full_artist_info.update(ad)
+                                        for k, v in ad.items():
+                                            if v is not None:
+                                                full_artist_info[k] = v
                                 except Exception:
                                     pass
 
-                        fans = full_artist_info.get("nb_fan", 0) or 0
-                        return (overlap, is_exact, fans, full_artist_info)
+                        fans = full_artist_info.get("nb_fan") or cand.get("nb_fan") or 0
+                        nb_albums = full_artist_info.get("nb_album") or cand.get("nb_album") or 0
+                        return (overlap, has_exact_accents, is_exact, fans, nb_albums, full_artist_info)
 
                     import concurrent.futures
                     with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
                         scored = list(pool.map(evaluate_candidate, viable[:8]))
 
-                    scored.sort(key=lambda x: (x[0], x[1], x[2]), reverse=True)
-                    winner = scored[0][3]
-                    cls._cache_artist_deezer[key] = winner
+                    scored.sort(key=lambda x: (x[0], x[1], x[2], x[3], x[4]), reverse=True)
+                    winner = scored[0][5]
+                    cls._cache_artist_deezer[key] = (now, winner)
                     return winner
         except Exception:
             pass
@@ -367,7 +406,7 @@ class LastFMService(metaclass=LastFMMeta):
 
         # Fallback to iTunes artwork
         itunes_img = cls._fetch_itunes_artwork(artist_name)
-        if itunes_img:
+        if itunes_img and not cls._is_placeholder_or_empty(itunes_img):
             cls._cache_artist_images[key] = itunes_img
             return itunes_img
 
@@ -376,7 +415,7 @@ class LastFMService(metaclass=LastFMMeta):
 
     @classmethod
     def _fetch_track_image(cls, track_name: str, artist_name: str) -> str:
-        """Fetches track cover artwork (from its album) via Deezer API with multi-candidate artist matching"""
+        """Fetches track cover artwork (from its album) via Deezer API with multi-candidate artist matching and iTunes fallback"""
         if not track_name:
             return ""
         query_str = f"{artist_name} {track_name}".strip() if artist_name else track_name.strip()
@@ -392,7 +431,7 @@ class LastFMService(metaclass=LastFMMeta):
             url = f"https://api.deezer.com/search/track?q={q}&limit=5"
             headers = {"User-Agent": "PathdApp/1.0"}
             req = urllib.request.Request(url, headers=headers)
-            with urllib.request.urlopen(req, timeout=3) as response:
+            with urllib.request.urlopen(req, timeout=3.5) as response:
                 if response.status == 200:
                     data = json.loads(response.read().decode('utf-8', errors='replace'))
                     tracks = data.get("data", [])
@@ -409,16 +448,24 @@ class LastFMService(metaclass=LastFMMeta):
 
                         album = matched_track.get("album", {})
                         img = album.get("cover_xl") or album.get("cover_big") or album.get("cover_medium") or ""
-                        cls._cache_track_images[key] = img
-                        return img
+                        if img and not cls._is_placeholder_or_empty(img):
+                            cls._cache_track_images[key] = img
+                            return img
         except Exception:
             pass
+
+        # Fallback to iTunes artwork
+        itunes_img = cls._fetch_itunes_artwork(artist_name, track_name)
+        if itunes_img and not cls._is_placeholder_or_empty(itunes_img):
+            cls._cache_track_images[key] = itunes_img
+            return itunes_img
+
         cls._cache_track_images[key] = ""
         return ""
 
     @classmethod
     def _fetch_album_image(cls, album_name: str, artist_name: str) -> str:
-        """Fetches album cover artwork from Deezer API with multi-candidate artist matching"""
+        """Fetches album cover artwork from Deezer API with multi-candidate artist matching and iTunes fallback"""
         if not album_name:
             return ""
         query_str = f"{artist_name} {album_name}".strip() if artist_name else album_name.strip()
@@ -434,7 +481,7 @@ class LastFMService(metaclass=LastFMMeta):
             url = f"https://api.deezer.com/search/album?q={q}&limit=5"
             headers = {"User-Agent": "PathdApp/1.0"}
             req = urllib.request.Request(url, headers=headers)
-            with urllib.request.urlopen(req, timeout=3) as response:
+            with urllib.request.urlopen(req, timeout=3.5) as response:
                 if response.status == 200:
                     data = json.loads(response.read().decode('utf-8', errors='replace'))
                     albums = data.get("data", [])
@@ -450,10 +497,18 @@ class LastFMService(metaclass=LastFMMeta):
                             matched_album = albums[0]
 
                         img = matched_album.get("cover_xl") or matched_album.get("cover_big") or matched_album.get("cover_medium") or ""
-                        cls._cache_album_images[key] = img
-                        return img
+                        if img and not cls._is_placeholder_or_empty(img):
+                            cls._cache_album_images[key] = img
+                            return img
         except Exception:
             pass
+
+        # Fallback to iTunes artwork
+        itunes_img = cls._fetch_itunes_artwork(artist_name, album_name)
+        if itunes_img and not cls._is_placeholder_or_empty(itunes_img):
+            cls._cache_album_images[key] = itunes_img
+            return itunes_img
+
         cls._cache_album_images[key] = ""
         return ""
 
@@ -502,12 +557,15 @@ class LastFMService(metaclass=LastFMMeta):
                             if img.get("size") == "extralarge" or img.get("size") == "large":
                                 image = img.get("#text")
                         
+                        if cls._is_placeholder_or_empty(image):
+                            image = ""
+
                         album_name = album.get("name", "")
                         artist_name = album.get("artist", {}).get("name", "") if isinstance(album.get("artist"), dict) else str(album.get("artist") or "")
-                        if enrich_images and cls._is_placeholder_or_empty(image) and album_name:
+                        if enrich_images and not image and album_name:
                             try:
                                 enriched_img = cls._fetch_album_image(album_name, artist_name)
-                                if enriched_img:
+                                if enriched_img and not cls._is_placeholder_or_empty(enriched_img):
                                     image = enriched_img
                             except Exception:
                                 pass
@@ -516,7 +574,7 @@ class LastFMService(metaclass=LastFMMeta):
                             "name": album_name,
                             "artist": artist_name,
                             "playcount": album.get("playcount"),
-                            "image": image,
+                            "image": image if not cls._is_placeholder_or_empty(image) else "",
                             "url": album.get("url")
                         }
 
@@ -577,11 +635,14 @@ class LastFMService(metaclass=LastFMMeta):
                             if img.get("size") == "extralarge" or img.get("size") == "large":
                                 image = img.get("#text")
                         
+                        if cls._is_placeholder_or_empty(image):
+                            image = ""
+
                         artist_name = artist.get("name", "")
-                        if enrich_images and cls._is_placeholder_or_empty(image) and artist_name:
+                        if enrich_images and not image and artist_name:
                             try:
                                 enriched_img = cls._fetch_artist_image(artist_name)
-                                if enriched_img:
+                                if enriched_img and not cls._is_placeholder_or_empty(enriched_img):
                                     image = enriched_img
                             except Exception:
                                 pass
@@ -589,7 +650,7 @@ class LastFMService(metaclass=LastFMMeta):
                         return {
                             "name": artist_name,
                             "playcount": artist.get("playcount"),
-                            "image": image,
+                            "image": image if not cls._is_placeholder_or_empty(image) else "",
                             "url": artist.get("url")
                         }
 
@@ -650,13 +711,16 @@ class LastFMService(metaclass=LastFMMeta):
                             if img.get("size") == "extralarge" or img.get("size") == "large":
                                 image = img.get("#text")
                         
+                        if cls._is_placeholder_or_empty(image):
+                            image = ""
+
                         track_name = track.get("name", "")
                         artist_name = track.get("artist", {}).get("name", "") if isinstance(track.get("artist"), dict) else str(track.get("artist") or "")
 
-                        if enrich_images and cls._is_placeholder_or_empty(image) and track_name:
+                        if enrich_images and not image and track_name:
                             try:
                                 enriched_img = cls._fetch_track_image(track_name, artist_name)
-                                if enriched_img:
+                                if enriched_img and not cls._is_placeholder_or_empty(enriched_img):
                                     image = enriched_img
                             except Exception:
                                 pass
@@ -665,7 +729,7 @@ class LastFMService(metaclass=LastFMMeta):
                             "name": track_name,
                             "artist": artist_name,
                             "playcount": track.get("playcount"),
-                            "image": image,
+                            "image": image if not cls._is_placeholder_or_empty(image) else "",
                             "url": track.get("url")
                         }
 
@@ -789,12 +853,19 @@ class LastFMService(metaclass=LastFMMeta):
                                 img = i.get("#text")
                         if cls._is_placeholder_or_empty(img):
                             img = ""
+                        if not img:
+                            try:
+                                enriched_img = cls._fetch_album_image(title, artist_name)
+                                if enriched_img and not cls._is_placeholder_or_empty(enriched_img):
+                                    img = enriched_img
+                            except Exception:
+                                pass
                         results.append({
                             "title": title,
                             "record_type": "album",
                             "release_date": "",
                             "year": "",
-                            "cover": img
+                            "cover": img if not cls._is_placeholder_or_empty(img) else ""
                         })
                     return results
         except Exception:

@@ -5275,7 +5275,7 @@ export const Profile: React.FC = () => {
                       maxWidth: musicType === 'artists' ? '140px' : '100%',
                       boxShadow: musicType === 'artists' ? '0 4px 12px rgba(0,0,0,0.3)' : undefined
                     }}>
-                      {item.image ? (
+                      {item.image && !item.image.includes('2a96cbd8b46e442fc41c2b86b821562f') && !item.image.includes('d41d8cd98f00b204e9800998ecf8427e') ? (
                         <img
                           src={item.image}
                           alt={item.name}
@@ -5283,13 +5283,22 @@ export const Profile: React.FC = () => {
                           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                           onError={(e) => {
                             e.currentTarget.style.display = 'none';
+                            const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                            if (fallback) fallback.style.display = 'flex';
                           }}
                         />
-                      ) : (
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', color: 'var(--color-music, #1DB954)', opacity: 0.6 }}>
-                          {musicType === 'artists' ? <Mic size={36} /> : musicType === 'tracks' ? <Headphones size={36} /> : <Disc size={36} />}
-                        </div>
-                      )}
+                      ) : null}
+                      <div style={{
+                        display: (item.image && !item.image.includes('2a96cbd8b46e442fc41c2b86b821562f') && !item.image.includes('d41d8cd98f00b204e9800998ecf8427e')) ? 'none' : 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: '100%',
+                        height: '100%',
+                        color: 'var(--color-music, #1DB954)',
+                        opacity: 0.6
+                      }}>
+                        {musicType === 'artists' ? <Mic size={36} /> : musicType === 'tracks' ? <Headphones size={36} /> : <Disc size={36} />}
+                      </div>
                     </div>
 
                     {/* Text details */}
