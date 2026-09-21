@@ -1713,8 +1713,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
       window.dispatchEvent(new Event('library-updated'));
       onUpdate && onUpdate(updatedSelected);
-    } catch (err) {
-      console.error("Bulk toggle all seasons failed", err);
+    } catch (err: any) {
+      console.error("Bulk toggle all seasons failed:", err?.response?.data || err);
     }
   };
 
