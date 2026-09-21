@@ -214,7 +214,8 @@ const ModalScrollRow: React.FC<{ children: React.ReactNode }> = ({ children }) =
 
 export const ItemDetailsModal: React.FC<ItemDetailsModalProps> = (props) => {
   if (!props.item) return null;
-  const itemKey = props.item.id || props.item.external_id || `${props.item.title}_${props.item.item_type}` || 'active_modal_item';
+  const rawId = props.item.external_id || props.item.id || `${props.item.title}_${props.item.item_type}` || 'active_modal_item';
+  const itemKey = `${props.item.item_type || 'media'}_${rawId}`;
   return <ErrorBoundary><ItemDetailsModalInner key={itemKey} {...props} /></ErrorBoundary>;
 };
 
@@ -1483,11 +1484,17 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     if (!selectedItem) return;
     const isComic = selectedItem.item_type === 'comic' || String(selectedItem.external_id || '').startsWith('cv_vol_');
     let effectiveListId = selectedItem.tracking_list_id;
+    let newlyTrackedItem: any = null;
     if (!effectiveListId) {
       const defaultSt = isComic ? 'reading' : 'watching';
       const tracked = await ensureTracked(defaultSt);
       if (!tracked) return;
-      effectiveListId = typeof tracked === 'number' ? tracked : tracked.tracking_list_id;
+      if (typeof tracked === 'object') {
+        newlyTrackedItem = tracked;
+        effectiveListId = tracked.tracking_list_id;
+      } else {
+        effectiveListId = tracked;
+      }
     }
 
     const isAllCompleted = isComic ? (selectedItem.status === 'read' || selectedItem.status === 'completed') : selectedItem.status === 'completed';
@@ -1583,52 +1590,50 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
         mark_again: isMarkAgain
       });
 
-      const listRes = await apiClient.get(`/lists/${effectiveListId}`);
-      const updatedList = listRes.data.items || [];
-      setEpisodes(updatedList);
-      setCachedSeries(`list_${effectiveListId}`, updatedList);
+      let updatedList = episodes;
+      if (episodes.length === 0) {
+        const listRes = await apiClient.get(`/lists/${effectiveListId}`);
+        updatedList = listRes.data.items || [];
+        setEpisodes(updatedList);
+        setCachedSeries(`list_${effectiveListId}`, updatedList);
+      }
 
-      const extIds = updatedList.map((x: any) => x.external_id).filter(Boolean);
+      const extIds = (updatedList.length > 0 ? updatedList : allKnownEps).map((x: any) => x.external_id || (x.id ? `cv_issue_${String(x.id).replace('cv_issue_', '').replace('cv_', '')}` : '')).filter(Boolean);
       let latestProg: Record<string, boolean> = {};
-      if (extIds.length > 0) {
+      if (!targetCompleted && extIds.length > 0) {
         const progRes = await apiClient.post('/users/me/progress/bulk-check', { external_ids: extIds });
         latestProg = progRes.data || {};
-        if (!targetCompleted) {
-          // Explicitly ensure all known and list items default to false unless active in latestProg
-          const resetProg: Record<string, boolean> = {};
-          allKnownEps.forEach((ep: any) => {
-            if (isComic) {
-              const cleanEpId = String(ep.id || ep.external_id || '').replace('cv_issue_', '').replace('cv_', '');
-              const idKey = `cv_issue_${cleanEpId}`;
-              const isComp = !!latestProg[idKey] || !!latestProg[cleanEpId] || !!latestProg[String(ep.id)] || (ep.external_id ? !!latestProg[ep.external_id] : false);
-              resetProg[idKey] = isComp;
-              if (cleanEpId) resetProg[cleanEpId] = isComp;
-              if (ep.id) resetProg[String(ep.id)] = isComp;
-              if (ep.external_id) resetProg[ep.external_id] = isComp;
-              const stateToSave = isComp ? {
-                status: 'read',
-                pages_read: ep.page_count || ep.total_pages || 0,
-                total_pages: ep.page_count || ep.total_pages || null
-              } : {
-                status: '',
-                pages_read: 0,
-                total_pages: ep.page_count || ep.total_pages || null
-              };
-              setCachedSeries(`issue_state_cv_issue_${cleanEpId}`, stateToSave);
-              setCachedSeries(`issue_state_${idKey}`, stateToSave);
-              if (ep.external_id) setCachedSeries(`issue_state_${ep.external_id}`, stateToSave);
-            } else {
-              const idKey = ep.external_id || (typeof ep.id === 'string' && ep.id.startsWith('tvm-ep-') ? ep.id : `tvm-ep-${ep.id}`);
-              if (idKey) resetProg[idKey] = !!latestProg[idKey];
-            }
-          });
-          extIds.forEach((eid: string) => {
-            resetProg[eid] = !!latestProg[eid];
-          });
-          setGlobalProgress(prev => ({ ...prev, ...resetProg }));
-        } else {
-          setGlobalProgress(prev => ({ ...prev, ...latestProg }));
-        }
+        const resetProg: Record<string, boolean> = {};
+        allKnownEps.forEach((ep: any) => {
+          if (isComic) {
+            const cleanEpId = String(ep.id || ep.external_id || '').replace('cv_issue_', '').replace('cv_', '');
+            const idKey = `cv_issue_${cleanEpId}`;
+            const isComp = !!latestProg[idKey] || !!latestProg[cleanEpId] || !!latestProg[String(ep.id)] || (ep.external_id ? !!latestProg[ep.external_id] : false);
+            resetProg[idKey] = isComp;
+            if (cleanEpId) resetProg[cleanEpId] = isComp;
+            if (ep.id) resetProg[String(ep.id)] = isComp;
+            if (ep.external_id) resetProg[ep.external_id] = isComp;
+            const stateToSave = isComp ? {
+              status: 'read',
+              pages_read: ep.page_count || ep.total_pages || 0,
+              total_pages: ep.page_count || ep.total_pages || null
+            } : {
+              status: '',
+              pages_read: 0,
+              total_pages: ep.page_count || ep.total_pages || null
+            };
+            setCachedSeries(`issue_state_cv_issue_${cleanEpId}`, stateToSave);
+            setCachedSeries(`issue_state_${idKey}`, stateToSave);
+            if (ep.external_id) setCachedSeries(`issue_state_${ep.external_id}`, stateToSave);
+          } else {
+            const idKey = ep.external_id || (typeof ep.id === 'string' && ep.id.startsWith('tvm-ep-') ? ep.id : `tvm-ep-${ep.id}`);
+            if (idKey) resetProg[idKey] = !!latestProg[idKey];
+          }
+        });
+        extIds.forEach((eid: string) => {
+          resetProg[eid] = !!latestProg[eid];
+        });
+        setGlobalProgress(prev => ({ ...prev, ...resetProg }));
       } else if (!targetCompleted) {
         const resetProg: Record<string, boolean> = {};
         allKnownEps.forEach((ep: any) => {
@@ -1670,16 +1675,18 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
         }
       }
 
+      const baseItem = newlyTrackedItem ? { ...selectedItem, ...newlyTrackedItem } : selectedItem;
       const updatedSelected = {
-        ...selectedItem,
+        ...baseItem,
         status: nextStatus,
-        completed_at: (nextStatus === 'completed' || nextStatus === 'read') ? (selectedItem.completed_at || new Date().toISOString()) : null,
-        pages_read: isComic && (nextStatus === 'plan_to_read' || !targetCompleted) ? 0 : selectedItem.pages_read
+        completed_at: (nextStatus === 'completed' || nextStatus === 'read') ? (baseItem.completed_at || new Date().toISOString()) : null,
+        pages_read: isComic && (nextStatus === 'plan_to_read' || !targetCompleted) ? 0 : baseItem.pages_read
       };
       setSelectedItem(updatedSelected);
 
-      if (selectedItem?.id && user?.is_pro) {
-        apiClient.get(`/library/${selectedItem.id}/consumption-history`)
+      const targetId = updatedSelected.id;
+      if (targetId && user?.is_pro) {
+        apiClient.get(`/library/${targetId}/consumption-history`)
           .then(hRes => {
             if (hRes.data) {
               if (hRes.data.history) setConsumptionHistory(hRes.data.history);
@@ -4024,7 +4031,15 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
           const defaultSt = selectedItem?.item_type === 'comic' ? 'reading' : 'watching';
           const tracked = await ensureTracked(defaultSt);
           if (!tracked) return;
-          effectiveListId = typeof tracked === 'number' ? tracked : tracked.tracking_list_id;
+          if (typeof tracked === 'object') {
+            effectiveListId = tracked.tracking_list_id;
+            setSelectedItem((prev: any) => ({
+              ...prev,
+              ...tracked
+            }));
+          } else {
+            effectiveListId = tracked;
+          }
         } catch (err) {
           console.error("Failed to track series automatically", err);
           return;
