@@ -14,9 +14,13 @@
   --accent-primary: #f59e0b; /* Solar Amber */
   --accent-secondary: #d97706; /* Deep Amber */
   --accent-hover: #d97706;
+  --accent-text: #0f172a;
+  --accent-text-hover: #ffffff;
   
   --border-color: rgba(245, 158, 11, 0.18); /* Warm amber glow */
   --border-glow: rgba(245, 158, 11, 0.35);
+  --btn-glow: var(--border-glow);
+  --btn-glow-hover: rgba(245, 158, 11, 0.45);
   --card-shadow: 0 10px 40px -10px rgba(0,0,0,0.6);
 
   /* Priority Color Levels (1 to 5) */
@@ -69,9 +73,13 @@
   --accent-primary: #d97706; /* Rich Amber */
   --accent-secondary: #b45309; /* Deep Ochre */
   --accent-hover: #b45309;
+  --accent-text: #ffffff;
+  --accent-text-hover: #ffffff;
   
   --border-color: rgba(217, 119, 6, 0.16);
   --border-glow: rgba(217, 119, 6, 0.25);
+  --btn-glow: var(--border-glow);
+  --btn-glow-hover: rgba(217, 119, 6, 0.35);
   --card-shadow: 0 10px 40px -10px rgba(15, 23, 42, 0.08);
 
   /* Scrollbar Theme Tokens (Light Mode) */
@@ -336,22 +344,29 @@ h1, h2, h3, h4, h5, h6 {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  background: var(--accent-primary);
-  color: #0f172a;
+  background: var(--btn-bg, var(--accent-primary));
+  color: var(--btn-text, var(--accent-text, #0f172a));
   border: none;
   border-radius: 12px;
   padding: 0.75rem 1.5rem;
   font-weight: 600;
   cursor: pointer;
-  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.35);
-  transition: background-color 0.2s, transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 4px 14px var(--btn-glow, color-mix(in srgb, var(--btn-bg, var(--accent-primary)) 35%, transparent));
+  transition: background-color 0.2s, transform 0.2s, box-shadow 0.2s, color 0.2s;
 }
 
-.btn-primary:hover {
-  background: var(--accent-hover);
-  color: #ffffff;
+.btn-primary:hover:not(:disabled) {
+  background: var(--btn-hover-bg, var(--accent-hover, var(--btn-bg, var(--accent-primary))));
+  color: var(--btn-hover-text, var(--accent-text-hover, #ffffff));
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(245, 158, 11, 0.45);
+  box-shadow: 0 6px 20px var(--btn-glow-hover, var(--btn-glow, color-mix(in srgb, var(--btn-hover-bg, var(--accent-hover, var(--btn-bg, var(--accent-primary)))) 45%, transparent)));
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
 }
 
 .activity-card {
@@ -360,7 +375,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .activity-card:hover {
   transform: translateY(-4px);
-  box-shadow: 0 4px 20px rgba(245, 158, 11, 0.15);
+  box-shadow: 0 4px 20px var(--card-hover-glow, color-mix(in srgb, var(--accent-primary) 20%, transparent));
 }
 
 .btn-secondary {

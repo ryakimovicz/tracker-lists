@@ -197,8 +197,13 @@ export const MusicServiceGuideModal: React.FC<MusicServiceGuideModalProps> = ({ 
                       color: '#fff',
                       border: 'none',
                       textDecoration: 'none',
-                      borderRadius: '8px'
-                    }}
+                      borderRadius: '8px',
+                      '--btn-bg': '#d51007',
+                      '--btn-hover-bg': '#b90d06',
+                      '--btn-glow': 'rgba(213, 16, 7, 0.35)',
+                      '--btn-glow-hover': 'rgba(213, 16, 7, 0.55)',
+                      boxShadow: '0 4px 14px rgba(213, 16, 7, 0.35)'
+                    } as React.CSSProperties}
                   >
                     <ExternalLink size={14} />
                     {isEs ? 'Abrir Configuración de Last.fm' : 'Open Last.fm Settings'}

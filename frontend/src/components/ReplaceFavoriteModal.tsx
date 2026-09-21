@@ -59,8 +59,12 @@ export const ReplaceFavoriteModal: React.FC<ReplaceFavoriteModalProps> = ({
           display: 'flex',
           flexDirection: 'column',
           gap: '1.5rem',
-          position: 'relative'
-        }}
+          position: 'relative',
+          '--accent-primary': `var(--color-${newItem.item_type || 'movie'})`,
+          '--accent-hover': `var(--color-${newItem.item_type || 'movie'})`,
+          '--accent-text': `var(--color-text-${newItem.item_type || 'movie'}, #ffffff)`,
+          '--accent-text-hover': `var(--color-text-${newItem.item_type || 'movie'}, #ffffff)`,
+        } as React.CSSProperties}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Close Button */}

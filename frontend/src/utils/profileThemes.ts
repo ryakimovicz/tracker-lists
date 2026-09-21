@@ -190,6 +190,10 @@ export function getProfileTheme(colorId?: string | null, isLight: boolean = fals
       '--accent-hover': mode.hover,
       '--border-color': mode.border,
       '--border-glow': mode.glow,
+      '--btn-glow': mode.glow,
+      '--btn-glow-hover': mode.glow,
+      '--accent-text': isLight ? '#ffffff' : (theme.id === 'amber' ? '#0f172a' : '#ffffff'),
+      '--accent-text-hover': '#ffffff',
     } as React.CSSProperties,
     modalStyles: {
       background: isLight 

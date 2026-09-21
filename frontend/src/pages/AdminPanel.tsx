@@ -701,7 +701,21 @@ export const AdminPanel: React.FC = () => {
                           <button
                             onClick={() => handleBanMedia(r.item_type, r.external_id, r.title, r.reason)}
                             className="btn-primary"
-                            style={{ background: '#ef4444', borderColor: '#ef4444', color: '#fff', fontSize: '0.82rem', padding: '0.45rem 0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+                            style={{
+                              background: '#ef4444',
+                              borderColor: '#ef4444',
+                              color: '#fff',
+                              fontSize: '0.82rem',
+                              padding: '0.45rem 0.85rem',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.35rem',
+                              '--btn-bg': '#ef4444',
+                              '--btn-hover-bg': '#dc2626',
+                              '--btn-glow': 'rgba(239, 68, 68, 0.35)',
+                              '--btn-glow-hover': 'rgba(239, 68, 68, 0.55)',
+                              boxShadow: '0 4px 14px rgba(239, 68, 68, 0.35)'
+                            } as React.CSSProperties}
                           >
                             <Ban size={14} /> {isEs ? 'Banear Obra' : 'Ban Media'}
                           </button>
@@ -797,7 +811,21 @@ export const AdminPanel: React.FC = () => {
                         <button
                           onClick={() => handleBanFranchise(fr.target_type, fr.target_id, fr.name)}
                           className="btn-primary"
-                          style={{ background: '#ef4444', borderColor: '#ef4444', color: '#fff', fontSize: '0.75rem', padding: '0.35rem 0.65rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+                          style={{
+                            background: '#ef4444',
+                            borderColor: '#ef4444',
+                            color: '#fff',
+                            fontSize: '0.75rem',
+                            padding: '0.35rem 0.65rem',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.3rem',
+                            '--btn-bg': '#ef4444',
+                            '--btn-hover-bg': '#dc2626',
+                            '--btn-glow': 'rgba(239, 68, 68, 0.35)',
+                            '--btn-glow-hover': 'rgba(239, 68, 68, 0.55)',
+                            boxShadow: '0 4px 14px rgba(239, 68, 68, 0.35)'
+                          } as React.CSSProperties}
                         >
                           <Ban size={12} /> {isEs ? 'Bloquear Todo' : 'Block All'}
                         </button>
@@ -1058,8 +1086,15 @@ export const AdminPanel: React.FC = () => {
                       borderColor: selectedUser.is_vip ? '#ef4444' : 'transparent',
                       fontSize: '0.85rem',
                       padding: '0.45rem 1rem',
-                      flexShrink: 0
-                    }}
+                      flexShrink: 0,
+                      ...(!selectedUser.is_vip ? {
+                        '--btn-glow': 'rgba(139, 92, 246, 0.35)',
+                        '--btn-glow-hover': 'rgba(139, 92, 246, 0.55)',
+                        boxShadow: '0 4px 14px rgba(139, 92, 246, 0.35)'
+                      } : {
+                        boxShadow: 'none'
+                      })
+                    } as React.CSSProperties}
                   >
                     {selectedUser.is_vip ? (isEs ? 'Quitar VIP' : 'Otorgar VIP') : (isEs ? 'Otorgar VIP' : 'Grant VIP')}
                   </button>
@@ -1221,7 +1256,17 @@ export const AdminPanel: React.FC = () => {
                       disabled={actionLoading}
                       onClick={handleUnsuspendUser}
                       className="btn-primary"
-                      style={{ background: '#10b981', fontSize: '0.85rem', padding: '0.45rem 1.2rem', marginTop: '0.5rem' }}
+                      style={{
+                        background: '#10b981',
+                        fontSize: '0.85rem',
+                        padding: '0.45rem 1.2rem',
+                        marginTop: '0.5rem',
+                        '--btn-bg': '#10b981',
+                        '--btn-hover-bg': '#059669',
+                        '--btn-glow': 'rgba(16, 185, 129, 0.35)',
+                        '--btn-glow-hover': 'rgba(16, 185, 129, 0.55)',
+                        boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)'
+                      } as React.CSSProperties}
                     >
                       {isEs ? 'Levantar Suspensión' : 'Remove Suspension'}
                     </button>

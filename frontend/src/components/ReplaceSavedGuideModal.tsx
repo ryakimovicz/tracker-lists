@@ -39,8 +39,14 @@ export const ReplaceSavedGuideModal: React.FC<ReplaceSavedGuideModalProps> = ({
           display: 'flex',
           flexDirection: 'column',
           gap: '1.5rem',
-          position: 'relative'
-        }}
+          position: 'relative',
+          '--accent-primary': 'var(--color-guide)',
+          '--accent-hover': 'var(--color-guide)',
+          '--accent-text': 'var(--color-text-guide, #ffffff)',
+          '--accent-text-hover': 'var(--color-text-guide, #ffffff)',
+          '--btn-glow': 'rgba(45, 212, 191, 0.35)',
+          '--btn-glow-hover': 'rgba(45, 212, 191, 0.55)',
+        } as React.CSSProperties}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Close Button */}
