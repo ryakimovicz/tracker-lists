@@ -699,17 +699,24 @@ def get_library(
 
                 if list_eps:
                     from app.models.item_progress import ItemProgress
-                    completed_prog_items = db.query(ListItem.title).join(
-                        ItemProgress,
-                        (ItemProgress.list_item_id == ListItem.id) |
-                        (ItemProgress.external_id == ListItem.external_id) |
-                        (ItemProgress.external_id == func.replace(ListItem.external_id, 'cv_issue_', ''))
-                    ).filter(
-                        ListItem.list_id == s_it.tracking_list_id,
+                    lep_ids = [it.id for it in list_eps if it.id]
+                    lep_exts = [it.external_id for it in list_eps if it.external_id]
+                    clean_lep_exts = [eid.replace('cv_issue_', '').replace('tvm-ep-', '') for eid in lep_exts]
+                    all_lep_match = set(lep_exts + clean_lep_exts)
+                    
+                    prog_recs = db.query(ItemProgress).filter(
                         ItemProgress.user_id == target_user_id,
-                        ItemProgress.is_completed == True
-                    ).all()
-                    c_titles = [r[0] for r in completed_prog_items if r[0]]
+                        ItemProgress.is_completed == True,
+                        (ItemProgress.list_item_id.in_(lep_ids) | ItemProgress.external_id.in_(list(all_lep_match)))
+                    ).all() if (lep_ids or all_lep_match) else []
+                    
+                    prog_item_ids = {p.list_item_id for p in prog_recs if p.list_item_id}
+                    prog_ext_ids = {p.external_id for p in prog_recs if p.external_id}
+                    
+                    c_titles = [
+                        it.title for it in list_eps
+                        if (it.id in prog_item_ids or it.external_id in prog_ext_ids or (it.external_id and it.external_id.replace('cv_issue_', '') in prog_ext_ids)) and it.title
+                    ]
                     series_completed_eps_count_map[s_it.id] = len(c_titles)
                     if c_titles:
                         import re

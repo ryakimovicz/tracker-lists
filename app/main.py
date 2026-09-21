@@ -16,9 +16,18 @@ logger = logging.getLogger(__name__)
 def migrate_enums():
     if engine.dialect.name == "postgresql":
         enum_migrations = [
-            ("userlibrarystatusenum", ["plan_to_watch", "watching", "completed", "dropped", "plan_to_read", "reading", "read", "plan_to_play", "playing", "endless"]),
-            ("itemtypeenum", ["anime", "manga", "book", "comic", "movie", "series", "game", "custom"]),
-            ("visibilityenum", ["public", "private", "unlisted", "draft"]),
+            ("userlibrarystatusenum", [
+                "plan_to_watch", "watching", "completed", "dropped", "plan_to_read", "reading", "read", "plan_to_play", "playing", "endless",
+                "PLAN_TO_WATCH", "WATCHING", "COMPLETED", "DROPPED", "PLAN_TO_READ", "READING", "READ", "PLAN_TO_PLAY", "PLAYING", "ENDLESS"
+            ]),
+            ("itemtypeenum", [
+                "anime", "manga", "book", "comic", "movie", "series", "game", "custom",
+                "ANIME", "MANGA", "BOOK", "COMIC", "MOVIE", "SERIES", "GAME", "CUSTOM"
+            ]),
+            ("visibilityenum", [
+                "public", "private", "unlisted", "draft",
+                "PUBLIC", "PRIVATE", "UNLISTED", "DRAFT"
+            ]),
         ]
         try:
             raw_conn = engine.raw_connection()
