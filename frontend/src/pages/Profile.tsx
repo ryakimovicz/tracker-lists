@@ -2693,7 +2693,7 @@ export const Profile: React.FC = () => {
                     const sStatus = cached?.status || anyItem.series_status;
                     const isEnded = sStatus === 'Ended' || sStatus === 'Finished' || sStatus === 'Canceled' || anyItem.is_ended === true || cached?.is_ended === true || (item.external_id ? seriesEndedMap[item.external_id] === true : false);
 
-                    if (hasEverCompleted || item.status === 'completed') {
+                    if ((hasEverCompleted || item.status === 'completed') && item.status !== 'watching') {
                       if (isEnded) {
                         badges.push({ text: language === 'es' ? 'Terminada' : 'Completed', color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)' });
                       } else {
@@ -2755,7 +2755,7 @@ export const Profile: React.FC = () => {
                       const startYr = parseInt(item.release_date || volMeta?.start_year || volMeta?.first_air_date || (titleYearMatch ? titleYearMatch[1] : '0'));
                       const isEnded = sStatus === 'Ended' || anyItem.is_ended === true || volMeta?.is_ended === true || (startYr > 0 && startYr < currentYear - 1);
 
-                      if (hasEverCompleted || item.status === 'completed' || item.status === 'read') {
+                      if ((hasEverCompleted || item.status === 'completed' || item.status === 'read') && item.status !== 'reading') {
                         if (isEnded) {
                           badges.push({ text: language === 'es' ? 'Leído' : 'Read', color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)' });
                         } else {
@@ -2786,7 +2786,7 @@ export const Profile: React.FC = () => {
                         }
                       }
                     } else {
-                      if (hasEverCompleted || item.status === 'completed' || item.status === 'read') {
+                      if ((hasEverCompleted || item.status === 'completed' || item.status === 'read') && item.status !== 'reading') {
                         badges.push({ text: language === 'es' ? 'Leído' : 'Read', color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)' });
                       } else if (item.status === 'reading') {
                         badges.push({ text: language === 'es' ? 'Leyendo' : 'Reading', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' });
@@ -4313,7 +4313,7 @@ export const Profile: React.FC = () => {
                 const sStatus = cached?.status || anyItem.series_status;
                 const isEnded = sStatus === 'Ended' || sStatus === 'Finished' || sStatus === 'Canceled' || anyItem.is_ended === true || cached?.is_ended === true || (item.external_id ? seriesEndedMap[item.external_id] === true : false);
 
-                if (hasEverCompleted || item.status === 'completed') {
+                if ((hasEverCompleted || item.status === 'completed') && item.status !== 'watching') {
                   if (isEnded) {
                     badges.push({ text: language === 'es' ? 'Terminada' : 'Completed', color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)' });
                   } else {
@@ -4323,7 +4323,7 @@ export const Profile: React.FC = () => {
                   badges.push({ text: language === 'es' ? 'Viendo' : 'Watching', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' });
                 }
               } else if (['book', 'comic', 'manga'].includes(item.item_type)) {
-                if (hasEverCompleted || item.status === 'completed' || item.status === 'read') {
+                if ((hasEverCompleted || item.status === 'completed' || item.status === 'read') && item.status !== 'reading') {
                   badges.push({ text: language === 'es' ? 'Leído' : 'Read', color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)' });
                 } else if (item.status === 'reading') {
                   badges.push({ text: language === 'es' ? 'Leyendo' : 'Reading', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' });

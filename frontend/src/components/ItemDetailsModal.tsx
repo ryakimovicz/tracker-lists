@@ -3493,22 +3493,56 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   };
   const checkCompletionStatus = async (effectiveListId: number, currentEpisodes: any[]) => {
     const isComic = selectedItem?.item_type === 'comic' || String(selectedItem?.external_id || '').startsWith('cv_vol_');
-    const canonicalSeasons = (seasons || []).filter((s: any) => s.season_number > 0 && !s.is_extras);
-    const totalEpisodes = canonicalSeasons.reduce((acc: number, s: any) => acc + (s.episode_count || 0), 0);
-    const completedEpisodes = currentEpisodes.filter((ep: any) => ep.is_completed && ep.season_number !== 0 && !ep.is_extra).length;
-
-    // Check if the series / comic volume is ended/finished forever
     const cleanVolId = String(selectedItem?.external_id || '').replace('cv_vol_', '').replace('cv_issue_', '').replace('cv_', '');
     const seriesCacheKey = `series_${selectedItem?.external_id}`;
     const cachedSeriesData = selectedItem?.external_id ? getCachedSeries(seriesCacheKey) : null;
     const volMeta = isComic ? (getCachedSeries(`comic_vol_${selectedItem?.external_id}`) || getCachedSeries(`${selectedItem?.external_id}_metadata`) || getCachedSeries(`cv_vol_${cleanVolId}_metadata`)) : null;
+    const cachedAll = isComic 
+      ? (getCachedSeries(`${cleanVolId}_all_episodes`) || getCachedSeries(`cv_vol_${cleanVolId}_all_episodes`) || getCachedSeries(`${selectedItem?.external_id}_all_episodes`)) 
+      : getCachedSeries(`${selectedItem?.external_id}_all_episodes`);
+
+    const canonicalSeasons = (seasons || []).filter((s: any) => s.season_number > 0 && !s.is_extras);
+    let totalEpisodes = canonicalSeasons.reduce((acc: number, s: any) => acc + (s.episode_count || 0), 0);
+
+    if (isComic) {
+      const comicIssueCount =
+        (Array.isArray(cachedAll) && cachedAll.length > 0 ? cachedAll.length : 0) ||
+        (seasonEpisodes && seasonEpisodes[1] && seasonEpisodes[1].length > 0 ? seasonEpisodes[1].length : 0) ||
+        volMeta?.count_of_issues ||
+        volMeta?.page_count ||
+        volMeta?.total_issues ||
+        selectedItem?.count_of_issues ||
+        selectedItem?.page_count ||
+        (totalEpisodes > 1 ? totalEpisodes : 0);
+      if (comicIssueCount > 0) {
+        totalEpisodes = comicIssueCount;
+      }
+    }
+
+    let completedEpisodes = 0;
+    if (isComic && Array.isArray(cachedAll) && cachedAll.length > 0) {
+      completedEpisodes = cachedAll.filter((ep: any) => {
+        const cleanEpId = String(ep.id || ep.external_id || '').replace('cv_issue_', '').replace('cv_', '');
+        const idKey = `cv_issue_${cleanEpId}`;
+        const inList = currentEpisodes.find((it: any) => {
+          const cleanItId = String(it.external_id || '').replace('cv_issue_', '').replace('cv_', '');
+          return cleanItId === cleanEpId || it.external_id === idKey || it.external_id === ep.external_id;
+        });
+        if (inList) return !!inList.is_completed;
+        return !!globalProgress[idKey] || !!globalProgress[cleanEpId];
+      }).length;
+    } else {
+      completedEpisodes = currentEpisodes.filter((ep: any) => ep.is_completed && ep.season_number !== 0 && !ep.is_extra).length;
+    }
+
+    // Check if the series / comic volume is ended/finished forever
     const currentYear = new Date().getFullYear();
     const startYr = parseInt(selectedItem?.start_year || volMeta?.start_year || selectedItem?.release_date || '0');
     const isEnded = isComic
       ? (selectedItem?.is_ended === true || volMeta?.is_ended === true || volMeta?.status === 'Ended' || selectedItem?.status === 'Ended' || (startYr > 0 && startYr < currentYear - 1))
       : (cachedSeriesData?.status === 'Ended' || selectedItem?.is_ended === true || selectedItem?.series_status === 'Ended');
 
-    // Truly finished ONLY if series is ended AND all total episodes of all seasons are completed
+    // Truly finished ONLY if series is ended AND all total episodes of all seasons are completed (must have totalEpisodes > 0)
     const isTrulyCompleted = (canonicalSeasons.length > 0 || isComic) && isEnded && totalEpisodes > 0 && completedEpisodes >= totalEpisodes;
 
     if (isTrulyCompleted) {
@@ -3528,6 +3562,15 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
             await apiClient.put(`/library/${targetId}`, { status: completedStatus });
             if (selectedItem.item_type !== 'episode') {
               setSelectedItem((prev: any) => ({ ...prev, status: completedStatus, id: targetId }));
+              try {
+                const cachedLibStr = sessionStorage.getItem('pathd_lib_cache');
+                if (cachedLibStr) {
+                  let cachedLib: any[] = JSON.parse(cachedLibStr);
+                  cachedLib = cachedLib.map((it: any) => (it.id === targetId || it.external_id === selectedItem.external_id) ? { ...it, status: completedStatus } : it);
+                  sessionStorage.setItem('pathd_lib_cache', JSON.stringify(cachedLib));
+                }
+              } catch (e) {}
+              window.dispatchEvent(new Event('library-updated'));
             }
           }
         } catch (e) {
@@ -3565,6 +3608,15 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                 id: targetId,
                 last_seen_episode: completedEpisodes > 0 ? prev?.last_seen_episode : null
               }));
+              try {
+                const cachedLibStr = sessionStorage.getItem('pathd_lib_cache');
+                if (cachedLibStr) {
+                  let cachedLib: any[] = JSON.parse(cachedLibStr);
+                  cachedLib = cachedLib.map((it: any) => (it.id === targetId || it.external_id === selectedItem.external_id) ? { ...it, status: fallbackStatus, completed_at: null } : it);
+                  sessionStorage.setItem('pathd_lib_cache', JSON.stringify(cachedLib));
+                }
+              } catch (e) {}
+              window.dispatchEvent(new Event('library-updated'));
             }
           } else if (selectedItem.item_type !== 'episode') {
             setSelectedItem((prev: any) => ({
@@ -3572,6 +3624,15 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
               status: fallbackStatus,
               last_seen_episode: completedEpisodes > 0 ? prev?.last_seen_episode : null
             }));
+            try {
+              const cachedLibStr = sessionStorage.getItem('pathd_lib_cache');
+              if (cachedLibStr) {
+                let cachedLib: any[] = JSON.parse(cachedLibStr);
+                cachedLib = cachedLib.map((it: any) => (it.external_id === selectedItem.external_id) ? { ...it, status: fallbackStatus, completed_at: null } : it);
+                sessionStorage.setItem('pathd_lib_cache', JSON.stringify(cachedLib));
+              }
+            } catch (e) {}
+            window.dispatchEvent(new Event('library-updated'));
           }
         } catch (e) {
           console.error("Failed to revert completion status", e);
@@ -3999,9 +4060,10 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     }
 
     try {
-      await apiClient.post(`/lists/${effectiveListId}/bulk-toggle-episodes`, {
+      const toggleRes = await apiClient.post(`/lists/${effectiveListId}/bulk-toggle-episodes`, {
         episodes: episodesToMark
       });
+      const returnedStatus = toggleRes.data?.status;
       const listRes = await apiClient.get(`/lists/${effectiveListId}`);
       const updatedList = listRes.data.items || [];
       setEpisodes(updatedList);
@@ -4020,7 +4082,31 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       });
       setGlobalProgress(prev => ({ ...prev, ...extProgMap }));
       await checkCompletionStatus(effectiveListId, updatedList);
-      onUpdate && onUpdate();
+
+      const targetStatus = returnedStatus || (isComic ? 'reading' : 'watching');
+      const updatedSelected = {
+        ...selectedItem,
+        status: targetStatus,
+        tracking_list_id: effectiveListId
+      };
+      setSelectedItem((prev: any) => prev ? { ...prev, status: targetStatus, tracking_list_id: effectiveListId } : updatedSelected);
+
+      try {
+        const cachedLibStr = sessionStorage.getItem('pathd_lib_cache');
+        if (cachedLibStr) {
+          let cachedLib: any[] = JSON.parse(cachedLibStr);
+          const existsIdx = cachedLib.findIndex((it: any) => (selectedItem?.id && it.id === selectedItem.id) || (it.external_id === selectedItem?.external_id && it.item_type === selectedItem?.item_type));
+          if (existsIdx >= 0) {
+            cachedLib[existsIdx] = { ...cachedLib[existsIdx], status: targetStatus, tracking_list_id: effectiveListId, completed_at: null };
+          } else if (selectedItem?.id) {
+            cachedLib = [{ ...selectedItem, status: targetStatus, tracking_list_id: effectiveListId, completed_at: null }, ...cachedLib];
+          }
+          sessionStorage.setItem('pathd_lib_cache', JSON.stringify(cachedLib));
+        }
+      } catch (e) {}
+
+      window.dispatchEvent(new Event('library-updated'));
+      onUpdate && onUpdate(updatedSelected);
     } catch (err) {
       console.error("Bulk toggle missing episodes failed", err);
     }

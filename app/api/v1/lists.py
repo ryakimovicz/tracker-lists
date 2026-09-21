@@ -2972,7 +2972,7 @@ def bulk_toggle_episodes(
             lib_item.updated_at = now_dt
 
         db.commit()
-        return {"message": f"{len(episodes_list)} episodes progress toggled successfully", "status": lib_item.status.value if (lib_item and hasattr(lib_item.status, 'value')) else (lib_item.status if lib_item else ("read" if is_comic else "watching"))}
+        return {"message": f"{len(episodes_list)} episodes progress toggled successfully", "status": lib_item.status.value if (lib_item and hasattr(lib_item.status, 'value')) else (lib_item.status if lib_item else ("reading" if is_comic else "watching"))}
     except HTTPException:
         db.rollback()
         raise
