@@ -1101,7 +1101,22 @@ def delete_from_library(
         )
         
     ext_id = lib_item.external_id
+    item_type = lib_item.item_type
     tracking_list_id = lib_item.tracking_list_id
+
+    # If this item was linked to a private tracking list, detach it so cascade / delete doesn't fail
+    if tracking_list_id:
+        lib_item.tracking_list_id = None
+        db.flush()
+
+    # If it was a favorite, handle reordering
+    if lib_item.is_favorite and lib_item.favorite_order is not None:
+        reorder_favorites_after_delete(
+            db=db,
+            user_id=current_user.id,
+            deleted_order=lib_item.favorite_order,
+            item_type=item_type
+        )
 
     # Clean up activities for this library item (reversible cleanup)
     from app.services.activity_service import ActivityService

@@ -599,6 +599,13 @@ export const Search: React.FC = () => {
   useEffect(() => {
     loadShelfItems();
     loadSocialMetadata();
+    const handleLibUpdated = () => {
+      loadShelfItems();
+    };
+    window.addEventListener('library-updated', handleLibUpdated);
+    return () => {
+      window.removeEventListener('library-updated', handleLibUpdated);
+    };
   }, []);
 
   useEffect(() => {
@@ -894,6 +901,11 @@ export const Search: React.FC = () => {
         ? (language === 'es' ? 'Elemento y su historial eliminados por completo.' : 'Item and all history deleted completely.')
         : (language === 'es' ? 'Elemento eliminado de tu estantería (historial conservado).' : 'Item removed from your shelf (history preserved).')
       );
+      setResults(prev => prev.map(r => 
+        r.item_type === itemToRemoveFromShelf.item_type && r.external_id === itemToRemoveFromShelf.external_id 
+        ? { ...r, id: undefined, status: undefined, tracking_list_id: undefined, completed_at: undefined, is_favorite: false } 
+        : r
+      ));
       setItemToRemoveFromShelf(null);
       await loadShelfItems();
       window.dispatchEvent(new CustomEvent('progress-updated', { detail: { deletedExternalId: itemToRemoveFromShelf.external_id, deleteHistory } }));
@@ -1051,6 +1063,24 @@ export const Search: React.FC = () => {
   const normType = selectedItem ? (selectedItem.item_type === 'anime' ? 'series' : selectedItem.item_type) : '';
   const currentShelfItem = selectedItem ? shelfItems.find(x => x.external_id === selectedItem.external_id && x.item_type === selectedItem.item_type) : null;
   const isFavorite = Boolean(currentShelfItem?.is_favorite);
+
+  const modalItem = React.useMemo(() => {
+    if (!selectedItem) return null;
+    if (selectedItem.item_type === 'guide' || selectedItem.item_type === 'user') {
+      return selectedItem;
+    }
+    if (currentShelfItem) {
+      return { ...selectedItem, ...currentShelfItem };
+    }
+    // If not in shelfItems, strip any stale shelf/tracking properties from previous sessions
+    const clean: any = { ...selectedItem };
+    delete clean.id;
+    delete clean.tracking_list_id;
+    delete clean.status;
+    delete clean.completed_at;
+    delete clean.is_favorite;
+    return clean;
+  }, [selectedItem, currentShelfItem]);
 
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem 0', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
@@ -1689,7 +1719,7 @@ export const Search: React.FC = () => {
 
       {selectedItem && (
         <ItemDetailsModal 
-          item={currentShelfItem ? { ...selectedItem, ...currentShelfItem } : selectedItem}
+          item={modalItem || selectedItem}
           isOwnProfile={true}
           profileId={currentUser?.id}
           onClose={() => setSelectedItem(null)}
@@ -1697,15 +1727,21 @@ export const Search: React.FC = () => {
           isFavorite={isFavorite}
           onToggleFavorite={handleToggleFavorite}
           onUpdate={(updatedItem) => {
-            if (updatedItem) {
+            if (updatedItem && updatedItem.id) {
               setResults(prev => prev.map(r => 
                 r.item_type === selectedItem.item_type && r.external_id === selectedItem.external_id 
                 ? { ...r, ...updatedItem } 
                 : r
               ));
+            } else {
+              setResults(prev => prev.map(r => 
+                r.item_type === selectedItem?.item_type && r.external_id === selectedItem?.external_id 
+                ? { ...r, id: undefined, status: undefined, tracking_list_id: undefined, completed_at: undefined, is_favorite: false } 
+                : r
+              ));
             }
             // Re-fetch shelf items to reflect status/favorite changes
-            apiClient.get('/library/').then(res => setShelfItems(res.data));
+            loadShelfItems();
           }}
         />
       )}

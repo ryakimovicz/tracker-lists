@@ -1998,7 +1998,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       onClose();
       window.dispatchEvent(new CustomEvent('progress-updated', { detail: { deletedExternalId: selectedItem.external_id, deleteHistory } }));
       window.dispatchEvent(new Event('library-updated'));
-      onUpdate && onUpdate();
+      onUpdate && onUpdate({ id: undefined, status: undefined, tracking_list_id: undefined, completed_at: undefined, is_favorite: false, pages_read: 0 });
     } catch (e) {
       console.error(e);
     }
@@ -2553,7 +2553,18 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                 })
                 .catch(e => console.error("Failed to fetch global progress from tracker list", e));
             }
-          }).catch(() => {});
+          }).catch(err => {
+            if (err?.response?.status === 404) {
+              removeCachedSeries(`list_${effectiveTrackingListId}`);
+              setSelectedItem((prev: any) => {
+                if (!prev) return null;
+                const next = { ...prev };
+                delete next.tracking_list_id;
+                return next;
+              });
+              setEpisodes([]);
+            }
+          });
         }
 
         if (user && incomingItem.external_id) {
@@ -2608,8 +2619,33 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                       })
                       .catch(e => console.error("Failed to fetch global progress from tracker list", e));
                   }
-                }).catch(() => {});
+                }).catch(err => {
+                  if (err?.response?.status === 404) {
+                    removeCachedSeries(`list_${myMatch.tracking_list_id}`);
+                    setSelectedItem((prev: any) => {
+                      if (!prev) return null;
+                      const next = { ...prev };
+                      delete next.tracking_list_id;
+                      return next;
+                    });
+                    setEpisodes([]);
+                  }
+                });
               }
+            } else if (isOwnProfile || !profileId || profileId === user?.id) {
+              // If the item is NOT in the user's library (e.g. was deleted or never added),
+              // clear any stale shelf/tracking state that might have been passed in initial props
+              setSelectedItem((prev: any) => {
+                if (!prev) return null;
+                const next = { ...prev };
+                delete next.id;
+                delete next.status;
+                delete next.tracking_list_id;
+                delete next.completed_at;
+                delete next.is_favorite;
+                return next;
+              });
+              setEpisodes([]);
             }
           }).catch(err => {
             console.error("Failed to check personal library state", err);
@@ -3947,6 +3983,20 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       const listRes = await apiClient.get(`/lists/${effectiveListId}`);
       const updatedList = listRes.data.items || [];
       setEpisodes(updatedList);
+      const extProgMap: Record<string, boolean> = {};
+      updatedList.forEach((it: any) => {
+        if (it.external_id) {
+          const cleanEid = String(it.external_id).replace('cv_issue_', '').replace('cv_', '').replace('tvm-ep-', '');
+          extProgMap[it.external_id] = !!it.is_completed;
+          extProgMap[cleanEid] = !!it.is_completed;
+          if (isComic) {
+            extProgMap[`cv_issue_${cleanEid}`] = !!it.is_completed;
+          } else {
+            extProgMap[`tvm-ep-${cleanEid}`] = !!it.is_completed;
+          }
+        }
+      });
+      setGlobalProgress(prev => ({ ...prev, ...extProgMap }));
       await checkCompletionStatus(effectiveListId, updatedList);
       onUpdate && onUpdate();
     } catch (err) {
@@ -6023,8 +6073,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                   });
 
                                   const cachedIssueState = getCachedSeries(`issue_state_${extIdKey}`) || getCachedSeries(`issue_state_cv_issue_${cleanEpId}`);
-                                  const hasExplicitProg = (extIdKey in globalProgress) || (cleanEpId in globalProgress);
-                                  const isCompleted = (hasExplicitProg ? (!!globalProgress[extIdKey] || !!globalProgress[cleanEpId]) : (cachedIssueState && (cachedIssueState.status === 'read' || cachedIssueState.is_completed))) || !!dbEp?.is_completed || !!dbEp?.completed_at;
+                                  const isCompleted = !!globalProgress[extIdKey] || !!globalProgress[cleanEpId] || !!dbEp?.is_completed || !!dbEp?.completed_at || (cachedIssueState && (cachedIssueState.status === 'read' || cachedIssueState.is_completed));
 
                                   return (
                                     <div
@@ -6218,7 +6267,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                 const dbEp = (episodes || []).find(x => {
                                   if (isComic) {
                                     const xClean = String(x.external_id || '').replace('cv_issue_', '').replace('cv_', '');
-                                    if (xClean && xClean === cleanEpId) return true;
+                                    if (xClean && cleanEpId && xClean === cleanEpId) return true;
                                     if (x.external_id === extIdKey || x.external_id === ep.external_id) return true;
                                     if (epNumFloat >= 0 && parseFloat(x.episode_number ?? -1) === epNumFloat) return true;
                                     return false;
@@ -6227,9 +6276,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                 });
 
                                 const cachedIssueState = isComic ? (getCachedSeries(`issue_state_${extIdKey}`) || getCachedSeries(`issue_state_cv_issue_${cleanEpId}`)) : null;
-                                const hasExplicitProg = (extIdKey in globalProgress) || (cleanEpId in globalProgress);
                                 const isCompleted = isComic
-                                  ? ((hasExplicitProg ? (!!globalProgress[extIdKey] || !!globalProgress[cleanEpId]) : (cachedIssueState && (cachedIssueState.status === 'read' || cachedIssueState.is_completed))) || !!dbEp?.is_completed || !!dbEp?.completed_at)
+                                  ? (!!globalProgress[extIdKey] || !!globalProgress[cleanEpId] || !!dbEp?.is_completed || !!dbEp?.completed_at || (cachedIssueState && (cachedIssueState.status === 'read' || cachedIssueState.is_completed)))
                                   : (!!globalProgress[extIdKey] || !!dbEp?.is_completed);
 
                                 return (
@@ -6597,7 +6645,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                                const dbEp = (episodes || []).find(x => {
                                                  if (isComic) {
                                                    const xClean = String(x.external_id || '').replace('cv_issue_', '').replace('cv_', '');
-                                                   if (xClean && xClean === cleanEpId) return true;
+                                                   if (xClean && cleanEpId && xClean === cleanEpId) return true;
                                                    if (x.external_id === extIdKey || x.external_id === ep.external_id) return true;
                                                    if (epNumFloat >= 0 && parseFloat(x.episode_number ?? -1) === epNumFloat) return true;
                                                    return false;
@@ -6606,9 +6654,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                                });
 
                                                const cachedIssueState = isComic ? (getCachedSeries(`issue_state_${extIdKey}`) || getCachedSeries(`issue_state_cv_issue_${cleanEpId}`)) : null;
-                                               const hasExplicitProg = (extIdKey in globalProgress) || (cleanEpId in globalProgress);
                                                const isCompleted = isComic
-                                                 ? ((hasExplicitProg ? (!!globalProgress[extIdKey] || !!globalProgress[cleanEpId]) : (cachedIssueState && (cachedIssueState.status === 'read' || cachedIssueState.is_completed))) || !!dbEp?.is_completed || !!dbEp?.completed_at)
+                                                 ? (!!globalProgress[extIdKey] || !!globalProgress[cleanEpId] || !!dbEp?.is_completed || !!dbEp?.completed_at || (cachedIssueState && (cachedIssueState.status === 'read' || cachedIssueState.is_completed)))
                                                  : (!!globalProgress[extIdKey] || !!dbEp?.is_completed);
 
                                                const isSpecial = ep.is_significant_special || ep.ep_type === 'significant_special' || (ep.episode_number == null && !ep.is_extra && ep.season_number > 0);

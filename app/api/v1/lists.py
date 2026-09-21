@@ -296,10 +296,18 @@ def get_list_details(
     
     if current_user:
         progress_records = db.query(ItemProgress).filter(ItemProgress.user_id == current_user.id).all()
-        external_progress_map = {
-            (p.item_type.lower() if p.item_type else "", p.external_id): (p.is_completed, p.is_skipped)
-            for p in progress_records if p.external_id
-        }
+        external_progress_map = {}
+        for p in progress_records:
+            if p.external_id:
+                p_type = str(p.item_type.value if hasattr(p.item_type, 'value') else p.item_type).lower() if p.item_type else ""
+                if "comic" in p_type:
+                    p_type = "comic"
+                elif "series" in p_type:
+                    p_type = "series"
+                elif "anime" in p_type:
+                    p_type = "anime"
+                external_progress_map[(p_type, p.external_id)] = (p.is_completed, p.is_skipped)
+                external_progress_map[("", p.external_id)] = (p.is_completed, p.is_skipped)
         custom_progress_map = {
             p.list_item_id: (p.is_completed, p.is_skipped)
             for p in progress_records if p.list_item_id and not p.external_id
@@ -392,8 +400,15 @@ def get_list_details(
     for item in items:
         # Check progress
         if item.external_id:
-            key = (item.item_type.value.lower() if hasattr(item.item_type, 'value') else str(item.item_type).lower(), item.external_id)
-            is_comp, is_skip = external_progress_map.get(key, (False, False))
+            i_type = str(item.item_type.value if hasattr(item.item_type, 'value') else item.item_type).lower() if item.item_type else ""
+            if "comic" in i_type:
+                i_type = "comic"
+            elif "series" in i_type:
+                i_type = "series"
+            elif "anime" in i_type:
+                i_type = "anime"
+            key = (i_type, item.external_id)
+            is_comp, is_skip = external_progress_map.get(key, external_progress_map.get(("", item.external_id), (False, False)))
         else:
             is_comp, is_skip = custom_progress_map.get(item.id, (False, False))
 
@@ -2518,71 +2533,112 @@ def bulk_toggle_episodes(
 
     if lib_item:
         if req.completed:
-            # Check if all aired episodes are completed
-            all_aired_completed = False
-            if lib_item.external_id:
-                try:
-                    all_episodes = TVMazeService.get_all_episodes(lib_item.external_id)
-                    now_date = now_dt.strftime("%Y-%m-%d")
+            if is_comic:
+                from app.services.comicvine import ComicVineService
+                total_vol_issues = 0
+                if lib_item.external_id:
+                    try:
+                        cv_issues = ComicVineService.get_comic_volume_issues(lib_item.external_id)
+                        total_vol_issues = len(cv_issues) if cv_issues else 0
+                    except Exception:
+                        pass
 
-                    def is_ep_aired_check(ep_dict):
-                        astamp = ep_dict.get("airstamp")
-                        if astamp:
-                            try:
-                                ep_dt = datetime.fromisoformat(astamp.replace("Z", "+00:00"))
-                                return ep_dt <= now_dt
-                            except Exception:
-                                pass
-                        adate = ep_dict.get("airdate")
-                        return bool(adate and adate <= now_date)
+                completed_count = db.query(ListItem).join(
+                    ItemProgress, ItemProgress.external_id == ListItem.external_id
+                ).filter(
+                    ListItem.list_id == list_id,
+                    ItemProgress.user_id == current_user.id,
+                    ItemProgress.is_completed == True
+                ).count()
 
-                    aired_eps = [
-                        e for e in all_episodes 
-                        if is_ep_aired_check(e) and not e.get("is_extra") and e.get("season_number", 1) != 0 and e.get("ep_type") != "insignificant_special"
-                    ]
-                    if aired_eps:
-                        aired_ext_ids = {f"tvm-ep-{e['id']}" for e in aired_eps}
-                        completed_progs = db.query(ItemProgress.external_id).filter(
-                            ItemProgress.user_id == current_user.id,
-                            ItemProgress.is_completed == True
-                        ).all()
-                        watched_ext_ids = {p[0] for p in completed_progs if p[0]}
-                        if aired_ext_ids.issubset(watched_ext_ids):
-                            all_aired_completed = True
-                except Exception as e:
-                    print(f"Error checking all_aired_completed: {e}")
-
-            if all_aired_completed:
-                lib_item.status = UserLibraryStatusEnum.COMPLETED
-                lib_item.completed_at = now_dt
-            else:
-                lib_item.status = UserLibraryStatusEnum.WATCHING
-                lib_item.completed_at = None
-
-            # Update last seen episode based on completed episodes
-            completed_items = db.query(ListItem.title).join(ItemProgress, ItemProgress.external_id == ListItem.external_id).filter(
-                ListItem.list_id == list_id,
-                ItemProgress.user_id == current_user.id,
-                ItemProgress.is_completed == True
-            ).all()
-            completed_titles = [r[0] for r in completed_items if r[0]]
-            if completed_titles:
-                import re
-                ep_tuples = []
-                for t in completed_titles:
-                    m = re.search(r'S(\d+)E(\d+)', t, re.IGNORECASE)
-                    if m:
-                        ep_tuples.append((int(m.group(1)), int(m.group(2)), t))
-                if ep_tuples:
-                    ep_tuples.sort(key=lambda x: (x[0], x[1]))
-                    lib_item.last_seen_episode = ep_tuples[-1][2]
+                if total_vol_issues > 0 and completed_count >= total_vol_issues:
+                    lib_item.status = UserLibraryStatusEnum.READ
+                    lib_item.completed_at = now_dt
                 else:
-                    lib_item.last_seen_episode = completed_titles[-1]
+                    lib_item.status = UserLibraryStatusEnum.READING
+                    lib_item.completed_at = None
+
+                completed_items = db.query(ListItem.title).join(
+                    ItemProgress, ItemProgress.external_id == ListItem.external_id
+                ).filter(
+                    ListItem.list_id == list_id,
+                    ItemProgress.user_id == current_user.id,
+                    ItemProgress.is_completed == True
+                ).all()
+                completed_titles = [r[0] for r in completed_items if r[0]]
+                if completed_titles:
+                    import re
+                    def parse_issue_num(t):
+                        m = re.search(r'#(\d+(\.\d+)?)', t)
+                        return float(m.group(1)) if m else -1.0
+                    sorted_titles = sorted(completed_titles, key=parse_issue_num)
+                    lib_item.last_seen_episode = sorted_titles[-1]
+            else:
+                # Check if all aired episodes are completed
+                all_aired_completed = False
+                if lib_item.external_id:
+                    try:
+                        all_episodes = TVMazeService.get_all_episodes(lib_item.external_id)
+                        now_date = now_dt.strftime("%Y-%m-%d")
+
+                        def is_ep_aired_check(ep_dict):
+                            astamp = ep_dict.get("airstamp")
+                            if astamp:
+                                try:
+                                    ep_dt = datetime.fromisoformat(astamp.replace("Z", "+00:00"))
+                                    return ep_dt <= now_dt
+                                except Exception:
+                                    pass
+                            adate = ep_dict.get("airdate")
+                            return bool(adate and adate <= now_date)
+
+                        aired_eps = [
+                            e for e in all_episodes 
+                            if is_ep_aired_check(e) and not e.get("is_extra") and e.get("season_number", 1) != 0 and e.get("ep_type") != "insignificant_special"
+                        ]
+                        if aired_eps:
+                            aired_ext_ids = {f"tvm-ep-{e['id']}" for e in aired_eps}
+                            completed_progs = db.query(ItemProgress.external_id).filter(
+                                ItemProgress.user_id == current_user.id,
+                                ItemProgress.is_completed == True
+                            ).all()
+                            watched_ext_ids = {p[0] for p in completed_progs if p[0]}
+                            if aired_ext_ids.issubset(watched_ext_ids):
+                                all_aired_completed = True
+                    except Exception as e:
+                        print(f"Error checking all_aired_completed: {e}")
+
+                if all_aired_completed:
+                    lib_item.status = UserLibraryStatusEnum.COMPLETED
+                    lib_item.completed_at = now_dt
+                else:
+                    lib_item.status = UserLibraryStatusEnum.WATCHING
+                    lib_item.completed_at = None
+
+                # Update last seen episode based on completed episodes
+                completed_items = db.query(ListItem.title).join(ItemProgress, ItemProgress.external_id == ListItem.external_id).filter(
+                    ListItem.list_id == list_id,
+                    ItemProgress.user_id == current_user.id,
+                    ItemProgress.is_completed == True
+                ).all()
+                completed_titles = [r[0] for r in completed_items if r[0]]
+                if completed_titles:
+                    import re
+                    ep_tuples = []
+                    for t in completed_titles:
+                        m = re.search(r'S(\d+)E(\d+)', t, re.IGNORECASE)
+                        if m:
+                            ep_tuples.append((int(m.group(1)), int(m.group(2)), t))
+                    if ep_tuples:
+                        ep_tuples.sort(key=lambda x: (x[0], x[1]))
+                        lib_item.last_seen_episode = ep_tuples[-1][2]
+                    else:
+                        lib_item.last_seen_episode = completed_titles[-1]
 
         lib_item.updated_at = now_dt
 
     db.commit()
-    return {"message": f"{len(episodes_list)} episodes progress toggled successfully", "status": lib_item.status.value if (lib_item and hasattr(lib_item.status, 'value')) else (lib_item.status if lib_item else "watching")}
+    return {"message": f"{len(episodes_list)} episodes progress toggled successfully", "status": lib_item.status.value if (lib_item and hasattr(lib_item.status, 'value')) else (lib_item.status if lib_item else ("reading" if is_comic else "watching"))}
 
 
 
