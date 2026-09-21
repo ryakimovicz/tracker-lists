@@ -13,27 +13,40 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Trigger reload for fresh service caches
+def migrate_enums():
+    if engine.dialect.name == "postgresql":
+        enum_migrations = [
+            ("userlibrarystatusenum", ["plan_to_watch", "watching", "completed", "dropped", "plan_to_read", "reading", "read", "plan_to_play", "playing", "endless"]),
+            ("itemtypeenum", ["anime", "manga", "book", "comic", "movie", "series", "game", "custom"]),
+            ("visibilityenum", ["public", "private", "unlisted", "draft"]),
+        ]
+        try:
+            raw_conn = engine.raw_connection()
+            try:
+                # Set driver connection isolation level to autocommit (required by PostgreSQL for ALTER TYPE)
+                raw_conn.set_isolation_level(0)
+            except Exception:
+                pass
+            with raw_conn.cursor() as cur:
+                for enum_type, enum_vals in enum_migrations:
+                    for val in enum_vals:
+                        try:
+                            cur.execute(f"ALTER TYPE {enum_type} ADD VALUE IF NOT EXISTS '{val}';")
+                            logger.info(f"Auto-migration: Added enum value '{val}' to {enum_type}")
+                        except Exception as e:
+                            logger.warning(f"Auto-migration: Note on adding value '{val}' to {enum_type}: {e}")
+            raw_conn.close()
+        except Exception as e:
+            logger.error(f"Error during raw PostgreSQL enum migration: {e}")
+
+# 1. Migrate enums first before creating any tables or opening ORM sessions
+migrate_enums()
+
+# 2. Create tables
 Base.metadata.create_all(bind=engine)
 
 def auto_migrate_schema():
     try:
-        if engine.dialect.name == "postgresql":
-            enum_migrations = [
-                ("userlibrarystatusenum", ["plan_to_watch", "watching", "completed", "dropped", "plan_to_read", "reading", "read", "plan_to_play", "playing", "endless"]),
-                ("itemtypeenum", ["anime", "manga", "book", "comic", "movie", "series", "game", "custom"]),
-                ("visibilityenum", ["public", "private", "unlisted", "draft"]),
-            ]
-            autocommit_engine = engine.execution_options(isolation_level="AUTOCOMMIT")
-            for enum_type, enum_vals in enum_migrations:
-                for val in enum_vals:
-                    try:
-                        with autocommit_engine.connect() as conn:
-                            conn.execute(text(f"ALTER TYPE {enum_type} ADD VALUE IF NOT EXISTS '{val}';"))
-                        logger.info(f"Auto-migration: Added enum value '{val}' to {enum_type}")
-                    except Exception as e:
-                        logger.warning(f"Auto-migration: Note on adding value '{val}' to {enum_type}: {e}")
-
         inspector = inspect(engine)
         if "users" in inspector.get_table_names():
             existing_cols = {col["name"] for col in inspector.get_columns("users")}
