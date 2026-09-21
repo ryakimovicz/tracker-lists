@@ -2282,6 +2282,7 @@ def bulk_toggle_all_seasons(
 
     # Get initial item count to increment index in memory
     item_count = db.query(ListItem).filter(ListItem.list_id == list_id).count()
+    seen_ext_ids = set()
 
     for ep in episodes_list:
         ep_id = ep.get('id')
@@ -2296,6 +2297,10 @@ def bulk_toggle_all_seasons(
             ext_id = f"tvm-ep-{ep_id}"
             media_item_type = ItemTypeEnum.SERIES
             sec_name = f"Season {ep.get('season_number', 1)}"
+
+        if ext_id in seen_ext_ids:
+            continue
+        seen_ext_ids.add(ext_id)
 
         item = db.query(ListItem).filter(
             ListItem.list_id == list_id,

@@ -186,6 +186,19 @@ def auto_migrate_schema():
                             logger.info("Auto-migration: Rebuilt media_reviews table to drop uq_user_item_review constraint.")
                 except Exception as e:
                     logger.warning(f"Auto-migration: Note on dropping constraint: {e}")
+            if engine.dialect.name == "postgresql":
+                enum_migrations = [
+                    ("userlibrarystatusenum", ["plan_to_watch", "watching", "completed", "dropped", "plan_to_read", "reading", "read", "plan_to_play", "playing", "endless"]),
+                    ("itemtypeenum", ["anime", "manga", "book", "comic", "movie", "series", "game", "custom"]),
+                    ("visibilityenum", ["public", "private", "unlisted", "draft"]),
+                ]
+                for enum_type, enum_vals in enum_migrations:
+                    for val in enum_vals:
+                        try:
+                            with engine.begin() as conn:
+                                conn.execute(text(f"ALTER TYPE {enum_type} ADD VALUE IF NOT EXISTS '{val}';"))
+                        except Exception as e:
+                            logger.warning(f"Auto-migration: Note on adding value '{val}' to {enum_type}: {e}")
     except Exception as e:
         logger.error(f"Error during schema inspection migration: {e}")
 
