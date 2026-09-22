@@ -14,7 +14,7 @@ import { prefetchMediaDetails } from '../utils/prefetch';
 import { removeCachedSeries, clearCachedSeriesMatching } from '../utils/seriesCache';
 import { getCachedShelfItems, setCachedShelfItems, createShelfMap, findInShelfMap } from '../utils/shelfCache';
 
-import { Search as SearchIcon, AlertCircle, CheckCircle, Plus, X, Heart, Star, Users, BookOpen, Package, Puzzle, Sparkles, Gamepad2, Trash2, Flame, TrendingUp, Trophy, Bookmark, Film, Tv, Book, MessageSquare, MessageCircle } from 'lucide-react';
+import { Search as SearchIcon, AlertCircle, CheckCircle, Plus, X, Heart, Star, Users, BookOpen, Package, Puzzle, Sparkles, Gamepad2, Trash2, Flame, TrendingUp, Trophy, Bookmark, Film, Tv, Book, MessageSquare, MessageCircle, Rocket } from 'lucide-react';
 
 interface SearchResultItem {
   external_id: string;
@@ -1244,7 +1244,7 @@ export const Search: React.FC = () => {
                 transition: "all 0.2s ease"
               }}
             >
-              <Sparkles size={17} color={exploreSubTab === 'nuevo' ? "var(--accent-primary)" : "currentColor"} />
+              <Rocket size={17} color={exploreSubTab === 'nuevo' ? "var(--accent-primary)" : "currentColor"} />
               <span>{t('exploreNew')}</span>
               {exploreSubTab === 'nuevo' && (
                 <div style={{ position: "absolute", bottom: "-0.3rem", left: 0, right: 0, height: "2.5px", background: "var(--accent-primary)", borderRadius: "3px" }} />
