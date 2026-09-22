@@ -1,2 +1,3 @@
 https://pathd.pages.dev/* https://pathd.net/:splat 301!
+https://www.pathd.net/* https://pathd.net/:splat 301!
 /* /index.html 200
