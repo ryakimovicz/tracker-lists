@@ -2221,8 +2221,9 @@ def bulk_toggle_season(
         
         if lib_item:
             all_list_items = db.query(ListItem).filter(ListItem.list_id == list_id).all()
-            all_item_ids = [it.id for it in all_list_items if it.id]
-            all_ext_ids = [it.external_id for it in all_list_items if it.external_id]
+            regular_list_items = [it for it in all_list_items if it.section != "Extras" and not (it.title and "[Extra]" in it.title)]
+            all_item_ids = [it.id for it in regular_list_items if it.id] if regular_list_items else [it.id for it in all_list_items if it.id]
+            all_ext_ids = [it.external_id for it in regular_list_items if it.external_id] if regular_list_items else [it.external_id for it in all_list_items if it.external_id]
             
             completed_progs = db.query(ItemProgress).filter(
                 ItemProgress.user_id == current_user.id,
@@ -2604,9 +2605,11 @@ def bulk_toggle_all_seasons(
                             lib_item.last_seen_episode = completed_titles[-1]
             else:
                 all_list_items = db.query(ListItem).filter(ListItem.list_id == list_id).all()
-                total_eps_count = len(all_list_items)
-                target_item_ids = [it.id for it in all_list_items if it.id]
-                target_exts = [it.external_id for it in all_list_items if it.external_id]
+                regular_items = [it for it in all_list_items if it.section != "Extras" and not (it.title and "[Extra]" in it.title)]
+                eval_items = regular_items if regular_items else all_list_items
+                total_eps_count = len(eval_items)
+                target_item_ids = [it.id for it in eval_items if it.id]
+                target_exts = [it.external_id for it in eval_items if it.external_id]
                 
                 completed_progs = []
                 if target_item_ids or target_exts:

@@ -1501,7 +1501,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     }
   };
 
-  const handleToggleAllEpisodes = async (action?: 'mark_all' | 'mark_again' | 'remove' | 'toggle', scope: 'seasons_only' | 'seasons_and_specials' | 'all' = 'seasons_and_specials', passedEpisodes?: any[]) => {
+  const handleToggleAllEpisodes = async (action?: 'mark_all' | 'mark_again' | 'remove' | 'toggle', scope: 'seasons_only' | 'seasons_and_specials' | 'all' | 'extras_only' = 'seasons_and_specials', passedEpisodes?: any[]) => {
     if (!selectedItem) return;
     const isComic = selectedItem.item_type === 'comic' || String(selectedItem.external_id || '').startsWith('cv_vol_');
     let effectiveListId = selectedItem.tracking_list_id;
@@ -1538,33 +1538,38 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       }
     }
 
-    // Filter cachedAll according to chosen scope (when removing, unmark all episodes)
+    // Filter cachedAll according to chosen scope
     let targetEps: any[] = cachedAll && Array.isArray(cachedAll) ? [...cachedAll] : [];
-    if (!isComic && targetEps.length > 0 && action !== 'remove') {
+    if (!isComic && targetEps.length > 0) {
       if (scope === 'seasons_only') {
         targetEps = targetEps.filter((ep: any) => !ep.is_significant_special && !ep.is_extra && ep.season_number > 0 && ep.ep_type !== 'significant_special' && ep.ep_type !== 'insignificant_special');
       } else if (scope === 'seasons_and_specials') {
         targetEps = targetEps.filter((ep: any) => !ep.is_extra && ep.ep_type !== 'insignificant_special' && ep.season_number !== 0);
+      } else if (scope === 'extras_only') {
+        targetEps = targetEps.filter((ep: any) => ep.is_extra || ep.ep_type === 'insignificant_special' || ep.season_number === 0);
       }
 
       // Filter out unaired episodes when marking as watched: only mark episodes that already aired
-      const nowMs = Date.now();
-      targetEps = targetEps.filter((ep: any) => {
-        if (ep.airstamp) return new Date(ep.airstamp).getTime() <= nowMs;
-        if (ep.airdate || ep.air_date) {
-          const ad = ep.airdate || ep.air_date;
-          const at = ep.airtime || '00:00';
-          return new Date(`${ad}T${at}:00Z`).getTime() <= nowMs;
-        }
-        return true;
-      });
+      if (action !== 'remove') {
+        const nowMs = Date.now();
+        targetEps = targetEps.filter((ep: any) => {
+          if (ep.airstamp) return new Date(ep.airstamp).getTime() <= nowMs;
+          if (ep.airdate || ep.air_date) {
+            const ad = ep.airdate || ep.air_date;
+            const at = ep.airtime || '00:00';
+            return new Date(`${ad}T${at}:00Z`).getTime() <= nowMs;
+          }
+          return true;
+        });
+      }
     }
 
-    // Optimistically update global progress
-    const allKnownEps: any[] = (cachedAll && Array.isArray(cachedAll) && cachedAll.length > 0) ? cachedAll : (targetEps.length > 0 ? targetEps : (episodes || []));
-    if (allKnownEps.length > 0) {
+    // Optimistically update global progress only for the episodes in this scope
+    const allKnownEps: any[] = (cachedAll && Array.isArray(cachedAll) && cachedAll.length > 0) ? cachedAll : (episodes || []);
+    const epsToToggle = targetEps.length > 0 ? targetEps : (action === 'remove' ? allKnownEps : []);
+    if (epsToToggle.length > 0) {
       const newProg: Record<string, boolean> = {};
-      allKnownEps.forEach((ep: any) => {
+      epsToToggle.forEach((ep: any) => {
         if (isComic) {
           const cleanEpId = String(ep.id || ep.external_id || '').replace('cv_issue_', '').replace('cv_', '');
           const idKey = `cv_issue_${cleanEpId}`;
@@ -5922,17 +5927,31 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem' }}>
                             <button
                               type="button"
-                              onClick={() => {
+                              onClick={async () => {
                                 if (selectedItem?.status === 'completed' || isAllWatched) {
                                   setShowReconsumedModal(true);
                                 } else {
                                   const cacheKeyAll = `${selectedItem?.external_id}_all_episodes`;
-                                  const cachedAll = getCachedSeries(cacheKeyAll) || [];
-                                  const hasSpecials = cachedAll.some((ep: any) => (ep.is_significant_special || ep.ep_type === 'significant_special') && !ep.is_extra);
+                                  let cachedAll = getCachedSeries(cacheKeyAll);
+                                  if (!cachedAll || !Array.isArray(cachedAll) || cachedAll.length === 0) {
+                                    try {
+                                      const epRes = await apiClient.get(`/search/series/${selectedItem.external_id}/episodes`);
+                                      if (Array.isArray(epRes.data) && epRes.data.length > 0) {
+                                        cachedAll = epRes.data;
+                                        setCachedSeries(cacheKeyAll, cachedAll);
+                                      }
+                                    } catch (err) {
+                                      console.error("Failed to fetch episodes for series scope check", err);
+                                    }
+                                  }
 
-                                  // If no specials exist, mark regular seasons directly without asking
-                                  if (!hasSpecials) {
-                                    handleToggleAllEpisodes('mark_all', 'seasons_only');
+                                  const allEps = cachedAll || [];
+                                  const hasSpecials = allEps.some((ep: any) => (ep.is_significant_special || ep.ep_type === 'significant_special') && !ep.is_extra);
+                                  const hasExtras = allEps.some((ep: any) => ep.is_extra || ep.ep_type === 'insignificant_special' || ep.season_number === 0);
+
+                                  // If no specials AND no extras exist, mark regular seasons directly without asking
+                                  if (!hasSpecials && !hasExtras) {
+                                    handleToggleAllEpisodes('mark_all', 'seasons_only', allEps);
                                   } else {
                                     setPendingSeriesScopeAction('mark_all');
                                     setShowSeriesScopeModal(true);
@@ -5941,12 +5960,12 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                               }}
                               style={{
                                 width: '100%',
-                                background: isAllWatched 
+                                background: (selectedItem?.status === 'completed' || isAllWatched) 
                                   ? `var(--color-${selectedItem?.item_type || 'series'})` 
                                   : areRegularSeasonsWatched 
                                     ? 'transparent' 
                                     : 'var(--bg-tertiary)',
-                                border: isAllWatched 
+                                border: (selectedItem?.status === 'completed' || isAllWatched) 
                                   ? 'none' 
                                   : areRegularSeasonsWatched 
                                     ? `2px dashed var(--color-${selectedItem?.item_type || 'series'})` 
@@ -8204,10 +8223,21 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                           setShowReconsumedModal(false);
                           if (selectedItem.item_type === 'series' || selectedItem.item_type === 'anime') {
                             const cacheKeyAll = `${selectedItem?.external_id}_all_episodes`;
-                            const cachedAll = getCachedSeries(cacheKeyAll) || [];
-                            const hasSpecials = cachedAll.some((ep: any) => (ep.is_significant_special || ep.ep_type === 'significant_special') && !ep.is_extra);
-                            if (!hasSpecials) {
-                              await handleToggleAllEpisodes('mark_again', 'seasons_only');
+                            let cachedAll = getCachedSeries(cacheKeyAll);
+                            if (!cachedAll || !Array.isArray(cachedAll) || cachedAll.length === 0) {
+                              try {
+                                const epRes = await apiClient.get(`/search/series/${selectedItem.external_id}/episodes`);
+                                if (Array.isArray(epRes.data) && epRes.data.length > 0) {
+                                  cachedAll = epRes.data;
+                                  setCachedSeries(cacheKeyAll, cachedAll);
+                                }
+                              } catch (err) {}
+                            }
+                            const allEps = cachedAll || [];
+                            const hasSpecials = allEps.some((ep: any) => (ep.is_significant_special || ep.ep_type === 'significant_special') && !ep.is_extra);
+                            const hasExtras = allEps.some((ep: any) => ep.is_extra || ep.ep_type === 'insignificant_special' || ep.season_number === 0);
+                            if (!hasSpecials && !hasExtras) {
+                              await handleToggleAllEpisodes('mark_again', 'seasons_only', allEps);
                             } else {
                               setPendingSeriesScopeAction('mark_again');
                               setShowSeriesScopeModal(true);
@@ -8282,7 +8312,26 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         onClick={async () => {
                           setShowReconsumedModal(false);
                           if (selectedItem.item_type === 'series' || selectedItem.item_type === 'anime') {
-                            await handleToggleAllEpisodes('remove', 'all');
+                            const cacheKeyAll = `${selectedItem?.external_id}_all_episodes`;
+                            let cachedAll = getCachedSeries(cacheKeyAll);
+                            if (!cachedAll || !Array.isArray(cachedAll) || cachedAll.length === 0) {
+                              try {
+                                const epRes = await apiClient.get(`/search/series/${selectedItem.external_id}/episodes`);
+                                if (Array.isArray(epRes.data) && epRes.data.length > 0) {
+                                  cachedAll = epRes.data;
+                                  setCachedSeries(cacheKeyAll, cachedAll);
+                                }
+                              } catch (err) {}
+                            }
+                            const allEps = cachedAll || [];
+                            const hasSpecials = allEps.some((ep: any) => (ep.is_significant_special || ep.ep_type === 'significant_special') && !ep.is_extra);
+                            const hasExtras = allEps.some((ep: any) => ep.is_extra || ep.ep_type === 'insignificant_special' || ep.season_number === 0);
+                            if (!hasSpecials && !hasExtras) {
+                              await handleToggleAllEpisodes('remove', 'all');
+                            } else {
+                              setPendingSeriesScopeAction('remove');
+                              setShowSeriesScopeModal(true);
+                            }
                           } else if (selectedItem.item_type === 'comic' && !isEpisode) {
                             const cacheKey = `${selectedItem.external_id}_all_episodes`;
                             const list = (seasonEpisodes[1] && seasonEpisodes[1].length > 0) ? seasonEpisodes[1] : (getCachedSeries(cacheKey) || []);
@@ -8371,7 +8420,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                 // Determine which options to show
                 const showSeasonsOption = !isRemove ? true : (watchedSeasonsCount > 0 || hasWatchedRegularDb || selectedItem?.status === 'completed');
                 const showSpecialsOption = !isRemove ? hasSpecials : (hasSpecials && (watchedSpecialsCount > 0 || watchedSeasonsCount > 0 || hasWatchedRegularDb));
-                const showAllOption = !isRemove ? (hasSpecials && hasExtras) : (hasExtras && watchedExtrasCount > 0);
+                const showAllOption = !isRemove ? hasExtras : (hasExtras && watchedExtrasCount > 0);
                 const showExtrasOnlyOption = isRemove && hasExtras && watchedExtrasCount > 0 && watchedSeasonsCount === 0 && watchedSpecialsCount === 0 && !hasWatchedRegularDb;
 
                 return (
@@ -8452,12 +8501,12 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                               <Check size={16} strokeWidth={3} style={{ flexShrink: 0, color: 'var(--accent-primary)' }} />
                             )}
                             <span>
-                              {language === 'es' ? 'Solo temporadas' : 'Seasons only'}
+                              {language === 'es' ? 'Solo episodios regulares' : 'Regular episodes only'}
                             </span>
                           </button>
                         )}
 
-                        {/* Option 2: Temporadas + Especiales */}
+                        {/* Option 2: Regulares + Especiales */}
                         {showSpecialsOption && (
                           <button
                             type="button"
@@ -8486,12 +8535,12 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                               <Check size={16} strokeWidth={3} style={{ flexShrink: 0, color: 'var(--accent-primary)' }} />
                             )}
                             <span>
-                              {language === 'es' ? 'Temporadas + Especiales' : 'Seasons + Specials'}
+                              {language === 'es' ? 'Regulares + Especiales' : 'Regular + Specials'}
                             </span>
                           </button>
                         )}
 
-                        {/* Option 3: Todo (temporadas, especiales y extras) */}
+                        {/* Option 3: Todo (regulares, especiales y extras) */}
                         {showAllOption && (
                           <button
                             type="button"
@@ -8520,7 +8569,10 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                               <Check size={16} strokeWidth={3} style={{ flexShrink: 0, color: 'var(--accent-primary)' }} />
                             )}
                             <span>
-                              {language === 'es' ? 'Todo (Temporadas, Especiales y Extras)' : 'All (Seasons, Specials & Extras)'}
+                              {language === 'es'
+                                ? (hasSpecials ? 'Todo (Regulares, Especiales y Extras)' : 'Todo (Regulares y Extras)')
+                                : (hasSpecials ? 'All (Regular, Specials & Extras)' : 'All (Regular & Extras)')
+                              }
                             </span>
                           </button>
                         )}
@@ -8531,7 +8583,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                             type="button"
                             onClick={async () => {
                               setShowSeriesScopeModal(false);
-                              await handleToggleAllEpisodes('remove', 'all');
+                              await handleToggleAllEpisodes('remove', 'extras_only');
                             }}
                             style={{
                               display: 'flex',
