@@ -207,6 +207,7 @@ export const Profile: React.FC = () => {
   });
   const [activeTab, setActiveTab] = useState<'shelf' | 'guides' | 'favorites' | 'music'>('shelf');
   const [mediaFilter, setMediaFilter] = useState<'all' | 'movie' | 'series' | 'anime' | 'book' | 'comic' | 'manga' | 'game'>('all');
+  const [shelfStatusFilter, setShelfStatusFilter] = useState<string>('all');
   const [favoritesMediaFilter, setFavoritesMediaFilter] = useState<'all' | 'movie' | 'series' | 'anime' | 'book' | 'comic' | 'manga' | 'game'>('all');
   const [showReorderTooltip, setShowReorderTooltip] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -628,7 +629,7 @@ export const Profile: React.FC = () => {
       el.removeEventListener('scroll', updateShelfScrollState);
       window.removeEventListener('resize', updateShelfScrollState);
     };
-  }, [updateShelfScrollState, activeTab, isShelfExpanded, shelfViewMode, libraryItems, shelfSearchQuery, mediaFilter]);
+  }, [updateShelfScrollState, activeTab, isShelfExpanded, shelfViewMode, libraryItems, shelfSearchQuery, mediaFilter, shelfStatusFilter]);
 
   useEffect(() => {
     if (activeTab !== 'guides') return;
@@ -1817,6 +1818,124 @@ export const Profile: React.FC = () => {
     return isLooseType && !followsParentSeries;
   };
 
+  const getItemShelfStatus = useCallback((item: LibraryItem): string => {
+    if (item.status === 'dropped') return 'dropped';
+
+    const isPlanTo = ['plan_to_watch', 'plan_to_play', 'plan_to_read'].includes(item.status) ||
+      ((item.item_type === 'series' || item.item_type === 'anime') &&
+       !item.last_seen_episode &&
+       item.status !== 'completed' &&
+       item.status !== 'watching' &&
+       (!item.completed_episodes_count || item.completed_episodes_count === 0));
+
+    if (isPlanTo) return 'plan_to';
+
+    const hasEverCompleted = (item.times_completed && item.times_completed > 0) || !!item.completed_at;
+
+    if (item.item_type === 'game') {
+      const isHundred = item.is_hundred_percent || (item.times_completed_hundred && item.times_completed_hundred > 0);
+      if (isHundred) return 'hundred_percent';
+      if (hasEverCompleted || item.status === 'completed') return 'completed';
+      if (item.status === 'playing') return 'watching';
+      return 'watching';
+    }
+
+    if (item.item_type === 'movie') {
+      if (hasEverCompleted || item.status === 'completed') return 'completed';
+      if (item.status === 'watching') return 'watching';
+      return 'completed';
+    }
+
+    if (item.item_type === 'series' || item.item_type === 'anime') {
+      const cacheKey = `series_${item.external_id}`;
+      const cached = item.external_id ? (getCachedSeries(cacheKey) || getCachedSeries(`${item.external_id}_metadata`)) : null;
+      const anyItem = item as any;
+      const sStatus = cached?.status || anyItem.series_status;
+      const isEnded = sStatus === 'Ended' || sStatus === 'Finished' || sStatus === 'Canceled' || anyItem.is_ended === true || cached?.is_ended === true || (item.external_id ? seriesEndedMap[item.external_id] === true : false);
+
+      if ((hasEverCompleted || item.status === 'completed') && item.status !== 'watching') {
+        if (isEnded) return 'completed';
+        return 'watching'; // "Al día" counts as watching!
+      }
+
+      if (item.status === 'watching') {
+        return 'watching';
+      }
+
+      return 'watching';
+    }
+
+    if (['book', 'comic', 'manga'].includes(item.item_type)) {
+      if (item.item_type === 'comic') {
+        const cleanVolId = String(item.external_id || '').replace('cv_vol_', '').replace('cv_issue_', '').replace('cv_', '');
+        const volMeta = getCachedSeries(`comic_vol_${item.external_id}`) || getCachedSeries(`${item.external_id}_metadata`) || getCachedSeries(`cv_vol_${cleanVolId}_metadata`) || getCachedSeries(`series_${item.external_id}`);
+        const anyItem = item as any;
+        const sStatus = volMeta?.status || anyItem.series_status;
+        const currentYear = new Date().getFullYear();
+        const titleYearMatch = item.title ? String(item.title).match(/\b(19\d\d|20\d\d)\b/) : null;
+        const startYr = parseInt(item.release_date || volMeta?.start_year || volMeta?.first_air_date || (titleYearMatch ? titleYearMatch[1] : '0'));
+        const isEnded = sStatus === 'Ended' || anyItem.is_ended === true || volMeta?.is_ended === true || (startYr > 0 && startYr < currentYear - 1);
+
+        if ((hasEverCompleted || item.status === 'completed' || item.status === 'read') && item.status !== 'reading') {
+          if (isEnded) return 'completed';
+          return 'watching'; // "Al día" counts as reading/watching!
+        }
+
+        if (item.status === 'reading') return 'watching';
+        return 'watching';
+      }
+
+      if (hasEverCompleted || item.status === 'completed' || item.status === 'read') return 'completed';
+      if (item.status === 'reading') return 'watching';
+      return 'completed';
+    }
+
+    return 'watching';
+  }, [seriesEndedMap]);
+
+  const getSubcategoriesForMedia = useCallback((mediaType: string, itemsForMedia: LibraryItem[]) => {
+    const getCount = (statusId: string) => {
+      if (statusId === 'all') return itemsForMedia.length;
+      return itemsForMedia.filter(i => getItemShelfStatus(i) === statusId).length;
+    };
+
+    if (mediaType === 'movie') {
+      return [
+        { id: 'all', label: language === 'es' ? 'Todo' : 'All', count: getCount('all') },
+        { id: 'watching', label: language === 'es' ? 'Pausadas' : 'Paused', count: getCount('watching') },
+        { id: 'completed', label: language === 'es' ? 'Vistas' : 'Watched', count: getCount('completed') },
+        { id: 'plan_to', label: language === 'es' ? 'Por ver' : 'Plan to watch', count: getCount('plan_to') },
+        { id: 'dropped', label: language === 'es' ? 'Abandonadas' : 'Dropped', count: getCount('dropped') },
+      ];
+    } else if (mediaType === 'series' || mediaType === 'anime') {
+      return [
+        { id: 'all', label: language === 'es' ? 'Todo' : 'All', count: getCount('all') },
+        { id: 'watching', label: language === 'es' ? 'Viendo' : 'Watching', count: getCount('watching') },
+        { id: 'completed', label: language === 'es' ? 'Terminadas' : 'Completed', count: getCount('completed') },
+        { id: 'plan_to', label: language === 'es' ? 'Por ver' : 'Plan to watch', count: getCount('plan_to') },
+        { id: 'dropped', label: language === 'es' ? 'Abandonadas' : 'Dropped', count: getCount('dropped') },
+      ];
+    } else if (mediaType === 'game') {
+      return [
+        { id: 'all', label: language === 'es' ? 'Todo' : 'All', count: getCount('all') },
+        { id: 'watching', label: language === 'es' ? 'Jugando' : 'Playing', count: getCount('watching') },
+        { id: 'completed', label: language === 'es' ? 'Terminados' : 'Completed', count: getCount('completed') },
+        { id: 'hundred_percent', label: '100%', count: getCount('hundred_percent'), hasTrophy: true },
+        { id: 'plan_to', label: language === 'es' ? 'Por jugar' : 'Plan to play', count: getCount('plan_to') },
+        { id: 'dropped', label: language === 'es' ? 'Abandonados' : 'Dropped', count: getCount('dropped') },
+      ];
+    } else {
+      // book, comic, manga
+      return [
+        { id: 'all', label: language === 'es' ? 'Todo' : 'All', count: getCount('all') },
+        { id: 'watching', label: language === 'es' ? 'Leyendo' : 'Reading', count: getCount('watching') },
+        { id: 'completed', label: language === 'es' ? 'Leídos' : 'Read', count: getCount('completed') },
+        { id: 'plan_to', label: language === 'es' ? 'Por leer' : 'Plan to read', count: getCount('plan_to') },
+        { id: 'dropped', label: language === 'es' ? 'Abandonados' : 'Dropped', count: getCount('dropped') },
+      ];
+    }
+  }, [getItemShelfStatus, language]);
+
   const filteredItems = libraryItems
     .filter(item => {
       if (item.external_id?.startsWith('cv_issue_')) return false;
@@ -1835,10 +1954,16 @@ export const Profile: React.FC = () => {
       
       const isLoose = isLooseEpisodeOrSeason(item);
       const isSeriesOrRegular = item.item_type !== 'episode' && item.item_type !== 'season' && !item.external_id?.startsWith('tvm-ep-');
-      const isNotStartedSeries = (item.item_type === 'series' || item.item_type === 'anime') && !item.last_seen_episode;
-      const isPlanToStatus = ['plan_to_watch', 'plan_to_play', 'plan_to_read'].includes(item.status);
 
-      return matchesMedia && matchesSearch && (isSeriesOrRegular || isLoose) && !isNotStartedSeries && !isPlanToStatus;
+      if (!matchesMedia || !matchesSearch || (!isSeriesOrRegular && !isLoose)) return false;
+
+      // Status subcategory filter (active when a specific category is selected)
+      if (mediaFilter !== 'all' && shelfStatusFilter !== 'all') {
+        const itemStatus = getItemShelfStatus(item);
+        if (itemStatus !== shelfStatusFilter) return false;
+      }
+
+      return true;
     })
     .sort((a, b) => {
       const dateA = new Date(a.completed_at || a.updated_at || 0).getTime();
@@ -1854,12 +1979,6 @@ export const Profile: React.FC = () => {
 
   const visualLibraryItems = libraryItems.filter(item => {
     if (item.external_id?.startsWith('cv_issue_')) return false;
-    const isPlanToStatus = ['plan_to_watch', 'plan_to_play', 'plan_to_read'].includes(item.status);
-    if (isPlanToStatus) return false;
-
-    const isNotStartedSeries = (item.item_type === 'series' || item.item_type === 'anime') && !item.last_seen_episode;
-    if (isNotStartedSeries) return false;
-    
     const isLooseType = item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tvm-ep-');
     if (!isLooseType) return true;
     const parentTitle = item.last_seen_episode || '';
@@ -2478,11 +2597,20 @@ export const Profile: React.FC = () => {
                   const typeTextColor = type === 'all' ? '#ffffff' : `var(--color-text-${type})`;
                   const isSelected = mediaFilter === type;
 
+                  const typeCount = type === 'all'
+                    ? visualLibraryItems.length
+                    : visualLibraryItems.filter(item => {
+                        if (type === 'series') return item.item_type === 'series' || item.item_type === 'episode' || item.item_type === 'season';
+                        if (type === 'anime') return item.item_type === 'anime';
+                        return item.item_type === type;
+                      }).length;
+
                   return (
                     <button
                       key={type}
                       onClick={() => {
                         setMediaFilter(type as any);
+                        setShelfStatusFilter('all');
                         setCurrentPage(1);
                       }}
                       className={`profile-category-tab ${isSelected ? 'selected' : ''}`}
@@ -2508,11 +2636,78 @@ export const Profile: React.FC = () => {
                          type === 'manga' ? 'Mangas' :
                          type === 'game' ? (language === 'es' ? 'Juegos' : 'Games') : type}
                       </span>
+                      <span
+                        style={{
+                          fontSize: '0.78rem',
+                          opacity: isSelected ? 0.85 : 0.6,
+                          fontWeight: isSelected ? 600 : 500,
+                          lineHeight: 'inherit'
+                        }}
+                      >
+                        ({typeCount})
+                      </span>
                     </button>
                   );
                 });
               })()}
             </div>
+
+            {/* Subcategories (Status Filters) */}
+            {mediaFilter !== 'all' && (() => {
+              const currentMediaItems = visualLibraryItems.filter(item => {
+                if (mediaFilter === 'series') return item.item_type === 'series' || item.item_type === 'episode' || item.item_type === 'season';
+                if (mediaFilter === 'anime') return item.item_type === 'anime';
+                return item.item_type === mediaFilter;
+              });
+
+              const subcategories = getSubcategoriesForMedia(mediaFilter, currentMediaItems);
+              const visibleSubcategories = subcategories.filter(sub => sub.id === 'all' || sub.count > 0);
+
+              if (visibleSubcategories.length <= 1) return null;
+
+              return (
+                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                  {visibleSubcategories.map(sub => {
+                    const isSelected = shelfStatusFilter === sub.id;
+                    const catColor = `var(--color-${mediaFilter})`;
+                    const catTextColor = `var(--color-text-${mediaFilter})`;
+
+                    return (
+                      <button
+                        key={sub.id}
+                        type="button"
+                        onClick={() => {
+                          setShelfStatusFilter(sub.id);
+                          setCurrentPage(1);
+                        }}
+                        className={`profile-subcategory-tab ${isSelected ? 'selected' : ''}`}
+                        style={{
+                          '--tab-color': catColor,
+                          '--tab-text': catTextColor
+                        } as React.CSSProperties}
+                      >
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.28rem' }}>
+                          {(sub as any).hasTrophy && (
+                            <Trophy size={13} strokeWidth={2.2} style={{ flexShrink: 0 }} />
+                          )}
+                          <span>{sub.label}</span>
+                        </span>
+                        <span
+                          style={{
+                            fontSize: '0.75rem',
+                            opacity: isSelected ? 0.85 : 0.6,
+                            fontWeight: isSelected ? 600 : 500,
+                            lineHeight: 'inherit'
+                          }}
+                        >
+                          ({sub.count})
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              );
+            })()}
             
             <div style={{ width: '100%', maxWidth: '400px' }}>
               <input
@@ -2656,6 +2851,13 @@ export const Profile: React.FC = () => {
                     badges.push({ text: language === 'es' ? 'Abandonado' : 'Dropped', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.15)' });
                   } else if (item.status === 'endless') {
                     badges.push({ text: language === 'es' ? 'Infinito' : 'Endless', color: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.15)' });
+                  } else if (['plan_to_watch', 'plan_to_play', 'plan_to_read'].includes(item.status) || ((item.item_type === 'series' || item.item_type === 'anime') && !item.last_seen_episode && item.status !== 'completed' && item.status !== 'watching' && (!item.completed_episodes_count || item.completed_episodes_count === 0))) {
+                    const planText = item.item_type === 'game'
+                      ? (language === 'es' ? 'Por jugar' : 'Plan to play')
+                      : ['book', 'comic', 'manga'].includes(item.item_type)
+                      ? (language === 'es' ? 'Por leer' : 'Plan to read')
+                      : (language === 'es' ? 'Por ver' : 'Plan to watch');
+                    badges.push({ text: planText, color: '#a855f7', bg: 'rgba(168, 85, 247, 0.15)' });
                   } else if (item.item_type === 'game') {
                     if (hasEverCompleted) {
                       const hundredRuns = item.times_completed_hundred ?? (item.is_hundred_percent ? (item.times_completed || 1) : 0);
@@ -2684,7 +2886,7 @@ export const Profile: React.FC = () => {
                     if (hasEverCompleted) {
                       badges.push({ text: language === 'es' ? 'Visto' : 'Watched', color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)' });
                     } else if (item.status === 'watching') {
-                      badges.push({ text: language === 'es' ? 'Pausa' : 'Paused', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' });
+                      badges.push({ text: language === 'es' ? 'Pausada' : 'Paused', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' });
                     }
                   } else if (item.item_type === 'series' || item.item_type === 'anime') {
                     const cacheKey = `series_${item.external_id}`;
@@ -4304,7 +4506,7 @@ export const Profile: React.FC = () => {
                 if (hasEverCompleted) {
                   badges.push({ text: language === 'es' ? 'Visto' : 'Watched', color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)' });
                 } else if (item.status === 'watching') {
-                  badges.push({ text: language === 'es' ? 'Pausa' : 'Paused', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' });
+                  badges.push({ text: language === 'es' ? 'Pausada' : 'Paused', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' });
                 }
               } else if (item.item_type === 'series' || item.item_type === 'anime') {
                 const cacheKey = `series_${item.external_id}`;

@@ -6061,7 +6061,11 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                               transition: 'all 0.2s ease'
                             }}
                           >
-                            {['book', 'comic', 'manga'].includes(selectedItem?.item_type) ? (language === 'es' ? 'Leyendo' : 'Reading') : (language === 'es' ? 'Viendo' : 'Watching')}
+                            {['book', 'comic', 'manga'].includes(selectedItem?.item_type)
+                              ? (language === 'es' ? 'Leyendo' : 'Reading')
+                              : selectedItem?.item_type === 'movie'
+                              ? (language === 'es' ? 'Pausada' : 'Paused')
+                              : (language === 'es' ? 'Viendo' : 'Watching')}
                           </button>
                           <button
                             type="button"

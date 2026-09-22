@@ -593,6 +593,33 @@ h1, h2, h3, h4, h5, h6 {
   font-weight: 600;
 }
 
+.profile-subcategory-tab {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-weight: 500;
+  padding: 0.25rem 0.65rem;
+  font-size: 0.8rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.profile-subcategory-tab:hover {
+  border-color: var(--tab-color);
+  color: var(--tab-color);
+}
+
+.profile-subcategory-tab.selected {
+  background: var(--tab-color);
+  border-color: var(--tab-color);
+  color: var(--tab-text, #ffffff);
+  font-weight: 600;
+}
+
 /* Quick Add/Remove Shelf Button in Media Cards */
 .btn-card-add-shelf {
   padding: 0.35rem;
