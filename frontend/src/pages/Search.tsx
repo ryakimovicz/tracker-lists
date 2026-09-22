@@ -12,6 +12,7 @@ import { ProModal } from '../components/ProModal';
 import { getOrderedCategories, sortFilterTabs, getCategoryIcon } from '../utils/categoryOrder';
 import { prefetchMediaDetails } from '../utils/prefetch';
 import { removeCachedSeries, clearCachedSeriesMatching } from '../utils/seriesCache';
+import { getCachedShelfItems, setCachedShelfItems, createShelfMap, findInShelfMap } from '../utils/shelfCache';
 
 import { Search as SearchIcon, AlertCircle, CheckCircle, Plus, X, Heart, Star, Users, BookOpen, Package, Puzzle, Sparkles, Gamepad2, Trash2, Flame, TrendingUp, Trophy, Bookmark, Film, Tv, Book, MessageSquare, MessageCircle } from 'lucide-react';
 
@@ -548,8 +549,9 @@ export const Search: React.FC = () => {
     }
   };
 
-  // Shelf tracking states
-  const [shelfItems, setShelfItems] = useState<any[]>([]);
+  // Shelf tracking states (Synchronous Frame-0 cache for 0ms instant '+' matching)
+  const [shelfItems, setShelfItems] = useState<any[]>(getCachedShelfItems);
+  const shelfMap = React.useMemo(() => createShelfMap(shelfItems), [shelfItems]);
   const [itemToRemoveFromShelf, setItemToRemoveFromShelf] = useState<any | null>(null);
 
   // Details Modal states
@@ -577,8 +579,11 @@ export const Search: React.FC = () => {
 
   const loadShelfItems = async () => {
     try {
-      const res = await apiClient.get('/library/');
-      setShelfItems(res.data);
+      const res = await apiClient.get('/library/shelf');
+      if (Array.isArray(res.data)) {
+        setShelfItems(res.data);
+        setCachedShelfItems(res.data);
+      }
     } catch (e) {
       console.error("Failed to load shelf items", e);
     }
@@ -600,6 +605,10 @@ export const Search: React.FC = () => {
     loadShelfItems();
     loadSocialMetadata();
     const handleLibUpdated = () => {
+      const cached = getCachedShelfItems();
+      if (cached && cached.length > 0) {
+        setShelfItems(cached);
+      }
       loadShelfItems();
     };
     window.addEventListener('library-updated', handleLibUpdated);
@@ -853,7 +862,9 @@ export const Search: React.FC = () => {
 
     setShelfItems(prev => {
       const filtered = prev.filter(x => !(x.external_id === item.external_id && x.item_type === item.item_type));
-      return [...filtered, optimisticItem];
+      const updated = [...filtered, optimisticItem];
+      setCachedShelfItems(updated);
+      return updated;
     });
 
     try {
@@ -868,9 +879,14 @@ export const Search: React.FC = () => {
         status: status
       });
       await loadShelfItems();
+      window.dispatchEvent(new CustomEvent('library-updated', { detail: { item: optimisticItem } }));
     } catch (err: any) {
       // Revert optimistic state on failure
-      setShelfItems(prev => prev.filter(x => !(x.external_id === item.external_id && x.item_type === item.item_type)));
+      setShelfItems(prev => {
+        const updated = prev.filter(x => !(x.external_id === item.external_id && x.item_type === item.item_type));
+        setCachedShelfItems(updated);
+        return updated;
+      });
       setErrorMsg(err.response?.data?.detail || 'Failed to add item to your library shelf.');
       setTimeout(() => setErrorMsg(''), 4000);
     }
@@ -1061,7 +1077,7 @@ export const Search: React.FC = () => {
   };
 
   const normType = selectedItem ? (selectedItem.item_type === 'anime' ? 'series' : selectedItem.item_type) : '';
-  const currentShelfItem = selectedItem ? shelfItems.find(x => x.external_id === selectedItem.external_id && x.item_type === selectedItem.item_type) : null;
+  const currentShelfItem = selectedItem ? findInShelfMap(shelfMap, selectedItem.item_type, selectedItem.external_id) : null;
   const isFavorite = Boolean(currentShelfItem?.is_favorite);
 
   const modalItem = React.useMemo(() => {
@@ -1408,7 +1424,7 @@ export const Search: React.FC = () => {
                 );
               }
 
-              const shelfItem = shelfItems.find(x => x.external_id === item.external_id && x.item_type === item.item_type);
+              const shelfItem = findInShelfMap(shelfMap, item.item_type, item.external_id);
               const onShelf = Boolean(shelfItem);
               const itemTypeColor = `var(--color-${item.item_type || 'movie'})`;
               const itemTypeTextColor = `var(--color-text-${item.item_type || 'movie'})`;
@@ -1476,7 +1492,11 @@ export const Search: React.FC = () => {
                                                     Boolean(shelfItem.status || shelfItem.completed_at || shelfItem.last_seen_episode || shelfItem.rating || shelfItem.consumption_count > 0 || shelfItem.total_time_spent > 0);
                                 if (!hasProgress) {
                                   const previousShelf = shelfItems;
-                                  setShelfItems(prev => prev.filter(x => !(x.external_id === item.external_id && x.item_type === item.item_type)));
+                                  setShelfItems(prev => {
+                                    const updated = prev.filter(x => !(x.external_id === item.external_id && x.item_type === item.item_type));
+                                    setCachedShelfItems(updated);
+                                    return updated;
+                                  });
                                   try {
                                     if (shelfItem.id && shelfItem.id > 0) {
                                       await apiClient.delete(`/library/${shelfItem.id}?delete_history=true`);
@@ -1500,6 +1520,7 @@ export const Search: React.FC = () => {
                                     setTimeout(() => setSuccessMsg(''), 3000);
                                   } catch (err: any) {
                                     setShelfItems(previousShelf);
+                                    setCachedShelfItems(previousShelf);
                                     setErrorMsg(err.response?.data?.detail || 'Failed to remove item.');
                                     setTimeout(() => setErrorMsg(''), 4000);
                                   }

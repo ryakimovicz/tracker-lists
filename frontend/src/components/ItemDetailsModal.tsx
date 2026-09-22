@@ -9,6 +9,7 @@ import { Star, Heart, X, Flag, CheckCircle, Check, CheckCheck, Plus, MoreVertica
 
 
 import { getCachedSeries, setCachedSeries, removeCachedSeries, clearCachedSeriesMatching } from '../utils/seriesCache';
+import { getCachedShelfItems, createShelfMap, findInShelfMap, updateCachedShelfItem, removeCachedShelfItem } from '../utils/shelfCache';
 import { useAuth } from '../context/AuthContext';
 import { KlipyPicker } from './KlipyPicker';
 import type { SelectedKlipyMedia } from './KlipyPicker';
@@ -1024,7 +1025,27 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   const profileTheme = getProfileTheme(effectiveColor, isLight);
 
   
-  const [selectedItem, setSelectedItem] = useState<any>(initialItem);
+  const [selectedItem, setSelectedItem] = useState<any>(() => {
+    if (!initialItem) return initialItem;
+    if (initialItem.id) return initialItem;
+    try {
+      const cached = getCachedShelfItems();
+      const map = createShelfMap(cached);
+      const matched = findInShelfMap(map, initialItem.item_type, initialItem.external_id || initialItem.id);
+      if (matched && matched.id) {
+        return {
+          ...initialItem,
+          ...matched,
+          id: matched.id,
+          status: matched.status || initialItem.status,
+          is_favorite: matched.is_favorite ?? initialItem.is_favorite,
+          tracking_list_id: matched.tracking_list_id ?? initialItem.tracking_list_id,
+          completed_at: matched.completed_at ?? initialItem.completed_at
+        };
+      }
+    } catch (_) {}
+    return initialItem;
+  });
   const [isCoverPeek, setIsCoverPeek] = useState(false);
   
   const [itemReviews, setItemReviews] = useState<any[]>([]);
@@ -1699,6 +1720,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
         }
       } catch (e) {}
 
+      updateCachedShelfItem(updatedSelected);
+
       const targetId = updatedSelected.id;
       if (targetId && user?.is_pro) {
         apiClient.get(`/library/${targetId}/consumption-history`)
@@ -1783,6 +1806,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
             sessionStorage.setItem('pathd_lib_cache', JSON.stringify(cachedLib));
           }
         } catch (e) {}
+
+        updateCachedShelfItem(updatedItem);
 
         if (['completed', 'read'].includes(newStatus) && user?.is_pro) {
           apiClient.get(`/library/${selectedItem.id}/consumption-history`)
@@ -1996,6 +2021,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
           sessionStorage.setItem('pathd_lib_cache', JSON.stringify(cachedLib));
         }
       } catch (e) {}
+
+      removeCachedShelfItem(removedId, selectedItem.external_id, selectedItem.item_type);
 
       if (deleteHistory) {
         const cleanId = String(selectedItem.external_id || selectedItem.id || '').replace('cv_vol_', '').replace('cv_issue_', '').replace('cv_', '').replace('tvm-ep-', '').replace('tvm_', '');
@@ -2374,6 +2401,24 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     
     const initModal = async (incomingItem: any) => {
       let item = incomingItem;
+      if (item && !item.id) {
+        try {
+          const cached = getCachedShelfItems();
+          const map = createShelfMap(cached);
+          const matched = findInShelfMap(map, item.item_type, item.external_id || item.id);
+          if (matched && matched.id) {
+            item = {
+              ...item,
+              ...matched,
+              id: matched.id,
+              status: matched.status || item.status,
+              is_favorite: matched.is_favorite ?? item.is_favorite,
+              tracking_list_id: matched.tracking_list_id ?? item.tracking_list_id,
+              completed_at: matched.completed_at ?? item.completed_at
+            };
+          }
+        } catch (_) {}
+      }
 
       // 1. Render item immediately with whatever data we already have
       setSelectedItem(item);
@@ -3478,6 +3523,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
           sessionStorage.setItem('pathd_lib_cache', JSON.stringify(cachedLib));
         } catch (e) {}
 
+        updateCachedShelfItem(newItem);
+
         window.dispatchEvent(new Event('library-updated'));
         onUpdate && onUpdate(newItem);
         return newItem;
@@ -3616,6 +3663,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                   sessionStorage.setItem('pathd_lib_cache', JSON.stringify(cachedLib));
                 }
               } catch (e) {}
+              updateCachedShelfItem({ id: targetId, external_id: selectedItem.external_id, item_type: selectedItem.item_type, status: fallbackStatus, completed_at: null });
               window.dispatchEvent(new Event('library-updated'));
             }
           } else if (selectedItem.item_type !== 'episode') {
@@ -3632,6 +3680,9 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                 sessionStorage.setItem('pathd_lib_cache', JSON.stringify(cachedLib));
               }
             } catch (e) {}
+            if (selectedItem.external_id) {
+              updateCachedShelfItem({ id: selectedItem.id, external_id: selectedItem.external_id, item_type: selectedItem.item_type, status: fallbackStatus, completed_at: null });
+            }
             window.dispatchEvent(new Event('library-updated'));
           }
         } catch (e) {

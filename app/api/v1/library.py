@@ -618,6 +618,47 @@ def add_to_library(
     
     return new_lib_item
 
+@router.get("/shelf")
+def get_user_shelf(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Ultra-fast, indexed endpoint returning user's shelf items for instant O(1) matching"""
+    items = db.query(
+        UserLibraryItem.id,
+        UserLibraryItem.external_id,
+        UserLibraryItem.item_type,
+        UserLibraryItem.status,
+        UserLibraryItem.is_favorite,
+        UserLibraryItem.tracking_list_id,
+        UserLibraryItem.completed_at,
+        UserLibraryItem.last_seen_episode,
+        UserLibraryItem.title,
+        UserLibraryItem.image_url,
+        UserLibraryItem.imdb_id,
+        UserLibraryItem.custom_badge,
+        UserLibraryItem.release_date
+    ).filter(UserLibraryItem.user_id == current_user.id).all()
+
+    return [
+        {
+            "id": it.id,
+            "external_id": it.external_id,
+            "item_type": it.item_type,
+            "status": it.status.value if hasattr(it.status, "value") else str(it.status),
+            "is_favorite": it.is_favorite,
+            "tracking_list_id": it.tracking_list_id,
+            "completed_at": it.completed_at.isoformat() if it.completed_at else None,
+            "last_seen_episode": it.last_seen_episode,
+            "title": it.title,
+            "image_url": it.image_url,
+            "imdb_id": it.imdb_id,
+            "custom_badge": it.custom_badge,
+            "release_date": it.release_date
+        }
+        for it in items
+    ]
+
 @router.get("/", response_model=List[LibraryItemResponse])
 def get_library(
     request: Request,

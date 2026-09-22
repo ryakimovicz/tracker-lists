@@ -127,14 +127,22 @@ export const prefetchRoute = (route: string) => {
   switch (route) {
     case '/search':
     case '/explore': {
-      // Prefetch explore recommendations
-      apiClient.get('/search/explore/tabs')
-        .then(res => {
-          if (res.data) {
-            sessionStorage.setItem('pathd_explore_cache', JSON.stringify(res.data));
-          }
-        })
-        .catch(() => {});
+      // Prefetch explore recommendations and lightweight shelf items
+      Promise.allSettled([
+        apiClient.get('/search/explore/tabs'),
+        apiClient.get('/library/shelf')
+      ]).then(([expRes, shelfRes]) => {
+        if (expRes.status === 'fulfilled' && expRes.value.data) {
+          sessionStorage.setItem('pathd_explore_cache', JSON.stringify(expRes.value.data));
+        }
+        if (shelfRes.status === 'fulfilled' && Array.isArray(shelfRes.value.data)) {
+          const serialized = JSON.stringify(shelfRes.value.data);
+          try {
+            localStorage.setItem('pathd_shelf_cache', serialized);
+            sessionStorage.setItem('pathd_shelf_cache', serialized);
+          } catch (_) {}
+        }
+      }).catch(() => {});
       break;
     }
     case '/social': {
