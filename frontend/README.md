@@ -20,6 +20,7 @@ Frontend oficial de **Pathd (v0.9.8 Beta)**, desarrollado como una Single Page A
   - **Idle Warmup**: Calentamiento automático de datos en segundo plano durante períodos de inactividad de CPU.
   - **Hover & Touch Prefetching**: Anticipación inteligente al clic en elementos del Sidebar y tarjetas de obras.
   - **Multi-tier Cache**: Caché en memoria + `sessionStorage` para apertura de vistas y modales en 0 ms.
+  - **Instant Shelf Cache**: Persistencia local inmediata de la estantería del usuario con indexación $O(1)$ para marcar obras agregadas sin retraso en Explorar y modales.
   - **Debounced Search**: Búsqueda reactiva optimizada con botón de borrado instantáneo y filtros de categoría permanentes.
 - **Monetización**: Google AdSense con bloques responsivos integrados y soporte nativo para cuentas Premium sin anuncios.
 
@@ -83,10 +84,11 @@ frontend/src/
 │   ├── Social.tsx                  # Feed de actividad de seguidos y comunidad
 │   ├── CreateGuide.tsx             # Constructor interactivo de guías cronológicas (Drag & Drop)
 │   ├── GuideDetail.tsx             # Vista y progreso de guías con soporte para Mods
-│   ├── Profile.tsx                 # Perfil (Estantería, Favoritos Drag & Drop, Guías, Last.fm)
+│   ├── Profile.tsx                 # Perfil (Estantería con subcategorías por estado, Favoritos Drag & Drop, Guías, Last.fm)
 │   ├── Customize.tsx               # Personalización estética de perfil y orden de categorías
 │   └── Settings.tsx                # Configuración de cuenta, seguridad y suscripciones
 └── utils/        # Utilidades y motores de caché:
+    ├── shelfCache.ts               # Caché local y diccionario hash O(1) de obras en estantería para sincronización inmediata
     ├── klipyFavorites.ts           # Almacenamiento local de favoritos de KLIPY
     ├── prefetch.ts                 # Motor de prefetching anticipado y warmup
     ├── seriesCache.ts              # Caché de metadatos de episodios y volúmenes

@@ -23,10 +23,11 @@ Cuenta con un potente constructor de **Guías Cronológicas interactivas**, modi
 
 ### 🎯 Todo tu Entretenimiento en un Solo Lugar
 - **Seguimiento Unificado**: Olvídate de usar una app distinta para cada formato. Todo tu historial, pendientes, re-consumo y calificaciones conviven en tu estantería personal.
+- **Estantería Inteligente con Subcategorías por Estado**: Organización automática por medios y estados contextuales (*Viendo / Al día, Pausadas, Terminadas / Leídas, 🏆 100%, Por ver/leer/jugar y Abandonadas*) con contadores tipográficos sutiles y suma matemática unificada.
 - **Selectores de Progreso Inteligentes por Formato**:
-  - *Series y Anime*: Detección automática del siguiente episodio por ver, avance con un solo clic, estado "Al día" en emisión y árbol interactivo de temporadas.
+  - *Series y Anime*: Detección automática del siguiente episodio por ver, avance con un solo clic, estado "Al día" en emisión, exclusión de extras/especiales en el cómputo y árbol interactivo de temporadas.
   - *Libros, Cómics y Mangas*: Contador interactivo de páginas leídas, porcentaje en tiempo real, sincronización de grapas/números sueltos dentro de tomos y confirmación de números anteriores.
-  - *Juegos y Películas*: Registro dinámico de tiempo dedicado (*horas y minutos*), soporte para juegos infinitos/continuos y distinciones entre completado estándar y **100% completado**.
+  - *Juegos y Películas*: Registro dinámico de tiempo dedicado (*horas y minutos*), soporte para películas pausadas, juegos infinitos/continuos y distinciones entre completado estándar y **100% completado**.
 - **Calendario de Próximos Estrenos**:
   - Pestaña *Próximos* con visualización en *Calendario* mensual persistente y sección *Por Confirmar (TBA)* para obras anunciadas sin fecha exacta.
   - Persistencia permanente de fechas de estreno (`release_date`) en la base de datos para carga instantánea en 0 ms.
@@ -59,6 +60,7 @@ Cuenta con un potente constructor de **Guías Cronológicas interactivas**, modi
 ### ⚡ Rendimiento Ultrarrápido (0 ms)
 - **Motor de Prefetching Inteligente**: Calentamiento silencioso en segundo plano (*Idle Warmup*) y precarga anticipada al interactuar con enlaces (*Hover & Touch Prefetching*).
 - **Búsqueda Multicapa con Caché y Debounce**: Barra de búsqueda con limpieza instantánea, filtros por categoría persistentes y caché en memoria y `sessionStorage`.
+- **Sincronización Instantánea de Estantería (Frame-0)**: Caché local persistente con indexación hash $O(1)$ para marcar de inmediato las obras agregadas en Explorar y modales sin esperar peticiones de red.
 - **Navegación Continua en Carruseles**: Desplazamiento fluido con soporte de clic único (paso fijo) o pulsación sostenida (*Smooth Continuous Scrolling*) y máscaras de gradiente.
 
 ---

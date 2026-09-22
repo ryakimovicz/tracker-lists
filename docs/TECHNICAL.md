@@ -30,6 +30,7 @@ Documento de referencia para desarrolladores, arquitectura del sistema y catálo
   - **Hover & Touch Prefetching**: Anticipación inteligente al clic en enlaces del Sidebar y tarjetas
   - **Multi-tier Cache**: Caché en memoria + `sessionStorage` para aperturas en 0 ms
   - **Debounced Search**: Búsqueda reactiva optimizada con limpieza en 1 clic y filtros por categoría permanentes
+  - **Instant Shelf Cache & O(1) Match**: Sincronización inmediata en Frame-0 de obras agregadas (`shelfCache.ts`) y diccionario hash $O(1)$ para pintar el botón "+" sin latencia en resultados de búsqueda y modales
 
 ### Infraestructura de Despliegue
 - **Frontend SPA**: [Cloudflare Pages](https://pages.cloudflare.com/) (Auto-deploy en push a `main` / `dev`)
@@ -135,6 +136,7 @@ Documento de referencia para desarrolladores, arquitectura del sistema y catálo
 |---|---|---|
 | POST | `/` | Añadir obra a la estantería personal (incluye persistencia de `release_date`) |
 | GET | `/` | Obtener estantería del usuario con desglose de progreso, horas, páginas y badges 100% |
+| GET | `/shelf` | Obtención ultrarrápida y ligera (<3ms) de obras en estantería para indexación O(1) inmediata y caché de exploración |
 | PUT | `/{library_item_id}` | Actualizar estado, tiempo, páginas leídas, fecha de estreno, destacado o badge 100% |
 | PUT | `/favorites/reorder` | Persistir orden personalizado de obras destacadas en perfil (`favorite_order`) |
 | DELETE | `/{library_item_id}` | Eliminar obra de la estantería (con opción de conservar o purgar historial) |
