@@ -157,10 +157,18 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, []);
 
   useEffect(() => {
+    document.documentElement.lang = language;
+    const metaDesc = document.querySelector('meta[name="description"]');
     if (language === 'es') {
       document.title = 'Pathd • Seguimiento Multimedia Todo en Uno y Guías';
+      if (metaDesc) {
+        metaDesc.setAttribute('content', 'Organiza, descubre y lleva el seguimiento de películas, series, animes, libros, cómics, mangas y videojuegos. Crea y explora guías cronológicas comunitarias.');
+      }
     } else {
       document.title = 'Pathd • All-in-One Media Tracker & Guides';
+      if (metaDesc) {
+        metaDesc.setAttribute('content', 'Track, discover and organize movies, TV shows, anime, books, comics, manga, and video games. Create and explore community chronological guides.');
+      }
     }
   }, [language]);
 
