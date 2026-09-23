@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../context/LanguageContext';
 import { SocialActivityCard } from '../components/SocialActivityCard';
 import type { ActivityCardData } from '../components/SocialActivityCard';
+import { ItemDetailsModal } from '../components/ItemDetailsModal';
 import { Link } from 'react-router-dom';
 
 type SocialTab = 'following' | 'discover' | 'reviews' | 'me';
@@ -18,6 +19,7 @@ export const Social: React.FC = () => {
   const [activities, setActivities] = useState<ActivityCardData[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<any | null>(null);
 
   const fetchTabFeed = async (tab: SocialTab, isRefresh = false) => {
     try {
@@ -196,10 +198,24 @@ export const Social: React.FC = () => {
               activity={act}
               isOwnActivity={Boolean(user && user.id === act.user_id)}
               onVisibilityToggle={handleVisibilityToggle}
+              onOpenItem={(item) => setSelectedItem(item)}
             />
           ))
         )}
       </div>
+
+      {selectedItem && (
+        <ItemDetailsModal
+          item={selectedItem}
+          isOwnProfile={true}
+          profileId={user?.id}
+          onClose={() => setSelectedItem(null)}
+          onOpenItem={(item) => setSelectedItem(item)}
+          onUpdate={() => {
+            fetchTabFeed(activeTab, true);
+          }}
+        />
+      )}
     </div>
   );
 };

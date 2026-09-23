@@ -4142,12 +4142,36 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       }
 
       const targetStatus = returnedStatus || (isComic ? 'reading' : 'watching');
+      const returnedLastSeen = toggleRes.data?.last_seen_episode;
+
+      // Extract last seen unit from episodesToMark if not returned
+      let computedLastSeen = returnedLastSeen;
+      if (!computedLastSeen && episodesToMark.length > 0) {
+        const sortedEps = [...episodesToMark].sort((a, b) => {
+          const aNum = parseFloat(String(a.issue_number || a.episode_number || 0));
+          const bNum = parseFloat(String(b.issue_number || b.episode_number || 0));
+          return aNum - bNum;
+        });
+        const lastEp = sortedEps[sortedEps.length - 1];
+        if (isComic) {
+          computedLastSeen = lastEp.title || (lastEp.issue_number ? `#${lastEp.issue_number}` : (lastEp.name ? `#${lastEp.name}` : undefined));
+        } else {
+          computedLastSeen = lastEp.title || `S${String(lastEp.season_number || 1).padStart(2, '0')}E${String(lastEp.episode_number || 1).padStart(2, '0')}`;
+        }
+      }
+
       const updatedSelected = {
         ...selectedItem,
         status: targetStatus,
-        tracking_list_id: effectiveListId
+        tracking_list_id: effectiveListId,
+        ...(computedLastSeen ? { last_seen_episode: computedLastSeen } : {})
       };
-      setSelectedItem((prev: any) => prev ? { ...prev, status: targetStatus, tracking_list_id: effectiveListId } : updatedSelected);
+      setSelectedItem((prev: any) => prev ? {
+        ...prev,
+        status: targetStatus,
+        tracking_list_id: effectiveListId,
+        ...(computedLastSeen ? { last_seen_episode: computedLastSeen } : {})
+      } : updatedSelected);
 
       try {
         const cachedLibStr = sessionStorage.getItem('pathd_lib_cache');
@@ -4155,13 +4179,27 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
           let cachedLib: any[] = JSON.parse(cachedLibStr);
           const existsIdx = cachedLib.findIndex((it: any) => (selectedItem?.id && it.id === selectedItem.id) || (it.external_id === selectedItem?.external_id && it.item_type === selectedItem?.item_type));
           if (existsIdx >= 0) {
-            cachedLib[existsIdx] = { ...cachedLib[existsIdx], status: targetStatus, tracking_list_id: effectiveListId, completed_at: null };
+            cachedLib[existsIdx] = {
+              ...cachedLib[existsIdx],
+              status: targetStatus,
+              tracking_list_id: effectiveListId,
+              completed_at: null,
+              ...(computedLastSeen ? { last_seen_episode: computedLastSeen } : {})
+            };
           } else if (selectedItem?.id) {
-            cachedLib = [{ ...selectedItem, status: targetStatus, tracking_list_id: effectiveListId, completed_at: null }, ...cachedLib];
+            cachedLib = [{
+              ...selectedItem,
+              status: targetStatus,
+              tracking_list_id: effectiveListId,
+              completed_at: null,
+              ...(computedLastSeen ? { last_seen_episode: computedLastSeen } : {})
+            }, ...cachedLib];
           }
           sessionStorage.setItem('pathd_lib_cache', JSON.stringify(cachedLib));
         }
       } catch (e) {}
+
+      updateCachedShelfItem(updatedSelected);
 
       window.dispatchEvent(new Event('library-updated'));
       onUpdate && onUpdate(updatedSelected);

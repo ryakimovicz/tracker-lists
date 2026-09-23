@@ -2702,6 +2702,19 @@ def bulk_toggle_episodes(
             UserLibraryItem.user_id == current_user.id,
             UserLibraryItem.tracking_list_id == list_id
         ).first()
+
+        if not lib_item and reading_list:
+            # Fallback lookup in case tracking_list_id was not yet saved on UserLibraryItem
+            candidate_items = db.query(UserLibraryItem).filter(
+                UserLibraryItem.user_id == current_user.id,
+                UserLibraryItem.item_type.in_(["series", "anime", "comic"])
+            ).all()
+            for cand in candidate_items:
+                if cand.tracking_list_id == list_id or (cand.title and (cand.title in reading_list.title or reading_list.title.endswith(cand.title))):
+                    lib_item = cand
+                    if not lib_item.tracking_list_id:
+                        lib_item.tracking_list_id = list_id
+                    break
         
         series_title = lib_item.title if lib_item else "Series"
         is_comic = (lib_item and lib_item.item_type == "comic")
@@ -2786,6 +2799,7 @@ def bulk_toggle_episodes(
             if p.list_item_id:
                 progs_by_item_id[p.list_item_id] = p
 
+        newly_completed_units = []
         for ext_id, item, media_item_type in processed_eps:
             clean_ext = ext_id.replace("cv_issue_", "").replace("tvm-ep-", "").replace("cv_", "").replace("cv-", "")
             progress = progs_by_ext.get(ext_id) or progs_by_ext.get(clean_ext) or progs_by_item_id.get(item.id)
@@ -2843,6 +2857,7 @@ def bulk_toggle_episodes(
                     progs_by_item_id[item.id] = progress
 
                 if not was_already_completed:
+                    newly_completed_units.append(item)
                     ch = ConsumptionHistory(
                         user_id=current_user.id,
                         item_type=media_type_str,
@@ -2980,8 +2995,101 @@ def bulk_toggle_episodes(
 
             lib_item.updated_at = now_dt
 
+        # Record activity log with range/batch metadata if any units were completed
+        if req.completed and newly_completed_units:
+            import re
+            from app.services.activity_service import ActivityService
+            from app.models.activity import UserActivityLog
+
+            target_type = lib_item.item_type.value if (lib_item and hasattr(lib_item.item_type, 'value')) else (lib_item.item_type if lib_item else ("comic" if is_comic else "series"))
+            work_title = lib_item.title if lib_item else series_title
+            work_ext_id = lib_item.external_id if lib_item else None
+            work_image_url = lib_item.image_url if lib_item else None
+
+            # Sort newly completed units chronologically
+            if is_comic:
+                def extract_issue_n(it):
+                    m = re.search(r'#(\d+(\.\d+)?)', it.title or '')
+                    return float(m.group(1)) if m else (float(it.order_index or 0))
+                sorted_units = sorted(newly_completed_units, key=extract_issue_n)
+            else:
+                def extract_s_e(it):
+                    m = re.search(r'S(\d+)E(\d+)', it.title or '', re.IGNORECASE)
+                    if m:
+                        return (int(m.group(1)), int(m.group(2)))
+                    return (1, it.order_index or 0)
+                sorted_units = sorted(newly_completed_units, key=extract_s_e)
+
+            def get_unit_label(it):
+                if is_comic:
+                    m = re.search(r'#\d+(\.\d+)?', it.title or '')
+                    return m.group(0) if m else (f"#{it.order_index}" if it.order_index else it.title)
+                else:
+                    m = re.search(r'S(\d+)E(\d+)', it.title or '', re.IGNORECASE)
+                    if m:
+                        s_pad = f"{int(m.group(1)):02d}"
+                        e_pad = f"{int(m.group(2)):02d}"
+                        return f"T{s_pad} | E{e_pad}"
+                    return it.title
+
+            count = len(sorted_units)
+            start_unit = get_unit_label(sorted_units[0])
+            end_unit = get_unit_label(sorted_units[-1])
+
+            # Check if this work was added to library in the last 15 minutes to unify into a single event
+            recent_add = db.query(UserActivityLog).filter(
+                UserActivityLog.user_id == current_user.id,
+                UserActivityLog.activity_type == "item_added_to_library",
+                UserActivityLog.external_id == work_ext_id
+            ).order_by(UserActivityLog.id.desc()).first()
+
+            is_unified = False
+            if recent_add and recent_add.created_at:
+                try:
+                    c_at = recent_add.created_at.replace(tzinfo=timezone.utc) if recent_add.created_at.tzinfo is None else recent_add.created_at
+                    if (now_dt - c_at).total_seconds() < 900:
+                        is_unified = True
+                        db.delete(recent_add)
+                        db.flush()
+                except Exception:
+                    pass
+
+            act_meta = {
+                "count": count,
+                "start_unit": start_unit,
+                "end_unit": end_unit,
+                "item_type": target_type,
+                "work_title": work_title,
+                "also_added": is_unified,
+                "is_range": count > 1
+            }
+
+            if count == 1:
+                item_title_val = sorted_units[0].title
+            else:
+                item_title_val = f"{work_title} ({start_unit} - {end_unit})"
+
+            ActivityService.record_activity(
+                db=db,
+                user_id=current_user.id,
+                activity_type="item_status_changed",
+                item_title=item_title_val,
+                item_type=target_type,
+                external_id=work_ext_id,
+                list_id=list_id,
+                image_url=work_image_url,
+                details="completed",
+                metadata=act_meta
+            )
+
         db.commit()
-        return {"message": f"{len(episodes_list)} episodes progress toggled successfully", "status": lib_item.status.value if (lib_item and hasattr(lib_item.status, 'value')) else (lib_item.status if lib_item else ("reading" if is_comic else "watching"))}
+        if lib_item:
+            db.refresh(lib_item)
+        return {
+            "message": f"{len(episodes_list)} episodes progress toggled successfully",
+            "status": lib_item.status.value if (lib_item and hasattr(lib_item.status, 'value')) else (lib_item.status if lib_item else ("reading" if is_comic else "watching")),
+            "last_seen_episode": lib_item.last_seen_episode if lib_item else None
+        }
     except HTTPException:
         db.rollback()
         raise

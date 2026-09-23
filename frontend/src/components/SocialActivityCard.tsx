@@ -30,12 +30,14 @@ interface SocialActivityCardProps {
   activity: ActivityCardData;
   isOwnActivity?: boolean;
   onVisibilityToggle?: (id: number, isHidden: boolean) => void;
+  onOpenItem?: (item: any) => void;
 }
 
 export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
   activity,
   isOwnActivity = false,
-  onVisibilityToggle
+  onVisibilityToggle,
+  onOpenItem
 }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -89,11 +91,28 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
     }
   };
 
-  const handleClickCard = () => {
-    if (activity.list_id) {
+  const isGuideActivity = activity.item_type === 'guide' || activity.activity_type.startsWith('guide_');
+
+  const handleClickCard = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (isGuideActivity && activity.list_id) {
       navigate(`/guide/${activity.list_id}`);
-    } else if (activity.external_id) {
-      // Could open modal or view item if supported
+      return;
+    }
+
+    if (onOpenItem) {
+      const effectiveItemType = activity.item_type || meta.item_type || 'series';
+      const cleanTitle = meta.work_title || (parsedEpisode ? parsedEpisode.seriesName : activity.item_title);
+      
+      const itemToOpen = {
+        external_id: activity.external_id || undefined,
+        id: (!activity.external_id && activity.list_id) ? activity.list_id : undefined,
+        title: cleanTitle || activity.item_title || 'Media',
+        image_url: activity.image_url || undefined,
+        item_type: effectiveItemType,
+        tracking_list_id: activity.list_id || undefined
+      };
+      onOpenItem(itemToOpen);
     }
   };
 
@@ -234,8 +253,18 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
     return null;
   };
 
+  // Parse metadata if present
+  const meta = React.useMemo(() => {
+    if (!activity.metadata_json) return {} as Record<string, any>;
+    try {
+      return typeof activity.metadata_json === 'string' ? JSON.parse(activity.metadata_json) : activity.metadata_json;
+    } catch {
+      return {} as Record<string, any>;
+    }
+  }, [activity.metadata_json]);
+
   const parsedEpisode = parseEpisodeInfo(activity.item_title);
-  const categoryMeta = getCategoryMeta(activity.item_type);
+  const categoryMeta = getCategoryMeta(activity.item_type || meta.item_type);
 
   // Check if details is a clean review comment (not just "completed" or star number)
   const isReviewComment = activity.activity_type === 'item_reviewed' && activity.details && activity.details.trim().length > 0;
@@ -243,10 +272,17 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
   const numericRating = isRating && activity.details && !isNaN(Number(activity.details)) ? Number(activity.details) : null;
 
   const [isCardHovered, setIsCardHovered] = useState(false);
+  const [isFooterHovered, setIsFooterHovered] = useState(false);
+  const [isLikeHovered, setIsLikeHovered] = useState(false);
+
+  const isClickable = Boolean(
+    (isGuideActivity && activity.list_id) ||
+    (onOpenItem && (activity.external_id || activity.list_id || activity.item_title))
+  );
 
   // Helper to split a title so the last word is bundled with the category icon and timestamp
   const renderTitleWithBadgeAndTimestamp = (titleText: string) => {
-    const trimmed = titleText.trim();
+    const trimmed = (titleText || '').trim();
     const lastSpaceIdx = trimmed.lastIndexOf(' ');
 
     const leadText = lastSpaceIdx !== -1 ? trimmed.slice(0, lastSpaceIdx + 1) : '';
@@ -254,17 +290,15 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
 
     const titleColor = isCardHovered
       ? (categoryMeta?.themeColor || 'var(--accent-primary)')
-      : (activity.list_id ? 'var(--accent-primary)' : 'var(--text-primary)');
+      : (isGuideActivity ? 'var(--accent-primary)' : 'var(--text-primary)');
 
     return (
       <>
         {leadText && (
           <span
-            onClick={handleClickCard}
             style={{
               fontWeight: 700,
               color: titleColor,
-              cursor: activity.list_id ? 'pointer' : 'default',
               transition: 'color 0.2s ease'
             }}
           >
@@ -273,11 +307,9 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
         )}
         <span style={{ whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center' }}>
           <span
-            onClick={handleClickCard}
             style={{
               fontWeight: 700,
               color: titleColor,
-              cursor: activity.list_id ? 'pointer' : 'default',
               transition: 'color 0.2s ease'
             }}
           >
@@ -314,8 +346,6 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
   return (
     <div
       className="glass-card activity-card"
-      onMouseEnter={() => setIsCardHovered(true)}
-      onMouseLeave={() => setIsCardHovered(false)}
       style={{
         padding: '1.1rem 1.25rem',
         borderRadius: '14px',
@@ -330,7 +360,17 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
       }}
     >
       {/* Upper Area: Left Content Column + Right Prominent Poster */}
-      <div style={{ display: 'flex', gap: '1.1rem', alignItems: 'stretch' }}>
+      <div
+        onClick={handleClickCard}
+        onMouseEnter={() => setIsCardHovered(true)}
+        onMouseLeave={() => setIsCardHovered(false)}
+        style={{
+          display: 'flex',
+          gap: '1.1rem',
+          alignItems: 'stretch',
+          cursor: isClickable ? 'pointer' : 'default'
+        }}
+      >
         {/* Left main content body */}
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
           {/* Header row: User avatar + action sentence + 3-dots */}
@@ -382,7 +422,31 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
                   </span>
 
                   {/* Action sentence with clean wrapping */}
-                  {parsedEpisode ? (
+                  {meta.is_range ? (
+                    (() => {
+                      const isComic = (activity.item_type || meta.item_type) === 'comic';
+                      const workName = meta.work_title || activity.item_title?.split(' (')[0] || activity.item_title;
+                      const alsoAdded = !!meta.also_added;
+                      const verb = alsoAdded
+                        ? (isComic ? (isEs ? 'agregó y leyó del' : 'added and read') : (isEs ? 'agregó y vio del' : 'added and watched'))
+                        : (isComic ? (isEs ? 'leyó del' : 'read') : (isEs ? 'vio del' : 'watched'));
+
+                      return (
+                        <>
+                          <span style={{ marginRight: '0.35rem' }}>{verb}</span>
+                          <span style={{ fontWeight: 600, color: 'var(--text-primary)', marginRight: '0.35rem' }}>
+                            {meta.start_unit}
+                          </span>
+                          <span style={{ marginRight: '0.35rem' }}>{isEs ? 'al' : 'to'}</span>
+                          <span style={{ fontWeight: 600, color: 'var(--text-primary)', marginRight: '0.35rem' }}>
+                            {meta.end_unit}
+                          </span>
+                          <span style={{ marginRight: '0.35rem' }}>{isEs ? 'de' : 'of'}</span>
+                          {renderTitleWithBadgeAndTimestamp(workName)}
+                        </>
+                      );
+                    })()
+                  ) : parsedEpisode ? (
                     <>
                       <span style={{ marginRight: '0.35rem' }}>{isEs ? 'completó el' : 'completed'}</span>
                       <span style={{ fontWeight: 600, color: 'var(--text-primary)', marginRight: '0.35rem' }}>
@@ -513,11 +577,9 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
         {/* Right side prominent poster covering vertical space */}
         {activity.image_url && (
           <div
-            onClick={handleClickCard}
             style={{
               flexShrink: 0,
               width: isReviewComment ? '84px' : '72px',
-              cursor: activity.list_id ? 'pointer' : 'default',
               display: 'flex',
               alignItems: 'stretch',
               overflow: 'hidden',
@@ -544,14 +606,20 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
         )}
       </div>
 
-      {/* Action Bar (Like + Comments) */}
+      {/* Footer / Action Bar (Like + Comments) */}
       <div
+        onClick={() => setShowComments(!showComments)}
+        onMouseEnter={() => setIsFooterHovered(true)}
+        onMouseLeave={() => setIsFooterHovered(false)}
         style={{
           display: 'flex',
           alignItems: 'center',
           gap: '1.25rem',
-          paddingTop: '0.25rem',
-          borderTop: '1px solid rgba(255,255,255,0.04)'
+          paddingTop: '0.45rem',
+          marginTop: '-0.1rem',
+          borderTop: '1px solid rgba(255,255,255,0.04)',
+          cursor: 'pointer',
+          userSelect: 'none'
         }}
       >
         {/* Like Button (ThumbsUp) */}
@@ -574,12 +642,14 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
             transform: likeAnimating ? 'scale(1.15)' : 'scale(1)'
           }}
           onMouseEnter={(e) => {
+            setIsLikeHovered(true);
             if (!isLiked) {
               e.currentTarget.style.color = '#3b82f6';
               e.currentTarget.style.background = 'rgba(59, 130, 246, 0.08)';
             }
           }}
           onMouseLeave={(e) => {
+            setIsLikeHovered(false);
             if (!isLiked) {
               e.currentTarget.style.color = 'var(--text-secondary)';
               e.currentTarget.style.background = 'transparent';
@@ -590,19 +660,17 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
           <span>{likesCount}</span>
         </button>
 
-        {/* Comment Button */}
-        <button
-          onClick={() => setShowComments(!showComments)}
+        {/* Comment Indicator / Button */}
+        <div
           style={{
-            background: showComments ? 'rgba(99, 102, 241, 0.12)' : 'transparent',
-            border: showComments ? '1px solid rgba(99, 102, 241, 0.3)' : '1px solid transparent',
-            color: showComments ? 'var(--accent-primary)' : 'var(--text-secondary)',
+            background: (showComments || (isFooterHovered && !isLikeHovered)) ? 'rgba(245, 158, 11, 0.12)' : 'transparent',
+            border: (showComments || (isFooterHovered && !isLikeHovered)) ? '1px solid rgba(245, 158, 11, 0.35)' : '1px solid transparent',
+            color: (showComments || (isFooterHovered && !isLikeHovered)) ? 'var(--accent-primary)' : 'var(--text-secondary)',
             borderRadius: '20px',
             padding: '0.35rem 0.75rem',
             display: 'inline-flex',
             alignItems: 'center',
             gap: '0.45rem',
-            cursor: 'pointer',
             fontSize: '0.88rem',
             fontWeight: 600,
             transition: 'all 0.15s ease'
@@ -610,7 +678,7 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
         >
           <MessageSquare size={18} />
           <span>{commentsCount} {isEs ? (commentsCount === 1 ? 'comentario' : 'comentarios') : (commentsCount === 1 ? 'comment' : 'comments')}</span>
-        </button>
+        </div>
       </div>
 
       {/* Comments Accordion */}

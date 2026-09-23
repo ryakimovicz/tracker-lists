@@ -3365,7 +3365,7 @@ export const Profile: React.FC = () => {
                                     {(() => {
                                       let formatted = item.last_seen_episode;
                                       if (item.item_type === 'comic') {
-                                        const issueMatch = item.last_seen_episode.match(/#(\d+)/);
+                                        const issueMatch = item.last_seen_episode.match(/#(\d+(\.\d+)?)/) || item.last_seen_episode.match(/^(\d+(\.\d+)?)$/);
                                         if (issueMatch) {
                                           formatted = `#${issueMatch[1]}`;
                                         } else if (item.last_seen_episode.startsWith(item.title)) {
@@ -3575,7 +3575,7 @@ export const Profile: React.FC = () => {
                           } else if ((item.item_type === 'series' || item.item_type === 'anime' || item.item_type === 'comic') && item.last_seen_episode) {
                             let formatted = item.last_seen_episode;
                             if (item.item_type === 'comic') {
-                              const issueMatch = item.last_seen_episode.match(/#(\d+)/);
+                              const issueMatch = item.last_seen_episode.match(/#(\d+(\.\d+)?)/) || item.last_seen_episode.match(/^(\d+(\.\d+)?)$/);
                               if (issueMatch) formatted = `#${issueMatch[1]}`;
                               else if (item.last_seen_episode.startsWith(item.title)) formatted = item.last_seen_episode.slice(item.title.length).trim() || item.last_seen_episode;
                             } else {
@@ -5737,7 +5737,19 @@ export const Profile: React.FC = () => {
                   const totalPages = meta.total_pages || 0;
                   const lastSeen = meta.last_seen_episode || '';
 
-                  if (count > 1) {
+                  if (meta.is_range && meta.start_unit && meta.end_unit) {
+                    const workName = meta.work_title || title.split(' (')[0] || title;
+                    const alsoAdded = !!meta.also_added;
+                    if (itemType === 'comic') {
+                      msg = alsoAdded
+                        ? (language === 'es' ? `Se agregó y leyó del ${meta.start_unit} al ${meta.end_unit} de "${workName}".` : `Added and read ${meta.start_unit} to ${meta.end_unit} of "${workName}".`)
+                        : (language === 'es' ? `Se leyó del ${meta.start_unit} al ${meta.end_unit} de "${workName}".` : `Read ${meta.start_unit} to ${meta.end_unit} of "${workName}".`);
+                    } else {
+                      msg = alsoAdded
+                        ? (language === 'es' ? `Se agregó y vio del ${meta.start_unit} al ${meta.end_unit} de la serie "${workName}".` : `Added and watched ${meta.start_unit} to ${meta.end_unit} of "${workName}".`)
+                        : (language === 'es' ? `Se vio del ${meta.start_unit} al ${meta.end_unit} de la serie "${workName}".` : `Watched ${meta.start_unit} to ${meta.end_unit} of "${workName}".`);
+                    }
+                  } else if (count > 1) {
                     if (itemType === 'series' || itemType === 'anime') {
                       msg = language === 'es'
                         ? `Se vieron ${count} episodios de "${title}".`
