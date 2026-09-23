@@ -220,7 +220,7 @@ export const ItemDetailsModal: React.FC<ItemDetailsModalProps> = (props) => {
   return <ErrorBoundary><ItemDetailsModalInner key={itemKey} {...props} /></ErrorBoundary>;
 };
 
-const MediaAttachmentView: React.FC<{
+export const MediaAttachmentView: React.FC<{
   mediaUrl?: string | null;
   mediaType?: string | null;
   maxWidth?: string;

@@ -1,190 +1,206 @@
 import React, { useState, useEffect } from 'react';
+import { Users, Compass, Star, User, RefreshCw } from 'lucide-react';
 import { apiClient } from '../api/client';
-import { Link, useNavigate } from 'react-router-dom';
-import { AdBanner } from '../components/AdBanner';
+import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../context/LanguageContext';
+import { SocialActivityCard } from '../components/SocialActivityCard';
+import type { ActivityCardData } from '../components/SocialActivityCard';
+import { Link } from 'react-router-dom';
+
+type SocialTab = 'following' | 'discover' | 'reviews' | 'me';
 
 export const Social: React.FC = () => {
-  const [feed, setFeed] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
   const { language } = useTranslation();
-  const navigate = useNavigate();
+  const isEs = language === 'es';
+
+  const [activeTab, setActiveTab] = useState<SocialTab>('following');
+  const [activities, setActivities] = useState<ActivityCardData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchTabFeed = async (tab: SocialTab, isRefresh = false) => {
+    try {
+      if (isRefresh) setRefreshing(true);
+      else setLoading(true);
+
+      let endpoint = '/social/feed/following';
+      if (tab === 'discover') endpoint = '/social/feed/discover';
+      else if (tab === 'reviews') endpoint = '/social/feed/reviews';
+      else if (tab === 'me') endpoint = '/social/feed/me';
+
+      const res = await apiClient.get(endpoint);
+      if (Array.isArray(res.data)) {
+        setActivities(res.data);
+      }
+    } catch (err) {
+      console.error(`Error loading social feed for tab ${tab}:`, err);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchSocial = async () => {
-      // 1. Instant cache check from sessionStorage
-      const cached = sessionStorage.getItem('pathd_social_cache');
-      if (cached) {
-        try {
-          const parsed = JSON.parse(cached);
-          if (Array.isArray(parsed)) {
-            setFeed(parsed);
-            setLoading(false);
-          }
-        } catch (e) {}
-      } else {
-        setLoading(true);
-      }
+    fetchTabFeed(activeTab);
+  }, [activeTab]);
 
-      // 2. Fetch fresh data from API
-      try {
-        const activityRes = await apiClient.get('/social/users/feed/activity');
-        if (activityRes.data) {
-          setFeed(activityRes.data);
-          sessionStorage.setItem('pathd_social_cache', JSON.stringify(activityRes.data));
-        }
-      } catch (err) {
-        console.error('Failed to fetch social feed', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchSocial();
-  }, []);
+  const handleTabChange = (tab: SocialTab) => {
+    setActiveTab(tab);
+  };
 
-  if (loading) {
-    return <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>Cargando actividad...</div>;
-  }
+  const handleVisibilityToggle = (id: number, isHidden: boolean) => {
+    setActivities(prev =>
+      prev.map(a => (a.id === id ? { ...a, is_hidden: isHidden } : a))
+    );
+  };
+
+  const tabsConfig = [
+    {
+      id: 'following' as SocialTab,
+      label: isEs ? 'Siguiendo' : 'Following',
+      icon: Users,
+      description: isEs ? 'Actividad de personas a las que sigues' : 'Activity from users you follow'
+    },
+    {
+      id: 'discover' as SocialTab,
+      label: isEs ? 'Descubrir' : 'Discover',
+      icon: Compass,
+      description: isEs ? 'Hitos y actividad comunitaria global' : 'Global community milestones and highlights'
+    },
+    {
+      id: 'reviews' as SocialTab,
+      label: isEs ? 'Reseñas' : 'Reviews',
+      icon: Star,
+      description: isEs ? 'Calificaciones y reseñas recientes' : 'Recent ratings and community reviews'
+    },
+    {
+      id: 'me' as SocialTab,
+      label: isEs ? 'Mi Actividad' : 'My Activity',
+      icon: User,
+      description: isEs ? 'Tu muro público y gestión de visibilidad' : 'Your public feed and visibility settings'
+    }
+  ];
 
   return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem 1rem', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-      
-      {/* Feed */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-        {feed.length === 0 ? (
-          <div className="glass-card" style={{ padding: '4rem 2rem', textAlign: 'center' }}>
-            <h3 style={{ fontSize: '1.8rem', marginBottom: '1rem', color: 'var(--text-primary)' }}>No hay actividad reciente</h3>
-            <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem', fontSize: '1.1rem' }}>Parece que las personas que sigues no han estado activas últimamente. ¡Encuentra nuevos usuarios para seguir!</p>
-            <Link to="/explore" style={{ 
-              background: 'var(--accent-primary)', 
-              color: '#fff', 
-              padding: '0.85rem 2rem', 
-              borderRadius: '30px', 
-              textDecoration: 'none',
-              fontWeight: 600,
-              display: 'inline-block',
-              transition: 'all 0.2s ease'
-            }}>Ir a Explorar</Link>
+    <div style={{ maxWidth: '680px', margin: '0 auto', padding: '1.5rem 1rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+      {/* Header & Tabs */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h1 style={{ margin: '0 0 0.25rem 0', fontSize: '1.85rem', fontWeight: 800 }}>
+              {isEs ? 'Comunidad' : 'Community'}
+            </h1>
+            <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.95rem' }}>
+              {tabsConfig.find(t => t.id === activeTab)?.description}
+            </p>
           </div>
-        ) : (
-          feed.map((item, idx) => {
-            const onClickHandler = () => {
-              if (item.list_id) {
-                navigate(`/guide/${item.list_id}`);
-              } else if (item.external_id) {
-                // If it is media without a list_id, navigate to media page
-                // We'd need the item type, assuming it's movie/series/game etc
-                // For simplicity, just use external_id if possible
-              }
-            };
 
-            let actionText = "realizó una acción en";
-            
-            if (item.activity_type === "account_created") actionText = "creó su cuenta en Pathd";
-            else if (item.activity_type === "avatar_changed") actionText = "actualizó su foto de perfil";
-            else if (item.activity_type === "banner_changed") actionText = "actualizó su portada de perfil";
-            else if (item.activity_type === "background_changed") actionText = "actualizó su fondo de perfil";
-            else if (item.activity_type === "username_changed") actionText = "cambió su nombre de usuario";
-            else if (item.activity_type === "lastfm_connected") actionText = "conectó su cuenta de Last.fm";
-            else if (item.activity_type === "item_added_to_library" || item.activity_type === "shelf_add") actionText = "agregó a su biblioteca";
-            else if (item.activity_type === "item_favorited" || item.activity_type === "shelf_favorite") actionText = "destacó en su perfil a";
-            else if (item.activity_type === "user_followed") actionText = "comenzó a seguir a";
-            else if (item.activity_type === "item_rated") actionText = `calificó con ${item.details || ''}★ a`;
-            else if (item.activity_type === "guide_rated") actionText = `calificó con ${item.details || ''}★ la guía`;
-            else if (item.activity_type === "item_reviewed") actionText = "escribió una reseña en";
-            else if (item.activity_type === "guide_commented") actionText = "comentó en la guía";
-            else if (item.activity_type === "social_commented") actionText = "comentó en";
-            else if (item.activity_type === "guide_review_commented") actionText = "comentó en la reseña de";
-            else if (item.activity_type === "guide_created") actionText = "creó una nueva guía:";
-            else if (item.activity_type === "guide_edited") actionText = "editó la guía:";
-            else if (item.activity_type === "guide_followed") actionText = "empezó a seguir la guía:";
-            else if (item.activity_type === "item_status_changed" || item.activity_type === "item_completed") {
-              actionText = "actualizó su progreso en";
-            }
-            
+          <button
+            onClick={() => fetchTabFeed(activeTab, true)}
+            disabled={refreshing || loading}
+            className="btn-secondary"
+            style={{
+              padding: '0.45rem 0.85rem',
+              borderRadius: '20px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              fontSize: '0.85rem'
+            }}
+          >
+            <RefreshCw size={15} style={{ animation: refreshing ? 'spin 1s linear infinite' : 'none' }} />
+            <span>{isEs ? 'Actualizar' : 'Refresh'}</span>
+          </button>
+        </div>
+
+        {/* 4 Tabs Bar */}
+        <div
+          style={{
+            display: 'flex',
+            gap: '0.5rem',
+            background: 'var(--bg-secondary, rgba(255,255,255,0.03))',
+            padding: '0.4rem',
+            borderRadius: '12px',
+            border: '1px solid var(--border-color)',
+            overflowX: 'auto'
+          }}
+        >
+          {tabsConfig.map(tab => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
             return (
-            <div 
-              key={idx} 
-              className="glass-card activity-card" 
-              style={{ 
-                padding: '1.5rem', 
-                display: 'flex', 
-                gap: '1.25rem', 
-                alignItems: 'flex-start', 
-                cursor: 'pointer',
-                transition: 'transform 0.2s, background 0.2s'
-              }}
-              onClick={onClickHandler}
-              onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
-              onMouseLeave={(e) => e.currentTarget.style.transform = 'none'}
-            >
-              
-              {/* Avatar */}
-              <div style={{ 
-                width: '50px', height: '50px', 
-                borderRadius: '50%', 
-                background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))', 
-                display: 'flex', alignItems: 'center', justifyContent: 'center', 
-                fontSize: '1.5rem',
-                color: '#fff',
-                fontWeight: 'bold',
-                flexShrink: 0,
-                boxShadow: '0 4px 10px rgba(0,0,0,0.2)'
-              }}>
-                {(item.username || 'U').charAt(0).toUpperCase()}
-              </div>
-
-              {/* Content */}
-              <div style={{ flex: 1 }}>
-                  <p style={{ margin: '0 0 0.5rem 0', fontSize: '1.05rem', lineHeight: 1.5, color: 'var(--text-primary)' }}>
-                    <span style={{ fontWeight: 700, color: 'var(--accent-primary)' }}>{item.username}</span> {actionText} <span style={{ fontWeight: 700 }}>{item.item_title}</span>
-                  </p>
-                  
-                  {/* Rich Content Box */}
-                  {(item.image_url || item.details) && (
-                    <div style={{ 
-                      background: 'rgba(255,255,255,0.03)', 
-                      border: '1px solid var(--glass-border)',
-                      padding: '1rem', 
-                      borderRadius: '12px', 
-                      display: 'flex', 
-                      gap: '1rem', 
-                      alignItems: 'center',
-                      marginTop: '0.75rem'
-                    }}>
-                       {item.image_url && (
-                         <img 
-                           src={item.image_url} 
-                           alt="Cover" 
-                           style={{ width: '60px', height: '90px', objectFit: 'cover', borderRadius: '6px', boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }}
-                         />
-                       )}
-                       <div style={{flex: 1}}>
-                         {item.details && (
-                           <p style={{ margin: 0, fontSize: '0.95rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
-                             "{item.details}"
-                           </p>
-                         )}
-                       </div>
-                    </div>
-                  )}
-
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginTop: '1rem', fontWeight: 500 }}>
-                  {new Date(item.created_at).toLocaleString(undefined, {
-                    month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
-                  })}
-                </span>
-              </div>
-            </div>
+              <button
+                key={tab.id}
+                onClick={() => handleTabChange(tab.id)}
+                style={{
+                  flex: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem',
+                  padding: '0.65rem 1rem',
+                  border: 'none',
+                  borderRadius: '8px',
+                  background: isActive ? 'var(--accent-primary)' : 'transparent',
+                  color: isActive ? '#fff' : 'var(--text-secondary)',
+                  fontWeight: isActive ? 700 : 500,
+                  fontSize: '0.92rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                <Icon size={18} />
+                <span>{tab.label}</span>
+              </button>
             );
-          })
-        )}
+          })}
+        </div>
       </div>
 
-      {/* Non-intrusive bottom sponsor / AdBanner */}
-      <AdBanner />
+      {/* Feed Content */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        {loading ? (
+          <div style={{ padding: '4rem 2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+            <div style={{ fontSize: '1.05rem', fontWeight: 600 }}>{isEs ? 'Cargando feed...' : 'Loading feed...'}</div>
+          </div>
+        ) : activities.length === 0 ? (
+          <div className="glass-card" style={{ padding: '4rem 2rem', textAlign: 'center', borderRadius: '16px' }}>
+            <h3 style={{ fontSize: '1.4rem', marginBottom: '0.5rem', color: 'var(--text-primary)' }}>
+              {activeTab === 'following'
+                ? (isEs ? 'Tu muro está en silencio' : 'Your feed is quiet')
+                : (isEs ? 'No hay actividad disponible' : 'No activity available')}
+            </h3>
+            <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem', fontSize: '0.95rem', maxWidth: '460px', margin: '0 auto 1.5rem auto' }}>
+              {activeTab === 'following'
+                ? (isEs ? 'Los usuarios que sigues no han registrado actividad recientemente. ¡Explora la pestaña Descubrir para conectar con más personas!' : 'Users you follow have not recorded activity recently. Explore Discover to find new people!')
+                : activeTab === 'me'
+                ? (isEs ? 'Todavía no has registrado actividad pública. Completa obras o califícalas para ver tu progreso aquí.' : 'You have not logged public activity yet. Complete items or rate them to see your progress.')
+                : (isEs ? 'No se encontraron publicaciones con los criterios actuales.' : 'No entries found with the current criteria.')}
+            </p>
+            {activeTab === 'following' && (
+              <button
+                onClick={() => setActiveTab('discover')}
+                className="btn-primary"
+                style={{ padding: '0.7rem 1.75rem', borderRadius: '25px', fontWeight: 600 }}
+              >
+                {isEs ? 'Ir a Descubrir' : 'Go to Discover'}
+              </button>
+            )}
+          </div>
+        ) : (
+          activities.map(act => (
+            <SocialActivityCard
+              key={act.id}
+              activity={act}
+              isOwnActivity={Boolean(user && user.id === act.user_id)}
+              onVisibilityToggle={handleVisibilityToggle}
+            />
+          ))
+        )}
+      </div>
     </div>
   );
 };
-
 export default Social;

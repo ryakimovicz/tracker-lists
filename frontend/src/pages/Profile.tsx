@@ -1089,17 +1089,24 @@ export const Profile: React.FC = () => {
     if (!profile) return;
     try {
       const res = await apiClient.post(`/social/users/${profile.id}/follow`);
-      const isNowFollowing = res.data.following;
+      const isNowFollowing = Boolean(res.data.following);
+      const isNowRequested = Boolean(res.data.requested);
+
       setProfile(prev => prev ? {
         ...prev,
         is_following: isNowFollowing,
-        followers_count: Math.max(0, (prev.followers_count || 0) + (isNowFollowing ? 1 : -1))
+        follow_request_pending: isNowRequested,
+        followers_count: Math.max(0, (prev.followers_count || 0) + (isNowFollowing ? 1 : (prev.is_following ? -1 : 0)))
       } : null);
-      setSuccessMsg(isNowFollowing 
-        ? (language === 'es' ? 'Comenzaste a seguir a este usuario.' : 'Started following this user.')
-        : (language === 'es' ? 'Dejaste de seguir a este usuario.' : 'Unfollowed this user.')
-      );
-      setTimeout(() => setSuccessMsg(''), 3000);
+
+      if (isNowRequested) {
+        setSuccessMsg(language === 'es' ? 'Solicitud de seguimiento enviada.' : 'Follow request sent.');
+      } else if (isNowFollowing) {
+        setSuccessMsg(language === 'es' ? 'Comenzaste a seguir a este usuario.' : 'Started following this user.');
+      } else {
+        setSuccessMsg(language === 'es' ? 'Dejaste de seguir o cancelaste la solicitud.' : 'Unfollowed or cancelled request.');
+      }
+      setTimeout(() => setSuccessMsg(''), 3500);
     } catch (err: any) {
       setErrorMsg(err.response?.data?.detail || 'Error updating follow status');
     }
@@ -2213,13 +2220,12 @@ export const Profile: React.FC = () => {
               )}
 
 
-              {/* Follow / Unfollow button on other users' profiles */}
-
+              {/* Follow / Unfollow / Request button on other users' profiles */}
               {!isOwnProfile && currentUser && (
                 <button
                   type="button"
                   onClick={handleToggleFollowProfileUser}
-                  className={profile.is_following ? 'btn-secondary' : 'btn-primary'}
+                  className={profile.is_following || (profile as any).follow_request_pending ? 'btn-secondary' : 'btn-primary'}
                   style={{
                     padding: '0.35rem 0.9rem',
                     fontSize: '0.85rem',
@@ -2234,6 +2240,16 @@ export const Profile: React.FC = () => {
                     <>
                       <UserCheck size={16} />
                       {language === 'es' ? 'Siguiendo' : 'Following'}
+                    </>
+                  ) : (profile as any).follow_request_pending ? (
+                    <>
+                      <UserCheck size={16} color="var(--accent-primary)" />
+                      {language === 'es' ? 'Solicitud enviada' : 'Requested'}
+                    </>
+                  ) : (profile as any).is_private ? (
+                    <>
+                      <UserPlus size={16} />
+                      {language === 'es' ? 'Solicitar seguir' : 'Request to follow'}
                     </>
                   ) : (
                     <>
@@ -2479,35 +2495,108 @@ export const Profile: React.FC = () => {
         </div>
       )}
 
-      {/* Tab Navigation */}
-      <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', gap: '1.5rem' }}>
-        <button
-          onClick={() => setActiveTab('shelf')}
-          className={`profile-tab-btn ${activeTab === 'shelf' ? 'active' : ''}`}
+      {/* Private Account Locked Screen */}
+      {(profile as any)?.is_private_locked ? (
+        <div
+          className="glass-card"
           style={{
-            '--tab-color': 'var(--accent-primary)'
-          } as React.CSSProperties}
+            padding: '4rem 2rem',
+            textAlign: 'center',
+            borderRadius: '16px',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '1rem',
+            maxWidth: '520px',
+            margin: '2rem auto'
+          }}
         >
-          {activeTab === 'shelf' ? (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-              {/* Row 1 */}
-              <rect x="3" y="3" width="4.5" height="4.5" rx="1" />
-              <rect x="9.75" y="3" width="4.5" height="4.5" rx="1" />
-              <rect x="16.5" y="3" width="4.5" height="4.5" rx="1" />
-              {/* Row 2 */}
-              <rect x="3" y="9.75" width="4.5" height="4.5" rx="1" />
-              <rect x="9.75" y="9.75" width="4.5" height="4.5" rx="1" />
-              <rect x="16.5" y="9.75" width="4.5" height="4.5" rx="1" />
-              {/* Row 3 */}
-              <rect x="3" y="16.5" width="4.5" height="4.5" rx="1" />
-              <rect x="9.75" y="16.5" width="4.5" height="4.5" rx="1" />
-              <rect x="16.5" y="16.5" width="4.5" height="4.5" rx="1" />
-            </svg>
-          ) : (
-            <Grid size={18} strokeWidth={1.8} />
+          <div
+            style={{
+              width: '64px',
+              height: '64px',
+              borderRadius: '50%',
+              background: 'rgba(124, 58, 237, 0.12)',
+              border: '1px solid rgba(124, 58, 237, 0.3)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'var(--accent-primary)'
+            }}
+          >
+            <Lock size={32} />
+          </div>
+
+          <h3 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+            {language === 'es' ? 'Esta cuenta es privada' : 'This account is private'}
+          </h3>
+
+          <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.95rem', lineHeight: 1.5 }}>
+            {language === 'es'
+              ? 'Sigue a este usuario para ver su estantería cultural, guías creadas y actividad reciente.'
+              : 'Follow this user to view their shelf, created guides, and recent cultural activity.'}
+          </p>
+
+          {currentUser && (
+            <button
+              onClick={handleToggleFollowProfileUser}
+              className={(profile as any)?.follow_request_pending ? 'btn-secondary' : 'btn-primary'}
+              style={{
+                marginTop: '0.5rem',
+                padding: '0.65rem 1.75rem',
+                borderRadius: '25px',
+                fontWeight: 600,
+                fontSize: '0.92rem',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}
+            >
+              {(profile as any)?.follow_request_pending ? (
+                <>
+                  <UserCheck size={18} color="var(--accent-primary)" />
+                  <span>{language === 'es' ? 'Solicitud pendiente' : 'Request pending'}</span>
+                </>
+              ) : (
+                <>
+                  <UserPlus size={18} />
+                  <span>{language === 'es' ? 'Solicitar seguir' : 'Request to follow'}</span>
+                </>
+              )}
+            </button>
           )}
-          <span>{language === 'es' ? 'Estantería' : 'My Shelf'}</span>
-        </button>
+        </div>
+      ) : (
+        <>
+          {/* Tab Navigation */}
+          <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', gap: '1.5rem' }}>
+            <button
+              onClick={() => setActiveTab('shelf')}
+              className={`profile-tab-btn ${activeTab === 'shelf' ? 'active' : ''}`}
+              style={{
+                '--tab-color': 'var(--accent-primary)'
+              } as React.CSSProperties}
+            >
+              {activeTab === 'shelf' ? (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                  {/* Row 1 */}
+                  <rect x="3" y="3" width="4.5" height="4.5" rx="1" />
+                  <rect x="9.75" y="3" width="4.5" height="4.5" rx="1" />
+                  <rect x="16.5" y="3" width="4.5" height="4.5" rx="1" />
+                  {/* Row 2 */}
+                  <rect x="3" y="9.75" width="4.5" height="4.5" rx="1" />
+                  <rect x="9.75" y="9.75" width="4.5" height="4.5" rx="1" />
+                  <rect x="16.5" y="9.75" width="4.5" height="4.5" rx="1" />
+                  {/* Row 3 */}
+                  <rect x="3" y="16.5" width="4.5" height="4.5" rx="1" />
+                  <rect x="9.75" y="16.5" width="4.5" height="4.5" rx="1" />
+                  <rect x="16.5" y="16.5" width="4.5" height="4.5" rx="1" />
+                </svg>
+              ) : (
+                <Grid size={18} strokeWidth={1.8} />
+              )}
+              <span>{language === 'es' ? 'Estantería' : 'My Shelf'}</span>
+            </button>
 
         <button
           onClick={() => setActiveTab('guides')}
@@ -6129,6 +6218,8 @@ export const Profile: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+      </>
       )}
 
       {/* Avatar Selector Modal */}

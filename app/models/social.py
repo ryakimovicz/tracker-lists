@@ -116,5 +116,90 @@ class BlockedFranchise(Base):
     target_id = Column(String(100), nullable=False, index=True)  # e.g., 'cv_vol_88907', 'cv_pub_7358'
     name = Column(String(255), nullable=False)
     item_type = Column(String(50), default="comic", nullable=False)  # comic, manga, anime, etc.
-    reason = Column(String(500), nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+
+
+# --- 0.9.9 Social & Notifications System ---
+
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    recipient_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    actor_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    notification_type = Column(String(50), nullable=False)  # 'activity_like', 'activity_comment', 'comment_reply', 'new_follower', 'follow_request', 'mention'
+    entity_type = Column(String(50), nullable=True)  # 'activity', 'review', 'user', 'guide'
+    entity_id = Column(String(100), nullable=True)
+    extra_data_json = Column(String(1000), nullable=True)
+    is_read = Column(DateTime(timezone=True), nullable=True)  # Null if unread, timestamp if read
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
+
+    recipient = relationship("User", foreign_keys=[recipient_id])
+    actor = relationship("User", foreign_keys=[actor_id])
+
+
+class ActivityLike(Base):
+    __tablename__ = "activity_likes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    activity_id = Column(Integer, ForeignKey("user_activity_logs.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    user = relationship("User")
+    activity = relationship("UserActivityLog", backref="likes")
+
+    __table_args__ = (
+        UniqueConstraint("activity_id", "user_id", name="uq_activity_user_like"),
+    )
+
+
+class ActivityComment(Base):
+    __tablename__ = "activity_comments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    activity_id = Column(Integer, ForeignKey("user_activity_logs.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    parent_id = Column(Integer, ForeignKey("activity_comments.id", ondelete="CASCADE"), nullable=True)
+    content = Column(Text, nullable=True)
+    media_url = Column(String(500), nullable=True)
+    media_type = Column(String(50), nullable=True)  # 'gif', 'meme', 'sticker', 'clip', 'emoji'
+    audio_url = Column(String(500), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    user = relationship("User")
+    activity = relationship("UserActivityLog", backref="comments")
+    replies = relationship("ActivityComment", cascade="all, delete-orphan")
+    votes = relationship("ActivityCommentVote", backref="comment", cascade="all, delete-orphan")
+
+
+class ActivityCommentVote(Base):
+    __tablename__ = "activity_comment_votes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    comment_id = Column(Integer, ForeignKey("activity_comments.id", ondelete="CASCADE"), nullable=False, index=True)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    user = relationship("User")
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "comment_id", name="uq_activity_comment_vote"),
+    )
+
+
+class FollowRequest(Base):
+    __tablename__ = "follow_requests"
+
+    id = Column(Integer, primary_key=True, index=True)
+    requester_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    target_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    requester = relationship("User", foreign_keys=[requester_id])
+    target = relationship("User", foreign_keys=[target_id])
+
+    __table_args__ = (
+        UniqueConstraint("requester_id", "target_id", name="uq_follow_request"),
+    )
+

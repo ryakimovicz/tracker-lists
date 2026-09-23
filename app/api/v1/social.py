@@ -9,7 +9,11 @@ from app.models.user import User
 from app.models.list import ReadingList, VisibilityEnum
 from app.models.list_item import ListItem
 from app.models.item_progress import ItemProgress
-from app.models.social import ListVote, ListReport, Comment, CommentVote, CommentReport, Follow
+from app.models.library import UserLibraryItem
+from app.models.social import (
+    ListVote, ListReport, Comment, CommentVote, CommentReport, Follow,
+    Notification, ActivityLike, ActivityComment, ActivityCommentVote, FollowRequest
+)
 from app.models.activity import UserActivityLog
 from app.services.tvmaze import TVMazeService
 from app.schemas.social import (
@@ -17,6 +21,11 @@ from app.schemas.social import (
     CommentResponse,
     ReportCreate,
     ActivityFeedItemResponse,
+    ActivityLikeToggleResponse,
+    ActivityCommentCreate,
+    ActivityCommentResponse,
+    NotificationResponse,
+    FollowRequestResponse,
     ListRatingCreate,
     ListRatingResponse
 )
@@ -335,7 +344,7 @@ def report_comment(
     db.commit()
     return {"message": "Comment reported successfully"}
 
-# --- 3. Follow System ---
+# --- 3. Follow System & Requests ---
 
 @router.post("/users/{user_id}/follow", status_code=status.HTTP_200_OK)
 def toggle_follow_user(
@@ -366,22 +375,150 @@ def toggle_follow_user(
             activity_type="user_followed",
             entity_id=str(user_id)
         )
-        return {"following": False}
-    else:
-        new_follow = Follow(follower_id=current_user.id, followed_id=user_id)
+        return {"following": False, "requested": False}
+
+    # If target is private, manage follow request
+    if getattr(target_user, 'is_private', False):
+        existing_req = db.query(FollowRequest).filter(
+            FollowRequest.requester_id == current_user.id,
+            FollowRequest.target_id == user_id
+        ).first()
+        if existing_req:
+            db.delete(existing_req)
+            db.commit()
+            return {"following": False, "requested": False}
+        else:
+            new_req = FollowRequest(requester_id=current_user.id, target_id=user_id)
+            db.add(new_req)
+            # Send notification to target_user
+            notif = Notification(
+                recipient_id=user_id,
+                actor_id=current_user.id,
+                notification_type="follow_request",
+                entity_type="user",
+                entity_id=str(current_user.id),
+                extra_data_json=f'{{"username": "{current_user.username}"}}'
+            )
+            db.add(notif)
+            db.commit()
+            return {"following": False, "requested": True}
+
+    # Public user: direct follow
+    new_follow = Follow(follower_id=current_user.id, followed_id=user_id)
+    db.add(new_follow)
+
+    # Send notification for new follower
+    notif = Notification(
+        recipient_id=user_id,
+        actor_id=current_user.id,
+        notification_type="new_follower",
+        entity_type="user",
+        entity_id=str(current_user.id),
+        extra_data_json=f'{{"username": "{current_user.username}"}}'
+    )
+    db.add(notif)
+    db.commit()
+
+    ActivityService.record_activity(
+        db=db,
+        user_id=current_user.id,
+        activity_type="user_followed",
+        item_title=target_user.username,
+        item_type="user",
+        entity_id=str(user_id),
+        image_url=target_user.photo_url,
+        details="followed"
+    )
+    return {"following": True, "requested": False}
+
+@router.post("/follow-requests/{request_id}/accept", status_code=status.HTTP_200_OK)
+def accept_follow_request(
+    request_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    freq = db.query(FollowRequest).filter(
+        FollowRequest.id == request_id,
+        FollowRequest.target_id == current_user.id
+    ).first()
+    if not freq:
+        raise HTTPException(status_code=404, detail="Follow request not found")
+
+    requester_id = freq.requester_id
+    # Create Follow
+    existing_follow = db.query(Follow).filter(
+        Follow.follower_id == requester_id,
+        Follow.followed_id == current_user.id
+    ).first()
+    if not existing_follow:
+        new_follow = Follow(follower_id=requester_id, followed_id=current_user.id)
         db.add(new_follow)
+
+    # Clean up request
+    db.delete(freq)
+
+    # Send notification to the accepted requester
+    notif = Notification(
+        recipient_id=requester_id,
+        actor_id=current_user.id,
+        notification_type="new_follower",
+        entity_type="user",
+        entity_id=str(current_user.id),
+        extra_data_json=f'{{"accepted": true, "username": "{current_user.username}"}}'
+    )
+    db.add(notif)
+    db.commit()
+    return {"message": "Follow request accepted"}
+
+@router.post("/follow-requests/{request_id}/reject", status_code=status.HTTP_200_OK)
+def reject_follow_request(
+    request_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    freq = db.query(FollowRequest).filter(
+        FollowRequest.id == request_id,
+        FollowRequest.target_id == current_user.id
+    ).first()
+    if not freq:
+        raise HTTPException(status_code=404, detail="Follow request not found")
+    db.delete(freq)
+    db.commit()
+    return {"message": "Follow request rejected"}
+
+@router.delete("/follow-requests/{target_id}/cancel", status_code=status.HTTP_200_OK)
+def cancel_follow_request(
+    target_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    freq = db.query(FollowRequest).filter(
+        FollowRequest.requester_id == current_user.id,
+        FollowRequest.target_id == target_id
+    ).first()
+    if freq:
+        db.delete(freq)
         db.commit()
-        ActivityService.record_activity(
-            db=db,
-            user_id=current_user.id,
-            activity_type="user_followed",
-            item_title=target_user.username,
-            item_type="user",
-            entity_id=str(user_id),
-            image_url=target_user.photo_url,
-            details="followed"
-        )
-        return {"following": True}
+    return {"message": "Follow request cancelled"}
+
+@router.get("/follow-requests", response_model=List[FollowRequestResponse])
+def get_pending_follow_requests(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    reqs = db.query(FollowRequest).filter(FollowRequest.target_id == current_user.id).order_by(FollowRequest.created_at.desc()).all()
+    results = []
+    for r in reqs:
+        u = db.query(User).filter(User.id == r.requester_id).first()
+        if u:
+            results.append(FollowRequestResponse(
+                id=r.id,
+                requester_id=u.id,
+                requester_username=u.username,
+                requester_photo_url=u.photo_url,
+                created_at=r.created_at
+            ))
+    return results
 
 @router.get("/users/{user_id}/followers", response_model=List[UserResponse])
 def get_user_followers(
@@ -413,6 +550,7 @@ def get_user_followers(
             "is_admin": u.is_admin,
             "show_nsfw": u.show_nsfw,
             "is_pro": u.is_pro,
+            "is_private": bool(getattr(u, "is_private", False)),
             "profile_color": u.profile_color,
             "lastfm_username": u.lastfm_username,
             "followers_count": f_count,
@@ -452,6 +590,7 @@ def get_user_following(
             "is_admin": u.is_admin,
             "show_nsfw": u.show_nsfw,
             "is_pro": u.is_pro,
+            "is_private": bool(getattr(u, "is_private", False)),
             "profile_color": u.profile_color,
             "lastfm_username": u.lastfm_username,
             "followers_count": f_count,
@@ -461,25 +600,98 @@ def get_user_following(
         res.append(UserResponse(**u_dict))
     return res
 
-# --- 4. Feeds ---
+# --- 4. Helper for Activity Serialisation ---
 
-@router.get("/lists/feed/social", response_model=List[ReadingListResponse])
-def get_followed_users_lists(
-    skip: int = 0,
-    limit: int = 20,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    # Retrieve public lists created by users that the current user follows
-    followed_ids_query = db.query(Follow.followed_id).filter(Follow.follower_id == current_user.id)
-    lists = db.query(ReadingList).filter(
-        ReadingList.visibility == VisibilityEnum.PUBLIC,
-        ReadingList.creator_id.in_(followed_ids_query)
-    ).order_by(ReadingList.created_at.desc()).offset(skip).limit(limit).all()
-    return lists
+def _format_activity_item(r: UserActivityLog, db: Session, current_user_id: Optional[int], client_lang: str, client_country: str) -> Optional[ActivityFeedItemResponse]:
+    user = db.query(User).filter(User.id == r.user_id).first()
+    if not user:
+        return None
 
-@router.get("/users/feed/activity", response_model=List[ActivityFeedItemResponse])
-def get_followed_activity_feed(
+    final_title = r.item_title
+    if r.item_type == 'series' and r.external_id and r.external_id.startswith('tvm_'):
+        clean_show_id = r.external_id.replace('tvm_', '')
+        if clean_show_id.isdigit():
+            loc_name = TVMazeService.get_localized_title(int(clean_show_id), r.item_title or '', lang=client_lang, country_code=client_country)
+            if loc_name:
+                final_title = loc_name
+
+    likes_count = db.query(ActivityLike).filter(ActivityLike.activity_id == r.id).count()
+    is_liked = False
+    if current_user_id:
+        is_liked = db.query(ActivityLike).filter(
+            ActivityLike.activity_id == r.id,
+            ActivityLike.user_id == current_user_id
+        ).first() is not None
+
+    comments_count = db.query(ActivityComment).filter(ActivityComment.activity_id == r.id).count()
+
+    # Ensure any activity about a media item has its poster image
+    final_image_url = r.image_url
+    if r.item_type in ('series', 'anime', 'episode') and r.item_title and ' - S' in r.item_title:
+        # Check user's library for the series poster
+        series_match = r.item_title.split(' - S')[0].strip()
+        lib_match = db.query(UserLibraryItem).filter(
+            UserLibraryItem.user_id == r.user_id,
+            UserLibraryItem.title.ilike(series_match)
+        ).first()
+        if lib_match and lib_match.image_url:
+            final_image_url = lib_match.image_url
+        else:
+            any_lib = db.query(UserLibraryItem).filter(
+                UserLibraryItem.title.ilike(series_match),
+                UserLibraryItem.image_url.isnot(None)
+            ).first()
+            if any_lib and any_lib.image_url:
+                final_image_url = any_lib.image_url
+    elif not final_image_url and r.item_title:
+        # If image_url is missing, look up by external_id or title in UserLibraryItem or ListItem
+        if r.external_id:
+            lib_by_ext = db.query(UserLibraryItem).filter(
+                UserLibraryItem.external_id == r.external_id,
+                UserLibraryItem.image_url.isnot(None)
+            ).first()
+            if lib_by_ext and lib_by_ext.image_url:
+                final_image_url = lib_by_ext.image_url
+            else:
+                li_by_ext = db.query(ListItem).filter(
+                    ListItem.external_id == r.external_id,
+                    ListItem.image_url.isnot(None)
+                ).first()
+                if li_by_ext and li_by_ext.image_url:
+                    final_image_url = li_by_ext.image_url
+
+        if not final_image_url and r.item_title:
+            lib_by_title = db.query(UserLibraryItem).filter(
+                UserLibraryItem.title.ilike(r.item_title),
+                UserLibraryItem.image_url.isnot(None)
+            ).first()
+            if lib_by_title and lib_by_title.image_url:
+                final_image_url = lib_by_title.image_url
+
+    return ActivityFeedItemResponse(
+        id=r.id,
+        user_id=r.user_id,
+        username=user.username,
+        user_photo_url=user.photo_url,
+        activity_type=r.activity_type,
+        item_title=final_title,
+        item_type=r.item_type,
+        external_id=r.external_id,
+        list_id=r.list_id,
+        image_url=final_image_url,
+        details=r.details,
+        metadata_json=r.metadata_json,
+        is_hidden=bool(getattr(r, 'is_hidden', False)),
+        likes_count=likes_count,
+        is_liked_by_me=is_liked,
+        comments_count=comments_count,
+        created_at=r.created_at
+    )
+
+# --- 5. The 4 Social Feeds (/social/feed) ---
+
+@router.get("/feed/following", response_model=List[ActivityFeedItemResponse])
+def get_following_feed(
     request: Request,
     skip: int = 0,
     limit: int = 20,
@@ -491,41 +703,332 @@ def get_followed_activity_feed(
     client_lang = parts[0].lower() if parts else "es"
     client_country = parts[1].upper() if len(parts) > 1 else ("ES" if client_lang == "es" and "es-es" in accept_lang.lower() else "AR")
 
-    # Fetch all activities from followed users
     followed_ids_query = db.query(Follow.followed_id).filter(Follow.follower_id == current_user.id)
     
-    # Query activity logs for followed users, ordering by created timestamp
     activity_records = db.query(UserActivityLog).filter(
-        UserActivityLog.user_id.in_(followed_ids_query)
+        UserActivityLog.user_id.in_(followed_ids_query),
+        UserActivityLog.is_hidden == False
     ).order_by(UserActivityLog.created_at.desc()).offset(skip).limit(limit).all()
-    
+
     feed = []
     for r in activity_records:
-        user = db.query(User).filter(User.id == r.user_id).first()
-        if not user:
-            continue
-            
-        final_title = r.item_title
-        if r.item_type == 'series' and r.external_id and r.external_id.startswith('tvm_'):
-            clean_show_id = r.external_id.replace('tvm_', '')
-            if clean_show_id.isdigit():
-                loc_name = TVMazeService.get_localized_title(int(clean_show_id), r.item_title or '', lang=client_lang, country_code=client_country)
-                if loc_name:
-                    final_title = loc_name
-
-        feed.append(
-            ActivityFeedItemResponse(
-                id=r.id,
-                user_id=r.user_id,
-                username=user.username,
-                activity_type=r.activity_type,
-                item_title=final_title,
-                item_type=r.item_type,
-                external_id=r.external_id,
-                list_id=r.list_id,
-                image_url=r.image_url,
-                details=r.details,
-                created_at=r.created_at
-            )
-        )
+        item = _format_activity_item(r, db, current_user.id, client_lang, client_country)
+        if item:
+            feed.append(item)
     return feed
+
+@router.get("/feed/discover", response_model=List[ActivityFeedItemResponse])
+def get_discover_feed(
+    request: Request,
+    skip: int = 0,
+    limit: int = 25,
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db)
+):
+    accept_lang = request.headers.get("Accept-Language", "es")
+    parts = accept_lang.split("-")
+    client_lang = parts[0].lower() if parts else "es"
+    client_country = parts[1].upper() if len(parts) > 1 else ("ES" if client_lang == "es" and "es-es" in accept_lang.lower() else "AR")
+
+    # Discover feed: activities from public users, not hidden
+    # Filter out private users
+    public_users_query = db.query(User.id).filter(User.is_private == False)
+
+    activity_records = db.query(UserActivityLog).filter(
+        UserActivityLog.user_id.in_(public_users_query),
+        UserActivityLog.is_hidden == False
+    ).order_by(UserActivityLog.created_at.desc()).offset(skip).limit(limit).all()
+
+    uid = current_user.id if current_user else None
+    feed = []
+    for r in activity_records:
+        item = _format_activity_item(r, db, uid, client_lang, client_country)
+        if item:
+            feed.append(item)
+    return feed
+
+@router.get("/feed/reviews", response_model=List[ActivityFeedItemResponse])
+def get_reviews_feed(
+    request: Request,
+    skip: int = 0,
+    limit: int = 20,
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db)
+):
+    accept_lang = request.headers.get("Accept-Language", "es")
+    parts = accept_lang.split("-")
+    client_lang = parts[0].lower() if parts else "es"
+    client_country = parts[1].upper() if len(parts) > 1 else ("ES" if client_lang == "es" and "es-es" in accept_lang.lower() else "AR")
+
+    # Review activities: item_reviewed, guide_rated, item_rated
+    review_types = ["item_reviewed", "guide_rated", "item_rated", "guide_review_commented"]
+    public_users_query = db.query(User.id).filter(User.is_private == False)
+
+    activity_records = db.query(UserActivityLog).filter(
+        UserActivityLog.user_id.in_(public_users_query),
+        UserActivityLog.is_hidden == False,
+        UserActivityLog.activity_type.in_(review_types)
+    ).order_by(UserActivityLog.created_at.desc()).offset(skip).limit(limit).all()
+
+    uid = current_user.id if current_user else None
+    feed = []
+    for r in activity_records:
+        item = _format_activity_item(r, db, uid, client_lang, client_country)
+        if item:
+            feed.append(item)
+    return feed
+
+@router.get("/feed/me", response_model=List[ActivityFeedItemResponse])
+def get_my_activity_feed(
+    request: Request,
+    skip: int = 0,
+    limit: int = 30,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    accept_lang = request.headers.get("Accept-Language", "es")
+    parts = accept_lang.split("-")
+    client_lang = parts[0].lower() if parts else "es"
+    client_country = parts[1].upper() if len(parts) > 1 else ("ES" if client_lang == "es" and "es-es" in accept_lang.lower() else "AR")
+
+    activity_records = db.query(UserActivityLog).filter(
+        UserActivityLog.user_id == current_user.id
+    ).order_by(UserActivityLog.created_at.desc()).offset(skip).limit(limit).all()
+
+    feed = []
+    for r in activity_records:
+        item = _format_activity_item(r, db, current_user.id, client_lang, client_country)
+        if item:
+            feed.append(item)
+    return feed
+
+@router.patch("/feed/activity/{activity_id}/visibility", status_code=status.HTTP_200_OK)
+def toggle_activity_visibility(
+    activity_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    act = db.query(UserActivityLog).filter(
+        UserActivityLog.id == activity_id,
+        UserActivityLog.user_id == current_user.id
+    ).first()
+    if not act:
+        raise HTTPException(status_code=404, detail="Activity not found or unauthorized")
+
+    act.is_hidden = not bool(getattr(act, "is_hidden", False))
+    db.commit()
+    return {"id": act.id, "is_hidden": act.is_hidden}
+
+# Legacy backwards compatibility endpoint for previous social view
+@router.get("/users/feed/activity", response_model=List[ActivityFeedItemResponse])
+def get_legacy_feed(
+    request: Request,
+    skip: int = 0,
+    limit: int = 20,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    return get_following_feed(request=request, skip=skip, limit=limit, current_user=current_user, db=db)
+
+# --- 6. Activity Likes & Comments (/social/activity) ---
+
+@router.post("/activity/{activity_id}/like", response_model=ActivityLikeToggleResponse)
+def toggle_activity_like(
+    activity_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    act = db.query(UserActivityLog).filter(UserActivityLog.id == activity_id).first()
+    if not act:
+        raise HTTPException(status_code=404, detail="Activity not found")
+
+    existing_like = db.query(ActivityLike).filter(
+        ActivityLike.activity_id == activity_id,
+        ActivityLike.user_id == current_user.id
+    ).first()
+
+    if existing_like:
+        db.delete(existing_like)
+        db.commit()
+        likes_count = db.query(ActivityLike).filter(ActivityLike.activity_id == activity_id).count()
+        return ActivityLikeToggleResponse(liked=False, likes_count=likes_count)
+    else:
+        new_like = ActivityLike(activity_id=activity_id, user_id=current_user.id)
+        db.add(new_like)
+        
+        # Send notification to activity owner if not self
+        if act.user_id != current_user.id:
+            safe_title = (act.item_title or '').replace('"', '')
+            notif = Notification(
+                recipient_id=act.user_id,
+                actor_id=current_user.id,
+                notification_type="activity_like",
+                entity_type="activity",
+                entity_id=str(act.id),
+                extra_data_json=f'{{"item_title": "{safe_title}"}}'
+            )
+            db.add(notif)
+            
+        db.commit()
+        likes_count = db.query(ActivityLike).filter(ActivityLike.activity_id == activity_id).count()
+        return ActivityLikeToggleResponse(liked=True, likes_count=likes_count)
+
+@router.get("/activity/{activity_id}/comments", response_model=List[ActivityCommentResponse])
+def get_activity_comments(
+    activity_id: int,
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db)
+):
+    comments = db.query(ActivityComment).filter(
+        ActivityComment.activity_id == activity_id
+    ).order_by(ActivityComment.created_at.asc()).all()
+
+    # Build reply map
+    comm_map = {}
+    uid = current_user.id if current_user else None
+
+    for c in comments:
+        u = db.query(User).filter(User.id == c.user_id).first()
+        votes_count = db.query(ActivityCommentVote).filter(ActivityCommentVote.comment_id == c.id).count()
+        is_voted = False
+        if uid:
+            is_voted = db.query(ActivityCommentVote).filter(
+                ActivityCommentVote.comment_id == c.id,
+                ActivityCommentVote.user_id == uid
+            ).first() is not None
+
+        c_resp = ActivityCommentResponse(
+            id=c.id,
+            activity_id=c.activity_id,
+            user_id=c.user_id,
+            username=u.username if u else "Unknown",
+            photo_url=u.photo_url if u else None,
+            parent_id=c.parent_id,
+            content=c.content,
+            media_url=c.media_url,
+            media_type=c.media_type,
+            audio_url=c.audio_url,
+            votes_count=votes_count,
+            is_voted_by_me=is_voted,
+            created_at=c.created_at,
+            replies=[]
+        )
+        comm_map[c.id] = c_resp
+
+    root_comments = []
+    for c in comments:
+        node = comm_map[c.id]
+        if c.parent_id and c.parent_id in comm_map:
+            comm_map[c.parent_id].replies.append(node)
+        else:
+            root_comments.append(node)
+
+    return root_comments
+
+@router.post("/activity/{activity_id}/comments", response_model=ActivityCommentResponse, status_code=status.HTTP_201_CREATED)
+def post_activity_comment(
+    activity_id: int,
+    comment_in: ActivityCommentCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    act = db.query(UserActivityLog).filter(UserActivityLog.id == activity_id).first()
+    if not act:
+        raise HTTPException(status_code=404, detail="Activity not found")
+
+    new_comment = ActivityComment(
+        activity_id=activity_id,
+        user_id=current_user.id,
+        parent_id=comment_in.parent_id,
+        content=comment_in.content,
+        media_url=comment_in.media_url,
+        media_type=comment_in.media_type,
+        audio_url=comment_in.audio_url
+    )
+    db.add(new_comment)
+    db.flush()
+
+    # Determine recipient of notification
+    recipient_id = act.user_id
+    notif_type = "activity_comment"
+    if comment_in.parent_id:
+        parent_c = db.query(ActivityComment).filter(ActivityComment.id == comment_in.parent_id).first()
+        if parent_c:
+            recipient_id = parent_c.user_id
+            notif_type = "comment_reply"
+
+    if recipient_id != current_user.id:
+        raw_snippet = str(comment_in.content or '')[:60].replace('"', '')
+        notif = Notification(
+            recipient_id=recipient_id,
+            actor_id=current_user.id,
+            notification_type=notif_type,
+            entity_type="activity",
+            entity_id=str(act.id),
+            extra_data_json=f'{{"snippet": "{raw_snippet}"}}'
+        )
+        db.add(notif)
+
+    db.commit()
+    db.refresh(new_comment)
+
+    return ActivityCommentResponse(
+        id=new_comment.id,
+        activity_id=new_comment.activity_id,
+        user_id=new_comment.user_id,
+        username=current_user.username,
+        photo_url=current_user.photo_url,
+        parent_id=new_comment.parent_id,
+        content=new_comment.content,
+        media_url=new_comment.media_url,
+        media_type=new_comment.media_type,
+        audio_url=new_comment.audio_url,
+        votes_count=0,
+        is_voted_by_me=False,
+        created_at=new_comment.created_at,
+        replies=[]
+    )
+
+@router.post("/comments/{comment_id}/vote", status_code=status.HTTP_200_OK)
+def toggle_activity_comment_vote(
+    comment_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    comment = db.query(ActivityComment).filter(ActivityComment.id == comment_id).first()
+    if not comment:
+        raise HTTPException(status_code=404, detail="Comment not found")
+
+    vote = db.query(ActivityCommentVote).filter(
+        ActivityCommentVote.comment_id == comment_id,
+        ActivityCommentVote.user_id == current_user.id
+    ).first()
+
+    if vote:
+        db.delete(vote)
+        db.commit()
+        cnt = db.query(ActivityCommentVote).filter(ActivityCommentVote.comment_id == comment_id).count()
+        return {"voted": False, "votes_count": cnt}
+    else:
+        new_vote = ActivityCommentVote(comment_id=comment_id, user_id=current_user.id)
+        db.add(new_vote)
+        db.commit()
+        cnt = db.query(ActivityCommentVote).filter(ActivityCommentVote.comment_id == comment_id).count()
+        return {"voted": True, "votes_count": cnt}
+
+@router.delete("/comments/{comment_id}", status_code=status.HTTP_200_OK)
+def delete_activity_comment(
+    comment_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    comment = db.query(ActivityComment).filter(ActivityComment.id == comment_id).first()
+    if not comment:
+        raise HTTPException(status_code=404, detail="Comment not found")
+
+    if comment.user_id != current_user.id and not getattr(current_user, 'is_admin', False):
+        raise HTTPException(status_code=403, detail="Not authorized to delete this comment")
+
+    db.delete(comment)
+    db.commit()
+    return {"message": "Comment deleted successfully"}

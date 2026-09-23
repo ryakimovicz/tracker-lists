@@ -1,0 +1,473 @@
+import React, { useState, useEffect } from 'react';
+import { Send, Reply, Trash2, ThumbsUp, Image as ImageIcon } from 'lucide-react';
+import { apiClient } from '../api/client';
+import { useAuth } from '../context/AuthContext';
+import { useTranslation } from '../context/LanguageContext';
+import { KlipyPicker } from './KlipyPicker';
+import type { SelectedKlipyMedia } from './KlipyPicker';
+import { MediaAttachmentView } from './ItemDetailsModal';
+
+export interface ActivityCommentItem {
+  id: number;
+  activity_id: number;
+  user_id: number;
+  username: string;
+  photo_url?: string | null;
+  parent_id?: number | null;
+  content?: string | null;
+  media_url?: string | null;
+  media_type?: string | null;
+  audio_url?: string | null;
+  votes_count: number;
+  is_voted_by_me: boolean;
+  created_at: string;
+  replies?: ActivityCommentItem[];
+}
+
+interface ActivityCommentThreadProps {
+  activityId: number;
+  onCommentsCountChange?: (count: number) => void;
+}
+
+export const ActivityCommentThread: React.FC<ActivityCommentThreadProps> = ({
+  activityId,
+  onCommentsCountChange
+}) => {
+  const { user } = useAuth();
+  const { language } = useTranslation();
+  const isEs = language === 'es';
+
+  const [comments, setComments] = useState<ActivityCommentItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [text, setText] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [selectedMedia, setSelectedMedia] = useState<SelectedKlipyMedia | null>(null);
+  const [showKlipy, setShowKlipy] = useState(false);
+
+  // Replying
+  const [replyTarget, setReplyTarget] = useState<{ id: number; username: string } | null>(null);
+  const [replyText, setReplyText] = useState('');
+  const [replyMedia, setReplyMedia] = useState<SelectedKlipyMedia | null>(null);
+  const [showReplyKlipy, setShowReplyKlipy] = useState(false);
+
+  const fetchComments = async () => {
+    try {
+      setLoading(true);
+      const res = await apiClient.get(`/social/activity/${activityId}/comments`);
+      if (Array.isArray(res.data)) {
+        setComments(res.data);
+        if (onCommentsCountChange) {
+          const totalCount = res.data.reduce((acc: number, c: any) => acc + 1 + (c.replies ? c.replies.length : 0), 0);
+          onCommentsCountChange(totalCount);
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching comments:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchComments();
+  }, [activityId]);
+
+  const handlePostComment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!text.trim() && !selectedMedia) return;
+
+    try {
+      setSubmitting(true);
+      await apiClient.post(`/social/activity/${activityId}/comments`, {
+        content: text.trim() || null,
+        parent_id: null,
+        media_url: selectedMedia?.url || null,
+        media_type: selectedMedia?.type || null,
+        audio_url: (selectedMedia?.type === 'clip' ? selectedMedia.url : null)
+      });
+      setText('');
+      setSelectedMedia(null);
+      await fetchComments();
+    } catch (err) {
+      console.error('Error posting comment:', err);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handlePostReply = async (e: React.FormEvent, parentId: number) => {
+    e.preventDefault();
+    if (!replyText.trim() && !replyMedia) return;
+
+    try {
+      setSubmitting(true);
+      await apiClient.post(`/social/activity/${activityId}/comments`, {
+        content: replyText.trim() || null,
+        parent_id: parentId,
+        media_url: replyMedia?.url || null,
+        media_type: replyMedia?.type || null,
+        audio_url: (replyMedia?.type === 'clip' ? replyMedia.url : null)
+      });
+      setReplyText('');
+      setReplyMedia(null);
+      setReplyTarget(null);
+      await fetchComments();
+    } catch (err) {
+      console.error('Error replying:', err);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleVoteComment = async (commentId: number) => {
+    try {
+      const res = await apiClient.post(`/social/comments/${commentId}/vote`);
+      setComments(prev =>
+        prev.map(c => {
+          if (c.id === commentId) {
+            return { ...c, is_voted_by_me: res.data.voted, votes_count: res.data.votes_count };
+          }
+          if (c.replies) {
+            return {
+              ...c,
+              replies: c.replies.map(r =>
+                r.id === commentId ? { ...r, is_voted_by_me: res.data.voted, votes_count: res.data.votes_count } : r
+              )
+            };
+          }
+          return c;
+        })
+      );
+    } catch (err) {
+      console.error('Error voting comment:', err);
+    }
+  };
+
+  const handleDeleteComment = async (commentId: number) => {
+    try {
+      await apiClient.delete(`/social/comments/${commentId}`);
+      await fetchComments();
+    } catch (err) {
+      console.error('Error deleting comment:', err);
+    }
+  };
+
+  const renderSingleComment = (item: ActivityCommentItem, isChild = false) => {
+    const isReplyingThis = replyTarget?.id === item.id;
+    const canDelete = user && (user.id === item.user_id || user.is_admin);
+
+    return (
+      <div
+        key={item.id}
+        style={{
+          display: 'flex',
+          gap: '0.75rem',
+          padding: '0.65rem 0',
+          marginLeft: isChild ? '2.2rem' : 0,
+          borderLeft: isChild ? '2px solid var(--border-color)' : 'none',
+          paddingLeft: isChild ? '0.75rem' : 0
+        }}
+      >
+        {/* Avatar */}
+        {item.photo_url ? (
+          <img
+            src={item.photo_url}
+            alt={item.username}
+            style={{ width: isChild ? '28px' : '34px', height: isChild ? '28px' : '34px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
+          />
+        ) : (
+          <div
+            style={{
+              width: isChild ? '28px' : '34px',
+              height: isChild ? '28px' : '34px',
+              borderRadius: '50%',
+              background: 'linear-gradient(135deg, var(--accent-primary), #6366f1)',
+              color: '#fff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: isChild ? '0.75rem' : '0.85rem',
+              fontWeight: 700,
+              flexShrink: 0
+            }}
+          >
+            {(item.username || 'U')[0].toUpperCase()}
+          </div>
+        )}
+
+        {/* Content body */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem' }}>
+            <span style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--text-primary)' }}>
+              {item.username}
+            </span>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+              {new Date(item.created_at).toLocaleDateString(isEs ? 'es-ES' : 'en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+            </span>
+          </div>
+
+          {item.content && (
+            <p style={{ margin: '0 0 0.35rem 0', fontSize: '0.88rem', lineHeight: 1.4, color: 'var(--text-primary)', wordBreak: 'break-word' }}>
+              {item.content}
+            </p>
+          )}
+
+          {/* Media / GIF / Clip */}
+          {item.media_url && (
+            <div style={{ margin: '0.45rem 0' }}>
+              <MediaAttachmentView
+                mediaUrl={item.media_url}
+                mediaType={item.media_type}
+                maxWidth="320px"
+                maxHeight="220px"
+                allowPausePlay={true}
+              />
+            </div>
+          )}
+
+          {/* Actions */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '0.25rem' }}>
+            <button
+              onClick={() => handleVoteComment(item.id)}
+              style={{
+                background: item.is_voted_by_me ? 'rgba(59, 130, 246, 0.15)' : 'transparent',
+                border: item.is_voted_by_me ? '1px solid rgba(59, 130, 246, 0.4)' : '1px solid transparent',
+                color: item.is_voted_by_me ? '#3b82f6' : 'var(--text-muted)',
+                borderRadius: '4px',
+                padding: '0.15rem 0.4rem',
+                fontSize: '0.76rem',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.25rem',
+                cursor: 'pointer'
+              }}
+            >
+              <ThumbsUp size={12} fill={item.is_voted_by_me ? '#3b82f6' : 'none'} />
+              <span>{item.votes_count}</span>
+            </button>
+
+            {user && (
+              <button
+                onClick={() => {
+                  if (isReplyingThis) {
+                    setReplyTarget(null);
+                  } else {
+                    setReplyTarget({ id: item.id, username: item.username });
+                    setReplyText(`@${item.username} `);
+                  }
+                }}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: isReplyingThis ? 'var(--accent-primary)' : 'var(--text-muted)',
+                  fontSize: '0.76rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.25rem'
+                }}
+              >
+                <Reply size={12} />
+                <span>{isReplyingThis ? (isEs ? 'Cancelar' : 'Cancel') : (isEs ? 'Responder' : 'Reply')}</span>
+              </button>
+            )}
+
+            {canDelete && (
+              <button
+                onClick={() => handleDeleteComment(item.id)}
+                title={isEs ? 'Eliminar' : 'Delete'}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer',
+                  padding: '0.15rem'
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = '#ef4444')}
+                onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
+              >
+                <Trash2 size={12} />
+              </button>
+            )}
+          </div>
+
+          {/* Reply form under parent */}
+          {isReplyingThis && (
+            <form onSubmit={(e) => handlePostReply(e, item.id)} style={{ marginTop: '0.65rem' }}>
+              <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                <input
+                  type="text"
+                  value={replyText}
+                  onChange={(e) => setReplyText(e.target.value)}
+                  placeholder={`${isEs ? 'Respondiendo a' : 'Replying to'} @${item.username}...`}
+                  style={{
+                    flex: 1,
+                    padding: '0.45rem 0.75rem',
+                    borderRadius: '20px',
+                    border: '1px solid var(--border-color)',
+                    background: 'var(--bg-primary, rgba(0,0,0,0.2))',
+                    color: 'var(--text-primary)',
+                    fontSize: '0.84rem'
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowReplyKlipy(true)}
+                  title="KLIPY (GIFs / Memes / Audio)"
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'var(--accent-primary)',
+                    cursor: 'pointer',
+                    padding: '0.35rem'
+                  }}
+                >
+                  <ImageIcon size={18} />
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting || (!replyText.trim() && !replyMedia)}
+                  className="btn-primary"
+                  style={{ padding: '0.45rem 0.8rem', borderRadius: '20px', fontSize: '0.8rem' }}
+                >
+                  <Send size={13} />
+                </button>
+              </div>
+
+              {replyMedia && (
+                <div style={{ marginTop: '0.6rem' }}>
+                  <MediaAttachmentView
+                    mediaUrl={replyMedia.url}
+                    mediaType={replyMedia.type}
+                    maxWidth="180px"
+                    maxHeight="130px"
+                    borderAccent
+                    isRemovable
+                    onRemove={() => setReplyMedia(null)}
+                    removeTitle={isEs ? 'Quitar multimedia' : 'Remove media'}
+                    allowPausePlay={true}
+                  />
+                </div>
+              )}
+            </form>
+          )}
+
+          {/* Render nested replies */}
+          {item.replies && item.replies.length > 0 && (
+            <div style={{ marginTop: '0.5rem' }}>
+              {item.replies.map(r => renderSingleComment(r, true))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem', marginTop: '0.75rem' }}>
+      {/* Input box */}
+      {user ? (
+        <form onSubmit={handlePostComment} style={{ marginBottom: '1rem' }}>
+          <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
+            <input
+              type="text"
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder={isEs ? 'Escribe un comentario...' : 'Write a comment...'}
+              style={{
+                flex: 1,
+                padding: '0.55rem 0.9rem',
+                borderRadius: '20px',
+                border: '1px solid var(--border-color)',
+                background: 'var(--bg-primary, rgba(0,0,0,0.15))',
+                color: 'var(--text-primary)',
+                fontSize: '0.88rem'
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowKlipy(true)}
+              title="KLIPY (GIFs / Memes / Audio)"
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: 'var(--accent-primary)',
+                cursor: 'pointer',
+                padding: '0.4rem'
+              }}
+            >
+              <ImageIcon size={20} />
+            </button>
+            <button
+              type="submit"
+              disabled={submitting || (!text.trim() && !selectedMedia)}
+              className="btn-primary"
+              style={{ padding: '0.55rem 1rem', borderRadius: '20px', fontSize: '0.85rem' }}
+            >
+              <Send size={15} />
+            </button>
+          </div>
+
+          {selectedMedia && (
+            <div style={{ marginTop: '0.6rem' }}>
+              <MediaAttachmentView
+                mediaUrl={selectedMedia.url}
+                mediaType={selectedMedia.type}
+                maxWidth="220px"
+                maxHeight="160px"
+                borderAccent
+                isRemovable
+                onRemove={() => setSelectedMedia(null)}
+                removeTitle={isEs ? 'Quitar multimedia' : 'Remove media'}
+                allowPausePlay={true}
+              />
+            </div>
+          )}
+        </form>
+      ) : (
+        <div style={{ padding: '0.6rem', textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+          {isEs ? 'Inicia sesión para comentar.' : 'Log in to comment.'}
+        </div>
+      )}
+
+      {/* List */}
+      {loading ? (
+        <div style={{ padding: '1rem', textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+          {isEs ? 'Cargando comentarios...' : 'Loading comments...'}
+        </div>
+      ) : comments.length === 0 ? (
+        <div style={{ padding: '0.75rem', textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+          {isEs ? 'Sé el primero en comentar.' : 'Be the first to comment.'}
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          {comments.map(c => renderSingleComment(c, false))}
+        </div>
+      )}
+
+      {/* Klipy pickers */}
+      {showKlipy && (
+        <KlipyPicker
+          isOpen={true}
+          onClose={() => setShowKlipy(false)}
+          onSelectMedia={(m) => {
+            setSelectedMedia(m);
+            setShowKlipy(false);
+          }}
+        />
+      )}
+
+      {showReplyKlipy && (
+        <KlipyPicker
+          isOpen={true}
+          onClose={() => setShowReplyKlipy(false)}
+          onSelectMedia={(m) => {
+            setReplyMedia(m);
+            setShowReplyKlipy(false);
+          }}
+        />
+      )}
+    </div>
+  );
+};

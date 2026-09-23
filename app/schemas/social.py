@@ -36,6 +36,7 @@ class ActivityFeedItemResponse(BaseModel):
     id: int
     user_id: int
     username: str
+    user_photo_url: Optional[str] = None
     activity_type: str
     item_title: Optional[str] = None
     item_type: Optional[str] = None
@@ -43,6 +44,67 @@ class ActivityFeedItemResponse(BaseModel):
     list_id: Optional[int] = None
     image_url: Optional[str] = None
     details: Optional[str] = None
+    metadata_json: Optional[str] = None
+    is_hidden: bool = False
+    likes_count: int = 0
+    is_liked_by_me: bool = False
+    comments_count: int = 0
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class ActivityLikeToggleResponse(BaseModel):
+    liked: bool
+    likes_count: int
+
+class ActivityCommentCreate(BaseModel):
+    content: Optional[str] = Field(None, max_length=1500)
+    parent_id: Optional[int] = None
+    media_url: Optional[str] = None
+    media_type: Optional[str] = None  # 'gif', 'meme', 'sticker', 'clip', 'emoji'
+    audio_url: Optional[str] = None
+
+class ActivityCommentResponse(BaseModel):
+    id: int
+    activity_id: int
+    user_id: int
+    username: str
+    photo_url: Optional[str] = None
+    parent_id: Optional[int] = None
+    content: Optional[str] = None
+    media_url: Optional[str] = None
+    media_type: Optional[str] = None
+    audio_url: Optional[str] = None
+    votes_count: int = 0
+    is_voted_by_me: bool = False
+    created_at: datetime
+    replies: List["ActivityCommentResponse"] = []
+
+    class Config:
+        from_attributes = True
+
+class NotificationResponse(BaseModel):
+    id: int
+    recipient_id: int
+    actor_id: int
+    actor_username: str
+    actor_photo_url: Optional[str] = None
+    notification_type: str
+    entity_type: Optional[str] = None
+    entity_id: Optional[str] = None
+    extra_data_json: Optional[str] = None
+    is_read: Optional[datetime] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class FollowRequestResponse(BaseModel):
+    id: int
+    requester_id: int
+    requester_username: str
+    requester_photo_url: Optional[str] = None
     created_at: datetime
 
     class Config:

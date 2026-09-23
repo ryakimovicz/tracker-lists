@@ -108,6 +108,34 @@ export const SettingsPage: React.FC = () => {
     }
   };
 
+  // Privacy state (Public vs Private)
+  const [isPrivate, setIsPrivate] = useState<boolean>(Boolean((user as any)?.is_private));
+  const [privacyLoading, setPrivacyLoading] = useState(false);
+  const [privacyMsg, setPrivacyMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const handleTogglePrivacy = async (newVal: boolean) => {
+    setPrivacyLoading(true);
+    setPrivacyMsg(null);
+    try {
+      await apiClient.put('/users/me/privacy', { is_private: newVal });
+      setIsPrivate(newVal);
+      await refreshProfile();
+      setPrivacyMsg({
+        type: 'success',
+        text: isEs
+          ? (newVal ? 'Tu perfil ahora es Privado. Los usuarios deberán solicitar seguirte.' : 'Tu perfil ahora es Público.')
+          : (newVal ? 'Your profile is now Private. Users must request to follow you.' : 'Your profile is now Public.')
+      });
+    } catch (err: any) {
+      setPrivacyMsg({
+        type: 'error',
+        text: err.response?.data?.detail || (isEs ? 'Error al actualizar la privacidad.' : 'Failed to update privacy.')
+      });
+    } finally {
+      setPrivacyLoading(false);
+    }
+  };
+
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentPassword || !newPassword) return;
@@ -599,6 +627,113 @@ export const SettingsPage: React.FC = () => {
             )}
           </div>
         )}
+
+        {/* Section: Account Privacy (Public vs Private) */}
+        <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.5rem' }}>
+            <h2 style={{ fontSize: '1.2rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
+              <Lock size={20} color="var(--accent-primary)" />
+              {isEs ? 'Privacidad del Perfil' : 'Profile Privacy'}
+            </h2>
+            <span
+              style={{
+                fontSize: '0.78rem',
+                padding: '0.2rem 0.65rem',
+                borderRadius: '12px',
+                background: isPrivate ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)',
+                color: isPrivate ? '#ef4444' : '#10b981',
+                border: `1px solid ${isPrivate ? 'rgba(239, 68, 68, 0.3)' : 'rgba(16, 185, 129, 0.3)'}`,
+                fontWeight: 700
+              }}
+            >
+              {isPrivate ? (isEs ? 'Cuenta Privada' : 'Private Account') : (isEs ? 'Cuenta Pública' : 'Public Account')}
+            </span>
+          </div>
+
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1.25rem', lineHeight: 1.5 }}>
+            {isEs
+              ? 'Controla quién puede ver tu actividad cultural, listas y perfil. En modo privado, los usuarios deberán enviarte una solicitud de seguimiento que deberás aprobar.'
+              : 'Control who can view your cultural activity, lists, and profile. When private, users must send you a follow request that you can approve.'}
+          </p>
+
+          {privacyMsg && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                padding: '0.75rem 1rem',
+                borderRadius: '8px',
+                marginBottom: '1rem',
+                fontSize: '0.85rem',
+                background: privacyMsg.type === 'success' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                color: privacyMsg.type === 'success' ? '#10b981' : '#ef4444',
+                border: `1px solid ${privacyMsg.type === 'success' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`,
+              }}
+            >
+              {privacyMsg.type === 'success' ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
+              <span>{privacyMsg.text}</span>
+            </div>
+          )}
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
+            {/* Public Option */}
+            <div
+              onClick={() => !privacyLoading && handleTogglePrivacy(false)}
+              style={{
+                padding: '1.25rem',
+                borderRadius: '12px',
+                border: !isPrivate ? '2px solid var(--accent-primary)' : '1px solid var(--border-color)',
+                background: !isPrivate ? 'var(--border-glow)' : 'var(--bg-secondary)',
+                cursor: privacyLoading ? 'not-allowed' : 'pointer',
+                transition: 'all 0.2s ease',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.5rem'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontWeight: 700, fontSize: '1rem', color: !isPrivate ? 'var(--accent-primary)' : 'var(--text-primary)' }}>
+                  {isEs ? 'Perfil Público (Recomendado)' : 'Public Profile (Recommended)'}
+                </span>
+                {!isPrivate && <CheckCircle size={18} color="var(--accent-primary)" />}
+              </div>
+              <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                {isEs
+                  ? 'Cualquiera puede seguirte con 1 clic, ver tus guías públicas y tu actividad aparecerá en el feed de Descubrir.'
+                  : 'Anyone can follow you in 1 click, view your public guides, and your updates can appear in Discover.'}
+              </p>
+            </div>
+
+            {/* Private Option */}
+            <div
+              onClick={() => !privacyLoading && handleTogglePrivacy(true)}
+              style={{
+                padding: '1.25rem',
+                borderRadius: '12px',
+                border: isPrivate ? '2px solid var(--accent-primary)' : '1px solid var(--border-color)',
+                background: isPrivate ? 'var(--border-glow)' : 'var(--bg-secondary)',
+                cursor: privacyLoading ? 'not-allowed' : 'pointer',
+                transition: 'all 0.2s ease',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.5rem'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontWeight: 700, fontSize: '1rem', color: isPrivate ? 'var(--accent-primary)' : 'var(--text-primary)' }}>
+                  {isEs ? 'Perfil Privado' : 'Private Profile'}
+                </span>
+                {isPrivate && <CheckCircle size={18} color="var(--accent-primary)" />}
+              </div>
+              <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                {isEs
+                  ? 'Solo tus seguidores aprobados pueden ver tus listas y actividad. Quienes no te sigan deberán enviar solicitud.'
+                  : 'Only approved followers can view your lists and activity. Strangers must request to follow you.'}
+              </p>
+            </div>
+          </div>
+        </div>
 
         {/* Section 6: Legal & Policies */}
         <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px' }}>

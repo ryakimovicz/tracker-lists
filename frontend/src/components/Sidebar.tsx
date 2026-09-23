@@ -1,14 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
 import type { Theme } from '../context/ThemeContext';
-import { LogOut, Shield, Globe, Sun, Moon, Monitor, Home, Users, PlusCircle, Compass, User, Star, Settings } from 'lucide-react';
+import { LogOut, Shield, Globe, Sun, Moon, Monitor, Home, Users, PlusCircle, Compass, User, Star, Settings, Bell } from 'lucide-react';
 import { prefetchRoute } from '../utils/prefetch';
 
 import { ProModal } from './ProModal';
 import { BrandLogo } from './BrandLogo';
+import { NotificationFlyout } from './NotificationFlyout';
+import { apiClient } from '../api/client';
 
 interface NavItemProps {
   to: string;
@@ -60,7 +62,27 @@ export const Sidebar: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [showProModal, setShowProModal] = useState(false);
+  const [showNotifFlyout, setShowNotifFlyout] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const isUserLoggedIn = Boolean(user && isAuthenticated);
+
+  // Poll or check unread notification count
+  useEffect(() => {
+    if (!isUserLoggedIn) return;
+    const fetchUnread = async () => {
+      try {
+        const res = await apiClient.get('/notifications/unread-count');
+        if (typeof res.data?.unread === 'number') {
+          setUnreadCount(res.data.unread);
+        }
+      } catch (err) {
+        // silent fail
+      }
+    };
+    fetchUnread();
+    const interval = setInterval(fetchUnread, 45000); // Poll every 45s
+    return () => clearInterval(interval);
+  }, [isUserLoggedIn]);
 
   const handleLogout = async () => {
     await logout();
@@ -119,9 +141,48 @@ export const Sidebar: React.FC = () => {
           </div>
         )}
 
-        {/* Settings & Admin in Bottom Area */}
+        {/* Settings, Notifications & Admin in Bottom Area */}
         {isUserLoggedIn && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+            <button
+              onClick={() => setShowNotifFlyout(!showNotifFlyout)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '0.75rem 1rem',
+                border: 'none',
+                background: showNotifFlyout ? 'var(--border-glow)' : 'transparent',
+                borderRadius: '8px',
+                color: showNotifFlyout ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                fontWeight: showNotifFlyout ? 600 : 500,
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                width: '100%',
+                textAlign: 'left'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <Bell size={20} />
+                <span style={{ fontSize: '1.05rem' }}>{language === 'es' ? 'Notificaciones' : 'Notifications'}</span>
+              </div>
+              {unreadCount > 0 && (
+                <span
+                  style={{
+                    background: '#ef4444',
+                    color: '#fff',
+                    borderRadius: '12px',
+                    padding: '0.1rem 0.5rem',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    minWidth: '20px',
+                    textAlign: 'center'
+                  }}
+                >
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              )}
+            </button>
             {user?.is_admin && (
               <NavItem to="/admin" icon={Shield} label={t('navAdmin') || 'Admin'} currentPath={location.pathname} currentSearch={location.search} currentUserId={user?.id} />
             )}
@@ -195,6 +256,13 @@ export const Sidebar: React.FC = () => {
       </div>
 
       {showProModal && <ProModal onClose={() => setShowProModal(false)} />}
+      
+      {/* Notification Flyout */}
+      <NotificationFlyout
+        isOpen={showNotifFlyout}
+        onClose={() => setShowNotifFlyout(false)}
+        onUnreadCountChange={(cnt) => setUnreadCount(cnt)}
+      />
     </div>
   );
 };

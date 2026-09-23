@@ -10,6 +10,7 @@ from app.api.v1.additions import router as additions_router
 from app.api.v1.admin import router as admin_router
 from app.api.v1.translate import router as translate_router
 from app.api.v1.payments import router as payments_router
+from app.api.v1.notifications import router as notifications_router
 
 api_router = APIRouter()
 
@@ -19,6 +20,7 @@ api_router.include_router(search_router, prefix="/search", tags=["search"])
 api_router.include_router(users_router, prefix="/users", tags=["users"])
 api_router.include_router(library_router, prefix="/library", tags=["library"])
 api_router.include_router(social_router, prefix="/social", tags=["social"])
+api_router.include_router(notifications_router, prefix="/notifications", tags=["notifications"])
 api_router.include_router(reviews_router, prefix="/reviews", tags=["reviews"])
 api_router.include_router(additions_router, prefix="/additions", tags=["additions"])
 api_router.include_router(admin_router, prefix="/admin", tags=["admin"])

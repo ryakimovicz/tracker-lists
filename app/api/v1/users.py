@@ -132,9 +132,12 @@ def get_user_dashboard(
         profile_color=current_user.profile_color,
         category_order=current_user.category_order,
         lastfm_username=current_user.lastfm_username,
+        is_private=bool(getattr(current_user, 'is_private', False)),
         followers_count=followers_count,
         following_count=following_count,
         is_following=False,
+        follow_request_pending=False,
+        is_private_locked=False,
         created_lists=created_lists,
         saved_lists=saved_lists
     )
@@ -817,6 +820,7 @@ class UserSettingsUpdate(BaseModel):
 
     show_nsfw: bool | None = None
     is_pro: bool | None = None
+    is_private: bool | None = None
 
 @router.put("/me", response_model=UserResponse)
 def update_user_settings(
@@ -827,12 +831,29 @@ def update_user_settings(
     if req.show_nsfw is not None:
         current_user.show_nsfw = req.show_nsfw
     
+    if req.is_private is not None:
+        current_user.is_private = req.is_private
+
     if req.is_pro is not None:
         was_pro = current_user.is_pro
         current_user.is_pro = req.is_pro
         if was_pro and not req.is_pro:
             trim_downgraded_user_favorites(db, current_user.id)
         
+    db.commit()
+    db.refresh(current_user)
+    return current_user
+
+class PrivacyUpdateRequest(BaseModel):
+    is_private: bool
+
+@router.put("/me/privacy", response_model=UserResponse)
+def update_user_privacy(
+    req: PrivacyUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    current_user.is_private = req.is_private
     db.commit()
     db.refresh(current_user)
     return current_user
@@ -979,23 +1000,43 @@ def get_any_user_profile(
                 saved_lists.append(rl_data)
                 other_saved_count += 1
 
-    followers_count = db.query(Follow).filter(Follow.followed_id == user.id).count()
-    following_count = db.query(Follow).filter(Follow.follower_id == user.id).count()
     is_following = False
-    if current_user:
+    follow_request_pending = False
+    is_own = current_user is not None and current_user.id == user.id
+    is_admin = current_user is not None and getattr(current_user, 'is_admin', False)
+
+    from app.models.social import FollowRequest
+
+    if current_user and not is_own:
         is_following = db.query(Follow).filter(
             Follow.follower_id == current_user.id,
             Follow.followed_id == user.id
         ).first() is not None
-    
+
+        if not is_following:
+            follow_request_pending = db.query(FollowRequest).filter(
+                FollowRequest.requester_id == current_user.id,
+                FollowRequest.target_id == user.id
+            ).first() is not None
+
+    is_user_private = bool(getattr(user, 'is_private', False))
+    is_private_locked = is_user_private and not is_own and not is_admin and not is_following
+
+    followers_count = db.query(Follow).filter(Follow.followed_id == user.id).count()
+    following_count = db.query(Follow).filter(Follow.follower_id == user.id).count()
+
+    # If the profile is private and locked, hide lists
+    final_created_lists = [] if is_private_locked else created_lists
+    final_saved_lists = [] if is_private_locked else saved_lists
+
     return UserDashboardResponse(
         id=user.id,
         username=user.username,
-        email=user.email,
+        email=user.email if (is_own or is_admin) else None,
         created_at=user.created_at,
         photo_url=user.photo_url,
-        banner_url=user.banner_url,
-        background_url=user.background_url,
+        banner_url=user.banner_url if not is_private_locked else None,
+        background_url=user.background_url if not is_private_locked else None,
         is_admin=user.is_admin,
         show_nsfw=user.show_nsfw,
         is_pro=is_pro,
@@ -1009,12 +1050,15 @@ def get_any_user_profile(
         admin_warning=user.admin_warning if (current_user and (current_user.id == user.id or current_user.is_admin)) else None,
         profile_color=user.profile_color,
         category_order=user.category_order,
-        lastfm_username=user.lastfm_username,
+        lastfm_username=user.lastfm_username if not is_private_locked else None,
+        is_private=is_user_private,
         followers_count=followers_count,
         following_count=following_count,
         is_following=is_following,
-        created_lists=created_lists,
-        saved_lists=saved_lists
+        follow_request_pending=follow_request_pending,
+        is_private_locked=is_private_locked,
+        created_lists=final_created_lists,
+        saved_lists=final_saved_lists
     )
 
 

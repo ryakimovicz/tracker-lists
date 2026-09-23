@@ -28,9 +28,11 @@ class UserResponse(UserBase):
     profile_color: str | None = None
     category_order: str | None = None
     lastfm_username: str | None = None
+    is_private: bool = False
     followers_count: int = 0
     following_count: int = 0
     is_following: bool = False
+    follow_request_pending: bool = False
 
     class Config:
         from_attributes = True
@@ -48,7 +50,7 @@ from app.schemas.list import ReadingListResponse
 class UserDashboardResponse(BaseModel):
     id: int
     username: str
-    email: EmailStr
+    email: str | None = None
     created_at: datetime
     photo_url: str | None = None
     banner_url: str | None = None
@@ -67,9 +69,12 @@ class UserDashboardResponse(BaseModel):
     profile_color: str | None = None
     category_order: str | None = None
     lastfm_username: str | None = None
+    is_private: bool = False
     followers_count: int = 0
     following_count: int = 0
     is_following: bool = False
+    follow_request_pending: bool = False
+    is_private_locked: bool = False
     created_lists: List[ReadingListResponse] = []
     saved_lists: List[ReadingListResponse] = []
 
