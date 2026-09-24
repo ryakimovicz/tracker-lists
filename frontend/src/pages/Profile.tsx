@@ -7,7 +7,7 @@ import { getProfileTheme } from '../utils/profileThemes';
 
 import { apiClient } from '../api/client';
 import { getCachedSeries, setCachedSeries } from '../utils/seriesCache';
-import { ItemDetailsModal } from '../components/ItemDetailsModal';
+import { ItemDetailsModal, StarRatingDisplay } from '../components/ItemDetailsModal';
 import { MediaPoster } from '../components/MediaPoster';
 import { AvatarSelectorModal } from '../components/AvatarSelectorModal';
 import { BannerSelectorModal } from '../components/BannerSelectorModal';
@@ -5948,45 +5948,45 @@ export const Profile: React.FC = () => {
 
                 case 'item_rated':
                   msg = language === 'es'
-                    ? `Se calificó "${title}" con ${act.details}★.`
-                    : `Rated "${title}" with ${act.details}★.`;
+                    ? `Calificó "${title}"`
+                    : `Rated "${title}"`;
                   break;
 
                 case 'guide_rated':
                   msg = language === 'es'
-                    ? `Se calificó la guía "${title}" con ${act.details}★.`
-                    : `Rated guide "${title}" with ${act.details}★.`;
+                    ? `Calificó la guía "${title}"`
+                    : `Rated guide "${title}"`;
                   break;
 
                 case 'item_reviewed': {
                   const rVal = meta.rating !== undefined && meta.rating !== null ? meta.rating : null;
                   if (rVal) {
                     msg = language === 'es'
-                      ? `Se calificó con ${rVal}★ y se escribió una reseña en "${title}".`
-                      : `Rated ${rVal}★ and reviewed "${title}".`;
+                      ? `Calificó y escribió una reseña de "${title}"`
+                      : `Rated and reviewed "${title}"`;
                   } else {
                     msg = language === 'es'
-                      ? `Se escribió una reseña en "${title}".`
-                      : `Reviewed "${title}".`;
+                      ? `Escribió una reseña de "${title}"`
+                      : `Reviewed "${title}"`;
                   }
                   break;
                 }
 
                 case 'guide_commented':
                   msg = language === 'es'
-                    ? `Se comentó en la guía "${title}".`
+                    ? `Comentó en la guía "${title}".`
                     : `Commented on guide "${title}".`;
                   break;
 
                 case 'social_commented':
                   msg = language === 'es'
-                    ? `Se comentó en la Actividad Social.`
+                    ? `Comentó en la Actividad Social.`
                     : `Commented on Social Activity.`;
                   break;
 
                 case 'guide_review_commented':
                   msg = language === 'es'
-                    ? `Se comentó en la reseña de una guía.`
+                    ? `Comentó en la reseña de una guía.`
                     : `Commented on a guide review.`;
                   break;
 
@@ -5995,14 +5995,138 @@ export const Profile: React.FC = () => {
                   break;
               }
 
+              const isReview = act.activity_type === 'item_reviewed';
+              const isRating = act.activity_type === 'item_rated' || act.activity_type === 'guide_rated';
+              const ratingNumber = (isRating && act.details && !isNaN(Number(act.details)))
+                ? Number(act.details)
+                : (meta.rating !== undefined && meta.rating !== null && !isNaN(Number(meta.rating)) ? Number(meta.rating) : null);
+              const reviewText = isReview && act.details && act.details.trim() ? act.details.trim() : null;
+
+              // Check if activity points to an item that can be opened in ItemDetailsModal
+              const canOpenModal = Boolean(act.external_id || act.list_id || title);
+              const targetPoster = act.image_url || meta.image_url;
+
               return (
-                <div key={act.id} className="glass-card" style={{ padding: '1rem', display: 'flex', gap: '1rem', alignItems: 'center', fontSize: '0.9rem' }}>
-                  <CheckCircle size={16} color="#10b981" />
-                  <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-                    <span>{msg}</span>
-                    <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-                      {formatDate(new Date(act.created_at))}
-                    </span>
+                <div
+                  key={act.id}
+                  className="glass-card"
+                  onClick={() => {
+                    if (canOpenModal && act.activity_type.startsWith('item_')) {
+                      let effectiveItemType = (meta.series_item_type || act.item_type || meta.item_type || 'series').toLowerCase();
+                      if (effectiveItemType === 'episode') effectiveItemType = 'series';
+                      let effectiveExternalId = meta.series_external_id || meta.parent_external_id || meta.work_ext_id || act.external_id || undefined;
+                      const cleanTitle = meta.series_title || meta.work_title || title;
+
+                      setSelectedItem({
+                        external_id: effectiveExternalId,
+                        id: (!effectiveExternalId && act.list_id) ? act.list_id : undefined,
+                        title: cleanTitle || 'Media',
+                        image_url: targetPoster || undefined,
+                        item_type: effectiveItemType,
+                        tracking_list_id: act.list_id || undefined
+                      });
+                    }
+                  }}
+                  style={{
+                    padding: '0.9rem 1.15rem',
+                    display: 'flex',
+                    gap: '1rem',
+                    alignItems: 'flex-start',
+                    fontSize: '0.9rem',
+                    borderRadius: '12px',
+                    background: 'var(--bg-secondary, rgba(255,255,255,0.03))',
+                    border: '1px solid var(--border-color)',
+                    cursor: (canOpenModal && act.activity_type.startsWith('item_')) ? 'pointer' : 'default',
+                    transition: 'all 0.18s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (canOpenModal && act.activity_type.startsWith('item_')) {
+                      e.currentTarget.style.borderColor = 'var(--accent-primary)';
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (canOpenModal && act.activity_type.startsWith('item_')) {
+                      e.currentTarget.style.borderColor = 'var(--border-color)';
+                      e.currentTarget.style.background = 'var(--bg-secondary, rgba(255,255,255,0.03))';
+                    }
+                  }}
+                >
+                  {/* Left: Thumbnail poster or Category icon */}
+                  {targetPoster ? (
+                    <div style={{
+                      width: '42px',
+                      height: '58px',
+                      borderRadius: '6px',
+                      overflow: 'hidden',
+                      flexShrink: 0,
+                      background: 'var(--bg-tertiary)',
+                      border: '1px solid rgba(255,255,255,0.08)',
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.25)'
+                    }}>
+                      <img
+                        src={targetPoster}
+                        alt={title || 'Media'}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
+                    </div>
+                  ) : (
+                    <div style={{
+                      width: '38px',
+                      height: '38px',
+                      borderRadius: '50%',
+                      background: 'rgba(16, 185, 129, 0.12)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                      marginTop: '0.15rem'
+                    }}>
+                      <CheckCircle size={18} color="#10b981" />
+                    </div>
+                  )}
+
+                  {/* Middle & Right Content */}
+                  <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem' }}>
+                      <span style={{ fontWeight: 500, color: 'var(--text-primary)', lineHeight: 1.4 }}>
+                        {msg}
+                      </span>
+                      <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem', whiteSpace: 'nowrap' }}>
+                        {formatDate(new Date(act.created_at))}
+                      </span>
+                    </div>
+
+                    {/* Optional Star Rating highlight */}
+                    {ratingNumber !== null && (
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.1rem' }}>
+                        <StarRatingDisplay rating={ratingNumber} size={14} gap="2px" />
+                        <span style={{ fontSize: '0.8rem', color: '#f59e0b', fontWeight: 700 }}>
+                          {ratingNumber} / 5
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Optional Review speech snippet */}
+                    {reviewText && (
+                      <div style={{
+                        marginTop: '0.2rem',
+                        background: 'rgba(255, 255, 255, 0.03)',
+                        borderLeft: '3px solid var(--accent-primary)',
+                        padding: '0.45rem 0.75rem',
+                        borderRadius: '0 6px 6px 0',
+                        fontSize: '0.84rem',
+                        color: 'var(--text-secondary)',
+                        lineHeight: 1.4,
+                        wordBreak: 'break-word',
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden'
+                      }}>
+                        {reviewText}
+                      </div>
+                    )}
                   </div>
                 </div>
               );
