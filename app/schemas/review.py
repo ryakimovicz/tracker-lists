@@ -8,6 +8,7 @@ class MediaReviewCreate(BaseModel):
     media_url: Optional[str] = Field(None, description="Optional attached media/GIF URL")
     media_type: Optional[str] = Field(None, description="Optional media type (gif, sticker, meme, clip)")
     parent_id: Optional[int] = Field(None, description="Parent review ID if this is a reply")
+    is_comment: Optional[bool] = Field(False, description="True if this is a community comment, not an official review")
 
 class MediaReviewResponse(BaseModel):
     id: int

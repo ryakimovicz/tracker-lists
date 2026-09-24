@@ -149,32 +149,23 @@ def delete_review_or_comment(
 
     from app.services.activity_service import ActivityService
 
-    # If it is a top-level review that still has a star rating, keep the rating but clear the comment text
-    if review.parent_id is None and review.rating is not None and review.rating > 0:
-        review.content = None
-        db.commit()
-        # Remove the review text activity log, keeping rating if any
-        ActivityService.delete_activity(
-            db=db,
-            user_id=review.user_id,
-            activity_type="item_reviewed",
-            entity_id=str(review_id)
-        )
-    else:
-        db.delete(review)
-        db.commit()
-        ActivityService.delete_activity(
-            db=db,
-            user_id=review.user_id,
-            activity_type="item_reviewed",
-            entity_id=str(review_id)
-        )
-        ActivityService.delete_activity(
-            db=db,
-            user_id=review.user_id,
-            activity_type="item_rated",
-            entity_id=str(review_id)
-        )
+    # Delete review or comment completely
+    review_id_val = review.id
+    db.delete(review)
+    db.commit()
+
+    ActivityService.delete_activity(
+        db=db,
+        user_id=current_user.id,
+        activity_type="item_reviewed",
+        entity_id=str(review_id_val)
+    )
+    ActivityService.delete_activity(
+        db=db,
+        user_id=current_user.id,
+        activity_type="item_rated",
+        entity_id=str(review_id_val)
+    )
     return None
 
 @router.get("/{item_type}/{external_id}", response_model=List[MediaReviewResponse])
@@ -300,29 +291,63 @@ def create_or_update_review(
             is_voted_by_me=False
         )
 
-    # Handle Top-Level Reviews (parent_id is None) - 1 per user per media item
+    # If marked explicitly as a community comment (or has media / no rating in a comment context)
+    if review_in.is_comment:
+        comment_record = MediaReview(
+            user_id=current_user.id,
+            parent_id=None,
+            item_type=item_type_lower,
+            external_id=external_id,
+            rating=None,
+            content=review_in.content,
+            media_url=review_in.media_url,
+            media_type=review_in.media_type,
+            created_at=datetime.now(timezone.utc)
+        )
+        db.add(comment_record)
+        db.commit()
+        db.refresh(comment_record)
+
+        return MediaReviewResponse(
+            id=comment_record.id,
+            user_id=comment_record.user_id,
+            username=current_user.username,
+            photo_url=current_user.photo_url,
+            item_type=comment_record.item_type,
+            external_id=comment_record.external_id,
+            rating=None,
+            content=comment_record.content,
+            media_url=comment_record.media_url,
+            media_type=comment_record.media_type,
+            parent_id=None,
+            is_edited=None,
+            created_at=comment_record.created_at,
+            vote_count=0,
+            is_voted_by_me=False
+        )
+
+    # Handle Top-Level Official Review (parent_id is None, rating or review text) - 1 per user per media item
+    # Target existing review: either an existing record with rating is not None or review that was not a pure comment
     review = db.query(MediaReview).filter(
         MediaReview.user_id == current_user.id,
         MediaReview.item_type == item_type_lower,
         MediaReview.external_id == external_id,
-        MediaReview.parent_id.is_(None)
+        MediaReview.parent_id.is_(None),
+        MediaReview.rating.isnot(None)
     ).first()
+
+    # Fallback to any root record without parent_id if only 1 exists
+    if not review:
+        review = db.query(MediaReview).filter(
+            MediaReview.user_id == current_user.id,
+            MediaReview.item_type == item_type_lower,
+            MediaReview.external_id == external_id,
+            MediaReview.parent_id.is_(None)
+        ).first()
 
     fields_set = review_in.model_fields_set if hasattr(review_in, 'model_fields_set') else set(getattr(review_in, '__fields_set__', []))
 
     if review:
-        if "content" in fields_set and review.content and review_in.content and review_in.content.strip() != review.content.strip():
-            # Check 30-minute editing window
-            created_time = review.created_at
-            if created_time.tzinfo is None:
-                created_time = created_time.replace(tzinfo=timezone.utc)
-            if (datetime.now(timezone.utc) - created_time).total_seconds() > 1800:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Los comentarios solo pueden editarse dentro de los primeros 30 minutos de haber sido publicados."
-                )
-            review.is_edited = datetime.now(timezone.utc)
-
         if "rating" in fields_set:
             review.rating = review_in.rating
         if "content" in fields_set:

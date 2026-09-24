@@ -3,7 +3,7 @@ import { useTranslation } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
 import { getProfileTheme } from '../utils/profileThemes';
 import { apiClient } from '../api/client';
-import { Star, Heart, X, Flag, CheckCircle, Check, CheckCheck, Plus, MoreVertical, Trash2, ArrowLeft, Clock, ChevronUp, ChevronDown, RotateCcw, BookOpen, Gamepad2, Package, Sparkles, Puzzle, Layers, ChevronLeft, ChevronRight, Calendar, RefreshCw, AlertCircle, Globe, Repeat, Trophy, ShieldAlert, Infinity as InfinityIcon, Reply, ThumbsUp, Edit2, Image as ImageIcon, Volume2, VolumeX, Play, Pause } from 'lucide-react';
+import { Star, Heart, X, Flag, CheckCircle, Check, CheckCheck, Plus, MoreVertical, Trash2, ArrowLeft, Clock, ChevronUp, ChevronDown, RotateCcw, BookOpen, Gamepad2, Package, Sparkles, Puzzle, Layers, ChevronLeft, ChevronRight, Calendar, RefreshCw, AlertCircle, Globe, Repeat, Trophy, ShieldAlert, Infinity as InfinityIcon, Reply, ThumbsUp, Edit2, Image as ImageIcon, Volume2, VolumeX, Play, Pause, MessageSquare } from 'lucide-react';
 
 
 
@@ -611,95 +611,184 @@ export const MediaAttachmentView: React.FC<{
 });
 
 const RootReviewEditor: React.FC<{
+  initialRating: number;
   initialReview: string;
-  onSave: (content: string) => void;
+  onSave: (rating: number, content: string) => void;
   onDelete: () => void;
-  onCancelEdit: () => void;
-  isEditing: boolean;
   hasExistingReview: boolean;
   isSaving: boolean;
+  isItemTracked: boolean;
+  isEpisode: boolean;
   user: any;
   language: string;
 }> = React.memo(({
+  initialRating,
   initialReview,
   onSave,
   onDelete,
-  onCancelEdit,
-  isEditing,
   hasExistingReview,
   isSaving,
+  isItemTracked,
+  isEpisode,
   user,
   language
 }) => {
-  const [text, setText] = useState(initialReview);
+  const [rating, setRating] = useState<number>(initialRating);
+  const [hoverRating, setHoverRating] = useState<number>(0);
+  const [text, setText] = useState<string>(initialReview);
+
+  useEffect(() => {
+    setRating(initialRating);
+  }, [initialRating]);
 
   useEffect(() => {
     setText(initialReview);
   }, [initialReview]);
 
-  return (
-    <div style={{ marginTop: '0.85rem', paddingTop: '0.85rem', borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-          {isEditing 
-            ? (language === 'es' ? 'Editar Tu Reseña' : 'Edit Your Review')
-            : (language === 'es' ? 'Tu Reseña' : 'Your Review')
-          }
-        </h4>
-        {isEditing && (
+  // If already published/saved, display fixed review (stars + optional text) with a single "Eliminar reseña" button
+  if (hasExistingReview) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <h5 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+              {language === 'es' ? 'Tu Reseña' : 'Your Review'}
+            </h5>
+            <div style={{ display: 'flex', gap: '0.15rem' }}>
+              {[1, 2, 3, 4, 5].map((star) => (
+                <Star
+                  key={star}
+                  size={18}
+                  fill={star <= initialRating ? '#f59e0b' : 'none'}
+                  color={star <= initialRating ? '#f59e0b' : 'var(--text-muted)'}
+                />
+              ))}
+            </div>
+          </div>
+
           <button
             type="button"
-            onClick={onCancelEdit}
-            style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', fontSize: '0.8rem', cursor: 'pointer' }}
+            onClick={onDelete}
+            disabled={isSaving}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: '#ef4444',
+              fontSize: '0.82rem',
+              cursor: 'pointer',
+              padding: '0.2rem 0.4rem',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.3rem'
+            }}
           >
-            {language === 'es' ? 'Cancelar' : 'Cancel'}
+            <Trash2 size={13} />
+            <span>{isSaving ? (language === 'es' ? 'Eliminando...' : 'Deleting...') : (language === 'es' ? 'Eliminar reseña' : 'Delete review')}</span>
           </button>
+        </div>
+
+        {initialReview && initialReview.trim() && (
+          <div style={{
+            padding: '0.75rem',
+            background: 'var(--bg-secondary)',
+            borderRadius: '8px',
+            border: '1px solid var(--border-color)',
+            fontSize: '0.9rem',
+            color: 'var(--text-primary)',
+            lineHeight: '1.45',
+            whiteSpace: 'pre-wrap'
+          }}>
+            {initialReview}
+          </div>
         )}
       </div>
-      <textarea
-        className="input-field"
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        placeholder={language === 'es' ? 'Escribe una reseña sobre esta obra...' : 'Write a review about this item...'}
-        style={{ width: '100%', minHeight: '80px', padding: '0.75rem', background: 'var(--bg-secondary)', resize: 'vertical' }}
-      />
+    );
+  }
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          {hasExistingReview && (
+  // Composing / Writing state: Stars + optional review text + single "Guardar" button
+  const effectiveRating = hoverRating > 0 ? hoverRating : rating;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+      <div>
+        <h5 style={{ margin: '0 0 0.4rem 0', color: 'var(--text-secondary)' }}>
+          {language === 'es' ? 'Tu Reseña:' : 'Your Review:'}
+        </h5>
+
+        <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          {[1, 2, 3, 4, 5].map((star) => (
             <button
+              key={star}
               type="button"
-              onClick={onDelete}
-              disabled={isSaving}
+              disabled={!user || !isItemTracked}
+              onClick={() => setRating(star)}
+              onMouseEnter={() => setHoverRating(star)}
+              onMouseLeave={() => setHoverRating(0)}
+              title={!isItemTracked
+                ? (isEpisode 
+                    ? (language === 'es' ? 'Marca este episodio como visto para calificarlo' : 'Mark this episode as watched to rate it')
+                    : (language === 'es' ? 'Añade este elemento a tu estantería para calificarlo' : 'Add this item to your shelf to rate it'))
+                : `${star} ${star === 1 ? 'estrella' : 'estrellas'}`
+              }
               style={{
                 background: 'transparent',
                 border: 'none',
-                color: '#ef4444',
-                fontSize: '0.82rem',
-                cursor: 'pointer',
-                padding: '0.4rem 0.6rem'
+                cursor: (user && isItemTracked) ? 'pointer' : 'not-allowed',
+                padding: 0,
+                opacity: (user && isItemTracked) ? 1 : 0.35,
+                transition: 'opacity 0.2s ease, transform 0.1s ease'
               }}
             >
-              {language === 'es' ? 'Eliminar reseña' : 'Delete review'}
+              <Star
+                size={24}
+                fill={star <= effectiveRating ? '#f59e0b' : 'none'}
+                color={star <= effectiveRating ? '#f59e0b' : 'var(--text-muted)'}
+              />
             </button>
-          )}
+          ))}
         </div>
 
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          <button
-            type="button"
-            onClick={() => onSave(text)}
-            className="btn-primary"
-            disabled={isSaving || !user || !text.trim()}
-            style={{ padding: '0.4rem 1rem', fontSize: '0.85rem' }}
-          >
-            {isSaving
-              ? (language === 'es' ? 'Guardando...' : 'Saving...')
-              : (language === 'es' ? 'Guardar Reseña' : 'Save Review')
+        {!isItemTracked && user && (
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic', display: 'block', marginTop: '0.25rem' }}>
+            {isEpisode
+              ? (language === 'es'
+                  ? 'Marca este episodio como visto para poder puntuarlo con estrellas.'
+                  : 'Mark this episode as watched to rate it with stars.')
+              : (language === 'es' 
+                  ? 'Añade este elemento a tu estantería para poder puntuarlo con estrellas.'
+                  : 'Add this item to your shelf to rate it with stars.')
             }
-          </button>
-        </div>
+          </span>
+        )}
       </div>
+
+      {/* Show text input and Guardar button once stars are selected */}
+      {user && isItemTracked && rating > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginTop: '0.2rem' }}>
+          <textarea
+            className="input-field"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder={language === 'es' ? 'Escribe una reseña sobre esta obra (opcional)...' : 'Write a review about this item (optional)...'}
+            style={{ width: '100%', minHeight: '80px', padding: '0.75rem', background: 'var(--bg-secondary)', resize: 'vertical' }}
+          />
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
+            <button
+              type="button"
+              onClick={() => onSave(rating, text)}
+              className="btn-primary"
+              disabled={isSaving || !user || rating === 0}
+              style={{ padding: '0.4rem 1.25rem', fontSize: '0.85rem', fontWeight: 600 }}
+            >
+              {isSaving
+                ? (language === 'es' ? 'Guardando...' : 'Saving...')
+                : (language === 'es' ? 'Guardar' : 'Save')
+              }
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 });
@@ -1114,6 +1203,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   const [editingReplyId, setEditingReplyId] = useState<number | null>(null);
   const [editingReplyText, setEditingReplyText] = useState<string>('');
   const [editingReplyMedia, setEditingReplyMedia] = useState<SelectedKlipyMedia | null>(null);
+  const [activeBottomTab, setActiveBottomTab] = useState<'reviews' | 'comments'>('reviews');
 
   // Klipy Picker Modal state
   const [klipyPickerTarget, setKlipyPickerTarget] = useState<'comment' | 'reply' | 'edit_reply' | 'edit_comment' | null>(null);
@@ -3271,50 +3361,36 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   ));
   const isItemTracked = isEpisode ? (isComicIssue ? Boolean(selectedItem?.status || isEpisodeCompleted) : isEpisodeCompleted) : Boolean(selectedItem?.id && selectedItem?.status);
 
-  const handleSaveRating = async (ratingVal: number) => {
+  const handleSaveReview = async (ratingVal: number, customContent?: string) => {
     if (!selectedItem || !selectedItem.external_id || !isItemTracked) return;
-    setUserRating(ratingVal);
-    try {
-      await apiClient.post(`/reviews/${selectedItem.item_type}/${selectedItem.external_id}`, {
-        rating: ratingVal
-      });
-      const revRes = await apiClient.get(`/reviews/${selectedItem.item_type}/${selectedItem.external_id}`);
-      setItemReviews(revRes.data);
-    } catch (err) {
-      console.error("Failed to save rating", err);
-    }
-  };
-
-  const handleDeleteRating = async () => {
-    if (!selectedItem || !selectedItem.external_id) return;
-    setUserRating(0);
-    try {
-      await apiClient.post(`/reviews/${selectedItem.item_type}/${selectedItem.external_id}`, {
-        rating: null
-      });
-      const revRes = await apiClient.get(`/reviews/${selectedItem.item_type}/${selectedItem.external_id}`);
-      setItemReviews(revRes.data);
-    } catch (err) {
-      console.error("Failed to delete rating", err);
-    }
-  };
-
-  const handleSaveComment = async (customContent?: string) => {
-    if (!selectedItem || !selectedItem.external_id) return;
     const textToSave = customContent !== undefined ? customContent : userComment;
     setIsSavingReview(true);
+    // Optimistic UI update
+    setUserRating(ratingVal);
+    setUserComment(textToSave);
     try {
-      await apiClient.post(`/reviews/${selectedItem.item_type}/${selectedItem.external_id}`, {
+      const res = await apiClient.post(`/reviews/${selectedItem.item_type}/${selectedItem.external_id}`, {
+        rating: ratingVal > 0 ? ratingVal : null,
         content: textToSave.trim() ? textToSave : null,
         media_url: null,
         media_type: null
       });
-      setUserComment(textToSave);
-      const revRes = await apiClient.get(`/reviews/${selectedItem.item_type}/${selectedItem.external_id}`);
-      setItemReviews(revRes.data);
-      setIsEditingComment(false);
+      if (res.data) {
+        setItemReviews(prev => {
+          const idx = prev.findIndex(r => r.id === res.data.id || (r.user_id === user?.id && !r.parent_id));
+          if (idx >= 0) {
+            const next = [...prev];
+            next[idx] = res.data;
+            return next;
+          }
+          return [res.data, ...prev];
+        });
+      }
     } catch(err) {
       console.error("Failed to save review", err);
+      // Re-fetch to reconcile on error
+      const revRes = await apiClient.get(`/reviews/${selectedItem.item_type}/${selectedItem.external_id}`);
+      setItemReviews(revRes.data);
     } finally {
       setIsSavingReview(false);
     }
@@ -3322,20 +3398,28 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
   const handleDeleteComment = async () => {
     if (!selectedItem || !selectedItem.external_id) return;
+    const myRootReview = (itemReviews || []).find((r: any) => r.user_id === user?.id && !r.parent_id);
     setIsSavingReview(true);
+    // Optimistically reset both stars and text
+    setUserRating(0);
+    setUserComment('');
+    setCommentMedia(null);
     try {
-      await apiClient.post(`/reviews/${selectedItem.item_type}/${selectedItem.external_id}`, {
-        content: null,
-        media_url: null,
-        media_type: null
-      });
-      setUserComment('');
-      setCommentMedia(null);
-      const revRes = await apiClient.get(`/reviews/${selectedItem.item_type}/${selectedItem.external_id}`);
-      setItemReviews(revRes.data);
-      setIsEditingComment(false);
+      if (myRootReview?.id) {
+        await apiClient.delete(`/reviews/${myRootReview.id}`);
+        setItemReviews(prev => prev.filter(r => r.id !== myRootReview.id));
+      } else {
+        await apiClient.post(`/reviews/${selectedItem.item_type}/${selectedItem.external_id}`, {
+          rating: null,
+          content: null,
+          media_url: null,
+          media_type: null
+        });
+      }
     } catch(err) {
       console.error("Failed to delete review", err);
+      const revRes = await apiClient.get(`/reviews/${selectedItem.item_type}/${selectedItem.external_id}`);
+      setItemReviews(revRes.data);
     } finally {
       setIsSavingReview(false);
     }
@@ -3350,7 +3434,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       const res = await apiClient.post(`/reviews/${selectedItem.item_type}/${selectedItem.external_id}`, {
         content: hasText ? newCommentText.trim() : null,
         media_url: newCommentMedia?.url || null,
-        media_type: newCommentMedia?.type || null
+        media_type: newCommentMedia?.type || null,
+        is_comment: true
       });
       setItemReviews(prev => {
         const exists = prev.some(r => r.id === res.data.id);
@@ -3414,6 +3499,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
             setCommentMedia(null);
           }
         } else {
+          setUserRating(0);
           setUserComment('');
           setCommentMedia(null);
         }
@@ -5194,94 +5280,30 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                     );
                   })()}
 
-                  {/* Star rating selector & inline review */}
-                  <div>
-                    <h5 style={{ margin: '0 0 0.4rem 0', color: 'var(--text-secondary)' }}>{language === 'es' ? 'Tu Calificación:' : 'Your Rating:'}</h5>
-                    <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <button
-                          key={star}
-                          disabled={!user || !isItemTracked}
-                          onClick={() => {
-                            handleSaveRating(star);
-                            setIsEditingComment(true);
-                          }}
-                          title={!isItemTracked 
-                            ? (isEpisode 
-                                ? (language === 'es' ? 'Marca este episodio como visto para calificarlo' : 'Mark this episode as watched to rate it')
-                                : (language === 'es' ? 'Añade este elemento a tu estantería para calificarlo' : 'Add this item to your shelf to rate it'))
-                            : `${star} ${star === 1 ? 'estrella' : 'estrellas'}`
-                          }
-                          style={{
-                            background: 'transparent',
-                            border: 'none',
-                            cursor: (user && isItemTracked) ? 'pointer' : 'not-allowed',
-                            padding: 0,
-                            opacity: (user && isItemTracked) ? 1 : 0.35,
-                            transition: 'opacity 0.2s ease'
-                          }}
-                        >
-                          <Star
-                            size={24}
-                            fill={star <= userRating ? '#f59e0b' : 'none'}
-                            color={star <= userRating ? '#f59e0b' : 'var(--text-muted)'}
+                  {/* Unified Review section (Stars + optional text commentary + Guardar) */}
+                  {user && (
+                    <div>
+                      {(() => {
+                        const myRootReview = (itemReviews || []).find((r: any) => r.user_id === user?.id && !r.parent_id);
+                        const hasExistingReview = Boolean(myRootReview && ((myRootReview.rating && myRootReview.rating > 0) || (myRootReview.content && myRootReview.content.trim())));
+
+                        return (
+                          <RootReviewEditor
+                            initialRating={userRating}
+                            initialReview={userComment}
+                            onSave={handleSaveReview}
+                            onDelete={handleDeleteComment}
+                            hasExistingReview={hasExistingReview}
+                            isSaving={isSavingReview}
+                            isItemTracked={isItemTracked}
+                            isEpisode={isEpisode}
+                            user={user}
+                            language={language}
                           />
-                        </button>
-                      ))}
-                      {user && isItemTracked && userRating > 0 && (
-                        <button
-                          onClick={handleDeleteRating}
-                          style={{
-                            background: 'transparent',
-                            border: 'none',
-                            color: '#ef4444',
-                            fontSize: '0.78rem',
-                            cursor: 'pointer',
-                            marginLeft: '0.75rem',
-                            padding: 0,
-                            textDecoration: 'underline'
-                          }}
-                        >
-                          {language === 'es' ? 'Eliminar puntuación' : 'Clear rating'}
-                        </button>
-                      )}
+                        );
+                      })()}
                     </div>
-                    {!isItemTracked && user && (
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic', display: 'block', marginTop: '0.25rem' }}>
-                        {isEpisode
-                          ? (language === 'es'
-                              ? 'Marca este episodio como visto para poder puntuarlo con estrellas.'
-                              : 'Mark this episode as watched to rate it with stars.')
-                          : (language === 'es' 
-                              ? 'Añade este elemento a tu estantería para poder puntuarlo con estrellas.'
-                              : 'Add this item to your shelf to rate it with stars.')
-                        }
-                      </span>
-                    )}
-
-                    {/* Review text box directly beneath rating stars when item is tracked and user has rated or started writing */}
-                    {user && isItemTracked && (userRating > 0 || isEditingComment || Boolean(userComment && userComment.trim())) && (() => {
-                      const myRootReview = (itemReviews || []).find((r: any) => r.user_id === user?.id && !r.parent_id);
-                      const hasExistingReview = Boolean(myRootReview?.content && myRootReview.content.trim());
-
-                      return (
-                        <RootReviewEditor
-                          initialReview={userComment}
-                          onSave={handleSaveComment}
-                          onDelete={handleDeleteComment}
-                          onCancelEdit={() => {
-                            setIsEditingComment(false);
-                            setUserComment(myRootReview?.content || '');
-                          }}
-                          isEditing={isEditingComment}
-                          hasExistingReview={hasExistingReview}
-                          isSaving={isSavingReview}
-                          user={user}
-                          language={language}
-                        />
-                      );
-                    })()}
-                  </div>
+                  )}
 
                   {/* Favorite toggler moved to 3-dots menu */}
 
@@ -7761,12 +7783,79 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
               )}
 
 
-              {/* Community Reviews List */}
-              <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', textAlign: 'left' }}>
-                <h4 style={{ margin: 0, fontSize: '1.1rem' }}>{language === 'es' ? 'Comentarios de la Comunidad' : 'Community Comments'}</h4>
+              {/* Bottom Tabs: Reseñas & Comentarios */}
+              <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.85rem', textAlign: 'left' }}>
+                {(() => {
+                  const reviewsList = (itemReviews || []).filter((r: any) => !r.parent_id && (r.rating !== null || (r.content && !r.media_url)));
+                  const commentsList = (itemReviews || []).filter((r: any) => !r.parent_id && (r.rating === null || r.media_url));
 
-                {/* New Comment Composer */}
-                {user && (
+                  return (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
+                      <button
+                        type="button"
+                        onClick={() => setActiveBottomTab('reviews')}
+                        style={{
+                          background: activeBottomTab === 'reviews' ? 'var(--accent-primary)' : 'transparent',
+                          color: activeBottomTab === 'reviews' ? '#fff' : 'var(--text-secondary)',
+                          border: 'none',
+                          borderRadius: '6px',
+                          padding: '0.35rem 0.75rem',
+                          fontSize: '0.9rem',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.4rem',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <Star size={15} fill={activeBottomTab === 'reviews' ? '#fff' : 'none'} />
+                        <span>{language === 'es' ? 'Reseñas' : 'Reviews'}</span>
+                        <span style={{
+                          fontSize: '0.75rem',
+                          background: activeBottomTab === 'reviews' ? 'rgba(255,255,255,0.25)' : 'var(--bg-tertiary)',
+                          padding: '0.1rem 0.4rem',
+                          borderRadius: '10px'
+                        }}>
+                          {reviewsList.length}
+                        </span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setActiveBottomTab('comments')}
+                        style={{
+                          background: activeBottomTab === 'comments' ? 'var(--accent-primary)' : 'transparent',
+                          color: activeBottomTab === 'comments' ? '#fff' : 'var(--text-secondary)',
+                          border: 'none',
+                          borderRadius: '6px',
+                          padding: '0.35rem 0.75rem',
+                          fontSize: '0.9rem',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.4rem',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <MessageSquare size={15} />
+                        <span>{language === 'es' ? 'Comentarios' : 'Comments'}</span>
+                        <span style={{
+                          fontSize: '0.75rem',
+                          background: activeBottomTab === 'comments' ? 'rgba(255,255,255,0.25)' : 'var(--bg-tertiary)',
+                          padding: '0.1rem 0.4rem',
+                          borderRadius: '10px'
+                        }}>
+                          {commentsList.length}
+                        </span>
+                      </button>
+                    </div>
+                  );
+                })()}
+
+                {/* New Comment Composer (Only under Comentarios Tab) */}
+                {activeBottomTab === 'comments' && user && (
                   <RootCommentEditor
                     commentText={newCommentText}
                     onChangeText={setNewCommentText}
@@ -7781,11 +7870,25 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                 )}
 
                 {(() => {
-                  const rootReviews = (itemReviews || []).filter((r: any) => !r.parent_id && ((r.content && r.content.trim()) || r.media_url));
-                  if (rootReviews.length === 0) {
+                  const isReviewsTab = activeBottomTab === 'reviews';
+                  const displayedList = (itemReviews || []).filter((r: any) => {
+                    if (r.parent_id) return false;
+                    if (isReviewsTab) {
+                      // Official reviews: have star rating OR non-media root review text
+                      return r.rating !== null || (r.content && !r.media_url);
+                    } else {
+                      // Community comments: no rating OR has media
+                      return r.rating === null || r.media_url;
+                    }
+                  });
+
+                  if (displayedList.length === 0) {
                     return (
                       <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                        {language === 'es' ? 'Nadie ha comentado sobre esto aún.' : 'No comments on this item yet.'}
+                        {isReviewsTab
+                          ? (language === 'es' ? 'Nadie ha dejado una reseña sobre esta obra aún.' : 'No reviews on this item yet.')
+                          : (language === 'es' ? 'Nadie ha comentado sobre esta obra aún.' : 'No comments on this item yet.')
+                        }
                       </p>
                     );
                   }
@@ -7808,7 +7911,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
                   return (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', maxHeight: '420px', overflowY: 'auto', paddingRight: '0.25rem' }}>
-                      {rootReviews.map((rootNode: any) => {
+                      {displayedList.map((rootNode: any) => {
                         const childReplies = (itemReviews || []).filter((r: any) => r.parent_id === rootNode.id);
                         const hasReplies = childReplies.length > 0;
                         const isCollapsed = !!collapsedReplies[rootNode.id];
@@ -7887,7 +7990,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                     ))}
                                   </div>
                                 )}
-                                {user && user.id === rootNode.user_id && isWithinEditWindow(rootNode.created_at) && (
+                                {user && !rootNode.rating && user.id === rootNode.user_id && isWithinEditWindow(rootNode.created_at) && (
                                   <button
                                     onClick={() => {
                                       if (isEditingThisComment) {
@@ -7996,7 +8099,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                 <span>{rootNode.vote_count || 0}</span>
                               </button>
 
-                              {user && (
+                              {user && activeBottomTab === 'comments' && (
                                 <button
                                   onClick={() => handleOpenReply(rootNode.id, rootNode.id, rootNode.username)}
                                   style={{
