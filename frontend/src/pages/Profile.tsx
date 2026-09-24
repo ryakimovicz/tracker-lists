@@ -6004,7 +6004,45 @@ export const Profile: React.FC = () => {
 
               // Check if activity points to an item that can be opened in ItemDetailsModal
               const canOpenModal = Boolean(act.external_id || act.list_id || title);
-              const targetPoster = act.image_url || meta.image_url;
+
+              // Resolve parent series/volume poster for episodes and comic issues
+              const isEpType = ['series', 'anime', 'episode'].includes(itemType) || (act.external_id && String(act.external_id).startsWith('tvm-ep-')) || Boolean(title && /S\d+E\d+/i.test(title));
+              const isComicType = ['comic', 'manga'].includes(itemType) || (act.external_id && String(act.external_id).startsWith('cv_issue_'));
+
+              let targetPoster = meta.series_image_url || meta.volume_image_url || null;
+
+              if (!targetPoster && isEpType) {
+                // Find parent show in libraryItems
+                const extractedShowName = (meta.show_name || meta.series_title || (title.match(/^(.*?)\s*-\s*[sS]\d+/i)?.[1]) || title.split(' (')[0] || '').trim().toLowerCase();
+                const matchedShow = libraryItems.find(item => {
+                  const it = (item.item_type || '').toLowerCase();
+                  if (!['series', 'anime'].includes(it)) return false;
+                  if (meta.series_external_id && item.external_id === meta.series_external_id) return true;
+                  if (extractedShowName && item.title && item.title.trim().toLowerCase() === extractedShowName) return true;
+                  return false;
+                });
+                if (matchedShow?.image_url) {
+                  targetPoster = matchedShow.image_url;
+                }
+              } else if (!targetPoster && isComicType) {
+                // Find parent volume in libraryItems
+                const volExtId = meta.volume_id || meta.series_external_id;
+                const volTitle = (meta.volume_title || meta.series_title || meta.work_title || (title.includes('#') ? title.split('#')[0] : title)).trim().toLowerCase();
+                const matchedVolume = libraryItems.find(item => {
+                  const it = (item.item_type || '').toLowerCase();
+                  if (!['comic', 'manga'].includes(it)) return false;
+                  if (volExtId && item.external_id === volExtId) return true;
+                  if (volTitle && item.title && item.title.trim().toLowerCase() === volTitle) return true;
+                  return false;
+                });
+                if (matchedVolume?.image_url) {
+                  targetPoster = matchedVolume.image_url;
+                }
+              }
+
+              if (!targetPoster) {
+                targetPoster = act.image_url || meta.image_url;
+              }
 
               return (
                 <div
