@@ -3,7 +3,7 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 class MediaReviewCreate(BaseModel):
-    rating: Optional[int] = Field(None, ge=1, le=5, description="Rating from 1 to 5 stars")
+    rating: Optional[float] = Field(None, ge=0.5, le=5.0, description="Rating from 0.5 to 5.0 stars")
     content: Optional[str] = Field(None, description="Optional text commentary review")
     media_url: Optional[str] = Field(None, description="Optional attached media/GIF URL")
     media_type: Optional[str] = Field(None, description="Optional media type (gif, sticker, meme, clip)")
@@ -17,7 +17,7 @@ class MediaReviewResponse(BaseModel):
     photo_url: Optional[str] = None
     item_type: str
     external_id: str
-    rating: Optional[int] = None
+    rating: Optional[float] = None
     content: Optional[str] = None
     media_url: Optional[str] = None
     media_type: Optional[str] = None

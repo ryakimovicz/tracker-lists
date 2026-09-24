@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import Column, Integer, String, Text, ForeignKey, DateTime, UniqueConstraint
+from sqlalchemy import Column, Integer, Float, String, Text, ForeignKey, DateTime, UniqueConstraint
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 
@@ -11,7 +11,7 @@ class MediaReview(Base):
     parent_id = Column(Integer, ForeignKey("media_reviews.id", ondelete="CASCADE"), nullable=True)
     item_type = Column(String(50), nullable=False)  # comic, manga, book, movie, series, game
     external_id = Column(String(100), nullable=False)
-    rating = Column(Integer, nullable=True)  # 1 to 5 stars
+    rating = Column(Float, nullable=True)  # 0.5 to 5.0 stars (step 0.5)
     content = Column(Text, nullable=True)     # Review commentary text
     media_url = Column(String(500), nullable=True)   # Attached GIF/Media URL
     media_type = Column(String(50), nullable=True)   # gif, sticker, meme, clip

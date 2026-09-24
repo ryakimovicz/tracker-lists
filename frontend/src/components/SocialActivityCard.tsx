@@ -5,6 +5,7 @@ import { apiClient } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../context/LanguageContext';
 import { ActivityCommentThread } from './ActivityCommentThread';
+import { StarRatingDisplay } from './ItemDetailsModal';
 
 export interface ActivityCardData {
   id: number;
@@ -659,16 +660,9 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
 
         {/* 5. Star rating highlight */}
         {numericRating !== null && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
-            {[1, 2, 3, 4, 5].map((s) => (
-              <Star
-                key={s}
-                size={14}
-                fill={s <= numericRating ? '#f59e0b' : 'none'}
-                color={s <= numericRating ? '#f59e0b' : 'var(--text-muted)'}
-              />
-            ))}
-            <span style={{ fontSize: '0.8rem', color: '#f59e0b', fontWeight: 700, marginLeft: '0.3rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+            <StarRatingDisplay rating={numericRating} size={14} gap="2px" />
+            <span style={{ fontSize: '0.8rem', color: '#f59e0b', fontWeight: 700 }}>
               {numericRating} / 5
             </span>
           </div>

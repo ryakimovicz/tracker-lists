@@ -610,6 +610,63 @@ export const MediaAttachmentView: React.FC<{
   );
 });
 
+export const StarRatingDisplay: React.FC<{
+  rating: number;
+  size?: number;
+  gap?: string;
+}> = React.memo(({ rating, size = 16, gap = '2px' }) => {
+  return (
+    <div style={{ display: 'inline-flex', alignItems: 'center', gap }}>
+      {[1, 2, 3, 4, 5].map((star) => {
+        const fillPercent = Math.max(0, Math.min(100, Math.round((rating - (star - 1)) * 100)));
+        return (
+          <div
+            key={star}
+            style={{
+              position: 'relative',
+              width: `${size}px`,
+              height: `${size}px`,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0
+            }}
+          >
+            {/* Background empty star */}
+            <Star
+              size={size}
+              fill="none"
+              color="var(--text-muted)"
+              style={{ position: 'absolute', top: 0, left: 0 }}
+            />
+            {/* Foreground filled/half-filled star */}
+            {fillPercent > 0 && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: `${fillPercent >= 75 ? 100 : fillPercent >= 25 ? 50 : 0}%`,
+                  height: '100%',
+                  overflow: 'hidden',
+                  pointerEvents: 'none'
+                }}
+              >
+                <Star
+                  size={size}
+                  fill="#f59e0b"
+                  color="#f59e0b"
+                  style={{ minWidth: `${size}px`, minHeight: `${size}px` }}
+                />
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+});
+
 const RootReviewEditor: React.FC<{
   initialRating: number;
   initialReview: string;
@@ -654,16 +711,10 @@ const RootReviewEditor: React.FC<{
             <h5 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-primary)' }}>
               {language === 'es' ? 'Tu Reseña' : 'Your Review'}
             </h5>
-            <div style={{ display: 'flex', gap: '0.15rem' }}>
-              {[1, 2, 3, 4, 5].map((star) => (
-                <Star
-                  key={star}
-                  size={18}
-                  fill={star <= initialRating ? '#f59e0b' : 'none'}
-                  color={star <= initialRating ? '#f59e0b' : 'var(--text-muted)'}
-                />
-              ))}
-            </div>
+            <StarRatingDisplay rating={initialRating} size={18} gap="3px" />
+            <span style={{ fontSize: '0.85rem', color: '#f59e0b', fontWeight: 700 }}>
+              {initialRating}
+            </span>
           </div>
 
           <button
@@ -708,44 +759,67 @@ const RootReviewEditor: React.FC<{
   // Composing / Writing state: Stars + optional review text + single "Guardar" button
   const effectiveRating = hoverRating > 0 ? hoverRating : rating;
 
+  const handleContainerMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!user || !isItemTracked) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
+    const ratio = rect.width > 0 ? x / rect.width : 0;
+    // Map ratio [0, 1] to [0.5, 5.0] in 0.5 increments
+    const rawVal = ratio * 5;
+    const roundedHalf = Math.max(0.5, Math.min(5, Math.ceil(rawVal * 2) / 2));
+    setHoverRating(roundedHalf);
+  };
+
+  const handleContainerClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!user || !isItemTracked) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
+    const ratio = rect.width > 0 ? x / rect.width : 0;
+    const rawVal = ratio * 5;
+    const roundedHalf = Math.max(0.5, Math.min(5, Math.ceil(rawVal * 2) / 2));
+    setRating(roundedHalf);
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
       <div>
-        <h5 style={{ margin: '0 0 0.4rem 0', color: 'var(--text-secondary)' }}>
-          {language === 'es' ? 'Tu Reseña:' : 'Your Review:'}
-        </h5>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.4rem' }}>
+          <h5 style={{ margin: 0, color: 'var(--text-secondary)' }}>
+            {language === 'es' ? 'Tu Reseña:' : 'Your Review:'}
+          </h5>
+          {effectiveRating > 0 && (
+            <span style={{ fontSize: '0.88rem', color: '#f59e0b', fontWeight: 700 }}>
+              {effectiveRating} / 5
+            </span>
+          )}
+        </div>
 
-        <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center', flexWrap: 'wrap' }}>
-          {[1, 2, 3, 4, 5].map((star) => (
-            <button
-              key={star}
-              type="button"
-              disabled={!user || !isItemTracked}
-              onClick={() => setRating(star)}
-              onMouseEnter={() => setHoverRating(star)}
-              onMouseLeave={() => setHoverRating(0)}
-              title={!isItemTracked
-                ? (isEpisode 
-                    ? (language === 'es' ? 'Marca este episodio como visto para calificarlo' : 'Mark this episode as watched to rate it')
-                    : (language === 'es' ? 'Añade este elemento a tu estantería para calificarlo' : 'Add this item to your shelf to rate it'))
-                : `${star} ${star === 1 ? 'estrella' : 'estrellas'}`
-              }
-              style={{
-                background: 'transparent',
-                border: 'none',
-                cursor: (user && isItemTracked) ? 'pointer' : 'not-allowed',
-                padding: 0,
-                opacity: (user && isItemTracked) ? 1 : 0.35,
-                transition: 'opacity 0.2s ease, transform 0.1s ease'
-              }}
-            >
-              <Star
-                size={24}
-                fill={star <= effectiveRating ? '#f59e0b' : 'none'}
-                color={star <= effectiveRating ? '#f59e0b' : 'var(--text-muted)'}
-              />
-            </button>
-          ))}
+        {/* Continuous star track eliminating flicker between star gaps */}
+        <div
+          onMouseMove={handleContainerMouseMove}
+          onMouseLeave={() => setHoverRating(0)}
+          onClick={handleContainerClick}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            cursor: (user && isItemTracked) ? 'pointer' : 'not-allowed',
+            opacity: (user && isItemTracked) ? 1 : 0.35,
+            padding: '4px 6px',
+            borderRadius: '8px',
+            userSelect: 'none',
+            transition: 'opacity 0.2s ease',
+            background: 'rgba(255,255,255,0.02)'
+          }}
+          title={!isItemTracked
+            ? (isEpisode 
+                ? (language === 'es' ? 'Marca este episodio como visto para calificarlo' : 'Mark this episode as watched to rate it')
+                : (language === 'es' ? 'Añade este elemento a tu estantería para calificarlo' : 'Add this item to your shelf to rate it'))
+            : (effectiveRating > 0 ? `${effectiveRating} / 5` : '')
+          }
+        >
+          <div style={{ pointerEvents: 'none' }}>
+            <StarRatingDisplay rating={effectiveRating} size={26} gap="5px" />
+          </div>
         </div>
 
         {!isItemTracked && user && (
@@ -7979,15 +8053,11 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
                               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                 {rootNode.rating && (
-                                  <div style={{ display: 'flex', gap: '0.1rem' }}>
-                                    {[1, 2, 3, 4, 5].map((star) => (
-                                      <Star
-                                        key={star}
-                                        size={13}
-                                        fill={star <= rootNode.rating ? '#f59e0b' : 'none'}
-                                        color={star <= rootNode.rating ? '#f59e0b' : 'var(--text-muted)'}
-                                      />
-                                    ))}
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                    <StarRatingDisplay rating={rootNode.rating} size={14} gap="2px" />
+                                    <span style={{ fontSize: '0.78rem', color: '#f59e0b', fontWeight: 700 }}>
+                                      {rootNode.rating}
+                                    </span>
                                   </div>
                                 )}
                                 {user && !rootNode.rating && user.id === rootNode.user_id && isWithinEditWindow(rootNode.created_at) && (
