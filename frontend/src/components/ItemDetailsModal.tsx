@@ -637,7 +637,14 @@ export const StarRatingDisplay: React.FC<{
               size={size}
               fill="none"
               color="var(--text-muted)"
-              style={{ position: 'absolute', top: 0, left: 0 }}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: `${size}px`,
+                height: `${size}px`,
+                display: 'block'
+              }}
             />
             {/* Foreground filled/half-filled star */}
             {fillPercent > 0 && (
@@ -656,7 +663,15 @@ export const StarRatingDisplay: React.FC<{
                   size={size}
                   fill="#f59e0b"
                   color="#f59e0b"
-                  style={{ minWidth: `${size}px`, minHeight: `${size}px` }}
+                  style={{
+                    display: 'block',
+                    width: `${size}px`,
+                    height: `${size}px`,
+                    minWidth: `${size}px`,
+                    minHeight: `${size}px`,
+                    maxWidth: `${size}px`,
+                    maxHeight: `${size}px`
+                  }}
                 />
               </div>
             )}

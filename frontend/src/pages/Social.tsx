@@ -52,8 +52,52 @@ export const Social: React.FC = () => {
 
       const res = await apiClient.get(endpoint);
       if (Array.isArray(res.data)) {
-        setActivities(res.data);
-        const serialized = JSON.stringify(res.data);
+        // Consolidate legacy dual activities (one item_rated + one item_reviewed for same entity/item)
+        const consolidated: ActivityCardData[] = [];
+        const seenEntity = new Map<string, number>();
+
+        for (const item of res.data) {
+          const isReview = item.activity_type === 'item_reviewed';
+          const isRating = item.activity_type === 'item_rated';
+          const key = (isReview || isRating) && (item.external_id || item.item_title)
+            ? `${item.user_id}_${item.external_id || item.item_title}`
+            : null;
+
+          if (key && seenEntity.has(key)) {
+            const idx = seenEntity.get(key)!;
+            const existing = consolidated[idx];
+            // If existing is item_reviewed and current is item_rated, extract rating into meta
+            if (existing.activity_type === 'item_reviewed' && isRating) {
+              try {
+                const meta = existing.metadata_json ? (typeof existing.metadata_json === 'string' ? JSON.parse(existing.metadata_json) : existing.metadata_json) : {};
+                if (!meta.rating && item.details) {
+                  meta.rating = Number(item.details);
+                  existing.metadata_json = JSON.stringify(meta);
+                }
+              } catch (_) {}
+              continue;
+            } else if (existing.activity_type === 'item_rated' && isReview) {
+              // Current review takes precedence, copy existing rating into review's meta
+              try {
+                const meta = item.metadata_json ? (typeof item.metadata_json === 'string' ? JSON.parse(item.metadata_json) : item.metadata_json) : {};
+                if (!meta.rating && existing.details) {
+                  meta.rating = Number(existing.details);
+                  item.metadata_json = JSON.stringify(meta);
+                }
+              } catch (_) {}
+              consolidated[idx] = item;
+              continue;
+            }
+          }
+
+          if (key) {
+            seenEntity.set(key, consolidated.length);
+          }
+          consolidated.push(item);
+        }
+
+        setActivities(consolidated);
+        const serialized = JSON.stringify(consolidated);
         try {
           sessionStorage.setItem(`pathd_social_feed_${tab}`, serialized);
           localStorage.setItem(`pathd_social_feed_${tab}`, serialized);

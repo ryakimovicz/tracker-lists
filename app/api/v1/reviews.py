@@ -375,7 +375,29 @@ def create_or_update_review(
 
     from app.services.activity_service import ActivityService
 
-    if review_in.rating is not None and review_in.rating > 0:
+    # Delete any previous activity for this review to prevent duplicates
+    ActivityService.delete_activity(db=db, user_id=current_user.id, activity_type="item_rated", entity_id=str(review.id))
+    ActivityService.delete_activity(db=db, user_id=current_user.id, activity_type="item_reviewed", entity_id=str(review.id))
+
+    has_rating = review_in.rating is not None and review_in.rating > 0
+    has_content = bool(review_in.content and review_in.content.strip())
+
+    if has_content:
+        # Single unified event for review (contains text and optional rating)
+        meta = {"rating": review_in.rating} if has_rating else {}
+        ActivityService.record_activity(
+            db=db,
+            user_id=current_user.id,
+            activity_type="item_reviewed",
+            item_title=resolved_title,
+            item_type=item_type_lower,
+            external_id=external_id,
+            entity_id=str(review.id),
+            details=review_in.content[:150],
+            metadata=meta
+        )
+    elif has_rating:
+        # Only rated with stars, no written review
         ActivityService.record_activity(
             db=db,
             user_id=current_user.id,
@@ -385,18 +407,6 @@ def create_or_update_review(
             external_id=external_id,
             entity_id=str(review.id),
             details=str(review_in.rating)
-        )
-
-    if review_in.content and review_in.content.strip():
-        ActivityService.record_activity(
-            db=db,
-            user_id=current_user.id,
-            activity_type="item_reviewed",
-            item_title=resolved_title,
-            item_type=item_type_lower,
-            external_id=external_id,
-            entity_id=str(review.id),
-            details=review_in.content[:100]
         )
 
     # Return with mapped fields

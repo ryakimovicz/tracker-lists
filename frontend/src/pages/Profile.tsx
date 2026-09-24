@@ -5660,17 +5660,60 @@ export const Profile: React.FC = () => {
               </div>
             </div>
           ) : (
-            activities.map((act) => {
-              const parseMeta = () => {
-                if (!act.metadata_json) return {};
-                try {
-                  return typeof act.metadata_json === 'string' ? JSON.parse(act.metadata_json) : act.metadata_json;
-                } catch (e) {
-                  return {};
+            (() => {
+              // Consolidate legacy dual activities (item_rated + item_reviewed for the same work)
+              const consolidated: any[] = [];
+              const seenEntity = new Map<string, number>();
+
+              for (const act of activities) {
+                const isReview = act.activity_type === 'item_reviewed';
+                const isRating = act.activity_type === 'item_rated';
+                const key = (isReview || isRating) && (act.external_id || act.item_title)
+                  ? `${act.user_id}_${act.external_id || act.item_title}`
+                  : null;
+
+                if (key && seenEntity.has(key)) {
+                  const idx = seenEntity.get(key)!;
+                  const existing = consolidated[idx];
+                  if (existing.activity_type === 'item_reviewed' && isRating) {
+                    try {
+                      const meta = existing.metadata_json ? (typeof existing.metadata_json === 'string' ? JSON.parse(existing.metadata_json) : existing.metadata_json) : {};
+                      if (!meta.rating && act.details) {
+                        meta.rating = Number(act.details);
+                        existing.metadata_json = JSON.stringify(meta);
+                      }
+                    } catch (_) {}
+                    continue;
+                  } else if (existing.activity_type === 'item_rated' && isReview) {
+                    try {
+                      const meta = act.metadata_json ? (typeof act.metadata_json === 'string' ? JSON.parse(act.metadata_json) : act.metadata_json) : {};
+                      if (!meta.rating && existing.details) {
+                        meta.rating = Number(existing.details);
+                        act.metadata_json = JSON.stringify(meta);
+                      }
+                    } catch (_) {}
+                    consolidated[idx] = act;
+                    continue;
+                  }
                 }
-              };
-              const meta = parseMeta();
-              const count = meta.count || 1;
+
+                if (key) {
+                  seenEntity.set(key, consolidated.length);
+                }
+                consolidated.push(act);
+              }
+
+              return consolidated.map((act) => {
+                const parseMeta = () => {
+                  if (!act.metadata_json) return {};
+                  try {
+                    return typeof act.metadata_json === 'string' ? JSON.parse(act.metadata_json) : act.metadata_json;
+                  } catch (e) {
+                    return {};
+                  }
+                };
+                const meta = parseMeta();
+                const count = meta.count || 1;
 
               const getStatusLabel = (status: string) => {
                 const all = [
@@ -5915,11 +5958,19 @@ export const Profile: React.FC = () => {
                     : `Rated guide "${title}" with ${act.details}★.`;
                   break;
 
-                case 'item_reviewed':
-                  msg = language === 'es'
-                    ? `Se escribió una reseña en "${title}".`
-                    : `Reviewed "${title}".`;
+                case 'item_reviewed': {
+                  const rVal = meta.rating !== undefined && meta.rating !== null ? meta.rating : null;
+                  if (rVal) {
+                    msg = language === 'es'
+                      ? `Se calificó con ${rVal}★ y se escribió una reseña en "${title}".`
+                      : `Rated ${rVal}★ and reviewed "${title}".`;
+                  } else {
+                    msg = language === 'es'
+                      ? `Se escribió una reseña en "${title}".`
+                      : `Reviewed "${title}".`;
+                  }
                   break;
+                }
 
                 case 'guide_commented':
                   msg = language === 'es'
@@ -5955,9 +6006,10 @@ export const Profile: React.FC = () => {
                   </div>
                 </div>
               );
-            })
-          )}
-        </div>
+            });
+          })()
+        )}
+      </div>
       </div>
 
       {/* Standalone Item Details Modal (at the top) */}

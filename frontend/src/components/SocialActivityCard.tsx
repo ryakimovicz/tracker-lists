@@ -325,7 +325,9 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
   // Check if details is a clean review comment (not just "completed" or star number)
   const isReviewComment = activity.activity_type === 'item_reviewed' && activity.details && activity.details.trim().length > 0;
   const isRating = activity.activity_type === 'item_rated' || activity.activity_type === 'guide_rated';
-  const numericRating = isRating && activity.details && !isNaN(Number(activity.details)) ? Number(activity.details) : null;
+  const numericRating = (isRating && activity.details && !isNaN(Number(activity.details)))
+    ? Number(activity.details)
+    : (meta?.rating !== undefined && meta?.rating !== null && !isNaN(Number(meta.rating)) ? Number(meta.rating) : null);
 
   const [isCardHovered, setIsCardHovered] = useState(false);
   const [isFooterHovered, setIsFooterHovered] = useState(false);
