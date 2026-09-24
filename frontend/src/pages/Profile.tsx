@@ -62,6 +62,7 @@ import {
   Tv,
   Gamepad2,
   Book,
+  Compass,
   MessageSquare,
   MessageCircle,
   Sparkles,
@@ -5703,488 +5704,19 @@ export const Profile: React.FC = () => {
                 consolidated.push(act);
               }
 
-              return consolidated.map((act) => {
-                const parseMeta = () => {
-                  if (!act.metadata_json) return {};
-                  try {
-                    return typeof act.metadata_json === 'string' ? JSON.parse(act.metadata_json) : act.metadata_json;
-                  } catch (e) {
-                    return {};
-                  }
-                };
-                const meta = parseMeta();
-                const count = meta.count || 1;
-
-              const getStatusLabel = (status: string) => {
-                const all = [
-                  { value: 'plan_to_play', label: language === 'es' ? 'Por Jugar' : 'Plan to Play' },
-                  { value: 'playing', label: language === 'es' ? 'Jugando' : 'Playing' },
-                  { value: 'completed', label: language === 'es' ? 'Completado' : 'Completed' },
-                  { value: 'endless', label: language === 'es' ? 'Infinito' : 'Endless' },
-                  { value: 'dropped', label: language === 'es' ? 'Abandonado' : 'Dropped' },
-                  { value: 'plan_to_watch', label: language === 'es' ? 'Por Ver' : 'Plan to Watch' },
-                  { value: 'watching', label: language === 'es' ? 'Viendo' : 'Watching' },
-                  { value: 'plan_to_read', label: language === 'es' ? 'Por Leer' : 'Plan to Read' },
-                  { value: 'reading', label: language === 'es' ? 'Leyendo' : 'Reading' },
-                  { value: 'read', label: language === 'es' ? 'Leído' : 'Read' }
-                ];
-                return all.find(s => s.value === status)?.label || status;
-              };
-
-              let msg = '';
-              const title = act.item_title || '';
-              const itemType = (act.item_type || meta.item_type || '').toLowerCase();
-
-              switch (act.activity_type) {
-                case 'account_created':
-                  msg = language === 'es' ? 'Se creó la cuenta de Pathd.' : 'Pathd account created.';
-                  break;
-
-                case 'avatar_changed':
-                  msg = language === 'es' ? 'Se actualizó la foto de perfil.' : 'Profile avatar updated.';
-                  break;
-
-                case 'banner_changed':
-                  msg = language === 'es' ? 'Se actualizó la portada de perfil.' : 'Profile banner updated.';
-                  break;
-
-                case 'background_changed':
-                  msg = language === 'es' ? 'Se actualizó el fondo de perfil.' : 'Profile background updated.';
-                  break;
-
-                case 'username_changed':
-                  msg = language === 'es' 
-                    ? `Se cambió el nombre de usuario a "${act.details || title}".`
-                    : `Username changed to "${act.details || title}".`;
-                  break;
-
-                case 'lastfm_connected':
-                  msg = language === 'es'
-                    ? `Se conectó la cuenta de Last.fm (${act.details || 'usuario'}).`
-                    : `Connected Last.fm account (${act.details || 'user'}).`;
-                  break;
-
-                case 'item_added_to_library':
-                case 'shelf_add':
-                  msg = language === 'es'
-                    ? `Se agregó "${title}" a la biblioteca.`
-                    : `Added "${title}" to library.`;
-                  break;
-
-                case 'item_status_changed':
-                case 'shelf_status':
-                case 'item_completed':
-                case 'item_progress': {
-                  const status = meta.status || act.details || '';
-                  const pages = meta.pages_read || 0;
-                  const totalPages = meta.total_pages || 0;
-                  const lastSeen = meta.last_seen_episode || '';
-
-                  if (meta.is_range && meta.start_unit && meta.end_unit) {
-                    const workName = meta.work_title || title.split(' (')[0] || title;
-                    const alsoAdded = !!meta.also_added;
-                    if (itemType === 'comic') {
-                      msg = alsoAdded
-                        ? (language === 'es' ? `Se agregó y leyó del ${meta.start_unit} al ${meta.end_unit} de "${workName}".` : `Added and read ${meta.start_unit} to ${meta.end_unit} of "${workName}".`)
-                        : (language === 'es' ? `Se leyó del ${meta.start_unit} al ${meta.end_unit} de "${workName}".` : `Read ${meta.start_unit} to ${meta.end_unit} of "${workName}".`);
-                    } else {
-                      msg = alsoAdded
-                        ? (language === 'es' ? `Se agregó y vio del ${meta.start_unit} al ${meta.end_unit} de la serie "${workName}".` : `Added and watched ${meta.start_unit} to ${meta.end_unit} of "${workName}".`)
-                        : (language === 'es' ? `Se vio del ${meta.start_unit} al ${meta.end_unit} de la serie "${workName}".` : `Watched ${meta.start_unit} to ${meta.end_unit} of "${workName}".`);
-                    }
-                  } else if (count > 1) {
-                    if (itemType === 'series' || itemType === 'anime') {
-                      msg = language === 'es'
-                        ? `Se vieron ${count} episodios de "${title}".`
-                        : `Watched ${count} episodes of "${title}".`;
-                    } else if (itemType === 'book' || itemType === 'manga') {
-                      msg = language === 'es'
-                        ? `Se avanzaron páginas en "${title}" (${pages}${totalPages ? ` / ${totalPages}` : ''} págs).`
-                        : `Progressed pages in "${title}" (${pages}${totalPages ? ` / ${totalPages}` : ''} pages).`;
-                    } else {
-                      msg = language === 'es'
-                        ? `Se registró progreso ${count} veces en "${title}".`
-                        : `Logged progress ${count} times on "${title}".`;
-                    }
-                  } else if (itemType === 'movie') {
-                    if (status === 'completed' || status === 'read') {
-                      msg = language === 'es' ? `Se marcó "${title}" como Visto.` : `Marked "${title}" as Watched.`;
-                    } else if (status === 'dropped') {
-                      msg = language === 'es' ? `Se abandonó la película "${title}".` : `Dropped movie "${title}".`;
-                    } else if (status === 'watching') {
-                      msg = language === 'es' ? `Se comenzó a ver "${title}".` : `Started watching "${title}".`;
-                    } else {
-                      msg = language === 'es' ? `Se cambió el estado de "${title}" a ${getStatusLabel(status)}.` : `Changed status of "${title}" to ${getStatusLabel(status)}.`;
-                    }
-                  } else if (itemType === 'series' || itemType === 'anime' || itemType === 'episode') {
-                    const isEpisode = meta.is_single_episode || (act.external_id && act.external_id.startsWith('tvm-ep-')) || Boolean(lastSeen && /S\d+E\d+/i.test(lastSeen)) || Boolean(title && /S\d+E\d+/i.test(title));
-                    
-                    const formatEpisodeString = (rawText: string, showHint?: string) => {
-                      // Match patterns like "Show Name - S01E02 - Episode Title" or "S01E02 - Episode Title" or "S01E02"
-                      const match = rawText.match(/^(?:(.*?)\s*-\s*)?S(\d+)E(\d+)(?:\s*-\s*(.*))?$/i);
-                      if (match) {
-                        const extractedShow = (match[1] || showHint || '').trim();
-                        const sNum = parseInt(match[2], 10);
-                        const eNum = parseInt(match[3], 10);
-                        const epName = (match[4] || '').trim();
-                        const seasonPrefix = language === 'es' ? 'T' : 'S';
-                        const codeStr = `${seasonPrefix}${sNum < 10 ? '0' : ''}${sNum} | E${eNum < 10 ? '0' : ''}${eNum}`;
-                        const epPart = epName ? `${codeStr} (${epName})` : codeStr;
-                        const finalShow = extractedShow || showHint;
-                        if (finalShow) {
-                          return language === 'es'
-                            ? `el ${epPart} de la serie '${finalShow}'`
-                            : `${epPart} from '${finalShow}'`;
-                        }
-                        return epPart;
-                      }
-                      return rawText;
-                    };
-
-                    if (isEpisode) {
-                      const epSource = lastSeen || title;
-                      const formattedEp = formatEpisodeString(epSource, meta.show_name);
-                      msg = language === 'es'
-                        ? `Se vio ${formattedEp.startsWith('el ') ? formattedEp : `el ${formattedEp}`}.`
-                        : `Watched ${formattedEp}.`;
-                    } else if (status === 'completed') {
-                      msg = language === 'es' ? `Se terminó la serie "${title}".` : `Completed series "${title}".`;
-                    } else if (status === 'dropped') {
-                      msg = language === 'es'
-                        ? `Se abandonó la serie "${title}"${lastSeen ? ` (último: ${lastSeen})` : ''}.`
-                        : `Dropped series "${title}"${lastSeen ? ` (last: ${lastSeen})` : ''}.`;
-                    } else if (lastSeen) {
-                      const formattedEp = formatEpisodeString(lastSeen, meta.show_name || title);
-                      msg = language === 'es'
-                        ? `Se vio ${formattedEp.startsWith('el ') ? formattedEp : `el ${formattedEp}`}.`
-                        : `Watched ${formattedEp}.`;
-                    } else {
-                      msg = language === 'es'
-                        ? `Se marcó "${title}" como ${getStatusLabel(status)}.`
-                        : `Marked "${title}" as ${getStatusLabel(status)}.`;
-                    }
-                  } else if (itemType === 'book' || itemType === 'manga') {
-                    if (status === 'read' || status === 'completed') {
-                      msg = language === 'es'
-                        ? `Se leyó "${title}"${totalPages ? ` (${totalPages} págs)` : ''}.`
-                        : `Read "${title}"${totalPages ? ` (${totalPages} pages)` : ''}.`;
-                    } else if (status === 'dropped') {
-                      msg = language === 'es'
-                        ? `Se abandonó "${title}"${pages ? ` en la pág. ${pages}` : ''}.`
-                        : `Dropped "${title}"${pages ? ` on page ${pages}` : ''}.`;
-                    } else if (pages > 0) {
-                      msg = language === 'es'
-                        ? `Se leyeron páginas de "${title}" (pág. ${pages}${totalPages ? ` de ${totalPages}` : ''}).`
-                        : `Reading "${title}" (page ${pages}${totalPages ? ` of ${totalPages}` : ''}).`;
-                    } else {
-                      msg = language === 'es'
-                        ? `Se marcó "${title}" como ${getStatusLabel(status)}.`
-                        : `Marked "${title}" as ${getStatusLabel(status)}.`;
-                    }
-                  } else if (itemType === 'comic') {
-                    if (status === 'read' || status === 'completed') {
-                      msg = language === 'es' ? `Se leyó "${title}".` : `Read "${title}".`;
-                    } else if (status === 'dropped') {
-                      msg = language === 'es'
-                        ? `Se abandonó el cómic "${title}"${lastSeen ? ` (${lastSeen})` : ''}.`
-                        : `Dropped comic "${title}"${lastSeen ? ` (${lastSeen})` : ''}.`;
-                    } else if (lastSeen) {
-                      msg = language === 'es' ? `Se leyó "${lastSeen}" de "${title}".` : `Read "${lastSeen}" of "${title}".`;
-                    } else {
-                      msg = language === 'es' ? `Se marcó "${title}" como ${getStatusLabel(status)}.` : `Marked "${title}" as ${getStatusLabel(status)}.`;
-                    }
-                  } else if (itemType === 'game') {
-                    if (meta.is_hundred_percent) {
-                      msg = language === 'es' ? `Se completó al 100% "${title}".` : `Completed 100% of "${title}".`;
-                    } else if (status === 'completed') {
-                      msg = language === 'es' ? `Se completó el juego "${title}".` : `Completed game "${title}".`;
-                    } else if (status === 'endless') {
-                      msg = language === 'es' ? `Se marcó "${title}" como Infinito.` : `Marked "${title}" as Endless.`;
-                    } else if (status === 'dropped') {
-                      msg = language === 'es' ? `Se abandonó el juego "${title}".` : `Dropped game "${title}".`;
-                    } else if (status === 'playing') {
-                      msg = language === 'es' ? `Se comenzó a jugar a "${title}".` : `Started playing "${title}".`;
-                    } else {
-                      msg = language === 'es' ? `Se cambió el estado de "${title}" a ${getStatusLabel(status)}.` : `Changed status of "${title}" to ${getStatusLabel(status)}.`;
-                    }
-                  } else {
-                    msg = language === 'es'
-                      ? `Se marcó "${title}" como ${getStatusLabel(status)}.`
-                      : `Marked "${title}" as ${getStatusLabel(status)}.`;
-                  }
-                  break;
-                }
-
-                case 'guide_created':
-                  msg = language === 'es'
-                    ? `Se creó la guía "${title}".`
-                    : `Created guide "${title}".`;
-                  break;
-
-                case 'guide_edited':
-                  msg = language === 'es'
-                    ? `Se editó la guía "${title}".`
-                    : `Edited guide "${title}".`;
-                  break;
-
-                case 'guide_followed':
-                  msg = language === 'es'
-                    ? `Se comenzó a seguir la guía "${title}".`
-                    : `Started following guide "${title}".`;
-                  break;
-
-                case 'item_favorited':
-                case 'shelf_favorite':
-                  msg = language === 'es'
-                    ? `Se destacó "${title}".`
-                    : `Featured "${title}".`;
-                  break;
-
-                case 'user_followed':
-                  msg = language === 'es'
-                    ? `Se comenzó a seguir a @${title}.`
-                    : `Started following @${title}.`;
-                  break;
-
-                case 'item_rated':
-                  msg = language === 'es'
-                    ? `Calificó "${title}"`
-                    : `Rated "${title}"`;
-                  break;
-
-                case 'guide_rated':
-                  msg = language === 'es'
-                    ? `Calificó la guía "${title}"`
-                    : `Rated guide "${title}"`;
-                  break;
-
-                case 'item_reviewed': {
-                  const rVal = meta.rating !== undefined && meta.rating !== null ? meta.rating : null;
-                  if (rVal) {
-                    msg = language === 'es'
-                      ? `Calificó y escribió una reseña de "${title}"`
-                      : `Rated and reviewed "${title}"`;
-                  } else {
-                    msg = language === 'es'
-                      ? `Escribió una reseña de "${title}"`
-                      : `Reviewed "${title}"`;
-                  }
-                  break;
-                }
-
-                case 'guide_commented':
-                  msg = language === 'es'
-                    ? `Comentó en la guía "${title}".`
-                    : `Commented on guide "${title}".`;
-                  break;
-
-                case 'social_commented':
-                  msg = language === 'es'
-                    ? `Comentó en la Actividad Social.`
-                    : `Commented on Social Activity.`;
-                  break;
-
-                case 'guide_review_commented':
-                  msg = language === 'es'
-                    ? `Comentó en la reseña de una guía.`
-                    : `Commented on a guide review.`;
-                  break;
-
-                default:
-                  msg = title ? `${act.activity_type} - ${title}` : act.activity_type;
-                  break;
-              }
-
-              const isReview = act.activity_type === 'item_reviewed';
-              const isRating = act.activity_type === 'item_rated' || act.activity_type === 'guide_rated';
-              const ratingNumber = (isRating && act.details && !isNaN(Number(act.details)))
-                ? Number(act.details)
-                : (meta.rating !== undefined && meta.rating !== null && !isNaN(Number(meta.rating)) ? Number(meta.rating) : null);
-              const reviewText = isReview && act.details && act.details.trim() ? act.details.trim() : null;
-
-              // Check if activity points to an item that can be opened in ItemDetailsModal
-              const canOpenModal = Boolean(act.external_id || act.list_id || title);
-
-              // Resolve parent series/volume poster for episodes and comic issues
-              const isEpType = ['series', 'anime', 'episode'].includes(itemType) || (act.external_id && String(act.external_id).startsWith('tvm-ep-')) || Boolean(title && /S\d+E\d+/i.test(title));
-              const isComicType = ['comic', 'manga'].includes(itemType) || (act.external_id && String(act.external_id).startsWith('cv_issue_'));
-
-              let targetPoster = meta.series_image_url || meta.volume_image_url || null;
-
-              if (!targetPoster && isEpType) {
-                // Find parent show in libraryItems
-                const extractedShowName = (meta.show_name || meta.series_title || (title.match(/^(.*?)\s*-\s*[sS]\d+/i)?.[1]) || title.split(' (')[0] || '').trim().toLowerCase();
-                const matchedShow = libraryItems.find(item => {
-                  const it = (item.item_type || '').toLowerCase();
-                  if (!['series', 'anime'].includes(it)) return false;
-                  if (meta.series_external_id && item.external_id === meta.series_external_id) return true;
-                  if (extractedShowName && item.title && item.title.trim().toLowerCase() === extractedShowName) return true;
-                  return false;
-                });
-                if (matchedShow?.image_url) {
-                  targetPoster = matchedShow.image_url;
-                }
-              } else if (!targetPoster && isComicType) {
-                // Find parent volume in libraryItems
-                const volExtId = meta.volume_id || meta.series_external_id;
-                const volTitle = (meta.volume_title || meta.series_title || meta.work_title || (title.includes('#') ? title.split('#')[0] : title)).trim().toLowerCase();
-                const matchedVolume = libraryItems.find(item => {
-                  const it = (item.item_type || '').toLowerCase();
-                  if (!['comic', 'manga'].includes(it)) return false;
-                  if (volExtId && item.external_id === volExtId) return true;
-                  if (volTitle && item.title && item.title.trim().toLowerCase() === volTitle) return true;
-                  return false;
-                });
-                if (matchedVolume?.image_url) {
-                  targetPoster = matchedVolume.image_url;
-                }
-              }
-
-              if (!targetPoster) {
-                targetPoster = act.image_url || meta.image_url;
-              }
-
-              // Fallback to libraryItems for movies, books, games, etc. if activity did not have image_url
-              if (!targetPoster && act.activity_type.startsWith('item_')) {
-                const targetTitle = (title || '').trim().toLowerCase();
-                const matchedItem = libraryItems.find(item => {
-                  if (act.external_id && item.external_id === act.external_id) return true;
-                  if (targetTitle && item.title && item.title.trim().toLowerCase() === targetTitle) return true;
-                  return false;
-                });
-                if (matchedItem?.image_url) {
-                  targetPoster = matchedItem.image_url;
-                }
-              }
-
-              return (
-                <div
+              return consolidated.map((act) => (
+                <ProfileActivityCardItem
                   key={act.id}
-                  className="glass-card"
-                  onClick={() => {
-                    if (canOpenModal && act.activity_type.startsWith('item_')) {
-                      let effectiveItemType = (meta.series_item_type || act.item_type || meta.item_type || 'series').toLowerCase();
-                      if (effectiveItemType === 'episode') effectiveItemType = 'series';
-                      let effectiveExternalId = meta.series_external_id || meta.parent_external_id || meta.work_ext_id || act.external_id || undefined;
-                      const cleanTitle = meta.series_title || meta.work_title || title;
-
-                      setSelectedItem({
-                        external_id: effectiveExternalId,
-                        id: (!effectiveExternalId && act.list_id) ? act.list_id : undefined,
-                        title: cleanTitle || 'Media',
-                        image_url: targetPoster || undefined,
-                        item_type: effectiveItemType,
-                        tracking_list_id: act.list_id || undefined
-                      });
-                    }
-                  }}
-                  style={{
-                    padding: '0.9rem 1.15rem',
-                    display: 'flex',
-                    gap: '1rem',
-                    alignItems: 'flex-start',
-                    fontSize: '0.9rem',
-                    borderRadius: '12px',
-                    background: 'var(--bg-secondary, rgba(255,255,255,0.03))',
-                    border: '1px solid var(--border-color)',
-                    cursor: (canOpenModal && act.activity_type.startsWith('item_')) ? 'pointer' : 'default',
-                    transition: 'all 0.18s ease'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (canOpenModal && act.activity_type.startsWith('item_')) {
-                      e.currentTarget.style.borderColor = 'var(--accent-primary)';
-                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (canOpenModal && act.activity_type.startsWith('item_')) {
-                      e.currentTarget.style.borderColor = 'var(--border-color)';
-                      e.currentTarget.style.background = 'var(--bg-secondary, rgba(255,255,255,0.03))';
-                    }
-                  }}
-                >
-                  {/* Left: Thumbnail poster or Category icon */}
-                  {targetPoster ? (
-                    <div style={{
-                      width: '42px',
-                      height: '58px',
-                      borderRadius: '6px',
-                      overflow: 'hidden',
-                      flexShrink: 0,
-                      background: 'var(--bg-tertiary)',
-                      border: '1px solid rgba(255,255,255,0.08)',
-                      boxShadow: '0 2px 6px rgba(0,0,0,0.25)'
-                    }}>
-                      <img
-                        src={targetPoster}
-                        alt={title || 'Media'}
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                      />
-                    </div>
-                  ) : (
-                    <div style={{
-                      width: '38px',
-                      height: '38px',
-                      borderRadius: '50%',
-                      background: 'rgba(16, 185, 129, 0.12)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0,
-                      marginTop: '0.15rem'
-                    }}>
-                      <CheckCircle size={18} color="#10b981" />
-                    </div>
-                  )}
-
-                  {/* Middle & Right Content */}
-                  <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem' }}>
-                      <span style={{ fontWeight: 500, color: 'var(--text-primary)', lineHeight: 1.4 }}>
-                        {msg}
-                      </span>
-                      <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem', whiteSpace: 'nowrap' }}>
-                        {formatDate(new Date(act.created_at))}
-                      </span>
-                    </div>
-
-                    {/* Optional Star Rating highlight */}
-                    {ratingNumber !== null && (
-                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.1rem' }}>
-                        <StarRatingDisplay rating={ratingNumber} size={14} gap="2px" />
-                        <span style={{ fontSize: '0.8rem', color: '#f59e0b', fontWeight: 700 }}>
-                          {ratingNumber} / 5
-                        </span>
-                      </div>
-                    )}
-
-                    {/* Optional Review speech snippet */}
-                    {reviewText && (
-                      <div style={{
-                        marginTop: '0.2rem',
-                        background: 'rgba(255, 255, 255, 0.03)',
-                        borderLeft: '3px solid var(--accent-primary)',
-                        padding: '0.45rem 0.75rem',
-                        borderRadius: '0 6px 6px 0',
-                        fontSize: '0.84rem',
-                        color: 'var(--text-secondary)',
-                        lineHeight: 1.4,
-                        wordBreak: 'break-word',
-                        display: '-webkit-box',
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: 'vertical',
-                        overflow: 'hidden'
-                      }}>
-                        {reviewText}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            });
-          })()
-        )}
-      </div>
+                  act={act}
+                  language={language}
+                  formatDate={formatDate}
+                  libraryItems={libraryItems}
+                  setSelectedItem={setSelectedItem}
+                />
+              ));
+            })()
+          )}
+        </div>
       </div>
 
       {/* Standalone Item Details Modal (at the top) */}
@@ -6542,7 +6074,604 @@ export const Profile: React.FC = () => {
     </div>
   );
 };
+
+// Activity card item for Profile activity history
+interface ProfileActivityCardItemProps {
+  act: any;
+  language: string;
+  formatDate: (date: Date) => string;
+  libraryItems: any[];
+  setSelectedItem: (item: any) => void;
+}
+
+const ProfileActivityCardItem: React.FC<ProfileActivityCardItemProps> = ({
+  act,
+  language,
+  formatDate,
+  libraryItems,
+  setSelectedItem
+}) => {
+  const [isHovered, setIsHovered] = useState(false);
+  const isEs = language === 'es';
+
+  const parseMeta = () => {
+    if (!act.metadata_json) return {};
+    try {
+      return typeof act.metadata_json === 'string' ? JSON.parse(act.metadata_json) : act.metadata_json;
+    } catch {
+      return {};
+    }
+  };
+
+  const meta = parseMeta();
+  const count = meta.count || 1;
+  const rawTitle = (act.item_title || '').trim();
+  const itemType = (act.item_type || meta.item_type || '').toLowerCase();
+
+  const getStatusLabel = (status: string) => {
+    const all = [
+      { value: 'plan_to_play', label: isEs ? 'Por Jugar' : 'Plan to Play' },
+      { value: 'playing', label: isEs ? 'Jugando' : 'Playing' },
+      { value: 'completed', label: isEs ? 'Completado' : 'Completed' },
+      { value: 'endless', label: isEs ? 'Infinito' : 'Endless' },
+      { value: 'dropped', label: isEs ? 'Abandonado' : 'Dropped' },
+      { value: 'plan_to_watch', label: isEs ? 'Por Ver' : 'Plan to Watch' },
+      { value: 'watching', label: isEs ? 'Viendo' : 'Watching' },
+      { value: 'plan_to_read', label: isEs ? 'Por Leer' : 'Plan to Read' },
+      { value: 'reading', label: isEs ? 'Leyendo' : 'Reading' },
+      { value: 'read', label: isEs ? 'Leído' : 'Read' }
+    ];
+    return all.find(s => s.value === status)?.label || status;
+  };
+
+  const getCategoryMeta = (rawType?: string | null) => {
+    const t = (rawType || 'series').toLowerCase();
+    switch (t) {
+      case 'movie':
+        return {
+          label: isEs ? 'Película' : 'Movie',
+          icon: <Film size={13} />,
+          themeColor: 'var(--color-movie)'
+        };
+      case 'series':
+      case 'episode':
+      case 'season':
+        return {
+          label: isEs ? 'Serie' : 'Series',
+          icon: <Tv size={13} />,
+          themeColor: 'var(--color-series)'
+        };
+      case 'anime':
+        return {
+          label: isEs ? 'Anime' : 'Anime',
+          icon: <Sparkles size={13} />,
+          themeColor: 'var(--color-anime)'
+        };
+      case 'book':
+        return {
+          label: isEs ? 'Libro' : 'Book',
+          icon: <Book size={13} />,
+          themeColor: 'var(--color-book)'
+        };
+      case 'comic':
+        return {
+          label: isEs ? 'Cómic' : 'Comic',
+          icon: <Book size={13} />,
+          themeColor: 'var(--color-comic)'
+        };
+      case 'manga':
+        return {
+          label: isEs ? 'Manga' : 'Manga',
+          icon: <Book size={13} />,
+          themeColor: 'var(--color-manga)'
+        };
+      case 'game':
+        return {
+          label: isEs ? 'Videojuego' : 'Game',
+          icon: <Gamepad2 size={13} />,
+          themeColor: 'var(--color-game)'
+        };
+      case 'guide':
+        return {
+          label: isEs ? 'Guía' : 'Guide',
+          icon: <Compass size={13} />,
+          themeColor: 'var(--color-guide)'
+        };
+      default:
+        return {
+          label: isEs ? 'Obra' : 'Media',
+          icon: <Tv size={13} />,
+          themeColor: 'var(--color-series)'
+        };
+    }
+  };
+
+  const isGuideActivity = act.activity_type.startsWith('guide_');
+  const catMeta = isGuideActivity ? getCategoryMeta('guide') : getCategoryMeta(act.item_type || meta.item_type || 'series');
+
+  // Render title with hover color and Lucide category icon badge on the right
+  const renderTitle = (titleText: string) => {
+    const trimmed = (titleText || '').trim();
+    if (!trimmed) return null;
+
+    const lastSpaceIdx = trimmed.lastIndexOf(' ');
+    const leadText = lastSpaceIdx !== -1 ? trimmed.slice(0, lastSpaceIdx + 1) : '';
+    const lastWord = lastSpaceIdx !== -1 ? trimmed.slice(lastSpaceIdx + 1) : trimmed;
+
+    const titleColor = isHovered
+      ? (catMeta?.themeColor || 'var(--accent-primary)')
+      : (isGuideActivity ? 'var(--accent-primary)' : 'var(--text-primary)');
+
+    return (
+      <span style={{ display: 'inline' }}>
+        {leadText && (
+          <span style={{ fontWeight: 600, color: titleColor, transition: 'color 0.2s ease' }}>
+            {leadText}
+          </span>
+        )}
+        <span style={{ whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center' }}>
+          <span style={{ fontWeight: 600, color: titleColor, transition: 'color 0.2s ease' }}>
+            {lastWord}
+          </span>
+          {catMeta && (
+            <span
+              title={catMeta.label}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: catMeta.themeColor || 'var(--accent-primary)',
+                marginLeft: '0.35rem',
+                verticalAlign: 'middle',
+                filter: isHovered ? 'drop-shadow(0 0 6px rgba(255,255,255,0.25))' : 'none',
+                transition: 'filter 0.2s ease'
+              }}
+            >
+              {catMeta.icon}
+            </span>
+          )}
+        </span>
+      </span>
+    );
+  };
+
+  let msg: React.ReactNode = '';
+
+  switch (act.activity_type) {
+    case 'account_created':
+      msg = isEs ? 'Se creó la cuenta de Pathd.' : 'Pathd account created.';
+      break;
+
+    case 'avatar_changed':
+      msg = isEs ? 'Se actualizó la foto de perfil.' : 'Profile avatar updated.';
+      break;
+
+    case 'banner_changed':
+      msg = isEs ? 'Se actualizó la portada de perfil.' : 'Profile banner updated.';
+      break;
+
+    case 'background_changed':
+      msg = isEs ? 'Se actualizó el fondo de perfil.' : 'Profile background updated.';
+      break;
+
+    case 'username_changed':
+      msg = isEs 
+        ? <>Se cambió el nombre de usuario a {act.details || rawTitle}.</>
+        : <>Username changed to {act.details || rawTitle}.</>;
+      break;
+
+    case 'lastfm_connected':
+      msg = isEs
+        ? `Se conectó la cuenta de Last.fm (${act.details || 'usuario'}).`
+        : `Connected Last.fm account (${act.details || 'user'}).`;
+      break;
+
+    case 'item_added_to_library':
+    case 'shelf_add':
+      msg = isEs ? (
+        <>Se agregó {renderTitle(rawTitle)} a la biblioteca.</>
+      ) : (
+        <>Added {renderTitle(rawTitle)} to library.</>
+      );
+      break;
+
+    case 'item_status_changed':
+    case 'shelf_status':
+    case 'item_completed':
+    case 'item_progress': {
+      const status = meta.status || act.details || '';
+      const pages = meta.pages_read || 0;
+      const totalPages = meta.total_pages || 0;
+      const lastSeen = meta.last_seen_episode || '';
+
+      if (meta.is_range && meta.start_unit && meta.end_unit) {
+        const workName = meta.work_title || rawTitle.split(' (')[0] || rawTitle;
+        const alsoAdded = !!meta.also_added;
+        if (itemType === 'comic') {
+          msg = alsoAdded ? (
+            isEs
+              ? <>Se agregó y leyó del {meta.start_unit} al {meta.end_unit} de {renderTitle(workName)}.</>
+              : <>Added and read {meta.start_unit} to {meta.end_unit} of {renderTitle(workName)}.</>
+          ) : (
+            isEs
+              ? <>Se leyó del {meta.start_unit} al {meta.end_unit} de {renderTitle(workName)}.</>
+              : <>Read {meta.start_unit} to {meta.end_unit} of {renderTitle(workName)}.</>
+          );
+        } else {
+          msg = alsoAdded ? (
+            isEs
+              ? <>Se agregó y vio del {meta.start_unit} al {meta.end_unit} de la serie {renderTitle(workName)}.</>
+              : <>Added and watched {meta.start_unit} to {meta.end_unit} of {renderTitle(workName)}.</>
+          ) : (
+            isEs
+              ? <>Se vio del {meta.start_unit} al {meta.end_unit} de la serie {renderTitle(workName)}.</>
+              : <>Watched {meta.start_unit} to {meta.end_unit} of {renderTitle(workName)}.</>
+          );
+        }
+      } else if (count > 1) {
+        if (itemType === 'series' || itemType === 'anime') {
+          msg = isEs ? (
+            <>Se vieron {count} episodios de {renderTitle(rawTitle)}.</>
+          ) : (
+            <>Watched {count} episodes of {renderTitle(rawTitle)}.</>
+          );
+        } else if (itemType === 'book' || itemType === 'manga') {
+          msg = isEs ? (
+            <>Se avanzaron páginas en {renderTitle(rawTitle)} ({pages}{totalPages ? ` / ${totalPages}` : ''} págs).</>
+          ) : (
+            <>Progressed pages in {renderTitle(rawTitle)} ({pages}{totalPages ? ` / ${totalPages}` : ''} pages).</>
+          );
+        } else {
+          msg = isEs ? (
+            <>Se registró progreso {count} veces en {renderTitle(rawTitle)}.</>
+          ) : (
+            <>Logged progress {count} times on {renderTitle(rawTitle)}.</>
+          );
+        }
+      } else if (itemType === 'movie') {
+        if (status === 'completed' || status === 'read') {
+          msg = isEs ? <>Se marcó {renderTitle(rawTitle)} como Visto.</> : <>Marked {renderTitle(rawTitle)} as Watched.</>;
+        } else if (status === 'dropped') {
+          msg = isEs ? <>Se abandonó la película {renderTitle(rawTitle)}.</> : <>Dropped movie {renderTitle(rawTitle)}.</>;
+        } else if (status === 'watching') {
+          msg = isEs ? <>Se comenzó a ver {renderTitle(rawTitle)}.</> : <>Started watching {renderTitle(rawTitle)}.</>;
+        } else {
+          msg = isEs ? <>Se cambió el estado de {renderTitle(rawTitle)} a {getStatusLabel(status)}.</> : <>Changed status of {renderTitle(rawTitle)} to {getStatusLabel(status)}.</>;
+        }
+      } else if (itemType === 'series' || itemType === 'anime' || itemType === 'episode') {
+        const isEpisode = meta.is_single_episode || (act.external_id && act.external_id.startsWith('tvm-ep-')) || Boolean(lastSeen && /S\d+E\d+/i.test(lastSeen)) || Boolean(rawTitle && /S\d+E\d+/i.test(rawTitle));
+
+        const formatEpisodeString = (rawText: string, showHint?: string): React.ReactNode => {
+          const match = rawText.match(/^(?:(.*?)\s*-\s*)?S(\d+)E(\d+)(?:\s*-\s*(.*))?$/i);
+          if (match) {
+            const extractedShow = (match[1] || showHint || '').trim();
+            const sNum = parseInt(match[2], 10);
+            const eNum = parseInt(match[3], 10);
+            const epName = (match[4] || '').trim();
+            const seasonPrefix = isEs ? 'T' : 'S';
+            const codeStr = `${seasonPrefix}${sNum < 10 ? '0' : ''}${sNum} | E${eNum < 10 ? '0' : ''}${eNum}`;
+            const epPart = epName ? `${codeStr} (${epName})` : codeStr;
+            const finalShow = extractedShow || showHint;
+            if (finalShow) {
+              return isEs
+                ? <>el {epPart} de la serie {renderTitle(finalShow)}</>
+                : <>{epPart} from {renderTitle(finalShow)}</>;
+            }
+            return epPart;
+          }
+          return renderTitle(rawText);
+        };
+
+        if (isEpisode) {
+          const epSource = lastSeen || rawTitle;
+          const formattedEp = formatEpisodeString(epSource, meta.show_name);
+          msg = isEs ? <>Se vio {formattedEp}.</> : <>Watched {formattedEp}.</>;
+        } else if (status === 'completed') {
+          msg = isEs ? <>Se terminó la serie {renderTitle(rawTitle)}.</> : <>Completed series {renderTitle(rawTitle)}.</>;
+        } else if (status === 'dropped') {
+          msg = isEs
+            ? <>Se abandonó la serie {renderTitle(rawTitle)}{lastSeen ? ` (último: ${lastSeen})` : ''}.</>
+            : <>Dropped series {renderTitle(rawTitle)}{lastSeen ? ` (last: ${lastSeen})` : ''}.</>;
+        } else if (lastSeen) {
+          const formattedEp = formatEpisodeString(lastSeen, meta.show_name || rawTitle);
+          msg = isEs ? <>Se vio {formattedEp}.</> : <>Watched {formattedEp}.</>;
+        } else {
+          msg = isEs
+            ? <>Se marcó {renderTitle(rawTitle)} como {getStatusLabel(status)}.</>
+            : <>Marked {renderTitle(rawTitle)} as ${getStatusLabel(status)}.</>;
+        }
+      } else if (itemType === 'book' || itemType === 'manga') {
+        if (status === 'read' || status === 'completed') {
+          msg = isEs
+            ? <>Se leyó {renderTitle(rawTitle)}{totalPages ? ` (${totalPages} págs)` : ''}.</>
+            : <>Read {renderTitle(rawTitle)}{totalPages ? ` (${totalPages} pages)` : ''}.</>;
+        } else if (status === 'dropped') {
+          msg = isEs
+            ? <>Se abandonó {renderTitle(rawTitle)}{pages ? ` en la pág. ${pages}` : ''}.</>
+            : <>Dropped {renderTitle(rawTitle)}{pages ? ` on page ${pages}` : ''}.</>;
+        } else if (pages > 0) {
+          msg = isEs
+            ? <>Se leyeron páginas de {renderTitle(rawTitle)} (pág. ${pages}${totalPages ? ` de ${totalPages}` : ''}).</>
+            : <>Reading {renderTitle(rawTitle)} (page ${pages}${totalPages ? ` of ${totalPages}` : ''}).</>;
+        } else {
+          msg = isEs
+            ? <>Se marcó {renderTitle(rawTitle)} como {getStatusLabel(status)}.</>
+            : <>Marked {renderTitle(rawTitle)} as {getStatusLabel(status)}.</>;
+        }
+      } else if (itemType === 'comic') {
+        if (status === 'read' || status === 'completed') {
+          msg = isEs ? <>Se leyó {renderTitle(rawTitle)}.</> : <>Read {renderTitle(rawTitle)}.</>;
+        } else if (status === 'dropped') {
+          msg = isEs
+            ? <>Se abandonó el cómic {renderTitle(rawTitle)}{lastSeen ? ` (${lastSeen})` : ''}.</>
+            : <>Dropped comic {renderTitle(rawTitle)}{lastSeen ? ` (${lastSeen})` : ''}.</>;
+        } else if (lastSeen) {
+          msg = isEs ? <>Se leyó {lastSeen} de {renderTitle(rawTitle)}.</> : <>Read {lastSeen} of {renderTitle(rawTitle)}.</>;
+        } else {
+          msg = isEs ? <>Se marcó {renderTitle(rawTitle)} como {getStatusLabel(status)}.</> : <>Marked {renderTitle(rawTitle)} as {getStatusLabel(status)}.</>;
+        }
+      } else if (itemType === 'game') {
+        if (meta.is_hundred_percent) {
+          msg = isEs ? <>Se completó al 100% {renderTitle(rawTitle)}.</> : <>Completed 100% of {renderTitle(rawTitle)}.</>;
+        } else if (status === 'completed') {
+          msg = isEs ? <>Se completó el juego {renderTitle(rawTitle)}.</> : <>Completed game {renderTitle(rawTitle)}.</>;
+        } else if (status === 'endless') {
+          msg = isEs ? <>Se marcó {renderTitle(rawTitle)} como Infinito.</> : <>Marked {renderTitle(rawTitle)} as Endless.</>;
+        } else if (status === 'dropped') {
+          msg = isEs ? <>Se abandonó el juego {renderTitle(rawTitle)}.</> : <>Dropped game {renderTitle(rawTitle)}.</>;
+        } else if (status === 'playing') {
+          msg = isEs ? <>Se comenzó a jugar a {renderTitle(rawTitle)}.</> : <>Started playing {renderTitle(rawTitle)}.</>;
+        } else {
+          msg = isEs ? <>Se cambió el estado de {renderTitle(rawTitle)} a {getStatusLabel(status)}.</> : <>Changed status of {renderTitle(rawTitle)} to {getStatusLabel(status)}.</>;
+        }
+      } else {
+        msg = isEs
+          ? <>Se marcó {renderTitle(rawTitle)} como {getStatusLabel(status)}.</>
+          : <>Marked {renderTitle(rawTitle)} as {getStatusLabel(status)}.</>;
+      }
+      break;
+    }
+
+    case 'guide_created':
+      msg = isEs ? <>Se creó la guía {renderTitle(rawTitle)}.</> : <>Created guide {renderTitle(rawTitle)}.</>;
+      break;
+
+    case 'guide_edited':
+      msg = isEs ? <>Se editó la guía {renderTitle(rawTitle)}.</> : <>Edited guide {renderTitle(rawTitle)}.</>;
+      break;
+
+    case 'guide_followed':
+      msg = isEs ? <>Se comenzó a seguir la guía {renderTitle(rawTitle)}.</> : <>Started following guide {renderTitle(rawTitle)}.</>;
+      break;
+
+    case 'item_favorited':
+    case 'shelf_favorite':
+      msg = isEs ? <>Se destacó {renderTitle(rawTitle)}.</> : <>Featured {renderTitle(rawTitle)}.</>;
+      break;
+
+    case 'user_followed':
+      msg = isEs ? <>Se comenzó a seguir a @{rawTitle}.</> : <>Started following @{rawTitle}.</>;
+      break;
+
+    case 'item_rated':
+      msg = isEs ? <>Calificó {renderTitle(rawTitle)}</> : <>Rated {renderTitle(rawTitle)}</>;
+      break;
+
+    case 'guide_rated':
+      msg = isEs ? <>Calificó la guía {renderTitle(rawTitle)}</> : <>Rated guide {renderTitle(rawTitle)}</>;
+      break;
+
+    case 'item_reviewed': {
+      const rVal = meta.rating !== undefined && meta.rating !== null ? meta.rating : null;
+      if (rVal) {
+        msg = isEs
+          ? <>Calificó y escribió una reseña de {renderTitle(rawTitle)}</>
+          : <>Rated and reviewed {renderTitle(rawTitle)}</>;
+      } else {
+        msg = isEs
+          ? <>Escribió una reseña de {renderTitle(rawTitle)}</>
+          : <>Reviewed {renderTitle(rawTitle)}</>;
+      }
+      break;
+    }
+
+    case 'guide_commented':
+      msg = isEs ? <>Comentó en la guía {renderTitle(rawTitle)}.</> : <>Commented on guide {renderTitle(rawTitle)}.</>;
+      break;
+
+    case 'social_commented':
+      msg = isEs ? 'Comentó en la Actividad Social.' : 'Commented on Social Activity.';
+      break;
+
+    case 'guide_review_commented':
+      msg = isEs ? 'Comentó en la reseña de una guía.' : 'Commented on a guide review.';
+      break;
+
+    default:
+      msg = rawTitle ? <>{act.activity_type} - {renderTitle(rawTitle)}</> : act.activity_type;
+      break;
+  }
+
+  const isReview = act.activity_type === 'item_reviewed';
+  const isRating = act.activity_type === 'item_rated' || act.activity_type === 'guide_rated';
+  const ratingNumber = (isRating && act.details && !isNaN(Number(act.details)))
+    ? Number(act.details)
+    : (meta.rating !== undefined && meta.rating !== null && !isNaN(Number(meta.rating)) ? Number(meta.rating) : null);
+  const reviewText = isReview && act.details && act.details.trim() ? act.details.trim() : null;
+
+  const canOpenModal = Boolean(act.external_id || act.list_id || rawTitle);
+
+  const isEpType = ['series', 'anime', 'episode'].includes(itemType) || (act.external_id && String(act.external_id).startsWith('tvm-ep-')) || Boolean(rawTitle && /S\d+E\d+/i.test(rawTitle));
+  const isComicType = ['comic', 'manga'].includes(itemType) || (act.external_id && String(act.external_id).startsWith('cv_issue_'));
+
+  let targetPoster = meta.series_image_url || meta.volume_image_url || null;
+
+  if (!targetPoster && isEpType) {
+    const extractedShowName = (meta.show_name || meta.series_title || (rawTitle.match(/^(.*?)\s*-\s*[sS]\d+/i)?.[1]) || rawTitle.split(' (')[0] || '').trim().toLowerCase();
+    const matchedShow = libraryItems.find(item => {
+      const it = (item.item_type || '').toLowerCase();
+      if (!['series', 'anime'].includes(it)) return false;
+      if (meta.series_external_id && item.external_id === meta.series_external_id) return true;
+      if (extractedShowName && item.title && item.title.trim().toLowerCase() === extractedShowName) return true;
+      return false;
+    });
+    if (matchedShow?.image_url) {
+      targetPoster = matchedShow.image_url;
+    }
+  } else if (!targetPoster && isComicType) {
+    const volExtId = meta.volume_id || meta.series_external_id;
+    const volTitle = (meta.volume_title || meta.series_title || meta.work_title || (rawTitle.includes('#') ? rawTitle.split('#')[0] : rawTitle)).trim().toLowerCase();
+    const matchedVolume = libraryItems.find(item => {
+      const it = (item.item_type || '').toLowerCase();
+      if (!['comic', 'manga'].includes(it)) return false;
+      if (volExtId && item.external_id === volExtId) return true;
+      if (volTitle && item.title && item.title.trim().toLowerCase() === volTitle) return true;
+      return false;
+    });
+    if (matchedVolume?.image_url) {
+      targetPoster = matchedVolume.image_url;
+    }
+  }
+
+  if (!targetPoster) {
+    targetPoster = act.image_url || meta.image_url;
+  }
+
+  if (!targetPoster && act.activity_type.startsWith('item_')) {
+    const targetTitle = rawTitle.toLowerCase();
+    const matchedItem = libraryItems.find(item => {
+      if (act.external_id && item.external_id === act.external_id) return true;
+      if (targetTitle && item.title && item.title.trim().toLowerCase() === targetTitle) return true;
+      return false;
+    });
+    if (matchedItem?.image_url) {
+      targetPoster = matchedItem.image_url;
+    }
+  }
+
+  return (
+    <div
+      className="glass-card"
+      onClick={() => {
+        if (canOpenModal && act.activity_type.startsWith('item_')) {
+          let effectiveItemType = (meta.series_item_type || act.item_type || meta.item_type || 'series').toLowerCase();
+          if (effectiveItemType === 'episode') effectiveItemType = 'series';
+          let effectiveExternalId = meta.series_external_id || meta.parent_external_id || meta.work_ext_id || act.external_id || undefined;
+          const cleanTitle = meta.series_title || meta.work_title || rawTitle;
+
+          setSelectedItem({
+            external_id: effectiveExternalId,
+            id: (!effectiveExternalId && act.list_id) ? act.list_id : undefined,
+            title: cleanTitle || 'Media',
+            image_url: targetPoster || undefined,
+            item_type: effectiveItemType,
+            tracking_list_id: act.list_id || undefined
+          });
+        }
+      }}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      style={{
+        padding: '0.9rem 1.15rem',
+        display: 'flex',
+        gap: '1rem',
+        alignItems: 'flex-start',
+        fontSize: '0.9rem',
+        borderRadius: '12px',
+        background: isHovered && canOpenModal && act.activity_type.startsWith('item_')
+          ? 'rgba(255, 255, 255, 0.05)'
+          : 'var(--bg-secondary, rgba(255,255,255,0.03))',
+        borderColor: isHovered && canOpenModal && act.activity_type.startsWith('item_')
+          ? 'var(--accent-primary)'
+          : 'var(--border-color)',
+        borderWidth: '1px',
+        borderStyle: 'solid',
+        cursor: (canOpenModal && act.activity_type.startsWith('item_')) ? 'pointer' : 'default',
+        transition: 'all 0.18s ease'
+      }}
+    >
+      {/* Left: Thumbnail poster or Category icon */}
+      {targetPoster ? (
+        <div style={{
+          width: '42px',
+          height: '58px',
+          borderRadius: '6px',
+          overflow: 'hidden',
+          flexShrink: 0,
+          background: 'var(--bg-tertiary)',
+          border: '1px solid rgba(255,255,255,0.08)',
+          boxShadow: '0 2px 6px rgba(0,0,0,0.25)'
+        }}>
+          <img
+            src={targetPoster}
+            alt={rawTitle || 'Media'}
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          />
+        </div>
+      ) : (
+        <div style={{
+          width: '38px',
+          height: '38px',
+          borderRadius: '50%',
+          background: 'rgba(16, 185, 129, 0.12)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexShrink: 0,
+          marginTop: '0.15rem'
+        }}>
+          <CheckCircle size={18} color="#10b981" />
+        </div>
+      )}
+
+      {/* Middle & Right Content */}
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <span style={{ fontWeight: 500, color: 'var(--text-primary)', lineHeight: 1.4 }}>
+            {msg}
+          </span>
+          <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem', whiteSpace: 'nowrap' }}>
+            {formatDate(new Date(act.created_at))}
+          </span>
+        </div>
+
+        {/* Optional Star Rating highlight */}
+        {ratingNumber !== null && (
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.1rem' }}>
+            <StarRatingDisplay rating={ratingNumber} size={14} gap="2px" />
+            <span style={{ fontSize: '0.8rem', color: '#f59e0b', fontWeight: 700 }}>
+              {ratingNumber} / 5
+            </span>
+          </div>
+        )}
+
+        {/* Optional Review speech snippet */}
+        {reviewText && (
+          <div style={{
+            marginTop: '0.2rem',
+            background: 'rgba(255, 255, 255, 0.03)',
+            borderLeft: '3px solid var(--accent-primary)',
+            padding: '0.45rem 0.75rem',
+            borderRadius: '0 6px 6px 0',
+            fontSize: '0.84rem',
+            color: 'var(--text-secondary)',
+            lineHeight: 1.4,
+            wordBreak: 'break-word',
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden'
+          }}>
+            {reviewText}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 export default Profile;
+
 
 
 
