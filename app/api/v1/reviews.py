@@ -281,18 +281,7 @@ def create_or_update_review(
         db.commit()
         db.refresh(reply_review)
 
-        if review_in.content and review_in.content.strip():
-            from app.services.activity_service import ActivityService
-            ActivityService.record_activity(
-                db=db,
-                user_id=current_user.id,
-                activity_type="item_reviewed",
-                item_title=resolved_title,
-                item_type=item_type_lower,
-                external_id=external_id,
-                entity_id=str(reply_review.id),
-                details=review_in.content[:100]
-            )
+        # Replies are community comments, not standalone review activities
 
         return MediaReviewResponse(
             id=reply_review.id,

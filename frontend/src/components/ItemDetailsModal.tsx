@@ -610,46 +610,40 @@ export const MediaAttachmentView: React.FC<{
   );
 });
 
-const RootCommentEditor: React.FC<{
-  initialComment: string;
-  commentMedia: SelectedKlipyMedia | null;
+const RootReviewEditor: React.FC<{
+  initialReview: string;
   onSave: (content: string) => void;
   onDelete: () => void;
   onCancelEdit: () => void;
-  onOpenKlipy: () => void;
-  onRemoveMedia: () => void;
   isEditing: boolean;
-  hasExistingComment: boolean;
+  hasExistingReview: boolean;
   isSaving: boolean;
   user: any;
   language: string;
 }> = React.memo(({
-  initialComment,
-  commentMedia,
+  initialReview,
   onSave,
   onDelete,
   onCancelEdit,
-  onOpenKlipy,
-  onRemoveMedia,
   isEditing,
-  hasExistingComment,
+  hasExistingReview,
   isSaving,
   user,
   language
 }) => {
-  const [text, setText] = useState(initialComment);
+  const [text, setText] = useState(initialReview);
 
   useEffect(() => {
-    setText(initialComment);
-  }, [initialComment]);
+    setText(initialReview);
+  }, [initialReview]);
 
   return (
-    <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+    <div style={{ marginTop: '0.85rem', paddingTop: '0.85rem', borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h4 style={{ margin: 0, fontSize: '1.1rem' }}>
+        <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)' }}>
           {isEditing 
-            ? (language === 'es' ? 'Editar Tu Comentario' : 'Edit Your Comment')
-            : (language === 'es' ? 'Tu Comentario' : 'Your Comment')
+            ? (language === 'es' ? 'Editar Tu Reseña' : 'Edit Your Review')
+            : (language === 'es' ? 'Tu Reseña' : 'Your Review')
           }
         </h4>
         {isEditing && (
@@ -666,8 +660,79 @@ const RootCommentEditor: React.FC<{
         className="input-field"
         value={text}
         onChange={(e) => setText(e.target.value)}
-        placeholder={language === 'es' ? '¿Qué te pareció este elemento? Escribe tu comentario aquí...' : 'What did you think of this item? Write your comment here...'}
+        placeholder={language === 'es' ? 'Escribe una reseña sobre esta obra...' : 'Write a review about this item...'}
         style={{ width: '100%', minHeight: '80px', padding: '0.75rem', background: 'var(--bg-secondary)', resize: 'vertical' }}
+      />
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          {hasExistingReview && (
+            <button
+              type="button"
+              onClick={onDelete}
+              disabled={isSaving}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: '#ef4444',
+                fontSize: '0.82rem',
+                cursor: 'pointer',
+                padding: '0.4rem 0.6rem'
+              }}
+            >
+              {language === 'es' ? 'Eliminar reseña' : 'Delete review'}
+            </button>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <button
+            type="button"
+            onClick={() => onSave(text)}
+            className="btn-primary"
+            disabled={isSaving || !user || !text.trim()}
+            style={{ padding: '0.4rem 1rem', fontSize: '0.85rem' }}
+          >
+            {isSaving
+              ? (language === 'es' ? 'Guardando...' : 'Saving...')
+              : (language === 'es' ? 'Guardar Reseña' : 'Save Review')
+            }
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+});
+
+const RootCommentEditor: React.FC<{
+  commentText: string;
+  onChangeText: (text: string) => void;
+  commentMedia: SelectedKlipyMedia | null;
+  onOpenKlipy: () => void;
+  onRemoveMedia: () => void;
+  onSubmit: () => void;
+  isSubmitting: boolean;
+  user: any;
+  language: string;
+}> = React.memo(({
+  commentText,
+  onChangeText,
+  commentMedia,
+  onOpenKlipy,
+  onRemoveMedia,
+  onSubmit,
+  isSubmitting,
+  user,
+  language
+}) => {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', padding: '0.85rem', background: 'var(--bg-secondary)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+      <textarea
+        className="input-field"
+        value={commentText}
+        onChange={(e) => onChangeText(e.target.value)}
+        placeholder={language === 'es' ? 'Escribe un comentario sobre esta obra...' : 'Write a comment about this item...'}
+        style={{ width: '100%', minHeight: '65px', padding: '0.65rem', background: 'rgba(0,0,0,0.15)', resize: 'vertical' }}
       />
 
       {/* Attached Media Preview */}
@@ -685,71 +750,49 @@ const RootCommentEditor: React.FC<{
         />
       )}
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          {hasExistingComment && (
-            <button
-              type="button"
-              onClick={onDelete}
-              disabled={isSaving}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                color: '#ef4444',
-                fontSize: '0.82rem',
-                cursor: 'pointer',
-                padding: '0.4rem 0.6rem'
-              }}
-            >
-              {language === 'es' ? 'Eliminar comentario' : 'Delete comment'}
-            </button>
-          )}
-        </div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '0.5rem' }}>
+        {/* Attach GIF / Media Button */}
+        <button
+          type="button"
+          onClick={onOpenKlipy}
+          title={language === 'es' ? 'Añadir GIF / Multimedia' : 'Add GIF / Media'}
+          aria-label={language === 'es' ? 'Añadir GIF / Multimedia' : 'Add GIF / Media'}
+          style={{
+            background: commentMedia ? 'rgba(236, 72, 153, 0.12)' : 'rgba(255,255,255,0.06)',
+            border: commentMedia ? '1px solid #ec4899' : '1px solid var(--border-color)',
+            color: commentMedia ? '#ec4899' : 'var(--text-secondary)',
+            borderRadius: '6px',
+            padding: '0.4rem 0.55rem',
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'all 0.15s ease'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = '#ec4899';
+            e.currentTarget.style.color = '#ec4899';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = commentMedia ? '#ec4899' : 'var(--border-color)';
+            e.currentTarget.style.color = commentMedia ? '#ec4899' : 'var(--text-secondary)';
+          }}
+        >
+          <ImageIcon size={16} />
+        </button>
 
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          {/* Attach GIF / Media Button */}
-          <button
-            type="button"
-            onClick={onOpenKlipy}
-            title={language === 'es' ? 'Añadir GIF / Multimedia' : 'Add GIF / Media'}
-            aria-label={language === 'es' ? 'Añadir GIF / Multimedia' : 'Add GIF / Media'}
-            style={{
-              background: commentMedia ? 'rgba(236, 72, 153, 0.12)' : 'rgba(255,255,255,0.06)',
-              border: commentMedia ? '1px solid #ec4899' : '1px solid var(--border-color)',
-              color: commentMedia ? '#ec4899' : 'var(--text-secondary)',
-              borderRadius: '6px',
-              padding: '0.42rem 0.55rem',
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'all 0.15s ease'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = '#ec4899';
-              e.currentTarget.style.color = '#ec4899';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = commentMedia ? '#ec4899' : 'var(--border-color)';
-              e.currentTarget.style.color = commentMedia ? '#ec4899' : 'var(--text-secondary)';
-            }}
-          >
-            <ImageIcon size={16} />
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onSave(text)}
-            className="btn-primary"
-            disabled={isSaving || !user || (!text.trim() && !commentMedia)}
-            style={{ padding: '0.4rem 1rem', fontSize: '0.85rem' }}
-          >
-            {isSaving
-              ? (language === 'es' ? 'Publicando...' : 'Publishing...')
-              : (language === 'es' ? 'Publicar' : 'Publish')
-            }
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={onSubmit}
+          className="btn-primary"
+          disabled={isSubmitting || !user || (!commentText.trim() && !commentMedia)}
+          style={{ padding: '0.4rem 1rem', fontSize: '0.85rem' }}
+        >
+          {isSubmitting
+            ? (language === 'es' ? 'Publicando...' : 'Publishing...')
+            : (language === 'es' ? 'Comentar' : 'Comment')
+          }
+        </button>
       </div>
     </div>
   );
@@ -1052,6 +1095,12 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   const [userRating, setUserRating] = useState<number>(0);
   const [userComment, setUserComment] = useState<string>('');
   const [commentMedia, setCommentMedia] = useState<SelectedKlipyMedia | null>(null);
+  const [newCommentText, setNewCommentText] = useState<string>('');
+  const [newCommentMedia, setNewCommentMedia] = useState<SelectedKlipyMedia | null>(null);
+  const [isPostingComment, setIsPostingComment] = useState<boolean>(false);
+  const [editingCommentId, setEditingCommentId] = useState<number | null>(null);
+  const [editingCommentText, setEditingCommentText] = useState<string>('');
+  const [editingCommentMedia, setEditingCommentMedia] = useState<SelectedKlipyMedia | null>(null);
   const [pagesReadVal, setPagesReadVal] = useState<number | ''>(0);
   const [totalPagesVal, setTotalPagesVal] = useState<number | ''>('');
   const [hasInteractedWithTime, setHasInteractedWithTime] = useState<boolean>(false);
@@ -1067,7 +1116,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   const [editingReplyMedia, setEditingReplyMedia] = useState<SelectedKlipyMedia | null>(null);
 
   // Klipy Picker Modal state
-  const [klipyPickerTarget, setKlipyPickerTarget] = useState<'comment' | 'reply' | 'edit_reply' | null>(null);
+  const [klipyPickerTarget, setKlipyPickerTarget] = useState<'comment' | 'reply' | 'edit_reply' | 'edit_comment' | null>(null);
 
   // Game & Manga relations & Navigation history
   const [gameRelations, setGameRelations] = useState<{ collections?: any[], bundle_games?: any[], editions?: any[], dlcs?: any[], parent_game?: any } | null>(null);
@@ -3257,15 +3306,15 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     try {
       await apiClient.post(`/reviews/${selectedItem.item_type}/${selectedItem.external_id}`, {
         content: textToSave.trim() ? textToSave : null,
-        media_url: commentMedia?.url || null,
-        media_type: commentMedia?.type || null
+        media_url: null,
+        media_type: null
       });
       setUserComment(textToSave);
       const revRes = await apiClient.get(`/reviews/${selectedItem.item_type}/${selectedItem.external_id}`);
       setItemReviews(revRes.data);
       setIsEditingComment(false);
     } catch(err) {
-      console.error("Failed to save comment", err);
+      console.error("Failed to save review", err);
     } finally {
       setIsSavingReview(false);
     }
@@ -3286,9 +3335,61 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       setItemReviews(revRes.data);
       setIsEditingComment(false);
     } catch(err) {
-      console.error("Failed to delete comment", err);
+      console.error("Failed to delete review", err);
     } finally {
       setIsSavingReview(false);
+    }
+  };
+
+  const handlePostCommunityComment = async () => {
+    const hasText = Boolean(newCommentText.trim());
+    const hasMedia = Boolean(newCommentMedia?.url);
+    if (!selectedItem || !selectedItem.external_id || (!hasText && !hasMedia) || isPostingComment) return;
+    setIsPostingComment(true);
+    try {
+      const res = await apiClient.post(`/reviews/${selectedItem.item_type}/${selectedItem.external_id}`, {
+        content: hasText ? newCommentText.trim() : null,
+        media_url: newCommentMedia?.url || null,
+        media_type: newCommentMedia?.type || null
+      });
+      setItemReviews(prev => {
+        const exists = prev.some(r => r.id === res.data.id);
+        if (exists) return prev.map(r => r.id === res.data.id ? res.data : r);
+        return [...prev, res.data];
+      });
+      setNewCommentText('');
+      setNewCommentMedia(null);
+    } catch (err) {
+      console.error("Failed to post comment", err);
+    } finally {
+      setIsPostingComment(false);
+    }
+  };
+
+  const handleSaveEditCommunityComment = async (commentId: number, customText?: string) => {
+    const textToSave = customText !== undefined ? customText : editingCommentText;
+    const hasText = Boolean(textToSave.trim());
+    const hasMedia = Boolean(editingCommentMedia?.url);
+    if ((!hasText && !hasMedia) || isPostingComment) return;
+    setIsPostingComment(true);
+    try {
+      const res = await apiClient.put(`/reviews/${commentId}`, {
+        content: textToSave.trim() || null,
+        media_url: editingCommentMedia?.url || null,
+        media_type: editingCommentMedia?.type || null
+      });
+      setItemReviews(prev => prev.map(r => r.id === commentId ? res.data : r));
+      setEditingCommentId(null);
+      setEditingCommentText('');
+      setEditingCommentMedia(null);
+    } catch (err: any) {
+      if (err.response?.data?.detail) {
+        alert(err.response.data.detail);
+      } else {
+        console.error("Failed to edit comment", err);
+      }
+    } finally {
+      setIsPostingComment(false);
     }
   };
 
@@ -5093,7 +5194,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                     );
                   })()}
 
-                  {/* Star rating selector */}
+                  {/* Star rating selector & inline review */}
                   <div>
                     <h5 style={{ margin: '0 0 0.4rem 0', color: 'var(--text-secondary)' }}>{language === 'es' ? 'Tu Calificación:' : 'Your Rating:'}</h5>
                     <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -5101,7 +5202,10 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         <button
                           key={star}
                           disabled={!user || !isItemTracked}
-                          onClick={() => handleSaveRating(star)}
+                          onClick={() => {
+                            handleSaveRating(star);
+                            setIsEditingComment(true);
+                          }}
                           title={!isItemTracked 
                             ? (isEpisode 
                                 ? (language === 'es' ? 'Marca este episodio como visto para calificarlo' : 'Mark this episode as watched to rate it')
@@ -5154,6 +5258,29 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         }
                       </span>
                     )}
+
+                    {/* Review text box directly beneath rating stars when item is tracked and user has rated or started writing */}
+                    {user && isItemTracked && (userRating > 0 || isEditingComment || Boolean(userComment && userComment.trim())) && (() => {
+                      const myRootReview = (itemReviews || []).find((r: any) => r.user_id === user?.id && !r.parent_id);
+                      const hasExistingReview = Boolean(myRootReview?.content && myRootReview.content.trim());
+
+                      return (
+                        <RootReviewEditor
+                          initialReview={userComment}
+                          onSave={handleSaveComment}
+                          onDelete={handleDeleteComment}
+                          onCancelEdit={() => {
+                            setIsEditingComment(false);
+                            setUserComment(myRootReview?.content || '');
+                          }}
+                          isEditing={isEditingComment}
+                          hasExistingReview={hasExistingReview}
+                          isSaving={isSavingReview}
+                          user={user}
+                          language={language}
+                        />
+                      );
+                    })()}
                   </div>
 
                   {/* Favorite toggler moved to 3-dots menu */}
@@ -7633,39 +7760,26 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                 </div>
               )}
 
-              {/* Comment write area - only shown if user has not yet posted a root comment OR is actively editing it */}
-              {(() => {
-                const myRootReview = (itemReviews || []).find((r: any) => r.user_id === user?.id && !r.parent_id);
-                const hasExistingComment = Boolean(myRootReview?.content && myRootReview.content.trim());
-
-                if (hasExistingComment && !isEditingComment) {
-                  return null;
-                }
-
-                return (
-                  <RootCommentEditor
-                    initialComment={userComment}
-                    commentMedia={commentMedia}
-                    onSave={handleSaveComment}
-                    onDelete={handleDeleteComment}
-                    onCancelEdit={() => {
-                      setIsEditingComment(false);
-                      setUserComment(myRootReview?.content || '');
-                    }}
-                    onOpenKlipy={() => setKlipyPickerTarget('comment')}
-                    onRemoveMedia={() => setCommentMedia(null)}
-                    isEditing={isEditingComment}
-                    hasExistingComment={hasExistingComment}
-                    isSaving={isSavingReview}
-                    user={user}
-                    language={language}
-                  />
-                );
-              })()}
 
               {/* Community Reviews List */}
               <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', textAlign: 'left' }}>
                 <h4 style={{ margin: 0, fontSize: '1.1rem' }}>{language === 'es' ? 'Comentarios de la Comunidad' : 'Community Comments'}</h4>
+
+                {/* New Comment Composer */}
+                {user && (
+                  <RootCommentEditor
+                    commentText={newCommentText}
+                    onChangeText={setNewCommentText}
+                    commentMedia={newCommentMedia}
+                    onOpenKlipy={() => setKlipyPickerTarget('comment')}
+                    onRemoveMedia={() => setNewCommentMedia(null)}
+                    onSubmit={handlePostCommunityComment}
+                    isSubmitting={isPostingComment}
+                    user={user}
+                    language={language}
+                  />
+                )}
+
                 {(() => {
                   const rootReviews = (itemReviews || []).filter((r: any) => !r.parent_id && ((r.content && r.content.trim()) || r.media_url));
                   if (rootReviews.length === 0) {
@@ -7699,6 +7813,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         const hasReplies = childReplies.length > 0;
                         const isCollapsed = !!collapsedReplies[rootNode.id];
                         const isReplyingRoot = replyTarget?.targetReviewId === rootNode.id;
+                        const isEditingThisComment = editingCommentId === rootNode.id;
 
                         return (
                           <div
@@ -7775,31 +7890,37 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                 {user && user.id === rootNode.user_id && isWithinEditWindow(rootNode.created_at) && (
                                   <button
                                     onClick={() => {
-                                      setUserComment(rootNode.content || '');
-                                      if (rootNode.media_url) {
-                                        setCommentMedia({
-                                          url: rootNode.media_url,
-                                          type: rootNode.media_type || 'gif',
-                                          slug: '',
-                                          title: ''
-                                        });
+                                      if (isEditingThisComment) {
+                                        setEditingCommentId(null);
+                                        setEditingCommentText('');
+                                        setEditingCommentMedia(null);
                                       } else {
-                                        setCommentMedia(null);
+                                        setEditingCommentId(rootNode.id);
+                                        setEditingCommentText(rootNode.content || '');
+                                        if (rootNode.media_url) {
+                                          setEditingCommentMedia({
+                                            url: rootNode.media_url,
+                                            type: rootNode.media_type || 'gif',
+                                            slug: '',
+                                            title: ''
+                                          });
+                                        } else {
+                                          setEditingCommentMedia(null);
+                                        }
                                       }
-                                      setIsEditingComment(true);
                                     }}
                                     title={language === 'es' ? 'Editar comentario' : 'Edit comment'}
                                     style={{
                                       background: 'transparent',
                                       border: 'none',
-                                      color: 'var(--text-muted)',
+                                      color: isEditingThisComment ? 'var(--accent-primary)' : 'var(--text-muted)',
                                       cursor: 'pointer',
                                       padding: '0.2rem',
                                       display: 'flex',
                                       alignItems: 'center'
                                     }}
                                     onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--accent-primary)')}
-                                    onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
+                                    onMouseLeave={(e) => (e.currentTarget.style.color = isEditingThisComment ? 'var(--accent-primary)' : 'var(--text-muted)')}
                                   >
                                     <Edit2 size={13} />
                                   </button>
@@ -7826,15 +7947,32 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                               </div>
                             </div>
 
-                            {/* Comment text */}
-                            {rootNode.content && (
-                              <p style={{ margin: 0, fontSize: '0.92rem', color: 'var(--text-primary)', whiteSpace: 'pre-wrap', lineHeight: '1.45' }}>
-                                {renderReviewContent(rootNode.content)}
-                              </p>
+                            {/* Comment text or Edit Form */}
+                            {isEditingThisComment ? (
+                              <ReviewEditReplyForm
+                                initialText={rootNode.content || ''}
+                                editingMedia={editingCommentMedia}
+                                onCancel={() => {
+                                  setEditingCommentId(null);
+                                  setEditingCommentText('');
+                                  setEditingCommentMedia(null);
+                                }}
+                                onOpenKlipy={() => setKlipyPickerTarget('edit_comment')}
+                                onRemoveMedia={() => setEditingCommentMedia(null)}
+                                onSave={(text) => handleSaveEditCommunityComment(rootNode.id, text)}
+                                isSubmitting={isPostingComment}
+                                language={language}
+                              />
+                            ) : (
+                              <>
+                                {rootNode.content && (
+                                  <p style={{ margin: 0, fontSize: '0.92rem', color: 'var(--text-primary)', whiteSpace: 'pre-wrap', lineHeight: '1.45' }}>
+                                    {renderReviewContent(rootNode.content)}
+                                  </p>
+                                )}
+                                {renderMediaAttachment(rootNode.media_url, rootNode.media_type)}
+                              </>
                             )}
-
-                            {/* Comment Media Attachment */}
-                            {renderMediaAttachment(rootNode.media_url, rootNode.media_type)}
 
                             {/* Actions */}
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '0.25rem', flexWrap: 'wrap' }}>
@@ -10022,7 +10160,9 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                 onClose={() => setKlipyPickerTarget(null)}
                 onSelectMedia={(media) => {
                   if (klipyPickerTarget === 'comment') {
-                    setCommentMedia(media);
+                    setNewCommentMedia(media);
+                  } else if (klipyPickerTarget === 'edit_comment') {
+                    setEditingCommentMedia(media);
                   } else if (klipyPickerTarget === 'reply') {
                     setReplyMedia(media);
                   } else if (klipyPickerTarget === 'edit_reply') {

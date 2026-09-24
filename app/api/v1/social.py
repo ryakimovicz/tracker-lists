@@ -205,18 +205,7 @@ def add_comment(
     db.commit()
     db.refresh(new_comment)
 
-    # Record activity log
-    from app.services.activity_service import ActivityService
-    ActivityService.record_activity(
-        db=db,
-        user_id=current_user.id,
-        activity_type="guide_commented",
-        item_title=reading_list.title,
-        item_type="guide",
-        list_id=reading_list.id,
-        entity_id=str(new_comment.id),
-        details=comment_in.content[:100]
-    )
+    # Guide comments do not generate standalone social activity cards
     
     return CommentResponse(
         id=new_comment.id,
@@ -749,10 +738,12 @@ def get_following_feed(
     client_country = parts[1].upper() if len(parts) > 1 else ("ES" if client_lang == "es" and "es-es" in accept_lang.lower() else "AR")
 
     followed_ids_query = db.query(Follow.followed_id).filter(Follow.follower_id == current_user.id)
+    comment_types = ["guide_commented", "item_commented", "guide_review_commented"]
     
     activity_records = db.query(UserActivityLog).filter(
         UserActivityLog.user_id.in_(followed_ids_query),
-        UserActivityLog.is_hidden == False
+        UserActivityLog.is_hidden == False,
+        ~UserActivityLog.activity_type.in_(comment_types)
     ).order_by(UserActivityLog.created_at.desc()).offset(skip).limit(limit).all()
 
     feed = []
@@ -775,13 +766,14 @@ def get_discover_feed(
     client_lang = parts[0].lower() if parts else "es"
     client_country = parts[1].upper() if len(parts) > 1 else ("ES" if client_lang == "es" and "es-es" in accept_lang.lower() else "AR")
 
-    # Discover feed: activities from public users, not hidden
-    # Filter out private users
+    # Discover feed: activities from public users, not hidden, no comment events
     public_users_query = db.query(User.id).filter(User.is_private == False)
+    comment_types = ["guide_commented", "item_commented", "guide_review_commented"]
 
     activity_records = db.query(UserActivityLog).filter(
         UserActivityLog.user_id.in_(public_users_query),
-        UserActivityLog.is_hidden == False
+        UserActivityLog.is_hidden == False,
+        ~UserActivityLog.activity_type.in_(comment_types)
     ).order_by(UserActivityLog.created_at.desc()).offset(skip).limit(limit).all()
 
     uid = current_user.id if current_user else None
@@ -806,7 +798,7 @@ def get_reviews_feed(
     client_country = parts[1].upper() if len(parts) > 1 else ("ES" if client_lang == "es" and "es-es" in accept_lang.lower() else "AR")
 
     # Review activities: item_reviewed, guide_rated, item_rated
-    review_types = ["item_reviewed", "guide_rated", "item_rated", "guide_review_commented"]
+    review_types = ["item_reviewed", "guide_rated", "item_rated"]
     public_users_query = db.query(User.id).filter(User.is_private == False)
 
     activity_records = db.query(UserActivityLog).filter(
@@ -836,8 +828,10 @@ def get_my_activity_feed(
     client_lang = parts[0].lower() if parts else "es"
     client_country = parts[1].upper() if len(parts) > 1 else ("ES" if client_lang == "es" and "es-es" in accept_lang.lower() else "AR")
 
+    comment_types = ["guide_commented", "item_commented", "guide_review_commented"]
     activity_records = db.query(UserActivityLog).filter(
-        UserActivityLog.user_id == current_user.id
+        UserActivityLog.user_id == current_user.id,
+        ~UserActivityLog.activity_type.in_(comment_types)
     ).order_by(UserActivityLog.created_at.desc()).offset(skip).limit(limit).all()
 
     feed = []
