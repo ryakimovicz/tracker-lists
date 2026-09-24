@@ -643,6 +643,51 @@ def _format_activity_item(r: UserActivityLog, db: Session, current_user_id: Opti
             ).first()
             if any_lib and any_lib.image_url:
                 final_image_url = any_lib.image_url
+    elif r.item_type in ('comic', 'manga') or (r.external_id and str(r.external_id).startswith('cv_issue_')):
+        # For comic issues, always display the parent volume poster if available
+        meta_dict = {}
+        if r.metadata_json:
+            try:
+                meta_dict = json.loads(r.metadata_json) if isinstance(r.metadata_json, str) else r.metadata_json
+            except Exception:
+                pass
+
+        vol_ext_id = meta_dict.get('series_external_id') or meta_dict.get('volume_id')
+        vol_title = meta_dict.get('series_title') or meta_dict.get('work_title')
+        if not vol_title and r.item_title and '#' in r.item_title:
+            vol_title = r.item_title.split('#')[0].strip()
+
+        # Check library by tracking list, external id, or title
+        vol_lib = None
+        if r.list_id:
+            vol_lib = db.query(UserLibraryItem).filter(
+                UserLibraryItem.user_id == r.user_id,
+                UserLibraryItem.tracking_list_id == r.list_id,
+                UserLibraryItem.image_url.isnot(None)
+            ).first()
+        if not vol_lib and vol_ext_id:
+            vol_lib = db.query(UserLibraryItem).filter(
+                UserLibraryItem.external_id == vol_ext_id,
+                UserLibraryItem.image_url.isnot(None)
+            ).first()
+        if not vol_lib and vol_title:
+            vol_lib = db.query(UserLibraryItem).filter(
+                UserLibraryItem.user_id == r.user_id,
+                UserLibraryItem.title.ilike(vol_title),
+                UserLibraryItem.image_url.isnot(None)
+            ).first()
+        if not vol_lib and vol_title:
+            vol_lib = db.query(UserLibraryItem).filter(
+                UserLibraryItem.title.ilike(vol_title),
+                UserLibraryItem.image_url.isnot(None)
+            ).first()
+
+        if vol_lib and vol_lib.image_url:
+            final_image_url = vol_lib.image_url
+        elif r.list_id and not final_image_url:
+            reading_list = db.query(ReadingList).filter(ReadingList.id == r.list_id).first()
+            if reading_list and reading_list.cover_image:
+                final_image_url = reading_list.cover_image
     elif not final_image_url and r.item_title:
         # If image_url is missing, look up by external_id or title in UserLibraryItem or ListItem
         if r.external_id:

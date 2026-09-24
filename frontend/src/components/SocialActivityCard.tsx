@@ -122,8 +122,16 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
           }
         } catch (_) {}
       } else if (effectiveExternalId && typeof effectiveExternalId === 'string' && effectiveExternalId.startsWith('cv_issue_')) {
+        effectiveItemType = 'comic';
         if (meta.volume_id || meta.series_external_id) {
           effectiveExternalId = meta.volume_id || meta.series_external_id;
+        } else {
+          try {
+            const issueRes = await apiClient.get(`/search/comic/issue/${effectiveExternalId}`);
+            if (issueRes.data?.parent_series?.external_id) {
+              effectiveExternalId = issueRes.data.parent_series.external_id;
+            }
+          } catch (_) {}
         }
       }
 

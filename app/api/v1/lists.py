@@ -1857,6 +1857,7 @@ def toggle_series_episode(
         parent_ext_id = tracking_lib_item.external_id if tracking_lib_item else None
         parent_title = tracking_lib_item.title if tracking_lib_item else (reading_list.name if reading_list else None)
         parent_type = tracking_lib_item.item_type if tracking_lib_item else ("anime" if parent_ext_id and str(parent_ext_id).startswith("anime_") else "series")
+        parent_img = tracking_lib_item.image_url if tracking_lib_item and tracking_lib_item.image_url else item.image_url
         meta_dict = {
             "series_external_id": parent_ext_id,
             "series_title": parent_title,
@@ -1871,7 +1872,7 @@ def toggle_series_episode(
             item_type=item.item_type.value if hasattr(item.item_type, 'value') else item.item_type,
             external_id=item.external_id,
             list_id=list_id,
-            image_url=item.image_url,
+            image_url=parent_img,
             details="completed",
             metadata_json=json.dumps(meta_dict)
         )
