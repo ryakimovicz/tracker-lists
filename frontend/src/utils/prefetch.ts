@@ -146,14 +146,26 @@ export const prefetchRoute = (route: string) => {
       break;
     }
     case '/social': {
-      // Prefetch social feed
-      apiClient.get('/social/users/feed/activity')
-        .then(res => {
-          if (res.data) {
-            sessionStorage.setItem('pathd_social_cache', JSON.stringify(res.data));
-          }
-        })
-        .catch(() => {});
+      // Prefetch primary social feed (following + discover)
+      Promise.allSettled([
+        apiClient.get('/social/feed/following'),
+        apiClient.get('/social/feed/discover')
+      ]).then(([followingRes, discoverRes]) => {
+        if (followingRes.status === 'fulfilled' && Array.isArray(followingRes.value.data)) {
+          const serialized = JSON.stringify(followingRes.value.data);
+          try {
+            sessionStorage.setItem('pathd_social_feed_following', serialized);
+            localStorage.setItem('pathd_social_feed_following', serialized);
+          } catch (_) {}
+        }
+        if (discoverRes.status === 'fulfilled' && Array.isArray(discoverRes.value.data)) {
+          const serialized = JSON.stringify(discoverRes.value.data);
+          try {
+            sessionStorage.setItem('pathd_social_feed_discover', serialized);
+            localStorage.setItem('pathd_social_feed_discover', serialized);
+          } catch (_) {}
+        }
+      }).catch(() => {});
       break;
     }
     case '/profile': {

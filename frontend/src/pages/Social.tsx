@@ -6,9 +6,21 @@ import { useTranslation } from '../context/LanguageContext';
 import { SocialActivityCard } from '../components/SocialActivityCard';
 import type { ActivityCardData } from '../components/SocialActivityCard';
 import { ItemDetailsModal } from '../components/ItemDetailsModal';
+import { PathdLoader } from '../components/PathdLoader';
 import { Link } from 'react-router-dom';
 
 type SocialTab = 'following' | 'discover' | 'reviews' | 'me';
+
+const getCachedFeed = (tab: SocialTab): ActivityCardData[] => {
+  try {
+    const raw = sessionStorage.getItem(`pathd_social_feed_${tab}`) || localStorage.getItem(`pathd_social_feed_${tab}`);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (_) {}
+  return [];
+};
 
 export const Social: React.FC = () => {
   const { user } = useAuth();
@@ -16,16 +28,23 @@ export const Social: React.FC = () => {
   const isEs = language === 'es';
 
   const [activeTab, setActiveTab] = useState<SocialTab>('following');
-  const [activities, setActivities] = useState<ActivityCardData[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [activities, setActivities] = useState<ActivityCardData[]>(() => getCachedFeed('following'));
+  const [loading, setLoading] = useState<boolean>(() => getCachedFeed('following').length === 0);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedItem, setSelectedItem] = useState<any | null>(null);
 
   const fetchTabFeed = async (tab: SocialTab, isRefresh = false) => {
-    try {
-      if (isRefresh) setRefreshing(true);
-      else setLoading(true);
+    const cached = getCachedFeed(tab);
+    if (!isRefresh && cached.length > 0) {
+      setActivities(cached);
+      setLoading(false);
+    } else if (!isRefresh && activities.length === 0) {
+      setLoading(true);
+    }
 
+    if (isRefresh) setRefreshing(true);
+
+    try {
       let endpoint = '/social/feed/following';
       if (tab === 'discover') endpoint = '/social/feed/discover';
       else if (tab === 'reviews') endpoint = '/social/feed/reviews';
@@ -34,6 +53,11 @@ export const Social: React.FC = () => {
       const res = await apiClient.get(endpoint);
       if (Array.isArray(res.data)) {
         setActivities(res.data);
+        const serialized = JSON.stringify(res.data);
+        try {
+          sessionStorage.setItem(`pathd_social_feed_${tab}`, serialized);
+          localStorage.setItem(`pathd_social_feed_${tab}`, serialized);
+        } catch (_) {}
       }
     } catch (err) {
       console.error(`Error loading social feed for tab ${tab}:`, err);
@@ -85,7 +109,7 @@ export const Social: React.FC = () => {
   ];
 
   return (
-    <div style={{ maxWidth: '680px', margin: '0 auto', padding: '1.5rem 1rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+    <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem 0', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
       {/* Header & Tabs */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -164,8 +188,8 @@ export const Social: React.FC = () => {
       {/* Feed Content */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
         {loading ? (
-          <div style={{ padding: '4rem 2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-            <div style={{ fontSize: '1.05rem', fontWeight: 600 }}>{isEs ? 'Cargando feed...' : 'Loading feed...'}</div>
+          <div style={{ minHeight: '45vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '3rem 1rem' }}>
+            <PathdLoader size="medium" message={isEs ? 'Cargando comunidad...' : 'Loading community...'} />
           </div>
         ) : activities.length === 0 ? (
           <div className="glass-card" style={{ padding: '4rem 2rem', textAlign: 'center', borderRadius: '16px' }}>
