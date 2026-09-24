@@ -186,37 +186,44 @@ export const Social: React.FC = () => {
       </div>
 
       {/* Feed Content */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        {loading ? (
-          <div style={{ minHeight: '45vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '3rem 1rem' }}>
-            <PathdLoader size="medium" message={isEs ? 'Cargando comunidad...' : 'Loading community...'} />
-          </div>
-        ) : activities.length === 0 ? (
-          <div className="glass-card" style={{ padding: '4rem 2rem', textAlign: 'center', borderRadius: '16px' }}>
-            <h3 style={{ fontSize: '1.4rem', marginBottom: '0.5rem', color: 'var(--text-primary)' }}>
-              {activeTab === 'following'
-                ? (isEs ? 'Tu muro está en silencio' : 'Your feed is quiet')
-                : (isEs ? 'No hay actividad disponible' : 'No activity available')}
-            </h3>
-            <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem', fontSize: '0.95rem', maxWidth: '460px', margin: '0 auto 1.5rem auto' }}>
-              {activeTab === 'following'
-                ? (isEs ? 'Los usuarios que sigues no han registrado actividad recientemente. ¡Explora la pestaña Descubrir para conectar con más personas!' : 'Users you follow have not recorded activity recently. Explore Discover to find new people!')
-                : activeTab === 'me'
-                ? (isEs ? 'Todavía no has registrado actividad pública. Completa obras o califícalas para ver tu progreso aquí.' : 'You have not logged public activity yet. Complete items or rate them to see your progress.')
-                : (isEs ? 'No se encontraron publicaciones con los criterios actuales.' : 'No entries found with the current criteria.')}
-            </p>
-            {activeTab === 'following' && (
-              <button
-                onClick={() => setActiveTab('discover')}
-                className="btn-primary"
-                style={{ padding: '0.7rem 1.75rem', borderRadius: '25px', fontWeight: 600 }}
-              >
-                {isEs ? 'Ir a Descubrir' : 'Go to Discover'}
-              </button>
-            )}
-          </div>
-        ) : (
-          activities.map(act => (
+      {loading ? (
+        <div style={{ minHeight: '45vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '3rem 1rem' }}>
+          <PathdLoader size="medium" message={isEs ? 'Cargando comunidad...' : 'Loading community...'} />
+        </div>
+      ) : activities.length === 0 ? (
+        <div className="glass-card" style={{ padding: '4rem 2rem', textAlign: 'center', borderRadius: '16px' }}>
+          <h3 style={{ fontSize: '1.4rem', marginBottom: '0.5rem', color: 'var(--text-primary)' }}>
+            {activeTab === 'following'
+              ? (isEs ? 'Tu muro está en silencio' : 'Your feed is quiet')
+              : (isEs ? 'No hay actividad disponible' : 'No activity available')}
+          </h3>
+          <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem', fontSize: '0.95rem', maxWidth: '460px', margin: '0 auto 1.5rem auto' }}>
+            {activeTab === 'following'
+              ? (isEs ? 'Los usuarios que sigues no han registrado actividad recientemente. ¡Explora la pestaña Descubrir para conectar con más personas!' : 'Users you follow have not recorded activity recently. Explore Discover to find new people!')
+              : activeTab === 'me'
+              ? (isEs ? 'Todavía no has registrado actividad pública. Completa obras o califícalas para ver tu progreso aquí.' : 'You have not logged public activity yet. Complete items or rate them to see your progress.')
+              : (isEs ? 'No se encontraron publicaciones con los criterios actuales.' : 'No entries found with the current criteria.')}
+          </p>
+          {activeTab === 'following' && (
+            <button
+              onClick={() => setActiveTab('discover')}
+              className="btn-primary"
+              style={{ padding: '0.7rem 1.75rem', borderRadius: '25px', fontWeight: 600 }}
+            >
+              {isEs ? 'Ir a Descubrir' : 'Go to Discover'}
+            </button>
+          )}
+        </div>
+      ) : (
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+            gap: '1.25rem',
+            alignItems: 'stretch'
+          }}
+        >
+          {activities.map(act => (
             <SocialActivityCard
               key={act.id}
               activity={act}
@@ -224,9 +231,9 @@ export const Social: React.FC = () => {
               onVisibilityToggle={handleVisibilityToggle}
               onOpenItem={(item) => setSelectedItem(item)}
             />
-          ))
-        )}
-      </div>
+          ))}
+        </div>
+      )}
 
       {selectedItem && (
         <ItemDetailsModal

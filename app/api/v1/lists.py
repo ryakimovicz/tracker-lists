@@ -1653,8 +1653,11 @@ def check_series_completion(user_id: int, ep_external_id: str):
                     ItemProgress.is_completed == True
                 ).count()
                 
-                if completed_count >= total_aired:
-                    # Mark series as completed
+                show_status = (show.get("status") or "").lower()
+                is_show_ended = show_status in ("ended", "canceled", "cancelled")
+
+                if completed_count >= total_aired and is_show_ended:
+                    # Mark series as completed only if the show is truly ended
                     show_ext_id = f"tvm_{show_id}"
                     existing_series = db.query(UserLibraryItem).filter(
                         UserLibraryItem.user_id == user_id,
@@ -1850,15 +1853,27 @@ def toggle_series_episode(
         )
         db.add(ch)
         
-        # Record activity log
+        # Record activity log with parent series info and list_id
+        parent_ext_id = tracking_lib_item.external_id if tracking_lib_item else None
+        parent_title = tracking_lib_item.title if tracking_lib_item else (reading_list.name if reading_list else None)
+        parent_type = tracking_lib_item.item_type if tracking_lib_item else ("anime" if parent_ext_id and str(parent_ext_id).startswith("anime_") else "series")
+        meta_dict = {
+            "series_external_id": parent_ext_id,
+            "series_title": parent_title,
+            "series_item_type": parent_type,
+            "season_number": ep_req.season_number if hasattr(ep_req, 'season_number') else None,
+            "episode_number": ep_req.episode_number if hasattr(ep_req, 'episode_number') else None
+        }
         activity = UserActivityLog(
             user_id=current_user.id,
             activity_type="item_completed",
             item_title=item.title,
             item_type=item.item_type.value if hasattr(item.item_type, 'value') else item.item_type,
             external_id=item.external_id,
+            list_id=list_id,
             image_url=item.image_url,
-            details="completed"
+            details="completed",
+            metadata_json=json.dumps(meta_dict)
         )
         db.add(activity)
         
@@ -1954,16 +1969,25 @@ def toggle_series_episode(
                     except Exception as e:
                         print(f"Error checking all_aired_completed: {e}")
 
-                if all_aired_completed:
+                is_ended = False
+                if completed_ep_titles and lib_item.external_id:
+                    try:
+                        series_detail = TVMazeService.get_series_detail(lib_item.external_id)
+                        show_status = (series_detail.get("status") or "").lower()
+                        is_ended = show_status in ("ended", "canceled", "cancelled")
+                    except Exception as e:
+                        print(f"Error checking series status: {e}")
+
+                if all_aired_completed and is_ended:
                     lib_item.status = UserLibraryStatusEnum.COMPLETED
                     lib_item.completed_at = datetime.now(timezone.utc)
-                else:
+                elif completed_ep_titles:
                     lib_item.status = UserLibraryStatusEnum.WATCHING
                     lib_item.completed_at = None
-            else:
-                lib_item.last_seen_episode = None
-                lib_item.status = UserLibraryStatusEnum.PLAN_TO_WATCH
-                lib_item.completed_at = None
+                else:
+                    lib_item.last_seen_episode = None
+                    lib_item.status = UserLibraryStatusEnum.PLAN_TO_WATCH
+                    lib_item.completed_at = None
             
         lib_item.updated_at = datetime.now(timezone.utc)
         db.commit()
@@ -2295,8 +2319,10 @@ def bulk_toggle_season(
                             else:
                                 series_id = int(str(ext_id).replace('tvm_', ''))
                                 series_detail = TVMazeService.get_series_detail(series_id)
+                                show_status = (series_detail.get("status") or "").lower()
+                                is_ended = show_status in ("ended", "canceled", "cancelled")
                                 total_episodes = series_detail.get("number_of_episodes") or 99999
-                                if completed_eps >= total_episodes:
+                                if completed_eps >= total_episodes and is_ended:
                                     lib_it.status = UserLibraryStatusEnum.COMPLETED
                                     lib_it.completed_at = datetime.now(timezone.utc)
                                 else:
@@ -2958,7 +2984,16 @@ def bulk_toggle_episodes(
                         except Exception as e:
                             logger.warning(f"Error checking all_aired_completed: {e}")
 
-                    if all_aired_completed:
+                    is_ended = False
+                    if lib_item.external_id:
+                        try:
+                            series_detail = TVMazeService.get_series_detail(lib_item.external_id)
+                            show_status = (series_detail.get("status") or "").lower()
+                            is_ended = show_status in ("ended", "canceled", "cancelled")
+                        except Exception as e:
+                            logger.warning(f"Error checking series status: {e}")
+
+                    if all_aired_completed and is_ended:
                         lib_item.status = UserLibraryStatusEnum.COMPLETED
                         lib_item.completed_at = now_dt
                     else:

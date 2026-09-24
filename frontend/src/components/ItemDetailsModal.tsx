@@ -3547,7 +3547,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     const isComic = selectedItem?.item_type === 'comic' || String(selectedItem?.external_id || '').startsWith('cv_vol_');
     const cleanVolId = String(selectedItem?.external_id || '').replace('cv_vol_', '').replace('cv_issue_', '').replace('cv_', '');
     const seriesCacheKey = `series_${selectedItem?.external_id}`;
-    const cachedSeriesData = selectedItem?.external_id ? getCachedSeries(seriesCacheKey) : null;
+    const cachedSeriesData = selectedItem?.external_id ? (getCachedSeries(seriesCacheKey) || getCachedSeries(`${selectedItem?.external_id}_metadata`)) : null;
     const volMeta = isComic ? (getCachedSeries(`comic_vol_${selectedItem?.external_id}`) || getCachedSeries(`${selectedItem?.external_id}_metadata`) || getCachedSeries(`cv_vol_${cleanVolId}_metadata`)) : null;
     const cachedAll = isComic 
       ? (getCachedSeries(`${cleanVolId}_all_episodes`) || getCachedSeries(`cv_vol_${cleanVolId}_all_episodes`) || getCachedSeries(`${selectedItem?.external_id}_all_episodes`)) 
@@ -3589,9 +3589,10 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     // Check if the series / comic volume is ended/finished forever
     const currentYear = new Date().getFullYear();
     const startYr = parseInt(selectedItem?.start_year || volMeta?.start_year || selectedItem?.release_date || '0');
+    const showStatusStr = (cachedSeriesData?.status || selectedItem?.series_status || '').toLowerCase();
     const isEnded = isComic
       ? (selectedItem?.is_ended === true || volMeta?.is_ended === true || volMeta?.status === 'Ended' || selectedItem?.status === 'Ended' || (startYr > 0 && startYr < currentYear - 1))
-      : (cachedSeriesData?.status === 'Ended' || selectedItem?.is_ended === true || selectedItem?.series_status === 'Ended');
+      : (showStatusStr === 'ended' || showStatusStr === 'canceled' || showStatusStr === 'cancelled' || selectedItem?.is_ended === true);
 
     // Truly finished ONLY if series is ended AND all total episodes of all seasons are completed (must have totalEpisodes > 0)
     const knownVolIssues = isComic ? (volMeta?.count_of_issues || selectedItem?.count_of_issues || volMeta?.total_issues || selectedItem?.total_issues) : null;

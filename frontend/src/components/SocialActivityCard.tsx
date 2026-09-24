@@ -93,7 +93,7 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
 
   const isGuideActivity = activity.item_type === 'guide' || activity.activity_type.startsWith('guide_');
 
-  const handleClickCard = (e?: React.MouseEvent) => {
+  const handleClickCard = async (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     if (isGuideActivity && activity.list_id) {
       navigate(`/guide/${activity.list_id}`);
@@ -101,12 +101,35 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
     }
 
     if (onOpenItem) {
-      const effectiveItemType = activity.item_type || meta.item_type || 'series';
-      const cleanTitle = meta.work_title || (parsedEpisode ? parsedEpisode.seriesName : activity.item_title);
+      let effectiveItemType = (meta.series_item_type || activity.item_type || meta.item_type || 'series').toLowerCase();
+      if (effectiveItemType === 'episode') effectiveItemType = 'series';
+      if (meta.series_external_id && String(meta.series_external_id).startsWith('anime_')) effectiveItemType = 'anime';
+
+      let effectiveExternalId = meta.series_external_id || meta.parent_external_id || meta.work_ext_id || activity.external_id || undefined;
+      const cleanTitle = meta.series_title || meta.work_title || (parsedEpisode ? parsedEpisode.seriesName : (parsedComicIssue ? parsedComicIssue.seriesName : activity.item_title));
       
+      // If the activity is an episode (e.g. tvm-ep-12345), resolve parent show ID so it opens the series modal
+      if (effectiveExternalId && typeof effectiveExternalId === 'string' && effectiveExternalId.startsWith('tvm-ep-')) {
+        const epNumId = effectiveExternalId.replace('tvm-ep-', '');
+        try {
+          const epRes = await fetch(`https://api.tvmaze.com/episodes/${epNumId}`);
+          if (epRes.ok) {
+            const epData = await epRes.json();
+            const showId = epData?._links?.show?.href ? epData._links.show.href.split('/').pop() : null;
+            if (showId) {
+              effectiveExternalId = `tvm_${showId}`;
+            }
+          }
+        } catch (_) {}
+      } else if (effectiveExternalId && typeof effectiveExternalId === 'string' && effectiveExternalId.startsWith('cv_issue_')) {
+        if (meta.volume_id || meta.series_external_id) {
+          effectiveExternalId = meta.volume_id || meta.series_external_id;
+        }
+      }
+
       const itemToOpen = {
-        external_id: activity.external_id || undefined,
-        id: (!activity.external_id && activity.list_id) ? activity.list_id : undefined,
+        external_id: effectiveExternalId,
+        id: (!effectiveExternalId && activity.list_id) ? activity.list_id : undefined,
         title: cleanTitle || activity.item_title || 'Media',
         image_url: activity.image_url || undefined,
         item_type: effectiveItemType,
@@ -116,32 +139,40 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
     }
   };
 
-  // Human readable action text
+  // Human readable action text (capitalized and media-aware)
   const getActionPhrase = () => {
+    const rawType = (activity.item_type || meta.item_type || '').toLowerCase();
+    const isComicOrBook = ['comic', 'manga', 'book'].includes(rawType);
+    const isWatchable = ['series', 'anime', 'movie', 'episode', 'season'].includes(rawType);
+    const isGame = rawType === 'game';
+
     switch (activity.activity_type) {
       case 'item_status_changed':
       case 'item_completed':
-        return isEs ? 'completó' : 'completed';
+        if (isComicOrBook) return isEs ? 'Leyó' : 'Read';
+        if (isWatchable) return isEs ? 'Vio' : 'Watched';
+        if (isGame) return isEs ? 'Completó' : 'Completed';
+        return isEs ? 'Completó' : 'Completed';
       case 'item_rated':
-        return isEs ? 'calificó' : 'rated';
+        return isEs ? 'Calificó' : 'Rated';
       case 'item_reviewed':
-        return isEs ? 'escribió una reseña de' : 'reviewed';
+        return isEs ? 'Escribió una reseña de' : 'Reviewed';
       case 'guide_created':
-        return isEs ? 'creó la guía' : 'created the guide';
+        return isEs ? 'Creó la guía' : 'Created the guide';
       case 'guide_rated':
-        return isEs ? 'calificó la guía' : 'rated the guide';
+        return isEs ? 'Calificó la guía' : 'Rated the guide';
       case 'guide_commented':
-        return isEs ? 'comentó en la guía' : 'commented on the guide';
+        return isEs ? 'Comentó en la guía' : 'Commented on the guide';
       case 'user_followed':
-        return isEs ? 'comenzó a seguir a' : 'started following';
+        return isEs ? 'Comenzó a seguir a' : 'Started following';
       case 'shelf_add':
       case 'item_added_to_library':
-        return isEs ? 'agregó a su biblioteca' : 'added to library';
+        return isEs ? 'Agregó a su biblioteca' : 'Added to library';
       case 'shelf_favorite':
       case 'item_favorited':
-        return isEs ? 'destacó en su perfil' : 'favorited';
+        return isEs ? 'Destacó en su perfil' : 'Favorited';
       default:
-        return isEs ? 'registró actividad en' : 'logged activity on';
+        return isEs ? 'Registró actividad en' : 'Logged activity on';
     }
   };
 
@@ -253,6 +284,21 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
     return null;
   };
 
+  // Parse comic issue if formatted like "Series Name #12" or "Series Name #12 - Title" or "Series Name #12.5"
+  const parseComicIssueInfo = (title?: string | null) => {
+    if (!title) return null;
+    const isComic = (activity.item_type || meta.item_type) === 'comic' || (activity.item_type || meta.item_type) === 'manga';
+    if (!isComic) return null;
+    const match = title.match(/^(.*?)\s*#(\d+(?:\.\d+)?)(?:\s*-\s*(.*))?$/);
+    if (match) {
+      const seriesName = match[1].trim();
+      const issueNum = match[2].trim();
+      const issueTitle = match[3]?.trim();
+      return { seriesName, issueCode: `#${issueNum}`, issueTitle };
+    }
+    return null;
+  };
+
   // Parse metadata if present
   const meta = React.useMemo(() => {
     if (!activity.metadata_json) return {} as Record<string, any>;
@@ -264,6 +310,7 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
   }, [activity.metadata_json]);
 
   const parsedEpisode = parseEpisodeInfo(activity.item_title);
+  const parsedComicIssue = !parsedEpisode && !meta.is_range ? parseComicIssueInfo(activity.item_title) : null;
   const categoryMeta = getCategoryMeta(activity.item_type || meta.item_type);
 
   // Check if details is a clean review comment (not just "completed" or star number)
@@ -280,8 +327,8 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
     (onOpenItem && (activity.external_id || activity.list_id || activity.item_title))
   );
 
-  // Helper to split a title so the last word is bundled with the category icon and timestamp
-  const renderTitleWithBadgeAndTimestamp = (titleText: string) => {
+  // Helper to split a title so the last word is bundled with the category icon badge
+  const renderTitleWithBadge = (titleText: string) => {
     const trimmed = (titleText || '').trim();
     const lastSpaceIdx = trimmed.lastIndexOf(' ');
 
@@ -325,7 +372,6 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
                 justifyContent: 'center',
                 color: categoryMeta.themeColor || 'var(--accent-primary)',
                 marginLeft: '0.35rem',
-                marginRight: '0.2rem',
                 verticalAlign: 'middle',
                 filter: isCardHovered ? 'drop-shadow(0 0 6px rgba(255,255,255,0.25))' : 'none',
                 transition: 'filter 0.2s ease'
@@ -334,10 +380,6 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
               {categoryMeta.icon}
             </span>
           )}
-
-          <span style={{ color: 'var(--text-muted)', fontSize: '0.76rem', marginLeft: '0.15rem' }}>
-            • {formatRelativeTime(activity.created_at)}
-          </span>
         </span>
       </>
     );
@@ -347,261 +389,280 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
     <div
       className="glass-card activity-card"
       style={{
-        padding: '1.1rem 1.25rem',
-        borderRadius: '14px',
+        padding: '1.25rem',
+        borderRadius: '16px',
         display: 'flex',
         flexDirection: 'column',
-        gap: '0.85rem',
+        gap: '0.9rem',
         opacity: isHidden ? 0.6 : 1,
         position: 'relative',
         background: 'var(--bg-secondary, rgba(255,255,255,0.03))',
         border: isHidden ? '1px dashed var(--border-color)' : '1px solid var(--border-color)',
-        transition: 'border-color 0.2s ease, background 0.2s ease'
+        transition: 'border-color 0.2s ease, background 0.2s ease, transform 0.2s ease',
+        height: '100%',
+        justifyContent: 'space-between'
       }}
     >
-      {/* Upper Area: Left Content Column + Right Prominent Poster */}
+      {/* Clickable Card Body (Header + Poster + Action Description + Review) */}
       <div
         onClick={handleClickCard}
         onMouseEnter={() => setIsCardHovered(true)}
         onMouseLeave={() => setIsCardHovered(false)}
         style={{
           display: 'flex',
-          gap: '1.1rem',
-          alignItems: 'stretch',
-          cursor: isClickable ? 'pointer' : 'default'
+          flexDirection: 'column',
+          gap: '0.85rem',
+          cursor: isClickable ? 'pointer' : 'default',
+          flex: 1
         }}
       >
-        {/* Left main content body */}
-        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-          {/* Header row: User avatar + action sentence + 3-dots */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.65rem', flex: 1, minWidth: 0 }}>
+        {/* 1. Header row: User avatar + Username + Timestamp + Menu */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
+          <div
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/user/${encodeURIComponent(activity.username)}`);
+            }}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', cursor: 'pointer', minWidth: 0 }}
+          >
+            {activity.user_photo_url ? (
+              <img
+                src={activity.user_photo_url}
+                alt={activity.username}
+                style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
+              />
+            ) : (
               <div
-                onClick={(e) => {
-                  e.stopPropagation();
-                  navigate(`/user/${encodeURIComponent(activity.username)}`);
+                style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '50%',
+                  background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary, #6366f1))',
+                  color: '#fff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '0.92rem',
+                  fontWeight: 700,
+                  flexShrink: 0
                 }}
-                style={{ cursor: 'pointer', flexShrink: 0, marginTop: '2px' }}
               >
-                {activity.user_photo_url ? (
-                  <img
-                    src={activity.user_photo_url}
-                    alt={activity.username}
-                    style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover' }}
-                  />
-                ) : (
-                  <div
-                    style={{
-                      width: '36px',
-                      height: '36px',
-                      borderRadius: '50%',
-                      background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary, #6366f1))',
-                      color: '#fff',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '0.92rem',
-                      fontWeight: 700
-                    }}
-                  >
-                    {(activity.username || 'U')[0].toUpperCase()}
-                  </div>
-                )}
-              </div>
-
-              <div style={{ flex: 1, minWidth: 0, lineHeight: 1.55 }}>
-                <div style={{ fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
-                  <span
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      navigate(`/user/${encodeURIComponent(activity.username)}`);
-                    }}
-                    style={{ fontWeight: 700, color: 'var(--text-primary)', cursor: 'pointer', marginRight: '0.35rem' }}
-                  >
-                    {activity.username}
-                  </span>
-
-                  {/* Action sentence with clean wrapping */}
-                  {meta.is_range ? (
-                    (() => {
-                      const isComic = (activity.item_type || meta.item_type) === 'comic';
-                      const workName = meta.work_title || activity.item_title?.split(' (')[0] || activity.item_title;
-                      const alsoAdded = !!meta.also_added;
-                      const verb = alsoAdded
-                        ? (isComic ? (isEs ? 'agregó y leyó del' : 'added and read') : (isEs ? 'agregó y vio del' : 'added and watched'))
-                        : (isComic ? (isEs ? 'leyó del' : 'read') : (isEs ? 'vio del' : 'watched'));
-
-                      return (
-                        <>
-                          <span style={{ marginRight: '0.35rem' }}>{verb}</span>
-                          <span style={{ fontWeight: 600, color: 'var(--text-primary)', marginRight: '0.35rem' }}>
-                            {meta.start_unit}
-                          </span>
-                          <span style={{ marginRight: '0.35rem' }}>{isEs ? 'al' : 'to'}</span>
-                          <span style={{ fontWeight: 600, color: 'var(--text-primary)', marginRight: '0.35rem' }}>
-                            {meta.end_unit}
-                          </span>
-                          <span style={{ marginRight: '0.35rem' }}>{isEs ? 'de' : 'of'}</span>
-                          {renderTitleWithBadgeAndTimestamp(workName)}
-                        </>
-                      );
-                    })()
-                  ) : parsedEpisode ? (
-                    <>
-                      <span style={{ marginRight: '0.35rem' }}>{isEs ? 'completó el' : 'completed'}</span>
-                      <span style={{ fontWeight: 600, color: 'var(--text-primary)', marginRight: '0.35rem' }}>
-                        {parsedEpisode.epCode}
-                      </span>
-                      {parsedEpisode.episodeName && (
-                        <span style={{ color: 'var(--text-secondary)', marginRight: '0.35rem' }}>
-                          ({parsedEpisode.episodeName})
-                        </span>
-                      )}
-                      <span style={{ marginRight: '0.35rem' }}>{isEs ? 'de' : 'of'}</span>
-                      {renderTitleWithBadgeAndTimestamp(parsedEpisode.seriesName)}
-                    </>
-                  ) : (
-                    <>
-                      <span style={{ marginRight: '0.35rem' }}>{getActionPhrase()}</span>
-                      {activity.item_title && renderTitleWithBadgeAndTimestamp(activity.item_title)}
-                    </>
-                  )}
-
-                  {isHidden && (
-                    <span style={{ color: 'var(--text-muted)', fontSize: '0.74rem', fontStyle: 'italic', marginLeft: '0.35rem' }}>
-                      ({isEs ? 'Oculto' : 'Hidden'})
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* 3-dots menu for owner */}
-            {isOwnActivity && (
-              <div style={{ position: 'relative', flexShrink: 0 }}>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowMenu(!showMenu);
-                  }}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    color: 'var(--text-muted)',
-                    cursor: 'pointer',
-                    padding: '0.2rem',
-                    borderRadius: '6px'
-                  }}
-                >
-                  <MoreVertical size={16} />
-                </button>
-
-                {showMenu && (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      right: 0,
-                      top: '100%',
-                      background: 'var(--bg-secondary, #1e1e24)',
-                      border: '1px solid var(--border-color)',
-                      borderRadius: '8px',
-                      boxShadow: '0 10px 25px rgba(0,0,0,0.4)',
-                      zIndex: 20,
-                      minWidth: '180px',
-                      overflow: 'hidden'
-                    }}
-                  >
-                    <button
-                      onClick={handleToggleVisibility}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        width: '100%',
-                        padding: '0.55rem 0.85rem',
-                        background: 'transparent',
-                        border: 'none',
-                        color: 'var(--text-primary)',
-                        fontSize: '0.82rem',
-                        textAlign: 'left',
-                        cursor: 'pointer'
-                      }}
-                      onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')}
-                      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-                    >
-                      {isHidden ? <Eye size={14} /> : <EyeOff size={14} />}
-                      <span>{isHidden ? (isEs ? 'Mostrar en mi muro' : 'Show on feed') : (isEs ? 'Ocultar de mi muro' : 'Hide from feed')}</span>
-                    </button>
-                  </div>
-                )}
+                {(activity.username || 'U')[0].toUpperCase()}
               </div>
             )}
+            <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+              <span
+                style={{
+                  fontWeight: 700,
+                  fontSize: '0.92rem',
+                  color: 'var(--text-primary)',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                {activity.username}
+              </span>
+              <span style={{ color: 'var(--text-muted)', fontSize: '0.74rem' }}>
+                {formatRelativeTime(activity.created_at)}
+              </span>
+            </div>
           </div>
 
-          {/* Review text speech bubble if user wrote a review */}
-          {isReviewComment && (
-            <div
-              style={{
-                background: 'rgba(255, 255, 255, 0.04)',
-                borderLeft: '3px solid var(--accent-primary)',
-                padding: '0.65rem 0.95rem',
-                borderRadius: '0 8px 8px 0',
-                fontSize: '0.88rem',
-                color: 'var(--text-primary)',
-                lineHeight: 1.45,
-                wordBreak: 'break-word'
-              }}
-            >
-              "{activity.details}"
-            </div>
-          )}
+          {/* 3-dots menu for owner */}
+          {isOwnActivity && (
+            <div style={{ position: 'relative', flexShrink: 0 }}>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowMenu(!showMenu);
+                }}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer',
+                  padding: '0.2rem',
+                  borderRadius: '6px'
+                }}
+              >
+                <MoreVertical size={16} />
+              </button>
 
-          {/* Star rating highlight if item_rated */}
-          {numericRating !== null && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
-              {[1, 2, 3, 4, 5].map((s) => (
-                <Star
-                  key={s}
-                  size={14}
-                  fill={s <= numericRating ? '#f59e0b' : 'none'}
-                  color={s <= numericRating ? '#f59e0b' : 'var(--text-muted)'}
-                />
-              ))}
-              <span style={{ fontSize: '0.8rem', color: '#f59e0b', fontWeight: 700, marginLeft: '0.3rem' }}>
-                {numericRating} / 5
-              </span>
+              {showMenu && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    right: 0,
+                    top: '100%',
+                    background: 'var(--bg-secondary, #1e1e24)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '8px',
+                    boxShadow: '0 10px 25px rgba(0,0,0,0.4)',
+                    zIndex: 20,
+                    minWidth: '180px',
+                    overflow: 'hidden'
+                  }}
+                >
+                  <button
+                    onClick={handleToggleVisibility}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      width: '100%',
+                      padding: '0.55rem 0.85rem',
+                      background: 'transparent',
+                      border: 'none',
+                      color: 'var(--text-primary)',
+                      fontSize: '0.82rem',
+                      textAlign: 'left',
+                      cursor: 'pointer'
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                  >
+                    {isHidden ? <Eye size={14} /> : <EyeOff size={14} />}
+                    <span>{isHidden ? (isEs ? 'Mostrar en mi muro' : 'Show on feed') : (isEs ? 'Ocultar de mi muro' : 'Hide from feed')}</span>
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
 
-        {/* Right side prominent poster covering vertical space */}
+        {/* 2. Prominent Poster Cover Art */}
         {activity.image_url && (
           <div
             style={{
-              flexShrink: 0,
-              width: isReviewComment ? '84px' : '72px',
-              display: 'flex',
-              alignItems: 'stretch',
+              width: '100%',
+              height: '240px',
+              borderRadius: '12px',
               overflow: 'hidden',
-              borderRadius: '8px'
+              background: 'var(--bg-tertiary, rgba(0,0,0,0.2))',
+              position: 'relative',
+              boxShadow: '0 6px 18px rgba(0,0,0,0.3)',
+              border: '1px solid rgba(255,255,255,0.08)'
             }}
           >
             <img
               src={activity.image_url}
               alt={activity.item_title || 'Cover'}
               style={{
-                width: isReviewComment ? '84px' : '72px',
-                minHeight: isReviewComment ? '110px' : '88px',
+                width: '100%',
                 height: '100%',
-                maxHeight: isReviewComment ? '150px' : '105px',
-                borderRadius: '8px',
                 objectFit: 'cover',
-                boxShadow: '0 4px 14px rgba(0,0,0,0.4)',
-                border: '1px solid rgba(255,255,255,0.1)',
-                transform: isCardHovered ? 'scale(1.05)' : 'scale(1)',
-                transition: 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease'
+                transform: isCardHovered ? 'scale(1.04)' : 'scale(1)',
+                transition: 'transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
               }}
             />
+          </div>
+        )}
+
+        {/* 3. Action Sentence with badge */}
+        <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+          {meta.is_range ? (
+            (() => {
+              const isComic = (activity.item_type || meta.item_type) === 'comic' || (activity.item_type || meta.item_type) === 'manga';
+              const workName = meta.work_title || activity.item_title?.split(' (')[0] || activity.item_title;
+              const alsoAdded = !!meta.also_added;
+              const verb = alsoAdded
+                ? (isComic ? (isEs ? 'Agregó y leyó del' : 'Added and read from') : (isEs ? 'Agregó y vio del' : 'Added and watched from'))
+                : (isComic ? (isEs ? 'Leyó del' : 'Read from') : (isEs ? 'Vio del' : 'Watched from'));
+
+              return (
+                <>
+                  <span style={{ marginRight: '0.35rem' }}>{verb}</span>
+                  <span style={{ fontWeight: 600, color: 'var(--text-primary)', marginRight: '0.35rem' }}>
+                    {meta.start_unit}
+                  </span>
+                  <span style={{ marginRight: '0.35rem' }}>{isEs ? 'al' : 'to'}</span>
+                  <span style={{ fontWeight: 600, color: 'var(--text-primary)', marginRight: '0.35rem' }}>
+                    {meta.end_unit}
+                  </span>
+                  <span style={{ marginRight: '0.35rem' }}>{isEs ? 'de' : 'of'}</span>
+                  {renderTitleWithBadge(workName)}
+                </>
+              );
+            })()
+          ) : parsedEpisode ? (
+            <>
+              <span style={{ marginRight: '0.35rem' }}>{isEs ? 'Vio el' : 'Watched'}</span>
+              <span style={{ fontWeight: 600, color: 'var(--text-primary)', marginRight: '0.35rem' }}>
+                {parsedEpisode.epCode}
+              </span>
+              {parsedEpisode.episodeName && (
+                <span style={{ color: 'var(--text-secondary)', marginRight: '0.35rem' }}>
+                  ({parsedEpisode.episodeName})
+                </span>
+              )}
+              <span style={{ marginRight: '0.35rem' }}>{isEs ? 'de' : 'of'}</span>
+              {renderTitleWithBadge(parsedEpisode.seriesName)}
+            </>
+          ) : parsedComicIssue ? (
+            <>
+              <span style={{ marginRight: '0.35rem' }}>{isEs ? 'Leyó el' : 'Read'}</span>
+              <span style={{ fontWeight: 600, color: 'var(--text-primary)', marginRight: '0.35rem' }}>
+                {parsedComicIssue.issueCode}
+              </span>
+              {parsedComicIssue.issueTitle && (
+                <span style={{ color: 'var(--text-secondary)', marginRight: '0.35rem' }}>
+                  ({parsedComicIssue.issueTitle})
+                </span>
+              )}
+              <span style={{ marginRight: '0.35rem' }}>{isEs ? 'de' : 'of'}</span>
+              {renderTitleWithBadge(parsedComicIssue.seriesName)}
+            </>
+          ) : (
+            <>
+              <span style={{ marginRight: '0.35rem' }}>{getActionPhrase()}</span>
+              {activity.item_title && renderTitleWithBadge(activity.item_title)}
+            </>
+          )}
+
+          {isHidden && (
+            <span style={{ color: 'var(--text-muted)', fontSize: '0.74rem', fontStyle: 'italic', marginLeft: '0.35rem' }}>
+              ({isEs ? 'Oculto' : 'Hidden'})
+            </span>
+          )}
+        </div>
+
+        {/* 4. Review speech bubble if user reviewed */}
+        {isReviewComment && (
+          <div
+            style={{
+              background: 'rgba(255, 255, 255, 0.04)',
+              borderLeft: '3px solid var(--accent-primary)',
+              padding: '0.65rem 0.95rem',
+              borderRadius: '0 8px 8px 0',
+              fontSize: '0.86rem',
+              color: 'var(--text-primary)',
+              lineHeight: 1.45,
+              wordBreak: 'break-word',
+              display: '-webkit-box',
+              WebkitLineClamp: 3,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden'
+            }}
+          >
+            "{activity.details}"
+          </div>
+        )}
+
+        {/* 5. Star rating highlight */}
+        {numericRating !== null && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+            {[1, 2, 3, 4, 5].map((s) => (
+              <Star
+                key={s}
+                size={14}
+                fill={s <= numericRating ? '#f59e0b' : 'none'}
+                color={s <= numericRating ? '#f59e0b' : 'var(--text-muted)'}
+              />
+            ))}
+            <span style={{ fontSize: '0.8rem', color: '#f59e0b', fontWeight: 700, marginLeft: '0.3rem' }}>
+              {numericRating} / 5
+            </span>
           </div>
         )}
       </div>
@@ -616,7 +677,7 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
           alignItems: 'center',
           gap: '1.25rem',
           paddingTop: '0.45rem',
-          marginTop: '-0.1rem',
+          marginTop: '0.2rem',
           borderTop: '1px solid rgba(255,255,255,0.04)',
           cursor: 'pointer',
           userSelect: 'none'
