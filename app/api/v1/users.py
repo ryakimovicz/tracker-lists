@@ -1083,34 +1083,59 @@ def get_my_activity(
         UserActivityLog.user_id == current_user.id
     ).order_by(UserActivityLog.created_at.desc()).limit(limit).all()
     
+    # Pre-collect external_ids and titles missing images to bulk query
+    missing_ext_ids = {
+        act.external_id for act in activities
+        if not act.image_url and act.activity_type.startswith('item_') and act.external_id
+    }
+    missing_titles = {
+        act.item_title.lower() for act in activities
+        if not act.image_url and act.activity_type.startswith('item_') and act.item_title
+    }
+
+    lib_by_ext = {}
+    list_item_by_ext = {}
+    lib_by_title = {}
+
+    if missing_ext_ids:
+        libs = db.query(UserLibraryItem.external_id, UserLibraryItem.image_url).filter(
+            UserLibraryItem.user_id == current_user.id,
+            UserLibraryItem.external_id.in_(missing_ext_ids),
+            UserLibraryItem.image_url.isnot(None)
+        ).all()
+        for ext_id, img_url in libs:
+            if ext_id and img_url and ext_id not in lib_by_ext:
+                lib_by_ext[ext_id] = img_url
+
+        remaining_ext = missing_ext_ids - set(lib_by_ext.keys())
+        if remaining_ext:
+            list_items = db.query(ListItem.external_id, ListItem.image_url).filter(
+                ListItem.external_id.in_(remaining_ext),
+                ListItem.image_url.isnot(None)
+            ).all()
+            for ext_id, img_url in list_items:
+                if ext_id and img_url and ext_id not in list_item_by_ext:
+                    list_item_by_ext[ext_id] = img_url
+
+    if missing_titles:
+        title_libs = db.query(UserLibraryItem.title, UserLibraryItem.image_url).filter(
+            UserLibraryItem.user_id == current_user.id,
+            UserLibraryItem.image_url.isnot(None)
+        ).all()
+        for t, img_url in title_libs:
+            if t and img_url:
+                norm_t = t.strip().lower()
+                if norm_t in missing_titles and norm_t not in lib_by_title:
+                    lib_by_title[norm_t] = img_url
+
     res = []
     for act in activities:
         img = act.image_url
         if not img and act.activity_type.startswith('item_'):
             if act.external_id:
-                lib = db.query(UserLibraryItem).filter(
-                    UserLibraryItem.user_id == current_user.id,
-                    UserLibraryItem.external_id == act.external_id,
-                    UserLibraryItem.image_url.isnot(None)
-                ).first()
-                if lib and lib.image_url:
-                    img = lib.image_url
-                else:
-                    li = db.query(ListItem).filter(
-                        ListItem.external_id == act.external_id,
-                        ListItem.image_url.isnot(None)
-                    ).first()
-                    if li and li.image_url:
-                        img = li.image_url
-
+                img = lib_by_ext.get(act.external_id) or list_item_by_ext.get(act.external_id)
             if not img and act.item_title:
-                lib_t = db.query(UserLibraryItem).filter(
-                    UserLibraryItem.user_id == current_user.id,
-                    UserLibraryItem.title.ilike(act.item_title),
-                    UserLibraryItem.image_url.isnot(None)
-                ).first()
-                if lib_t and lib_t.image_url:
-                    img = lib_t.image_url
+                img = lib_by_title.get(act.item_title.strip().lower())
 
         res.append({
             "id": act.id,
@@ -1259,6 +1284,51 @@ def get_user_activity(
         UserActivityLog.user_id == user_id
     ).order_by(UserActivityLog.created_at.desc()).limit(limit).all()
     
+    # Pre-collect external_ids and titles missing images to bulk query
+    missing_ext_ids = {
+        act.external_id for act in activities
+        if not act.image_url and act.activity_type.startswith('item_') and act.external_id
+    }
+    missing_titles = {
+        act.item_title.lower() for act in activities
+        if not act.image_url and act.activity_type.startswith('item_') and act.item_title
+    }
+
+    lib_by_ext = {}
+    list_item_by_ext = {}
+    lib_by_title = {}
+
+    if missing_ext_ids:
+        libs = db.query(UserLibraryItem.external_id, UserLibraryItem.image_url).filter(
+            UserLibraryItem.user_id == user_id,
+            UserLibraryItem.external_id.in_(missing_ext_ids),
+            UserLibraryItem.image_url.isnot(None)
+        ).all()
+        for ext_id, img_url in libs:
+            if ext_id and img_url and ext_id not in lib_by_ext:
+                lib_by_ext[ext_id] = img_url
+
+        remaining_ext = missing_ext_ids - set(lib_by_ext.keys())
+        if remaining_ext:
+            list_items = db.query(ListItem.external_id, ListItem.image_url).filter(
+                ListItem.external_id.in_(remaining_ext),
+                ListItem.image_url.isnot(None)
+            ).all()
+            for ext_id, img_url in list_items:
+                if ext_id and img_url and ext_id not in list_item_by_ext:
+                    list_item_by_ext[ext_id] = img_url
+
+    if missing_titles:
+        title_libs = db.query(UserLibraryItem.title, UserLibraryItem.image_url).filter(
+            UserLibraryItem.user_id == user_id,
+            UserLibraryItem.image_url.isnot(None)
+        ).all()
+        for t, img_url in title_libs:
+            if t and img_url:
+                norm_t = t.strip().lower()
+                if norm_t in missing_titles and norm_t not in lib_by_title:
+                    lib_by_title[norm_t] = img_url
+
     res = []
     for act in activities:
         final_title = act.item_title
@@ -1272,29 +1342,9 @@ def get_user_activity(
         img = act.image_url
         if not img and act.activity_type.startswith('item_'):
             if act.external_id:
-                lib = db.query(UserLibraryItem).filter(
-                    UserLibraryItem.user_id == user_id,
-                    UserLibraryItem.external_id == act.external_id,
-                    UserLibraryItem.image_url.isnot(None)
-                ).first()
-                if lib and lib.image_url:
-                    img = lib.image_url
-                else:
-                    li = db.query(ListItem).filter(
-                        ListItem.external_id == act.external_id,
-                        ListItem.image_url.isnot(None)
-                    ).first()
-                    if li and li.image_url:
-                        img = li.image_url
-
+                img = lib_by_ext.get(act.external_id) or list_item_by_ext.get(act.external_id)
             if not img and act.item_title:
-                lib_t = db.query(UserLibraryItem).filter(
-                    UserLibraryItem.user_id == user_id,
-                    UserLibraryItem.title.ilike(act.item_title),
-                    UserLibraryItem.image_url.isnot(None)
-                ).first()
-                if lib_t and lib_t.image_url:
-                    img = lib_t.image_url
+                img = lib_by_title.get(act.item_title.strip().lower())
 
         res.append({
             "id": act.id,

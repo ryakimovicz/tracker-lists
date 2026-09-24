@@ -1129,18 +1129,29 @@ export const Profile: React.FC = () => {
       try {
         const cachedUser = sessionStorage.getItem(`pathd_user_cache_${targetUserIdentifier.toLowerCase()}`);
         const cachedLib = sessionStorage.getItem(`pathd_user_lib_${targetUserIdentifier.toLowerCase()}`);
+        const cachedAct = sessionStorage.getItem(`pathd_user_act_${targetUserIdentifier.toLowerCase()}`);
+        const cachedNp = sessionStorage.getItem(`pathd_user_np_${targetUserIdentifier.toLowerCase()}`);
         if (cachedUser) {
-          setProfile(JSON.parse(cachedUser));
+          const parsedUser = JSON.parse(cachedUser);
+          setProfile(parsedUser);
           if (cachedLib) {
             const parsedLib = JSON.parse(cachedLib);
             setLibraryItems(parsedLib);
             setFavorites(parsedLib.filter((i: LibraryItem) => i.is_favorite));
+          }
+          if (cachedAct) {
+            try { setActivities(JSON.parse(cachedAct)); } catch {}
+          }
+          if (cachedNp) {
+            try { setNowPlaying(JSON.parse(cachedNp)); } catch {}
           }
           setLoading(false);
         } else {
           setProfile(null);
           setLibraryItems([]);
           setFavorites([]);
+          setActivities([]);
+          setNowPlaying(null);
           setLoading(true);
         }
       } catch {
@@ -1150,18 +1161,29 @@ export const Profile: React.FC = () => {
       try {
         const cachedMe = sessionStorage.getItem('pathd_me_cache');
         const cachedLib = sessionStorage.getItem('pathd_lib_cache');
+        const cachedAct = sessionStorage.getItem('pathd_act_cache');
+        const cachedNp = sessionStorage.getItem('pathd_np_cache');
         if (cachedMe) {
-          setProfile(JSON.parse(cachedMe));
+          const parsedMe = JSON.parse(cachedMe);
+          setProfile(parsedMe);
           if (cachedLib) {
             const parsedLib = JSON.parse(cachedLib);
             setLibraryItems(parsedLib);
             setFavorites(parsedLib.filter((i: LibraryItem) => i.is_favorite));
+          }
+          if (cachedAct) {
+            try { setActivities(JSON.parse(cachedAct)); } catch {}
+          }
+          if (cachedNp) {
+            try { setNowPlaying(JSON.parse(cachedNp)); } catch {}
           }
           setLoading(false);
         } else {
           setProfile(null);
           setLibraryItems([]);
           setFavorites([]);
+          setActivities([]);
+          setNowPlaying(null);
           setLoading(true);
         }
       } catch {
@@ -1240,8 +1262,10 @@ export const Profile: React.FC = () => {
       } else {
         try {
           sessionStorage.setItem(`pathd_user_lib_${targetUserIdentifier.toLowerCase()}`, JSON.stringify(rawLibItems));
+          sessionStorage.setItem(`pathd_user_act_${targetUserIdentifier.toLowerCase()}`, JSON.stringify(activityRes.data || []));
           if (profileRes.data.username) {
             sessionStorage.setItem(`pathd_user_lib_${profileRes.data.username.toLowerCase()}`, JSON.stringify(rawLibItems));
+            sessionStorage.setItem(`pathd_user_act_${profileRes.data.username.toLowerCase()}`, JSON.stringify(activityRes.data || []));
           }
         } catch (e) {}
       }
@@ -1331,27 +1355,50 @@ export const Profile: React.FC = () => {
         });
       }
 
-      // 4. Fetch Last.fm data and prefetch top music in background if connected
+      // 4. Fetch Last.fm banner data (Now Playing) immediately in background, and full music stats asynchronously
       const targetLastfmUser = profileRes.data.lastfm_username;
       if (targetLastfmUser) {
-        setIsLastFmLoading(true);
+        // Only show spinner in the banner if we don't already have cached nowPlaying
+        setNowPlaying((prevNp: any) => {
+          if (!prevNp) setIsLastFmLoading(true);
+          return prevNp;
+        });
+
         const targetNpUrl = `/users/${targetId}/music/now-playing`;
+        apiClient.get(targetNpUrl)
+          .then(npRes => {
+            const npData = npRes.data || null;
+            setNowPlaying(npData);
+            try {
+              if (!targetUserIdentifier) {
+                sessionStorage.setItem('pathd_np_cache', JSON.stringify(npData));
+              } else {
+                sessionStorage.setItem(`pathd_user_np_${targetUserIdentifier.toLowerCase()}`, JSON.stringify(npData));
+                if (profileRes.data.username) {
+                  sessionStorage.setItem(`pathd_user_np_${profileRes.data.username.toLowerCase()}`, JSON.stringify(npData));
+                }
+              }
+            } catch (e) {}
+          })
+          .catch(() => {})
+          .finally(() => {
+            setIsLastFmLoading(false);
+          });
+
+        // Background fetch top music for the Music tab if needed
         const targetTaUrl = `/users/${targetId}/music/top-albums`;
         const targetArtistsUrl = `/users/${targetId}/music/top-artists?period=7day`;
         const targetTracksUrl = `/users/${targetId}/music/top-tracks?period=7day`;
-        
+
         Promise.allSettled([
-          apiClient.get(targetNpUrl),
           apiClient.get(targetTaUrl),
           apiClient.get(targetArtistsUrl),
           apiClient.get(targetTracksUrl)
-        ]).then(([npRes, taRes, tartRes, ttrRes]) => {
-          const npData = npRes.status === 'fulfilled' ? npRes.value.data : null;
+        ]).then(([taRes, tartRes, ttrRes]) => {
           const taData = taRes.status === 'fulfilled' ? (taRes.value.data || []) : [];
           const tartData = tartRes.status === 'fulfilled' ? (tartRes.value.data || []) : [];
           const ttrData = ttrRes.status === 'fulfilled' ? (ttrRes.value.data || []) : [];
-          
-          setNowPlaying(npData);
+
           setTopAlbums(taData);
 
           // Populate music cache in background for 7day default
@@ -1359,20 +1406,15 @@ export const Profile: React.FC = () => {
           if (tartData && tartData.length > 0) musicCacheRef.current[`${targetId}_artists_7day`] = tartData;
           if (ttrData && ttrData.length > 0) musicCacheRef.current[`${targetId}_tracks_7day`] = ttrData;
 
-          // If current tab is music or if musicItems is empty, set current view items
-          if (musicType === 'artists' && tartData.length > 0) {
-            setMusicItems(tartData);
-          } else if (musicType === 'albums' && taData.length > 0) {
-            setMusicItems(taData);
-          } else if (musicType === 'tracks' && ttrData.length > 0) {
-            setMusicItems(ttrData);
-          }
-        }).catch(() => {
-          setNowPlaying(null);
-          setTopAlbums([]);
-        }).finally(() => {
-          setIsLastFmLoading(false);
-        });
+          // If current view items empty, update
+          setMusicItems((prevItems) => {
+            if (prevItems && prevItems.length > 0) return prevItems;
+            if (musicType === 'artists' && tartData.length > 0) return tartData;
+            if (musicType === 'albums' && taData.length > 0) return taData;
+            if (musicType === 'tracks' && ttrData.length > 0) return ttrData;
+            return prevItems;
+          });
+        }).catch(() => {});
       } else {
         setNowPlaying(null);
         setTopAlbums([]);
