@@ -1083,23 +1083,50 @@ def get_my_activity(
         UserActivityLog.user_id == current_user.id
     ).order_by(UserActivityLog.created_at.desc()).limit(limit).all()
     
-    return [
-        {
+    res = []
+    for act in activities:
+        img = act.image_url
+        if not img and act.activity_type.startswith('item_'):
+            if act.external_id:
+                lib = db.query(UserLibraryItem).filter(
+                    UserLibraryItem.user_id == current_user.id,
+                    UserLibraryItem.external_id == act.external_id,
+                    UserLibraryItem.image_url.isnot(None)
+                ).first()
+                if lib and lib.image_url:
+                    img = lib.image_url
+                else:
+                    li = db.query(ListItem).filter(
+                        ListItem.external_id == act.external_id,
+                        ListItem.image_url.isnot(None)
+                    ).first()
+                    if li and li.image_url:
+                        img = li.image_url
+
+            if not img and act.item_title:
+                lib_t = db.query(UserLibraryItem).filter(
+                    UserLibraryItem.user_id == current_user.id,
+                    UserLibraryItem.title.ilike(act.item_title),
+                    UserLibraryItem.image_url.isnot(None)
+                ).first()
+                if lib_t and lib_t.image_url:
+                    img = lib_t.image_url
+
+        res.append({
             "id": act.id,
             "activity_type": act.activity_type,
             "item_title": act.item_title,
             "item_type": act.item_type,
             "external_id": act.external_id,
             "list_id": act.list_id,
-            "image_url": act.image_url,
+            "image_url": img,
             "details": act.details,
             "entity_id": act.entity_id,
             "metadata_json": act.metadata_json,
             "created_at": act.created_at,
             "updated_at": act.updated_at
-        }
-        for act in activities
-    ]
+        })
+    return res
 
 @router.get("/me/feed/guides-updates")
 def get_guides_updates(
@@ -1242,6 +1269,33 @@ def get_user_activity(
                 if loc_name:
                     final_title = loc_name
         
+        img = act.image_url
+        if not img and act.activity_type.startswith('item_'):
+            if act.external_id:
+                lib = db.query(UserLibraryItem).filter(
+                    UserLibraryItem.user_id == user_id,
+                    UserLibraryItem.external_id == act.external_id,
+                    UserLibraryItem.image_url.isnot(None)
+                ).first()
+                if lib and lib.image_url:
+                    img = lib.image_url
+                else:
+                    li = db.query(ListItem).filter(
+                        ListItem.external_id == act.external_id,
+                        ListItem.image_url.isnot(None)
+                    ).first()
+                    if li and li.image_url:
+                        img = li.image_url
+
+            if not img and act.item_title:
+                lib_t = db.query(UserLibraryItem).filter(
+                    UserLibraryItem.user_id == user_id,
+                    UserLibraryItem.title.ilike(act.item_title),
+                    UserLibraryItem.image_url.isnot(None)
+                ).first()
+                if lib_t and lib_t.image_url:
+                    img = lib_t.image_url
+
         res.append({
             "id": act.id,
             "activity_type": act.activity_type,
@@ -1249,7 +1303,7 @@ def get_user_activity(
             "item_type": act.item_type,
             "external_id": act.external_id,
             "list_id": act.list_id,
-            "image_url": act.image_url,
+            "image_url": img,
             "details": act.details,
             "entity_id": act.entity_id,
             "metadata_json": act.metadata_json,

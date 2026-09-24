@@ -6044,6 +6044,19 @@ export const Profile: React.FC = () => {
                 targetPoster = act.image_url || meta.image_url;
               }
 
+              // Fallback to libraryItems for movies, books, games, etc. if activity did not have image_url
+              if (!targetPoster && act.activity_type.startsWith('item_')) {
+                const targetTitle = (title || '').trim().toLowerCase();
+                const matchedItem = libraryItems.find(item => {
+                  if (act.external_id && item.external_id === act.external_id) return true;
+                  if (targetTitle && item.title && item.title.trim().toLowerCase() === targetTitle) return true;
+                  return false;
+                });
+                if (matchedItem?.image_url) {
+                  targetPoster = matchedItem.image_url;
+                }
+              }
+
               return (
                 <div
                   key={act.id}

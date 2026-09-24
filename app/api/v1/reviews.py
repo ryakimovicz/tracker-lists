@@ -254,13 +254,14 @@ def create_or_update_review(
             detail=f"Invalid media type. Must be one of {valid_types}"
         )
 
-    # Find the title if it exists in the library, otherwise use a placeholder
+    # Find the title and image if it exists in the library, otherwise use a placeholder
     lib_item = db.query(UserLibraryItem).filter(
         UserLibraryItem.user_id == current_user.id,
         UserLibraryItem.item_type == item_type_lower,
         UserLibraryItem.external_id == external_id
     ).first()
     resolved_title = lib_item.title if lib_item else f"{item_type_lower.capitalize()} ({external_id})"
+    resolved_image = lib_item.image_url if lib_item else None
 
     # Handle Threaded Replies (when parent_id is provided)
     if review_in.parent_id:
@@ -416,6 +417,7 @@ def create_or_update_review(
             item_title=resolved_title,
             item_type=item_type_lower,
             external_id=external_id,
+            image_url=resolved_image,
             entity_id=str(review.id),
             details=review_in.content[:150],
             metadata=meta
@@ -429,6 +431,7 @@ def create_or_update_review(
             item_title=resolved_title,
             item_type=item_type_lower,
             external_id=external_id,
+            image_url=resolved_image,
             entity_id=str(review.id),
             details=str(review_in.rating)
         )
