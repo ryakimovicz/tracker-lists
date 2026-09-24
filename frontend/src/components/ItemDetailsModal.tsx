@@ -3213,7 +3213,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
           setItemReviews(cachedRev);
           const currentUserId = user?.id;
           if (currentUserId) {
-            const myReview = cachedRev.find((r: any) => r.user_id === currentUserId);
+            const myReview = cachedRev.find((r: any) => r.user_id === currentUserId && !r.parent_id && r.rating !== null && r.rating !== undefined);
             if (myReview) {
               setUserRating(myReview.rating || 0);
               setUserComment(myReview.content || '');
@@ -3238,7 +3238,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
               setCachedSeries(cacheKeyReviews, res.data);
               const currentUserId = user?.id;
               if (currentUserId) {
-                const myReview = res.data.find((r: any) => r.user_id === currentUserId);
+                const myReview = res.data.find((r: any) => r.user_id === currentUserId && !r.parent_id && r.rating !== null && r.rating !== undefined);
                 if (myReview) {
                   setUserRating(myReview.rating || 0);
                   setUserComment(myReview.content || '');
@@ -3466,7 +3466,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       });
       if (res.data) {
         setItemReviews(prev => {
-          const idx = prev.findIndex(r => r.id === res.data.id || (r.user_id === user?.id && !r.parent_id));
+          const idx = prev.findIndex(r => r.id === res.data.id || (r.user_id === user?.id && !r.parent_id && r.rating !== null && r.rating !== undefined));
           if (idx >= 0) {
             const next = [...prev];
             next[idx] = res.data;
@@ -3487,7 +3487,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
   const handleDeleteComment = async () => {
     if (!selectedItem || !selectedItem.external_id) return;
-    const myRootReview = (itemReviews || []).find((r: any) => r.user_id === user?.id && !r.parent_id);
+    const myRootReview = (itemReviews || []).find((r: any) => r.user_id === user?.id && !r.parent_id && r.rating !== null && r.rating !== undefined);
     setIsSavingReview(true);
     // Optimistically reset both stars and text
     setUserRating(0);
@@ -5373,7 +5373,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                   {user && (
                     <div>
                       {(() => {
-                        const myRootReview = (itemReviews || []).find((r: any) => r.user_id === user?.id && !r.parent_id);
+                        const myRootReview = (itemReviews || []).find((r: any) => r.user_id === user?.id && !r.parent_id && r.rating !== null && r.rating !== undefined);
                         const hasExistingReview = Boolean(myRootReview && ((myRootReview.rating && myRootReview.rating > 0) || (myRootReview.content && myRootReview.content.trim())));
 
                         return (
@@ -7875,8 +7875,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
               {/* Bottom Tabs: Reseñas & Comentarios */}
               <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.85rem', textAlign: 'left' }}>
                 {(() => {
-                  const reviewsList = (itemReviews || []).filter((r: any) => !r.parent_id && (r.rating !== null || (r.content && !r.media_url)));
-                  const commentsList = (itemReviews || []).filter((r: any) => !r.parent_id && (r.rating === null || r.media_url));
+                  const reviewsList = (itemReviews || []).filter((r: any) => !r.parent_id && r.rating !== null && r.rating !== undefined);
+                  const commentsList = (itemReviews || []).filter((r: any) => !r.parent_id && (r.rating === null || r.rating === undefined));
 
                   return (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
@@ -7963,11 +7963,11 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                   const displayedList = (itemReviews || []).filter((r: any) => {
                     if (r.parent_id) return false;
                     if (isReviewsTab) {
-                      // Official reviews: have star rating OR non-media root review text
-                      return r.rating !== null || (r.content && !r.media_url);
+                      // Official reviews: must have a star rating
+                      return r.rating !== null && r.rating !== undefined;
                     } else {
-                      // Community comments: no rating OR has media
-                      return r.rating === null || r.media_url;
+                      // Community comments: no rating
+                      return r.rating === null || r.rating === undefined;
                     }
                   });
 

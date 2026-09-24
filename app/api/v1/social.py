@@ -604,13 +604,31 @@ def _format_activity_item(r: UserActivityLog, db: Session, current_user_id: Opti
             if loc_name:
                 final_title = loc_name
 
-    likes_count = db.query(ActivityLike).filter(ActivityLike.activity_id == r.id).count()
-    is_liked = False
-    if current_user_id:
-        is_liked = db.query(ActivityLike).filter(
-            ActivityLike.activity_id == r.id,
-            ActivityLike.user_id == current_user_id
-        ).first() is not None
+    from app.models.review import MediaReviewVote
+
+    review_id_int = None
+    if r.activity_type in ("item_reviewed", "item_rated") and r.entity_id:
+        try:
+            review_id_int = int(r.entity_id)
+        except (ValueError, TypeError):
+            review_id_int = None
+
+    if review_id_int:
+        likes_count = db.query(MediaReviewVote).filter(MediaReviewVote.review_id == review_id_int).count()
+        is_liked = False
+        if current_user_id:
+            is_liked = db.query(MediaReviewVote).filter(
+                MediaReviewVote.review_id == review_id_int,
+                MediaReviewVote.user_id == current_user_id
+            ).first() is not None
+    else:
+        likes_count = db.query(ActivityLike).filter(ActivityLike.activity_id == r.id).count()
+        is_liked = False
+        if current_user_id:
+            is_liked = db.query(ActivityLike).filter(
+                ActivityLike.activity_id == r.id,
+                ActivityLike.user_id == current_user_id
+            ).first() is not None
 
     comments_count = db.query(ActivityComment).filter(ActivityComment.activity_id == r.id).count()
 
@@ -886,14 +904,37 @@ def toggle_activity_like(
         ActivityLike.user_id == current_user.id
     ).first()
 
+    from app.models.review import MediaReviewVote
+
+    review_id_val = None
+    if act.activity_type in ("item_reviewed", "item_rated") and act.entity_id:
+        try:
+            review_id_val = int(act.entity_id)
+        except (ValueError, TypeError):
+            review_id_val = None
+
     if existing_like:
         db.delete(existing_like)
+        if review_id_val:
+            db.query(MediaReviewVote).filter(
+                MediaReviewVote.review_id == review_id_val,
+                MediaReviewVote.user_id == current_user.id
+            ).delete(synchronize_session=False)
+
         db.commit()
         likes_count = db.query(ActivityLike).filter(ActivityLike.activity_id == activity_id).count()
         return ActivityLikeToggleResponse(liked=False, likes_count=likes_count)
     else:
         new_like = ActivityLike(activity_id=activity_id, user_id=current_user.id)
         db.add(new_like)
+
+        if review_id_val:
+            existing_rev_vote = db.query(MediaReviewVote).filter(
+                MediaReviewVote.review_id == review_id_val,
+                MediaReviewVote.user_id == current_user.id
+            ).first()
+            if not existing_rev_vote:
+                db.add(MediaReviewVote(review_id=review_id_val, user_id=current_user.id))
         
         # Send notification to activity owner if not self
         if act.user_id != current_user.id:

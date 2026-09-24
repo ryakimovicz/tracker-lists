@@ -329,6 +329,10 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
     ? Number(activity.details)
     : (meta?.rating !== undefined && meta?.rating !== null && !isNaN(Number(meta.rating)) ? Number(meta.rating) : null);
 
+  // Reviews do not have comments in Social
+  const isReviewActivity = activity.activity_type === 'item_reviewed' || activity.activity_type === 'item_rated';
+  const canHaveComments = !isReviewActivity;
+
   const [isCardHovered, setIsCardHovered] = useState(false);
   const [isFooterHovered, setIsFooterHovered] = useState(false);
   const [isLikeHovered, setIsLikeHovered] = useState(false);
@@ -656,7 +660,7 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
               overflow: 'hidden'
             }}
           >
-            "{activity.details}"
+            {activity.details}
           </div>
         )}
 
@@ -673,7 +677,7 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
 
       {/* Footer / Action Bar (Like + Comments) */}
       <div
-        onClick={() => setShowComments(!showComments)}
+        onClick={canHaveComments ? () => setShowComments(!showComments) : undefined}
         onMouseEnter={() => setIsFooterHovered(true)}
         onMouseLeave={() => setIsFooterHovered(false)}
         style={{
@@ -683,7 +687,7 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
           paddingTop: '0.45rem',
           marginTop: '0.2rem',
           borderTop: '1px solid rgba(255,255,255,0.04)',
-          cursor: 'pointer',
+          cursor: canHaveComments ? 'pointer' : 'default',
           userSelect: 'none'
         }}
       >
@@ -725,29 +729,31 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
           <span>{likesCount}</span>
         </button>
 
-        {/* Comment Indicator / Button */}
-        <div
-          style={{
-            background: (showComments || (isFooterHovered && !isLikeHovered)) ? 'rgba(245, 158, 11, 0.12)' : 'transparent',
-            border: (showComments || (isFooterHovered && !isLikeHovered)) ? '1px solid rgba(245, 158, 11, 0.35)' : '1px solid transparent',
-            color: (showComments || (isFooterHovered && !isLikeHovered)) ? 'var(--accent-primary)' : 'var(--text-secondary)',
-            borderRadius: '20px',
-            padding: '0.35rem 0.75rem',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '0.45rem',
-            fontSize: '0.88rem',
-            fontWeight: 600,
-            transition: 'all 0.15s ease'
-          }}
-        >
-          <MessageSquare size={18} />
-          <span>{commentsCount} {isEs ? (commentsCount === 1 ? 'comentario' : 'comentarios') : (commentsCount === 1 ? 'comment' : 'comments')}</span>
-        </div>
+        {/* Comment Indicator / Button (Hidden for Reviews) */}
+        {canHaveComments && (
+          <div
+            style={{
+              background: (showComments || (isFooterHovered && !isLikeHovered)) ? 'rgba(245, 158, 11, 0.12)' : 'transparent',
+              border: (showComments || (isFooterHovered && !isLikeHovered)) ? '1px solid rgba(245, 158, 11, 0.35)' : '1px solid transparent',
+              color: (showComments || (isFooterHovered && !isLikeHovered)) ? 'var(--accent-primary)' : 'var(--text-secondary)',
+              borderRadius: '20px',
+              padding: '0.35rem 0.75rem',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.45rem',
+              fontSize: '0.88rem',
+              fontWeight: 600,
+              transition: 'all 0.15s ease'
+            }}
+          >
+            <MessageSquare size={18} />
+            <span>{commentsCount} {isEs ? (commentsCount === 1 ? 'comentario' : 'comentarios') : (commentsCount === 1 ? 'comment' : 'comments')}</span>
+          </div>
+        )}
       </div>
 
-      {/* Comments Accordion */}
-      {showComments && (
+      {/* Comments Accordion (Only if allowed) */}
+      {canHaveComments && showComments && (
         <ActivityCommentThread
           activityId={activity.id}
           onCommentsCountChange={(cnt) => setCommentsCount(cnt)}

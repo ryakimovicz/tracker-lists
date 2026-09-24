@@ -13,6 +13,8 @@ from app.schemas.review import MediaReviewCreate, MediaReviewResponse, ReviewRep
 
 router = APIRouter()
 
+from app.models.social import ActivityLike
+
 @router.post("/{review_id}/vote")
 def toggle_review_vote(
     review_id: int,
@@ -28,14 +30,36 @@ def toggle_review_vote(
         MediaReviewVote.review_id == review_id
     ).first()
 
+    # Find associated social activity logs for this review if any
+    acts = db.query(UserActivityLog).filter(
+        UserActivityLog.entity_id == str(review.id),
+        UserActivityLog.activity_type.in_(["item_reviewed", "item_rated"])
+    ).all()
+
     if vote:
         db.delete(vote)
+        # Also remove corresponding ActivityLike records
+        for act in acts:
+            db.query(ActivityLike).filter(
+                ActivityLike.activity_id == act.id,
+                ActivityLike.user_id == current_user.id
+            ).delete(synchronize_session=False)
+
         db.commit()
         votes_count = db.query(MediaReviewVote).filter(MediaReviewVote.review_id == review_id).count()
         return {"message": "Upvote removed", "is_voted": False, "is_voted_by_me": False, "vote_count": votes_count}
     else:
         vote = MediaReviewVote(user_id=current_user.id, review_id=review_id)
         db.add(vote)
+        # Also sync to ActivityLike records so Social feed reflects it
+        for act in acts:
+            existing_act_like = db.query(ActivityLike).filter(
+                ActivityLike.activity_id == act.id,
+                ActivityLike.user_id == current_user.id
+            ).first()
+            if not existing_act_like:
+                db.add(ActivityLike(activity_id=act.id, user_id=current_user.id))
+
         db.commit()
         votes_count = db.query(MediaReviewVote).filter(MediaReviewVote.review_id == review_id).count()
         return {"message": "Review upvoted", "is_voted": True, "is_voted_by_me": True, "vote_count": votes_count}
