@@ -6549,26 +6549,96 @@ const ProfileActivityCardItem: React.FC<ProfileActivityCardItemProps> = ({
     }
   }
 
+  const handleClickCard = async () => {
+    if (!canOpenModal || !act.activity_type.startsWith('item_')) return;
+
+    let effectiveItemType = (meta.series_item_type || act.item_type || meta.item_type || 'series').toLowerCase();
+    if (effectiveItemType === 'episode') effectiveItemType = 'series';
+    if (meta.series_external_id && String(meta.series_external_id).startsWith('anime_')) effectiveItemType = 'anime';
+
+    let effectiveExternalId = meta.series_external_id || meta.volume_id || meta.parent_external_id || meta.work_ext_id || act.external_id || undefined;
+    let cleanTitle = meta.series_title || meta.volume_title || meta.work_title || meta.show_name || undefined;
+
+    if (!cleanTitle) {
+      if (isEpType) {
+        const match = rawTitle.match(/^(.*?)\s*-\s*[sS]\d+/i);
+        cleanTitle = match ? match[1].trim() : rawTitle.split(' (')[0].trim();
+      } else if (isComicType) {
+        cleanTitle = rawTitle.includes('#') ? rawTitle.split('#')[0].trim() : rawTitle;
+      } else {
+        cleanTitle = rawTitle;
+      }
+    }
+
+    // If external_id points directly to a single episode (tvm-ep-XXXXX), resolve parent TV show
+    if (effectiveExternalId && typeof effectiveExternalId === 'string' && effectiveExternalId.startsWith('tvm-ep-')) {
+      const epNumId = effectiveExternalId.replace('tvm-ep-', '');
+      try {
+        const epRes = await fetch(`https://api.tvmaze.com/episodes/${epNumId}`);
+        if (epRes.ok) {
+          const epData = await epRes.json();
+          const showId = epData?._links?.show?.href ? epData._links.show.href.split('/').pop() : null;
+          if (showId) {
+            effectiveExternalId = `tvm_${showId}`;
+          }
+        }
+      } catch (_) {}
+    } else if (effectiveExternalId && typeof effectiveExternalId === 'string' && effectiveExternalId.startsWith('cv_issue_')) {
+      effectiveItemType = 'comic';
+      if (meta.volume_id || meta.series_external_id) {
+        effectiveExternalId = meta.volume_id || meta.series_external_id;
+      } else {
+        try {
+          const issueRes = await apiClient.get(`/search/comic/issue/${effectiveExternalId}`);
+          if (issueRes.data?.parent_series?.external_id) {
+            effectiveExternalId = issueRes.data.parent_series.external_id;
+            if (!cleanTitle && issueRes.data.parent_series.title) {
+              cleanTitle = issueRes.data.parent_series.title;
+            }
+          }
+        } catch (_) {}
+      }
+    }
+
+    // Try finding matching parent item in libraryItems if effectiveExternalId is still an episode or comic issue
+    if (isEpType && (!effectiveExternalId || String(effectiveExternalId).startsWith('tvm-ep-'))) {
+      const targetName = (cleanTitle || '').toLowerCase();
+      const matchedShow = libraryItems.find(item => {
+        const it = (item.item_type || '').toLowerCase();
+        if (!['series', 'anime'].includes(it)) return false;
+        return (targetName && item.title && item.title.trim().toLowerCase() === targetName);
+      });
+      if (matchedShow) {
+        if (matchedShow.external_id) effectiveExternalId = matchedShow.external_id;
+        effectiveItemType = (matchedShow.item_type || 'series').toLowerCase();
+      }
+    } else if (isComicType && (!effectiveExternalId || String(effectiveExternalId).startsWith('cv_issue_'))) {
+      const targetName = (cleanTitle || '').toLowerCase();
+      const matchedVolume = libraryItems.find(item => {
+        const it = (item.item_type || '').toLowerCase();
+        if (!['comic', 'manga'].includes(it)) return false;
+        return (targetName && item.title && item.title.trim().toLowerCase() === targetName);
+      });
+      if (matchedVolume) {
+        if (matchedVolume.external_id) effectiveExternalId = matchedVolume.external_id;
+        effectiveItemType = (matchedVolume.item_type || 'comic').toLowerCase();
+      }
+    }
+
+    setSelectedItem({
+      external_id: effectiveExternalId,
+      id: (!effectiveExternalId && act.list_id) ? act.list_id : undefined,
+      title: cleanTitle || rawTitle || 'Media',
+      image_url: targetPoster || undefined,
+      item_type: effectiveItemType,
+      tracking_list_id: act.list_id || undefined
+    });
+  };
+
   return (
     <div
       className="glass-card"
-      onClick={() => {
-        if (canOpenModal && act.activity_type.startsWith('item_')) {
-          let effectiveItemType = (meta.series_item_type || act.item_type || meta.item_type || 'series').toLowerCase();
-          if (effectiveItemType === 'episode') effectiveItemType = 'series';
-          let effectiveExternalId = meta.series_external_id || meta.parent_external_id || meta.work_ext_id || act.external_id || undefined;
-          const cleanTitle = meta.series_title || meta.work_title || rawTitle;
-
-          setSelectedItem({
-            external_id: effectiveExternalId,
-            id: (!effectiveExternalId && act.list_id) ? act.list_id : undefined,
-            title: cleanTitle || 'Media',
-            image_url: targetPoster || undefined,
-            item_type: effectiveItemType,
-            tracking_list_id: act.list_id || undefined
-          });
-        }
-      }}
+      onClick={handleClickCard}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       style={{
