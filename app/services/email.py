@@ -368,3 +368,182 @@ class EmailService:
             subject=subject,
             html_content=html_content
         )
+
+    @classmethod
+    def send_username_changed_email(cls, to_email: str, old_username: str, new_username: str, lang: str = "es") -> bool:
+        """
+        Sends email notification when an administrator updates a user's username.
+        Supports both Spanish ('es') and English ('en').
+        """
+        frontend_url = getattr(settings, "FRONTEND_URL", "http://localhost:5173").rstrip("/")
+        login_link = f"{frontend_url}/login"
+        is_en = str(lang).lower().startswith("en")
+
+        if is_en:
+            subject = "👤 Your Pathd username has been updated"
+            heading = "Username updated 👤"
+            intro = f"Hello, <strong>{new_username}</strong>. An administrator has updated your username on <strong>Pathd</strong>."
+            change_details = f"Your previous username was <code>@{old_username}</code> and your new username is now <strong><code>@{new_username}</code></strong>."
+            reassurance = "All your created lists, saved items, progress, reviews, and password remain completely safe and unchanged."
+            action_text = "You can now log in using your new username or your email address:"
+            btn_text = "Log In to Pathd"
+            alt_text = "Or copy and paste this link into your browser:"
+            help_text = "If you have questions regarding this change, feel free to reply to this email or contact support at support@pathd.net."
+            tagline = f"© {settings.PROJECT_NAME} • Your entertainment universe, organized."
+        else:
+            subject = "👤 Tu nombre de usuario en Pathd ha sido modificado"
+            heading = "Nombre de usuario actualizado 👤"
+            intro = f"Hola, <strong>{new_username}</strong>. Un administrador ha actualizado tu nombre de usuario en <strong>Pathd</strong>."
+            change_details = f"Tu nombre anterior era <code>@{old_username}</code> y tu nuevo nombre a partir de ahora es <strong><code>@{new_username}</code></strong>."
+            reassurance = "Todas tus listas creadas, elementos guardados, progreso, reseñas y tu contraseña siguen intactos y sin cambios."
+            action_text = "A partir de este momento puedes iniciar sesión utilizando tu nuevo nombre de usuario o tu correo electrónico:"
+            btn_text = "Iniciar Sesión en Pathd"
+            alt_text = "O copia y pega este enlace en tu navegador:"
+            help_text = "Si tienes dudas sobre este cambio, puedes responder a este correo o contactarnos en support@pathd.net."
+            tagline = f"© {settings.PROJECT_NAME} • Tu universo de entretenimiento organizado."
+
+        html_content = f"""
+<!DOCTYPE html>
+<html lang="{ 'en' if is_en else 'es' }">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{subject}</title>
+  <style>
+    body {{
+      margin: 0;
+      padding: 0;
+      background-color: #090d16;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      color: #f8fafc;
+      -webkit-font-smoothing: antialiased;
+    }}
+    .container {{
+      max-width: 580px;
+      margin: 40px auto;
+      background: #0d1527;
+      border: 1px solid #1e293b;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    }}
+    .header {{
+      background: linear-gradient(135deg, #090d16, #111c38);
+      padding: 32px 32px 24px;
+      text-align: center;
+      border-bottom: 1px solid #1e293b;
+    }}
+    .logo-text {{
+      font-size: 28px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      color: #f8fafc;
+    }}
+    .logo-accent {{
+      color: #f59e0b;
+    }}
+    .content {{
+      padding: 36px 32px;
+      line-height: 1.6;
+      font-size: 15px;
+      color: #cbd5e1;
+    }}
+    h2 {{
+      color: #f8fafc;
+      font-size: 22px;
+      margin-top: 0;
+      margin-bottom: 16px;
+      font-weight: 700;
+    }}
+    .highlight-card {{
+      background: rgba(245, 158, 11, 0.08);
+      border: 1px solid rgba(245, 158, 11, 0.25);
+      border-radius: 10px;
+      padding: 16px 20px;
+      margin: 20px 0;
+      color: #f8fafc;
+      font-size: 15px;
+    }}
+    code {{
+      background: rgba(0, 0, 0, 0.3);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: monospace;
+      color: #f59e0b;
+    }}
+    .btn-container {{
+      text-align: center;
+      margin: 32px 0;
+    }}
+    .btn {{
+      display: inline-block;
+      background-color: #f59e0b;
+      color: #090d16 !important;
+      text-decoration: none;
+      padding: 14px 34px;
+      font-weight: 700;
+      font-size: 15px;
+      border-radius: 12px;
+      box-shadow: 0 4px 16px rgba(245, 158, 11, 0.35);
+    }}
+    .footer {{
+      padding: 24px 32px;
+      background-color: #090d16;
+      border-top: 1px solid #1e293b;
+      text-align: center;
+      font-size: 12px;
+      color: #64748b;
+    }}
+    .alt-link {{
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid #1e293b;
+      font-size: 13px;
+      color: #64748b;
+      word-break: break-all;
+    }}
+    .alt-link a {{
+      color: #f59e0b;
+      text-decoration: underline;
+    }}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <span class="logo-text">Path<span class="logo-accent">d</span></span>
+    </div>
+    <div class="content">
+      <h2>{heading}</h2>
+      <p>{intro}</p>
+      
+      <div class="highlight-card">
+        {change_details}
+      </div>
+
+      <p>{reassurance}</p>
+      <p>{action_text}</p>
+      
+      <div class="btn-container">
+        <a href="{login_link}" class="btn" target="_blank">{btn_text}</a>
+      </div>
+
+      <p style="font-size: 13px; color: #94a3b8;">{help_text}</p>
+
+      <div class="alt-link">
+        <p>{alt_text}</p>
+        <a href="{login_link}">{login_link}</a>
+      </div>
+    </div>
+    <div class="footer">
+      <p>{tagline}</p>
+    </div>
+  </div>
+</body>
+</html>
+        """
+        return cls.send_email(
+            to_email=to_email,
+            subject=subject,
+            html_content=html_content
+        )

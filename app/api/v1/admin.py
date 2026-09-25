@@ -1,5 +1,5 @@
 from typing import List, Dict, Any
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request, BackgroundTasks
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -1091,11 +1091,15 @@ class AdminChangeUsernameRequest(BaseModel):
 def admin_change_username(
     user_id: int,
     body: AdminChangeUsernameRequest,
+    request: Request,
+    background_tasks: BackgroundTasks,
     current_admin: User = Depends(get_current_admin),
     db: Session = Depends(get_db)
 ):
     import re
     from sqlalchemy import func
+    from app.services.email import EmailService
+
     new_username = body.username.strip()
 
     if len(new_username) < 3 or len(new_username) > 30:
@@ -1114,6 +1118,8 @@ def admin_change_username(
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado.")
 
+    is_self = (current_admin.id == user.id)
+
     if user.username.lower() == new_username.lower():
         # Just update capitalization if same
         user.username = new_username
@@ -1122,7 +1128,7 @@ def admin_change_username(
             "success": True,
             "message": f"Nombre de usuario actualizado a @{new_username}.",
             "new_username": new_username,
-            "is_self": current_admin.id == user.id
+            "is_self": is_self
         }
 
     # Check uniqueness
@@ -1137,13 +1143,25 @@ def admin_change_username(
         )
 
     old_username = user.username
+    user_email = user.email
     user.username = new_username
     db.commit()
+
+    # Send notification email if another user was modified by admin
+    if not is_self and user_email:
+        lang = (request.headers.get("accept-language") or "es")[:2].lower()
+        background_tasks.add_task(
+            EmailService.send_username_changed_email,
+            to_email=user_email,
+            old_username=old_username,
+            new_username=new_username,
+            lang=lang
+        )
 
     return {
         "success": True,
         "message": f"¡Nombre de usuario de @{old_username} cambiado a @{new_username} exitosamente!",
         "new_username": new_username,
-        "is_self": current_admin.id == user.id
+        "is_self": is_self
     }
 
