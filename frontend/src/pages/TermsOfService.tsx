@@ -1,6 +1,6 @@
 import React from 'react';
 import { useTranslation } from '../context/LanguageContext';
-import { FileText, CheckCircle, AlertTriangle, HelpCircle, ArrowLeft, ExternalLink, ShieldAlert } from 'lucide-react';
+import { FileText, CheckCircle, AlertTriangle, HelpCircle, ArrowLeft, ExternalLink, ShieldAlert, CreditCard, MessageSquare, Mail } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export const TermsOfService: React.FC = () => {
@@ -21,7 +21,7 @@ export const TermsOfService: React.FC = () => {
           </h1>
         </div>
         <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '2rem' }}>
-          {isEs ? 'Última actualización: 1 de septiembre de 2026' : 'Last updated: September 1, 2026'}
+          {isEs ? 'Última actualización: 25 de septiembre de 2026' : 'Last updated: September 25, 2026'}
         </p>
 
         <section style={{ marginBottom: '2rem' }}>
@@ -30,8 +30,8 @@ export const TermsOfService: React.FC = () => {
           </h2>
           <p style={{ color: 'var(--text-secondary)' }}>
             {isEs
-              ? 'Al acceder y utilizar Pathd (pathd.net), aceptas cumplir y estar sujeto a estos Términos de Servicio. Si no estás de acuerdo con alguno de ellos, no debes utilizar la plataforma.'
-              : 'By accessing and using Pathd (pathd.net), you agree to comply with and be bound by these Terms of Service. If you do not agree with any part of these terms, you must not use the platform.'}
+              ? 'Al acceder, registrarte o utilizar Pathd (pathd.net), aceptas cumplir de manera vinculante estos Términos de Servicio y nuestra Política de Privacidad. Si no estás de acuerdo con alguna de estas condiciones, debes abstenerte de utilizar la plataforma.'
+              : 'By accessing, registering on, or using Pathd (pathd.net), you agree to be legally bound by these Terms of Service and our Privacy Policy. If you do not agree with any of these provisions, you must refrain from using the platform.'}
           </p>
         </section>
 
@@ -41,20 +41,81 @@ export const TermsOfService: React.FC = () => {
           </h2>
           <p style={{ color: 'var(--text-secondary)' }}>
             {isEs
-              ? 'Te comprometes a utilizar la plataforma de forma respetuosa y legal. Está terminantemente prohibido:'
-              : 'You agree to use the platform respectfully and lawfully. The following are strictly prohibited:'}
+              ? 'Te comprometes a utilizar la plataforma de forma respetuosa, legal y ética. Está terminantemente prohibido:'
+              : 'You agree to use the platform respectfully, lawfully, and ethically. The following are strictly prohibited:'}
           </p>
-          <ul style={{ color: 'var(--text-secondary)', paddingLeft: '1.5rem' }}>
-            <li>{isEs ? 'Publicar contenido difamatorio, acosador, de odio o que infrinja derechos de autor.' : 'Posting defamatory, harassing, hateful, or copyright-infringing content.'}</li>
+          <ul style={{ color: 'var(--text-secondary)', paddingLeft: '1.5rem', marginTop: '0.5rem' }}>
+            <li>{isEs ? 'Publicar contenido difamatorio, acosador, discriminatorio, de odio o que infrinja derechos de autor de terceros.' : 'Posting defamatory, harassing, discriminatory, hateful, or copyright-infringing content.'}</li>
             <li>{isEs ? 'Publicar, buscar o distribuir contenido para adultos (+18), explícito, erótico o pornográfico. Pathd es una plataforma estrictamente orientada a entretenimiento general y familiar (SFW).' : 'Posting, searching, or sharing adult (+18), explicit, erotic, or pornographic content. Pathd is strictly a Safe For Work (SFW) / general-audience entertainment platform.'}</li>
-            <li>{isEs ? 'Intentar vulnerar la seguridad, realizar scraping abusivo o saturar los servidores.' : 'Attempting to breach security, perform abusive scraping, or overload the servers.'}</li>
-            <li>{isEs ? 'Crear cuentas falsas o automatizadas para manipular votos y reseñas.' : 'Creating fake or automated accounts to manipulate votes and reviews.'}</li>
+            <li>{isEs ? 'Intentar vulnerar la seguridad, realizar scraping abusivo, desestabilizar o saturar la infraestructura del servicio.' : 'Attempting to breach security, conduct abusive scraping, disrupt, or overload service infrastructure.'}</li>
+            <li>{isEs ? 'Crear cuentas falsas, duplicadas o automatizadas (bots) para manipular votos, lecturas, estadísticas o reseñas.' : 'Creating fake, duplicate, or automated bot accounts to manipulate votes, reading progress, statistics, or reviews.'}</li>
           </ul>
         </section>
 
         <section style={{ marginBottom: '2rem' }}>
           <h2 style={{ fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)' }}>
-            <HelpCircle size={20} /> {isEs ? '3. Fuentes de Datos, APIs y Atribuciones de Terceros' : '3. Data Sources, APIs & Third-Party Attributions'}
+            <CreditCard size={20} /> {isEs ? '3. Suscripciones Premium, Facturación y Cancelaciones' : '3. Premium Subscriptions, Billing & Cancellations'}
+          </h2>
+          <p style={{ color: 'var(--text-secondary)' }}>
+            {isEs
+              ? 'Pathd ofrece acceso opcional a suscripciones Premium que desbloquean funciones avanzadas de personalización y navegación libre de publicidad:'
+              : 'Pathd offers optional Premium subscriptions unlocking advanced customization features and an ad-free experience:'}
+          </p>
+          <ul style={{ color: 'var(--text-secondary)', paddingLeft: '1.5rem', marginTop: '0.5rem' }}>
+            <li>
+              <strong>{isEs ? 'Merchant of Record:' : 'Merchant of Record:'}</strong> {isEs
+                ? 'Todos los pagos y cobros recurrentes son procesados de forma segura por nuestro Merchant of Record internacional, Dodo Payments (dodopayments.com). Dodo Payments se encarga de la recaudación tributaria aplicable, facturación y procesamiento bancario seguro.'
+                : 'All recurring payments and checkouts are securely processed by our international Merchant of Record, Dodo Payments (dodopayments.com). Dodo Payments handles applicable tax collection, invoicing, and secure banking compliance.'}
+            </li>
+            <li>
+              <strong>{isEs ? 'Renovación Automática:' : 'Automatic Renewal:'}</strong> {isEs
+                ? 'Las suscripciones se renuevan automáticamente en base a tu período de facturación elegido (mensual o anual) hasta que decidas cancelarla.'
+                : 'Subscriptions renew automatically on your chosen billing cadence (monthly or annual) until you decide to cancel.'}
+            </li>
+            <li>
+              <strong>{isEs ? 'Cancelación en Cualquier Momento:' : 'Cancel Anytime:'}</strong> {isEs
+                ? 'Puedes desactivar la renovación automática en cualquier momento desde la sección de Ajustes de tu cuenta. Mantendrás el acceso completo a los beneficios Premium hasta el fin del ciclo de facturación abonado, sin cargos adicionales.'
+                : 'You can disable auto-renewal at any time directly from your account Settings. You will retain full access to Premium benefits until the end of your paid billing cycle without additional charges.'}
+            </li>
+            <li>
+              <strong>{isEs ? 'Reembolsos:' : 'Refunds:'}</strong> {isEs
+                ? 'Salvo que la ley aplicable disponga lo contrario, los pagos realizados no son reembolsables una vez activado el período facturado. Ante cualquier inconveniente de cobro o disputa, puedes contactar a nuestro equipo de soporte.'
+                : 'Except where mandatory applicable law provides otherwise, payments are non-refundable once the billing period has commenced. In case of billing issues or disputes, please contact our support team.'}
+            </li>
+          </ul>
+        </section>
+
+        <section style={{ marginBottom: '2rem' }}>
+          <h2 style={{ fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)' }}>
+            <MessageSquare size={20} /> {isEs ? '4. Contenido Generado por el Usuario (UGC) y Licencias' : '4. User-Generated Content (UGC) & Licenses'}
+          </h2>
+          <p style={{ color: 'var(--text-secondary)' }}>
+            {isEs
+              ? 'Al crear listas, guías, notas, reseñas, comentarios o aportes dentro de Pathd:'
+              : 'When creating lists, guides, notes, reviews, comments, or contributions within Pathd:'}
+          </p>
+          <ul style={{ color: 'var(--text-secondary)', paddingLeft: '1.5rem', marginTop: '0.5rem' }}>
+            <li>
+              <strong>{isEs ? 'Propiedad de tu contenido:' : 'Ownership of your content:'}</strong> {isEs
+                ? 'Conservas en todo momento la titularidad y derechos sobre los textos, opiniones y guías originales que escribas en la plataforma.'
+                : 'You retain full ownership and rights over the original texts, reviews, and guides you compose on the platform.'}
+            </li>
+            <li>
+              <strong>{isEs ? 'Licencia concedida a la plataforma:' : 'License granted to the platform:'}</strong> {isEs
+                ? 'Nos concedes una licencia mundial, no exclusiva y libre de regalías para alojar, almacenar, formatear, traducir, mostrar y distribuir dicho contenido dentro de la plataforma y sus servicios asociados.'
+                : 'You grant us a worldwide, non-exclusive, royalty-free license to host, store, format, translate, display, and distribute such content within the platform and its related services.'}
+            </li>
+            <li>
+              <strong>{isEs ? 'Responsabilidad:' : 'Responsibility:'}</strong> {isEs
+                ? 'Eres el único responsable del contenido que publicas y garantizas que no viola derechos de terceros ni secretos comerciales.'
+                : 'You are solely responsible for the content you publish and warrant that it does not infringe upon third-party rights or trade secrets.'}
+            </li>
+          </ul>
+        </section>
+
+        <section style={{ marginBottom: '2rem' }}>
+          <h2 style={{ fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)' }}>
+            <HelpCircle size={20} /> {isEs ? '5. Fuentes de Datos, APIs y Atribuciones de Terceros' : '5. Data Sources, APIs & Third-Party Attributions'}
           </h2>
           <p style={{ color: 'var(--text-secondary)' }}>
             {isEs
@@ -160,12 +221,24 @@ export const TermsOfService: React.FC = () => {
               </p>
             </div>
 
+            <div style={{ background: 'var(--bg-tertiary)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+              <div style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span>KLIPY</span>
+                <a href="https://klipy.co" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.85rem' }}>
+                  klipy.co <ExternalLink size={13} />
+                </a>
+              </div>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0.5rem 0 0' }}>
+                {isEs ? 'Biblioteca interactiva de GIFs, clips y stickers para comentarios.' : 'Interactive GIFs, clips, and stickers library for social comments.'}
+              </p>
+            </div>
+
           </div>
         </section>
 
         <section style={{ marginBottom: '2rem' }}>
           <h2 style={{ fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)' }}>
-            <ShieldAlert size={20} color="#ef4444" /> {isEs ? '4. Moderación de Contenido, Reportes y Purga de Catálogo' : '4. Content Moderation, Reporting & Catalog Purges'}
+            <ShieldAlert size={20} color="#ef4444" /> {isEs ? '6. Moderación de Contenido, Reportes y Purga de Catálogo' : '6. Content Moderation, Reporting & Catalog Purges'}
           </h2>
           <p style={{ color: 'var(--text-secondary)' }}>
             {isEs
@@ -191,18 +264,44 @@ export const TermsOfService: React.FC = () => {
           </ul>
         </section>
 
-        <section>
+        <section style={{ marginBottom: '2rem' }}>
           <h2 style={{ fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)' }}>
-            <HelpCircle size={20} /> {isEs ? '5. Limitación de Responsabilidad' : '5. Disclaimer of Warranties'}
+            <HelpCircle size={20} /> {isEs ? '7. Limitación de Responsabilidad' : '7. Disclaimer of Warranties'}
           </h2>
           <p style={{ color: 'var(--text-secondary)' }}>
             {isEs
-              ? 'El servicio se brinda "tal cual" (as is) sin garantías de ningún tipo. Nos reservamos el derecho de modificar o suspender el servicio con o sin previo aviso.'
-              : 'The service is provided on an "as is" and "as available" basis without warranties of any kind. We reserve the right to modify or suspend the service at any time.'}
+              ? 'El servicio se brinda "tal cual" (as is) y según disponibilidad ("as available") sin garantías de ningún tipo, expresas o implícitas. No garantizamos que el servicio sea ininterrumpido, esté 100% libre de errores o que la disponibilidad de APIs de terceros se mantenga constante indefinidamente.'
+              : 'The service is provided on an "as is" and "as available" basis without warranties of any kind, either express or implied. We do not warrant that the service will be uninterrupted, error-free, or that third-party API availability will remain constant indefinitely.'}
+          </p>
+        </section>
+
+        <section style={{ marginBottom: '2rem' }}>
+          <h2 style={{ fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)' }}>
+            <CheckCircle size={20} /> {isEs ? '8. Cierre de Cuenta y Modificaciones de los Términos' : '8. Account Termination & Changes to Terms'}
+          </h2>
+          <p style={{ color: 'var(--text-secondary)' }}>
+            {isEs
+              ? 'Puedes eliminar tu cuenta en cualquier momento desde la sección de Ajustes, lo que borrará de forma permanente tus datos asociados. Asimismo, nos reservamos el derecho de actualizar estos Términos periódicamente. Cualquier cambio sustancial será debidamente reflejado actualizando la fecha al inicio de este documento.'
+              : 'You may terminate your account at any time from your Settings page, permanently deleting your associated data. We also reserve the right to update these Terms periodically. Substantial modifications will be reflected by updating the effective date at the top of this document.'}
+          </p>
+        </section>
+
+        <section>
+          <h2 style={{ fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)' }}>
+            <Mail size={20} /> {isEs ? '9. Contacto y Consultas Legales' : '9. Legal Contact & Support'}
+          </h2>
+          <p style={{ color: 'var(--text-secondary)' }}>
+            {isEs
+              ? 'Para cualquier consulta relacionada con estos Términos de Servicio, facturación o derechos de autor (DMCA), puedes comunicarte con nosotros a '
+              : 'For any inquiries regarding these Terms of Service, billing, or copyright concerns (DMCA), please contact us at '}
+            <a href="mailto:support@pathd.net" style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>support@pathd.net</a>
+            {isEs ? ' o ' : ' or '}
+            <a href="mailto:contact@pathd.net" style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>contact@pathd.net</a>.
           </p>
         </section>
       </div>
     </div>
   );
 };
+
 export default TermsOfService;
