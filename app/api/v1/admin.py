@@ -22,10 +22,11 @@ def get_all_reports(
     """
     Returns lists of active reports grouped by type (media, lists, comments, reviews).
     """
-    from app.models.social import MediaItemReport, BlockedMediaItem, BlockedFranchise
+    from app.models.social import MediaItemReport, BlockedMediaItem, BlockedFranchise, ActivityComment, ActivityCommentReport
     media_reports = db.query(MediaItemReport).order_by(MediaItemReport.created_at.desc()).all()
     list_reports = db.query(ListReport).order_by(ListReport.created_at.desc()).all()
     comment_reports = db.query(CommentReport).order_by(CommentReport.created_at.desc()).all()
+    act_comment_reports = db.query(ActivityCommentReport).order_by(ActivityCommentReport.created_at.desc()).all()
     review_reports = db.query(MediaReviewReport).order_by(MediaReviewReport.created_at.desc()).all()
     blocked_items = db.query(BlockedMediaItem).order_by(BlockedMediaItem.created_at.desc()).all()
     blocked_franchises = db.query(BlockedFranchise).order_by(BlockedFranchise.created_at.desc()).all()
@@ -78,21 +79,49 @@ def get_all_reports(
         
     formatted_comments = []
     for r in comment_reports:
+        c = r.comment
+        author = c.user if c else None
         formatted_comments.append({
             "report_id": r.id,
             "comment_id": r.comment_id,
-            "comment_content": r.comment.content if r.comment else "[Deleted]",
+            "comment_type": "guide",
+            "comment_content": c.content if (c and not getattr(c, 'is_deleted', False)) else "[Eliminado]",
+            "author_id": author.id if author else None,
+            "author_username": author.username if author else "Desconocido",
             "reporter_username": r.user.username if r.user else "Unknown",
             "reason": r.reason,
             "created_at": r.created_at
         })
+
+    for r in act_comment_reports:
+        ac = r.comment
+        author = ac.user if ac else None
+        formatted_comments.append({
+            "report_id": r.id,
+            "comment_id": r.comment_id,
+            "comment_type": "activity",
+            "comment_content": ac.content if (ac and not getattr(ac, 'is_deleted', False)) else "[Eliminado]",
+            "author_id": author.id if author else None,
+            "author_username": author.username if author else "Desconocido",
+            "reporter_username": r.user.username if r.user else "Unknown",
+            "reason": r.reason,
+            "created_at": r.created_at
+        })
+
+    formatted_comments.sort(key=lambda x: x["created_at"], reverse=True)
         
     formatted_reviews = []
     for r in review_reports:
+        rev = r.review
+        author = rev.user if rev else None
         formatted_reviews.append({
             "report_id": r.id,
             "review_id": r.review_id,
-            "review_content": r.review.content if r.review else "[Deleted]",
+            "review_content": rev.content if (rev and not getattr(rev, 'is_deleted', False)) else "[Eliminado]",
+            "item_type": rev.item_type if rev else None,
+            "external_id": rev.external_id if rev else None,
+            "author_id": author.id if author else None,
+            "author_username": author.username if author else "Desconocido",
             "reporter_username": r.user.username if r.user else "Unknown",
             "reason": r.reason,
             "created_at": r.created_at
@@ -415,6 +444,48 @@ def admin_dismiss_media_report(
     db.commit()
     return {"success": True, "message": "Reporte desestimado."}
 
+@router.delete("/reports/comment/{report_id}")
+def admin_dismiss_comment_report(
+    report_id: int,
+    current_admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    from app.models.social import CommentReport
+    report = db.query(CommentReport).filter(CommentReport.id == report_id).first()
+    if not report:
+        raise HTTPException(status_code=404, detail="Reporte no encontrado.")
+    db.delete(report)
+    db.commit()
+    return {"success": True, "message": "Reporte desestimado."}
+
+@router.delete("/reports/activity-comment/{report_id}")
+def admin_dismiss_activity_comment_report(
+    report_id: int,
+    current_admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    from app.models.social import ActivityCommentReport
+    report = db.query(ActivityCommentReport).filter(ActivityCommentReport.id == report_id).first()
+    if not report:
+        raise HTTPException(status_code=404, detail="Reporte no encontrado.")
+    db.delete(report)
+    db.commit()
+    return {"success": True, "message": "Reporte desestimado."}
+
+@router.delete("/reports/review/{report_id}")
+def admin_dismiss_review_report(
+    report_id: int,
+    current_admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    from app.models.review import MediaReviewReport
+    report = db.query(MediaReviewReport).filter(MediaReviewReport.id == report_id).first()
+    if not report:
+        raise HTTPException(status_code=404, detail="Reporte no encontrado.")
+    db.delete(report)
+    db.commit()
+    return {"success": True, "message": "Reporte desestimado."}
+
 @router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 def admin_delete_user(
     user_id: int,
@@ -497,7 +568,7 @@ def admin_delete_list(
     db.commit()
     return None
 
-@router.delete("/comments/{comment_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/comments/{comment_id}")
 def admin_delete_comment(
     comment_id: int,
     current_admin: User = Depends(get_current_admin),
@@ -507,11 +578,64 @@ def admin_delete_comment(
     if not comment:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found")
         
-    db.delete(comment)
-    db.commit()
-    return None
+    has_replies = db.query(Comment).filter(Comment.parent_id == comment.id).count() > 0
+    if has_replies:
+        comment.is_deleted = True
+        comment.content = None
+        db.commit()
+    else:
+        parent_id_val = comment.parent_id
+        db.delete(comment)
+        db.commit()
+        if parent_id_val:
+            parent = db.query(Comment).filter(Comment.id == parent_id_val).first()
+            if parent and getattr(parent, 'is_deleted', False):
+                if db.query(Comment).filter(Comment.parent_id == parent_id_val).count() == 0:
+                    db.delete(parent)
+                    db.commit()
 
-@router.delete("/reviews/{review_id}", status_code=status.HTTP_204_NO_CONTENT)
+    from app.services.activity_service import ActivityService
+    ActivityService.delete_activity(
+        db=db,
+        user_id=comment.user_id,
+        activity_type="guide_commented",
+        entity_id=str(comment_id)
+    )
+    return {"success": True, "message": "Comentario eliminado."}
+
+@router.delete("/activity-comments/{comment_id}")
+def admin_delete_activity_comment(
+    comment_id: int,
+    current_admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    from app.models.social import ActivityComment
+    comment = db.query(ActivityComment).filter(ActivityComment.id == comment_id).first()
+    if not comment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found")
+
+    has_replies = db.query(ActivityComment).filter(ActivityComment.parent_id == comment.id).count() > 0
+    if has_replies:
+        comment.is_deleted = True
+        comment.content = None
+        comment.media_url = None
+        comment.media_type = None
+        comment.audio_url = None
+        db.commit()
+    else:
+        parent_id_val = comment.parent_id
+        db.delete(comment)
+        db.commit()
+        if parent_id_val:
+            parent = db.query(ActivityComment).filter(ActivityComment.id == parent_id_val).first()
+            if parent and getattr(parent, 'is_deleted', False):
+                if db.query(ActivityComment).filter(ActivityComment.parent_id == parent_id_val).count() == 0:
+                    db.delete(parent)
+                    db.commit()
+
+    return {"success": True, "message": "Comentario eliminado."}
+
+@router.delete("/reviews/{review_id}")
 def admin_delete_review(
     review_id: int,
     current_admin: User = Depends(get_current_admin),
@@ -521,9 +645,40 @@ def admin_delete_review(
     if not review:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Review not found")
         
-    db.delete(review)
-    db.commit()
-    return None
+    has_replies = db.query(MediaReview).filter(MediaReview.parent_id == review.id).count() > 0
+    review_id_val = review.id
+    if has_replies:
+        review.is_deleted = True
+        review.content = None
+        review.media_url = None
+        review.media_type = None
+        review.rating = None
+        db.commit()
+    else:
+        parent_id_val = review.parent_id
+        db.delete(review)
+        db.commit()
+        if parent_id_val:
+            parent = db.query(MediaReview).filter(MediaReview.id == parent_id_val).first()
+            if parent and getattr(parent, 'is_deleted', False):
+                if db.query(MediaReview).filter(MediaReview.parent_id == parent_id_val).count() == 0:
+                    db.delete(parent)
+                    db.commit()
+
+    from app.services.activity_service import ActivityService
+    ActivityService.delete_activity(
+        db=db,
+        user_id=review.user_id,
+        activity_type="item_reviewed",
+        entity_id=str(review_id_val)
+    )
+    ActivityService.delete_activity(
+        db=db,
+        user_id=review.user_id,
+        activity_type="item_rated",
+        entity_id=str(review_id_val)
+    )
+    return {"success": True, "message": "Reseña o comentario eliminado."}
 
 
 # -------------------------------------------------------------

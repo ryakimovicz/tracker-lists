@@ -23,6 +23,7 @@ class MediaReviewResponse(BaseModel):
     media_type: Optional[str] = None
     parent_id: Optional[int] = None
     is_edited: Optional[datetime] = None
+    is_deleted: bool = False
     created_at: datetime
     vote_count: int = 0
     is_voted_by_me: bool = False

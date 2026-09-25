@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Send, Reply, Trash2, ThumbsUp, Image as ImageIcon } from 'lucide-react';
+import { Send, Reply, Trash2, ThumbsUp, Image as ImageIcon, Flag } from 'lucide-react';
 import { apiClient } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../context/LanguageContext';
@@ -18,6 +18,7 @@ export interface ActivityCommentItem {
   media_url?: string | null;
   media_type?: string | null;
   audio_url?: string | null;
+  is_deleted?: boolean;
   votes_count: number;
   is_voted_by_me: boolean;
   created_at: string;
@@ -152,6 +153,23 @@ export const ActivityCommentThread: React.FC<ActivityCommentThreadProps> = ({
     }
   };
 
+  const handleReportComment = async (commentId: number) => {
+    if (!user) return;
+    const promptMsg = isEs ? '¿Por qué deseas reportar este comentario? (mínimo 5 caracteres)' : 'Why are you reporting this comment? (minimum 5 characters)';
+    const reason = window.prompt(promptMsg);
+    if (!reason || reason.trim().length < 5) return;
+    try {
+      await apiClient.post(`/social/activity/comments/${commentId}/report`, { reason: reason.trim() });
+      alert(isEs ? 'Reporte enviado exitosamente.' : 'Report submitted successfully.');
+    } catch (err: any) {
+      if (err.response?.data?.detail) {
+        alert(err.response.data.detail);
+      } else {
+        alert(isEs ? 'Error al enviar reporte.' : 'Failed to submit report.');
+      }
+    }
+  };
+
   const renderSingleComment = (item: ActivityCommentItem, isChild = false) => {
     const isReplyingThis = replyTarget?.id === item.id;
     const canDelete = user && (user.id === item.user_id || user.is_admin);
@@ -169,7 +187,25 @@ export const ActivityCommentThread: React.FC<ActivityCommentThreadProps> = ({
         }}
       >
         {/* Avatar */}
-        {item.photo_url ? (
+        {item.is_deleted ? (
+          <div
+            style={{
+              width: isChild ? '28px' : '34px',
+              height: isChild ? '28px' : '34px',
+              borderRadius: '50%',
+              background: 'var(--bg-tertiary, rgba(255,255,255,0.05))',
+              color: 'var(--text-muted)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: isChild ? '0.75rem' : '0.85rem',
+              fontWeight: 700,
+              flexShrink: 0
+            }}
+          >
+            ?
+          </div>
+        ) : item.photo_url ? (
           <img
             src={item.photo_url}
             alt={item.username}
@@ -198,53 +234,63 @@ export const ActivityCommentThread: React.FC<ActivityCommentThreadProps> = ({
         {/* Content body */}
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem' }}>
-            <span style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--text-primary)' }}>
-              {item.username}
+            <span style={{ fontWeight: 700, fontSize: '0.88rem', color: item.is_deleted ? 'var(--text-muted)' : 'var(--text-primary)' }}>
+              {item.is_deleted ? (isEs ? 'Usuario' : 'User') : item.username}
             </span>
             <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
               {new Date(item.created_at).toLocaleDateString(isEs ? 'es-ES' : 'en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
             </span>
           </div>
 
-          {item.content && (
-            <p style={{ margin: '0 0 0.35rem 0', fontSize: '0.88rem', lineHeight: 1.4, color: 'var(--text-primary)', wordBreak: 'break-word' }}>
-              {item.content}
+          {item.is_deleted ? (
+            <p style={{ margin: '0 0 0.35rem 0', fontSize: '0.86rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+              {isEs ? 'Comentario eliminado.' : 'Comment deleted.'}
             </p>
-          )}
+          ) : (
+            <>
+              {item.content && (
+                <p style={{ margin: '0 0 0.35rem 0', fontSize: '0.88rem', lineHeight: 1.4, color: 'var(--text-primary)', wordBreak: 'break-word' }}>
+                  {item.content}
+                </p>
+              )}
 
-          {/* Media / GIF / Clip */}
-          {item.media_url && (
-            <div style={{ margin: '0.45rem 0' }}>
-              <MediaAttachmentView
-                mediaUrl={item.media_url}
-                mediaType={item.media_type}
-                maxWidth="320px"
-                maxHeight="220px"
-                allowPausePlay={true}
-              />
-            </div>
+              {/* Media / GIF / Clip */}
+              {item.media_url && (
+                <div style={{ margin: '0.45rem 0' }}>
+                  <MediaAttachmentView
+                    mediaUrl={item.media_url}
+                    mediaType={item.media_type}
+                    maxWidth="320px"
+                    maxHeight="220px"
+                    allowPausePlay={true}
+                  />
+                </div>
+              )}
+            </>
           )}
 
           {/* Actions */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '0.25rem' }}>
-            <button
-              onClick={() => handleVoteComment(item.id)}
-              style={{
-                background: item.is_voted_by_me ? 'rgba(59, 130, 246, 0.15)' : 'transparent',
-                border: item.is_voted_by_me ? '1px solid rgba(59, 130, 246, 0.4)' : '1px solid transparent',
-                color: item.is_voted_by_me ? '#3b82f6' : 'var(--text-muted)',
-                borderRadius: '4px',
-                padding: '0.15rem 0.4rem',
-                fontSize: '0.76rem',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.25rem',
-                cursor: 'pointer'
-              }}
-            >
-              <ThumbsUp size={12} fill={item.is_voted_by_me ? '#3b82f6' : 'none'} />
-              <span>{item.votes_count}</span>
-            </button>
+            {!item.is_deleted && (
+              <button
+                onClick={() => handleVoteComment(item.id)}
+                style={{
+                  background: item.is_voted_by_me ? 'rgba(59, 130, 246, 0.15)' : 'transparent',
+                  border: item.is_voted_by_me ? '1px solid rgba(59, 130, 246, 0.4)' : '1px solid transparent',
+                  color: item.is_voted_by_me ? '#3b82f6' : 'var(--text-muted)',
+                  borderRadius: '4px',
+                  padding: '0.15rem 0.4rem',
+                  fontSize: '0.76rem',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.25rem',
+                  cursor: 'pointer'
+                }}
+              >
+                <ThumbsUp size={12} fill={item.is_voted_by_me ? '#3b82f6' : 'none'} />
+                <span>{item.votes_count}</span>
+              </button>
+            )}
 
             {user && (
               <button
@@ -252,8 +298,9 @@ export const ActivityCommentThread: React.FC<ActivityCommentThreadProps> = ({
                   if (isReplyingThis) {
                     setReplyTarget(null);
                   } else {
-                    setReplyTarget({ id: item.id, username: item.username });
-                    setReplyText(`@${item.username} `);
+                    const uname = item.is_deleted ? (isEs ? 'Usuario' : 'User') : item.username;
+                    setReplyTarget({ id: item.id, username: uname });
+                    setReplyText(`@${uname} `);
                   }
                 }}
                 style={{
@@ -273,7 +320,25 @@ export const ActivityCommentThread: React.FC<ActivityCommentThreadProps> = ({
               </button>
             )}
 
-            {canDelete && (
+            {!item.is_deleted && user && user.id !== item.user_id && (
+              <button
+                onClick={() => handleReportComment(item.id)}
+                title={isEs ? 'Reportar' : 'Report'}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer',
+                  padding: '0.15rem'
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = '#f59e0b')}
+                onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
+              >
+                <Flag size={12} />
+              </button>
+            )}
+
+            {!item.is_deleted && canDelete && (
               <button
                 onClick={() => handleDeleteComment(item.id)}
                 title={isEs ? 'Eliminar' : 'Delete'}

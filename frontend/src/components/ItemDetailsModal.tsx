@@ -3596,6 +3596,21 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     } catch (err) {
       console.error("Failed to delete review", err);
     }
+  };  const handleReportReviewItem = async (reviewId: number) => {
+    if (!user) return;
+    const promptMsg = language === 'es' ? '¿Por qué deseas reportar este contenido? (mínimo 5 caracteres)' : 'Why are you reporting this content? (minimum 5 characters)';
+    const reason = window.prompt(promptMsg);
+    if (!reason || reason.trim().length < 5) return;
+    try {
+      await apiClient.post(`/reviews/${reviewId}/report`, { reason: reason.trim() });
+      alert(language === 'es' ? 'Reporte enviado exitosamente.' : 'Report submitted successfully.');
+    } catch (err: any) {
+      if (err.response?.data?.detail) {
+        alert(err.response.data.detail);
+      } else {
+        alert(language === 'es' ? 'Error al enviar reporte.' : 'Failed to submit report.');
+      }
+    }
   };
 
   const handleVoteReview = async (reviewId: number) => {
@@ -8023,7 +8038,23 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                             {/* Header */}
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                                {rootNode.photo_url ? (
+                                {rootNode.is_deleted ? (
+                                  <div style={{
+                                    width: '32px',
+                                    height: '32px',
+                                    borderRadius: '50%',
+                                    background: 'var(--bg-tertiary)',
+                                    color: 'var(--text-muted)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontSize: '0.82rem',
+                                    fontWeight: 700,
+                                    flexShrink: 0
+                                  }}>
+                                    ?
+                                  </div>
+                                ) : rootNode.photo_url ? (
                                   <img
                                     src={rootNode.photo_url}
                                     alt={rootNode.username}
@@ -8053,11 +8084,13 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                     {(rootNode.username || 'U')[0].toUpperCase()}
                                   </div>
                                 )}
-                                <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>{rootNode.username}</span>
+                                <span style={{ fontWeight: 600, fontSize: '0.9rem', color: rootNode.is_deleted ? 'var(--text-muted)' : 'inherit' }}>
+                                  {rootNode.is_deleted ? (language === 'es' ? 'Usuario' : 'User') : rootNode.username}
+                                </span>
                                 {rootNode.created_at && (
                                   <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
                                     • {formatReviewDate(rootNode.created_at)}
-                                    {rootNode.is_edited && (
+                                    {!rootNode.is_deleted && rootNode.is_edited && (
                                       <span style={{ marginLeft: '0.35rem', fontStyle: 'italic', color: 'var(--text-muted)', fontSize: '0.74rem' }}>
                                         ({language === 'es' ? 'Editado' : 'Edited'})
                                       </span>
@@ -8067,7 +8100,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                               </div>
 
                               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                {rootNode.rating && (
+                                {!rootNode.is_deleted && rootNode.rating && (
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                                     <StarRatingDisplay rating={rootNode.rating} size={14} gap="2px" />
                                     <span style={{ fontSize: '0.78rem', color: '#f59e0b', fontWeight: 700 }}>
@@ -8075,7 +8108,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                     </span>
                                   </div>
                                 )}
-                                {user && !rootNode.rating && user.id === rootNode.user_id && isWithinEditWindow(rootNode.created_at) && (
+                                {!rootNode.is_deleted && user && !rootNode.rating && user.id === rootNode.user_id && isWithinEditWindow(rootNode.created_at) && (
                                   <button
                                     onClick={() => {
                                       if (isEditingThisComment) {
@@ -8113,7 +8146,26 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                     <Edit2 size={13} />
                                   </button>
                                 )}
-                                {user && (user.id === rootNode.user_id || user.is_admin) && (
+                                {!rootNode.is_deleted && user && user.id !== rootNode.user_id && (
+                                  <button
+                                    onClick={() => handleReportReviewItem(rootNode.id)}
+                                    title={language === 'es' ? 'Reportar' : 'Report'}
+                                    style={{
+                                      background: 'transparent',
+                                      border: 'none',
+                                      color: 'var(--text-muted)',
+                                      cursor: 'pointer',
+                                      padding: '0.2rem',
+                                      display: 'flex',
+                                      alignItems: 'center'
+                                    }}
+                                    onMouseEnter={(e) => (e.currentTarget.style.color = '#f59e0b')}
+                                    onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
+                                  >
+                                    <Flag size={13} />
+                                  </button>
+                                )}
+                                {!rootNode.is_deleted && user && (user.id === rootNode.user_id || user.is_admin) && (
                                   <button
                                     onClick={() => handleDeleteReviewItem(rootNode.id)}
                                     title={language === 'es' ? 'Eliminar comentario' : 'Delete comment'}
@@ -8136,7 +8188,11 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                             </div>
 
                             {/* Comment text or Edit Form */}
-                            {isEditingThisComment ? (
+                            {rootNode.is_deleted ? (
+                              <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                                {language === 'es' ? 'Comentario eliminado.' : 'Comment deleted.'}
+                              </p>
+                            ) : isEditingThisComment ? (
                               <ReviewEditReplyForm
                                 initialText={rootNode.content || ''}
                                 editingMedia={editingCommentMedia}
@@ -8281,7 +8337,23 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                     >
                                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                          {reply.photo_url ? (
+                                          {reply.is_deleted ? (
+                                            <div style={{
+                                              width: '24px',
+                                              height: '24px',
+                                              borderRadius: '50%',
+                                              background: 'var(--bg-primary)',
+                                              color: 'var(--text-muted)',
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              justifyContent: 'center',
+                                              fontSize: '0.7rem',
+                                              fontWeight: 700,
+                                              flexShrink: 0
+                                            }}>
+                                              ?
+                                            </div>
+                                          ) : reply.photo_url ? (
                                             <img
                                               src={reply.photo_url}
                                               alt={reply.username}
@@ -8311,11 +8383,13 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                               {(reply.username || 'U')[0].toUpperCase()}
                                             </div>
                                           )}
-                                          <span style={{ fontWeight: 600, fontSize: '0.85rem' }}>{reply.username}</span>
+                                          <span style={{ fontWeight: 600, fontSize: '0.85rem', color: reply.is_deleted ? 'var(--text-muted)' : 'inherit' }}>
+                                            {reply.is_deleted ? (language === 'es' ? 'Usuario' : 'User') : reply.username}
+                                          </span>
                                           {reply.created_at && (
                                             <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
                                               • {formatReviewDate(reply.created_at)}
-                                              {reply.is_edited && (
+                                              {!reply.is_deleted && reply.is_edited && (
                                                 <span style={{ marginLeft: '0.35rem', fontStyle: 'italic', color: 'var(--text-muted)', fontSize: '0.7rem' }}>
                                                   ({language === 'es' ? 'Editado' : 'Edited'})
                                                 </span>
@@ -8325,7 +8399,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                         </div>
 
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                                          {user && user.id === reply.user_id && isWithinEditWindow(reply.created_at) && (
+                                          {!reply.is_deleted && user && user.id === reply.user_id && isWithinEditWindow(reply.created_at) && (
                                             <button
                                               onClick={() => {
                                                 if (isEditingThisReply) {
@@ -8363,7 +8437,26 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                               <Edit2 size={12} />
                                             </button>
                                           )}
-                                          {user && (user.id === reply.user_id || user.is_admin) && (
+                                          {!reply.is_deleted && user && user.id !== reply.user_id && (
+                                            <button
+                                              onClick={() => handleReportReviewItem(reply.id)}
+                                              title={language === 'es' ? 'Reportar' : 'Report'}
+                                              style={{
+                                                background: 'transparent',
+                                                border: 'none',
+                                                color: 'var(--text-muted)',
+                                                cursor: 'pointer',
+                                                padding: '0.2rem',
+                                                display: 'flex',
+                                                alignItems: 'center'
+                                              }}
+                                              onMouseEnter={(e) => (e.currentTarget.style.color = '#f59e0b')}
+                                              onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
+                                            >
+                                              <Flag size={12} />
+                                            </button>
+                                          )}
+                                          {!reply.is_deleted && user && (user.id === reply.user_id || user.is_admin) && (
                                             <button
                                               onClick={() => handleDeleteReviewItem(reply.id)}
                                               title={language === 'es' ? 'Eliminar respuesta' : 'Delete reply'}
@@ -8385,7 +8478,11 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                         </div>
                                       </div>
 
-                                      {isEditingThisReply ? (
+                                      {reply.is_deleted ? (
+                                        <p style={{ margin: 0, fontSize: '0.84rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                                          {language === 'es' ? 'Comentario eliminado.' : 'Comment deleted.'}
+                                        </p>
+                                      ) : isEditingThisReply ? (
                                         <ReviewEditReplyForm
                                           initialText={reply.content || ''}
                                           editingMedia={editingReplyMedia}
@@ -8411,7 +8508,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                         </>
                                       )}
 
-                                      {!isEditingThisReply && (
+                                      {!reply.is_deleted && !isEditingThisReply && (
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginTop: '0.15rem' }}>
                                           <button
                                             onClick={() => handleVoteReview(reply.id)}
@@ -8453,9 +8550,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                             </button>
                                           )}
                                         </div>
-                                      )}
-
-                                      {/* Inline Reply Form under this Child Reply */}
+                                      )}                                      {/* Inline Reply Form under this Child Reply */}
                                       {replyTarget?.targetReviewId === reply.id && (
                                         <div style={{ marginTop: '0.35rem' }}>
                                           <ReviewReplyForm

@@ -15,7 +15,8 @@ import {
   ThumbsUp,
   Reply,
   Pencil,
-  Lock
+  Lock,
+  Flag
 } from 'lucide-react';
 import { ItemDetailsModal } from '../components/ItemDetailsModal';
 import { ReplaceSavedGuideModal } from '../components/ReplaceSavedGuideModal';
@@ -28,7 +29,8 @@ interface CommentItem {
   user_id: number;
   list_id: number;
   parent_id?: number | null;
-  content: string;
+  content: string | null;
+  is_deleted?: boolean;
   created_at: string;
   creator_username: string;
   photo_url?: string;
@@ -175,9 +177,26 @@ export const ViewGuide: React.FC = () => {
     if (!guide) return;
     try {
       await apiClient.delete(`/social/lists/${guide.id}/comments/${commentId}`);
-      setComments(prev => prev.filter(c => c.id !== commentId));
+      await fetchComments();
     } catch (err) {
       console.error("Failed to delete comment", err);
+    }
+  };
+
+  const handleReportComment = async (commentId: number) => {
+    if (!currentUser || !guide) return;
+    const promptMsg = language === 'es' ? '¿Por qué deseas reportar este comentario? (mínimo 5 caracteres)' : 'Why are you reporting this comment? (minimum 5 characters)';
+    const reason = window.prompt(promptMsg);
+    if (!reason || reason.trim().length < 5) return;
+    try {
+      await apiClient.post(`/social/lists/${guide.id}/comments/${commentId}/report`, { reason: reason.trim() });
+      alert(language === 'es' ? 'Reporte enviado exitosamente.' : 'Report submitted successfully.');
+    } catch (err: any) {
+      if (err.response?.data?.detail) {
+        alert(err.response.data.detail);
+      } else {
+        alert(language === 'es' ? 'Error al enviar reporte.' : 'Failed to submit report.');
+      }
     }
   };
 
@@ -225,7 +244,8 @@ export const ViewGuide: React.FC = () => {
     }));
   };
 
-  const renderCommentContent = (content: string) => {
+  const renderCommentContent = (content: string | null) => {
+    if (!content) return null;
     const parts = content.split(/(@[a-zA-Z0-9_\-.]+)/g);
     return (
       <span>
@@ -1328,7 +1348,23 @@ export const ViewGuide: React.FC = () => {
                       {/* Header */}
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                          {node.photo_url ? (
+                          {node.is_deleted ? (
+                            <div style={{
+                              width: '32px',
+                              height: '32px',
+                              borderRadius: '50%',
+                              background: 'var(--bg-tertiary, rgba(255,255,255,0.05))',
+                              color: 'var(--text-muted)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '0.82rem',
+                              fontWeight: 700,
+                              flexShrink: 0
+                            }}>
+                              ?
+                            </div>
+                          ) : node.photo_url ? (
                             <img
                               src={node.photo_url}
                               alt={node.creator_username}
@@ -1358,61 +1394,92 @@ export const ViewGuide: React.FC = () => {
                               {(node.creator_username || 'U')[0].toUpperCase()}
                             </div>
                           )}
-                          <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>{node.creator_username}</span>
+                          <span style={{ fontWeight: 600, fontSize: '0.9rem', color: node.is_deleted ? 'var(--text-muted)' : 'inherit' }}>
+                            {node.is_deleted ? (language === 'es' ? 'Usuario' : 'User') : node.creator_username}
+                          </span>
                           <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>• {formatCommentDate(node.created_at)}</span>
                         </div>
 
-                        {currentUser && (currentUser.id === node.user_id || currentUser.is_admin) && (
-                          <button
-                            onClick={() => handleDeleteComment(node.id)}
-                            title={language === 'es' ? 'Eliminar comentario' : 'Delete comment'}
-                            style={{
-                              background: 'transparent',
-                              border: 'none',
-                              color: 'var(--text-muted)',
-                              cursor: 'pointer',
-                              padding: '0.2rem',
-                              display: 'flex',
-                              alignItems: 'center'
-                            }}
-                            onMouseEnter={(e) => (e.currentTarget.style.color = '#ef4444')}
-                            onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        )}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                          {!node.is_deleted && currentUser && currentUser.id !== node.user_id && (
+                            <button
+                              onClick={() => handleReportComment(node.id)}
+                              title={language === 'es' ? 'Reportar' : 'Report'}
+                              style={{
+                                background: 'transparent',
+                                border: 'none',
+                                color: 'var(--text-muted)',
+                                cursor: 'pointer',
+                                padding: '0.2rem',
+                                display: 'flex',
+                                alignItems: 'center'
+                              }}
+                              onMouseEnter={(e) => (e.currentTarget.style.color = '#f59e0b')}
+                              onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
+                            >
+                              <Flag size={13} />
+                            </button>
+                          )}
+                          {!node.is_deleted && currentUser && (currentUser.id === node.user_id || currentUser.is_admin) && (
+                            <button
+                              onClick={() => handleDeleteComment(node.id)}
+                              title={language === 'es' ? 'Eliminar comentario' : 'Delete comment'}
+                              style={{
+                                background: 'transparent',
+                                border: 'none',
+                                color: 'var(--text-muted)',
+                                cursor: 'pointer',
+                                padding: '0.2rem',
+                                display: 'flex',
+                                alignItems: 'center'
+                              }}
+                              onMouseEnter={(e) => (e.currentTarget.style.color = '#ef4444')}
+                              onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
+                        </div>
                       </div>
 
                       {/* Comment text */}
-                      <p style={{ margin: 0, fontSize: '0.92rem', color: 'var(--text-primary)', whiteSpace: 'pre-wrap', lineHeight: '1.45' }}>
-                        {renderCommentContent(node.content)}
-                      </p>
+                      {node.is_deleted ? (
+                        <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                          {language === 'es' ? 'Comentario eliminado.' : 'Comment deleted.'}
+                        </p>
+                      ) : (
+                        <p style={{ margin: 0, fontSize: '0.92rem', color: 'var(--text-primary)', whiteSpace: 'pre-wrap', lineHeight: '1.45' }}>
+                          {renderCommentContent(node.content)}
+                        </p>
+                      )}
 
                       {/* Actions */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '0.25rem', flexWrap: 'wrap' }}>
-                        <button
-                          onClick={() => handleVoteComment(node.id)}
-                          style={{
-                            background: node.is_voted_by_me ? 'rgba(59, 130, 246, 0.15)' : 'transparent',
-                            border: node.is_voted_by_me ? '1px solid rgba(59, 130, 246, 0.3)' : '1px solid var(--border-color)',
-                            color: node.is_voted_by_me ? '#3b82f6' : 'var(--text-secondary)',
-                            borderRadius: '4px',
-                            padding: '0.2rem 0.5rem',
-                            fontSize: '0.78rem',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '0.35rem',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s ease'
-                          }}
-                        >
-                          <ThumbsUp size={12} fill={node.is_voted_by_me ? '#3b82f6' : 'none'} />
-                          <span>{node.vote_count}</span>
-                        </button>
+                        {!node.is_deleted && (
+                          <button
+                            onClick={() => handleVoteComment(node.id)}
+                            style={{
+                              background: node.is_voted_by_me ? 'rgba(59, 130, 246, 0.15)' : 'transparent',
+                              border: node.is_voted_by_me ? '1px solid rgba(59, 130, 246, 0.3)' : '1px solid var(--border-color)',
+                              color: node.is_voted_by_me ? '#3b82f6' : 'var(--text-secondary)',
+                              borderRadius: '4px',
+                              padding: '0.2rem 0.5rem',
+                              fontSize: '0.78rem',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.35rem',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s ease'
+                            }}
+                          >
+                            <ThumbsUp size={12} fill={node.is_voted_by_me ? '#3b82f6' : 'none'} />
+                            <span>{node.vote_count}</span>
+                          </button>
+                        )}
 
                         {currentUser && (
                           <button
-                            onClick={() => handleOpenReply(node.id, node.id, node.creator_username)}
+                            onClick={() => handleOpenReply(node.id, node.id, node.is_deleted ? (language === 'es' ? 'Usuario' : 'User') : node.creator_username)}
                             style={{
                               background: 'transparent',
                               border: 'none',
@@ -1493,7 +1560,23 @@ export const ViewGuide: React.FC = () => {
                                 {/* Reply Header */}
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                    {reply.photo_url ? (
+                                    {reply.is_deleted ? (
+                                      <div style={{
+                                        width: '26px',
+                                        height: '26px',
+                                        borderRadius: '50%',
+                                        background: 'var(--bg-tertiary, rgba(255,255,255,0.05))',
+                                        color: 'var(--text-muted)',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        fontSize: '0.72rem',
+                                        fontWeight: 700,
+                                        flexShrink: 0
+                                      }}>
+                                        ?
+                                      </div>
+                                    ) : reply.photo_url ? (
                                       <img
                                         src={reply.photo_url}
                                         alt={reply.creator_username}
@@ -1523,57 +1606,88 @@ export const ViewGuide: React.FC = () => {
                                         {(reply.creator_username || 'U')[0].toUpperCase()}
                                       </div>
                                     )}
-                                    <span style={{ fontWeight: 600, fontSize: '0.85rem' }}>{reply.creator_username}</span>
+                                    <span style={{ fontWeight: 600, fontSize: '0.85rem', color: reply.is_deleted ? 'var(--text-muted)' : 'inherit' }}>
+                                      {reply.is_deleted ? (language === 'es' ? 'Usuario' : 'User') : reply.creator_username}
+                                    </span>
                                     <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>• {formatCommentDate(reply.created_at)}</span>
                                   </div>
 
-                                  {currentUser && (currentUser.id === reply.user_id || currentUser.is_admin) && (
-                                    <button
-                                      onClick={() => handleDeleteComment(reply.id)}
-                                      title={language === 'es' ? 'Eliminar respuesta' : 'Delete reply'}
-                                      style={{
-                                        background: 'transparent',
-                                        border: 'none',
-                                        color: 'var(--text-muted)',
-                                        cursor: 'pointer',
-                                        padding: '0.2rem',
-                                        display: 'flex',
-                                        alignItems: 'center'
-                                      }}
-                                      onMouseEnter={(e) => (e.currentTarget.style.color = '#ef4444')}
-                                      onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
-                                    >
-                                      <Trash2 size={13} />
-                                    </button>
-                                  )}
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                    {!reply.is_deleted && currentUser && currentUser.id !== reply.user_id && (
+                                      <button
+                                        onClick={() => handleReportComment(reply.id)}
+                                        title={language === 'es' ? 'Reportar' : 'Report'}
+                                        style={{
+                                          background: 'transparent',
+                                          border: 'none',
+                                          color: 'var(--text-muted)',
+                                          cursor: 'pointer',
+                                          padding: '0.2rem',
+                                          display: 'flex',
+                                          alignItems: 'center'
+                                        }}
+                                        onMouseEnter={(e) => (e.currentTarget.style.color = '#f59e0b')}
+                                        onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
+                                      >
+                                        <Flag size={12} />
+                                      </button>
+                                    )}
+                                    {!reply.is_deleted && currentUser && (currentUser.id === reply.user_id || currentUser.is_admin) && (
+                                      <button
+                                        onClick={() => handleDeleteComment(reply.id)}
+                                        title={language === 'es' ? 'Eliminar respuesta' : 'Delete reply'}
+                                        style={{
+                                          background: 'transparent',
+                                          border: 'none',
+                                          color: 'var(--text-muted)',
+                                          cursor: 'pointer',
+                                          padding: '0.2rem',
+                                          display: 'flex',
+                                          alignItems: 'center'
+                                        }}
+                                        onMouseEnter={(e) => (e.currentTarget.style.color = '#ef4444')}
+                                        onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
+                                      >
+                                        <Trash2 size={13} />
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
 
                                 {/* Reply Text */}
-                                <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-primary)', whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>
-                                  {renderCommentContent(reply.content)}
-                                </p>
+                                {reply.is_deleted ? (
+                                  <p style={{ margin: 0, fontSize: '0.84rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                                    {language === 'es' ? 'Comentario eliminado.' : 'Comment deleted.'}
+                                  </p>
+                                ) : (
+                                  <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-primary)', whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>
+                                    {renderCommentContent(reply.content)}
+                                  </p>
+                                )}
 
                                 {/* Reply Actions */}
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '0.2rem', flexWrap: 'wrap' }}>
-                                  <button
-                                    onClick={() => handleVoteComment(reply.id)}
-                                    style={{
-                                      background: reply.is_voted_by_me ? 'rgba(59, 130, 246, 0.15)' : 'transparent',
-                                      border: reply.is_voted_by_me ? '1px solid rgba(59, 130, 246, 0.3)' : '1px solid var(--border-color)',
-                                      color: reply.is_voted_by_me ? '#3b82f6' : 'var(--text-secondary)',
-                                      borderRadius: '4px',
-                                      padding: '0.15rem 0.45rem',
-                                      fontSize: '0.75rem',
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: '0.3rem',
-                                      cursor: 'pointer',
-                                      transition: 'all 0.2s ease'
-                                    }}
-                                  >
-                                    <ThumbsUp size={11} fill={reply.is_voted_by_me ? '#3b82f6' : 'none'} />
-                                    <span>{reply.vote_count}</span>
-                                  </button>
+                                  {!reply.is_deleted && (
+                                    <button
+                                      onClick={() => handleVoteComment(reply.id)}
+                                      style={{
+                                        background: reply.is_voted_by_me ? 'rgba(59, 130, 246, 0.15)' : 'transparent',
+                                        border: reply.is_voted_by_me ? '1px solid rgba(59, 130, 246, 0.3)' : '1px solid var(--border-color)',
+                                        color: reply.is_voted_by_me ? '#3b82f6' : 'var(--text-secondary)',
+                                        borderRadius: '4px',
+                                        padding: '0.15rem 0.45rem',
+                                        fontSize: '0.75rem',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '0.3rem',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s ease'
+                                      }}
+                                    >
+                                      <ThumbsUp size={11} fill={reply.is_voted_by_me ? '#3b82f6' : 'none'} />
+                                      <span>{reply.vote_count}</span>
+                                    </button>
+                                  )}
 
                                   {currentUser && (
                                     <button

@@ -354,14 +354,41 @@ export const AdminPanel: React.FC = () => {
     });
   };
 
-  const handleDeleteReportItem = async (type: 'list' | 'comment' | 'review', id: number) => {
+  const handleDeleteReportItem = async (type: 'list' | 'comment' | 'activity_comment' | 'review', id: number) => {
     try {
       if (type === 'list') await apiClient.delete(`/admin/lists/${id}`);
       if (type === 'comment') await apiClient.delete(`/admin/comments/${id}`);
+      if (type === 'activity_comment') await apiClient.delete(`/admin/activity-comments/${id}`);
       if (type === 'review') await apiClient.delete(`/admin/reviews/${id}`);
       fetchReports();
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  const handleDismissReport = async (type: 'comment' | 'activity_comment' | 'review' | 'list', reportId: number) => {
+    try {
+      if (type === 'comment') await apiClient.delete(`/admin/reports/comment/${reportId}`);
+      if (type === 'activity_comment') await apiClient.delete(`/admin/reports/activity-comment/${reportId}`);
+      if (type === 'review') await apiClient.delete(`/admin/reports/review/${reportId}`);
+      fetchReports();
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleInspectUserFromReport = async (userId: number) => {
+    if (!userId) return;
+    try {
+      const res = await apiClient.get('/admin/users', { params: { q: String(userId), limit: 10 } });
+      const found = (res.data.users || []).find((u: AdminUser) => u.id === userId);
+      if (found) {
+        handleOpenUserModal(found);
+      } else {
+        alert(isEs ? 'Usuario no encontrado.' : 'User not found.');
+      }
+    } catch (err) {
+      console.error('Error fetching user for modal:', err);
     }
   };
 
@@ -891,34 +918,151 @@ export const AdminPanel: React.FC = () => {
                 </div>
               )}
 
-              {/* Lists, Comments, Reviews Reports */}
-              {reports.lists?.map((r: any) => (
-                <div key={r.report_id} style={{ background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: 8, border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                      <FileText size={16} color="var(--accent-primary)" /> Lista #{r.list_id}
-                    </div>
-                    <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Motivo: {r.reason} • Por: @{r.reporter_username}</div>
+              {/* Lists Reports */}
+              {reports.lists && reports.lists.length > 0 && (
+                <div>
+                  <h4 style={{ margin: '0 0 0.85rem', color: 'var(--text-primary)', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <FileText size={16} color="var(--accent-primary)" /> {isEs ? 'Listas Reportadas' : 'Reported Lists'} ({reports.lists.length})
+                  </h4>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    {reports.lists.map((r: any) => (
+                      <div key={r.report_id} style={{ background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: 8, border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+                        <div>
+                          <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                            <FileText size={16} color="var(--accent-primary)" /> Lista #{r.list_id}
+                          </div>
+                          <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                            <strong>{isEs ? 'Motivo:' : 'Reason:'}</strong> {r.reason} • {isEs ? 'Por:' : 'By:'} @{r.reporter_username}
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <button onClick={() => handleDeleteReportItem('list', r.list_id)} className="btn-secondary" style={{ color: '#ef4444', borderColor: '#ef4444' }}>
+                            <Trash2 size={14} /> {isEs ? 'Eliminar Lista' : 'Delete List'}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                  <button onClick={() => handleDeleteReportItem('list', r.list_id)} className="btn-secondary" style={{ color: '#ef4444', borderColor: '#ef4444' }}>
-                    <Trash2 size={14} /> Eliminar Lista
-                  </button>
                 </div>
-              ))}
+              )}
 
-              {reports.comments?.map((r: any) => (
-                <div key={r.report_id} style={{ background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: 8, border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                      <MessageSquare size={16} color="var(--accent-primary)" /> Comentario #{r.comment_id}: "{r.comment_content}"
-                    </div>
-                    <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Motivo: {r.reason} • Por: @{r.reporter_username}</div>
+              {/* Reviews Reports Section */}
+              {reports.reviews && reports.reviews.length > 0 && (
+                <div>
+                  <h4 style={{ margin: '0 0 0.85rem', color: 'var(--text-primary)', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <Star size={16} color="#f59e0b" /> {isEs ? 'Reseñas Reportadas' : 'Reported Reviews'} ({reports.reviews.length})
+                  </h4>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                    {reports.reviews.map((r: any) => (
+                      <div key={r.report_id} style={{ background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: 8, border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+                        <div style={{ flex: 1, minWidth: 260 }}>
+                          <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-primary)' }}>
+                            <Star size={15} color="#f59e0b" /> {isEs ? 'Reseña' : 'Review'} #{r.review_id}
+                            {r.author_username && (
+                              <span style={{ fontSize: '0.8rem', color: 'var(--accent-primary)', marginLeft: '0.25rem' }}>
+                                ({isEs ? 'Autor:' : 'Author:'} @{r.author_username})
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ margin: '0.35rem 0', fontSize: '0.88rem', color: 'var(--text-primary)', fontStyle: 'italic', background: 'rgba(0,0,0,0.15)', padding: '0.4rem 0.6rem', borderRadius: 6 }}>
+                            "{r.review_content}"
+                          </div>
+                          <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                            <strong>{isEs ? 'Motivo:' : 'Reason:'}</strong> {r.reason} • {isEs ? 'Reportado por:' : 'Reported by:'} @{r.reporter_username}
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                          {r.author_id && (
+                            <button
+                              onClick={() => handleInspectUserFromReport(r.author_id)}
+                              className="btn-secondary"
+                              style={{ fontSize: '0.8rem', padding: '0.4rem 0.75rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+                            >
+                              <UserIcon size={14} /> {isEs ? 'Ver Usuario' : 'Inspect User'}
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleDeleteReportItem('review', r.review_id)}
+                            className="btn-secondary"
+                            style={{ color: '#ef4444', borderColor: '#ef4444', fontSize: '0.8rem', padding: '0.4rem 0.75rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+                          >
+                            <Trash2 size={14} /> {isEs ? 'Eliminar Reseña' : 'Delete Review'}
+                          </button>
+                          <button
+                            onClick={() => handleDismissReport('review', r.report_id)}
+                            className="btn-secondary"
+                            style={{ fontSize: '0.8rem', padding: '0.4rem 0.75rem' }}
+                          >
+                            {isEs ? 'Desestimar' : 'Dismiss'}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                  <button onClick={() => handleDeleteReportItem('comment', r.comment_id)} className="btn-secondary" style={{ color: '#ef4444', borderColor: '#ef4444' }}>
-                    <Trash2 size={14} /> Eliminar Comentario
-                  </button>
                 </div>
-              ))}
+              )}
+
+              {/* Comments Reports Section */}
+              {reports.comments && reports.comments.length > 0 && (
+                <div>
+                  <h4 style={{ margin: '0 0 0.85rem', color: 'var(--text-primary)', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <MessageSquare size={16} color="var(--accent-primary)" /> {isEs ? 'Comentarios Reportados' : 'Reported Comments'} ({reports.comments.length})
+                  </h4>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                    {reports.comments.map((r: any) => {
+                      const isActivity = r.comment_type === 'activity';
+                      return (
+                        <div key={r.report_id} style={{ background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: 8, border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+                          <div style={{ flex: 1, minWidth: 260 }}>
+                            <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-primary)' }}>
+                              <MessageSquare size={15} color="var(--accent-primary)" />
+                              {isActivity ? (isEs ? 'Comentario de Social' : 'Activity Comment') : (isEs ? 'Comentario de Guía' : 'Guide Comment')} #{r.comment_id}
+                              {r.author_username && (
+                                <span style={{ fontSize: '0.8rem', color: 'var(--accent-primary)', marginLeft: '0.25rem' }}>
+                                  ({isEs ? 'Autor:' : 'Author:'} @{r.author_username})
+                                </span>
+                              )}
+                            </div>
+                            <div style={{ margin: '0.35rem 0', fontSize: '0.88rem', color: 'var(--text-primary)', fontStyle: 'italic', background: 'rgba(0,0,0,0.15)', padding: '0.4rem 0.6rem', borderRadius: 6 }}>
+                              "{r.comment_content}"
+                            </div>
+                            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                              <strong>{isEs ? 'Motivo:' : 'Reason:'}</strong> {r.reason} • {isEs ? 'Reportado por:' : 'Reported by:'} @{r.reporter_username}
+                            </div>
+                          </div>
+
+                          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                            {r.author_id && (
+                              <button
+                                onClick={() => handleInspectUserFromReport(r.author_id)}
+                                className="btn-secondary"
+                                style={{ fontSize: '0.8rem', padding: '0.4rem 0.75rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+                              >
+                                <UserIcon size={14} /> {isEs ? 'Ver Usuario' : 'Inspect User'}
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handleDeleteReportItem(isActivity ? 'activity_comment' : 'comment', r.comment_id)}
+                              className="btn-secondary"
+                              style={{ color: '#ef4444', borderColor: '#ef4444', fontSize: '0.8rem', padding: '0.4rem 0.75rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+                            >
+                              <Trash2 size={14} /> {isEs ? 'Eliminar Comentario' : 'Delete Comment'}
+                            </button>
+                            <button
+                              onClick={() => handleDismissReport(isActivity ? 'activity_comment' : 'comment', r.report_id)}
+                              className="btn-secondary"
+                              style={{ fontSize: '0.8rem', padding: '0.4rem 0.75rem' }}
+                            >
+                              {isEs ? 'Desestimar' : 'Dismiss'}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

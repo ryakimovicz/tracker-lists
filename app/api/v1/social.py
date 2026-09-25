@@ -240,23 +240,25 @@ def get_list_comments(
                 CommentVote.user_id == current_user.id
             ).first() is not None
             
+        is_del = bool(getattr(c, 'is_deleted', False))
         results.append(
             CommentResponse(
                 id=c.id,
                 user_id=c.user_id,
                 list_id=c.list_id,
                 parent_id=c.parent_id,
-                content=c.content,
+                content=None if is_del else c.content,
+                is_deleted=is_del,
                 created_at=c.created_at,
-                creator_username=c.user.username if c.user else "Unknown",
-                photo_url=c.user.photo_url if c.user else None,
-                vote_count=vote_count,
-                is_voted_by_me=is_voted
+                creator_username="Usuario" if is_del else (c.user.username if c.user else "Unknown"),
+                photo_url=None if is_del else (c.user.photo_url if c.user else None),
+                vote_count=0 if is_del else vote_count,
+                is_voted_by_me=False if is_del else is_voted
             )
         )
     return results
 
-@router.delete("/lists/{list_id}/comments/{comment_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/lists/{list_id}/comments/{comment_id}", status_code=status.HTTP_200_OK)
 def delete_comment(
     list_id: int,
     comment_id: int,
@@ -274,8 +276,24 @@ def delete_comment(
             detail="You are not authorized to delete this comment"
         )
         
-    db.delete(comment)
-    db.commit()
+    has_replies = db.query(Comment).filter(Comment.parent_id == comment.id).count() > 0
+
+    if has_replies:
+        comment.is_deleted = True
+        comment.content = None
+        db.commit()
+    else:
+        parent_id_val = comment.parent_id
+        db.delete(comment)
+        db.commit()
+
+        if parent_id_val:
+            parent = db.query(Comment).filter(Comment.id == parent_id_val).first()
+            if parent and getattr(parent, 'is_deleted', False):
+                other_replies = db.query(Comment).filter(Comment.parent_id == parent_id_val).count()
+                if other_replies == 0:
+                    db.delete(parent)
+                    db.commit()
 
     from app.services.activity_service import ActivityService
     ActivityService.delete_activity(
@@ -284,7 +302,7 @@ def delete_comment(
         activity_type="guide_commented",
         entity_id=str(comment_id)
     )
-    return None
+    return {"message": "Comment deleted successfully", "is_deleted": has_replies}
 
 @router.post("/lists/{list_id}/comments/{comment_id}/vote", status_code=status.HTTP_200_OK)
 def toggle_comment_vote(
@@ -993,19 +1011,21 @@ def get_activity_comments(
                 ActivityCommentVote.user_id == uid
             ).first() is not None
 
+        is_del = bool(getattr(c, 'is_deleted', False))
         c_resp = ActivityCommentResponse(
             id=c.id,
             activity_id=c.activity_id,
             user_id=c.user_id,
-            username=u.username if u else "Unknown",
-            photo_url=u.photo_url if u else None,
+            username="Usuario" if is_del else (u.username if u else "Unknown"),
+            photo_url=None if is_del else (u.photo_url if u else None),
             parent_id=c.parent_id,
-            content=c.content,
-            media_url=c.media_url,
-            media_type=c.media_type,
-            audio_url=c.audio_url,
-            votes_count=votes_count,
-            is_voted_by_me=is_voted,
+            content=None if is_del else c.content,
+            media_url=None if is_del else c.media_url,
+            media_type=None if is_del else c.media_type,
+            audio_url=None if is_del else c.audio_url,
+            is_deleted=is_del,
+            votes_count=0 if is_del else votes_count,
+            is_voted_by_me=False if is_del else is_voted,
             created_at=c.created_at,
             replies=[]
         )
@@ -1125,6 +1145,54 @@ def delete_activity_comment(
     if comment.user_id != current_user.id and not getattr(current_user, 'is_admin', False):
         raise HTTPException(status_code=403, detail="Not authorized to delete this comment")
 
-    db.delete(comment)
+    has_replies = db.query(ActivityComment).filter(ActivityComment.parent_id == comment.id).count() > 0
+
+    if has_replies:
+        comment.is_deleted = True
+        comment.content = None
+        comment.media_url = None
+        comment.media_type = None
+        comment.audio_url = None
+        db.commit()
+    else:
+        parent_id_val = comment.parent_id
+        db.delete(comment)
+        db.commit()
+
+        if parent_id_val:
+            parent = db.query(ActivityComment).filter(ActivityComment.id == parent_id_val).first()
+            if parent and getattr(parent, 'is_deleted', False):
+                other_replies = db.query(ActivityComment).filter(ActivityComment.parent_id == parent_id_val).count()
+                if other_replies == 0:
+                    db.delete(parent)
+                    db.commit()
+
+    return {"message": "Comment deleted successfully", "is_deleted": has_replies}
+
+@router.post("/activity/comments/{comment_id}/report", status_code=status.HTTP_201_CREATED)
+def report_activity_comment(
+    comment_id: int,
+    report_in: ReportCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    comment = db.query(ActivityComment).filter(ActivityComment.id == comment_id).first()
+    if not comment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found")
+
+    from app.models.social import ActivityCommentReport
+    existing_report = db.query(ActivityCommentReport).filter(
+        ActivityCommentReport.comment_id == comment_id,
+        ActivityCommentReport.user_id == current_user.id
+    ).first()
+    if existing_report:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Ya has reportado este comentario.")
+
+    report = ActivityCommentReport(
+        user_id=current_user.id,
+        comment_id=comment_id,
+        reason=report_in.reason.strip()
+    )
+    db.add(report)
     db.commit()
-    return {"message": "Comment deleted successfully"}
+    return {"message": "Comment reported successfully"}

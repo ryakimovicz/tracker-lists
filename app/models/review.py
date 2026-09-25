@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import Column, Integer, Float, String, Text, ForeignKey, DateTime, UniqueConstraint
+from sqlalchemy import Column, Integer, Float, String, Text, ForeignKey, DateTime, UniqueConstraint, Boolean
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 
@@ -16,6 +16,7 @@ class MediaReview(Base):
     media_url = Column(String(500), nullable=True)   # Attached GIF/Media URL
     media_type = Column(String(50), nullable=True)   # gif, sticker, meme, clip
     is_edited = Column(DateTime(timezone=True), nullable=True)  # Or boolean / timestamp
+    is_deleted = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 
     # Relationships

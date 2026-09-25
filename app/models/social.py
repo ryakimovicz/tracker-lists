@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import Column, Integer, String, Text, ForeignKey, DateTime, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Text, ForeignKey, DateTime, UniqueConstraint, Boolean
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 
@@ -36,6 +36,7 @@ class Comment(Base):
     list_id = Column(Integer, ForeignKey("reading_lists.id", ondelete="CASCADE"), nullable=False)
     parent_id = Column(Integer, ForeignKey("comments.id", ondelete="CASCADE"), nullable=True)
     content = Column(Text, nullable=False)
+    is_deleted = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
     # Relationships
@@ -165,12 +166,14 @@ class ActivityComment(Base):
     media_url = Column(String(500), nullable=True)
     media_type = Column(String(50), nullable=True)  # 'gif', 'meme', 'sticker', 'clip', 'emoji'
     audio_url = Column(String(500), nullable=True)
+    is_deleted = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 
     user = relationship("User")
     activity = relationship("UserActivityLog", backref="comments")
     replies = relationship("ActivityComment", cascade="all, delete-orphan")
     votes = relationship("ActivityCommentVote", backref="comment", cascade="all, delete-orphan")
+    reports = relationship("ActivityCommentReport", back_populates="comment", cascade="all, delete-orphan")
 
 
 class ActivityCommentVote(Base):
@@ -186,6 +189,20 @@ class ActivityCommentVote(Base):
     __table_args__ = (
         UniqueConstraint("user_id", "comment_id", name="uq_activity_comment_vote"),
     )
+
+
+class ActivityCommentReport(Base):
+    __tablename__ = "activity_comment_reports"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    comment_id = Column(Integer, ForeignKey("activity_comments.id", ondelete="CASCADE"), nullable=False, index=True)
+    reason = Column(String(500), nullable=False)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    # Relationships
+    user = relationship("User")
+    comment = relationship("ActivityComment", back_populates="reports")
 
 
 class FollowRequest(Base):

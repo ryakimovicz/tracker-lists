@@ -177,6 +177,26 @@ def auto_migrate_schema():
                 except Exception as e:
                     logger.warning(f"Auto-migration: Failed to alter details column length: {e}")
 
+        if "comments" in inspector.get_table_names():
+            existing_comm_cols = {col["name"] for col in inspector.get_columns("comments")}
+            if "is_deleted" not in existing_comm_cols:
+                try:
+                    with engine.begin() as conn:
+                        conn.execute(text("ALTER TABLE comments ADD COLUMN is_deleted BOOLEAN DEFAULT FALSE;"))
+                    logger.info("Auto-migration: Added column 'is_deleted' to comments table.")
+                except Exception as e:
+                    logger.warning(f"Auto-migration: Failed to add column 'is_deleted' to comments: {e}")
+
+        if "activity_comments" in inspector.get_table_names():
+            existing_act_comm_cols = {col["name"] for col in inspector.get_columns("activity_comments")}
+            if "is_deleted" not in existing_act_comm_cols:
+                try:
+                    with engine.begin() as conn:
+                        conn.execute(text("ALTER TABLE activity_comments ADD COLUMN is_deleted BOOLEAN DEFAULT FALSE;"))
+                    logger.info("Auto-migration: Added column 'is_deleted' to activity_comments table.")
+                except Exception as e:
+                    logger.warning(f"Auto-migration: Failed to add column 'is_deleted' to activity_comments: {e}")
+
         if "media_reviews" in inspector.get_table_names():
             existing_rev_cols = {col["name"] for col in inspector.get_columns("media_reviews")}
             rev_cols_to_add = [
@@ -184,6 +204,7 @@ def auto_migrate_schema():
                 ("is_edited", "TIMESTAMP"),
                 ("media_url", "VARCHAR(500)"),
                 ("media_type", "VARCHAR(50)"),
+                ("is_deleted", "BOOLEAN DEFAULT FALSE"),
             ]
             for col_name, col_type in rev_cols_to_add:
                 if col_name not in existing_rev_cols:
@@ -210,14 +231,15 @@ def auto_migrate_schema():
                                     media_url VARCHAR(500),
                                     media_type VARCHAR(50),
                                     is_edited TIMESTAMP,
+                                    is_deleted BOOLEAN DEFAULT 0,
                                     created_at DATETIME NOT NULL,
                                     parent_id INTEGER REFERENCES media_reviews_new(id) ON DELETE CASCADE,
                                     FOREIGN KEY(user_id) REFERENCES users (id) ON DELETE CASCADE
                                 );
                             """))
                             conn.execute(text("""
-                                INSERT INTO media_reviews_new (id, user_id, item_type, external_id, rating, content, media_url, media_type, is_edited, created_at, parent_id)
-                                SELECT id, user_id, item_type, external_id, rating, content, media_url, media_type, is_edited, created_at, parent_id FROM media_reviews;
+                                INSERT INTO media_reviews_new (id, user_id, item_type, external_id, rating, content, media_url, media_type, is_edited, is_deleted, created_at, parent_id)
+                                SELECT id, user_id, item_type, external_id, rating, content, media_url, media_type, is_edited, COALESCE(is_deleted, 0), created_at, parent_id FROM media_reviews;
                             """))
                             conn.execute(text("DROP TABLE media_reviews;"))
                             conn.execute(text("ALTER TABLE media_reviews_new RENAME TO media_reviews;"))

@@ -158,7 +158,7 @@ def edit_review_or_reply(
         is_voted_by_me=is_voted
     )
 
-@router.delete("/{review_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{review_id}", status_code=status.HTTP_200_OK)
 def delete_review_or_comment(
     review_id: int,
     current_user: User = Depends(get_current_user),
@@ -173,24 +173,74 @@ def delete_review_or_comment(
 
     from app.services.activity_service import ActivityService
 
-    # Delete review or comment completely
-    review_id_val = review.id
-    db.delete(review)
-    db.commit()
+    # Check if this comment/review has replies
+    has_replies = db.query(MediaReview).filter(MediaReview.parent_id == review.id).count() > 0
 
+    review_id_val = review.id
+    if has_replies:
+        # Soft delete: wipe content and media, flag as deleted to preserve child replies
+        review.is_deleted = True
+        review.content = None
+        review.media_url = None
+        review.media_type = None
+        review.rating = None
+        db.commit()
+    else:
+        # Hard delete if it has no children
+        parent_id_val = review.parent_id
+        db.delete(review)
+        db.commit()
+
+        # If parent was soft-deleted and now has no other remaining replies, clean up parent
+        if parent_id_val:
+            parent = db.query(MediaReview).filter(MediaReview.id == parent_id_val).first()
+            if parent and parent.is_deleted:
+                other_replies = db.query(MediaReview).filter(MediaReview.parent_id == parent_id_val).count()
+                if other_replies == 0:
+                    db.delete(parent)
+                    db.commit()
+
+    # Clean up associated activity feed events if deleted
     ActivityService.delete_activity(
         db=db,
-        user_id=current_user.id,
+        user_id=review.user_id,
         activity_type="item_reviewed",
         entity_id=str(review_id_val)
     )
     ActivityService.delete_activity(
         db=db,
-        user_id=current_user.id,
+        user_id=review.user_id,
         activity_type="item_rated",
         entity_id=str(review_id_val)
     )
-    return None
+    return {"message": "Deleted successfully", "is_deleted": has_replies}
+
+@router.post("/{review_id}/report", status_code=status.HTTP_201_CREATED)
+def report_review_or_comment(
+    review_id: int,
+    report_in: ReviewReportCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    review = db.query(MediaReview).filter(MediaReview.id == review_id).first()
+    if not review:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Review not found")
+
+    existing_report = db.query(MediaReviewReport).filter(
+        MediaReviewReport.review_id == review_id,
+        MediaReviewReport.user_id == current_user.id
+    ).first()
+    if existing_report:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Ya has reportado este contenido.")
+
+    report = MediaReviewReport(
+        user_id=current_user.id,
+        review_id=review_id,
+        reason=report_in.reason.strip()
+    )
+    db.add(report)
+    db.commit()
+    return {"message": "Report submitted successfully"}
 
 @router.get("/{item_type}/{external_id}", response_model=List[MediaReviewResponse])
 def get_item_reviews(
@@ -209,9 +259,9 @@ def get_item_reviews(
 
     response_list = []
     for r in reviews:
-        votes_count = db.query(MediaReviewVote).filter(MediaReviewVote.review_id == r.id).count()
+        votes_count = db.query(MediaReviewVote).filter(MediaReviewVote.review_id == r.id).count() if not r.is_deleted else 0
         is_voted = False
-        if current_user:
+        if current_user and not r.is_deleted:
             is_voted = db.query(MediaReviewVote).filter(
                 MediaReviewVote.review_id == r.id,
                 MediaReviewVote.user_id == current_user.id
@@ -222,15 +272,16 @@ def get_item_reviews(
                 id=r.id,
                 user_id=r.user_id,
                 username=r.user.username if r.user else "Deleted User",
-                photo_url=r.user.photo_url if r.user else None,
+                photo_url=r.user.photo_url if (r.user and not r.is_deleted) else None,
                 item_type=r.item_type,
                 external_id=r.external_id,
-                rating=r.rating,
+                rating=r.rating if not r.is_deleted else None,
                 content=r.content,
-                media_url=r.media_url,
-                media_type=r.media_type,
+                media_url=r.media_url if not r.is_deleted else None,
+                media_type=r.media_type if not r.is_deleted else None,
                 parent_id=r.parent_id,
-                is_edited=r.is_edited,
+                is_edited=r.is_edited if not r.is_deleted else None,
+                is_deleted=bool(r.is_deleted),
                 created_at=r.created_at,
                 vote_count=votes_count,
                 is_voted_by_me=is_voted

@@ -19,7 +19,8 @@ class CommentResponse(BaseModel):
     user_id: int
     list_id: int
     parent_id: Optional[int] = None
-    content: str
+    content: Optional[str] = None
+    is_deleted: bool = False
     created_at: datetime
     creator_username: str
     photo_url: Optional[str] = None
@@ -76,6 +77,7 @@ class ActivityCommentResponse(BaseModel):
     media_url: Optional[str] = None
     media_type: Optional[str] = None
     audio_url: Optional[str] = None
+    is_deleted: bool = False
     votes_count: int = 0
     is_voted_by_me: bool = False
     created_at: datetime

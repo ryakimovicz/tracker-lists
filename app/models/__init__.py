@@ -8,7 +8,7 @@ from app.models.item_progress import ItemProgress
 from app.models.library import UserLibraryItem, UserLibraryStatusEnum
 from app.models.social import (
     ListVote, ListReport, Comment, CommentVote, CommentReport, Follow, MediaItemReport, BlockedMediaItem,
-    Notification, ActivityLike, ActivityComment, ActivityCommentVote, FollowRequest
+    Notification, ActivityLike, ActivityComment, ActivityCommentVote, ActivityCommentReport, FollowRequest
 )
 from app.models.review import MediaReview, MediaReviewVote, MediaReviewReport
 from app.models.addition import ListAddition, ListAdditionItem, UserAdoptedAddition, AdditionVote, AdditionComment
@@ -39,6 +39,7 @@ __all__ = [
     "ActivityLike",
     "ActivityComment",
     "ActivityCommentVote",
+    "ActivityCommentReport",
     "FollowRequest",
     "MediaReview",
     "MediaReviewVote",
