@@ -742,6 +742,14 @@ export const SettingsPage: React.FC = () => {
                   ? 'Solo tus seguidores aprobados pueden ver tus listas y actividad. Quienes no te sigan deberán enviar solicitud.'
                   : 'Only approved followers can view your lists and activity. Strangers must request to follow you.'}
               </p>
+              <div style={{ marginTop: '0.25rem', paddingTop: '0.5rem', borderTop: '1px solid var(--border-color)', fontSize: '0.78rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                <Eye size={13} style={{ flexShrink: 0 }} />
+                <span>
+                  {isEs
+                    ? 'Tus reseñas y comentarios en obras o guías públicas seguirán siendo visibles.'
+                    : 'Your reviews and comments on public media or guides will remain visible.'}
+                </span>
+              </div>
             </div>
           </div>
         </div>
