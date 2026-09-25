@@ -1345,8 +1345,12 @@ export const AdminPanel: React.FC = () => {
                       whiteSpace: 'nowrap',
                       background: '#3b82f6',
                       borderColor: '#3b82f6',
+                      color: '#ffffff',
                       '--btn-bg': '#3b82f6',
-                      '--btn-hover-bg': '#2563eb'
+                      '--btn-hover-bg': '#2563eb',
+                      '--btn-glow': 'rgba(59, 130, 246, 0.35)',
+                      '--btn-glow-hover': 'rgba(59, 130, 246, 0.55)',
+                      boxShadow: '0 4px 14px rgba(59, 130, 246, 0.35)'
                     } as React.CSSProperties}
                   >
                     {isEs ? 'Guardar Nombre' : 'Save Username'}
