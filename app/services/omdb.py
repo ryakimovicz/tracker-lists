@@ -9,6 +9,10 @@ from app.services.base import SearchResultItem
 from app.core.config import settings
 
 class OMDbService:
+    @classmethod
+    def get_api_key(cls) -> str:
+        return settings.OMDB_API_KEY or cls.API_KEY
+
     API_KEY = settings.OMDB_API_KEY
     FANART_API_KEY = settings.FANART_API_KEY
 
@@ -91,8 +95,9 @@ class OMDbService:
             return cls.get_fanart_poster(imdb_id)
             
         def get_omdb_details():
-            if not cls.API_KEY or not imdb_id: return "", None, item.get("Year"), 0.0
-            url = f"http://www.omdbapi.com/?i={imdb_id}&plot=full&apikey={cls.API_KEY}"
+            api_key = cls.get_api_key()
+            if not api_key or not imdb_id: return "", None, item.get("Year"), 0.0
+            url = f"http://www.omdbapi.com/?i={imdb_id}&plot=full&apikey={api_key}"
             try:
                 req = urllib.request.Request(url, headers={"User-Agent": "TrackerLists/1.0"})
                 with urllib.request.urlopen(req, timeout=3) as res:
@@ -179,7 +184,8 @@ class OMDbService:
         if not external_id:
             return None
         imdb_id = external_id.replace("omdb_", "").strip()
-        if not imdb_id or not cls.API_KEY:
+        api_key = cls.get_api_key()
+        if not imdb_id or not api_key:
             return None
             
         if imdb_id in cls._details_cache:
@@ -187,7 +193,7 @@ class OMDbService:
             if time.time() - timestamp < cls.CACHE_TTL_SECONDS:
                 return cached_item
 
-        url = f"http://www.omdbapi.com/?i={imdb_id}&plot=full&apikey={cls.API_KEY}"
+        url = f"http://www.omdbapi.com/?i={imdb_id}&plot=full&apikey={api_key}"
         try:
             req = urllib.request.Request(url, headers={"User-Agent": "TrackerLists/1.0"})
             with urllib.request.urlopen(req, timeout=4) as res:
@@ -202,7 +208,8 @@ class OMDbService:
 
     @classmethod
     def search_movies(cls, query: str) -> List[SearchResultItem]:
-        if not query or not cls.API_KEY:
+        api_key = cls.get_api_key()
+        if not query or not api_key:
             return []
 
         cache_key = query.strip().lower()
@@ -212,8 +219,8 @@ class OMDbService:
                 return cached_results
             
         encoded_query = urllib.parse.quote(query)
-        url_p1 = f"http://www.omdbapi.com/?s={encoded_query}&type=movie&page=1&apikey={cls.API_KEY}"
-        url_p2 = f"http://www.omdbapi.com/?s={encoded_query}&type=movie&page=2&apikey={cls.API_KEY}"
+        url_p1 = f"http://www.omdbapi.com/?s={encoded_query}&type=movie&page=1&apikey={api_key}"
+        url_p2 = f"http://www.omdbapi.com/?s={encoded_query}&type=movie&page=2&apikey={api_key}"
         
         results = []
         try:
@@ -239,7 +246,7 @@ class OMDbService:
             # If exact query yielded nothing and query does not contain '*', try wildcard search *query* or query*
             if not search_items and '*' not in query:
                 try:
-                    url_wildcard = f"http://www.omdbapi.com/?s={urllib.parse.quote('*' + query + '*')}&type=movie&apikey={cls.API_KEY}"
+                    url_wildcard = f"http://www.omdbapi.com/?s={urllib.parse.quote('*' + query + '*')}&type=movie&apikey={api_key}"
                     req_w = urllib.request.Request(url_wildcard, headers={"User-Agent": "TrackerLists/1.0"})
                     with urllib.request.urlopen(req_w, timeout=4) as resp_w:
                         if resp_w.status == 200:
