@@ -1084,10 +1084,66 @@ def admin_change_user_id(
     }
 
 
+class AdminChangeUsernameRequest(BaseModel):
+    username: str
 
+@router.put("/users/{user_id}/username")
+def admin_change_username(
+    user_id: int,
+    body: AdminChangeUsernameRequest,
+    current_admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    import re
+    from sqlalchemy import func
+    new_username = body.username.strip()
 
+    if len(new_username) < 3 or len(new_username) > 30:
+        raise HTTPException(
+            status_code=400,
+            detail="El nombre de usuario debe tener entre 3 y 30 caracteres."
+        )
 
+    if not re.match(r"^[a-zA-Z0-9_\-\.]+$", new_username):
+        raise HTTPException(
+            status_code=400,
+            detail="El nombre de usuario solo puede contener letras, números, guiones y puntos (sin espacios ni caracteres especiales)."
+        )
 
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
 
+    if user.username.lower() == new_username.lower():
+        # Just update capitalization if same
+        user.username = new_username
+        db.commit()
+        return {
+            "success": True,
+            "message": f"Nombre de usuario actualizado a @{new_username}.",
+            "new_username": new_username,
+            "is_self": current_admin.id == user.id
+        }
 
+    # Check uniqueness
+    existing = db.query(User).filter(
+        func.lower(User.username) == new_username.lower(),
+        User.id != user_id
+    ).first()
+    if existing:
+        raise HTTPException(
+            status_code=400,
+            detail=f"El nombre de usuario '@{new_username}' ya está en uso por otra cuenta."
+        )
+
+    old_username = user.username
+    user.username = new_username
+    db.commit()
+
+    return {
+        "success": True,
+        "message": f"¡Nombre de usuario de @{old_username} cambiado a @{new_username} exitosamente!",
+        "new_username": new_username,
+        "is_self": current_admin.id == user.id
+    }
 

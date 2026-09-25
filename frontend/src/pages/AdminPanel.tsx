@@ -67,6 +67,7 @@ export const AdminPanel: React.FC = () => {
   const [giftMonths, setGiftMonths] = useState<number>(1);
   const [warningMessage, setWarningMessage] = useState('');
   const [newUserIdInput, setNewUserIdInput] = useState<number | string>('');
+  const [newUsernameInput, setNewUsernameInput] = useState<string>('');
   
   // Granular suspension states
   const [suspensionValue, setSuspensionValue] = useState<number>(7);
@@ -134,6 +135,59 @@ export const AdminPanel: React.FC = () => {
     });
   };
 
+  const handleChangeUsername = () => {
+    if (!selectedUser) return;
+    const trimmed = newUsernameInput.trim();
+    if (!trimmed || trimmed.length < 3 || trimmed.length > 30) {
+      setModalFeedback({
+        type: 'error',
+        text: isEs ? 'El nombre de usuario debe tener entre 3 y 30 caracteres.' : 'Username must be between 3 and 30 characters.'
+      });
+      return;
+    }
+    if (trimmed.toLowerCase() === selectedUser.username.toLowerCase() && trimmed === selectedUser.username) {
+      setModalFeedback({
+        type: 'error',
+        text: isEs ? 'El usuario ya tiene ese nombre.' : 'User already has this username.'
+      });
+      return;
+    }
+
+    const isChangingSelf = (currentUser?.id === selectedUser.id);
+    setConfirmDialog({
+      isOpen: true,
+      title: isEs ? '¿Cambiar Nombre de Usuario?' : 'Change Username?',
+      message: isEs
+        ? `¿Confirmas cambiar el nombre de usuario de "${selectedUser.username}" a "${trimmed}"? ${isChangingSelf ? 'Al cambiar tu propio nombre de usuario, se actualizará tu perfil.' : 'Se actualizará su perfil y menciones públicas.'}`
+        : `Confirm changing username from "${selectedUser.username}" to "${trimmed}"?`,
+      type: 'warning',
+      confirmText: isEs ? 'Cambiar Nombre' : 'Change Username',
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        setActionLoading(true);
+        try {
+          const res = await apiClient.put(`/admin/users/${selectedUser.id}/username`, { username: trimmed });
+          const updatedUsername = res.data.new_username || trimmed;
+          const updated = { ...selectedUser, username: updatedUsername };
+          setSelectedUser(updated);
+          setUsers(prev => prev.map(u => u.id === selectedUser.id ? updated : u));
+          setNewUsernameInput(updatedUsername);
+          setModalFeedback({
+            type: 'success',
+            text: res.data.message || (isEs ? `Nombre de usuario actualizado a @${updatedUsername}.` : `Username updated to @${updatedUsername}.`)
+          });
+        } catch (err: any) {
+          setModalFeedback({
+            type: 'error',
+            text: err.response?.data?.detail || (isEs ? 'Error al cambiar nombre de usuario.' : 'Error changing username.')
+          });
+        } finally {
+          setActionLoading(false);
+        }
+      }
+    });
+  };
+
 
 
   useEffect(() => {
@@ -170,6 +224,7 @@ export const AdminPanel: React.FC = () => {
   const handleOpenUserModal = (user: AdminUser) => {
     setSelectedUser(user);
     setNewUserIdInput(user.id);
+    setNewUsernameInput(user.username);
     setWarningMessage(user.admin_warning || '');
     setSuspensionReason(user.suspension_reason || '');
     setGiftMonths(1);
@@ -1250,6 +1305,51 @@ export const AdminPanel: React.FC = () => {
                     style={{ fontSize: '0.85rem', padding: '0.45rem 1.25rem', whiteSpace: 'nowrap' }}
                   >
                     {isEs ? 'Guardar ID' : 'Save ID'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Action 0.5: Cambiar Nombre de Usuario */}
+              <div style={{ background: 'rgba(59, 130, 246, 0.08)', padding: '1rem 1.25rem', borderRadius: 12, border: '1px solid rgba(59, 130, 246, 0.3)' }}>
+                <div style={{ fontWeight: 700, fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#60a5fa', marginBottom: '0.3rem' }}>
+                  <UserIcon size={16} /> {isEs ? 'Cambiar Nombre de Usuario' : 'Change Username'}
+                </div>
+
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
+                  {isEs 
+                    ? 'Modifica el nombre de usuario de la cuenta. Debe tener entre 3 y 30 caracteres alfanuméricos (sin espacios).' 
+                    : 'Modify account username. Must be between 3 and 30 alphanumeric characters (no spaces).'}
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flex: 1 }}>
+                    <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>@</span>
+                    <input
+                      type="text"
+                      value={newUsernameInput}
+                      onChange={e => setNewUsernameInput(e.target.value)}
+                      className="input-field"
+                      style={{ width: '100%', padding: '0.45rem 0.8rem', fontSize: '0.85rem' }}
+                      placeholder={isEs ? 'Nuevo nombre de usuario...' : 'New username...'}
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={actionLoading || !newUsernameInput.trim() || newUsernameInput.trim() === selectedUser.username}
+                    onClick={handleChangeUsername}
+                    className="btn-primary"
+                    style={{
+                      fontSize: '0.85rem',
+                      padding: '0.45rem 1.25rem',
+                      whiteSpace: 'nowrap',
+                      background: '#3b82f6',
+                      borderColor: '#3b82f6',
+                      '--btn-bg': '#3b82f6',
+                      '--btn-hover-bg': '#2563eb'
+                    } as React.CSSProperties}
+                  >
+                    {isEs ? 'Guardar Nombre' : 'Save Username'}
                   </button>
                 </div>
               </div>
