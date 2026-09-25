@@ -1,5 +1,5 @@
 import { HorizontalScroll } from '../components/HorizontalScroll';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
@@ -601,19 +601,39 @@ export const Search: React.FC = () => {
     }
   };
 
+  const lastShelfFetchRef = useRef<number>(Date.now());
+
   useEffect(() => {
     loadShelfItems();
     loadSocialMetadata();
+    lastShelfFetchRef.current = Date.now();
+
     const handleLibUpdated = () => {
       const cached = getCachedShelfItems();
       if (cached && cached.length > 0) {
         setShelfItems(cached);
       }
       loadShelfItems();
+      lastShelfFetchRef.current = Date.now();
     };
+
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === 'visible') {
+        if (Date.now() - lastShelfFetchRef.current > 25000) {
+          loadShelfItems();
+          lastShelfFetchRef.current = Date.now();
+        }
+      }
+    };
+
     window.addEventListener('library-updated', handleLibUpdated);
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    window.addEventListener('focus', handleVisibilityOrFocus);
+
     return () => {
       window.removeEventListener('library-updated', handleLibUpdated);
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+      window.removeEventListener('focus', handleVisibilityOrFocus);
     };
   }, []);
 

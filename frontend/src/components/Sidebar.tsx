@@ -69,19 +69,39 @@ export const Sidebar: React.FC = () => {
   // Poll or check unread notification count
   useEffect(() => {
     if (!isUserLoggedIn) return;
+    let lastUnreadFetch = Date.now();
+
     const fetchUnread = async () => {
       try {
         const res = await apiClient.get('/notifications/unread-count');
         if (typeof res.data?.unread === 'number') {
           setUnreadCount(res.data.unread);
         }
+        lastUnreadFetch = Date.now();
       } catch (err) {
         // silent fail
       }
     };
+
     fetchUnread();
     const interval = setInterval(fetchUnread, 45000); // Poll every 45s
-    return () => clearInterval(interval);
+
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === 'visible') {
+        if (Date.now() - lastUnreadFetch > 15000) {
+          fetchUnread();
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    window.addEventListener('focus', handleVisibilityOrFocus);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+    };
   }, [isUserLoggedIn]);
 
   const handleLogout = async () => {

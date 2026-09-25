@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import { useTranslation } from '../context/LanguageContext';
-import { getCachedSeries, setCachedSeries } from '../utils/seriesCache';
+import { getCachedSeries, setCachedSeries, clearCachedSeriesMatching } from '../utils/seriesCache';
 import { ItemDetailsModal } from '../components/ItemDetailsModal';
 import { MediaPoster } from '../components/MediaPoster';
 import { AdBanner } from '../components/AdBanner';
@@ -2135,6 +2135,9 @@ export const Home: React.FC = () => {
     const handleVisibilityOrFocus = () => {
       if (document.visibilityState === 'visible') {
         if (Date.now() - lastFetchRef.current > 20000) {
+          // Invalidate cached episode progress so the cards pull latest server progress
+          clearCachedSeriesMatching('list_');
+          clearCachedSeriesMatching('next_candidate_');
           fetchDashboard(true);
         }
       }

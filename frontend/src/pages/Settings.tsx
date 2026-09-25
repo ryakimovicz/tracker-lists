@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
@@ -112,6 +112,17 @@ export const SettingsPage: React.FC = () => {
   const [isPrivate, setIsPrivate] = useState<boolean>(Boolean((user as any)?.is_private));
   const [privacyLoading, setPrivacyLoading] = useState(false);
   const [privacyMsg, setPrivacyMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  useEffect(() => {
+    refreshProfile();
+  }, []);
+
+  useEffect(() => {
+    if (user) {
+      setIsPrivate(Boolean((user as any)?.is_private));
+      setUsername(user.username || '');
+    }
+  }, [user]);
 
   const handleTogglePrivacy = async (newVal: boolean) => {
     setPrivacyLoading(true);

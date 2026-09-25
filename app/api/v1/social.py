@@ -913,6 +913,8 @@ def toggle_activity_like(
         except (ValueError, TypeError):
             review_id_val = None
 
+    from sqlalchemy.exc import IntegrityError
+
     if existing_like:
         db.delete(existing_like)
         if review_id_val:
@@ -921,7 +923,11 @@ def toggle_activity_like(
                 MediaReviewVote.user_id == current_user.id
             ).delete(synchronize_session=False)
 
-        db.commit()
+        try:
+            db.commit()
+        except Exception:
+            db.rollback()
+
         likes_count = db.query(ActivityLike).filter(ActivityLike.activity_id == activity_id).count()
         return ActivityLikeToggleResponse(liked=False, likes_count=likes_count)
     else:
@@ -949,9 +955,19 @@ def toggle_activity_like(
             )
             db.add(notif)
             
-        db.commit()
+        try:
+            db.commit()
+            liked_status = True
+        except IntegrityError:
+            # Already liked concurrently from another tab/device
+            db.rollback()
+            liked_status = True
+        except Exception:
+            db.rollback()
+            liked_status = False
+
         likes_count = db.query(ActivityLike).filter(ActivityLike.activity_id == activity_id).count()
-        return ActivityLikeToggleResponse(liked=True, likes_count=likes_count)
+        return ActivityLikeToggleResponse(liked=liked_status, likes_count=likes_count)
 
 @router.get("/activity/{activity_id}/comments", response_model=List[ActivityCommentResponse])
 def get_activity_comments(

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Users, Compass, Star, User, RefreshCw } from 'lucide-react';
 import { apiClient } from '../api/client';
 import { useAuth } from '../context/AuthContext';
@@ -111,12 +111,60 @@ export const Social: React.FC = () => {
     }
   };
 
+  const [hasNewUpdates, setHasNewUpdates] = useState(false);
+  const lastFeedFetchRef = useRef<number>(Date.now());
+
   useEffect(() => {
     fetchTabFeed(activeTab);
+    setHasNewUpdates(false);
+    lastFeedFetchRef.current = Date.now();
   }, [activeTab]);
 
+  // Check for updates when user returns to the tab after 45s
+  useEffect(() => {
+    const handleVisibilityOrFocus = async () => {
+      if (document.visibilityState === 'visible') {
+        const timePassed = Date.now() - lastFeedFetchRef.current;
+        if (timePassed > 45000 && !loading && !refreshing) {
+          // Peek silently to see if first activity changed
+          try {
+            let endpoint = '/social/feed/following';
+            if (activeTab === 'discover') endpoint = '/social/feed/discover';
+            else if (activeTab === 'reviews') endpoint = '/social/feed/reviews';
+            else if (activeTab === 'me') endpoint = '/social/feed/me';
+
+            const res = await apiClient.get(endpoint);
+            if (Array.isArray(res.data) && res.data.length > 0) {
+              const latestId = res.data[0]?.id;
+              const currentId = activities[0]?.id;
+              if (latestId && currentId && latestId !== currentId) {
+                setHasNewUpdates(true);
+              }
+            }
+          } catch (e) {
+            // ignore silent peek errors
+          }
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    window.addEventListener('focus', handleVisibilityOrFocus);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+    };
+  }, [activeTab, activities, loading, refreshing]);
+
   const handleTabChange = (tab: SocialTab) => {
+    setHasNewUpdates(false);
     setActiveTab(tab);
+  };
+
+  const handleApplyUpdates = () => {
+    setHasNewUpdates(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    fetchTabFeed(activeTab, true);
   };
 
   const handleVisibilityToggle = (id: number, isHidden: boolean) => {
@@ -156,32 +204,13 @@ export const Social: React.FC = () => {
     <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem 0', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
       {/* Header & Tabs */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <h1 style={{ margin: '0 0 0.25rem 0', fontSize: '1.85rem', fontWeight: 800 }}>
-              {isEs ? 'Comunidad' : 'Community'}
-            </h1>
-            <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.95rem' }}>
-              {tabsConfig.find(t => t.id === activeTab)?.description}
-            </p>
-          </div>
-
-          <button
-            onClick={() => fetchTabFeed(activeTab, true)}
-            disabled={refreshing || loading}
-            className="btn-secondary"
-            style={{
-              padding: '0.45rem 0.85rem',
-              borderRadius: '20px',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.4rem',
-              fontSize: '0.85rem'
-            }}
-          >
-            <RefreshCw size={15} style={{ animation: refreshing ? 'spin 1s linear infinite' : 'none' }} />
-            <span>{isEs ? 'Actualizar' : 'Refresh'}</span>
-          </button>
+        <div>
+          <h1 style={{ margin: '0 0 0.25rem 0', fontSize: '1.85rem', fontWeight: 800 }}>
+            {isEs ? 'Comunidad' : 'Community'}
+          </h1>
+          <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.95rem' }}>
+            {tabsConfig.find(t => t.id === activeTab)?.description}
+          </p>
         </div>
 
         {/* 4 Tabs Bar */}
@@ -228,6 +257,50 @@ export const Social: React.FC = () => {
           })}
         </div>
       </div>
+
+      {/* Floating Centered Refresh Button */}
+      {hasNewUpdates && (
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          marginTop: '-1rem',
+          marginBottom: '-0.5rem',
+          position: 'sticky',
+          top: '1rem',
+          zIndex: 30
+        }}>
+          <button
+            onClick={handleApplyUpdates}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.45rem',
+              padding: '0.5rem 1.15rem',
+              borderRadius: '24px',
+              border: '1px solid var(--accent-primary)',
+              background: 'var(--bg-secondary, #1e2029)',
+              color: 'var(--accent-primary, #6366f1)',
+              fontSize: '0.88rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+              boxShadow: '0 4px 14px rgba(0,0,0,0.3)',
+              transition: 'all 0.2s ease',
+              backdropFilter: 'blur(8px)'
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.transform = 'translateY(-2px)';
+              e.currentTarget.style.boxShadow = '0 6px 18px rgba(99,102,241,0.25)';
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 4px 14px rgba(0,0,0,0.3)';
+            }}
+          >
+            <RefreshCw size={14} />
+            <span>{isEs ? 'Actualizar' : 'Update'}</span>
+          </button>
+        </div>
+      )}
 
       {/* Feed Content */}
       {loading ? (
