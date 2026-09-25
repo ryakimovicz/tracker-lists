@@ -746,8 +746,8 @@ export const SettingsPage: React.FC = () => {
                 <Eye size={13} style={{ flexShrink: 0 }} />
                 <span>
                   {isEs
-                    ? 'Tus reseñas y comentarios en obras o guías públicas seguirán siendo visibles.'
-                    : 'Your reviews and comments on public media or guides will remain visible.'}
+                    ? 'Tus reseñas y comentarios en espacios públicos seguirán siendo visibles.'
+                    : 'Your reviews and comments in public spaces will remain visible.'}
                 </span>
               </div>
             </div>

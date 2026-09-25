@@ -134,8 +134,8 @@ export const PrivacyPolicy: React.FC = () => {
             </li>
             <li>
               <strong>{isEs ? 'Reseñas y Comentarios Públicos:' : 'Public Reviews and Comments:'}</strong> {isEs
-                ? 'Las reseñas y comentarios que decidas publicar voluntariamente en obras, fichas de contenido o guías públicas forman parte de la discusión comunitaria y son visibles públicamente en dichas fichas junto a tu nombre de usuario. Al hacer clic en tu usuario, los visitantes no autorizados verán tu perfil bloqueado.'
-                : 'Reviews and comments you voluntarily post on public media, titles, or guides are part of public community discussions and remain visible on those pages alongside your username. Non-approved visitors clicking on your username will see your profile locked.'}
+                ? 'Las reseñas y comentarios que decidas publicar voluntariamente en espacios comunitarios (como fichas de obras, guías o eventos del feed) forman parte de la conversación pública y son visibles junto a tu nombre de usuario. Al hacer clic en tu usuario, los visitantes no autorizados verán tu perfil protegido.'
+                : 'Reviews and comments you voluntarily post in community spaces (such as media pages, guides, or feed events) are part of public discussions and remain visible alongside your username. Non-approved visitors clicking on your username will see your profile locked.'}
             </li>
           </ul>
         </section>
