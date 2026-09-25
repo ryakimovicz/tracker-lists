@@ -739,47 +739,50 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
 
     setIsLoading(true);
     try {
-      let currentTracked: any[] = [];
-      if (item.tracking_list_id) {
-        try {
-          const listRes = await apiClient.get(`/lists/${item.tracking_list_id}`);
-          currentTracked = listRes.data.items || [];
-          setTrackedEpisodes(currentTracked);
-          setCachedSeries(`list_${item.tracking_list_id}`, currentTracked);
-        } catch (err) {
-          console.error("Failed to load tracking list for Home card", err);
-          currentTracked = getCachedSeries(`list_${item.tracking_list_id}`) || [];
-        }
+      // Run queries in parallel for high speed
+      const listPromise = item.tracking_list_id
+        ? apiClient.get(`/lists/${item.tracking_list_id}`).then(res => res.data.items || []).catch(err => {
+            console.error("Failed to load tracking list for Home card", err);
+            return getCachedSeries(`list_${item.tracking_list_id}`) || [];
+          })
+        : Promise.resolve([]);
+
+      const seriesCacheKey = `series_${item.external_id}`;
+      const cachedSeries = getCachedSeries(seriesCacheKey);
+      const seriesPromise = isComic
+        ? Promise.resolve(null)
+        : (cachedSeries && cachedSeries.seasons
+            ? Promise.resolve(cachedSeries)
+            : apiClient.get(`/search/series/${item.external_id}`).then(res => {
+                const filteredSeasons = (res.data.seasons || []).filter((s: any) => s.season_number > 0);
+                const data = { ...res.data, seasons: filteredSeasons };
+                setCachedSeries(seriesCacheKey, data);
+                return data;
+              }).catch(() => null)
+          );
+
+      const cacheKeyAll = `${item.external_id}_all_episodes`;
+      const cachedAllEps = getCachedSeries(cacheKeyAll);
+      const episodesPromise = (cachedAllEps && Array.isArray(cachedAllEps) && cachedAllEps.length > 0)
+        ? Promise.resolve(cachedAllEps)
+        : apiClient.get(isComic ? `/search/comic/volume/${item.external_id}/issues` : `/search/series/${item.external_id}/episodes`)
+            .then(res => {
+              setCachedSeries(cacheKeyAll, res.data);
+              return res.data;
+            }).catch(() => []);
+
+      const [currentTracked, seriesData, allEps] = await Promise.all([listPromise, seriesPromise, episodesPromise]);
+
+      if (item.tracking_list_id && Array.isArray(currentTracked)) {
+        setTrackedEpisodes(currentTracked);
+        setCachedSeries(`list_${item.tracking_list_id}`, currentTracked);
       }
 
-      if (!isComic) {
-        let filteredSeasons: any[] = [];
-        const cacheKey = `series_${item.external_id}`;
-        const cached = getCachedSeries(cacheKey);
-        if (cached && cached.seasons) {
-          filteredSeasons = cached.seasons;
-        } else {
-          const seriesRes = await apiClient.get(`/search/series/${item.external_id}`);
-          filteredSeasons = (seriesRes.data.seasons || []).filter((s: any) => s.season_number > 0);
-          setCachedSeries(cacheKey, { ...seriesRes.data, seasons: filteredSeasons });
-        }
-
+      if (!isComic && seriesData) {
+        const filteredSeasons = seriesData.seasons || [];
         if (filteredSeasons.length === 0) {
           setIsInitialLoad(false);
           return;
-        }
-      }
-
-      const cacheKeyAll = `${item.external_id}_all_episodes`;
-      let allEps = getCachedSeries(cacheKeyAll);
-      if (!allEps || !Array.isArray(allEps) || allEps.length === 0) {
-        try {
-          const endpoint = isComic ? `/search/comic/volume/${item.external_id}/issues` : `/search/series/${item.external_id}/episodes`;
-          const res = await apiClient.get(endpoint);
-          allEps = res.data;
-          setCachedSeries(cacheKeyAll, allEps);
-        } catch (e) {
-          allEps = [];
         }
       }
 
@@ -793,8 +796,7 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
         setNextEp(null);
         setCachedSeries(`next_candidate_${item.id}`, { nextEp: null, isCaughtUp: true });
       } else {
-        const seriesCacheKey = `series_${item.external_id}`;
-        const cachedSeriesData = item.external_id ? getCachedSeries(seriesCacheKey) : null;
+        const cachedSeriesData = seriesData || (item.external_id ? getCachedSeries(seriesCacheKey) : null);
         const isEnded = isComic ? (item.is_ended || item.status === 'Ended') : (cachedSeriesData?.status === 'Ended' || item.is_ended === true);
         const hasWatchedAny = currentTracked.some((t: any) => t.is_completed);
         const allEpsCount = Array.isArray(allEps) ? allEps.length : 0;
@@ -957,6 +959,8 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
       });
       if (isAlreadyCompleted) {
         url += `?action=mark_again`;
+      } else {
+        url += `?action=complete`;
       }
     } catch (err) {}
 
@@ -1208,15 +1212,13 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
             <div style={{ position: "absolute", bottom: "0.5rem", right: "0.5rem", display: "flex", gap: "0.35rem", zIndex: 2 }}>
               <button 
                 onClick={handleMarkSeen}
-                disabled={isLoading}
                 className="btn-check-seen"
                 title={language === 'es' ? (isComic ? 'Marcar primer número' : 'Marcar primer episodio') : (isComic ? 'Mark first issue' : 'Mark first episode')}
                 style={{
                   width: "30px", height: "30px", borderRadius: "50%",
                   background: "var(--bg-tertiary)", border: `2px solid ${themeColor || "var(--text-muted)"}`,
                   display: "flex", alignItems: "center", justifyContent: "center",
-                  cursor: isLoading ? "wait" : "pointer", color: themeColor || "var(--text-primary)",
-                  opacity: isLoading ? 0.6 : 1,
+                  cursor: "pointer", color: themeColor || "var(--text-primary)",
                   "--btn-hover-bg": themeColor,
                   "--btn-hover-text": themeTextColor
                 } as React.CSSProperties}
@@ -1225,15 +1227,13 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
               </button>
               <button 
                 onClick={handleStartWatching}
-                disabled={isLoading}
                 className="btn-check-seen"
                 title={language === 'es' ? (isComic ? 'Comenzar a leer' : 'Comenzar a ver') : (isComic ? 'Start reading' : 'Start watching')}
                 style={{
                   width: "30px", height: "30px", borderRadius: "50%",
                   background: "var(--bg-tertiary)", border: `2px solid ${themeColor || "var(--text-muted)"}`,
                   display: "flex", alignItems: "center", justifyContent: "center",
-                  cursor: isLoading ? "wait" : "pointer", color: themeColor || "var(--text-primary)",
-                  opacity: isLoading ? 0.6 : 1,
+                  cursor: "pointer", color: themeColor || "var(--text-primary)",
                   "--btn-hover-bg": themeColor,
                   "--btn-hover-text": themeTextColor
                 } as React.CSSProperties}
@@ -1244,15 +1244,13 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
           ) : (
             <button 
               onClick={handleMarkSeen}
-              disabled={isLoading}
               className="btn-check-seen"
               style={{
                 position: "absolute", bottom: "0.5rem", right: "0.5rem",
                 width: "32px", height: "32px", borderRadius: "50%",
                 background: "var(--bg-tertiary)", border: `2px solid ${themeColor || "var(--text-muted)"}`,
                 display: "flex", alignItems: "center", justifyContent: "center",
-                cursor: isLoading ? "wait" : "pointer", color: themeColor || "var(--text-primary)",
-                opacity: isLoading ? 0.6 : 1,
+                cursor: "pointer", color: themeColor || "var(--text-primary)",
                 "--btn-hover-bg": themeColor,
                 "--btn-hover-text": themeTextColor
               } as React.CSSProperties}

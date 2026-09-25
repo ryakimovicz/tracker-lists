@@ -1775,11 +1775,29 @@ def toggle_series_episode(
     just_marked = False
     
     if progress:
-        if action == "mark_again":
-            progress.is_completed = True
-            progress.list_item_id = item.id
-            progress.completed_at = now_dt
-            just_marked = True
+        if action == "complete":
+            # Explicit completion request: if already completed, do NOT duplicate history
+            if progress.is_completed:
+                just_marked = False
+            else:
+                progress.is_completed = True
+                progress.list_item_id = item.id
+                progress.completed_at = now_dt
+                just_marked = True
+        elif action == "mark_again":
+            # If marked again within the last 30 minutes, ignore duplicate click to protect history
+            recent_ch = db.query(ConsumptionHistory).filter(
+                ConsumptionHistory.user_id == current_user.id,
+                ConsumptionHistory.external_id == ext_id,
+                ConsumptionHistory.consumed_at >= now_dt - timedelta(minutes=30)
+            ).first()
+            if recent_ch:
+                just_marked = False
+            else:
+                progress.is_completed = True
+                progress.list_item_id = item.id
+                progress.completed_at = now_dt
+                just_marked = True
         elif action == "remove":
             # Check if there is consumption history to remove latest
             history = db.query(ConsumptionHistory).filter(
