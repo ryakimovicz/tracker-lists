@@ -728,11 +728,13 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
   const [isLoading, setIsLoading] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState<boolean>(initialIsLoading);
 
-  const fetchNextEpisode = async () => {
+  const optimisticLockUntilRef = useRef<number>(0);
+
+  const fetchNextEpisode = async (force = false) => {
     // Check if we already have a valid candidate from cache to avoid flicker
     const cachedList = item.tracking_list_id ? (getCachedSeries(`list_${item.tracking_list_id}`) || []) : [];
     const syncCandidate = computeNextCandidate(Array.isArray(cachedList) ? cachedList : []);
-    if (syncCandidate.nextEp) {
+    if (syncCandidate.nextEp && Date.now() >= optimisticLockUntilRef.current) {
       setNextEp(syncCandidate.nextEp);
       setIsCaughtUp(false);
       setIsInitialLoad(false);
@@ -774,6 +776,11 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
             }).catch(() => []);
 
       const [currentTracked, seriesData, allEps] = await Promise.all([listPromise, seriesPromise, episodesPromise]);
+
+      if (Date.now() < optimisticLockUntilRef.current && !force) {
+        // We are currently applying an optimistic mark seen, do not overwrite state with potentially stale server response
+        return;
+      }
 
       if (item.tracking_list_id && Array.isArray(currentTracked)) {
         setTrackedEpisodes(currentTracked);
@@ -825,8 +832,10 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
   };
 
   useEffect(() => {
-    fetchNextEpisode();
-  }, [item]);
+    if (Date.now() >= optimisticLockUntilRef.current) {
+      fetchNextEpisode();
+    }
+  }, [item.id, item.status, item.tracking_list_id]);
 
   const handleMarkSeen = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -892,8 +901,12 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
       ? (String(currentEpToMark.id).startsWith('cv_') ? currentEpToMark.id : `cv_issue_${currentEpToMark.id}`)
       : currentEpToMark.id;
 
+    // Lock candidate re-computations for 3 seconds to avoid stale server responses overwriting nextEp
+    optimisticLockUntilRef.current = Date.now() + 3000;
+
     // Immediately show next episode/issue so user can keep clicking without any delay
     setNextEp(nextCandidate);
+    setCachedSeries(`next_candidate_${item.id}`, { nextEp: nextCandidate, isCaughtUp: isLastEpisodeOfAll });
 
     // Optimistically update trackedEpisodes and cache so card never disappears on parent re-renders
     const newCompletedEpId = String(currentEpToMark.id || '');
@@ -994,12 +1007,11 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
           onUpdate();
           window.dispatchEvent(new Event('library-updated'));
         } catch (e) {}
-      } else {
-        window.dispatchEvent(new Event('library-updated'));
       }
     }).catch(err => {
       console.error("Failed to mark item in background", err);
-      fetchNextEpisode();
+      optimisticLockUntilRef.current = 0;
+      fetchNextEpisode(true);
     });
   };
 
