@@ -144,6 +144,12 @@ export const PrivacyPolicy: React.FC = () => {
               ? 'Puedes eliminar o restringir las cookies y datos locales en cualquier momento a través de la configuración de privacidad de tu navegador web (Chrome, Firefox, Safari o Edge). Ten en cuenta que deshabilitar cookies esenciales cerrará tu sesión activa y te impedirá acceder a tu cuenta.'
               : 'You can delete or restrict cookies and local storage at any time via your web browser privacy settings (Chrome, Firefox, Safari, or Edge). Note that disabling essential cookies will sign you out and prevent account access.'}
           </p>
+
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '0.75rem' }}>
+            {isEs
+              ? 'Métricas de Red y Rendimiento (Cloudflare): Utilizamos Cloudflare Web Analytics a nivel de infraestructura para medir la velocidad de carga, estabilidad del servicio y volumen de tráfico general. Esta medición es totalmente anónima, no utiliza cookies, no almacena direcciones IP y no realiza seguimiento individual de los usuarios.'
+              : 'Network & Performance Metrics (Cloudflare): We use Cloudflare Web Analytics at the infrastructure level to measure loading speeds, service reliability, and aggregate traffic volumes. This measurement is completely anonymous, uses no cookies, does not store IP addresses, and performs no cross-site tracking.'}
+          </p>
         </section>
 
         <section style={{ marginBottom: '2rem' }}>
