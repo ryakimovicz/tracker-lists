@@ -63,7 +63,7 @@ def get_all_reports(
             "target_id": bf.target_id,
             "name": bf.name,
             "item_type": bf.item_type,
-            "reason": bf.reason,
+            "reason": getattr(bf, "reason", None),
             "created_at": bf.created_at
         })
         
