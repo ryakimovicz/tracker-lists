@@ -88,10 +88,10 @@ export const CookieBanner: React.FC = () => {
           ? 'Utilizamos almacenamiento local y cookies esenciales para mantener tu sesión activa y recordar tus preferencias. No usamos cookies de rastreo publicitario.'
           : 'We use local storage and essential cookies to keep you signed in and remember your preferences. We do not use third-party advertising trackers.'}{' '}
         <Link
-          to="/privacy"
+          to="/privacy#cookies"
           style={{ color: 'var(--accent-primary)', textDecoration: 'underline', fontWeight: 500 }}
         >
-          {isEs ? 'Leer política de privacidad' : 'Read privacy policy'}
+          {isEs ? 'Ver política de cookies' : 'View cookie policy'}
         </Link>
         .
       </p>
@@ -107,7 +107,7 @@ export const CookieBanner: React.FC = () => {
             borderRadius: '8px',
           }}
         >
-          {isEs ? 'Entendido' : 'Got it'}
+          {isEs ? 'Aceptar esenciales' : 'Accept essential'}
         </button>
       </div>
     </aside>

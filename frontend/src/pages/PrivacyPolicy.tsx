@@ -68,7 +68,7 @@ export const PrivacyPolicy: React.FC = () => {
           </p>
         </section>
 
-        <section style={{ marginBottom: '2rem' }}>
+        <section id="cookies" style={{ marginBottom: '2rem' }}>
           <h2 style={{ fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)' }}>
             <Database size={20} /> {isEs ? '4. Cookies y Almacenamiento Local' : '4. Cookies & Local Storage'}
           </h2>
@@ -89,11 +89,61 @@ export const PrivacyPolicy: React.FC = () => {
                 : 'Local browser storage (localStorage) to remember your display theme (light/dark), language preference, and filtering options.'}
             </li>
             <li>
-              <strong>{isEs ? 'Sin Cookies Publicitarias:' : 'No Advertising Cookies:'}</strong> {isEs
-                ? 'No utilizamos cookies de seguimiento publicitario ni redes de anuncios de terceros.'
-                : 'We do not use advertising tracking cookies or third-party ad networks.'}
+              <strong>{isEs ? 'Sin Cookies Publicitarias ni Rastreadores:' : 'No Advertising Cookies or Trackers:'}</strong> {isEs
+                ? 'No utilizamos cookies de seguimiento publicitario, píxeles de remarketing ni redes de anuncios de terceros.'
+                : 'We do not use advertising tracking cookies, remarketing pixels, or third-party ad networks.'}
             </li>
           </ul>
+
+          <div style={{ overflowX: 'auto', marginTop: '1.25rem', marginBottom: '1.25rem' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+              <thead>
+                <tr style={{ borderBottom: '2px solid var(--border-color)', textAlign: 'left' }}>
+                  <th style={{ padding: '0.6rem 0.75rem', color: 'var(--text-primary)' }}>{isEs ? 'Elemento' : 'Item'}</th>
+                  <th style={{ padding: '0.6rem 0.75rem', color: 'var(--text-primary)' }}>{isEs ? 'Tipo' : 'Type'}</th>
+                  <th style={{ padding: '0.6rem 0.75rem', color: 'var(--text-primary)' }}>{isEs ? 'Clave / Nombre' : 'Key / Name'}</th>
+                  <th style={{ padding: '0.6rem 0.75rem', color: 'var(--text-primary)' }}>{isEs ? 'Propósito' : 'Purpose'}</th>
+                  <th style={{ padding: '0.6rem 0.75rem', color: 'var(--text-primary)' }}>{isEs ? 'Duración' : 'Duration'}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
+                  <td style={{ padding: '0.6rem 0.75rem', fontWeight: 600 }}>{isEs ? 'Sesión segura' : 'Secure Session'}</td>
+                  <td style={{ padding: '0.6rem 0.75rem' }}>Cookie (HttpOnly)</td>
+                  <td style={{ padding: '0.6rem 0.75rem', fontFamily: 'monospace' }}>refresh_token</td>
+                  <td style={{ padding: '0.6rem 0.75rem' }}>{isEs ? 'Renovación segura de credenciales de sesión' : 'Secure session credential renewal'}</td>
+                  <td style={{ padding: '0.6rem 0.75rem' }}>{isEs ? 'Persistente (sesión)' : 'Session-based'}</td>
+                </tr>
+                <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
+                  <td style={{ padding: '0.6rem 0.75rem', fontWeight: 600 }}>{isEs ? 'Idioma' : 'Language'}</td>
+                  <td style={{ padding: '0.6rem 0.75rem' }}>LocalStorage</td>
+                  <td style={{ padding: '0.6rem 0.75rem', fontFamily: 'monospace' }}>preferred_language</td>
+                  <td style={{ padding: '0.6rem 0.75rem' }}>{isEs ? 'Recordar preferencia de idioma (ES / EN)' : 'Remember language preference (ES / EN)'}</td>
+                  <td style={{ padding: '0.6rem 0.75rem' }}>{isEs ? 'Persistente local' : 'Local persistent'}</td>
+                </tr>
+                <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
+                  <td style={{ padding: '0.6rem 0.75rem', fontWeight: 600 }}>{isEs ? 'Tema visual' : 'Display Theme'}</td>
+                  <td style={{ padding: '0.6rem 0.75rem' }}>LocalStorage</td>
+                  <td style={{ padding: '0.6rem 0.75rem', fontFamily: 'monospace' }}>theme</td>
+                  <td style={{ padding: '0.6rem 0.75rem' }}>{isEs ? 'Recordar apariencia (claro / oscuro)' : 'Remember display appearance (light / dark)'}</td>
+                  <td style={{ padding: '0.6rem 0.75rem' }}>{isEs ? 'Persistente local' : 'Local persistent'}</td>
+                </tr>
+                <tr>
+                  <td style={{ padding: '0.6rem 0.75rem', fontWeight: 600 }}>{isEs ? 'Aviso de Cookies' : 'Cookie Notice'}</td>
+                  <td style={{ padding: '0.6rem 0.75rem' }}>LocalStorage</td>
+                  <td style={{ padding: '0.6rem 0.75rem', fontFamily: 'monospace' }}>cookie_consent</td>
+                  <td style={{ padding: '0.6rem 0.75rem' }}>{isEs ? 'Evitar mostrar reiteradamente el banner de cookies' : 'Dismiss recurring cookie consent banner'}</td>
+                  <td style={{ padding: '0.6rem 0.75rem' }}>{isEs ? 'Persistente local' : 'Local persistent'}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '0.75rem' }}>
+            {isEs
+              ? 'Puedes eliminar o restringir las cookies y datos locales en cualquier momento a través de la configuración de privacidad de tu navegador web (Chrome, Firefox, Safari o Edge). Ten en cuenta que deshabilitar cookies esenciales cerrará tu sesión activa y te impedirá acceder a tu cuenta.'
+              : 'You can delete or restrict cookies and local storage at any time via your web browser privacy settings (Chrome, Firefox, Safari, or Edge). Note that disabling essential cookies will sign you out and prevent account access.'}
+          </p>
         </section>
 
         <section style={{ marginBottom: '2rem' }}>
