@@ -22,7 +22,7 @@ export const PrivacyPolicy: React.FC = () => {
           </h1>
         </div>
         <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '2rem' }}>
-          {isEs ? 'Última actualización: 25 de agosto de 2026' : 'Last updated: August 25, 2026'}
+          {isEs ? 'Última actualización: 25 de septiembre de 2026' : 'Last updated: September 25, 2026'}
         </p>
 
         <section style={{ marginBottom: '2rem' }}>
@@ -70,23 +70,79 @@ export const PrivacyPolicy: React.FC = () => {
 
         <section style={{ marginBottom: '2rem' }}>
           <h2 style={{ fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)' }}>
-            <Database size={20} /> {isEs ? '4. Publicidad, Google AdSense y Cookies' : '4. Advertising, Google AdSense & Cookies'}
+            <Database size={20} /> {isEs ? '4. Cookies y Almacenamiento Local' : '4. Cookies & Local Storage'}
           </h2>
           <p style={{ color: 'var(--text-secondary)' }}>
             {isEs
-              ? 'Pathd utiliza Google AdSense para mostrar anuncios publicitarios a usuarios no suscritos al plan Premium. Google utiliza cookies (como la cookie de DoubleClick) para publicar anuncios basados en las visitas anteriores de los usuarios a este u otros sitios web.'
-              : 'Pathd uses Google AdSense to serve advertisements to non-Premium users. Google uses cookies (such as the DoubleClick cookie) to serve ads based on users\' prior visits to this or other websites.'}
+              ? 'Pathd utiliza almacenamiento esencial y cookies estrictamente necesarias para el correcto funcionamiento del servicio:'
+              : 'Pathd uses essential storage and strictly necessary cookies to ensure proper operation of the service:'}
           </p>
+          <ul style={{ color: 'var(--text-secondary)', paddingLeft: '1.5rem', marginTop: '0.5rem' }}>
+            <li>
+              <strong>{isEs ? 'Cookies de Sesión:' : 'Session Cookies:'}</strong> {isEs
+                ? 'Cookies HttpOnly seguras para gestionar tu token de actualización (refresh token) y mantener tu sesión autenticada de forma protegida.'
+                : 'Secure HttpOnly cookies to manage your refresh token and keep your session authenticated safely.'}
+            </li>
+            <li>
+              <strong>{isEs ? 'Preferencias Locales:' : 'Local Preferences:'}</strong> {isEs
+                ? 'Almacenamiento local (localStorage) para recordar tu tema visual (claro/oscuro), idioma preferido y opciones de filtrado en tu navegador.'
+                : 'Local browser storage (localStorage) to remember your display theme (light/dark), language preference, and filtering options.'}
+            </li>
+            <li>
+              <strong>{isEs ? 'Sin Cookies Publicitarias:' : 'No Advertising Cookies:'}</strong> {isEs
+                ? 'No utilizamos cookies de seguimiento publicitario ni redes de anuncios de terceros.'
+                : 'We do not use advertising tracking cookies or third-party ad networks.'}
+            </li>
+          </ul>
+        </section>
+
+        <section style={{ marginBottom: '2rem' }}>
+          <h2 style={{ fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)' }}>
+            <Mail size={20} /> {isEs ? '5. Correos Electrónicos y Comunicaciones' : '5. Email Communications'}
+          </h2>
+          <p style={{ color: 'var(--text-secondary)' }}>
+            {isEs
+              ? 'Enviamos exclusivamente correos electrónicos transaccionales y de seguridad a través de nuestro proveedor de mensajería (Resend). Estos correos incluyen:'
+              : 'We send strictly transactional and security-related emails via our delivery provider (Resend). These emails include:'}
+          </p>
+          <ul style={{ color: 'var(--text-secondary)', paddingLeft: '1.5rem', marginTop: '0.5rem' }}>
+            <li>{isEs ? 'Confirmación y verificación de cuenta al registrarte.' : 'Account confirmation and email verification upon signup.'}</li>
+            <li>{isEs ? 'Enlaces seguros para restablecer o cambiar tu contraseña.' : 'Secure links to reset or change your password.'}</li>
+            <li>{isEs ? 'Notificaciones de seguridad del sistema (como avisos de cambio de nombre de usuario o cambios críticos).' : 'Security notices (such as username modification alerts or critical account changes).'}</li>
+          </ul>
           <p style={{ color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
             {isEs
-              ? 'Los usuarios pueden inhabilitar el uso de cookies para publicidad personalizada accediendo a la Configuración de anuncios de Google (https://adssettings.google.com) o a través del portal www.aboutads.info.'
-              : 'Users may opt out of personalized advertising by visiting Google Ads Settings (https://adssettings.google.com) or via www.aboutads.info.'}
+              ? 'No enviamos boletines publicitarios ni compartimos tu dirección de correo con fines de mercadotecnia de terceros.'
+              : 'We do not send marketing newsletters nor share your email address for third-party promotional purposes.'}
           </p>
         </section>
 
         <section style={{ marginBottom: '2rem' }}>
           <h2 style={{ fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)' }}>
-            <Database size={20} /> {isEs ? '5. APIs y Servicios de Terceros' : '5. Third-Party APIs & Services'}
+            <Shield size={20} /> {isEs ? '6. Privacidad del Perfil y Contenido Comunitario' : '6. Profile Privacy & Community Content'}
+          </h2>
+          <p style={{ color: 'var(--text-secondary)' }}>
+            {isEs
+              ? 'Pathd te permite configurar tu cuenta como Privada en cualquier momento desde los ajustes de perfil:'
+              : 'Pathd allows you to configure your account as Private at any time from your profile settings:'}
+          </p>
+          <ul style={{ color: 'var(--text-secondary)', paddingLeft: '1.5rem', marginTop: '0.5rem' }}>
+            <li>
+              <strong>{isEs ? 'Perfiles Privados:' : 'Private Profiles:'}</strong> {isEs
+                ? 'Tu biblioteca personal, listas creadas y guardadas, estadísticas de consumo y feed de actividad quedan bloqueados para el público general y únicamente pueden ser visualizados por los seguidores que apruebes previamente.'
+                : 'Your personal library, created/saved lists, consumption statistics, and activity feed are locked from the general public and can only be viewed by followers you explicitly approve.'}
+            </li>
+            <li>
+              <strong>{isEs ? 'Reseñas y Comentarios Públicos:' : 'Public Reviews and Comments:'}</strong> {isEs
+                ? 'Las reseñas y comentarios que decidas publicar voluntariamente en obras, fichas de contenido o guías públicas forman parte de la discusión comunitaria y son visibles públicamente en dichas fichas junto a tu nombre de usuario. Al hacer clic en tu usuario, los visitantes no autorizados verán tu perfil bloqueado.'
+                : 'Reviews and comments you voluntarily post on public media, titles, or guides are part of public community discussions and remain visible on those pages alongside your username. Non-approved visitors clicking on your username will see your profile locked.'}
+            </li>
+          </ul>
+        </section>
+
+        <section style={{ marginBottom: '2rem' }}>
+          <h2 style={{ fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)' }}>
+            <Database size={20} /> {isEs ? '7. APIs y Servicios de Metadatos de Terceros' : '7. Third-Party APIs & Metadata Services'}
           </h2>
           <p style={{ color: 'var(--text-secondary)' }}>
             {isEs
@@ -97,7 +153,7 @@ export const PrivacyPolicy: React.FC = () => {
 
         <section style={{ marginBottom: '2rem' }}>
           <h2 style={{ fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)' }}>
-            <Lock size={20} /> {isEs ? '6. Tus Derechos y Eliminación de Datos (GDPR / CCPA)' : '6. Your Rights & Data Deletion (GDPR / CCPA)'}
+            <Lock size={20} /> {isEs ? '8. Tus Derechos y Eliminación de Datos (GDPR / CCPA)' : '8. Your Rights & Data Deletion (GDPR / CCPA)'}
           </h2>
           <p style={{ color: 'var(--text-secondary)' }}>
             {isEs
@@ -108,13 +164,15 @@ export const PrivacyPolicy: React.FC = () => {
 
         <section>
           <h2 style={{ fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)' }}>
-            <Mail size={20} /> {isEs ? '7. Contacto de Privacidad y Soporte' : '7. Privacy & Support Contact'}
+            <Mail size={20} /> {isEs ? '9. Contacto de Privacidad y Soporte' : '9. Privacy & Support Contact'}
           </h2>
           <p style={{ color: 'var(--text-secondary)' }}>
             {isEs
-              ? 'Si tienes dudas sobre esta Política de Privacidad, pagos o tus datos, contáctanos en '
-              : 'If you have any questions about this Privacy Policy, billing, or your data, please contact us at '}
-            <a href="mailto:support@pathd.net" style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>support@pathd.net</a>.
+              ? 'Si tienes dudas sobre esta Política de Privacidad, pagos, soporte o tus datos personales, puedes escribirnos a '
+              : 'If you have any questions regarding this Privacy Policy, billing, support, or your personal data, you can reach us at '}
+            <a href="mailto:support@pathd.net" style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>support@pathd.net</a>
+            {isEs ? ' o ' : ' or '}
+            <a href="mailto:contact@pathd.net" style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>contact@pathd.net</a>.
           </p>
         </section>
       </div>
