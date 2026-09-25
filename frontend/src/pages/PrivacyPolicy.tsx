@@ -146,8 +146,8 @@ export const PrivacyPolicy: React.FC = () => {
           </h2>
           <p style={{ color: 'var(--text-secondary)' }}>
             {isEs
-              ? 'Para enriquecer tus listas con carátulas, sinopsis y datos de entretenimiento, Pathd utiliza APIs de metadatos de terceros (como IGDB/Twitch, OMDb/TMDB, Google Books, Comic Vine, Fanart.tv, KLIPY y Last.fm). Estos servicios no reciben tus datos personales identificables, únicamente consultas anónimas de búsqueda de contenido multimedia.'
-              : 'To enrich your lists with posters, synopses, and entertainment metadata, Pathd integrates with third-party data APIs (such as IGDB/Twitch, OMDb/TMDB, Google Books, Comic Vine, Fanart.tv, KLIPY, and Last.fm). These services do not receive your personal identifiable information, only anonymized media search queries.'}
+              ? 'Para enriquecer tus listas con carátulas, sinopsis y datos de entretenimiento, Pathd utiliza APIs de metadatos de terceros (como IGDB/Twitch, OMDb, TVMaze, Comic Vine, AniList, Google Books, Open Library, Fanart.tv, KLIPY, Last.fm, Deezer, Apple Music y MusicBrainz). Estos servicios no reciben tus datos personales identificables, únicamente consultas anónimas de búsqueda de contenido multimedia.'
+              : 'To enrich your lists with posters, synopses, and entertainment metadata, Pathd integrates with third-party data APIs (such as IGDB/Twitch, OMDb, TVMaze, Comic Vine, AniList, Google Books, Open Library, Fanart.tv, KLIPY, Last.fm, Deezer, Apple Music, and MusicBrainz). These services do not receive your personal identifiable information, only anonymized media search queries.'}
           </p>
         </section>
 
@@ -170,9 +170,7 @@ export const PrivacyPolicy: React.FC = () => {
             {isEs
               ? 'Si tienes dudas sobre esta Política de Privacidad, pagos, soporte o tus datos personales, puedes escribirnos a '
               : 'If you have any questions regarding this Privacy Policy, billing, support, or your personal data, you can reach us at '}
-            <a href="mailto:support@pathd.net" style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>support@pathd.net</a>
-            {isEs ? ' o ' : ' or '}
-            <a href="mailto:contact@pathd.net" style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>contact@pathd.net</a>.
+            <a href="mailto:support@pathd.net" style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>support@pathd.net</a>.
           </p>
         </section>
       </div>

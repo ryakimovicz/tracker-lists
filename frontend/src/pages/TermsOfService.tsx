@@ -169,7 +169,7 @@ export const TermsOfService: React.FC = () => {
                 </a>
               </div>
               <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0.5rem 0 0' }}>
-                {isEs ? 'Estructura de temporadas, episodios y calendarios de series.' : 'TV show schedules, season guides, and episode descriptions.'}
+                {isEs ? 'Estructura de temporadas, episodios y calendarios de series de televisión y anime.' : 'TV show and anime schedules, season guides, and episode descriptions.'}
               </p>
             </div>
 
@@ -193,19 +193,31 @@ export const TermsOfService: React.FC = () => {
                 </a>
               </div>
               <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0.5rem 0 0' }}>
-                {isEs ? 'Catálogo de manga, novelas ligeras y anime (API GraphQL).' : 'Manga, light novel, and anime catalog powered by AniList GraphQL.'}
+                {isEs ? 'Catálogo de manga, manhwa y novelas ligeras (API GraphQL).' : 'Manga, manhwa, and light novel catalog powered by AniList GraphQL.'}
               </p>
             </div>
 
             <div style={{ background: 'var(--bg-tertiary)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
               <div style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span>Google Books & Open Library</span>
+                <span>Google Books</span>
+                <a href="https://books.google.com" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.85rem' }}>
+                  books.google.com <ExternalLink size={13} />
+                </a>
+              </div>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0.5rem 0 0' }}>
+                {isEs ? 'Metadatos bibliográficos de libros, autores, números de páginas y sinopsis.' : 'Book bibliographic metadata, authors, page counts, and synopses.'}
+              </p>
+            </div>
+
+            <div style={{ background: 'var(--bg-tertiary)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+              <div style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span>Open Library</span>
                 <a href="https://openlibrary.org" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.85rem' }}>
                   openlibrary.org <ExternalLink size={13} />
                 </a>
               </div>
               <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0.5rem 0 0' }}>
-                {isEs ? 'Metadatos bibliográficos, autores, páginas y portadas de libros.' : 'Book metadata, authors, page counts, and cover images.'}
+                {isEs ? 'Catálogo bibliográfico abierto y portadas de ediciones de libros.' : 'Open book bibliographic catalog and edition cover archives.'}
               </p>
             </div>
 
@@ -217,7 +229,31 @@ export const TermsOfService: React.FC = () => {
                 </a>
               </div>
               <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0.5rem 0 0' }}>
-                {isEs ? 'Scrobbling en tiempo real, artistas y álbumes musicales.' : 'Real-time music scrobbling, artist, and album metadata.'}
+                {isEs ? 'Scrobbling en tiempo real, estadísticas musicales y perfiles de artistas.' : 'Real-time music scrobbling, playback stats, and artist profiles.'}
+              </p>
+            </div>
+
+            <div style={{ background: 'var(--bg-tertiary)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+              <div style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span>Deezer & iTunes / Apple Music</span>
+                <a href="https://www.deezer.com" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.85rem' }}>
+                  deezer.com <ExternalLink size={13} />
+                </a>
+              </div>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0.5rem 0 0' }}>
+                {isEs ? 'Portadas oficiales en alta fidelidad y metadatos de álbumes y pistas.' : 'High-fidelity official album artwork and track metadata fallback.'}
+              </p>
+            </div>
+
+            <div style={{ background: 'var(--bg-tertiary)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+              <div style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span>MusicBrainz</span>
+                <a href="https://musicbrainz.org" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.85rem' }}>
+                  musicbrainz.org <ExternalLink size={13} />
+                </a>
+              </div>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0.5rem 0 0' }}>
+                {isEs ? 'Enciclopedia musical comunitaria para fechas históricas de lanzamiento.' : 'Open community music encyclopedia for authentic original release dates.'}
               </p>
             </div>
 
@@ -292,10 +328,14 @@ export const TermsOfService: React.FC = () => {
           </h2>
           <p style={{ color: 'var(--text-secondary)' }}>
             {isEs
-              ? 'Para cualquier consulta relacionada con estos Términos de Servicio, facturación o derechos de autor (DMCA), puedes comunicarte con nosotros a '
-              : 'For any inquiries regarding these Terms of Service, billing, or copyright concerns (DMCA), please contact us at '}
-            <a href="mailto:support@pathd.net" style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>support@pathd.net</a>
-            {isEs ? ' o ' : ' or '}
+              ? 'Para consultas de soporte técnico, facturación o funcionamiento de tu cuenta, escríbenos a '
+              : 'For customer support, billing inquiries, or account assistance, please contact '}
+            <a href="mailto:support@pathd.net" style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>support@pathd.net</a>.
+          </p>
+          <p style={{ color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
+            {isEs
+              ? 'Para asuntos legales, requerimientos oficiales, prensa o notificaciones de derechos de autor (DMCA), comunícate a '
+              : 'For legal notices, official inquiries, press, or copyright claims (DMCA), please reach out to '}
             <a href="mailto:contact@pathd.net" style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>contact@pathd.net</a>.
           </p>
         </section>
