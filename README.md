@@ -47,9 +47,14 @@ Cuenta con un potente constructor de **Guías Cronológicas interactivas**, modi
 
 ### 👥 Comunidad, Reseñas, Actividad & KLIPY Multimedia
 - **Feed Social y Actividad Estandarizada**:
+  - Feed social estructurado con 4 pestañas especializadas (*Siguiendo, Descubrir, Reseñas y Mi Actividad*).
+  - Botón flotante e inteligente de **Actualizar** que aparece solo cuando hay actividad fresca detectada, evitando saltos de scroll molestos.
   - Historial de actividad personal y público con agrupación inteligente por ventana de 24 horas (*24h batching*) para evitar saturación en avances de episodios, páginas y sesiones de juego.
+  - Likes e interacciones totalmente idempotentes y protegidos contra carreras de red concurrentes.
   - Sincronización y limpieza reversible automática al desmarcar o eliminar obras.
-- **Reseñas & Puntuaciones**: Califica del 1 al 5 estrellas, redacta críticas y debate en hilos de comentarios.
+- **Reseñas & Puntuaciones de Precisión**:
+  - Calificación fluida con soporte para **medias estrellas** (0.5 a 5.0 ⭐) y hover continuo.
+  - Críticas de la comunidad separadas de los hilos de debate general, con votos y soporte para KLIPY.
 - **Integración KLIPY**: Selector multimedia enriquecido integrado en comentarios y reseñas con **GIFs, Stickers, Memes y Clips de Audio**, con buscador persistente, pestañas de favoritos y control global de volumen con auto-silenciado en scroll.
 - **Suite Musical Completa (Last.fm)**:
   - Vincula tu cuenta de Last.fm con soporte para Spotify, Apple Music, YouTube Music y Deezer.
@@ -57,7 +62,10 @@ Cuenta con un potente constructor de **Guías Cronológicas interactivas**, modi
   - Tops semanales, mensuales e históricos de artistas, álbumes y canciones.
   - Enriquecimiento de portadas HD multifuente (*Last.fm, Deezer, MusicBrainz, Discogs*) y modal interactivo de detalles de álbumes y pistas con tracklist completo.
 
-### ⚡ Rendimiento Ultrarrápido (0 ms)
+### ⚡ Rendimiento Ultrarrápido & Sincronización Multidispositivo (0 ms)
+- **Sincronización Inteligente Multidispositivo**:
+  - Detección reactiva de visibilidad (`visibilitychange` / `focus`) para sincronizar estantería, notificaciones no leídas y listas de seguimiento entre PC y móvil sin recargas forzadas ni saturación del servidor.
+  - Marcado instantáneo de episodios y números de cómics en Inicio con avance optimista y backend idempotente (`action=complete`), garantizando **cero registros duplicados** en el historial.
 - **Motor de Prefetching Inteligente**: Calentamiento silencioso en segundo plano (*Idle Warmup*) y precarga anticipada al interactuar con enlaces (*Hover & Touch Prefetching*).
 - **Búsqueda Multicapa con Caché y Debounce**: Barra de búsqueda con limpieza instantánea, filtros por categoría persistentes y caché en memoria y `sessionStorage`.
 - **Sincronización Instantánea de Estantería (Frame-0)**: Caché local persistente con indexación hash $O(1)$ para marcar de inmediato las obras agregadas en Explorar y modales sin esperar peticiones de red.

@@ -17,6 +17,7 @@ Documento de referencia para desarrolladores, arquitectura del sistema y catálo
   - In-memory TTL Cache (Explorar, Tendencias y Búsqueda global/individual por tipo)
   - Filtrado dinámico en tiempo real contra `BlockedFranchise` y `BlockedMediaItem`
   - Persistencia de fechas de lanzamiento (`release_date`) en la tabla `user_library_items` para carga en 0 ms
+  - **Idempotencia Multidispositivo**: Endpoints de marcado de episodios (`action=complete`) y likes de actividad protegidos contra duplicación de registros de consumo (`ConsumptionHistory`) y condiciones de carrera de red
 - **Tareas en Segundo Plano**: FastAPI `BackgroundTasks` (despacho asíncrono de correos y sincronizaciones de actividad)
 
 ### Frontend
@@ -123,7 +124,7 @@ Documento de referencia para desarrolladores, arquitectura del sistema y catálo
 | DELETE | `/{list_id}/items/{item_id}` | Eliminar ítem de la guía |
 | POST | `/{list_id}/items/tv-import` | Importar temporada completa de serie |
 | POST | `/{list_id}/items/bulk-toggle` | Marcar múltiples ítems de forma masiva |
-| POST | `/{list_id}/toggle-series-episode` | Marcar/desmarcar episodio individual |
+| POST | `/{list_id}/toggle-series-episode` | Marcar/desmarcar episodio individual con parámetro `action` (`complete` para idempotencia sin duplicados en historial / `mark_again` para rewatch con ventana de desduplicación de 30m) |
 | POST | `/{list_id}/bulk-toggle-season` | Marcar toda una temporada de una vez |
 | POST | `/{list_id}/sections/bulk-action` | Acción masiva sobre una sección |
 | POST | `/items/{item_id}/toggle` | Marcar ítem como completado/pendiente |
@@ -159,6 +160,9 @@ Documento de referencia para desarrolladores, arquitectura del sistema y catálo
 | DELETE | `/lists/{list_id}/comments/{comment_id}` | Eliminar comentario |
 | POST | `/lists/{list_id}/comments/{comment_id}/vote` | Votar un comentario |
 | POST | `/lists/{list_id}/comments/{comment_id}/report` | Reportar un comentario |
+| POST | `/activity/{activity_id}/like` | Dar o quitar like a una publicación de actividad (idempotente con protección de concurrencia) |
+| GET | `/activity/{activity_id}/comments` | Obtener comentarios de una publicación de actividad |
+| POST | `/activity/{activity_id}/comments` | Comentar en una publicación de actividad |
 | POST | `/media/report` | Reportar una obra del catálogo por contenido indebido |
 
 ### Reseñas y Comentarios Multimedia (`/api/v1/reviews`)

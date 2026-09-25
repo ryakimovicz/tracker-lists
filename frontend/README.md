@@ -16,7 +16,11 @@ Frontend oficial de **Pathd (v0.9.8 Beta)**, desarrollado como una Single Page A
   - Tipografía moderna (*Inter / Outfit*).
 - **Multimedia & Comunidad**:
   - **KLIPY API Integrada**: Selector de contenido enriquecido (**GIFs, Stickers, Memes y Clips de Audio**) en reseñas y comentarios con persistencia de favoritos (`klipyFavorites.ts`), buscador reactivo, slider de volumen y auto-silenciado en scroll o pérdida de foco.
-- **Rendimiento & Precarga**:
+  - **Puntuaciones de 0.5 a 5 Estrellas**: Componente interactivo de rating con detección de medias estrellas y hover suave continuo.
+  - **Feed Social No Invasivo**: Botón flotante y centrado de actualización que aparece únicamente cuando se detecta actividad nueva al regresar a la pestaña.
+- **Rendimiento & Sincronización Multidispositivo**:
+  - **Auto-Sync Reactivo**: Detección de visibilidad de pestaña (`visibilitychange` / `focus`) con intervalos de resguardo (throttling de 15s a 25s) para refrescar el estante, notificaciones no leídas y listas de seguimiento sin peticiones innecesarias.
+  - **Marcado Instantáneo e Idempotente**: Botón de check de episodios en Inicio inmediatamente cliqueable apoyado en caché local, consultas paralelas (`Promise.all`) y mutación optimista en 0 ms.
   - **Idle Warmup**: Calentamiento automático de datos en segundo plano durante períodos de inactividad de CPU.
   - **Hover & Touch Prefetching**: Anticipación inteligente al clic en elementos del Sidebar y tarjetas de obras.
   - **Multi-tier Cache**: Caché en memoria + `sessionStorage` para apertura de vistas y modales en 0 ms.
