@@ -146,8 +146,8 @@ export const PrivacyPolicy: React.FC = () => {
           </h2>
           <p style={{ color: 'var(--text-secondary)' }}>
             {isEs
-              ? 'Para enriquecer tus listas con carátulas, sinopsis y datos de entretenimiento, Pathd utiliza APIs de metadatos de terceros (como IGDB/Twitch, OMDb, TVMaze, Comic Vine, AniList, Google Books, Open Library, Fanart.tv, KLIPY, Last.fm, Deezer, Apple Music y MusicBrainz). Estos servicios no reciben tus datos personales identificables, únicamente consultas anónimas de búsqueda de contenido multimedia.'
-              : 'To enrich your lists with posters, synopses, and entertainment metadata, Pathd integrates with third-party data APIs (such as IGDB/Twitch, OMDb, TVMaze, Comic Vine, AniList, Google Books, Open Library, Fanart.tv, KLIPY, Last.fm, Deezer, Apple Music, and MusicBrainz). These services do not receive your personal identifiable information, only anonymized media search queries.'}
+              ? 'Para enriquecer tus listas con carátulas, sinopsis y datos de entretenimiento, Pathd utiliza APIs de metadatos de terceros (como IGDB/Twitch, OMDb, TVMaze, Comic Vine, AniList, Google Books, Open Library, Fanart.tv, KLIPY, Last.fm, Deezer, Apple Search API y MusicBrainz). Estos servicios no reciben tus datos personales identificables, únicamente consultas anónimas de búsqueda de contenido multimedia.'
+              : 'To enrich your lists with posters, synopses, and entertainment metadata, Pathd integrates with third-party data APIs (such as IGDB/Twitch, OMDb, TVMaze, Comic Vine, AniList, Google Books, Open Library, Fanart.tv, KLIPY, Last.fm, Deezer, Apple Search API, and MusicBrainz). These services do not receive your personal identifiable information, only anonymized media search queries.'}
           </p>
         </section>
 

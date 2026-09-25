@@ -235,13 +235,25 @@ export const TermsOfService: React.FC = () => {
 
             <div style={{ background: 'var(--bg-tertiary)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
               <div style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span>Deezer & iTunes / Apple Music</span>
+                <span>Deezer</span>
                 <a href="https://www.deezer.com" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.85rem' }}>
                   deezer.com <ExternalLink size={13} />
                 </a>
               </div>
               <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0.5rem 0 0' }}>
-                {isEs ? 'Portadas oficiales en alta fidelidad y metadatos de álbumes y pistas.' : 'High-fidelity official album artwork and track metadata fallback.'}
+                {isEs ? 'Portadas oficiales en alta fidelidad y metadatos de álbumes y artistas.' : 'Official high-fidelity album artwork and artist metadata.'}
+              </p>
+            </div>
+
+            <div style={{ background: 'var(--bg-tertiary)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+              <div style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span>Apple Search API</span>
+                <a href="https://www.apple.com" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.85rem' }}>
+                  apple.com <ExternalLink size={13} />
+                </a>
+              </div>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0.5rem 0 0' }}>
+                {isEs ? 'Búsqueda y verificación de catálogos musicales y fechas de lanzamiento.' : 'Music catalog search and release date verification.'}
               </p>
             </div>
 
