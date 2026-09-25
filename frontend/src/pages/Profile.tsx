@@ -3735,7 +3735,6 @@ export const Profile: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => {
-                            setCanShelfScrollLeft(true);
                             shelfContinuousScroll.handleClick('right', isShelfExpanded ? 360 : 300);
                           }}
                           onMouseEnter={handleMouseEnterBtn}
@@ -3744,7 +3743,6 @@ export const Profile: React.FC = () => {
                             shelfContinuousScroll.stopScrolling();
                           }}
                           onMouseDown={(e) => {
-                            setCanShelfScrollLeft(true);
                             handleMouseDownBtn(e);
                             shelfContinuousScroll.startScrolling('right');
                           }}
@@ -3753,7 +3751,6 @@ export const Profile: React.FC = () => {
                             shelfContinuousScroll.stopScrolling();
                           }}
                           onTouchStart={() => {
-                            setCanShelfScrollLeft(true);
                             shelfContinuousScroll.startScrolling('right');
                           }}
                           onTouchEnd={shelfContinuousScroll.stopScrolling}
