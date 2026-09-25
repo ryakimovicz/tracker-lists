@@ -753,6 +753,7 @@ export const Profile: React.FC = () => {
   const shelfListScrollRef = useRef<HTMLDivElement>(null);
   const [canShelfScrollLeft, setCanShelfScrollLeft] = useState(false);
   const [canShelfScrollRight, setCanShelfScrollRight] = useState(false);
+  const shelfRightScrollGraceRef = useRef<number>(0);
   const [shelfContainerWidth, setShelfContainerWidth] = useState(0);
 
   const guidesContainerRef = useRef<HTMLDivElement>(null);
@@ -786,7 +787,8 @@ export const Profile: React.FC = () => {
     const el = shelfScrollRef.current;
     if (!el) return;
     const { scrollLeft, scrollWidth, clientWidth } = el;
-    const canLeft = scrollLeft > 1;
+    const hasRightGrace = Date.now() < shelfRightScrollGraceRef.current;
+    const canLeft = scrollLeft > 4 || hasRightGrace;
     const canRight = scrollLeft < scrollWidth - clientWidth - 4;
     setCanShelfScrollLeft(prev => (prev !== canLeft ? canLeft : prev));
     setCanShelfScrollRight(prev => (prev !== canRight ? canRight : prev));
@@ -3660,7 +3662,9 @@ export const Profile: React.FC = () => {
                         {/* Left Arrow Button */}
                         <button
                           type="button"
-                          onClick={() => shelfContinuousScroll.handleClick('left', isShelfExpanded ? 360 : 300)}
+                          onClick={() => {
+                            shelfContinuousScroll.handleClick('left', isShelfExpanded ? 360 : 300);
+                          }}
                           onMouseEnter={handleMouseEnterBtn}
                           onMouseLeave={(e) => {
                             handleMouseLeaveBtn(e);
@@ -3668,13 +3672,17 @@ export const Profile: React.FC = () => {
                           }}
                           onMouseDown={(e) => {
                             handleMouseDownBtn(e);
+                            shelfRightScrollGraceRef.current = 0;
                             shelfContinuousScroll.startScrolling('left');
                           }}
                           onMouseUp={(e) => {
                             handleMouseUpBtn(e);
                             shelfContinuousScroll.stopScrolling();
                           }}
-                          onTouchStart={() => shelfContinuousScroll.startScrolling('left')}
+                          onTouchStart={() => {
+                            shelfRightScrollGraceRef.current = 0;
+                            shelfContinuousScroll.startScrolling('left');
+                          }}
                           onTouchEnd={shelfContinuousScroll.stopScrolling}
                           onTouchCancel={shelfContinuousScroll.stopScrolling}
                           style={{
@@ -3735,6 +3743,8 @@ export const Profile: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => {
+                            shelfRightScrollGraceRef.current = Date.now() + 500;
+                            setCanShelfScrollLeft(true);
                             shelfContinuousScroll.handleClick('right', isShelfExpanded ? 360 : 300);
                           }}
                           onMouseEnter={handleMouseEnterBtn}
@@ -3744,6 +3754,8 @@ export const Profile: React.FC = () => {
                           }}
                           onMouseDown={(e) => {
                             handleMouseDownBtn(e);
+                            shelfRightScrollGraceRef.current = Date.now() + 500;
+                            setCanShelfScrollLeft(true);
                             shelfContinuousScroll.startScrolling('right');
                           }}
                           onMouseUp={(e) => {
@@ -3751,6 +3763,8 @@ export const Profile: React.FC = () => {
                             shelfContinuousScroll.stopScrolling();
                           }}
                           onTouchStart={() => {
+                            shelfRightScrollGraceRef.current = Date.now() + 500;
+                            setCanShelfScrollLeft(true);
                             shelfContinuousScroll.startScrolling('right');
                           }}
                           onTouchEnd={shelfContinuousScroll.stopScrolling}

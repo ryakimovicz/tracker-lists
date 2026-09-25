@@ -231,10 +231,22 @@ body {
 .main-content {
   flex: 1;
   min-width: 0;
-  max-width: 1300px;
-  margin: 0 auto;
   padding: 2rem 1.5rem;
   overflow-x: hidden;
+  box-sizing: border-box;
+}
+
+/* 
+  Centrado respecto al monitor total:
+  Cuando la pantalla tiene espacio suficiente para que el contenido de 1200px quede en el centro exacto
+  del monitor (al menos 1200px + 250px*2 = 1700px), compensamos los 250px de la barra lateral en el lado
+  derecho (margin-right: 250px) para que el centro del área disponible coincida con el 50vw del monitor.
+  En pantallas más chicas, el margin-right se reduce suavemente a 0 para que NUNCA se recorte ni choque.
+*/
+@media (min-width: 1200px) {
+  .main-content {
+    margin-right: min(250px, max(0px, calc(100vw - 1200px - 250px)));
+  }
 }
 
 .right-ad-sidebar {
