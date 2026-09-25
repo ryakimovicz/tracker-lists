@@ -107,17 +107,37 @@ async def verify_payment_success(
     db: Session = Depends(get_db)
 ):
     """
-    Verifies and immediately activates Pro status upon return from successful checkout
+    Verifies subscription status directly with Dodo Payments API before activating Pro
     """
-    if payload.status in ["active", "succeeded", "success"] or payload.subscription_id:
-        current_user.is_pro = True
-        current_user.is_pro_cancelled = False
-        if payload.subscription_id:
-            current_user.dodo_subscription_id = payload.subscription_id
-        db.commit()
-        db.refresh(current_user)
-        logger.info(f"User {current_user.username} verified and activated Pro via return flow (sub={payload.subscription_id})")
-        return {"status": "success", "is_pro": True, "is_pro_cancelled": False}
+    sub_id = payload.subscription_id or current_user.dodo_subscription_id
+    if not sub_id or not settings.DODO_PAYMENTS_API_KEY:
+        # Fallback to existing state if no API key or no sub_id
+        return {"status": "pending", "is_pro": current_user.is_pro, "is_pro_cancelled": current_user.is_pro_cancelled}
+
+    client = get_dodo_client()
+    try:
+        sub = await client.subscriptions.retrieve(subscription_id=sub_id)
+        # Check that the subscription belongs to this user's email or metadata
+        sub_email = getattr(getattr(sub, 'customer', None), 'email', None)
+        sub_metadata = getattr(sub, 'metadata', {}) or {}
+        user_id_meta = str(sub_metadata.get('user_id', ''))
+        
+        matches_user = (user_id_meta == str(current_user.id)) or (sub_email and sub_email.lower() == current_user.email.lower())
+        sub_status = getattr(sub, 'status', '').lower()
+        
+        if matches_user and sub_status in ['active', 'succeeded', 'trialing', 'on_trial']:
+            current_user.is_pro = True
+            current_user.is_pro_cancelled = False
+            current_user.dodo_subscription_id = sub_id
+            db.commit()
+            db.refresh(current_user)
+            logger.info(f"User {current_user.username} verified and activated Pro via Dodo API (sub={sub_id})")
+            return {"status": "success", "is_pro": True, "is_pro_cancelled": False}
+        else:
+            logger.warning(f"Subscription check failed for user {current_user.username}: status={sub_status}, matches={matches_user}")
+    except Exception as e:
+        logger.error(f"Error validating Dodo subscription {sub_id} with API: {e}")
+
     return {"status": "pending", "is_pro": current_user.is_pro, "is_pro_cancelled": current_user.is_pro_cancelled}
 
 
