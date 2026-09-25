@@ -786,13 +786,13 @@ export const Profile: React.FC = () => {
     const el = shelfScrollRef.current;
     if (!el) return;
     const { scrollLeft, scrollWidth, clientWidth } = el;
-    const canLeft = scrollLeft > 4;
+    const canLeft = scrollLeft > 1;
     const canRight = scrollLeft < scrollWidth - clientWidth - 4;
     setCanShelfScrollLeft(prev => (prev !== canLeft ? canLeft : prev));
     setCanShelfScrollRight(prev => (prev !== canRight ? canRight : prev));
   }, []);
 
-  const shelfContinuousScroll = useContinuousScroll(shelfScrollRef, isShelfExpanded ? 360 : 300, 14, updateShelfScrollState);
+  const shelfContinuousScroll = useContinuousScroll(shelfScrollRef, isShelfExpanded ? 360 : 300);
   const createdContinuousScroll = useContinuousScroll(createdGuidesScrollRef, isCreatedGuidesExpanded ? 480 : 360);
   const savedContinuousScroll = useContinuousScroll(savedGuidesScrollRef, isSavedGuidesExpanded ? 480 : 360);
   const favoritesContinuousScroll = useContinuousScroll(favoritesScrollRef, isFavoritesExpanded ? 360 : 300);
@@ -3744,6 +3744,7 @@ export const Profile: React.FC = () => {
                             shelfContinuousScroll.stopScrolling();
                           }}
                           onMouseDown={(e) => {
+                            setCanShelfScrollLeft(true);
                             handleMouseDownBtn(e);
                             shelfContinuousScroll.startScrolling('right');
                           }}
@@ -3751,7 +3752,10 @@ export const Profile: React.FC = () => {
                             handleMouseUpBtn(e);
                             shelfContinuousScroll.stopScrolling();
                           }}
-                          onTouchStart={() => shelfContinuousScroll.startScrolling('right')}
+                          onTouchStart={() => {
+                            setCanShelfScrollLeft(true);
+                            shelfContinuousScroll.startScrolling('right');
+                          }}
                           onTouchEnd={shelfContinuousScroll.stopScrolling}
                           onTouchCancel={shelfContinuousScroll.stopScrolling}
                           style={{
