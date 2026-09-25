@@ -56,6 +56,7 @@ export const AdminPanel: React.FC = () => {
   const isEs = language === 'es';
 
   const [activeTab, setActiveTab] = useState<'users' | 'reports'>('users');
+  const [reportTab, setReportTab] = useState<'media' | 'reviews' | 'comments'>('media');
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [reports, setReports] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -684,18 +685,45 @@ export const AdminPanel: React.FC = () => {
       {/* Reports Tab */}
       {activeTab === 'reports' && (
         <div className="glass-card" style={{ padding: '2rem', borderRadius: 16 }}>
-          <h3 style={{ margin: '0 0 1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <ShieldAlert size={20} color="#ef4444" /> {isEs ? 'Reportes Pendientes de Moderación' : 'Pending Content Reports'}
-          </h3>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
+            <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <ShieldAlert size={20} color="#ef4444" /> {isEs ? 'Reportes Pendientes de Moderación' : 'Pending Content Reports'}
+            </h3>
 
-          {!reports || (!reports.media?.length && !reports.blocked_media?.length && !reports.lists?.length && !reports.comments?.length && !reports.reviews?.length) ? (
-            <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
-              {isEs ? 'No hay reportes pendientes. ¡Todo en orden!' : 'No pending reports. Everything is clean!'}
+            {/* Sub-tabs: Obras, Reseñas, Comentarios */}
+            <div style={{ display: 'flex', gap: '0.4rem', background: 'rgba(255, 255, 255, 0.05)', padding: '0.3rem', borderRadius: 10 }}>
+              <button
+                type="button"
+                onClick={() => setReportTab('media')}
+                className={reportTab === 'media' ? 'btn-primary' : 'btn-secondary'}
+                style={{ padding: '0.35rem 0.85rem', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.35rem', borderRadius: 6 }}
+              >
+                <Ban size={14} /> {isEs ? 'Obras' : 'Media'} ({reports?.media?.length || 0})
+              </button>
+              <button
+                type="button"
+                onClick={() => setReportTab('reviews')}
+                className={reportTab === 'reviews' ? 'btn-primary' : 'btn-secondary'}
+                style={{ padding: '0.35rem 0.85rem', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.35rem', borderRadius: 6 }}
+              >
+                <Star size={14} /> {isEs ? 'Reseñas' : 'Reviews'} ({reports?.reviews?.length || 0})
+              </button>
+              <button
+                type="button"
+                onClick={() => setReportTab('comments')}
+                className={reportTab === 'comments' ? 'btn-primary' : 'btn-secondary'}
+                style={{ padding: '0.35rem 0.85rem', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.35rem', borderRadius: 6 }}
+              >
+                <MessageSquare size={14} /> {isEs ? 'Comentarios' : 'Comments'} ({reports?.comments?.length || 0})
+              </button>
             </div>
-          ) : (
+          </div>
+
+          {/* Sub-tab 1: OBRAS */}
+          {reportTab === 'media' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
               {/* Media Reports */}
-              {reports.media && reports.media.length > 0 && (
+              {reports?.media && reports.media.length > 0 ? (
                 <div>
                   <h4 style={{ margin: '0 0 0.85rem', color: '#ef4444', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                     <ShieldAlert size={16} /> {isEs ? 'Obras Reportadas' : 'Reported Media Works'} ({reports.media.length})
@@ -768,6 +796,10 @@ export const AdminPanel: React.FC = () => {
                       </div>
                     ))}
                   </div>
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--text-secondary)', background: 'rgba(255,255,255,0.02)', borderRadius: 8, border: '1px solid var(--border-color)' }}>
+                  {isEs ? 'No hay reportes de obras pendientes.' : 'No pending media reports.'}
                 </div>
               )}
 
@@ -863,7 +895,7 @@ export const AdminPanel: React.FC = () => {
               </div>
 
               {/* Blocked Franchises / Sagas Blacklist */}
-              {reports.blocked_franchises && reports.blocked_franchises.length > 0 && (
+              {reports?.blocked_franchises && reports.blocked_franchises.length > 0 && (
                 <div>
                   <h4 style={{ margin: '0 0 0.85rem', color: 'var(--text-secondary)', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                     <Ban size={15} color="var(--accent-primary)" /> {isEs ? 'Sagas y Editoriales Bloqueadas (Blacklist)' : 'Blocked Sagas & Publishers (Blacklist)'} ({reports.blocked_franchises.length})
@@ -892,7 +924,7 @@ export const AdminPanel: React.FC = () => {
               )}
 
               {/* Blocked Media Items Blacklist */}
-              {reports.blocked_media && reports.blocked_media.length > 0 && (
+              {reports?.blocked_media && reports.blocked_media.length > 0 && (
                 <div>
                   <h4 style={{ margin: '0 0 0.85rem', color: 'var(--text-secondary)', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                     <Ban size={15} /> {isEs ? 'Obras Bloqueadas Activas (Blacklist)' : 'Active Blocked Media (Blacklist)'} ({reports.blocked_media.length})
@@ -919,7 +951,7 @@ export const AdminPanel: React.FC = () => {
               )}
 
               {/* Lists Reports */}
-              {reports.lists && reports.lists.length > 0 && (
+              {reports?.lists && reports.lists.length > 0 && (
                 <div>
                   <h4 style={{ margin: '0 0 0.85rem', color: 'var(--text-primary)', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                     <FileText size={16} color="var(--accent-primary)" /> {isEs ? 'Listas Reportadas' : 'Reported Lists'} ({reports.lists.length})
@@ -945,9 +977,13 @@ export const AdminPanel: React.FC = () => {
                   </div>
                 </div>
               )}
+            </div>
+          )}
 
-              {/* Reviews Reports Section */}
-              {reports.reviews && reports.reviews.length > 0 && (
+          {/* Sub-tab 2: RESEÑAS */}
+          {reportTab === 'reviews' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {reports?.reviews && reports.reviews.length > 0 ? (
                 <div>
                   <h4 style={{ margin: '0 0 0.85rem', color: 'var(--text-primary)', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                     <Star size={16} color="#f59e0b" /> {isEs ? 'Reseñas Reportadas' : 'Reported Reviews'} ({reports.reviews.length})
@@ -1001,13 +1037,22 @@ export const AdminPanel: React.FC = () => {
                     ))}
                   </div>
                 </div>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text-secondary)', background: 'rgba(255,255,255,0.02)', borderRadius: 10, border: '1px solid var(--border-color)' }}>
+                  <Star size={28} color="#f59e0b" style={{ marginBottom: '0.5rem', opacity: 0.8 }} />
+                  <div>{isEs ? 'No hay reseñas reportadas pendientes.' : 'No pending review reports.'}</div>
+                </div>
               )}
+            </div>
+          )}
 
-              {/* Comments Reports Section */}
-              {reports.comments && reports.comments.length > 0 && (
+          {/* Sub-tab 3: COMENTARIOS Y RESPUESTAS */}
+          {reportTab === 'comments' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {reports?.comments && reports.comments.length > 0 ? (
                 <div>
                   <h4 style={{ margin: '0 0 0.85rem', color: 'var(--text-primary)', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <MessageSquare size={16} color="var(--accent-primary)" /> {isEs ? 'Comentarios Reportados' : 'Reported Comments'} ({reports.comments.length})
+                    <MessageSquare size={16} color="var(--accent-primary)" /> {isEs ? 'Comentarios y Respuestas Reportados' : 'Reported Comments & Replies'} ({reports.comments.length})
                   </h4>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
                     {reports.comments.map((r: any) => {
@@ -1061,6 +1106,11 @@ export const AdminPanel: React.FC = () => {
                       );
                     })}
                   </div>
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text-secondary)', background: 'rgba(255,255,255,0.02)', borderRadius: 10, border: '1px solid var(--border-color)' }}>
+                  <MessageSquare size={28} color="var(--accent-primary)" style={{ marginBottom: '0.5rem', opacity: 0.8 }} />
+                  <div>{isEs ? 'No hay comentarios ni respuestas reportados pendientes.' : 'No pending reported comments or replies.'}</div>
                 </div>
               )}
             </div>
