@@ -20,6 +20,7 @@ class User(Base):
 
     lastfm_username = Column(String(100), nullable=True)
     lastfm_session_key = Column(String(100), nullable=True)
+    preferred_language = Column(String(10), default="es", nullable=False)
     is_admin = Column(Boolean, default=False, nullable=False)
     is_private = Column(Boolean, default=False, nullable=False)
     show_nsfw = Column(Boolean, default=False, nullable=False)

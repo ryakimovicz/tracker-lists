@@ -1149,7 +1149,7 @@ def admin_change_username(
 
     # Send notification email if another user was modified by admin
     if not is_self and user_email:
-        lang = (request.headers.get("accept-language") or "es")[:2].lower()
+        lang = getattr(user, 'preferred_language', None) or (request.headers.get("accept-language") or "es")[:2].lower()
         background_tasks.add_task(
             EmailService.send_username_changed_email,
             to_email=user_email,

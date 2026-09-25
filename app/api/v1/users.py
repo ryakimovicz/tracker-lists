@@ -132,6 +132,7 @@ def get_user_dashboard(
         profile_color=current_user.profile_color,
         category_order=current_user.category_order,
         lastfm_username=current_user.lastfm_username,
+        preferred_language=getattr(current_user, 'preferred_language', 'es') or 'es',
         is_private=bool(getattr(current_user, 'is_private', False)),
         followers_count=followers_count,
         following_count=following_count,
@@ -854,6 +855,23 @@ def update_user_privacy(
     db: Session = Depends(get_db)
 ):
     current_user.is_private = req.is_private
+    db.commit()
+    db.refresh(current_user)
+    return current_user
+
+class LanguageUpdateRequest(BaseModel):
+    language: str
+
+@router.put("/me/language", response_model=UserResponse)
+def update_user_language(
+    req: LanguageUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    clean_lang = req.language.strip().lower()[:2]
+    if clean_lang not in ("es", "en"):
+        clean_lang = "es"
+    current_user.preferred_language = clean_lang
     db.commit()
     db.refresh(current_user)
     return current_user

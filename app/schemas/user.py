@@ -28,6 +28,7 @@ class UserResponse(UserBase):
     profile_color: str | None = None
     category_order: str | None = None
     lastfm_username: str | None = None
+    preferred_language: str = "es"
     is_private: bool = False
     followers_count: int = 0
     following_count: int = 0
@@ -69,6 +70,7 @@ class UserDashboardResponse(BaseModel):
     profile_color: str | None = None
     category_order: str | None = None
     lastfm_username: str | None = None
+    preferred_language: str = "es"
     is_private: bool = False
     followers_count: int = 0
     following_count: int = 0

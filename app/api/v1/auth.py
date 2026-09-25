@@ -115,12 +115,17 @@ def register(
     hashed_password = get_password_hash(user_in.password)
     verification_tok = create_verification_token(user_in.email.strip().lower())
 
+    lang = (request.headers.get("accept-language") or "es")[:2].lower()
+    if lang not in ("es", "en"):
+        lang = "es"
+
     new_user = User(
         username=user_in.username.strip(),
         email=user_in.email.strip().lower(),
         hashed_password=hashed_password,
         is_verified=False,
-        verification_token=verification_tok
+        verification_token=verification_tok,
+        preferred_language=lang
     )
     db.add(new_user)
     db.commit()

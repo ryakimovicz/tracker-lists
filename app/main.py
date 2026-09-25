@@ -79,6 +79,7 @@ def auto_migrate_schema():
                 ("auth_provider", "VARCHAR(20) DEFAULT 'local'"),
                 ("category_order", "VARCHAR(200)"),
                 ("profile_color", "VARCHAR(20)"),
+                ("preferred_language", "VARCHAR(10) DEFAULT 'es'"),
             ]
             for col_name, col_type in columns_to_add:
                 if col_name not in existing_cols:

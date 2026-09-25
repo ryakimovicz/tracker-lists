@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { apiClient } from '../api/client';
 
 type Language = 'en' | 'es';
 
@@ -184,6 +185,12 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       sessionStorage.removeItem('pathd_act_cache');
     } catch (e) {}
     window.dispatchEvent(new CustomEvent('language-updated', { detail: lang }));
+
+    // Silently persist user's preferred language to backend if authenticated
+    const token = localStorage.getItem('access_token');
+    if (token) {
+      apiClient.put('/users/me/language', { language: lang }).catch(() => {});
+    }
   };
 
 
