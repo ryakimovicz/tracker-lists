@@ -211,7 +211,9 @@ const ScrollRow = ({
 
   const { startScrolling, stopScrolling, handleClick } = useContinuousScroll(
     scrollRef,
-    effectiveRowMode === 'two-rows' ? 360 : 300
+    effectiveRowMode === 'two-rows' ? 360 : 300,
+    14,
+    updateScrollState
   );
 
   const catColor = outlineColor || "var(--accent-primary)";

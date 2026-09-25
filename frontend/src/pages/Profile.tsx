@@ -792,11 +792,6 @@ export const Profile: React.FC = () => {
     setCanShelfScrollRight(prev => (prev !== canRight ? canRight : prev));
   }, []);
 
-  const shelfContinuousScroll = useContinuousScroll(shelfScrollRef, isShelfExpanded ? 360 : 300);
-  const createdContinuousScroll = useContinuousScroll(createdGuidesScrollRef, isCreatedGuidesExpanded ? 480 : 360);
-  const savedContinuousScroll = useContinuousScroll(savedGuidesScrollRef, isSavedGuidesExpanded ? 480 : 360);
-  const favoritesContinuousScroll = useContinuousScroll(favoritesScrollRef, isFavoritesExpanded ? 360 : 300);
-
   const updateCreatedGuidesScrollState = useCallback(() => {
     const el = createdGuidesScrollRef.current;
     if (!el) return;
@@ -847,6 +842,11 @@ export const Profile: React.FC = () => {
     const page = Math.max(1, Math.floor(col / maxVisibleInOneRow) + 1);
     setFavoritesPage(prev => (prev !== page ? page : prev));
   }, []);
+
+  const shelfContinuousScroll = useContinuousScroll(shelfScrollRef, isShelfExpanded ? 360 : 300, 14, updateShelfScrollState);
+  const createdContinuousScroll = useContinuousScroll(createdGuidesScrollRef, isCreatedGuidesExpanded ? 480 : 360, 14, updateCreatedGuidesScrollState);
+  const savedContinuousScroll = useContinuousScroll(savedGuidesScrollRef, isSavedGuidesExpanded ? 480 : 360, 14, updateSavedGuidesScrollState);
+  const favoritesContinuousScroll = useContinuousScroll(favoritesScrollRef, isFavoritesExpanded ? 360 : 300, 14, updateFavoritesScrollState);
 
   const handleToggleShelfExpanded = useCallback(() => {
     const el = shelfScrollRef.current;

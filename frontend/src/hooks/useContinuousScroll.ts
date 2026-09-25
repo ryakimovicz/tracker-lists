@@ -38,7 +38,7 @@ export function useContinuousScroll(
     const baseSpeed = customSpeed ?? speedRef.current;
     const dir = direction === 'left' ? -1 : 1;
 
-    // Only start continuous RAF scrolling after holding beyond 180ms
+    // Only start continuous RAF scrolling after holding beyond 140ms
     holdTimeoutRef.current = setTimeout(() => {
       isHoldingRef.current = true;
 
@@ -53,7 +53,7 @@ export function useContinuousScroll(
       };
 
       rafIdRef.current = requestAnimationFrame(loop);
-    }, 180);
+    }, 140);
   }, [scrollRef, stopScrolling]);
 
   const handleClick = useCallback((direction: 'left' | 'right', customStep?: number) => {
@@ -68,22 +68,16 @@ export function useContinuousScroll(
         left: direction === 'left' ? -step : step,
         behavior: 'smooth'
       });
-      // Trigger check immediately and during animation frames for ultra-responsive indicators
-      if (onScrollUpdateRef.current) {
-        onScrollUpdateRef.current();
-      }
-      requestAnimationFrame(() => {
+      // Poll scroll updates frequently during smooth scroll animation
+      let count = 0;
+      const poll = () => {
         if (onScrollUpdateRef.current) onScrollUpdateRef.current();
-      });
-      setTimeout(() => {
-        if (onScrollUpdateRef.current) onScrollUpdateRef.current();
-      }, 50);
-      setTimeout(() => {
-        if (onScrollUpdateRef.current) onScrollUpdateRef.current();
-      }, 150);
-      setTimeout(() => {
-        if (onScrollUpdateRef.current) onScrollUpdateRef.current();
-      }, 350);
+        count++;
+        if (count < 25) {
+          requestAnimationFrame(poll);
+        }
+      };
+      requestAnimationFrame(poll);
     }
   }, [scrollRef, stopScrolling]);
 
