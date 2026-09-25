@@ -3,16 +3,19 @@ import { useRef, useCallback, useEffect } from 'react';
 export function useContinuousScroll(
   scrollRef: React.RefObject<HTMLDivElement | null>,
   defaultStep: number = 350,
-  speedPxPerFrame: number = 14
+  speedPxPerFrame: number = 14,
+  onScrollUpdate?: () => void
 ) {
   const isHoldingRef = useRef(false);
   const rafIdRef = useRef<number | null>(null);
   const holdTimeoutRef = useRef<any>(null);
   const defaultStepRef = useRef(defaultStep);
   const speedRef = useRef(speedPxPerFrame);
+  const onScrollUpdateRef = useRef(onScrollUpdate);
 
   defaultStepRef.current = defaultStep;
   speedRef.current = speedPxPerFrame;
+  onScrollUpdateRef.current = onScrollUpdate;
 
   const stopScrolling = useCallback(() => {
     if (holdTimeoutRef.current) {
@@ -22,6 +25,9 @@ export function useContinuousScroll(
     if (rafIdRef.current) {
       cancelAnimationFrame(rafIdRef.current);
       rafIdRef.current = null;
+    }
+    if (onScrollUpdateRef.current) {
+      onScrollUpdateRef.current();
     }
   }, []);
 
@@ -39,6 +45,9 @@ export function useContinuousScroll(
       const loop = () => {
         if (scrollRef.current) {
           scrollRef.current.scrollLeft += dir * baseSpeed;
+          if (onScrollUpdateRef.current) {
+            onScrollUpdateRef.current();
+          }
         }
         rafIdRef.current = requestAnimationFrame(loop);
       };
@@ -59,6 +68,22 @@ export function useContinuousScroll(
         left: direction === 'left' ? -step : step,
         behavior: 'smooth'
       });
+      // Trigger check immediately and during animation frames for ultra-responsive indicators
+      if (onScrollUpdateRef.current) {
+        onScrollUpdateRef.current();
+      }
+      requestAnimationFrame(() => {
+        if (onScrollUpdateRef.current) onScrollUpdateRef.current();
+      });
+      setTimeout(() => {
+        if (onScrollUpdateRef.current) onScrollUpdateRef.current();
+      }, 50);
+      setTimeout(() => {
+        if (onScrollUpdateRef.current) onScrollUpdateRef.current();
+      }, 150);
+      setTimeout(() => {
+        if (onScrollUpdateRef.current) onScrollUpdateRef.current();
+      }, 350);
     }
   }, [scrollRef, stopScrolling]);
 

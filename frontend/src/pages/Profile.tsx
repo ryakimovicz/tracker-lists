@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate, useSearchParams, useParams, Link } from 'react-router-dom';
 import { useTranslation } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
@@ -150,6 +150,463 @@ export const getTagClass = (type: string) => {
     default: return 'tag-badge tag-series';
   }
 };
+
+interface ShelfCardItemProps {
+  item: LibraryItem;
+  mediaFilter: string;
+  isEffectiveFav: boolean;
+  language: string;
+  t: (key: string) => string;
+  renderBadges: (item: LibraryItem) => React.ReactNode;
+  onOpenDetails: (item: LibraryItem) => void;
+  onToggleFavorite: (itemId: number, currentFav: boolean) => void;
+  formatDate: (date: Date) => string;
+}
+
+const ShelfCardItem = React.memo<ShelfCardItemProps>(({
+  item,
+  mediaFilter,
+  isEffectiveFav,
+  language,
+  t,
+  renderBadges,
+  onOpenDetails,
+  onToggleFavorite,
+  formatDate
+}) => {
+  const isGame = item.item_type === 'game';
+  const rawBadge = (item.custom_badge || '').toLowerCase();
+
+  const getGameBadgeLabel = (b: string) => {
+    if (b === 'collection' || b === 'pack') return language === 'es' ? 'Colección' : 'Collection';
+    if (b === 'expansion') return language === 'es' ? 'Expansión' : 'Expansion';
+    if (b === 'dlc') return 'DLC';
+    if (b === 'edition') return language === 'es' ? 'Edición' : 'Edition';
+    if (b === 'remake') return 'Remake';
+    if (b === 'remaster') return 'Remaster';
+    return null;
+  };
+
+  const specialGameLabel = isGame ? getGameBadgeLabel(rawBadge) : null;
+  const isDlcOrExpansion = item.item_type === 'game' && ['dlc', 'expansion'].includes(item.badge || item.custom_badge || '');
+  const isUnconsumed = !isDlcOrExpansion && ['plan_to_watch', 'plan_to_read', 'plan_to_play'].includes(item.status);
+
+  const match = (item.title || '').match(/^(.*?)\s*-\s*S(\d+)E(\d+)(.*)$/i);
+  const isEpOrSeason = item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tvm-ep-');
+
+  let displayTitle = item.title;
+  if (isEpOrSeason && item.last_seen_episode && item.title.toLowerCase().startsWith(item.last_seen_episode.toLowerCase() + ' - ')) {
+    displayTitle = item.title.slice(item.last_seen_episode.length + 3);
+  }
+
+  return (
+    <div
+      className="glass-card"
+      style={{
+        minWidth: '185px',
+        maxWidth: '185px',
+        padding: '0.85rem',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '0.65rem',
+        flexShrink: 0
+      }}
+    >
+      <div style={{ position: 'relative', cursor: 'pointer', width: '100%', height: '230px', borderRadius: '8px', overflow: 'hidden' }} onClick={() => onOpenDetails(item)}>
+        <MediaPoster
+          src={item.image_url}
+          title={item.title}
+          itemType={item.item_type}
+          height="100%"
+          width="100%"
+          borderRadius="8px"
+        />
+
+        {/* Tag / Category Badge */}
+        {(() => {
+          if (mediaFilter === 'all') {
+            const normType = (item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tvm-ep-')) ? 'series' : item.item_type;
+            const label = isGame 
+              ? (specialGameLabel || (language === 'es' ? 'Juego' : 'Game'))
+              : (item.item_type === 'episode' || item.external_id?.startsWith('tvm-ep-'))
+              ? (language === 'es' ? 'Serie' : 'Show')
+              : item.item_type === 'season'
+              ? (language === 'es' ? 'Temporada' : 'Season')
+              : item.item_type === 'comic' ? (language === 'es' ? 'Cómic' : 'Comic') : item.item_type === 'manga' ? 'Manga' : t('media' + item.item_type.charAt(0).toUpperCase() + item.item_type.slice(1));
+
+            return (
+              <div
+                className={getTagClass(normType)}
+                style={{
+                  position: "absolute",
+                  top: "0.5rem",
+                  left: "0.5rem",
+                  padding: "0.2rem 0.35rem",
+                  borderRadius: "4px",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  opacity: 0.95,
+                  backdropFilter: 'blur(4px)',
+                  zIndex: 1
+                }}
+                title={label}
+              >
+                {getCategoryIcon(normType, { size: 14, color: 'currentColor' })}
+              </div>
+            );
+          }
+
+          if (isGame && specialGameLabel) {
+            return (
+              <div className="tag-badge tag-game" style={{ position: "absolute", top: "0.5rem", left: "0.5rem", padding: "0.15rem 0.45rem", borderRadius: "4px", fontSize: "0.7rem", fontWeight: 600, opacity: 0.9, backdropFilter: 'blur(4px)', zIndex: 1 }}>
+                {specialGameLabel}
+              </div>
+            );
+          }
+
+          return null;
+        })()}
+
+        {/* Favorite Heart Button (Unified Pink) */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleFavorite(item.id, isEffectiveFav);
+          }}
+          className={`btn-favorite-heart ${isEffectiveFav ? 'is-favorite' : ''}`}
+          style={{
+            position: 'absolute',
+            top: '0.5rem',
+            right: '0.5rem',
+            width: '32px',
+            height: '32px',
+            cursor: isUnconsumed && !isEffectiveFav ? 'not-allowed' : 'pointer',
+            opacity: isUnconsumed && !isEffectiveFav ? 0.35 : 1,
+            color: isEffectiveFav ? 'var(--color-user, #F472B6)' : 'var(--text-secondary)'
+          }}
+          title={isUnconsumed && !isEffectiveFav
+            ? (language === 'es' ? 'Empieza a consumir esta obra para poder destacarla' : 'Start consuming this item to feature it')
+            : (isEffectiveFav
+              ? (language === 'es' ? 'Quitar Destacado' : 'Remove Featured')
+              : (language === 'es' ? 'Destacar' : 'Favorite'))
+          }
+        >
+          <Heart size={16} fill={isEffectiveFav ? 'var(--color-user, #F472B6)' : 'none'} />
+        </button>
+      </div>
+
+      <div style={{ flex: 1, textAlign: 'left', cursor: 'pointer' }} onClick={() => onOpenDetails(item)}>
+        {isEpOrSeason && match ? (
+          <div style={{ display: 'flex', flexDirection: 'column', marginBottom: '0.25rem' }}>
+            <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.title}>{match[1].trim()}</h4>
+            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--accent-primary)', marginTop: '0.1rem' }}>{language === 'es' ? `T${match[2]} | E${match[3]}` : `S${match[2]} | E${match[3]}`}</span>
+            {match[4].replace(/^\s*-\s*/, '').trim() && <span style={{ fontSize: '0.78rem', fontWeight: 500, color: 'var(--text-secondary)', marginTop: '0.1rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{match[4].replace(/^\s*-\s*/, '').trim()}</span>}
+          </div>
+        ) : (
+          <>
+            <h4 style={{ margin: '0 0 0.25rem 0', fontSize: '0.92rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.title}>
+              {displayTitle}
+            </h4>
+            {isEpOrSeason && item.last_seen_episode && (
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500, display: 'block', marginTop: '0.1rem' }}>
+                {language === 'es' ? 'Serie: ' : 'Show: '}{item.last_seen_episode}
+              </span>
+            )}
+          </>
+        )}
+
+        {/* Unified Badges System */}
+        <div style={{ marginTop: '0.25rem' }}>
+          {renderBadges(item)}
+        </div>
+
+        {/* Followed series / comic volume last completed episode or issue */}
+        {(item.item_type === 'series' || item.item_type === 'anime' || item.item_type === 'comic') && item.last_seen_episode && (
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.3rem', marginTop: '0.35rem' }}>
+            {(() => {
+              let formatted = item.last_seen_episode;
+              if (item.item_type === 'comic') {
+                const issueMatch = item.last_seen_episode.match(/#(\d+(\.\d+)?)/) || item.last_seen_episode.match(/^(\d+(\.\d+)?)$/);
+                if (issueMatch) {
+                  formatted = `#${issueMatch[1]}`;
+                } else if (item.last_seen_episode.startsWith(item.title)) {
+                  formatted = item.last_seen_episode.slice(item.title.length).trim() || item.last_seen_episode;
+                }
+              } else {
+                const matchSpecialSeason = item.last_seen_episode.match(/S(\d+)\s*[•·-]\s*\[?Especial\]?/i);
+                const matchSpecial = item.last_seen_episode.match(/\[?Especial\]?/i);
+                const matchExtra = item.last_seen_episode.match(/Extras?\s*(\d+)?/i);
+                const matchEp = item.last_seen_episode.match(/S(\d+)E(\d+)/i);
+
+                if (matchEp) {
+                  const s = String(matchEp[1]).padStart(2, '0');
+                  const e = String(matchEp[2]).padStart(2, '0');
+                  formatted = language === 'es' ? `T${s} | E${e}` : `S${s} | E${e}`;
+                } else if (matchSpecialSeason) {
+                  const s = String(matchSpecialSeason[1]).padStart(2, '0');
+                  formatted = language === 'es' ? `T${s} • Especial` : `S${s} • Special`;
+                } else if (matchExtra) {
+                  const epNum = matchExtra[1];
+                  formatted = epNum ? `Extra ${epNum}` : 'Extra';
+                } else if (matchSpecial) {
+                  formatted = language === 'es' ? 'Especial' : 'Special';
+                }
+              }
+
+              const seriesRuns = item.times_completed || (item.completed_at ? 1 : 0);
+              const epRuns = item.last_seen_episode_count || 1;
+              const showEpBadge = epRuns > 1 && epRuns !== seriesRuns;
+
+              return (
+                <>
+                  <span>{`${language === 'es' ? 'Último: ' : 'Last: '}${formatted}`}</span>
+                  {showEpBadge && (
+                    <span style={{
+                      fontSize: '0.7rem',
+                      fontWeight: 700,
+                      color: 'var(--accent-primary)',
+                      background: 'rgba(99, 102, 241, 0.15)',
+                      padding: '0.05rem 0.35rem',
+                      borderRadius: '4px'
+                    }}>
+                      {`x${epRuns}`}
+                    </span>
+                  )}
+                </>
+              );
+            })()}
+          </span>
+        )}
+
+        {/* Movie Duration / Watched Time */}
+        {item.item_type === 'movie' && (item.pages_read || item.total_pages || 0) > 0 && (
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '0.25rem', marginTop: '0.2rem' }}>
+            <Clock size={12} />
+            {(() => {
+              const mins = item.pages_read || item.total_pages || 0;
+              const h = Math.floor(mins / 60);
+              const m = mins % 60;
+              return h > 0 ? `${h}h ${m > 0 ? `${String(m).padStart(2, '0')}m` : '00m'}` : `${m}m`;
+            })()}
+          </span>
+        )}
+
+        {/* Game Hours Played */}
+        {item.item_type === 'game' && (item.pages_read || 0) > 0 && (
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '0.25rem', marginTop: '0.2rem' }}>
+            <Clock size={12} />
+            {Math.floor((item.pages_read || 0) / 60)}h {String((item.pages_read || 0) % 60).padStart(2, '0')}m
+          </span>
+        )}
+
+        {/* Book / Comic / Manga Pages Read */}
+        {['book', 'comic', 'manga'].includes(item.item_type) && (!item.tracking_list_id && !item.last_seen_episode) && ((item.pages_read || 0) > 0 || (item.total_pages || 0) > 0) && (
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '0.25rem', marginTop: '0.2rem' }}>
+            <BookOpen size={12} />
+            {(() => {
+              const read = item.pages_read || 0;
+              const total = item.total_pages || 0;
+              if (item.status === 'read' || item.status === 'completed') {
+                const count = total > 0 ? total : read;
+                return `${count} ${language === 'es' ? (count === 1 ? 'pág.' : 'págs.') : (count === 1 ? 'page' : 'pages')}`;
+              }
+              if (read > 0 && total > 0) {
+                return `${read} / ${total} ${language === 'es' ? 'págs.' : 'pages'}`;
+              }
+              const count = read > 0 ? read : total;
+              return `${count} ${language === 'es' ? (count === 1 ? 'pág.' : 'págs.') : (count === 1 ? 'page' : 'pages')}`;
+            })()}
+          </span>
+        )}
+
+        {/* Formatted Date */}
+        {(item.completed_at || item.updated_at) && (
+          <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontStyle: 'italic', display: 'block', marginTop: '0.3rem' }}>
+            {formatDate(new Date(item.completed_at || item.updated_at || new Date()))}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+});
+
+interface ShelfListItemRowProps {
+  item: LibraryItem;
+  mediaFilter: string;
+  isEffectiveFav: boolean;
+  language: string;
+  renderBadges: (item: LibraryItem) => React.ReactNode;
+  onOpenDetails: (item: LibraryItem) => void;
+  onToggleFavorite: (itemId: number, currentFav: boolean) => void;
+  formatDate: (date: Date) => string;
+}
+
+const ShelfListItemRow = React.memo<ShelfListItemRowProps>(({
+  item,
+  mediaFilter,
+  isEffectiveFav,
+  language,
+  renderBadges,
+  onOpenDetails,
+  onToggleFavorite,
+  formatDate
+}) => {
+  const isDlcOrExpansion = item.item_type === 'game' && ['dlc', 'expansion'].includes(item.badge || item.custom_badge || '');
+  const isUnconsumed = !isDlcOrExpansion && ['plan_to_watch', 'plan_to_read', 'plan_to_play'].includes(item.status);
+
+  // Prepare title & episode formatted strings
+  const match = (item.title || '').match(/^(.*?)\s*-\s*S(\d+)E(\d+)(.*)$/i);
+  const isEpOrSeason = item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tvm-ep-');
+  let displayTitle = item.title;
+  let episodeSubtext = '';
+  if (isEpOrSeason && match) {
+    displayTitle = match[1].trim();
+    const s = match[2];
+    const e = match[3];
+    const epName = match[4].replace(/^\s*-\s*/, '').trim();
+    const formattedSE = language === 'es' ? `T${s} | E${e}` : `S${s} | E${e}`;
+    episodeSubtext = epName ? `${formattedSE} - ${epName}` : formattedSE;
+  } else if (isEpOrSeason && item.last_seen_episode && item.title.toLowerCase().startsWith(item.last_seen_episode.toLowerCase() + ' - ')) {
+    displayTitle = item.title.slice(item.last_seen_episode.length + 3);
+  }
+
+  // Prepare metadata snippet for Line 2
+  let metadataSnippet: React.ReactNode = null;
+  if (item.item_type === 'movie' && (item.pages_read || item.total_pages || 0) > 0) {
+    const mins = item.pages_read || item.total_pages || 0;
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    metadataSnippet = (
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+        <Clock size={12} />
+        {h > 0 ? `${h}h ${m > 0 ? `${String(m).padStart(2, '0')}m` : '00m'}` : `${m}m`}
+      </span>
+    );
+  } else if (item.item_type === 'game' && (item.pages_read || 0) > 0) {
+    metadataSnippet = (
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+        <Clock size={12} />
+        {Math.floor((item.pages_read || 0) / 60)}h {String((item.pages_read || 0) % 60).padStart(2, '0')}m
+      </span>
+    );
+  } else if ((item.item_type === 'series' || item.item_type === 'anime' || item.item_type === 'comic') && item.last_seen_episode) {
+    let formatted = item.last_seen_episode;
+    if (item.item_type === 'comic') {
+      const issueMatch = item.last_seen_episode.match(/#(\d+(\.\d+)?)/) || item.last_seen_episode.match(/^(\d+(\.\d+)?)$/);
+      if (issueMatch) formatted = `#${issueMatch[1]}`;
+      else if (item.last_seen_episode.startsWith(item.title)) formatted = item.last_seen_episode.slice(item.title.length).trim() || item.last_seen_episode;
+    } else {
+      const matchSE = item.last_seen_episode.match(/S(\d+)E(\d+)/i);
+      if (matchSE) {
+        const s = String(matchSE[1]).padStart(2, '0');
+        const e = String(matchSE[2]).padStart(2, '0');
+        formatted = language === 'es' ? `T${s} | E${e}` : `S${s} | E${e}`;
+      }
+    }
+    metadataSnippet = (
+      <span>{`${language === 'es' ? 'Último: ' : 'Last: '}${formatted}`}</span>
+    );
+  } else if (['book', 'comic', 'manga'].includes(item.item_type) && (!item.tracking_list_id && !item.last_seen_episode) && ((item.pages_read || 0) > 0 || (item.total_pages || 0) > 0)) {
+    const read = item.pages_read || 0;
+    const total = item.total_pages || 0;
+    const label = (item.status === 'read' || item.status === 'completed')
+      ? `${total > 0 ? total : read} ${language === 'es' ? 'págs.' : 'pages'}`
+      : (read > 0 && total > 0)
+      ? `${read} / ${total} ${language === 'es' ? 'págs.' : 'pages'}`
+      : `${read > 0 ? read : total} ${language === 'es' ? 'págs.' : 'pages'}`;
+    metadataSnippet = (
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+        <BookOpen size={12} />
+        {label}
+      </span>
+    );
+  }
+
+  return (
+    <div
+      key={item.id}
+      className="shelf-list-item-row"
+      onClick={() => onOpenDetails(item)}
+    >
+      {/* Left: Poster thumbnail */}
+      <div style={{ width: '44px', height: '62px', borderRadius: '6px', overflow: 'hidden', flexShrink: 0 }}>
+        <MediaPoster
+          src={item.image_url}
+          title={item.title}
+          itemType={item.item_type}
+          height="100%"
+          width="100%"
+          borderRadius="6px"
+        />
+      </div>
+
+      {/* Center: 2 Lines of info */}
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.25rem', textAlign: 'left' }}>
+        {/* Line 1: Title + category badge if 'all' + status badges on right */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0, flex: 1 }}>
+            <span style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={item.title}>
+              {displayTitle}
+            </span>
+            {mediaFilter === 'all' && (
+              <span
+                className={getTagClass((item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tvm-ep-')) ? 'series' : item.item_type)}
+                style={{ padding: '0.15rem 0.35rem', borderRadius: '4px', fontSize: '0.7rem', display: 'inline-flex', alignItems: 'center' }}
+              >
+                {getCategoryIcon((item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tvm-ep-')) ? 'series' : item.item_type, { size: 12, color: 'currentColor' })}
+              </span>
+            )}
+          </div>
+          <div style={{ flexShrink: 0 }}>
+            {renderBadges(item)}
+          </div>
+        </div>
+
+        {/* Line 2: Media metadata on left, date on right */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {episodeSubtext && (
+              <span style={{ color: 'var(--accent-primary)', fontWeight: 500 }}>
+                {episodeSubtext}
+              </span>
+            )}
+            {metadataSnippet}
+          </div>
+          {(item.completed_at || item.updated_at) && (
+            <span style={{ fontSize: '0.72rem', fontStyle: 'italic', flexShrink: 0 }}>
+              {formatDate(new Date(item.completed_at || item.updated_at || new Date()))}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Right: Favorite Heart button */}
+      <div style={{ flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
+        <button
+          type="button"
+          onClick={() => onToggleFavorite(item.id, isEffectiveFav)}
+          className={`btn-favorite-heart ${isEffectiveFav ? 'is-favorite' : ''}`}
+          style={{
+            width: '32px',
+            height: '32px',
+            cursor: isUnconsumed && !isEffectiveFav ? 'not-allowed' : 'pointer',
+            opacity: isUnconsumed && !isEffectiveFav ? 0.35 : 1,
+            color: isEffectiveFav ? 'var(--color-user, #F472B6)' : 'var(--text-secondary)'
+          }}
+          title={isUnconsumed && !isEffectiveFav
+            ? (language === 'es' ? 'Empieza a consumir esta obra para poder destacarla' : 'Start consuming this item to feature it')
+            : (isEffectiveFav
+              ? (language === 'es' ? 'Quitar Destacado' : 'Remove Featured')
+              : (language === 'es' ? 'Destacar' : 'Favorite'))
+          }
+        >
+          <Heart size={16} fill={isEffectiveFav ? 'var(--color-user, #F472B6)' : 'none'} />
+        </button>
+      </div>
+    </div>
+  );
+});
 
 export const Profile: React.FC = () => {
   const { t, language } = useTranslation();
@@ -325,11 +782,6 @@ export const Profile: React.FC = () => {
   const [canFavoritesScrollRight, setCanFavoritesScrollRight] = useState(false);
   const [favoritesContainerWidth, setFavoritesContainerWidth] = useState(0);
 
-  const shelfContinuousScroll = useContinuousScroll(shelfScrollRef, isShelfExpanded ? 360 : 300);
-  const createdContinuousScroll = useContinuousScroll(createdGuidesScrollRef, isCreatedGuidesExpanded ? 480 : 360);
-  const savedContinuousScroll = useContinuousScroll(savedGuidesScrollRef, isSavedGuidesExpanded ? 480 : 360);
-  const favoritesContinuousScroll = useContinuousScroll(favoritesScrollRef, isFavoritesExpanded ? 360 : 300);
-
   const updateShelfScrollState = useCallback(() => {
     const el = shelfScrollRef.current;
     if (!el) return;
@@ -339,6 +791,11 @@ export const Profile: React.FC = () => {
     setCanShelfScrollLeft(prev => (prev !== canLeft ? canLeft : prev));
     setCanShelfScrollRight(prev => (prev !== canRight ? canRight : prev));
   }, []);
+
+  const shelfContinuousScroll = useContinuousScroll(shelfScrollRef, isShelfExpanded ? 360 : 300, 14, updateShelfScrollState);
+  const createdContinuousScroll = useContinuousScroll(createdGuidesScrollRef, isCreatedGuidesExpanded ? 480 : 360);
+  const savedContinuousScroll = useContinuousScroll(savedGuidesScrollRef, isSavedGuidesExpanded ? 480 : 360);
+  const favoritesContinuousScroll = useContinuousScroll(favoritesScrollRef, isFavoritesExpanded ? 360 : 300);
 
   const updateCreatedGuidesScrollState = useCallback(() => {
     const el = createdGuidesScrollRef.current;
@@ -1986,58 +2443,94 @@ export const Profile: React.FC = () => {
     }
   }, [getItemShelfStatus, language]);
 
-  const filteredItems = libraryItems
-    .filter(item => {
+  const visualLibraryItems = useMemo<LibraryItem[]>(() => {
+    return libraryItems.filter((item: LibraryItem) => {
       if (item.external_id?.startsWith('cv_issue_')) return false;
-      let matchesMedia = false;
-      if (mediaFilter === 'all') matchesMedia = true;
-      else if (mediaFilter === 'series') matchesMedia = item.item_type === 'series' || item.item_type === 'episode' || item.item_type === 'season';
-      else if (mediaFilter === 'anime') matchesMedia = item.item_type === 'anime';
-      else matchesMedia = item.item_type === mediaFilter;
-      
-      const normalizeSearch = (str: string) => {
-        return str.toLowerCase().replace(/\b(y|and)\b|\s+&\s+/g, ' & ').replace(/\s+/g, ' ').trim();
-      };
-      
-      const normalizedQuery = normalizeSearch(shelfSearchQuery);
-      const matchesSearch = normalizeSearch(item.title).includes(normalizedQuery);
-      
-      const isLoose = isLooseEpisodeOrSeason(item);
-      const isSeriesOrRegular = item.item_type !== 'episode' && item.item_type !== 'season' && !item.external_id?.startsWith('tvm-ep-');
-
-      if (!matchesMedia || !matchesSearch || (!isSeriesOrRegular && !isLoose)) return false;
-
-      // Status subcategory filter (active when a specific category is selected)
-      if (mediaFilter !== 'all' && shelfStatusFilter !== 'all') {
-        const itemStatus = getItemShelfStatus(item);
-        if (itemStatus !== shelfStatusFilter) return false;
-      }
-
-      return true;
-    })
-    .sort((a, b) => {
-      const dateA = new Date(a.completed_at || a.updated_at || 0).getTime();
-      const dateB = new Date(b.completed_at || b.updated_at || 0).getTime();
-      return dateB - dateA;
+      const isLooseType = item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tvm-ep-');
+      if (!isLooseType) return true;
+      const parentTitle = item.last_seen_episode || '';
+      const followsParentSeries = libraryItems.some((li: LibraryItem) => 
+        (li.item_type === 'series' || li.item_type === 'anime') && 
+        (li.title === parentTitle || item.title.startsWith(li.title))
+      );
+      return !followsParentSeries;
     });
+  }, [libraryItems]);
+
+  const filteredItems = useMemo<LibraryItem[]>(() => {
+    return libraryItems
+      .filter((item: LibraryItem) => {
+        if (item.external_id?.startsWith('cv_issue_')) return false;
+        let matchesMedia = false;
+        if (mediaFilter === 'all') matchesMedia = true;
+        else if (mediaFilter === 'series') matchesMedia = item.item_type === 'series' || item.item_type === 'episode' || item.item_type === 'season';
+        else if (mediaFilter === 'anime') matchesMedia = item.item_type === 'anime';
+        else matchesMedia = item.item_type === mediaFilter;
+        
+        const normalizeSearch = (str: string) => {
+          return str.toLowerCase().replace(/\b(y|and)\b|\s+&\s+/g, ' & ').replace(/\s+/g, ' ').trim();
+        };
+        
+        const normalizedQuery = normalizeSearch(shelfSearchQuery);
+        const matchesSearch = normalizeSearch(item.title).includes(normalizedQuery);
+        
+        const isLoose = isLooseEpisodeOrSeason(item);
+        const isSeriesOrRegular = item.item_type !== 'episode' && item.item_type !== 'season' && !item.external_id?.startsWith('tvm-ep-');
+
+        if (!matchesMedia || !matchesSearch || (!isSeriesOrRegular && !isLoose)) return false;
+
+        // Status subcategory filter (active when a specific category is selected)
+        if (mediaFilter !== 'all' && shelfStatusFilter !== 'all') {
+          const itemStatus = getItemShelfStatus(item);
+          if (itemStatus !== shelfStatusFilter) return false;
+        }
+
+        return true;
+      })
+      .sort((a, b) => {
+        const dateA = new Date(a.completed_at || a.updated_at || 0).getTime();
+        const dateB = new Date(b.completed_at || b.updated_at || 0).getTime();
+        return dateB - dateA;
+      });
+  }, [libraryItems, mediaFilter, shelfSearchQuery, shelfStatusFilter, getItemShelfStatus]);
+
+  const categoryItemCounts = useMemo(() => {
+    const counts: Record<string, number> = {
+      all: visualLibraryItems.length,
+      movie: 0,
+      series: 0,
+      anime: 0,
+      book: 0,
+      comic: 0,
+      manga: 0,
+      game: 0
+    };
+    for (const item of visualLibraryItems) {
+      if (item.item_type === 'series' || item.item_type === 'episode' || item.item_type === 'season') {
+        counts.series = (counts.series || 0) + 1;
+      } else if (counts[item.item_type] !== undefined) {
+        counts[item.item_type]++;
+      }
+    }
+    return counts;
+  }, [visualLibraryItems]);
+
+  const visibleSubcategories = useMemo(() => {
+    if (mediaFilter === 'all') return [];
+    const currentMediaItems = visualLibraryItems.filter((item: LibraryItem) => {
+      if (mediaFilter === 'series') return item.item_type === 'series' || item.item_type === 'episode' || item.item_type === 'season';
+      if (mediaFilter === 'anime') return item.item_type === 'anime';
+      return item.item_type === mediaFilter;
+    });
+    const subcategories = getSubcategoriesForMedia(mediaFilter, currentMediaItems);
+    return subcategories.filter((sub: any) => sub.id === 'all' || sub.count > 0);
+  }, [mediaFilter, visualLibraryItems, getSubcategoriesForMedia]);
 
   const isFavorite = selectedItem && libraryItems.some(li =>
     li.item_type === selectedItem.item_type &&
     li.external_id === selectedItem.external_id &&
     li.is_favorite
   );
-
-  const visualLibraryItems = libraryItems.filter(item => {
-    if (item.external_id?.startsWith('cv_issue_')) return false;
-    const isLooseType = item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tvm-ep-');
-    if (!isLooseType) return true;
-    const parentTitle = item.last_seen_episode || '';
-    const followsParentSeries = libraryItems.some(li => 
-      (li.item_type === 'series' || li.item_type === 'anime') && 
-      (li.title === parentTitle || item.title.startsWith(li.title))
-    );
-    return !followsParentSeries;
-  });
 
   if (loading) {
     return (
@@ -2729,13 +3222,7 @@ export const Profile: React.FC = () => {
                   const typeTextColor = type === 'all' ? '#ffffff' : `var(--color-text-${type})`;
                   const isSelected = mediaFilter === type;
 
-                  const typeCount = type === 'all'
-                    ? visualLibraryItems.length
-                    : visualLibraryItems.filter(item => {
-                        if (type === 'series') return item.item_type === 'series' || item.item_type === 'episode' || item.item_type === 'season';
-                        if (type === 'anime') return item.item_type === 'anime';
-                        return item.item_type === type;
-                      }).length;
+                  const typeCount = categoryItemCounts[type] || 0;
 
                   return (
                     <button
@@ -2785,21 +3272,9 @@ export const Profile: React.FC = () => {
             </div>
 
             {/* Subcategories (Status Filters) */}
-            {mediaFilter !== 'all' && (() => {
-              const currentMediaItems = visualLibraryItems.filter(item => {
-                if (mediaFilter === 'series') return item.item_type === 'series' || item.item_type === 'episode' || item.item_type === 'season';
-                if (mediaFilter === 'anime') return item.item_type === 'anime';
-                return item.item_type === mediaFilter;
-              });
-
-              const subcategories = getSubcategoriesForMedia(mediaFilter, currentMediaItems);
-              const visibleSubcategories = subcategories.filter(sub => sub.id === 'all' || sub.count > 0);
-
-              if (visibleSubcategories.length <= 1) return null;
-
-              return (
-                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                  {visibleSubcategories.map(sub => {
+            {mediaFilter !== 'all' && visibleSubcategories.length > 1 && (
+              <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                  {visibleSubcategories.map((sub: any) => {
                     const isSelected = shelfStatusFilter === sub.id;
                     const catColor = `var(--color-${mediaFilter})`;
                     const catTextColor = `var(--color-text-${mediaFilter})`;
@@ -2838,8 +3313,7 @@ export const Profile: React.FC = () => {
                     );
                   })}
                 </div>
-              );
-            })()}
+            )}
             
             <div style={{ width: '100%', maxWidth: '400px' }}>
               <input
@@ -3238,284 +3712,32 @@ export const Profile: React.FC = () => {
                             maskImage: getMaskImage()
                           }}
                         >
-                          {filteredItems.map(item => (
-                            <div
-                              key={item.id}
-                              className="glass-card"
-                              style={{
-                                minWidth: '185px',
-                                maxWidth: '185px',
-                                padding: '0.85rem',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                gap: '0.65rem',
-                                flexShrink: 0
-                              }}
-                            >
-                              <div style={{ position: 'relative', cursor: 'pointer', width: '100%', height: '230px', borderRadius: '8px', overflow: 'hidden' }} onClick={() => handleOpenItemDetails(item)}>
-                                <MediaPoster
-                                  src={item.image_url}
-                                  title={item.title}
-                                  itemType={item.item_type}
-                                  height="100%"
-                                  width="100%"
-                                  borderRadius="8px"
-                                />
-                                
-                                {/* Tag / Category Badge */}
-                                {(() => {
-                                  const isGame = item.item_type === 'game';
-                                  const rawBadge = (item.custom_badge || '').toLowerCase();
-                                  
-                                  const getGameBadgeLabel = (b: string) => {
-                                    if (b === 'collection' || b === 'pack') return language === 'es' ? 'Colección' : 'Collection';
-                                    if (b === 'expansion') return language === 'es' ? 'Expansión' : 'Expansion';
-                                    if (b === 'dlc') return 'DLC';
-                                    if (b === 'edition') return language === 'es' ? 'Edición' : 'Edition';
-                                    if (b === 'remake') return 'Remake';
-                                    if (b === 'remaster') return 'Remaster';
-                                    return null;
-                                  };
-
-                                  const specialGameLabel = isGame ? getGameBadgeLabel(rawBadge) : null;
-
-                                  if (mediaFilter === 'all') {
-                                    const normType = (item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tvm-ep-')) ? 'series' : item.item_type;
-                                    const label = isGame 
-                                      ? (specialGameLabel || (language === 'es' ? 'Juego' : 'Game'))
-                                      : (item.item_type === 'episode' || item.external_id?.startsWith('tvm-ep-'))
-                                      ? (language === 'es' ? 'Serie' : 'Show')
-                                      : item.item_type === 'season'
-                                      ? (language === 'es' ? 'Temporada' : 'Season')
-                                      : item.item_type === 'comic' ? (language === 'es' ? 'Cómic' : 'Comic') : item.item_type === 'manga' ? 'Manga' : t('media' + item.item_type.charAt(0).toUpperCase() + item.item_type.slice(1));
-
-                                    return (
-                                      <div
-                                        className={getTagClass(normType)}
-                                        style={{
-                                          position: "absolute",
-                                          top: "0.5rem",
-                                          left: "0.5rem",
-                                          padding: "0.2rem 0.35rem",
-                                          borderRadius: "4px",
-                                          display: "inline-flex",
-                                          alignItems: "center",
-                                          justifyContent: "center",
-                                          opacity: 0.95,
-                                          backdropFilter: 'blur(4px)',
-                                          zIndex: 1
-                                        }}
-                                        title={label}
-                                      >
-                                        {getCategoryIcon(normType, { size: 14, color: 'currentColor' })}
-                                      </div>
-                                    );
-                                  }
-
-                                  if (isGame && specialGameLabel) {
-                                    return (
-                                      <div className="tag-badge tag-game" style={{ position: "absolute", top: "0.5rem", left: "0.5rem", padding: "0.15rem 0.45rem", borderRadius: "4px", fontSize: "0.7rem", fontWeight: 600, opacity: 0.9, backdropFilter: 'blur(4px)', zIndex: 1 }}>
-                                        {specialGameLabel}
-                                      </div>
-                                    );
-                                  }
-
-                                  return null;
-                                })()}
-                                
-                                {/* Favorite Heart Button (Unified Pink) */}
-                                {(() => {
-                                  const isEffectiveFav = displayedFavorites.some(df => df.id === item.id);
-                                  const isDlcOrExpansion = item.item_type === 'game' && ['dlc', 'expansion'].includes(item.badge || item.custom_badge || '');
-                                  const isUnconsumed = !isDlcOrExpansion && ['plan_to_watch', 'plan_to_read', 'plan_to_play'].includes(item.status);
-                                  return (
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleToggleFavorite(item.id, isEffectiveFav);
-                                      }}
-                                      className={`btn-favorite-heart ${isEffectiveFav ? 'is-favorite' : ''}`}
-                                      style={{
-                                        position: 'absolute',
-                                        top: '0.5rem',
-                                        right: '0.5rem',
-                                        width: '32px',
-                                        height: '32px',
-                                        cursor: isUnconsumed && !isEffectiveFav ? 'not-allowed' : 'pointer',
-                                        opacity: isUnconsumed && !isEffectiveFav ? 0.35 : 1,
-                                        color: isEffectiveFav ? 'var(--color-user, #F472B6)' : 'var(--text-secondary)'
-                                      }}
-                                      title={isUnconsumed && !isEffectiveFav
-                                        ? (language === 'es' ? 'Empieza a consumir esta obra para poder destacarla' : 'Start consuming this item to feature it')
-                                        : (isEffectiveFav
-                                          ? (language === 'es' ? 'Quitar Destacado' : 'Remove Featured')
-                                          : (language === 'es' ? 'Destacar' : 'Favorite'))
-                                      }
-                                    >
-                                      <Heart size={16} fill={isEffectiveFav ? 'var(--color-user, #F472B6)' : 'none'} />
-                                    </button>
-                                  );
-                                })()}
-
-                              </div>
-                              <div style={{ flex: 1, textAlign: 'left', cursor: 'pointer' }} onClick={() => handleOpenItemDetails(item)}>
-                                {(() => {
-                                  const match = (item.title || '').match(/^(.*?)\s*-\s*S(\d+)E(\d+)(.*)$/i);
-                                  const isEpOrSeason = item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tvm-ep-');
-                                  
-                                  if (isEpOrSeason && match) {
-                                    const series = match[1].trim();
-                                    const s = match[2];
-                                    const e = match[3];
-                                    const epName = match[4].replace(/^\s*-\s*/, '').trim();
-                                    const formattedSE = language === 'es' ? `T${s} | E${e}` : `S${s} | E${e}`;
-                                    return (
-                                      <div style={{ display: 'flex', flexDirection: 'column', marginBottom: '0.25rem' }}>
-                                        <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.title}>{series}</h4>
-                                        <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--accent-primary)', marginTop: '0.1rem' }}>{formattedSE}</span>
-                                        {epName && <span style={{ fontSize: '0.78rem', fontWeight: 500, color: 'var(--text-secondary)', marginTop: '0.1rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{epName}</span>}
-                                      </div>
-                                    );
-                                  }
-                                  
-                                  let displayTitle = item.title;
-                                  if (isEpOrSeason && item.last_seen_episode && item.title.toLowerCase().startsWith(item.last_seen_episode.toLowerCase() + ' - ')) {
-                                    displayTitle = item.title.slice(item.last_seen_episode.length + 3);
-                                  }
-                                  
-                                  return (
-                                    <>
-                                      <h4 style={{ margin: '0 0 0.25rem 0', fontSize: '0.92rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.title}>
-                                        {displayTitle}
-                                      </h4>
-                                      {isEpOrSeason && item.last_seen_episode && (
-                                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500, display: 'block', marginTop: '0.1rem' }}>
-                                          {language === 'es' ? 'Serie: ' : 'Show: '}{item.last_seen_episode}
-                                        </span>
-                                      )}
-                                    </>
-                                  );
-                                })()}
-
-                                {/* Unified Badges System */}
-                                <div style={{ marginTop: '0.25rem' }}>
-                                  {renderBadges(item)}
-                                </div>
-
-                                {/* Followed series / comic volume last completed episode or issue */}
-                                {(item.item_type === 'series' || item.item_type === 'anime' || item.item_type === 'comic') && item.last_seen_episode && (
-                                  <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.3rem', marginTop: '0.35rem' }}>
-                                    {(() => {
-                                      let formatted = item.last_seen_episode;
-                                      if (item.item_type === 'comic') {
-                                        const issueMatch = item.last_seen_episode.match(/#(\d+(\.\d+)?)/) || item.last_seen_episode.match(/^(\d+(\.\d+)?)$/);
-                                        if (issueMatch) {
-                                          formatted = `#${issueMatch[1]}`;
-                                        } else if (item.last_seen_episode.startsWith(item.title)) {
-                                          formatted = item.last_seen_episode.slice(item.title.length).trim() || item.last_seen_episode;
-                                        }
-                                      } else {
-                                        const matchSpecialSeason = item.last_seen_episode.match(/S(\d+)\s*[•·-]\s*\[?Especial\]?/i);
-                                        const matchSpecial = item.last_seen_episode.match(/\[?Especial\]?/i);
-                                        const matchExtra = item.last_seen_episode.match(/Extras?\s*(\d+)?/i);
-                                        const match = item.last_seen_episode.match(/S(\d+)E(\d+)/i);
-
-                                        if (match) {
-                                          const s = String(match[1]).padStart(2, '0');
-                                          const e = String(match[2]).padStart(2, '0');
-                                          formatted = language === 'es' ? `T${s} | E${e}` : `S${s} | E${e}`;
-                                        } else if (matchSpecialSeason) {
-                                          const s = String(matchSpecialSeason[1]).padStart(2, '0');
-                                          formatted = language === 'es' ? `T${s} • Especial` : `S${s} • Special`;
-                                        } else if (matchExtra) {
-                                          const epNum = matchExtra[1];
-                                          formatted = epNum ? `Extra ${epNum}` : 'Extra';
-                                        } else if (matchSpecial) {
-                                          formatted = language === 'es' ? 'Especial' : 'Special';
-                                        }
-                                      }
-
-                                      const seriesRuns = item.times_completed || (item.completed_at ? 1 : 0);
-                                      const epRuns = item.last_seen_episode_count || 1;
-                                      const showEpBadge = epRuns > 1 && epRuns !== seriesRuns;
-
-                                      return (
-                                        <>
-                                          <span>{`${language === 'es' ? 'Último: ' : 'Last: '}${formatted}`}</span>
-                                          {showEpBadge && (
-                                            <span style={{
-                                              fontSize: '0.7rem',
-                                              fontWeight: 700,
-                                              color: 'var(--accent-primary)',
-                                              background: 'rgba(99, 102, 241, 0.15)',
-                                              padding: '0.05rem 0.35rem',
-                                              borderRadius: '4px'
-                                            }}>
-                                              {`x${epRuns}`}
-                                            </span>
-                                          )}
-                                        </>
-                                      );
-                                    })()}
-                                  </span>
-                                )}
-
-                                {/* Movie Duration / Watched Time */}
-                                {item.item_type === 'movie' && (item.pages_read || item.total_pages || 0) > 0 && (
-                                  <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '0.25rem', marginTop: '0.2rem' }}>
-                                    <Clock size={12} />
-                                    {(() => {
-                                      const mins = item.pages_read || item.total_pages || 0;
-                                      const h = Math.floor(mins / 60);
-                                      const m = mins % 60;
-                                      return h > 0 ? `${h}h ${m > 0 ? `${String(m).padStart(2, '0')}m` : '00m'}` : `${m}m`;
-                                    })()}
-                                  </span>
-                                )}
-
-                                {/* Game Hours Played */}
-                                {item.item_type === 'game' && (item.pages_read || 0) > 0 && (
-                                  <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '0.25rem', marginTop: '0.2rem' }}>
-                                    <Clock size={12} />
-                                    {Math.floor((item.pages_read || 0) / 60)}h {String((item.pages_read || 0) % 60).padStart(2, '0')}m
-                                  </span>
-                                )}
-
-                                {/* Book / Comic / Manga Pages Read */}
-                                {['book', 'comic', 'manga'].includes(item.item_type) && (!item.tracking_list_id && !item.last_seen_episode) && ((item.pages_read || 0) > 0 || (item.total_pages || 0) > 0) && (
-                                  <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '0.25rem', marginTop: '0.2rem' }}>
-                                    <BookOpen size={12} />
-                                    {(() => {
-                                      const read = item.pages_read || 0;
-                                      const total = item.total_pages || 0;
-                                      if (item.status === 'read' || item.status === 'completed') {
-                                        const count = total > 0 ? total : read;
-                                        return `${count} ${language === 'es' ? (count === 1 ? 'pág.' : 'págs.') : (count === 1 ? 'page' : 'pages')}`;
-                                      }
-                                      if (read > 0 && total > 0) {
-                                        return `${read} / ${total} ${language === 'es' ? 'págs.' : 'pages'}`;
-                                      }
-                                      const count = read > 0 ? read : total;
-                                      return `${count} ${language === 'es' ? (count === 1 ? 'pág.' : 'págs.') : (count === 1 ? 'page' : 'pages')}`;
-                                    })()}
-                                  </span>
-                                )}
-
-                                {/* Formatted Date */}
-                                {(item.completed_at || item.updated_at) && (
-                                  <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontStyle: 'italic', display: 'block', marginTop: '0.3rem' }}>
-                                    {formatDate(new Date(item.completed_at || item.updated_at || new Date()))}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          ))}
+                          {filteredItems.map(item => {
+                            const isEffectiveFav = displayedFavorites.some(df => df.id === item.id);
+                            return (
+                              <ShelfCardItem
+                                key={item.id}
+                                item={item}
+                                mediaFilter={mediaFilter}
+                                isEffectiveFav={isEffectiveFav}
+                                language={language}
+                                t={t}
+                                renderBadges={renderBadges}
+                                onOpenDetails={handleOpenItemDetails}
+                                onToggleFavorite={handleToggleFavorite}
+                                formatDate={formatDate}
+                              />
+                            );
+                          })}
                         </div>
 
                         {/* Right Arrow Button */}
                         <button
                           type="button"
-                          onClick={() => shelfContinuousScroll.handleClick('right', isShelfExpanded ? 360 : 300)}
+                          onClick={() => {
+                            setCanShelfScrollLeft(true);
+                            shelfContinuousScroll.handleClick('right', isShelfExpanded ? 360 : 300);
+                          }}
                           onMouseEnter={handleMouseEnterBtn}
                           onMouseLeave={(e) => {
                             handleMouseLeaveBtn(e);
@@ -3577,159 +3799,18 @@ export const Profile: React.FC = () => {
                       >
                         {filteredItems.map(item => {
                           const isEffectiveFav = displayedFavorites.some(df => df.id === item.id);
-                          const isDlcOrExpansion = item.item_type === 'game' && ['dlc', 'expansion'].includes(item.badge || item.custom_badge || '');
-                          const isUnconsumed = !isDlcOrExpansion && ['plan_to_watch', 'plan_to_read', 'plan_to_play'].includes(item.status);
-
-                          // Prepare title & episode formatted strings
-                          const match = (item.title || '').match(/^(.*?)\s*-\s*S(\d+)E(\d+)(.*)$/i);
-                          const isEpOrSeason = item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tvm-ep-');
-                          let displayTitle = item.title;
-                          let episodeSubtext = '';
-                          if (isEpOrSeason && match) {
-                            displayTitle = match[1].trim();
-                            const s = match[2];
-                            const e = match[3];
-                            const epName = match[4].replace(/^\s*-\s*/, '').trim();
-                            const formattedSE = language === 'es' ? `T${s} | E${e}` : `S${s} | E${e}`;
-                            episodeSubtext = epName ? `${formattedSE} - ${epName}` : formattedSE;
-                          } else if (isEpOrSeason && item.last_seen_episode && item.title.toLowerCase().startsWith(item.last_seen_episode.toLowerCase() + ' - ')) {
-                            displayTitle = item.title.slice(item.last_seen_episode.length + 3);
-                          }
-
-                          // Prepare metadata snippet for Line 2
-                          let metadataSnippet: React.ReactNode = null;
-                          if (item.item_type === 'movie' && (item.pages_read || item.total_pages || 0) > 0) {
-                            const mins = item.pages_read || item.total_pages || 0;
-                            const h = Math.floor(mins / 60);
-                            const m = mins % 60;
-                            metadataSnippet = (
-                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
-                                <Clock size={12} />
-                                {h > 0 ? `${h}h ${m > 0 ? `${String(m).padStart(2, '0')}m` : '00m'}` : `${m}m`}
-                              </span>
-                            );
-                          } else if (item.item_type === 'game' && (item.pages_read || 0) > 0) {
-                            metadataSnippet = (
-                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
-                                <Clock size={12} />
-                                {Math.floor((item.pages_read || 0) / 60)}h {String((item.pages_read || 0) % 60).padStart(2, '0')}m
-                              </span>
-                            );
-                          } else if ((item.item_type === 'series' || item.item_type === 'anime' || item.item_type === 'comic') && item.last_seen_episode) {
-                            let formatted = item.last_seen_episode;
-                            if (item.item_type === 'comic') {
-                              const issueMatch = item.last_seen_episode.match(/#(\d+(\.\d+)?)/) || item.last_seen_episode.match(/^(\d+(\.\d+)?)$/);
-                              if (issueMatch) formatted = `#${issueMatch[1]}`;
-                              else if (item.last_seen_episode.startsWith(item.title)) formatted = item.last_seen_episode.slice(item.title.length).trim() || item.last_seen_episode;
-                            } else {
-                              const matchSE = item.last_seen_episode.match(/S(\d+)E(\d+)/i);
-                              if (matchSE) {
-                                const s = String(matchSE[1]).padStart(2, '0');
-                                const e = String(matchSE[2]).padStart(2, '0');
-                                formatted = language === 'es' ? `T${s} | E${e}` : `S${s} | E${e}`;
-                              }
-                            }
-                            metadataSnippet = (
-                              <span>{`${language === 'es' ? 'Último: ' : 'Last: '}${formatted}`}</span>
-                            );
-                          } else if (['book', 'comic', 'manga'].includes(item.item_type) && (!item.tracking_list_id && !item.last_seen_episode) && ((item.pages_read || 0) > 0 || (item.total_pages || 0) > 0)) {
-                            const read = item.pages_read || 0;
-                            const total = item.total_pages || 0;
-                            const label = (item.status === 'read' || item.status === 'completed')
-                              ? `${total > 0 ? total : read} ${language === 'es' ? 'págs.' : 'pages'}`
-                              : (read > 0 && total > 0)
-                              ? `${read} / ${total} ${language === 'es' ? 'págs.' : 'pages'}`
-                              : `${read > 0 ? read : total} ${language === 'es' ? 'págs.' : 'pages'}`;
-                            metadataSnippet = (
-                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
-                                <BookOpen size={12} />
-                                {label}
-                              </span>
-                            );
-                          }
-
                           return (
-                            <div
+                            <ShelfListItemRow
                               key={item.id}
-                              className="shelf-list-item-row"
-                              onClick={() => handleOpenItemDetails(item)}
-                            >
-                              {/* Left: Poster thumbnail */}
-                              <div style={{ width: '44px', height: '62px', borderRadius: '6px', overflow: 'hidden', flexShrink: 0 }}>
-                                <MediaPoster
-                                  src={item.image_url}
-                                  title={item.title}
-                                  itemType={item.item_type}
-                                  height="100%"
-                                  width="100%"
-                                  borderRadius="6px"
-                                />
-                              </div>
-
-                              {/* Center: 2 Lines of info */}
-                              <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.25rem', textAlign: 'left' }}>
-                                {/* Line 1: Title + category badge if 'all' + status badges on right */}
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0, flex: 1 }}>
-                                    <span style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={item.title}>
-                                      {displayTitle}
-                                    </span>
-                                    {mediaFilter === 'all' && (
-                                      <span
-                                        className={getTagClass((item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tvm-ep-')) ? 'series' : item.item_type)}
-                                        style={{ padding: '0.15rem 0.35rem', borderRadius: '4px', fontSize: '0.7rem', display: 'inline-flex', alignItems: 'center' }}
-                                      >
-                                        {getCategoryIcon((item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tvm-ep-')) ? 'series' : item.item_type, { size: 12, color: 'currentColor' })}
-                                      </span>
-                                    )}
-                                  </div>
-                                  <div style={{ flexShrink: 0 }}>
-                                    {renderBadges(item)}
-                                  </div>
-                                </div>
-
-                                {/* Line 2: Media metadata on left, date on right */}
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                    {episodeSubtext && (
-                                      <span style={{ color: 'var(--accent-primary)', fontWeight: 500 }}>
-                                        {episodeSubtext}
-                                      </span>
-                                    )}
-                                    {metadataSnippet}
-                                  </div>
-                                  {(item.completed_at || item.updated_at) && (
-                                    <span style={{ fontSize: '0.72rem', fontStyle: 'italic', flexShrink: 0 }}>
-                                      {formatDate(new Date(item.completed_at || item.updated_at || new Date()))}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-
-                              {/* Right: Favorite Heart button */}
-                              <div style={{ flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
-                                <button
-                                  type="button"
-                                  onClick={() => handleToggleFavorite(item.id, isEffectiveFav)}
-                                  className={`btn-favorite-heart ${isEffectiveFav ? 'is-favorite' : ''}`}
-                                  style={{
-                                    width: '32px',
-                                    height: '32px',
-                                    cursor: isUnconsumed && !isEffectiveFav ? 'not-allowed' : 'pointer',
-                                    opacity: isUnconsumed && !isEffectiveFav ? 0.35 : 1,
-                                    color: isEffectiveFav ? 'var(--color-user, #F472B6)' : 'var(--text-secondary)'
-                                  }}
-                                  title={isUnconsumed && !isEffectiveFav
-                                    ? (language === 'es' ? 'Empieza a consumir esta obra para poder destacarla' : 'Start consuming this item to feature it')
-                                    : (isEffectiveFav
-                                      ? (language === 'es' ? 'Quitar Destacado' : 'Remove Featured')
-                                      : (language === 'es' ? 'Destacar' : 'Favorite'))
-                                  }
-                                >
-                                  <Heart size={16} fill={isEffectiveFav ? 'var(--color-user, #F472B6)' : 'none'} />
-                                </button>
-                              </div>
-                            </div>
+                              item={item}
+                              mediaFilter={mediaFilter}
+                              isEffectiveFav={isEffectiveFav}
+                              language={language}
+                              renderBadges={renderBadges}
+                              onOpenDetails={handleOpenItemDetails}
+                              onToggleFavorite={handleToggleFavorite}
+                              formatDate={formatDate}
+                            />
                           );
                         })}
                       </div>
