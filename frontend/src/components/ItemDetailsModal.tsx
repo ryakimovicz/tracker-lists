@@ -3451,6 +3451,118 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   ));
   const isItemTracked = isEpisode ? (isComicIssue ? Boolean(selectedItem?.status || isEpisodeCompleted) : isEpisodeCompleted) : Boolean(selectedItem?.id && selectedItem?.status);
 
+  const getEpisodeHeaderInfo = () => {
+    if (!isEpisode) return null;
+    let seriesName = selectedItem?.parent_series?.title || selectedItem?.series_title || selectedItem?.volume_name || '';
+    let seasonNum = selectedItem?.season_number;
+    let episodeNum = selectedItem?.episode_number || selectedItem?.issue_number;
+    let episodeName = selectedItem?.episode_name || '';
+
+    const isComic = selectedItem?.item_type === 'comic' || String(selectedItem?.external_id || '').startsWith('cv_issue_');
+    const rawTitle = selectedItem?.title || '';
+
+    if (isComic) {
+      if (!seriesName && selectedItem?.parent_series?.title) {
+        seriesName = selectedItem.parent_series.title;
+      }
+      let displayTitle = rawTitle;
+      if (seriesName && displayTitle.startsWith(seriesName)) {
+        displayTitle = displayTitle.slice(seriesName.length).trim();
+      }
+      if (episodeNum && displayTitle.startsWith(`#${episodeNum}`)) {
+        displayTitle = displayTitle.replace(new RegExp(`^#${episodeNum}\\s*(-|:)?\\s*`), '').trim();
+      }
+      const issueBadge = episodeNum ? `#${episodeNum}` : (language === 'es' ? 'Número individual' : 'Issue');
+      return {
+        seriesName: seriesName || (selectedItem?.parent_series ? selectedItem.parent_series.title : null),
+        seasonNum: 1,
+        episodeNum,
+        seasonBadge: issueBadge,
+        episodeName: displayTitle || (language === 'es' ? `Número #${episodeNum || 1}` : `Issue #${episodeNum || 1}`)
+      };
+    }
+
+    const matchSpecialWithSeason = rawTitle.match(/^(.*?)\s*-\s*S(\d+)\s*[•·-]\s*\[?Especial\]?\s*-\s*(.*)$/i);
+    const matchSpecialSimple = rawTitle.match(/^(.*?)\s*-\s*\[?Especial\]?\s*-\s*(.*)$/i);
+    const matchExtra = rawTitle.match(/^(.*?)\s*-\s*Extras?\s*(\d+)?\s*-\s*(.*)$/i);
+    const matchFull = rawTitle.match(/^(.*?)\s*-\s*S(\d+)E(\d+)\s*-\s*(.*)$/i);
+
+    let isSpecial = selectedItem?.is_significant_special || selectedItem?.ep_type === 'significant_special' || (!episodeNum && seasonNum === 0);
+    let isExtra = selectedItem?.is_extra || selectedItem?.ep_type === 'insignificant_special' || (seasonNum === 0 && !selectedItem?.is_significant_special && selectedItem?.ep_type !== 'significant_special');
+
+    if (matchSpecialWithSeason) {
+      if (!seriesName) seriesName = matchSpecialWithSeason[1].trim();
+      if (!seasonNum) seasonNum = parseInt(matchSpecialWithSeason[2], 10);
+      episodeName = matchSpecialWithSeason[3].trim();
+      isSpecial = true;
+    } else if (matchSpecialSimple) {
+      if (!seriesName) seriesName = matchSpecialSimple[1].trim();
+      episodeName = matchSpecialSimple[2].trim();
+      isSpecial = true;
+    } else if (matchExtra) {
+      if (!seriesName) seriesName = matchExtra[1].trim();
+      if (!episodeNum && matchExtra[2]) episodeNum = parseInt(matchExtra[2], 10);
+      episodeName = matchExtra[3].trim();
+      isExtra = true;
+    } else if (matchFull) {
+      if (!seriesName) seriesName = matchFull[1].trim();
+      if (!seasonNum) seasonNum = parseInt(matchFull[2], 10);
+      if (!episodeNum) episodeNum = parseInt(matchFull[3], 10);
+      if (!episodeName) episodeName = matchFull[4].trim();
+    } else {
+      const matchSimple = rawTitle.match(/^(.*?)\s*-\s*S(\d+)E(\d+)/i);
+      if (matchSimple) {
+        if (!seriesName) seriesName = matchSimple[1].trim();
+        if (!seasonNum) seasonNum = parseInt(matchSimple[2], 10);
+        if (!episodeNum) episodeNum = parseInt(matchSimple[3], 10);
+      }
+    }
+
+    if (!episodeName && rawTitle) {
+      episodeName = rawTitle;
+    }
+
+    if (episodeName) {
+      if (seriesName && episodeName.startsWith(seriesName)) {
+        const afterSeries = episodeName.slice(seriesName.length);
+        if (/^\s*[-•·]\s*/.test(afterSeries)) {
+          episodeName = afterSeries.replace(/^\s*[-•·]\s*/, '').trim();
+        }
+      }
+      episodeName = episodeName
+        .replace(/^S\d+\s*[•·-]\s*\[?Especial\]?\s*-\s*/i, '')
+        .replace(/^\[?Especial\]?\s*-\s*/i, '')
+        .replace(/^Extras?\s*\d*\s*-\s*/i, '')
+        .replace(/^Extras?\s*-\s*/i, '')
+        .replace(/^S\d+E\d+\s*-\s*/i, '')
+        .trim();
+    }
+    if (!episodeName) {
+      episodeName = language === 'es' ? 'Episodio sin título' : 'Untitled Episode';
+    }
+
+    let seasonBadge: string | null = null;
+    if (isExtra) {
+      seasonBadge = episodeNum ? (language === 'es' ? `Extra ${episodeNum}` : `Extra ${episodeNum}`) : (language === 'es' ? 'Extra' : 'Extra');
+    } else if (isSpecial) {
+      seasonBadge = seasonNum && seasonNum > 0
+        ? (language === 'es' ? `Temporada ${seasonNum} • Especial` : `Season ${seasonNum} • Special`)
+        : (language === 'es' ? 'Especial' : 'Special');
+    } else if (seasonNum !== undefined && seasonNum !== null && episodeNum !== undefined && episodeNum !== null) {
+      seasonBadge = language === 'es' ? `Temporada ${seasonNum} • Episodio ${episodeNum}` : `Season ${seasonNum} • Episode ${episodeNum}`;
+    }
+
+    return {
+      seriesName: seriesName || (selectedItem?.parent_series ? selectedItem.parent_series.title : null),
+      seasonNum,
+      episodeNum,
+      seasonBadge,
+      episodeName
+    };
+  };
+
+  const epHeaderInfo = isEpisode ? getEpisodeHeaderInfo() : null;
+
   const handleSaveReview = async (ratingVal: number, customContent?: string) => {
     if (!selectedItem || !selectedItem.external_id || !isItemTracked) return;
     const textToSave = customContent !== undefined ? customContent : userComment;
@@ -3459,11 +3571,46 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     setUserRating(ratingVal);
     setUserComment(textToSave);
     try {
+      let resolvedItemTitle: string | null = null;
+      let resolvedImageUrl: string | null = selectedItem.image_url || selectedItem.poster_path || selectedItem.parent_series?.image_url || null;
+      let reviewMeta: Record<string, any> | null = null;
+
+      if (isEpisode) {
+        const info = getEpisodeHeaderInfo();
+        if (info) {
+          if (isComicIssue) {
+            resolvedItemTitle = `${info.seriesName || selectedItem.title || ''} ${info.seasonBadge || ''}${info.episodeName ? ` - ${info.episodeName}` : ''}`.trim();
+          } else {
+            const sNum = info.seasonNum || 1;
+            const eNum = info.episodeNum || 1;
+            const sPadded = sNum < 10 ? `0${sNum}` : `${sNum}`;
+            const ePadded = eNum < 10 ? `0${eNum}` : `${eNum}`;
+            resolvedItemTitle = `${info.seriesName || ''} - S${sPadded}E${ePadded}${info.episodeName ? ` - ${info.episodeName}` : ''}`.trim();
+          }
+          reviewMeta = {
+            show_name: info.seriesName || null,
+            series_title: info.seriesName || null,
+            series_external_id: selectedItem.parent_series?.external_id || null,
+            season_number: info.seasonNum || null,
+            episode_number: info.episodeNum || null,
+            issue_number: info.episodeNum || null,
+            episode_name: info.episodeName || null,
+            is_single_episode: !isComicIssue
+          };
+        }
+      }
+      if (!resolvedItemTitle) {
+        resolvedItemTitle = selectedItem.title || null;
+      }
+
       const res = await apiClient.post(`/reviews/${selectedItem.item_type}/${selectedItem.external_id}`, {
         rating: ratingVal > 0 ? ratingVal : null,
         content: textToSave.trim() ? textToSave : null,
         media_url: null,
-        media_type: null
+        media_type: null,
+        item_title: resolvedItemTitle,
+        image_url: resolvedImageUrl,
+        metadata_json: reviewMeta ? JSON.stringify(reviewMeta) : null
       });
       if (res.data) {
         setItemReviews(prev => {
@@ -3521,11 +3668,46 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     if (!selectedItem || !selectedItem.external_id || (!hasText && !hasMedia) || isPostingComment) return;
     setIsPostingComment(true);
     try {
+      let resolvedItemTitle: string | null = null;
+      let resolvedImageUrl: string | null = selectedItem.image_url || selectedItem.poster_path || selectedItem.parent_series?.image_url || null;
+      let reviewMeta: Record<string, any> | null = null;
+
+      if (isEpisode) {
+        const info = getEpisodeHeaderInfo();
+        if (info) {
+          if (isComicIssue) {
+            resolvedItemTitle = `${info.seriesName || selectedItem.title || ''} ${info.seasonBadge || ''}${info.episodeName ? ` - ${info.episodeName}` : ''}`.trim();
+          } else {
+            const sNum = info.seasonNum || 1;
+            const eNum = info.episodeNum || 1;
+            const sPadded = sNum < 10 ? `0${sNum}` : `${sNum}`;
+            const ePadded = eNum < 10 ? `0${eNum}` : `${eNum}`;
+            resolvedItemTitle = `${info.seriesName || ''} - S${sPadded}E${ePadded}${info.episodeName ? ` - ${info.episodeName}` : ''}`.trim();
+          }
+          reviewMeta = {
+            show_name: info.seriesName || null,
+            series_title: info.seriesName || null,
+            series_external_id: selectedItem.parent_series?.external_id || null,
+            season_number: info.seasonNum || null,
+            episode_number: info.episodeNum || null,
+            issue_number: info.episodeNum || null,
+            episode_name: info.episodeName || null,
+            is_single_episode: !isComicIssue
+          };
+        }
+      }
+      if (!resolvedItemTitle) {
+        resolvedItemTitle = selectedItem.title || null;
+      }
+
       const res = await apiClient.post(`/reviews/${selectedItem.item_type}/${selectedItem.external_id}`, {
         content: hasText ? newCommentText.trim() : null,
         media_url: newCommentMedia?.url || null,
         media_type: newCommentMedia?.type || null,
-        is_comment: true
+        is_comment: true,
+        item_title: resolvedItemTitle,
+        image_url: resolvedImageUrl,
+        metadata_json: reviewMeta ? JSON.stringify(reviewMeta) : null
       });
       setItemReviews(prev => {
         const exists = prev.some(r => r.id === res.data.id);
@@ -4515,9 +4697,23 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       const url = action ? `/lists/${effectiveListId}/toggle-series-episode?action=${action}` : `/lists/${effectiveListId}/toggle-series-episode`;
       const isComic = selectedItem?.item_type === 'comic' || String(selectedItem?.external_id || '').startsWith('cv_vol_');
       const epIdToSend = isComic ? (String(ep.id).startsWith('cv_') ? ep.id : `cv_issue_${ep.id}`) : ep.id;
+      
+      let epTitleToSend = ep.title;
+      if (!epTitleToSend) {
+        if (isComic) {
+          epTitleToSend = `${selectedItem.title} ${ep.name || `#${ep.issue_number || 1}`}`;
+        } else {
+          const sNum = ep.season_number || 1;
+          const eNum = ep.episode_number ?? ep.issue_number ?? 1;
+          const sPad = String(sNum).padStart(2, '0');
+          const ePad = String(eNum).padStart(2, '0');
+          epTitleToSend = `${selectedItem.title} - S${sPad}E${ePad} - ${ep.name || ep.episode_name || 'Untitled Episode'}`;
+        }
+      }
+
       const res = await apiClient.post(url, {
         episode_id: epIdToSend,
-        title: ep.title || (isComic ? `${selectedItem.title} ${ep.name || `#${ep.issue_number || 1}`}` : `${selectedItem.title} - ${ep.name || 'Untitled Episode'}`),
+        title: epTitleToSend,
         image_url: ep.image_url || ep.image?.original || ep.image?.medium || ep.still_path || selectedItem.image_url,
         overview: ep.custom_notes || ep.overview,
         season_number: ep.season_number || 1,
@@ -4590,119 +4786,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   const ratings = (itemReviews || []).filter(r => r.rating !== null && r.rating !== 0).map(r => r.rating);
   const avgRating = ratings.length > 0 ? (ratings.reduce((a: number, b: number) => a + b, 0) / ratings.length).toFixed(1) : null;
 
-  const getEpisodeHeaderInfo = () => {
-    if (!isEpisode) return null;
-    let seriesName = selectedItem.parent_series?.title || selectedItem.series_title || selectedItem.volume_name || '';
-    let seasonNum = selectedItem.season_number;
-    let episodeNum = selectedItem.episode_number || selectedItem.issue_number;
-    let episodeName = selectedItem.episode_name || '';
 
-    const isComic = selectedItem.item_type === 'comic' || String(selectedItem.external_id || '').startsWith('cv_issue_');
-    const rawTitle = selectedItem.title || '';
-
-    if (isComic) {
-      if (!seriesName && selectedItem.parent_series?.title) {
-        seriesName = selectedItem.parent_series.title;
-      }
-      // If rawTitle contains issue number or volume title, clean it up
-      let displayTitle = rawTitle;
-      if (seriesName && displayTitle.startsWith(seriesName)) {
-        displayTitle = displayTitle.slice(seriesName.length).trim();
-      }
-      if (episodeNum && displayTitle.startsWith(`#${episodeNum}`)) {
-        displayTitle = displayTitle.replace(new RegExp(`^#${episodeNum}\\s*(-|:)?\\s*`), '').trim();
-      }
-      const issueBadge = episodeNum ? `#${episodeNum}` : (language === 'es' ? 'Número individual' : 'Issue');
-      return {
-        seriesName: seriesName || (selectedItem.parent_series ? selectedItem.parent_series.title : null),
-        seasonNum: 1,
-        episodeNum,
-        seasonBadge: issueBadge,
-        episodeName: displayTitle || (language === 'es' ? `Número #${episodeNum || 1}` : `Issue #${episodeNum || 1}`)
-      };
-    }
-
-    // Check special and extra formats
-    const matchSpecialWithSeason = rawTitle.match(/^(.*?)\s*-\s*S(\d+)\s*[•·-]\s*\[?Especial\]?\s*-\s*(.*)$/i);
-    const matchSpecialSimple = rawTitle.match(/^(.*?)\s*-\s*\[?Especial\]?\s*-\s*(.*)$/i);
-    const matchExtra = rawTitle.match(/^(.*?)\s*-\s*Extras?\s*(\d+)?\s*-\s*(.*)$/i);
-    const matchFull = rawTitle.match(/^(.*?)\s*-\s*S(\d+)E(\d+)\s*-\s*(.*)$/i);
-
-    let isSpecial = selectedItem.is_significant_special || selectedItem.ep_type === 'significant_special' || (!episodeNum && seasonNum === 0);
-    let isExtra = selectedItem.is_extra || selectedItem.ep_type === 'insignificant_special' || (seasonNum === 0 && !selectedItem.is_significant_special && selectedItem.ep_type !== 'significant_special');
-
-    if (matchSpecialWithSeason) {
-      if (!seriesName) seriesName = matchSpecialWithSeason[1].trim();
-      if (!seasonNum) seasonNum = parseInt(matchSpecialWithSeason[2], 10);
-      episodeName = matchSpecialWithSeason[3].trim();
-      isSpecial = true;
-    } else if (matchSpecialSimple) {
-      if (!seriesName) seriesName = matchSpecialSimple[1].trim();
-      episodeName = matchSpecialSimple[2].trim();
-      isSpecial = true;
-    } else if (matchExtra) {
-      if (!seriesName) seriesName = matchExtra[1].trim();
-      if (!episodeNum && matchExtra[2]) episodeNum = parseInt(matchExtra[2], 10);
-      episodeName = matchExtra[3].trim();
-      isExtra = true;
-    } else if (matchFull) {
-      if (!seriesName) seriesName = matchFull[1].trim();
-      if (!seasonNum) seasonNum = parseInt(matchFull[2], 10);
-      if (!episodeNum) episodeNum = parseInt(matchFull[3], 10);
-      if (!episodeName) episodeName = matchFull[4].trim();
-    } else {
-      const matchSimple = rawTitle.match(/^(.*?)\s*-\s*S(\d+)E(\d+)/i);
-      if (matchSimple) {
-        if (!seriesName) seriesName = matchSimple[1].trim();
-        if (!seasonNum) seasonNum = parseInt(matchSimple[2], 10);
-        if (!episodeNum) episodeNum = parseInt(matchSimple[3], 10);
-      }
-    }
-
-    if (!episodeName && rawTitle) {
-      episodeName = rawTitle;
-    }
-
-    if (episodeName) {
-      if (seriesName && episodeName.startsWith(seriesName)) {
-        const afterSeries = episodeName.slice(seriesName.length);
-        if (/^\s*[-•·]\s*/.test(afterSeries)) {
-          episodeName = afterSeries.replace(/^\s*[-•·]\s*/, '').trim();
-        }
-      }
-      episodeName = episodeName
-        .replace(/^S\d+\s*[•·-]\s*\[?Especial\]?\s*-\s*/i, '')
-        .replace(/^\[?Especial\]?\s*-\s*/i, '')
-        .replace(/^Extras?\s*\d*\s*-\s*/i, '')
-        .replace(/^Extras?\s*-\s*/i, '')
-        .replace(/^S\d+E\d+\s*-\s*/i, '')
-        .trim();
-    }
-    if (!episodeName) {
-      episodeName = language === 'es' ? 'Episodio sin título' : 'Untitled Episode';
-    }
-
-    let seasonBadge: string | null = null;
-    if (isExtra) {
-      seasonBadge = episodeNum ? (language === 'es' ? `Extra ${episodeNum}` : `Extra ${episodeNum}`) : (language === 'es' ? 'Extra' : 'Extra');
-    } else if (isSpecial) {
-      seasonBadge = seasonNum && seasonNum > 0
-        ? (language === 'es' ? `Temporada ${seasonNum} • Especial` : `Season ${seasonNum} • Special`)
-        : (language === 'es' ? 'Especial' : 'Special');
-    } else if (seasonNum !== undefined && seasonNum !== null && episodeNum !== undefined && episodeNum !== null) {
-      seasonBadge = language === 'es' ? `Temporada ${seasonNum} • Episodio ${episodeNum}` : `Season ${seasonNum} • Episode ${episodeNum}`;
-    }
-
-    return {
-      seriesName: seriesName || (selectedItem.parent_series ? selectedItem.parent_series.title : null),
-      seasonNum,
-      episodeNum,
-      seasonBadge,
-      episodeName
-    };
-  };
-
-  const epHeaderInfo = isEpisode ? getEpisodeHeaderInfo() : null;
 
   const getModalTheme = () => {
     let cat = selectedItem?.item_type || 'movie';

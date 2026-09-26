@@ -1176,17 +1176,31 @@ def get_my_activity(
 
     res = []
     for act in activities:
+        final_title = act.item_title
         img = act.image_url
+
+        is_tvm_ep = (act.external_id and str(act.external_id).startswith('tvm-ep-')) or act.item_type == 'episode'
+        is_cv_issue = (act.external_id and str(act.external_id).startswith('cv_issue_'))
+        has_raw_title = bool(not final_title or (final_title.startswith('Episode (') and final_title.endswith(')')) or (final_title.startswith('Comic (') and final_title.endswith(')')))
+
+        if is_tvm_ep or is_cv_issue:
+            li = db.query(ListItem).filter(ListItem.external_id == act.external_id).first()
+            if li:
+                if has_raw_title and li.title:
+                    final_title = li.title
+                if li.image_url:
+                    img = li.image_url
+
         if not img and act.activity_type.startswith('item_'):
             if act.external_id:
                 img = lib_by_ext.get(act.external_id) or list_item_by_ext.get(act.external_id)
-            if not img and act.item_title:
-                img = lib_by_title.get(act.item_title.strip().lower())
+            if not img and final_title:
+                img = lib_by_title.get(final_title.strip().lower())
 
         res.append({
             "id": act.id,
             "activity_type": act.activity_type,
-            "item_title": act.item_title,
+            "item_title": final_title,
             "item_type": act.item_type,
             "external_id": act.external_id,
             "list_id": act.list_id,
@@ -1378,6 +1392,20 @@ def get_user_activity(
     res = []
     for act in activities:
         final_title = act.item_title
+        img = act.image_url
+
+        is_tvm_ep = (act.external_id and str(act.external_id).startswith('tvm-ep-')) or act.item_type == 'episode'
+        is_cv_issue = (act.external_id and str(act.external_id).startswith('cv_issue_'))
+        has_raw_title = bool(not final_title or (final_title.startswith('Episode (') and final_title.endswith(')')) or (final_title.startswith('Comic (') and final_title.endswith(')')))
+
+        if is_tvm_ep or is_cv_issue:
+            li = db.query(ListItem).filter(ListItem.external_id == act.external_id).first()
+            if li:
+                if has_raw_title and li.title:
+                    final_title = li.title
+                if li.image_url:
+                    img = li.image_url
+
         if act.item_type == 'series' and act.external_id and act.external_id.startswith('tvm_'):
             clean_show_id = act.external_id.replace('tvm_', '')
             if clean_show_id.isdigit():
@@ -1385,12 +1413,11 @@ def get_user_activity(
                 if loc_name:
                     final_title = loc_name
         
-        img = act.image_url
         if not img and act.activity_type.startswith('item_'):
             if act.external_id:
                 img = lib_by_ext.get(act.external_id) or list_item_by_ext.get(act.external_id)
-            if not img and act.item_title:
-                img = lib_by_title.get(act.item_title.strip().lower())
+            if not img and final_title:
+                img = lib_by_title.get(final_title.strip().lower())
 
         res.append({
             "id": act.id,

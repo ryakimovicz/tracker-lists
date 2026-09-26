@@ -277,38 +277,6 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
     }
   };
 
-  // Parse episode title into structured parts if formatted like "Series Name - S02E08 - Episode Name"
-  const parseEpisodeInfo = (title?: string | null) => {
-    if (!title) return null;
-    const match = title.match(/^(.*?)\s*-\s*[sS](\d+)[eE](\d+)\s*-\s*(.*)$/);
-    if (match) {
-      const seriesName = match[1].trim();
-      const seasonNum = parseInt(match[2], 10);
-      const episodeNum = parseInt(match[3], 10);
-      const sPadded = seasonNum < 10 ? `0${seasonNum}` : `${seasonNum}`;
-      const ePadded = episodeNum < 10 ? `0${episodeNum}` : `${episodeNum}`;
-      const epCode = isEs ? `T${sPadded} | E${ePadded}` : `S${sPadded} | E${ePadded}`;
-      const episodeName = match[4].trim();
-      return { seriesName, epCode, episodeName };
-    }
-    return null;
-  };
-
-  // Parse comic issue if formatted like "Series Name #12" or "Series Name #12 - Title" or "Series Name #12.5"
-  const parseComicIssueInfo = (title?: string | null) => {
-    if (!title) return null;
-    const isComic = (activity.item_type || meta.item_type) === 'comic' || (activity.item_type || meta.item_type) === 'manga';
-    if (!isComic) return null;
-    const match = title.match(/^(.*?)\s*#(\d+(?:\.\d+)?)(?:\s*-\s*(.*))?$/);
-    if (match) {
-      const seriesName = match[1].trim();
-      const issueNum = match[2].trim();
-      const issueTitle = match[3]?.trim();
-      return { seriesName, issueCode: `#${issueNum}`, issueTitle };
-    }
-    return null;
-  };
-
   // Parse metadata if present
   const meta = React.useMemo(() => {
     if (!activity.metadata_json) return {} as Record<string, any>;
@@ -318,6 +286,109 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
       return {} as Record<string, any>;
     }
   }, [activity.metadata_json]);
+
+  // Parse episode title into structured parts
+  const parseEpisodeInfo = (title?: string | null) => {
+    const rawText = (title || '').trim();
+    const isEp = (activity.item_type || meta.item_type) === 'series' ||
+      (activity.item_type || meta.item_type) === 'anime' ||
+      (activity.item_type || meta.item_type) === 'episode' ||
+      (activity.external_id && String(activity.external_id).startsWith('tvm-ep-')) ||
+      meta.is_single_episode;
+
+    if (!rawText && !isEp) return null;
+
+    const match = rawText.match(/^(?:(.*?)\s*-\s*)?[sS](\d+)[eE](\d+)(?:\s*-\s*(.*))?$/);
+    if (match) {
+      const seriesName = (match[1] || meta.show_name || meta.series_title || '').trim();
+      const seasonNum = parseInt(match[2], 10);
+      const episodeNum = parseInt(match[3], 10);
+      const sPadded = seasonNum < 10 ? `0${seasonNum}` : `${seasonNum}`;
+      const ePadded = episodeNum < 10 ? `0${episodeNum}` : `${episodeNum}`;
+      const epCode = isEs ? `T${sPadded} | E${ePadded}` : `S${sPadded} | E${ePadded}`;
+      const episodeName = (match[4] || '').trim();
+      return { seriesName, epCode, episodeName };
+    }
+
+    // Fallback: check metadata for season & episode numbers
+    if (meta.season_number && meta.episode_number) {
+      const seasonNum = parseInt(String(meta.season_number), 10);
+      const episodeNum = parseInt(String(meta.episode_number), 10);
+      const sPadded = seasonNum < 10 ? `0${seasonNum}` : `${seasonNum}`;
+      const ePadded = episodeNum < 10 ? `0${episodeNum}` : `${episodeNum}`;
+      const epCode = isEs ? `T${sPadded} | E${ePadded}` : `S${sPadded} | E${ePadded}`;
+      let seriesName = (meta.show_name || meta.series_title || '').trim();
+      let episodeName = '';
+
+      if (!seriesName && rawText.includes(' - ')) {
+        seriesName = rawText.split(' - ')[0].trim();
+      }
+      if (rawText.includes(' - ')) {
+        episodeName = rawText.split(' - ').slice(1).join(' - ').trim();
+      } else if (!rawText.startsWith('Episode (')) {
+        episodeName = rawText;
+      }
+
+      return { seriesName, epCode, episodeName };
+    }
+
+    // Fallback for "Series - Episode Name" when it's an episode activity
+    if (isEp && rawText.includes(' - ') && !rawText.startsWith('Episode (')) {
+      const parts = rawText.split(' - ');
+      const seriesName = (meta.show_name || meta.series_title || parts[0]).trim();
+      const episodeName = parts.slice(1).join(' - ').trim();
+      return { seriesName, epCode: '', episodeName };
+    }
+
+    // Fallback for "Episode (tvm-ep-XXXX)"
+    if (isEp && (rawText.startsWith('Episode (') || !rawText) && (meta.show_name || meta.series_title)) {
+      return {
+        seriesName: (meta.show_name || meta.series_title).trim(),
+        epCode: '',
+        episodeName: isEs ? 'un episodio' : 'an episode'
+      };
+    }
+
+    return null;
+  };
+
+  // Parse comic issue into structured parts
+  const parseComicIssueInfo = (title?: string | null) => {
+    const rawText = (title || '').trim();
+    const isComic = (activity.item_type || meta.item_type) === 'comic' ||
+      (activity.item_type || meta.item_type) === 'manga' ||
+      (activity.external_id && String(activity.external_id).startsWith('cv_issue_'));
+
+    if (!rawText && !isComic) return null;
+
+    const match = rawText.match(/^(.*?)\s*#(\d+(?:\.\d+)?)(?:\s*-\s*(.*))?$/);
+    if (match) {
+      const seriesName = (match[1] || meta.series_title || meta.volume_title || '').trim();
+      const issueNum = match[2].trim();
+      const issueTitle = match[3]?.trim();
+      return { seriesName, issueCode: `#${issueNum}`, issueTitle };
+    }
+
+    if (meta.issue_number) {
+      const issueCode = `#${meta.issue_number}`;
+      const seriesName = (meta.series_title || meta.volume_title || '').trim();
+      let issueTitle = '';
+      if (!rawText.startsWith('Comic (')) {
+        issueTitle = rawText;
+      }
+      return { seriesName, issueCode, issueTitle };
+    }
+
+    if (isComic && (rawText.startsWith('Comic (') || !rawText) && (meta.series_title || meta.volume_title)) {
+      return {
+        seriesName: (meta.series_title || meta.volume_title).trim(),
+        issueCode: '',
+        issueTitle: isEs ? 'un número' : 'an issue'
+      };
+    }
+
+    return null;
+  };
 
   const parsedEpisode = parseEpisodeInfo(activity.item_title);
   const parsedComicIssue = !parsedEpisode && !meta.is_range ? parseComicIssueInfo(activity.item_title) : null;
@@ -599,33 +670,51 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
               );
             })()
           ) : parsedEpisode ? (
-            <>
-              <span style={{ marginRight: '0.35rem' }}>{isEs ? 'Vio el' : 'Watched'}</span>
-              <span style={{ fontWeight: 600, color: 'var(--text-primary)', marginRight: '0.35rem' }}>
-                {parsedEpisode.epCode}
-              </span>
-              {parsedEpisode.episodeName && (
-                <span style={{ color: 'var(--text-secondary)', marginRight: '0.35rem' }}>
-                  ({parsedEpisode.episodeName})
-                </span>
-              )}
-              <span style={{ marginRight: '0.35rem' }}>{isEs ? 'de' : 'of'}</span>
-              {renderTitleWithBadge(parsedEpisode.seriesName)}
-            </>
+            (() => {
+              const verb = activity.activity_type === 'item_rated'
+                ? (isEs ? 'Calificó el' : 'Rated')
+                : activity.activity_type === 'item_reviewed'
+                ? (isEs ? 'Reseñó el' : 'Reviewed')
+                : (isEs ? 'Vio el' : 'Watched');
+              return (
+                <>
+                  <span style={{ marginRight: '0.35rem' }}>{verb}</span>
+                  <span style={{ fontWeight: 600, color: 'var(--text-primary)', marginRight: '0.35rem' }}>
+                    {parsedEpisode.epCode}
+                  </span>
+                  {parsedEpisode.episodeName && (
+                    <span style={{ color: 'var(--text-secondary)', marginRight: '0.35rem' }}>
+                      ({parsedEpisode.episodeName})
+                    </span>
+                  )}
+                  <span style={{ marginRight: '0.35rem' }}>{isEs ? 'de' : 'of'}</span>
+                  {renderTitleWithBadge(parsedEpisode.seriesName)}
+                </>
+              );
+            })()
           ) : parsedComicIssue ? (
-            <>
-              <span style={{ marginRight: '0.35rem' }}>{isEs ? 'Leyó el' : 'Read'}</span>
-              <span style={{ fontWeight: 600, color: 'var(--text-primary)', marginRight: '0.35rem' }}>
-                {parsedComicIssue.issueCode}
-              </span>
-              {parsedComicIssue.issueTitle && (
-                <span style={{ color: 'var(--text-secondary)', marginRight: '0.35rem' }}>
-                  ({parsedComicIssue.issueTitle})
-                </span>
-              )}
-              <span style={{ marginRight: '0.35rem' }}>{isEs ? 'de' : 'of'}</span>
-              {renderTitleWithBadge(parsedComicIssue.seriesName)}
-            </>
+            (() => {
+              const verb = activity.activity_type === 'item_rated'
+                ? (isEs ? 'Calificó el' : 'Rated')
+                : activity.activity_type === 'item_reviewed'
+                ? (isEs ? 'Reseñó el' : 'Reviewed')
+                : (isEs ? 'Leyó el' : 'Read');
+              return (
+                <>
+                  <span style={{ marginRight: '0.35rem' }}>{verb}</span>
+                  <span style={{ fontWeight: 600, color: 'var(--text-primary)', marginRight: '0.35rem' }}>
+                    {parsedComicIssue.issueCode}
+                  </span>
+                  {parsedComicIssue.issueTitle && (
+                    <span style={{ color: 'var(--text-secondary)', marginRight: '0.35rem' }}>
+                      ({parsedComicIssue.issueTitle})
+                    </span>
+                  )}
+                  <span style={{ marginRight: '0.35rem' }}>{isEs ? 'de' : 'of'}</span>
+                  {renderTitleWithBadge(parsedComicIssue.seriesName)}
+                </>
+              );
+            })()
           ) : (
             <>
               <span style={{ marginRight: '0.35rem' }}>{getActionPhrase()}</span>

@@ -9,6 +9,9 @@ class MediaReviewCreate(BaseModel):
     media_type: Optional[str] = Field(None, description="Optional media type (gif, sticker, meme, clip)")
     parent_id: Optional[int] = Field(None, description="Parent review ID if this is a reply")
     is_comment: Optional[bool] = Field(False, description="True if this is a community comment, not an official review")
+    item_title: Optional[str] = Field(None, description="Resolved title of the item or episode/issue")
+    image_url: Optional[str] = Field(None, description="Resolved image/poster/cover URL")
+    metadata_json: Optional[str] = Field(None, description="Optional JSON metadata dictionary for episodes/issues")
 
 class MediaReviewResponse(BaseModel):
     id: int

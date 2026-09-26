@@ -6373,6 +6373,100 @@ const ProfileActivityCardItem: React.FC<ProfileActivityCardItemProps> = ({
     );
   };
 
+  const formatEpisodeString = (rawText: string, showHint?: string): React.ReactNode => {
+    const match = rawText.match(/^(?:(.*?)\s*-\s*)?S(\d+)E(\d+)(?:\s*-\s*(.*))?$/i);
+    let extractedShow = (showHint || '').trim();
+    let sNum: number | null = null;
+    let eNum: number | null = null;
+    let epName = '';
+
+    if (match) {
+      extractedShow = (match[1] || showHint || '').trim();
+      sNum = parseInt(match[2], 10);
+      eNum = parseInt(match[3], 10);
+      epName = (match[4] || '').trim();
+    } else if (meta.season_number && meta.episode_number) {
+      sNum = parseInt(String(meta.season_number), 10);
+      eNum = parseInt(String(meta.episode_number), 10);
+      extractedShow = (meta.show_name || meta.series_title || showHint || '').trim();
+      if (!extractedShow && rawText.includes(' - ')) {
+        extractedShow = rawText.split(' - ')[0].trim();
+      }
+      if (rawText.includes(' - ')) {
+        const parts = rawText.split(' - ');
+        epName = parts.slice(1).join(' - ').trim();
+      } else if (!rawText.startsWith('Episode (')) {
+        epName = rawText.trim();
+      }
+    } else if (rawText.includes(' - ') && !rawText.startsWith('Episode (')) {
+      const parts = rawText.split(' - ');
+      const candidateShow = parts[0].trim();
+      const candidateEp = parts.slice(1).join(' - ').trim();
+      const finalShow = extractedShow || candidateShow;
+      if (finalShow) {
+        return isEs
+          ? <>{candidateEp} de la serie {renderTitle(finalShow)}</>
+          : <>{candidateEp} from {renderTitle(finalShow)}</>;
+      }
+    }
+
+    if (sNum !== null && !isNaN(sNum) && eNum !== null && !isNaN(eNum)) {
+      const seasonPrefix = isEs ? 'T' : 'S';
+      const codeStr = `${seasonPrefix}${sNum < 10 ? '0' : ''}${sNum} | E${eNum < 10 ? '0' : ''}${eNum}`;
+      const epPart = epName ? `${codeStr} (${epName})` : codeStr;
+      const finalShow = extractedShow || showHint;
+      if (finalShow) {
+        return isEs
+          ? <>el {epPart} de la serie {renderTitle(finalShow)}</>
+          : <>{epPart} from {renderTitle(finalShow)}</>;
+      }
+      return epPart;
+    }
+
+    if (rawText.startsWith('Episode (') && showHint) {
+      return isEs ? <>un episodio de la serie {renderTitle(showHint)}</> : <>an episode of {renderTitle(showHint)}</>;
+    }
+
+    return renderTitle(rawText);
+  };
+
+  const formatComicIssueString = (rawText: string, showHint?: string): React.ReactNode => {
+    const match = rawText.match(/^(.*?)\s*#(\d+(?:\.\d+)?)(?:\s*-\s*(.*))?$/);
+    let extractedShow = (showHint || '').trim();
+    let issueNum = '';
+    let issueTitle = '';
+
+    if (match) {
+      extractedShow = (match[1] || showHint || '').trim();
+      issueNum = match[2].trim();
+      issueTitle = match[3]?.trim() || '';
+    } else if (meta.issue_number) {
+      issueNum = String(meta.issue_number).trim();
+      extractedShow = (meta.series_title || meta.volume_title || showHint || '').trim();
+      if (!rawText.startsWith('Comic (')) {
+        issueTitle = rawText.trim();
+      }
+    }
+
+    if (issueNum) {
+      const issueCode = `#${issueNum}`;
+      const issuePart = issueTitle ? `${issueCode} (${issueTitle})` : issueCode;
+      const finalShow = extractedShow || showHint;
+      if (finalShow) {
+        return isEs
+          ? <>el {issuePart} de {renderTitle(finalShow)}</>
+          : <>{issuePart} of {renderTitle(finalShow)}</>;
+      }
+      return issuePart;
+    }
+
+    if (rawText.startsWith('Comic (') && showHint) {
+      return isEs ? <>un número de {renderTitle(showHint)}</> : <>an issue of {renderTitle(showHint)}</>;
+    }
+
+    return renderTitle(rawText);
+  };
+
   let msg: React.ReactNode = '';
 
   switch (act.activity_type) {
@@ -6477,32 +6571,11 @@ const ProfileActivityCardItem: React.FC<ProfileActivityCardItemProps> = ({
           msg = isEs ? <>Se cambió el estado de {renderTitle(rawTitle)} a {getStatusLabel(status)}.</> : <>Changed status of {renderTitle(rawTitle)} to {getStatusLabel(status)}.</>;
         }
       } else if (itemType === 'series' || itemType === 'anime' || itemType === 'episode') {
-        const isEpisode = meta.is_single_episode || (act.external_id && act.external_id.startsWith('tvm-ep-')) || Boolean(lastSeen && /S\d+E\d+/i.test(lastSeen)) || Boolean(rawTitle && /S\d+E\d+/i.test(rawTitle));
-
-        const formatEpisodeString = (rawText: string, showHint?: string): React.ReactNode => {
-          const match = rawText.match(/^(?:(.*?)\s*-\s*)?S(\d+)E(\d+)(?:\s*-\s*(.*))?$/i);
-          if (match) {
-            const extractedShow = (match[1] || showHint || '').trim();
-            const sNum = parseInt(match[2], 10);
-            const eNum = parseInt(match[3], 10);
-            const epName = (match[4] || '').trim();
-            const seasonPrefix = isEs ? 'T' : 'S';
-            const codeStr = `${seasonPrefix}${sNum < 10 ? '0' : ''}${sNum} | E${eNum < 10 ? '0' : ''}${eNum}`;
-            const epPart = epName ? `${codeStr} (${epName})` : codeStr;
-            const finalShow = extractedShow || showHint;
-            if (finalShow) {
-              return isEs
-                ? <>el {epPart} de la serie {renderTitle(finalShow)}</>
-                : <>{epPart} from {renderTitle(finalShow)}</>;
-            }
-            return epPart;
-          }
-          return renderTitle(rawText);
-        };
+        const isEpisode = meta.is_single_episode || (act.external_id && act.external_id.startsWith('tvm-ep-')) || Boolean(lastSeen && /S\d+E\d+/i.test(lastSeen)) || Boolean(rawTitle && /S\d+E\d+/i.test(rawTitle)) || Boolean(meta.season_number && meta.episode_number) || (rawTitle.includes(' - ') && !rawTitle.startsWith('Episode ('));
 
         if (isEpisode) {
           const epSource = lastSeen || rawTitle;
-          const formattedEp = formatEpisodeString(epSource, meta.show_name);
+          const formattedEp = formatEpisodeString(epSource, meta.show_name || meta.series_title);
           msg = isEs ? <>Se vio {formattedEp}.</> : <>Watched {formattedEp}.</>;
         } else if (status === 'completed') {
           msg = isEs ? <>Se terminó la serie {renderTitle(rawTitle)}.</> : <>Completed series {renderTitle(rawTitle)}.</>;
@@ -6511,12 +6584,12 @@ const ProfileActivityCardItem: React.FC<ProfileActivityCardItemProps> = ({
             ? <>Se abandonó la serie {renderTitle(rawTitle)}{lastSeen ? ` (último: ${lastSeen})` : ''}.</>
             : <>Dropped series {renderTitle(rawTitle)}{lastSeen ? ` (last: ${lastSeen})` : ''}.</>;
         } else if (lastSeen) {
-          const formattedEp = formatEpisodeString(lastSeen, meta.show_name || rawTitle);
+          const formattedEp = formatEpisodeString(lastSeen, meta.show_name || meta.series_title || rawTitle);
           msg = isEs ? <>Se vio {formattedEp}.</> : <>Watched {formattedEp}.</>;
         } else {
           msg = isEs
             ? <>Se marcó {renderTitle(rawTitle)} como {getStatusLabel(status)}.</>
-            : <>Marked {renderTitle(rawTitle)} as ${getStatusLabel(status)}.</>;
+            : <>Marked {renderTitle(rawTitle)} as {getStatusLabel(status)}.</>;
         }
       } else if (itemType === 'book' || itemType === 'manga') {
         if (status === 'read' || status === 'completed') {
@@ -6537,14 +6610,19 @@ const ProfileActivityCardItem: React.FC<ProfileActivityCardItemProps> = ({
             : <>Marked {renderTitle(rawTitle)} as {getStatusLabel(status)}.</>;
         }
       } else if (itemType === 'comic') {
-        if (status === 'read' || status === 'completed') {
+        const isSingleIssue = (act.external_id && act.external_id.startsWith('cv_issue_')) || Boolean(meta.issue_number) || Boolean(rawTitle && /#\d+/i.test(rawTitle));
+        if (isSingleIssue) {
+          const formattedIssue = formatComicIssueString(rawTitle, meta.series_title || meta.volume_title);
+          msg = isEs ? <>Se leyó {formattedIssue}.</> : <>Read {formattedIssue}.</>;
+        } else if (status === 'read' || status === 'completed') {
           msg = isEs ? <>Se leyó {renderTitle(rawTitle)}.</> : <>Read {renderTitle(rawTitle)}.</>;
         } else if (status === 'dropped') {
           msg = isEs
             ? <>Se abandonó el cómic {renderTitle(rawTitle)}{lastSeen ? ` (${lastSeen})` : ''}.</>
             : <>Dropped comic {renderTitle(rawTitle)}{lastSeen ? ` (${lastSeen})` : ''}.</>;
         } else if (lastSeen) {
-          msg = isEs ? <>Se leyó {lastSeen} de {renderTitle(rawTitle)}.</> : <>Read {lastSeen} of {renderTitle(rawTitle)}.</>;
+          const formattedIssue = formatComicIssueString(lastSeen, meta.series_title || meta.volume_title || rawTitle);
+          msg = isEs ? <>Se leyó {formattedIssue}.</> : <>Read {formattedIssue}.</>;
         } else {
           msg = isEs ? <>Se marcó {renderTitle(rawTitle)} como {getStatusLabel(status)}.</> : <>Marked {renderTitle(rawTitle)} as {getStatusLabel(status)}.</>;
         }
@@ -6591,24 +6669,41 @@ const ProfileActivityCardItem: React.FC<ProfileActivityCardItemProps> = ({
       msg = isEs ? <>Se comenzó a seguir a @{rawTitle}.</> : <>Started following @{rawTitle}.</>;
       break;
 
-    case 'item_rated':
-      msg = isEs ? <>Calificó {renderTitle(rawTitle)}</> : <>Rated {renderTitle(rawTitle)}</>;
+    case 'item_rated': {
+      const isEp = (act.external_id && act.external_id.startsWith('tvm-ep-')) || /S\d+E\d+/i.test(rawTitle) || ['episode', 'series', 'anime'].includes(itemType);
+      const isComic = (act.external_id && act.external_id.startsWith('cv_issue_')) || (/#\d+/i.test(rawTitle) && ['comic', 'manga'].includes(itemType));
+      let displayTarget: React.ReactNode = renderTitle(rawTitle);
+      if (isEp) {
+        displayTarget = formatEpisodeString(rawTitle, meta.show_name || meta.series_title);
+      } else if (isComic) {
+        displayTarget = formatComicIssueString(rawTitle, meta.series_title || meta.volume_title);
+      }
+      msg = isEs ? <>Calificó {displayTarget}</> : <>Rated {displayTarget}</>;
       break;
+    }
 
     case 'guide_rated':
       msg = isEs ? <>Calificó la guía {renderTitle(rawTitle)}</> : <>Rated guide {renderTitle(rawTitle)}</>;
       break;
 
     case 'item_reviewed': {
+      const isEp = (act.external_id && act.external_id.startsWith('tvm-ep-')) || /S\d+E\d+/i.test(rawTitle) || ['episode', 'series', 'anime'].includes(itemType);
+      const isComic = (act.external_id && act.external_id.startsWith('cv_issue_')) || (/#\d+/i.test(rawTitle) && ['comic', 'manga'].includes(itemType));
+      let displayTarget: React.ReactNode = renderTitle(rawTitle);
+      if (isEp) {
+        displayTarget = formatEpisodeString(rawTitle, meta.show_name || meta.series_title);
+      } else if (isComic) {
+        displayTarget = formatComicIssueString(rawTitle, meta.series_title || meta.volume_title);
+      }
       const rVal = meta.rating !== undefined && meta.rating !== null ? meta.rating : null;
       if (rVal) {
         msg = isEs
-          ? <>Calificó y escribió una reseña de {renderTitle(rawTitle)}</>
-          : <>Rated and reviewed {renderTitle(rawTitle)}</>;
+          ? <>Calificó y escribió una reseña de {displayTarget}</>
+          : <>Rated and reviewed {displayTarget}</>;
       } else {
         msg = isEs
-          ? <>Escribió una reseña de {renderTitle(rawTitle)}</>
-          : <>Reviewed {renderTitle(rawTitle)}</>;
+          ? <>Escribió una reseña de {displayTarget}</>
+          : <>Reviewed {displayTarget}</>;
       }
       break;
     }
@@ -6642,10 +6737,10 @@ const ProfileActivityCardItem: React.FC<ProfileActivityCardItemProps> = ({
   const isEpType = ['series', 'anime', 'episode'].includes(itemType) || (act.external_id && String(act.external_id).startsWith('tvm-ep-')) || Boolean(rawTitle && /S\d+E\d+/i.test(rawTitle));
   const isComicType = ['comic', 'manga'].includes(itemType) || (act.external_id && String(act.external_id).startsWith('cv_issue_'));
 
-  let targetPoster = meta.series_image_url || meta.volume_image_url || null;
+  let targetPoster = act.image_url || meta.image_url || meta.series_image_url || meta.volume_image_url || null;
 
   if (!targetPoster && isEpType) {
-    const extractedShowName = (meta.show_name || meta.series_title || (rawTitle.match(/^(.*?)\s*-\s*[sS]\d+/i)?.[1]) || rawTitle.split(' (')[0] || '').trim().toLowerCase();
+    const extractedShowName = (meta.show_name || meta.series_title || (rawTitle.match(/^(.*?)\s*-\s*[sS]\d+/i)?.[1]) || (rawTitle.startsWith('Episode (') ? '' : rawTitle.split(' (')[0]) || '').trim().toLowerCase();
     const matchedShow = libraryItems.find(item => {
       const it = (item.item_type || '').toLowerCase();
       if (!['series', 'anime'].includes(it)) return false;
@@ -6658,7 +6753,7 @@ const ProfileActivityCardItem: React.FC<ProfileActivityCardItemProps> = ({
     }
   } else if (!targetPoster && isComicType) {
     const volExtId = meta.volume_id || meta.series_external_id;
-    const volTitle = (meta.volume_title || meta.series_title || meta.work_title || (rawTitle.includes('#') ? rawTitle.split('#')[0] : rawTitle)).trim().toLowerCase();
+    const volTitle = (meta.volume_title || meta.series_title || meta.work_title || (rawTitle.includes('#') ? rawTitle.split('#')[0] : (rawTitle.startsWith('Comic (') ? '' : rawTitle))).trim().toLowerCase();
     const matchedVolume = libraryItems.find(item => {
       const it = (item.item_type || '').toLowerCase();
       if (!['comic', 'manga'].includes(it)) return false;
@@ -6669,10 +6764,6 @@ const ProfileActivityCardItem: React.FC<ProfileActivityCardItemProps> = ({
     if (matchedVolume?.image_url) {
       targetPoster = matchedVolume.image_url;
     }
-  }
-
-  if (!targetPoster) {
-    targetPoster = act.image_url || meta.image_url;
   }
 
   if (!targetPoster && act.activity_type.startsWith('item_')) {

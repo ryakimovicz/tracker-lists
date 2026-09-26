@@ -615,6 +615,22 @@ def _format_activity_item(r: UserActivityLog, db: Session, current_user_id: Opti
         return None
 
     final_title = r.item_title
+    final_image_url = r.image_url
+
+    # Check if this is an episode or comic issue
+    is_tvm_ep = (r.external_id and str(r.external_id).startswith('tvm-ep-')) or r.item_type == 'episode'
+    is_cv_issue = (r.external_id and str(r.external_id).startswith('cv_issue_'))
+    has_raw_title = bool(not final_title or (final_title.startswith('Episode (') and final_title.endswith(')')) or (final_title.startswith('Comic (') and final_title.endswith(')')))
+
+    if is_tvm_ep or is_cv_issue:
+        li = db.query(ListItem).filter(ListItem.external_id == r.external_id).first()
+        if li:
+            if has_raw_title and li.title:
+                final_title = li.title
+            if li.image_url:
+                # Always prefer specific episode still image / issue cover
+                final_image_url = li.image_url
+
     if r.item_type == 'series' and r.external_id and r.external_id.startswith('tvm_'):
         clean_show_id = r.external_id.replace('tvm_', '')
         if clean_show_id.isdigit():
@@ -651,25 +667,36 @@ def _format_activity_item(r: UserActivityLog, db: Session, current_user_id: Opti
     comments_count = db.query(ActivityComment).filter(ActivityComment.activity_id == r.id).count()
 
     # Ensure any activity about a media item has its poster image
-    final_image_url = r.image_url
-    if r.item_type in ('series', 'anime', 'episode') and r.item_title and ' - S' in r.item_title:
-        # Check user's library for the series poster
-        series_match = r.item_title.split(' - S')[0].strip()
-        lib_match = db.query(UserLibraryItem).filter(
-            UserLibraryItem.user_id == r.user_id,
-            UserLibraryItem.title.ilike(series_match)
-        ).first()
-        if lib_match and lib_match.image_url:
-            final_image_url = lib_match.image_url
-        else:
-            any_lib = db.query(UserLibraryItem).filter(
-                UserLibraryItem.title.ilike(series_match),
-                UserLibraryItem.image_url.isnot(None)
+    if r.item_type in ('series', 'anime', 'episode') or is_tvm_ep:
+        # Check user's library for the series poster if we need an image or fallback
+        series_match = None
+        if final_title and ' - S' in final_title:
+            series_match = final_title.split(' - S')[0].strip()
+        elif r.metadata_json:
+            try:
+                m = json.loads(r.metadata_json) if isinstance(r.metadata_json, str) else r.metadata_json
+                series_match = m.get('show_name') or m.get('series_title')
+            except Exception:
+                pass
+
+        if series_match:
+            lib_match = db.query(UserLibraryItem).filter(
+                UserLibraryItem.user_id == r.user_id,
+                UserLibraryItem.title.ilike(series_match)
             ).first()
-            if any_lib and any_lib.image_url:
-                final_image_url = any_lib.image_url
-    elif r.item_type in ('comic', 'manga') or (r.external_id and str(r.external_id).startswith('cv_issue_')):
-        # For comic issues, always display the parent volume poster if available
+            if lib_match and lib_match.image_url:
+                if not final_image_url:
+                    final_image_url = lib_match.image_url
+            else:
+                any_lib = db.query(UserLibraryItem).filter(
+                    UserLibraryItem.title.ilike(series_match),
+                    UserLibraryItem.image_url.isnot(None)
+                ).first()
+                if any_lib and any_lib.image_url:
+                    if not final_image_url:
+                        final_image_url = any_lib.image_url
+    elif r.item_type in ('comic', 'manga') or is_cv_issue:
+        # For comic issues, always display the parent volume poster if issue image is missing
         meta_dict = {}
         if r.metadata_json:
             try:
@@ -679,8 +706,8 @@ def _format_activity_item(r: UserActivityLog, db: Session, current_user_id: Opti
 
         vol_ext_id = meta_dict.get('series_external_id') or meta_dict.get('volume_id')
         vol_title = meta_dict.get('series_title') or meta_dict.get('work_title')
-        if not vol_title and r.item_title and '#' in r.item_title:
-            vol_title = r.item_title.split('#')[0].strip()
+        if not vol_title and final_title and '#' in final_title:
+            vol_title = final_title.split('#')[0].strip()
 
         # Check library by tracking list, external id, or title
         vol_lib = None
@@ -708,12 +735,13 @@ def _format_activity_item(r: UserActivityLog, db: Session, current_user_id: Opti
             ).first()
 
         if vol_lib and vol_lib.image_url:
-            final_image_url = vol_lib.image_url
+            if not final_image_url:
+                final_image_url = vol_lib.image_url
         elif r.list_id and not final_image_url:
             reading_list = db.query(ReadingList).filter(ReadingList.id == r.list_id).first()
             if reading_list and reading_list.cover_image:
                 final_image_url = reading_list.cover_image
-    elif not final_image_url and r.item_title:
+    elif not final_image_url and final_title:
         # If image_url is missing, look up by external_id or title in UserLibraryItem or ListItem
         if r.external_id:
             lib_by_ext = db.query(UserLibraryItem).filter(
@@ -730,9 +758,9 @@ def _format_activity_item(r: UserActivityLog, db: Session, current_user_id: Opti
                 if li_by_ext and li_by_ext.image_url:
                     final_image_url = li_by_ext.image_url
 
-        if not final_image_url and r.item_title:
+        if not final_image_url and final_title:
             lib_by_title = db.query(UserLibraryItem).filter(
-                UserLibraryItem.title.ilike(r.item_title),
+                UserLibraryItem.title.ilike(final_title),
                 UserLibraryItem.image_url.isnot(None)
             ).first()
             if lib_by_title and lib_by_title.image_url:

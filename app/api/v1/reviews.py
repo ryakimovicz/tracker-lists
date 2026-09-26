@@ -305,14 +305,41 @@ def create_or_update_review(
             detail=f"Invalid media type. Must be one of {valid_types}"
         )
 
-    # Find the title and image if it exists in the library, otherwise use a placeholder
-    lib_item = db.query(UserLibraryItem).filter(
-        UserLibraryItem.user_id == current_user.id,
-        UserLibraryItem.item_type == item_type_lower,
-        UserLibraryItem.external_id == external_id
-    ).first()
-    resolved_title = lib_item.title if lib_item else f"{item_type_lower.capitalize()} ({external_id})"
-    resolved_image = lib_item.image_url if lib_item else None
+    # Find the title and image if it exists in the library, otherwise use a placeholder or provided fields
+    resolved_title = review_in.item_title
+    resolved_image = review_in.image_url
+    act_meta = {}
+    if review_in.metadata_json:
+        try:
+            import json
+            act_meta = json.loads(review_in.metadata_json) if isinstance(review_in.metadata_json, str) else dict(review_in.metadata_json)
+        except Exception:
+            pass
+
+    if not resolved_title or not resolved_image:
+        lib_item = db.query(UserLibraryItem).filter(
+            UserLibraryItem.user_id == current_user.id,
+            UserLibraryItem.item_type == item_type_lower,
+            UserLibraryItem.external_id == external_id
+        ).first()
+        if lib_item:
+            if not resolved_title:
+                resolved_title = lib_item.title
+            if not resolved_image:
+                resolved_image = lib_item.image_url
+
+    # If still not resolved and it's an episode or comic issue, check ListItem
+    if not resolved_title or not resolved_image:
+        from app.models.list import ListItem
+        li = db.query(ListItem).filter(ListItem.external_id == external_id).first()
+        if li:
+            if not resolved_title:
+                resolved_title = li.title
+            if not resolved_image:
+                resolved_image = li.image_url
+
+    if not resolved_title:
+        resolved_title = f"{item_type_lower.capitalize()} ({external_id})"
 
     # Handle Threaded Replies (when parent_id is provided)
     if review_in.parent_id:
@@ -461,6 +488,8 @@ def create_or_update_review(
     if has_content:
         # Single unified event for review (contains text and optional rating)
         meta = {"rating": review_in.rating} if has_rating else {}
+        if act_meta:
+            meta.update(act_meta)
         ActivityService.record_activity(
             db=db,
             user_id=current_user.id,
@@ -475,6 +504,7 @@ def create_or_update_review(
         )
     elif has_rating:
         # Only rated with stars, no written review
+        meta = dict(act_meta) if act_meta else None
         ActivityService.record_activity(
             db=db,
             user_id=current_user.id,
@@ -484,7 +514,8 @@ def create_or_update_review(
             external_id=external_id,
             image_url=resolved_image,
             entity_id=str(review.id),
-            details=str(review_in.rating)
+            details=str(review_in.rating),
+            metadata=meta
         )
 
     # Return with mapped fields

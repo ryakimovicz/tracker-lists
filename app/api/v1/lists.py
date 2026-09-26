@@ -1871,26 +1871,45 @@ def toggle_series_episode(
         )
         db.add(ch)
         
+        # Format clean item title if it's missing SxxExx format for TV series
+        final_item_title = item.title
+        if not is_comic and hasattr(ep_req, 'season_number') and hasattr(ep_req, 'episode_number') and ep_req.season_number and ep_req.episode_number:
+            import re
+            if not re.search(r'S\d+E\d+', final_item_title or '', re.IGNORECASE):
+                s_pad = f"{int(ep_req.season_number):02d}"
+                e_pad = f"{int(ep_req.episode_number):02d}"
+                show_prefix = parent_title or ""
+                # Clean episode name
+                ep_clean_name = final_item_title
+                if show_prefix and ep_clean_name.startswith(show_prefix):
+                    ep_clean_name = ep_clean_name[len(show_prefix):].strip(" -:·")
+                final_item_title = f"{show_prefix} - S{s_pad}E{e_pad} - {ep_clean_name}".strip(" -")
+                item.title = final_item_title
+                db.flush()
+
         # Record activity log with parent series info and list_id
         parent_ext_id = tracking_lib_item.external_id if tracking_lib_item else None
         parent_title = tracking_lib_item.title if tracking_lib_item else (reading_list.name if reading_list else None)
         parent_type = tracking_lib_item.item_type if tracking_lib_item else ("anime" if parent_ext_id and str(parent_ext_id).startswith("anime_") else "series")
-        parent_img = tracking_lib_item.image_url if tracking_lib_item and tracking_lib_item.image_url else item.image_url
+        parent_img = tracking_lib_item.image_url if tracking_lib_item and tracking_lib_item.image_url else None
         meta_dict = {
             "series_external_id": parent_ext_id,
             "series_title": parent_title,
             "series_item_type": parent_type,
+            "series_image_url": parent_img,
+            "show_name": parent_title,
             "season_number": ep_req.season_number if hasattr(ep_req, 'season_number') else None,
-            "episode_number": ep_req.episode_number if hasattr(ep_req, 'episode_number') else None
+            "episode_number": ep_req.episode_number if hasattr(ep_req, 'episode_number') else None,
+            "is_single_episode": not is_comic
         }
         activity = UserActivityLog(
             user_id=current_user.id,
             activity_type="item_completed",
-            item_title=item.title,
+            item_title=final_item_title,
             item_type=item.item_type.value if hasattr(item.item_type, 'value') else item.item_type,
             external_id=item.external_id,
             list_id=list_id,
-            image_url=parent_img,
+            image_url=item.image_url or parent_img,
             details="completed",
             metadata_json=json.dumps(meta_dict)
         )
