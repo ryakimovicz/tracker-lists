@@ -290,9 +290,13 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
   // Parse episode title into structured parts
   const parseEpisodeInfo = (title?: string | null) => {
     const rawText = (title || '').trim();
-    const isEp = (activity.item_type || meta.item_type) === 'series' ||
-      (activity.item_type || meta.item_type) === 'anime' ||
-      (activity.item_type || meta.item_type) === 'episode' ||
+    const curType = (activity.item_type || meta.item_type || '').toLowerCase();
+    const isExplicitComic = ['comic', 'manga'].includes(curType) || (activity.external_id && String(activity.external_id).startsWith('cv_issue_'));
+    if (isExplicitComic) return null;
+
+    const isEp = curType === 'series' ||
+      curType === 'anime' ||
+      curType === 'episode' ||
       (activity.external_id && String(activity.external_id).startsWith('tvm-ep-')) ||
       meta.is_single_episode;
 
@@ -702,16 +706,22 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
               return (
                 <>
                   <span style={{ marginRight: '0.35rem' }}>{verb}</span>
-                  <span style={{ fontWeight: 600, color: 'var(--text-primary)', marginRight: '0.35rem' }}>
-                    {parsedComicIssue.issueCode}
-                  </span>
-                  {parsedComicIssue.issueTitle && (
-                    <span style={{ color: 'var(--text-secondary)', marginRight: '0.35rem' }}>
-                      ({parsedComicIssue.issueTitle})
+                  {parsedComicIssue.issueCode && (
+                    <span style={{ fontWeight: 600, color: 'var(--text-primary)', marginRight: '0.35rem' }}>
+                      {parsedComicIssue.issueCode}
                     </span>
                   )}
-                  <span style={{ marginRight: '0.35rem' }}>{isEs ? 'de' : 'of'}</span>
-                  {renderTitleWithBadge(parsedComicIssue.seriesName)}
+                  {parsedComicIssue.issueTitle && (
+                    <span style={{ color: 'var(--text-secondary)', marginRight: '0.35rem' }}>
+                      {parsedComicIssue.issueCode ? `(${parsedComicIssue.issueTitle})` : parsedComicIssue.issueTitle}
+                    </span>
+                  )}
+                  {parsedComicIssue.seriesName && (
+                    <>
+                      <span style={{ marginRight: '0.35rem' }}>{isEs ? 'de' : 'of'}</span>
+                      {renderTitleWithBadge(parsedComicIssue.seriesName)}
+                    </>
+                  )}
                 </>
               );
             })()
