@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../context/LanguageContext';
 import { ActivityCommentThread } from './ActivityCommentThread';
 import { StarRatingDisplay } from './ItemDetailsModal';
+import { renderFormattedContentWithMentions, AuthorUsername } from './MentionTag';
 
 export interface ActivityCardData {
   id: number;
@@ -466,18 +467,15 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
               </div>
             )}
             <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-              <span
+              <AuthorUsername
+                username={activity.username}
                 style={{
-                  fontWeight: 700,
                   fontSize: '0.92rem',
-                  color: 'var(--text-primary)',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
                   whiteSpace: 'nowrap'
                 }}
-              >
-                {activity.username}
-              </span>
+              />
               <span style={{ color: 'var(--text-muted)', fontSize: '0.74rem' }}>
                 {formatRelativeTime(activity.created_at)}
               </span>
@@ -660,7 +658,7 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
               overflow: 'hidden'
             }}
           >
-            {activity.details}
+            {renderFormattedContentWithMentions(activity.details)}
           </div>
         )}
 

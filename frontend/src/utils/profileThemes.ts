@@ -169,10 +169,15 @@ export const PROFILE_THEME_COLORS: ProfileThemeColor[] = [
   },
 ];
 
+export function findProfileThemeColor(colorId?: string | null) {
+  if (!colorId) return null;
+  return PROFILE_THEME_COLORS.find(
+    (c) => c.id === colorId || c.dark.accent.toLowerCase() === colorId.toLowerCase() || c.light.accent.toLowerCase() === colorId.toLowerCase()
+  ) || null;
+}
+
 export function getProfileTheme(colorId?: string | null, isLight: boolean = false) {
-  const matched = PROFILE_THEME_COLORS.find(
-    (c) => c.id === colorId || c.dark.accent.toLowerCase() === colorId?.toLowerCase() || c.light.accent.toLowerCase() === colorId?.toLowerCase()
-  );
+  const matched = findProfileThemeColor(colorId);
   const theme = matched || PROFILE_THEME_COLORS[0];
   const mode = isLight ? theme.light : theme.dark;
 

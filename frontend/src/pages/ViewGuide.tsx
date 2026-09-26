@@ -22,6 +22,7 @@ import { ItemDetailsModal } from '../components/ItemDetailsModal';
 import { ReplaceSavedGuideModal } from '../components/ReplaceSavedGuideModal';
 import { ProModal } from '../components/ProModal';
 import { AdBanner } from '../components/AdBanner';
+import { renderFormattedContentWithMentions, AuthorUsername } from '../components/MentionTag';
 
 
 interface CommentItem {
@@ -245,33 +246,7 @@ export const ViewGuide: React.FC = () => {
   };
 
   const renderCommentContent = (content: string | null) => {
-    if (!content) return null;
-    const parts = content.split(/(@[a-zA-Z0-9_\-.]+)/g);
-    return (
-      <span>
-        {parts.map((part, idx) => {
-          if (part.startsWith('@') && part.length > 1) {
-            return (
-              <span
-                key={idx}
-                style={{
-                  color: 'var(--accent-primary)',
-                  fontWeight: 600,
-                  background: 'rgba(99, 102, 241, 0.12)',
-                  padding: '0.1rem 0.35rem',
-                  borderRadius: '4px',
-                  marginRight: '0.2rem',
-                  display: 'inline-block'
-                }}
-              >
-                {part}
-              </span>
-            );
-          }
-          return part;
-        })}
-      </span>
-    );
+    return renderFormattedContentWithMentions(content);
   };
 
   const buildCommentTree = (items: CommentItem[]): CommentTreeNode[] => {
@@ -1394,9 +1369,12 @@ export const ViewGuide: React.FC = () => {
                               {(node.creator_username || 'U')[0].toUpperCase()}
                             </div>
                           )}
-                          <span style={{ fontWeight: 600, fontSize: '0.9rem', color: node.is_deleted ? 'var(--text-muted)' : 'inherit' }}>
-                            {node.is_deleted ? (language === 'es' ? 'Usuario' : 'User') : node.creator_username}
-                          </span>
+                          <AuthorUsername
+                            username={node.creator_username}
+                            isDeleted={node.is_deleted}
+                            deletedLabel={language === 'es' ? 'Usuario' : 'User'}
+                            style={{ fontSize: '0.9rem' }}
+                          />
                           <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>• {formatCommentDate(node.created_at)}</span>
                         </div>
 
@@ -1606,9 +1584,12 @@ export const ViewGuide: React.FC = () => {
                                         {(reply.creator_username || 'U')[0].toUpperCase()}
                                       </div>
                                     )}
-                                    <span style={{ fontWeight: 600, fontSize: '0.85rem', color: reply.is_deleted ? 'var(--text-muted)' : 'inherit' }}>
-                                      {reply.is_deleted ? (language === 'es' ? 'Usuario' : 'User') : reply.creator_username}
-                                    </span>
+                                    <AuthorUsername
+                                      username={reply.creator_username}
+                                      isDeleted={reply.is_deleted}
+                                      deletedLabel={language === 'es' ? 'Usuario' : 'User'}
+                                      style={{ fontSize: '0.85rem' }}
+                                    />
                                     <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>• {formatCommentDate(reply.created_at)}</span>
                                   </div>
 

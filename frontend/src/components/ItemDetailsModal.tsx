@@ -14,6 +14,7 @@ import { useAuth } from '../context/AuthContext';
 import { KlipyPicker } from './KlipyPicker';
 import type { SelectedKlipyMedia } from './KlipyPicker';
 import { isKlipyFavorite, toggleKlipyFavorite } from '../utils/klipyFavorites';
+import { renderFormattedContentWithMentions, AuthorUsername } from './MentionTag';
 
 
 
@@ -3734,33 +3735,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   };
 
   const renderReviewContent = (content: string) => {
-    if (!content) return null;
-    const parts = content.split(/(@[a-zA-Z0-9_\-.]+)/g);
-    return (
-      <span>
-        {parts.map((part, idx) => {
-          if (part.startsWith('@') && part.length > 1) {
-            return (
-              <span
-                key={idx}
-                style={{
-                  color: 'var(--accent-primary)',
-                  fontWeight: 600,
-                  background: 'rgba(99, 102, 241, 0.12)',
-                  padding: '0.1rem 0.35rem',
-                  borderRadius: '4px',
-                  marginRight: '0.2rem',
-                  display: 'inline-block'
-                }}
-              >
-                {part}
-              </span>
-            );
-          }
-          return <span key={idx}>{part}</span>;
-        })}
-      </span>
-    );
+    return renderFormattedContentWithMentions(content);
   };
 
 
@@ -8084,9 +8059,12 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                     {(rootNode.username || 'U')[0].toUpperCase()}
                                   </div>
                                 )}
-                                <span style={{ fontWeight: 600, fontSize: '0.9rem', color: rootNode.is_deleted ? 'var(--text-muted)' : 'inherit' }}>
-                                  {rootNode.is_deleted ? (language === 'es' ? 'Usuario' : 'User') : rootNode.username}
-                                </span>
+                                <AuthorUsername
+                                  username={rootNode.username}
+                                  isDeleted={rootNode.is_deleted}
+                                  deletedLabel={language === 'es' ? 'Usuario' : 'User'}
+                                  style={{ fontSize: '0.9rem' }}
+                                />
                                 {rootNode.created_at && (
                                   <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
                                     • {formatReviewDate(rootNode.created_at)}
@@ -8381,11 +8359,14 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                               flexShrink: 0
                                             }}>
                                               {(reply.username || 'U')[0].toUpperCase()}
-                                            </div>
+                                           </div>
                                           )}
-                                          <span style={{ fontWeight: 600, fontSize: '0.85rem', color: reply.is_deleted ? 'var(--text-muted)' : 'inherit' }}>
-                                            {reply.is_deleted ? (language === 'es' ? 'Usuario' : 'User') : reply.username}
-                                          </span>
+                                          <AuthorUsername
+                                            username={reply.username}
+                                            isDeleted={reply.is_deleted}
+                                            deletedLabel={language === 'es' ? 'Usuario' : 'User'}
+                                            style={{ fontSize: '0.85rem' }}
+                                          />
                                           {reply.created_at && (
                                             <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
                                               • {formatReviewDate(reply.created_at)}

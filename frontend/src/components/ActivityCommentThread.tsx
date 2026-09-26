@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Send, Reply, Trash2, ThumbsUp, Image as ImageIcon, Flag } from 'lucide-react';
 import { apiClient } from '../api/client';
 import { useAuth } from '../context/AuthContext';
@@ -6,6 +6,7 @@ import { useTranslation } from '../context/LanguageContext';
 import { KlipyPicker } from './KlipyPicker';
 import type { SelectedKlipyMedia } from './KlipyPicker';
 import { MediaAttachmentView } from './ItemDetailsModal';
+import { renderFormattedContentWithMentions, AuthorUsername } from './MentionTag';
 
 export interface ActivityCommentItem {
   id: number;
@@ -51,6 +52,17 @@ export const ActivityCommentThread: React.FC<ActivityCommentThreadProps> = ({
   const [replyMedia, setReplyMedia] = useState<SelectedKlipyMedia | null>(null);
   const [showReplyKlipy, setShowReplyKlipy] = useState(false);
 
+  const countTotal = (items: ActivityCommentItem[]): number => {
+    let count = 0;
+    for (const item of items) {
+      count += 1;
+      if (item.replies && item.replies.length > 0) {
+        count += countTotal(item.replies);
+      }
+    }
+    return count;
+  };
+
   const fetchComments = async () => {
     try {
       setLoading(true);
@@ -58,8 +70,7 @@ export const ActivityCommentThread: React.FC<ActivityCommentThreadProps> = ({
       if (Array.isArray(res.data)) {
         setComments(res.data);
         if (onCommentsCountChange) {
-          const totalCount = res.data.reduce((acc: number, c: any) => acc + 1 + (c.replies ? c.replies.length : 0), 0);
-          onCommentsCountChange(totalCount);
+          onCommentsCountChange(countTotal(res.data));
         }
       }
     } catch (err) {
@@ -120,25 +131,25 @@ export const ActivityCommentThread: React.FC<ActivityCommentThreadProps> = ({
     }
   };
 
+  const updateVoteInTree = (nodes: ActivityCommentItem[], commentId: number, voted: boolean, votesCount: number): ActivityCommentItem[] => {
+    return nodes.map(n => {
+      if (n.id === commentId) {
+        return { ...n, is_voted_by_me: voted, votes_count: votesCount };
+      }
+      if (n.replies && n.replies.length > 0) {
+        return {
+          ...n,
+          replies: updateVoteInTree(n.replies, commentId, voted, votesCount)
+        };
+      }
+      return n;
+    });
+  };
+
   const handleVoteComment = async (commentId: number) => {
     try {
       const res = await apiClient.post(`/social/comments/${commentId}/vote`);
-      setComments(prev =>
-        prev.map(c => {
-          if (c.id === commentId) {
-            return { ...c, is_voted_by_me: res.data.voted, votes_count: res.data.votes_count };
-          }
-          if (c.replies) {
-            return {
-              ...c,
-              replies: c.replies.map(r =>
-                r.id === commentId ? { ...r, is_voted_by_me: res.data.voted, votes_count: res.data.votes_count } : r
-              )
-            };
-          }
-          return c;
-        })
-      );
+      setComments(prev => updateVoteInTree(prev, commentId, res.data.voted, res.data.votes_count));
     } catch (err) {
       console.error('Error voting comment:', err);
     }
@@ -170,6 +181,30 @@ export const ActivityCommentThread: React.FC<ActivityCommentThreadProps> = ({
     }
   };
 
+  const replyInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (replyTarget && replyInputRef.current) {
+      replyInputRef.current.focus();
+      const len = replyInputRef.current.value.length;
+      replyInputRef.current.setSelectionRange(len, len);
+    }
+  }, [replyTarget?.id]);
+
+  const getAllDescendantReplies = (comment: ActivityCommentItem): ActivityCommentItem[] => {
+    const list: ActivityCommentItem[] = [];
+    const traverse = (node: ActivityCommentItem) => {
+      if (node.replies && node.replies.length > 0) {
+        for (const child of node.replies) {
+          list.push(child);
+          traverse(child);
+        }
+      }
+    };
+    traverse(comment);
+    return list.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  };
+
   const renderSingleComment = (item: ActivityCommentItem, isChild = false) => {
     const isReplyingThis = replyTarget?.id === item.id;
     const canDelete = user && (user.id === item.user_id || user.is_admin);
@@ -180,10 +215,7 @@ export const ActivityCommentThread: React.FC<ActivityCommentThreadProps> = ({
         style={{
           display: 'flex',
           gap: '0.75rem',
-          padding: '0.65rem 0',
-          marginLeft: isChild ? '2.2rem' : 0,
-          borderLeft: isChild ? '2px solid var(--border-color)' : 'none',
-          paddingLeft: isChild ? '0.75rem' : 0
+          padding: '0.65rem 0'
         }}
       >
         {/* Avatar */}
@@ -234,9 +266,12 @@ export const ActivityCommentThread: React.FC<ActivityCommentThreadProps> = ({
         {/* Content body */}
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem' }}>
-            <span style={{ fontWeight: 700, fontSize: '0.88rem', color: item.is_deleted ? 'var(--text-muted)' : 'var(--text-primary)' }}>
-              {item.is_deleted ? (isEs ? 'Usuario' : 'User') : item.username}
-            </span>
+            <AuthorUsername
+              username={item.username}
+              isDeleted={item.is_deleted}
+              deletedLabel={isEs ? 'Usuario' : 'User'}
+              style={{ fontSize: '0.88rem' }}
+            />
             <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
               {new Date(item.created_at).toLocaleDateString(isEs ? 'es-ES' : 'en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
             </span>
@@ -250,7 +285,7 @@ export const ActivityCommentThread: React.FC<ActivityCommentThreadProps> = ({
             <>
               {item.content && (
                 <p style={{ margin: '0 0 0.35rem 0', fontSize: '0.88rem', lineHeight: 1.4, color: 'var(--text-primary)', wordBreak: 'break-word' }}>
-                  {item.content}
+                  {renderFormattedContentWithMentions(item.content)}
                 </p>
               )}
 
@@ -357,11 +392,12 @@ export const ActivityCommentThread: React.FC<ActivityCommentThreadProps> = ({
             )}
           </div>
 
-          {/* Reply form under parent */}
+          {/* Reply form under this specific comment/reply */}
           {isReplyingThis && (
             <form onSubmit={(e) => handlePostReply(e, item.id)} style={{ marginTop: '0.65rem' }}>
               <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
                 <input
+                  ref={replyInputRef}
                   type="text"
                   value={replyText}
                   onChange={(e) => setReplyText(e.target.value)}
@@ -416,13 +452,6 @@ export const ActivityCommentThread: React.FC<ActivityCommentThreadProps> = ({
                 </div>
               )}
             </form>
-          )}
-
-          {/* Render nested replies */}
-          {item.replies && item.replies.length > 0 && (
-            <div style={{ marginTop: '0.5rem' }}>
-              {item.replies.map(r => renderSingleComment(r, true))}
-            </div>
           )}
         </div>
       </div>
@@ -507,7 +536,32 @@ export const ActivityCommentThread: React.FC<ActivityCommentThreadProps> = ({
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column' }}>
-          {comments.map(c => renderSingleComment(c, false))}
+          {comments.map(rootComment => {
+            const descendantReplies = getAllDescendantReplies(rootComment);
+            return (
+              <div key={rootComment.id} style={{ display: 'flex', flexDirection: 'column' }}>
+                {/* Root Comment */}
+                {renderSingleComment(rootComment, false)}
+
+                {/* All descendant replies flattened at a single indentation level */}
+                {descendantReplies.length > 0 && (
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      marginLeft: '1.5rem',
+                      paddingLeft: '0.85rem',
+                      borderLeft: '2px solid var(--border-color)',
+                      marginTop: '0.1rem',
+                      marginBottom: '0.4rem'
+                    }}
+                  >
+                    {descendantReplies.map(reply => renderSingleComment(reply, true))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 

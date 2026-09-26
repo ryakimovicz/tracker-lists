@@ -612,6 +612,34 @@ def search_users(
     return users
 
 
+class BatchUserColorsRequest(BaseModel):
+    usernames: List[str]
+
+@router.post("/colors")
+def get_users_colors(
+    req: BatchUserColorsRequest,
+    db: Session = Depends(get_db)
+):
+    clean_usernames = [u.strip().lower() for u in req.usernames if u and u.strip()]
+    if not clean_usernames:
+        return {}
+
+    # Query matching users
+    from sqlalchemy import func
+    users = db.query(User).filter(func.lower(User.username).in_(clean_usernames[:100])).all()
+
+    result = {}
+    for u in users:
+        is_pro = check_user_is_pro(u)
+        color = u.profile_color if (is_pro and u.profile_color) else None
+        result[u.username.lower()] = {
+            "username": u.username,
+            "profile_color": color,
+            "is_pro": is_pro
+        }
+    return result
+
+
 @router.put("/me/username", response_model=UserResponse)
 def update_username(
     req: UsernameUpdateRequest,
