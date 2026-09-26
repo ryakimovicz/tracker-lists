@@ -111,7 +111,7 @@ const translations: Translations = {
   unmarkAllIncludingExtras: { en: 'Unmark everything', es: 'Desmarcar todo' },
 
   // Search Page
-  searchTitle: { en: 'Explore Media Database', es: 'Explorar Base de Datos' },
+  searchTitle: { en: 'Explore media', es: 'Explorar obras' },
   searchPlaceholder: { en: 'Search games, movies, series, books, anime, manga...', es: 'Buscar juegos, películas, series, libros, anime, manga...' },
   searchButton: { en: 'Search', es: 'Buscar' },
   searchNoResults: { en: 'No results found.', es: 'No se encontraron resultados.' },
