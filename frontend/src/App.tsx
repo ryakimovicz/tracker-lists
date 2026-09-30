@@ -38,6 +38,7 @@ import React, { useEffect } from 'react';
 
 function AppRoutes() {
   const { isAuthenticated, isLoading } = useAuth();
+  const [contentMarginRight, setContentMarginRight] = React.useState<number>(0);
   const hasToken = Boolean(localStorage.getItem('access_token'));
 
   useEffect(() => {
@@ -46,13 +47,56 @@ function AppRoutes() {
     }
   }, [isAuthenticated]);
 
+  useEffect(() => {
+    const updateCentering = () => {
+      const windowTotalWidth = window.outerWidth || window.innerWidth;
+      const availableViewportWidth = window.innerWidth;
+      const contentWidth = 1200;
+      const sidebarWidth = 250;
+
+      // Position in total browser window
+      const leftInWindow = (windowTotalWidth - contentWidth) / 2;
+      const rightInWindow = leftInWindow + contentWidth;
+
+      // Check if centered-in-window fits comfortably:
+      // Must not overlap left sidebar (left >= sidebarWidth)
+      // and must not collide with right browser/DevTools edge (right <= availableViewportWidth)
+      if (leftInWindow >= sidebarWidth && rightInWindow <= availableViewportWidth) {
+        // To place 1200px content at leftInWindow, main-content margin-left is already 0 (after sidebar 250px).
+        // Since main-content has width: availableViewportWidth - sidebarWidth - marginRight,
+        // and flex aligns items center, centering inside main-content means:
+        // leftEdge = sidebarWidth + (effectiveMainWidth - contentWidth) / 2
+        // We want leftEdge = leftInWindow:
+        // (effectiveMainWidth - contentWidth) / 2 = leftInWindow - sidebarWidth
+        // effectiveMainWidth - contentWidth = 2 * (leftInWindow - sidebarWidth)
+        // effectiveMainWidth = contentWidth + 2 * (leftInWindow - sidebarWidth)
+        // Since effectiveMainWidth = availableViewportWidth - sidebarWidth - marginRight:
+        // marginRight = (availableViewportWidth - sidebarWidth) - (contentWidth + 2 * (leftInWindow - sidebarWidth))
+        const requiredMarginRight = (availableViewportWidth - sidebarWidth) - (contentWidth + 2 * (leftInWindow - sidebarWidth));
+        setContentMarginRight(Math.max(0, Math.round(requiredMarginRight)));
+      } else {
+        // Space is not enough to maintain full-window centering without colliding with sidebar or DevTools:
+        // Center cleanly between sidebar and DevTools/right edge (marginRight = 0)
+        setContentMarginRight(0);
+      }
+    };
+
+    updateCentering();
+    window.addEventListener('resize', updateCentering);
+    return () => window.removeEventListener('resize', updateCentering);
+  }, []);
+
   return (
     <Router>
       <div className="app-container">
         <SuspendedAccountModal />
         <Sidebar />
 
-        <main className="main-content">
+        <main 
+          className="main-content"
+          style={{ '--main-content-margin-right': `${contentMarginRight}px` } as React.CSSProperties}
+        >
+
           <Routes>
             {/* Conditional homepage depending on authentication status */}
             <Route

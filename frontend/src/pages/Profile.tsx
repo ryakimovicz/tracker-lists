@@ -6562,9 +6562,9 @@ const ProfileActivityCardItem: React.FC<ProfileActivityCardItemProps> = ({
         }
       } else if (itemType === 'movie') {
         if (status === 'completed' || status === 'read') {
-          msg = isEs ? <>Se marcó {renderTitle(rawTitle)} como Visto.</> : <>Marked {renderTitle(rawTitle)} as Watched.</>;
+          msg = isEs ? <>Se vio {renderTitle(rawTitle)}.</> : <>Watched {renderTitle(rawTitle)}.</>;
         } else if (status === 'dropped') {
-          msg = isEs ? <>Se abandonó la película {renderTitle(rawTitle)}.</> : <>Dropped movie {renderTitle(rawTitle)}.</>;
+          msg = isEs ? <>Se abandonó {renderTitle(rawTitle)}.</> : <>Dropped {renderTitle(rawTitle)}.</>;
         } else if (status === 'watching') {
           msg = isEs ? <>Se comenzó a ver {renderTitle(rawTitle)}.</> : <>Started watching {renderTitle(rawTitle)}.</>;
         } else {
@@ -6578,11 +6578,11 @@ const ProfileActivityCardItem: React.FC<ProfileActivityCardItemProps> = ({
           const formattedEp = formatEpisodeString(epSource, meta.show_name || meta.series_title);
           msg = isEs ? <>Se vio {formattedEp}.</> : <>Watched {formattedEp}.</>;
         } else if (status === 'completed') {
-          msg = isEs ? <>Se terminó la serie {renderTitle(rawTitle)}.</> : <>Completed series {renderTitle(rawTitle)}.</>;
+          msg = isEs ? <>Se terminó de ver {renderTitle(rawTitle)}.</> : <>Finished watching {renderTitle(rawTitle)}.</>;
         } else if (status === 'dropped') {
           msg = isEs
-            ? <>Se abandonó la serie {renderTitle(rawTitle)}{lastSeen ? ` (último: ${lastSeen})` : ''}.</>
-            : <>Dropped series {renderTitle(rawTitle)}{lastSeen ? ` (last: ${lastSeen})` : ''}.</>;
+            ? <>Se abandonó {renderTitle(rawTitle)}{lastSeen ? ` (último: ${lastSeen})` : ''}.</>
+            : <>Dropped {renderTitle(rawTitle)}{lastSeen ? ` (last: ${lastSeen})` : ''}.</>;
         } else if (lastSeen) {
           const formattedEp = formatEpisodeString(lastSeen, meta.show_name || meta.series_title || rawTitle);
           msg = isEs ? <>Se vio {formattedEp}.</> : <>Watched {formattedEp}.</>;
@@ -6594,8 +6594,8 @@ const ProfileActivityCardItem: React.FC<ProfileActivityCardItemProps> = ({
       } else if (itemType === 'book' || itemType === 'manga') {
         if (status === 'read' || status === 'completed') {
           msg = isEs
-            ? <>Se leyó {renderTitle(rawTitle)}{totalPages ? ` (${totalPages} págs)` : ''}.</>
-            : <>Read {renderTitle(rawTitle)}{totalPages ? ` (${totalPages} pages)` : ''}.</>;
+            ? <>Se terminó de leer {renderTitle(rawTitle)}{totalPages ? ` (${totalPages} págs)` : ''}.</>
+            : <>Finished reading {renderTitle(rawTitle)}{totalPages ? ` (${totalPages} pages)` : ''}.</>;
         } else if (status === 'dropped') {
           msg = isEs
             ? <>Se abandonó {renderTitle(rawTitle)}{pages ? ` en la pág. ${pages}` : ''}.</>
@@ -6615,11 +6615,11 @@ const ProfileActivityCardItem: React.FC<ProfileActivityCardItemProps> = ({
           const formattedIssue = formatComicIssueString(rawTitle, meta.series_title || meta.volume_title);
           msg = isEs ? <>Se leyó {formattedIssue}.</> : <>Read {formattedIssue}.</>;
         } else if (status === 'read' || status === 'completed') {
-          msg = isEs ? <>Se leyó {renderTitle(rawTitle)}.</> : <>Read {renderTitle(rawTitle)}.</>;
+          msg = isEs ? <>Se terminó de leer {renderTitle(rawTitle)}.</> : <>Finished reading {renderTitle(rawTitle)}.</>;
         } else if (status === 'dropped') {
           msg = isEs
-            ? <>Se abandonó el cómic {renderTitle(rawTitle)}{lastSeen ? ` (${lastSeen})` : ''}.</>
-            : <>Dropped comic {renderTitle(rawTitle)}{lastSeen ? ` (${lastSeen})` : ''}.</>;
+            ? <>Se abandonó {renderTitle(rawTitle)}{lastSeen ? ` (${lastSeen})` : ''}.</>
+            : <>Dropped {renderTitle(rawTitle)}{lastSeen ? ` (${lastSeen})` : ''}.</>;
         } else if (lastSeen) {
           const formattedIssue = formatComicIssueString(lastSeen, meta.series_title || meta.volume_title || rawTitle);
           msg = isEs ? <>Se leyó {formattedIssue}.</> : <>Read {formattedIssue}.</>;
@@ -6630,7 +6630,7 @@ const ProfileActivityCardItem: React.FC<ProfileActivityCardItemProps> = ({
         if (meta.is_hundred_percent) {
           msg = isEs ? <>Se completó al 100% {renderTitle(rawTitle)}.</> : <>Completed 100% of {renderTitle(rawTitle)}.</>;
         } else if (status === 'completed') {
-          msg = isEs ? <>Se completó el juego {renderTitle(rawTitle)}.</> : <>Completed game {renderTitle(rawTitle)}.</>;
+          msg = isEs ? <>Se terminó el juego {renderTitle(rawTitle)}.</> : <>Finished the game {renderTitle(rawTitle)}.</>;
         } else if (status === 'endless') {
           msg = isEs ? <>Se marcó {renderTitle(rawTitle)} como Infinito.</> : <>Marked {renderTitle(rawTitle)} as Endless.</>;
         } else if (status === 'dropped') {

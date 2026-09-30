@@ -14,10 +14,8 @@ export const RightSidebarAd: React.FC = () => {
     return null;
   }
 
-  // Hide completely for Pro/VIP/Admin users in production
-  if (!isLocalDev && (user?.is_pro || user?.is_vip || user?.is_admin)) {
-    return null;
-  }
+  // Return null when ads are not active
+  return null;
 
   return (
     <aside

@@ -158,11 +158,21 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
 
     switch (activity.activity_type) {
       case 'item_status_changed':
-      case 'item_completed':
+      case 'item_completed': {
+        const status = (meta.status || activity.details || '').toLowerCase();
+        const isCompleted = activity.activity_type === 'item_completed' || status === 'completed' || status === 'read';
+        if (isCompleted) {
+          if (rawType === 'movie') return isEs ? 'Vio' : 'Watched';
+          if (['series', 'anime'].includes(rawType)) return isEs ? 'Terminó de ver' : 'Finished watching';
+          if (isComicOrBook) return isEs ? 'Terminó de leer' : 'Finished reading';
+          if (isGame) return isEs ? 'Terminó el juego' : 'Finished the game';
+          return isEs ? 'Terminó' : 'Finished';
+        }
         if (isComicOrBook) return isEs ? 'Leyó' : 'Read';
         if (isWatchable) return isEs ? 'Vio' : 'Watched';
         if (isGame) return isEs ? 'Completó' : 'Completed';
         return isEs ? 'Completó' : 'Completed';
+      }
       case 'item_rated':
         return isEs ? 'Calificó' : 'Rated';
       case 'item_reviewed':
