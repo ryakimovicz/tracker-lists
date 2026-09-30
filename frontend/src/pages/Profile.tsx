@@ -6405,7 +6405,7 @@ const ProfileActivityCardItem: React.FC<ProfileActivityCardItemProps> = ({
       const finalShow = extractedShow || candidateShow;
       if (finalShow) {
         return isEs
-          ? <>{candidateEp} de la serie {renderTitle(finalShow)}</>
+          ? <>{candidateEp} de {renderTitle(finalShow)}</>
           : <>{candidateEp} from {renderTitle(finalShow)}</>;
       }
     }
@@ -6417,14 +6417,14 @@ const ProfileActivityCardItem: React.FC<ProfileActivityCardItemProps> = ({
       const finalShow = extractedShow || showHint;
       if (finalShow) {
         return isEs
-          ? <>el {epPart} de la serie {renderTitle(finalShow)}</>
+          ? <>el {epPart} de {renderTitle(finalShow)}</>
           : <>{epPart} from {renderTitle(finalShow)}</>;
       }
       return epPart;
     }
 
     if (rawText.startsWith('Episode (') && showHint) {
-      return isEs ? <>un episodio de la serie {renderTitle(showHint)}</> : <>an episode of {renderTitle(showHint)}</>;
+      return isEs ? <>un episodio de {renderTitle(showHint)}</> : <>an episode of {renderTitle(showHint)}</>;
     }
 
     return renderTitle(rawText);
@@ -6501,7 +6501,7 @@ const ProfileActivityCardItem: React.FC<ProfileActivityCardItemProps> = ({
     case 'item_added_to_library':
     case 'shelf_add':
       msg = isEs ? (
-        <>Se agregó {renderTitle(rawTitle)} a la biblioteca.</>
+        <>Se agregó {renderTitle(rawTitle)} a la estantería.</>
       ) : (
         <>Added {renderTitle(rawTitle)} to library.</>
       );
@@ -6519,27 +6519,53 @@ const ProfileActivityCardItem: React.FC<ProfileActivityCardItemProps> = ({
       if (meta.is_range && meta.start_unit && meta.end_unit) {
         const workName = meta.work_title || rawTitle.split(' (')[0] || rawTitle;
         const alsoAdded = !!meta.also_added;
-        if (itemType === 'comic') {
+        const isFinished = meta.finished_work !== undefined
+          ? Boolean(meta.finished_work)
+          : (meta.status === 'read' || meta.status === 'completed');
+        let finishingSuffix = '.';
+
+
+
+
+        if (isFinished) {
+          if (itemType === 'series') {
+            finishingSuffix = isEs ? ', terminando la serie.' : ', finishing the series.';
+          } else if (itemType === 'anime') {
+            finishingSuffix = isEs ? ', terminando el anime.' : ', finishing the anime.';
+          } else if (itemType === 'comic') {
+            finishingSuffix = isEs ? ', terminando el cómic.' : ', finishing the comic.';
+          } else if (itemType === 'manga') {
+            finishingSuffix = isEs ? ', terminando el manga.' : ', finishing the manga.';
+          } else if (itemType === 'book') {
+            finishingSuffix = isEs ? ', terminando el libro.' : ', finishing the book.';
+          } else {
+            finishingSuffix = isEs ? ', terminando la obra.' : ', finishing the work.';
+          }
+        }
+
+
+        if (itemType === 'comic' || itemType === 'manga' || itemType === 'book') {
           msg = alsoAdded ? (
             isEs
-              ? <>Se agregó y leyó del {meta.start_unit} al {meta.end_unit} de {renderTitle(workName)}.</>
-              : <>Added and read {meta.start_unit} to {meta.end_unit} of {renderTitle(workName)}.</>
+              ? <>Se agregó y leyó del {meta.start_unit} al {meta.end_unit} de {renderTitle(workName)}{finishingSuffix}</>
+              : <>Added and read {meta.start_unit} to {meta.end_unit} of {renderTitle(workName)}{finishingSuffix}</>
           ) : (
             isEs
-              ? <>Se leyó del {meta.start_unit} al {meta.end_unit} de {renderTitle(workName)}.</>
-              : <>Read {meta.start_unit} to {meta.end_unit} of {renderTitle(workName)}.</>
+              ? <>Se leyó del {meta.start_unit} al {meta.end_unit} de {renderTitle(workName)}{finishingSuffix}</>
+              : <>Read {meta.start_unit} to {meta.end_unit} of {renderTitle(workName)}{finishingSuffix}</>
           );
         } else {
           msg = alsoAdded ? (
             isEs
-              ? <>Se agregó y vio del {meta.start_unit} al {meta.end_unit} de la serie {renderTitle(workName)}.</>
-              : <>Added and watched {meta.start_unit} to {meta.end_unit} of {renderTitle(workName)}.</>
+              ? <>Se agregó y vio del {meta.start_unit} al {meta.end_unit} de {renderTitle(workName)}{finishingSuffix}</>
+              : <>Added and watched {meta.start_unit} to {meta.end_unit} of {renderTitle(workName)}{finishingSuffix}</>
           ) : (
             isEs
-              ? <>Se vio del {meta.start_unit} al {meta.end_unit} de la serie {renderTitle(workName)}.</>
-              : <>Watched {meta.start_unit} to {meta.end_unit} of {renderTitle(workName)}.</>
+              ? <>Se vio del {meta.start_unit} al {meta.end_unit} de {renderTitle(workName)}{finishingSuffix}</>
+              : <>Watched {meta.start_unit} to {meta.end_unit} of {renderTitle(workName)}{finishingSuffix}</>
           );
         }
+
       } else if (count > 1) {
         if (itemType === 'series' || itemType === 'anime') {
           msg = isEs ? (
@@ -6628,7 +6654,7 @@ const ProfileActivityCardItem: React.FC<ProfileActivityCardItemProps> = ({
         }
       } else if (itemType === 'game') {
         if (meta.is_hundred_percent) {
-          msg = isEs ? <>Se completó al 100% {renderTitle(rawTitle)}.</> : <>Completed 100% of {renderTitle(rawTitle)}.</>;
+          msg = isEs ? <>Se completó {renderTitle(rawTitle)} al 100%.</> : <>Completed 100% of {renderTitle(rawTitle)}.</>;
         } else if (status === 'completed') {
           msg = isEs ? <>Se terminó el juego {renderTitle(rawTitle)}.</> : <>Finished the game {renderTitle(rawTitle)}.</>;
         } else if (status === 'endless') {
@@ -6678,12 +6704,12 @@ const ProfileActivityCardItem: React.FC<ProfileActivityCardItemProps> = ({
       } else if (isComic) {
         displayTarget = formatComicIssueString(rawTitle, meta.series_title || meta.volume_title);
       }
-      msg = isEs ? <>Calificó {displayTarget}</> : <>Rated {displayTarget}</>;
+      msg = isEs ? <>Se calificó {displayTarget}</> : <>Rated {displayTarget}</>;
       break;
     }
 
     case 'guide_rated':
-      msg = isEs ? <>Calificó la guía {renderTitle(rawTitle)}</> : <>Rated guide {renderTitle(rawTitle)}</>;
+      msg = isEs ? <>Se calificó la guía {renderTitle(rawTitle)}</> : <>Rated guide {renderTitle(rawTitle)}</>;
       break;
 
     case 'item_reviewed': {
@@ -6698,26 +6724,26 @@ const ProfileActivityCardItem: React.FC<ProfileActivityCardItemProps> = ({
       const rVal = meta.rating !== undefined && meta.rating !== null ? meta.rating : null;
       if (rVal) {
         msg = isEs
-          ? <>Calificó y escribió una reseña de {displayTarget}</>
+          ? <>Se calificó y escribió una reseña de {displayTarget}</>
           : <>Rated and reviewed {displayTarget}</>;
       } else {
         msg = isEs
-          ? <>Escribió una reseña de {displayTarget}</>
+          ? <>Se escribió una reseña de {displayTarget}</>
           : <>Reviewed {displayTarget}</>;
       }
       break;
     }
 
     case 'guide_commented':
-      msg = isEs ? <>Comentó en la guía {renderTitle(rawTitle)}.</> : <>Commented on guide {renderTitle(rawTitle)}.</>;
+      msg = isEs ? <>Se comentó en la guía {renderTitle(rawTitle)}.</> : <>Commented on guide {renderTitle(rawTitle)}.</>;
       break;
 
     case 'social_commented':
-      msg = isEs ? 'Comentó en la Actividad Social.' : 'Commented on Social Activity.';
+      msg = isEs ? 'Se comentó en la Actividad Social.' : 'Commented on Social Activity.';
       break;
 
     case 'guide_review_commented':
-      msg = isEs ? 'Comentó en la reseña de una guía.' : 'Commented on a guide review.';
+      msg = isEs ? 'Se comentó en la reseña de una guía.' : 'Commented on a guide review.';
       break;
 
     default:

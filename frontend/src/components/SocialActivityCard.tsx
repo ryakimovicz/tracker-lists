@@ -165,7 +165,11 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
           if (rawType === 'movie') return isEs ? 'Vio' : 'Watched';
           if (['series', 'anime'].includes(rawType)) return isEs ? 'Terminó de ver' : 'Finished watching';
           if (isComicOrBook) return isEs ? 'Terminó de leer' : 'Finished reading';
-          if (isGame) return isEs ? 'Terminó el juego' : 'Finished the game';
+          if (isGame) {
+            return meta.is_hundred_percent
+              ? (isEs ? 'Completó al 100%' : '100% Completed')
+              : (isEs ? 'Terminó el juego' : 'Finished the game');
+          }
           return isEs ? 'Terminó' : 'Finished';
         }
         if (isComicOrBook) return isEs ? 'Leyó' : 'Read';
@@ -668,6 +672,30 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
                 ? (isComic ? (isEs ? 'Agregó y leyó del' : 'Added and read from') : (isEs ? 'Agregó y vio del' : 'Added and watched from'))
                 : (isComic ? (isEs ? 'Leyó del' : 'Read from') : (isEs ? 'Vio del' : 'Watched from'));
 
+              const isFinished = meta.finished_work !== undefined
+                ? Boolean(meta.finished_work)
+                : (meta.status === 'read' || meta.status === 'completed');
+              const workType = (activity.item_type || meta.item_type || '').toLowerCase();
+              let finishingSuffix = '.';
+
+
+              if (isFinished) {
+                if (workType === 'series') {
+                  finishingSuffix = isEs ? ', terminando la serie.' : ', finishing the series.';
+                } else if (workType === 'anime') {
+                  finishingSuffix = isEs ? ', terminando el anime.' : ', finishing the anime.';
+                } else if (workType === 'comic') {
+                  finishingSuffix = isEs ? ', terminando el cómic.' : ', finishing the comic.';
+                } else if (workType === 'manga') {
+                  finishingSuffix = isEs ? ', terminando el manga.' : ', finishing the manga.';
+                } else if (workType === 'book') {
+                  finishingSuffix = isEs ? ', terminando el libro.' : ', finishing the book.';
+                } else {
+                  finishingSuffix = isEs ? ', terminando la obra.' : ', finishing the work.';
+                }
+              }
+
+
               return (
                 <>
                   <span style={{ marginRight: '0.35rem' }}>{verb}</span>
@@ -680,9 +708,11 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
                   </span>
                   <span style={{ marginRight: '0.35rem' }}>{isEs ? 'de' : 'of'}</span>
                   {renderTitleWithBadge(workName)}
+                  <span>{finishingSuffix}</span>
                 </>
               );
             })()
+
           ) : parsedEpisode ? (
             (() => {
               const verb = activity.activity_type === 'item_rated'
@@ -736,10 +766,212 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
               );
             })()
           ) : (
-            <>
-              <span style={{ marginRight: '0.35rem' }}>{getActionPhrase()}</span>
-              {activity.item_title && renderTitleWithBadge(activity.item_title)}
-            </>
+            (() => {
+              const rawType = (activity.item_type || meta.item_type || '').toLowerCase();
+              const isComicOrBook = ['comic', 'manga', 'book'].includes(rawType);
+              const isWatchable = ['series', 'anime', 'movie', 'episode', 'season'].includes(rawType);
+              const isGame = rawType === 'game';
+              const titleNode = activity.item_title ? renderTitleWithBadge(activity.item_title) : null;
+
+              if (activity.activity_type === 'shelf_add' || activity.activity_type === 'item_added_to_library') {
+                return (
+                  <>
+                    <span style={{ marginRight: '0.35rem' }}>{isEs ? 'Agregó' : 'Added'}</span>
+                    {titleNode}
+                    <span style={{ marginLeft: '0.35rem' }}>{isEs ? 'a su estantería.' : 'to shelf.'}</span>
+                  </>
+                );
+              }
+
+              if (activity.activity_type === 'shelf_favorite' || activity.activity_type === 'item_favorited') {
+                return (
+                  <>
+                    <span style={{ marginRight: '0.35rem' }}>{isEs ? 'Agregó' : 'Added'}</span>
+                    {titleNode}
+                    <span style={{ marginLeft: '0.35rem' }}>{isEs ? 'a sus destacados.' : 'to favorites.'}</span>
+                  </>
+                );
+              }
+
+              if (activity.activity_type === 'item_status_changed' || activity.activity_type === 'item_completed') {
+                const status = (meta.status || activity.details || '').toLowerCase();
+                const isCompleted = activity.activity_type === 'item_completed' || status === 'completed' || status === 'read';
+
+                if (isCompleted) {
+                  if (rawType === 'movie') {
+                    return (
+                      <>
+                        <span style={{ marginRight: '0.35rem' }}>{isEs ? 'Vio' : 'Watched'}</span>
+                        {titleNode}
+                      </>
+                    );
+                  }
+                  if (['series', 'anime'].includes(rawType)) {
+                    return (
+                      <>
+                        <span style={{ marginRight: '0.35rem' }}>{isEs ? 'Terminó de ver' : 'Finished watching'}</span>
+                        {titleNode}
+                      </>
+                    );
+                  }
+                  if (isComicOrBook) {
+                    return (
+                      <>
+                        <span style={{ marginRight: '0.35rem' }}>{isEs ? 'Terminó de leer' : 'Finished reading'}</span>
+                        {titleNode}
+                      </>
+                    );
+                  }
+                  if (isGame) {
+                    if (meta.is_hundred_percent) {
+                      return (
+                        <>
+                          <span style={{ marginRight: '0.35rem' }}>{isEs ? 'Completó' : 'Completed'}</span>
+                          {titleNode}
+                          <span style={{ marginLeft: '0.35rem' }}>{isEs ? 'al 100%.' : '100%.'}</span>
+                        </>
+                      );
+                    }
+                    return (
+                      <>
+                        <span style={{ marginRight: '0.35rem' }}>{isEs ? 'Terminó el juego' : 'Finished the game'}</span>
+                        {titleNode}
+                      </>
+                    );
+                  }
+                  return (
+                    <>
+                      <span style={{ marginRight: '0.35rem' }}>{isEs ? 'Terminó' : 'Finished'}</span>
+                      {titleNode}
+                    </>
+                  );
+                }
+
+                // In progress / consumption statuses
+                if (status === 'watching' || (isWatchable && status === 'in_progress')) {
+                  return (
+                    <>
+                      <span style={{ marginRight: '0.35rem' }}>{isEs ? 'Comenzó a ver' : 'Started watching'}</span>
+                      {titleNode}
+                    </>
+                  );
+                }
+                if (status === 'reading' || (isComicOrBook && status === 'in_progress')) {
+                  return (
+                    <>
+                      <span style={{ marginRight: '0.35rem' }}>{isEs ? 'Comenzó a leer' : 'Started reading'}</span>
+                      {titleNode}
+                    </>
+                  );
+                }
+                if (status === 'playing' || (isGame && status === 'in_progress')) {
+                  return (
+                    <>
+                      <span style={{ marginRight: '0.35rem' }}>{isEs ? 'Comenzó a jugar a' : 'Started playing'}</span>
+                      {titleNode}
+                    </>
+                  );
+                }
+                if (status === 'endless' && isGame) {
+                  return (
+                    <>
+                      <span style={{ marginRight: '0.35rem' }}>{isEs ? 'Marcó' : 'Marked'}</span>
+                      {titleNode}
+                      <span style={{ marginLeft: '0.35rem' }}>{isEs ? 'como Infinito.' : 'as Endless.'}</span>
+                    </>
+                  );
+                }
+                if (status === 'plan_to_watch' || status === 'plan_to_read' || status === 'plan_to_play') {
+                  const label = isWatchable ? (isEs ? 'Por ver' : 'Plan to watch') : isComicOrBook ? (isEs ? 'Por leer' : 'Plan to read') : (isEs ? 'Por jugar' : 'Plan to play');
+                  return (
+                    <>
+                      <span style={{ marginRight: '0.35rem' }}>{isEs ? 'Marcó' : 'Marked'}</span>
+                      {titleNode}
+                      <span style={{ marginLeft: '0.35rem' }}>{isEs ? `como ${label}.` : `as ${label}.`}</span>
+                    </>
+                  );
+                }
+                if (status === 'on_hold') {
+                  return (
+                    <>
+                      <span style={{ marginRight: '0.35rem' }}>{isEs ? 'Marcó' : 'Marked'}</span>
+                      {titleNode}
+                      <span style={{ marginLeft: '0.35rem' }}>{isEs ? 'como En pausa.' : 'as On Hold.'}</span>
+                    </>
+                  );
+                }
+
+                // Fallback for general status change
+                return (
+                  <>
+                    <span style={{ marginRight: '0.35rem' }}>{isEs ? 'Actualizó el estado de' : 'Updated status of'}</span>
+                    {titleNode}
+                  </>
+                );
+              }
+
+              // Ratings and Reviews
+              if (activity.activity_type === 'item_rated') {
+                return (
+                  <>
+                    <span style={{ marginRight: '0.35rem' }}>{isEs ? 'Calificó' : 'Rated'}</span>
+                    {titleNode}
+                  </>
+                );
+              }
+
+              if (activity.activity_type === 'item_reviewed') {
+                return (
+                  <>
+                    <span style={{ marginRight: '0.35rem' }}>{isEs ? 'Escribió una reseña de' : 'Reviewed'}</span>
+                    {titleNode}
+                  </>
+                );
+              }
+
+              if (activity.activity_type === 'guide_created') {
+                return (
+                  <>
+                    <span style={{ marginRight: '0.35rem' }}>{isEs ? 'Creó la guía' : 'Created the guide'}</span>
+                    {titleNode}
+                  </>
+                );
+              }
+
+              if (activity.activity_type === 'guide_rated') {
+                return (
+                  <>
+                    <span style={{ marginRight: '0.35rem' }}>{isEs ? 'Calificó la guía' : 'Rated the guide'}</span>
+                    {titleNode}
+                  </>
+                );
+              }
+
+              if (activity.activity_type === 'guide_commented') {
+                return (
+                  <>
+                    <span style={{ marginRight: '0.35rem' }}>{isEs ? 'Comentó en la guía' : 'Commented on the guide'}</span>
+                    {titleNode}
+                  </>
+                );
+              }
+
+              if (activity.activity_type === 'user_followed') {
+                return (
+                  <>
+                    <span style={{ marginRight: '0.35rem' }}>{isEs ? 'Comenzó a seguir a' : 'Started following'}</span>
+                    {titleNode}
+                  </>
+                );
+              }
+
+              return (
+                <>
+                  <span style={{ marginRight: '0.35rem' }}>{getActionPhrase()}</span>
+                  {titleNode}
+                </>
+              );
+            })()
           )}
 
           {isHidden && (

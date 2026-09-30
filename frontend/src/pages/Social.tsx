@@ -57,6 +57,11 @@ export const Social: React.FC = () => {
         const seenEntity = new Map<string, number>();
 
         for (const item of res.data) {
+          const itemMeta = item.metadata_json ? (typeof item.metadata_json === 'string' ? JSON.parse(item.metadata_json) : item.metadata_json) : {};
+          if ((item.details || '').toLowerCase() === 'dropped' || (itemMeta.status || '').toLowerCase() === 'dropped') {
+            continue;
+          }
+
           const isReview = item.activity_type === 'item_reviewed';
           const isRating = item.activity_type === 'item_rated';
           const key = (isReview || isRating) && (item.external_id || item.item_title)

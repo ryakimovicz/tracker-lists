@@ -3127,6 +3127,8 @@ def bulk_toggle_episodes(
                 except Exception:
                     pass
 
+            is_finished_work = bool(lib_item and lib_item.status in (UserLibraryStatusEnum.READ, UserLibraryStatusEnum.COMPLETED))
+
             act_meta = {
                 "count": count,
                 "start_unit": start_unit,
@@ -3134,13 +3136,16 @@ def bulk_toggle_episodes(
                 "item_type": target_type,
                 "work_title": work_title,
                 "also_added": is_unified,
-                "is_range": count > 1
+                "is_range": count > 1,
+                "finished_work": is_finished_work,
+                "status": "completed" if is_finished_work else "in_progress"
             }
 
             if count == 1:
                 item_title_val = sorted_units[0].title
             else:
                 item_title_val = f"{work_title} ({start_unit} - {end_unit})"
+
 
             ActivityService.record_activity(
                 db=db,
@@ -3151,9 +3156,10 @@ def bulk_toggle_episodes(
                 external_id=work_ext_id,
                 list_id=list_id,
                 image_url=work_image_url,
-                details="completed",
+                details="completed" if is_finished_work else "in_progress",
                 metadata=act_meta
             )
+
 
         db.commit()
         if lib_item:

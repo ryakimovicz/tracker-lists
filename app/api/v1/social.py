@@ -610,6 +610,17 @@ def get_user_following(
 # --- 4. Helper for Activity Serialisation ---
 
 def _format_activity_item(r: UserActivityLog, db: Session, current_user_id: Optional[int], client_lang: str, client_country: str) -> Optional[ActivityFeedItemResponse]:
+    # Do not show abandoned/dropped events in Social feed
+    if (r.details or '').lower() == 'dropped':
+        return None
+    if r.metadata_json:
+        try:
+            m = json.loads(r.metadata_json) if isinstance(r.metadata_json, str) else r.metadata_json
+            if (m.get('status') or '').lower() == 'dropped':
+                return None
+        except Exception:
+            pass
+
     user = db.query(User).filter(User.id == r.user_id).first()
     if not user:
         return None
