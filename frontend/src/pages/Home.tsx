@@ -2149,9 +2149,7 @@ export const Home: React.FC = () => {
     const handleVisibilityOrFocus = () => {
       if (document.visibilityState === 'visible') {
         if (Date.now() - lastFetchRef.current > 20000) {
-          // Invalidate cached episode progress so the cards pull latest server progress
-          clearCachedSeriesMatching('list_');
-          clearCachedSeriesMatching('next_candidate_');
+          // Re-fetch dashboard silently in background without wiping local cache prematurely
           fetchDashboard(true);
         }
       }
@@ -2232,6 +2230,12 @@ export const Home: React.FC = () => {
 
       // For series, anime, and tracked comics in 'watching' / 'reading', only show if there is at least one issue/episode waiting
       if (i.item_type === "series" || i.item_type === "anime" || (i.item_type === "comic" && i.tracking_list_id)) {
+        // Instant check: if this device already determined that the work is caught up (no pending episodes/issues), exclude immediately
+        const savedCandidate = getCachedSeries(`next_candidate_${i.id}`);
+        if (savedCandidate?.isCaughtUp) {
+          return false;
+        }
+
         const isComic = i.item_type === "comic";
         const cacheKeyAll = `${i.external_id}_all_episodes`;
         const allEps = getCachedSeries(cacheKeyAll);
