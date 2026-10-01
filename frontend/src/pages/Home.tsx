@@ -691,6 +691,7 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
         }
         
         // Pick the first episode in chronological order that is still pending in the current cycle
+        const targetCycle = minSeen + 1;
         let candidate = aired.find((_, idx) => airedCounts[idx] < targetCycle) || null;
         if (candidate) {
           return { nextEp: candidate, isCaughtUp: false, initialLoad: false };
