@@ -1122,160 +1122,168 @@ export const Search: React.FC = () => {
   }, [selectedItem, currentShelfItem]);
 
   return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.75rem', position: 'relative' }}>
+    <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
       
-      {/* Sticky Search Header Panel */}
-      <section 
-        style={{ 
+      {/* Sticky Header Wrapper: Contains Search Panel AND (when not searching) Explore Subtabs */}
+      <div
+        style={{
           position: 'sticky',
-          top: '0px',
+          top: 0,
           zIndex: 40,
-          background: 'var(--bg-secondary)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
-          border: '1px solid var(--border-color)',
-          borderRadius: '16px',
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.35)',
-          padding: '1.5rem 2rem',
-          display: 'flex', 
-          flexDirection: 'column', 
-          gap: '1.15rem' 
+          background: 'var(--bg-primary)',
+          marginTop: '-2rem',
+          paddingTop: '1.25rem',
+          paddingBottom: '0.75rem',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '1rem',
+          borderBottom: '1px solid var(--border-color)',
+          boxShadow: '0 8px 24px rgba(0, 0, 0, 0.45)'
         }}
       >
-        <form onSubmit={handleSearch} style={{ display: 'flex', gap: '1rem' }}>
-          <div style={{ flex: 1, position: 'relative' }}>
-            <input
-              type="text"
-              required
-              className="input-field"
-              placeholder={activeTab === 'all' 
-                ? t('searchPlaceholder')
-                : (language === 'es' ? `Buscar en ${getCategoryLabel(activeTab)}...` : `Search in ${getCategoryLabel(activeTab)}...`)}
-              value={query}
-              onChange={(e) => {
-                const val = e.target.value;
-                setQuery(val);
-                if (val.trim() === '') {
-                  setSubmittedQuery('');
-                  setResults([]);
-                }
-              }}
-              style={{ paddingLeft: '2.5rem', paddingRight: query ? '2.5rem' : '1rem' }}
-            />
-            <SearchIcon size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)' }} />
-            {query && (
-              <button
-                type="button"
-                onClick={handleClearSearch}
-                title={language === 'es' ? 'Limpiar búsqueda' : 'Clear search'}
-                aria-label={language === 'es' ? 'Limpiar búsqueda' : 'Clear search'}
-                style={{
-                  position: 'absolute',
-                  right: '0.75rem',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  background: 'rgba(255, 255, 255, 0.1)',
-                  border: 'none',
-                  borderRadius: '50%',
-                  width: '22px',
-                  height: '22px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  color: 'var(--text-muted)',
-                  padding: 0,
-                  transition: 'background 0.2s, color 0.2s'
+        {/* Search Header Panel */}
+        <section 
+          style={{ 
+            background: 'var(--bg-secondary)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            border: '1px solid var(--border-color)',
+            borderRadius: '16px',
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.25)',
+            padding: '1.25rem 1.75rem',
+            display: 'flex', 
+            flexDirection: 'column', 
+            gap: '1rem' 
+          }}
+        >
+          <form onSubmit={handleSearch} style={{ display: 'flex', gap: '1rem' }}>
+            <div style={{ flex: 1, position: 'relative' }}>
+              <input
+                type="text"
+                required
+                className="input-field"
+                placeholder={activeTab === 'all' 
+                  ? t('searchPlaceholder')
+                  : (language === 'es' ? `Buscar en ${getCategoryLabel(activeTab)}...` : `Search in ${getCategoryLabel(activeTab)}...`)}
+                value={query}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setQuery(val);
+                  if (val.trim() === '') {
+                    setSubmittedQuery('');
+                    setResults([]);
+                  }
                 }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.25)';
-                  e.currentTarget.style.color = '#ffffff';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-                  e.currentTarget.style.color = 'var(--text-muted)';
-                }}
-              >
-                <X size={14} />
-              </button>
-            )}
+                style={{ paddingLeft: '2.5rem', paddingRight: query ? '2.5rem' : '1rem' }}
+              />
+              <SearchIcon size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)' }} />
+              {query && (
+                <button
+                  type="button"
+                  onClick={handleClearSearch}
+                  title={language === 'es' ? 'Limpiar búsqueda' : 'Clear search'}
+                  aria-label={language === 'es' ? 'Limpiar búsqueda' : 'Clear search'}
+                  style={{
+                    position: 'absolute',
+                    right: '0.75rem',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'rgba(255, 255, 255, 0.1)',
+                    border: 'none',
+                    borderRadius: '50%',
+                    width: '22px',
+                    height: '22px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    color: 'var(--text-muted)',
+                    padding: 0,
+                    transition: 'background 0.2s, color 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.25)';
+                    e.currentTarget.style.color = '#ffffff';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                    e.currentTarget.style.color = 'var(--text-muted)';
+                  }}
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+
+            <button type="submit" disabled={isSearching} className="btn-primary" style={{ padding: '0 2.5rem' }}>
+              {isSearching ? '...' : t('searchButton')}
+            </button>
+          </form>
+
+          {/* Permanent Category Tabs */}
+          <div style={{
+            display: 'flex',
+            gap: '0.5rem',
+            overflowX: 'auto',
+            paddingTop: '0.15rem',
+            paddingBottom: '0.15rem',
+            WebkitOverflowScrolling: 'touch'
+          }}>
+            {sortFilterTabs([
+              { value: 'all', label: language === 'es' ? 'Todo' : 'All' },
+              { value: 'movie', label: language === 'es' ? 'Películas' : 'Movies' },
+              { value: 'series', label: language === 'es' ? 'Series' : 'Shows' },
+              { value: 'anime', label: 'Anime' },
+              { value: 'book', label: language === 'es' ? 'Libros' : 'Books' },
+              { value: 'comic', label: language === 'es' ? 'Cómics' : 'Comics' },
+              { value: 'manga', label: 'Mangas' },
+              { value: 'game', label: language === 'es' ? 'Juegos' : 'Games' },
+              { value: 'user', label: language === 'es' ? 'Usuarios' : 'Users' },
+              { value: 'guide', label: language === 'es' ? 'Guías' : 'Guides' }
+            ], user?.category_order).map(tab => {
+              const isSelected = activeTab === tab.value;
+              const tabColor = tab.value === 'all' 
+                ? 'var(--accent-primary)' 
+                : tab.value === 'user' 
+                ? 'var(--color-user, #ec4899)' 
+                : `var(--color-${tab.value})`;
+              const tabTextColor = tab.value === 'all' 
+                ? '#ffffff' 
+                : `var(--color-text-${tab.value})`;
+
+              return (
+                <button
+                  key={tab.value}
+                  type="button"
+                  onClick={() => handleTabClick(tab.value as any)}
+                  className={`profile-category-tab ${isSelected ? 'selected' : ''}`}
+                  style={{
+                    padding: '0.35rem 0.85rem',
+                    fontSize: '0.85rem',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.4rem',
+                    '--tab-color': tabColor,
+                    '--tab-text': tabTextColor
+                  } as React.CSSProperties}
+                >
+                  {getCategoryIcon(tab.value, { size: 14, color: isSelected ? tabTextColor : tabColor })}
+                  <span>{tab.label}</span>
+                </button>
+              );
+            })}
           </div>
+        </section>
 
-          <button type="submit" disabled={isSearching} className="btn-primary" style={{ padding: '0 2.5rem' }}>
-            {isSearching ? '...' : t('searchButton')}
-          </button>
-        </form>
-
-        {/* Permanent Category Tabs */}
-        <div style={{
-          display: 'flex',
-          gap: '0.5rem',
-          overflowX: 'auto',
-          paddingTop: '0.15rem',
-          paddingBottom: '0.15rem',
-          WebkitOverflowScrolling: 'touch'
-        }}>
-          {sortFilterTabs([
-            { value: 'all', label: language === 'es' ? 'Todo' : 'All' },
-            { value: 'movie', label: language === 'es' ? 'Películas' : 'Movies' },
-            { value: 'series', label: language === 'es' ? 'Series' : 'Shows' },
-            { value: 'anime', label: 'Anime' },
-            { value: 'book', label: language === 'es' ? 'Libros' : 'Books' },
-            { value: 'comic', label: language === 'es' ? 'Cómics' : 'Comics' },
-            { value: 'manga', label: 'Mangas' },
-            { value: 'game', label: language === 'es' ? 'Juegos' : 'Games' },
-            { value: 'user', label: language === 'es' ? 'Usuarios' : 'Users' },
-            { value: 'guide', label: language === 'es' ? 'Guías' : 'Guides' }
-          ], user?.category_order).map(tab => {
-            const isSelected = activeTab === tab.value;
-            const tabColor = tab.value === 'all' 
-              ? 'var(--accent-primary)' 
-              : tab.value === 'user' 
-              ? 'var(--color-user, #ec4899)' 
-              : `var(--color-${tab.value})`;
-            const tabTextColor = tab.value === 'all' 
-              ? '#ffffff' 
-              : `var(--color-text-${tab.value})`;
-
-            return (
-              <button
-                key={tab.value}
-                type="button"
-                onClick={() => handleTabClick(tab.value as any)}
-                className={`profile-category-tab ${isSelected ? 'selected' : ''}`}
-                style={{
-                  padding: '0.35rem 0.85rem',
-                  fontSize: '0.85rem',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.4rem',
-                  '--tab-color': tabColor,
-                  '--tab-text': tabTextColor
-                } as React.CSSProperties}
-              >
-                {getCategoryIcon(tab.value, { size: 14, color: isSelected ? tabTextColor : tabColor })}
-                <span>{tab.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      </section>
-
-      {submittedQuery === '' ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-          
+        {/* Explore Subtabs (Novedades, Tendencias, Guías) stick directly under the Search Panel */}
+        {submittedQuery === '' && (
           <div 
             style={{ 
               display: "flex", 
               alignItems: "center", 
               gap: "1.5rem", 
-              borderBottom: "1px solid var(--border-color)", 
-              paddingBottom: "0.25rem", 
-              position: "sticky",
-              top: "148px",
-              zIndex: 35,
-              background: "var(--bg-primary)",
-              paddingTop: "0.5rem"
+              paddingTop: "0.25rem",
+              paddingBottom: "0.25rem"
             }}
           >
             <button 
@@ -1347,6 +1355,11 @@ export const Search: React.FC = () => {
               )}
             </button>
           </div>
+        )}
+      </div>
+
+      {submittedQuery === '' ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
 
           {exploreSubTab === 'guias' ? (
             <ExploreGuidesSection
