@@ -4078,6 +4078,13 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     const canonicalSeasons = (seasons || []).filter((s: any) => s.season_number > 0 && !s.is_extras);
     let totalEpisodes = canonicalSeasons.reduce((acc: number, s: any) => acc + (s.episode_count || 0), 0);
 
+    // For TV series/anime, find all significant specials
+    let significantSpecials: any[] = [];
+    if (!isComic && Array.isArray(cachedAll) && cachedAll.length > 0) {
+      significantSpecials = cachedAll.filter((e: any) => (e.is_significant_special || e.ep_type === 'significant_special') && !e.is_extra);
+      totalEpisodes += significantSpecials.length;
+    }
+
     if (isComic) {
       const comicIssueCount =
         volMeta?.count_of_issues ||
@@ -4105,7 +4112,21 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
         return !!globalProgress[idKey] || !!globalProgress[cleanEpId];
       }).length;
     } else {
-      completedEpisodes = currentEpisodes.filter((ep: any) => ep.is_completed && ep.season_number !== 0 && !ep.is_extra).length;
+      // Completed regular episodes (season > 0, not extra)
+      const completedRegular = currentEpisodes.filter((ep: any) => ep.is_completed && ep.season_number !== 0 && !ep.is_extra && ep.ep_type !== 'insignificant_special').length;
+      
+      // Completed significant specials
+      let completedSpecials = 0;
+      if (significantSpecials.length > 0) {
+        completedSpecials = significantSpecials.filter((sp: any) => {
+          const extId = typeof sp.id === 'string' && sp.id.startsWith('tvm-ep-') ? sp.id : `tvm-ep-${sp.id}`;
+          if (globalProgress[extId] !== undefined) return !!globalProgress[extId];
+          const found = currentEpisodes.find((x: any) => x.external_id === extId || x.id === sp.id);
+          return found ? !!found.is_completed : false;
+        }).length;
+      }
+
+      completedEpisodes = completedRegular + completedSpecials;
     }
 
     // Check if the series / comic volume is ended/finished forever
@@ -4116,7 +4137,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       ? (selectedItem?.is_ended === true || volMeta?.is_ended === true || volMeta?.status === 'Ended' || selectedItem?.status === 'Ended' || (startYr > 0 && startYr < currentYear - 1))
       : (showStatusStr === 'ended' || showStatusStr === 'canceled' || showStatusStr === 'cancelled' || selectedItem?.is_ended === true);
 
-    // Truly finished ONLY if series is ended AND all total episodes of all seasons are completed (must have totalEpisodes > 0)
+    // Truly finished ONLY if series is ended AND all total episodes (regular + relevant specials) are completed (must have totalEpisodes > 0)
     const knownVolIssues = isComic ? (volMeta?.count_of_issues || selectedItem?.count_of_issues || volMeta?.total_issues || selectedItem?.total_issues) : null;
     const isTrulyCompleted = (canonicalSeasons.length > 0 || isComic) && isEnded && totalEpisodes > 0 && completedEpisodes >= totalEpisodes && (!knownVolIssues || completedEpisodes >= knownVolIssues);
 

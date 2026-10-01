@@ -1612,8 +1612,8 @@ def check_series_completion(user_id: int, ep_external_id: str):
         if not show_id:
             return
             
-        # 2. Get all episodes for the show
-        episodes_url = f"https://api.tvmaze.com/shows/{show_id}/episodes"
+        # 2. Get all episodes for the show (including specials)
+        episodes_url = f"https://api.tvmaze.com/shows/{show_id}/episodes?specials=1"
         req2 = urllib.request.Request(episodes_url, headers={"User-Agent": "TrackerLists/1.0"})
         with urllib.request.urlopen(req2, timeout=5) as response2:
             if response2.status == 200:
@@ -1635,7 +1635,21 @@ def check_series_completion(user_id: int, ep_external_id: str):
                     adate = ep_dict.get("airdate")
                     return bool(adate and adate <= now_date)
 
-                aired_episodes = [ep for ep in episodes if is_ep_aired(ep)]
+                # Strict completion rule: regular episodes + significant specials (exclude extras / insignificant)
+                def is_valid_for_completion(ep_dict):
+                    if not is_ep_aired(ep_dict):
+                        return False
+                    season_num = ep_dict.get("season", 0)
+                    is_extra = ep_dict.get("is_extra", False)
+                    ep_type = ep_dict.get("ep_type", "")
+                    is_sig = ep_dict.get("is_significant_special", False) or ep_type == "significant_special"
+                    # If season is 0, only include if explicitly marked as significant special
+                    if season_num == 0:
+                        return is_sig and not is_extra and ep_type != "insignificant_special"
+                    # Regular seasons: include unless marked as extra/insignificant
+                    return not is_extra and ep_type != "insignificant_special"
+
+                aired_episodes = [ep for ep in episodes if is_valid_for_completion(ep)]
                 total_aired = len(aired_episodes)
                 
                 if total_aired == 0:

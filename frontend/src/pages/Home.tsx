@@ -895,7 +895,16 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
             nextCandidate = candidate;
           }
         } else {
-          isLastEpisodeOfAll = true;
+          // Strictly verify that all valid episodes (regulars + significant specials) are completed
+          const allOtherWatched = sortedAllEps.every((ep: any) => {
+            const epId = String(ep.id || '').replace('cv_issue_', '').replace('tvm-ep-', '');
+            if (epId === cleanCurrentId) return true; // It is the one we are marking right now
+            const fullEpId = isComic ? (String(ep.id).startsWith('cv_issue_') ? String(ep.id) : `cv_issue_${ep.id}`) : (String(ep.id).startsWith('tvm-ep-') ? String(ep.id) : `tvm-ep-${ep.id}`);
+            return trackedEpisodes.has(fullEpId) || trackedEpisodes.has(epId);
+          });
+          if (allOtherWatched) {
+            isLastEpisodeOfAll = true;
+          }
         }
       }
     }
