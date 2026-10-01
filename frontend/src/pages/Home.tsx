@@ -970,13 +970,14 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
       episode_number: currentEpToMark.episode_number ?? currentEpToMark.issue_number ?? null,
       is_significant_special: isCurrentSpecial
     }).then(async () => {
+      let stateChanged = false;
       // If the series / comic was in plan_to_watch / plan_to_read, move it to in-progress
       if (item.status === 'plan_to_watch' || item.status === 'plan_to_read') {
         try {
           const nextSt = isComic ? 'reading' : 'watching';
           await apiClient.put(`/library/${item.id}`, { status: nextSt });
+          stateChanged = true;
           onUpdate();
-          window.dispatchEvent(new Event('library-updated'));
         } catch (e) {}
       }
 
@@ -985,10 +986,14 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
         try {
           const compSt = isComic ? 'read' : 'completed';
           await apiClient.put(`/library/${item.id}`, { status: compSt });
+          stateChanged = true;
           onUpdate();
-          window.dispatchEvent(new Event('library-updated'));
         } catch (e) {}
       }
+
+      // Always notify the app that activity was logged and library/progress changed
+      window.dispatchEvent(new Event('library-updated'));
+      window.dispatchEvent(new Event('progress-updated'));
     }).catch(err => {
       console.error("Failed to mark item in background", err);
       optimisticLockUntilRef.current = 0;

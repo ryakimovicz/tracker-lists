@@ -246,35 +246,43 @@ export const Social: React.FC = () => {
   const lastFeedFetchRef = useRef<number>(Date.now());
 
   useEffect(() => {
+    // Show cached immediately, then fetch fresh in background
     fetchTabFeed(activeTab);
     setHasNewUpdates(false);
     lastFeedFetchRef.current = Date.now();
   }, [activeTab]);
 
-  // Check for updates when user returns to the tab after 45s
+  // Listen to system library and progress events to immediately refresh Social in the background
+  useEffect(() => {
+    const handleImmediateRefresh = () => {
+      // Clear cache for current tab and refetch fresh activities immediately
+      try {
+        sessionStorage.removeItem(`pathd_social_feed_${activeTab}`);
+        localStorage.removeItem(`pathd_social_feed_${activeTab}`);
+      } catch (_) {}
+      fetchTabFeed(activeTab, true);
+    };
+
+    window.addEventListener('library-updated', handleImmediateRefresh);
+    window.addEventListener('progress-updated', handleImmediateRefresh);
+    window.addEventListener('activity-created', handleImmediateRefresh);
+
+    return () => {
+      window.removeEventListener('library-updated', handleImmediateRefresh);
+      window.removeEventListener('progress-updated', handleImmediateRefresh);
+      window.removeEventListener('activity-created', handleImmediateRefresh);
+    };
+  }, [activeTab]);
+
+  // Check for updates when user returns to the tab or refocuses
   useEffect(() => {
     const handleVisibilityOrFocus = async () => {
       if (document.visibilityState === 'visible') {
         const timePassed = Date.now() - lastFeedFetchRef.current;
-        if (timePassed > 45000 && !loading && !refreshing) {
-          // Peek silently to see if first activity changed
-          try {
-            let endpoint = '/social/feed/following';
-            if (activeTab === 'discover') endpoint = '/social/feed/discover';
-            else if (activeTab === 'reviews') endpoint = '/social/feed/reviews';
-            else if (activeTab === 'me') endpoint = '/social/feed/me';
-
-            const res = await apiClient.get(endpoint);
-            if (Array.isArray(res.data) && res.data.length > 0) {
-              const latestId = res.data[0]?.id;
-              const currentId = activities[0]?.id;
-              if (latestId && currentId && latestId !== currentId) {
-                setHasNewUpdates(true);
-              }
-            }
-          } catch (e) {
-            // ignore silent peek errors
-          }
+        // If more than 5 seconds passed, refresh feed to keep Social totally up to date
+        if (timePassed > 5000 && !loading && !refreshing) {
+          fetchTabFeed(activeTab, true);
+          lastFeedFetchRef.current = Date.now();
         }
       }
     };
@@ -285,7 +293,7 @@ export const Social: React.FC = () => {
       document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
       window.removeEventListener('focus', handleVisibilityOrFocus);
     };
-  }, [activeTab, activities, loading, refreshing]);
+  }, [activeTab, loading, refreshing]);
 
   const handleTabChange = (tab: SocialTab) => {
     setHasNewUpdates(false);

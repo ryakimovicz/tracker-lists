@@ -1652,15 +1652,40 @@ export const Profile: React.FC = () => {
 
     fetchProfileAndLibrary();
 
+    const fetchActivitiesFast = async () => {
+      try {
+        const targetId = userIdParam || profile?.id;
+        const actUrl = targetId ? `/users/${targetId}/activity` : '/users/me/activity';
+        const res = await apiClient.get(actUrl);
+        if (Array.isArray(res.data)) {
+          setActivities(res.data);
+          try {
+            sessionStorage.setItem(targetId ? `pathd_user_act_${targetId}` : 'pathd_act_cache', JSON.stringify(res.data));
+          } catch (_) {}
+        }
+      } catch (_) {}
+    };
+
     const handleProfileUpdate = () => {
+      // Refresh activities instantly in parallel with full profile/library reload
+      fetchActivitiesFast();
       fetchProfileAndLibrary();
+    };
+
+    const handleActivityOrProgressUpdate = () => {
+      fetchActivitiesFast();
     };
 
     window.addEventListener('profile-updated', handleProfileUpdate);
     window.addEventListener('library-updated', handleProfileUpdate);
+    window.addEventListener('progress-updated', handleActivityOrProgressUpdate);
+    window.addEventListener('activity-created', handleActivityOrProgressUpdate);
+
     return () => {
       window.removeEventListener('profile-updated', handleProfileUpdate);
       window.removeEventListener('library-updated', handleProfileUpdate);
+      window.removeEventListener('progress-updated', handleActivityOrProgressUpdate);
+      window.removeEventListener('activity-created', handleActivityOrProgressUpdate);
     };
   }, [usernameParam, userIdParam]);
 
