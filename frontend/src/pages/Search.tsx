@@ -1122,23 +1122,21 @@ export const Search: React.FC = () => {
   }, [selectedItem, currentShelfItem]);
 
   return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
+    <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
       
       {/* Sticky Header Wrapper: Contains Search Panel AND (when not searching) Explore Subtabs */}
       <div
         style={{
           position: 'sticky',
           top: 0,
-          zIndex: 40,
+          zIndex: 50,
           background: 'var(--bg-primary)',
           marginTop: '-2rem',
-          paddingTop: '1.25rem',
-          paddingBottom: '0.75rem',
+          paddingTop: '2rem',
+          paddingBottom: 0,
           display: 'flex',
           flexDirection: 'column',
-          gap: '1rem',
-          borderBottom: '1px solid var(--border-color)',
-          boxShadow: '0 8px 24px rgba(0, 0, 0, 0.45)'
+          gap: '1.25rem'
         }}
       >
         {/* Search Header Panel */}
@@ -1281,77 +1279,78 @@ export const Search: React.FC = () => {
             style={{ 
               display: "flex", 
               alignItems: "center", 
-              gap: "1.5rem", 
-              paddingTop: "0.25rem",
-              paddingBottom: "0.25rem"
+              gap: "1.75rem", 
+              borderBottom: "1px solid var(--border-color)",
+              paddingBottom: "0.75rem",
+              paddingTop: "0.25rem"
             }}
           >
             <button 
               onClick={() => setExploreSubTab('nuevo')}
               style={{
-                fontSize: "1.05rem", fontWeight: exploreSubTab === 'nuevo' ? 700 : 500,
+                fontSize: "1.05rem", fontWeight: exploreSubTab === 'nuevo' ? 600 : 500,
                 color: exploreSubTab === 'nuevo' ? "var(--text-primary)" : "var(--text-secondary)",
                 background: "transparent",
                 border: "none",
                 cursor: "pointer",
-                padding: "0.4rem 0.2rem",
+                padding: "0.25rem 0",
                 position: "relative",
-                display: "flex",
+                display: "inline-flex",
                 alignItems: "center",
-                gap: "0.45rem",
-                transition: "all 0.2s ease"
+                gap: "0.5rem",
+                transition: "color 0.15s ease"
               }}
             >
               <Rocket size={17} color={exploreSubTab === 'nuevo' ? "var(--accent-primary)" : "currentColor"} />
               <span>{t('exploreNew')}</span>
               {exploreSubTab === 'nuevo' && (
-                <div style={{ position: "absolute", bottom: "-0.3rem", left: 0, right: 0, height: "2.5px", background: "var(--accent-primary)", borderRadius: "3px" }} />
+                <div style={{ position: "absolute", bottom: "-0.75rem", left: 0, right: 0, height: "2px", background: "var(--accent-primary)" }} />
               )}
             </button>
 
             <button 
               onClick={() => setExploreSubTab('tendencias')}
               style={{
-                fontSize: "1.05rem", fontWeight: exploreSubTab === 'tendencias' ? 700 : 500,
+                fontSize: "1.05rem", fontWeight: exploreSubTab === 'tendencias' ? 600 : 500,
                 color: exploreSubTab === 'tendencias' ? "var(--text-primary)" : "var(--text-secondary)",
                 background: "transparent",
                 border: "none",
                 cursor: "pointer",
-                padding: "0.4rem 0.2rem",
+                padding: "0.25rem 0",
                 position: "relative",
-                display: "flex",
+                display: "inline-flex",
                 alignItems: "center",
-                gap: "0.45rem",
-                transition: "all 0.2s ease"
+                gap: "0.5rem",
+                transition: "color 0.15s ease"
               }}
             >
               <Flame size={17} color={exploreSubTab === 'tendencias' ? "#f97316" : "currentColor"} />
               <span>{t('exploreTrending')}</span>
               {exploreSubTab === 'tendencias' && (
-                <div style={{ position: "absolute", bottom: "-0.3rem", left: 0, right: 0, height: "2.5px", background: "#f97316", borderRadius: "3px" }} />
+                <div style={{ position: "absolute", bottom: "-0.75rem", left: 0, right: 0, height: "2px", background: "#f97316" }} />
               )}
             </button>
 
             <button 
               onClick={() => setExploreSubTab('guias')}
               style={{
-                fontSize: "1.05rem", fontWeight: exploreSubTab === 'guias' ? 700 : 500,
+                fontSize: "1.05rem", fontWeight: exploreSubTab === 'guias' ? 600 : 500,
                 color: exploreSubTab === 'guias' ? "var(--text-primary)" : "var(--text-secondary)",
                 background: "transparent",
                 border: "none",
                 cursor: "pointer",
-                padding: "0.4rem 0.2rem",
+                padding: "0.25rem 0",
                 position: "relative",
-                display: "flex",
+                display: "inline-flex",
                 alignItems: "center",
-                gap: "0.45rem",
-                transition: "all 0.2s ease"
+                gap: "0.5rem",
+                transition: "color 0.15s ease"
               }}
             >
               <BookOpen size={17} color={exploreSubTab === 'guias' ? "var(--color-guide)" : "currentColor"} />
               <span>{t('exploreGuides')}</span>
               {exploreSubTab === 'guias' && (
-                <div style={{ position: "absolute", bottom: "-0.3rem", left: 0, right: 0, height: "2.5px", background: "var(--color-guide)", borderRadius: "3px" }} />
+                <div style={{ position: "absolute", bottom: "-0.75rem", left: 0, right: 0, height: "2px", background: "var(--color-guide)" }} />
               )}
             </button>
           </div>
@@ -1359,7 +1358,7 @@ export const Search: React.FC = () => {
       </div>
 
       {submittedQuery === '' ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem', marginTop: '1rem' }}>
 
           {exploreSubTab === 'guias' ? (
             <ExploreGuidesSection

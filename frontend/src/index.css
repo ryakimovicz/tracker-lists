@@ -232,7 +232,7 @@ body {
   flex: 1;
   min-width: 0;
   padding: 2rem 1.5rem;
-  overflow-x: hidden;
+  overflow-x: clip;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
