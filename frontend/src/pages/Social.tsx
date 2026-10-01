@@ -52,9 +52,20 @@ export const Social: React.FC = () => {
 
       const res = await apiClient.get(endpoint);
       if (Array.isArray(res.data)) {
-        // Consolidate legacy dual activities (one item_rated + one item_reviewed for same entity/item)
+        // Consolidate legacy dual activities:
+        // 1. One item_rated + one item_reviewed for same entity/item
+        // 2. An episode/issue watch/read event + a work completed event for the same user & series/comic
         const consolidated: ActivityCardData[] = [];
-        const seenEntity = new Map<string, number>();
+        const seenReviewRating = new Map<string, number>();
+
+        // Helper to extract series / work title & id for grouping
+        const getWorkIdent = (item: ActivityCardData) => {
+          const meta = item.metadata_json ? (typeof item.metadata_json === 'string' ? JSON.parse(item.metadata_json) : item.metadata_json) : {};
+          const workTitle = (meta.series_title || meta.volume_title || meta.show_name || meta.work_title || '').trim().toLowerCase();
+          const seriesExtId = (meta.series_external_id || meta.parent_external_id || meta.volume_id || '').trim().toLowerCase();
+          const cleanItemTitle = (item.item_title || '').trim().toLowerCase();
+          return { workTitle, seriesExtId, cleanItemTitle, meta };
+        };
 
         for (const item of res.data) {
           const itemMeta = item.metadata_json ? (typeof item.metadata_json === 'string' ? JSON.parse(item.metadata_json) : item.metadata_json) : {};
@@ -64,14 +75,13 @@ export const Social: React.FC = () => {
 
           const isReview = item.activity_type === 'item_reviewed';
           const isRating = item.activity_type === 'item_rated';
-          const key = (isReview || isRating) && (item.external_id || item.item_title)
+          const reviewKey = (isReview || isRating) && (item.external_id || item.item_title)
             ? `${item.user_id}_${item.external_id || item.item_title}`
             : null;
 
-          if (key && seenEntity.has(key)) {
-            const idx = seenEntity.get(key)!;
+          if (reviewKey && seenReviewRating.has(reviewKey)) {
+            const idx = seenReviewRating.get(reviewKey)!;
             const existing = consolidated[idx];
-            // If existing is item_reviewed and current is item_rated, extract rating into meta
             if (existing.activity_type === 'item_reviewed' && isRating) {
               try {
                 const meta = existing.metadata_json ? (typeof existing.metadata_json === 'string' ? JSON.parse(existing.metadata_json) : existing.metadata_json) : {};
@@ -82,7 +92,6 @@ export const Social: React.FC = () => {
               } catch (_) {}
               continue;
             } else if (existing.activity_type === 'item_rated' && isReview) {
-              // Current review takes precedence, copy existing rating into review's meta
               try {
                 const meta = item.metadata_json ? (typeof item.metadata_json === 'string' ? JSON.parse(item.metadata_json) : item.metadata_json) : {};
                 if (!meta.rating && existing.details) {
@@ -95,10 +104,73 @@ export const Social: React.FC = () => {
             }
           }
 
-          if (key) {
-            seenEntity.set(key, consolidated.length);
+          if (reviewKey) {
+            seenReviewRating.set(reviewKey, consolidated.length);
           }
-          consolidated.push(item);
+
+          // Check for work completion unification:
+          // An episode/issue event and a work completed event (item_completed or status=completed/read)
+          const isWorkCompletion = (item.activity_type === 'item_completed' || item.activity_type === 'item_status_changed') &&
+            (itemMeta.status === 'completed' || itemMeta.status === 'read' || (item.details || '').toLowerCase() === 'completed' || (item.details || '').toLowerCase() === 'read');
+
+          const isUnitConsumption = (item.activity_type === 'episode_watched' || item.activity_type === 'issue_read' || item.activity_type === 'item_progress_updated' || item.activity_type === 'item_status_changed') &&
+            ((item.external_id && (String(item.external_id).startsWith('tvm-ep-') || String(item.external_id).startsWith('cv_issue_'))) || item.item_type === 'episode');
+
+          let mergedWithExisting = false;
+
+          if (isWorkCompletion) {
+            // Find recent unit consumption event by the same user for this work (within the consolidated list)
+            const itemWorkTitle = (item.item_title || '').trim().toLowerCase();
+            const itemWorkExt = (item.external_id || '').trim().toLowerCase();
+            for (let i = consolidated.length - 1; i >= Math.max(0, consolidated.length - 15); i--) {
+              const target = consolidated[i];
+              if (target.user_id !== item.user_id) continue;
+              const targetIdent = getWorkIdent(target);
+              const matchesWork = (itemWorkExt && targetIdent.seriesExtId && itemWorkExt === targetIdent.seriesExtId) ||
+                (itemWorkTitle && targetIdent.workTitle && itemWorkTitle === targetIdent.workTitle) ||
+                (itemWorkTitle && target.item_title && target.item_title.toLowerCase().startsWith(itemWorkTitle));
+              
+              if (matchesWork) {
+                // Merge completion flag into target unit activity
+                const targetMeta = target.metadata_json ? (typeof target.metadata_json === 'string' ? JSON.parse(target.metadata_json) : target.metadata_json) : {};
+                targetMeta.finished_work = true;
+                target.metadata_json = JSON.stringify(targetMeta);
+                mergedWithExisting = true;
+                break;
+              }
+            }
+          } else if (isUnitConsumption) {
+            // Check if there is already a work completion event for this work in consolidated
+            const unitIdent = getWorkIdent(item);
+            for (let i = consolidated.length - 1; i >= Math.max(0, consolidated.length - 15); i--) {
+              const target = consolidated[i];
+              if (target.user_id !== item.user_id) continue;
+              const targetMeta = target.metadata_json ? (typeof target.metadata_json === 'string' ? JSON.parse(target.metadata_json) : target.metadata_json) : {};
+              const targetIsCompletion = (target.activity_type === 'item_completed' || target.activity_type === 'item_status_changed') &&
+                (targetMeta.status === 'completed' || targetMeta.status === 'read' || (target.details || '').toLowerCase() === 'completed' || (target.details || '').toLowerCase() === 'read');
+              
+              if (targetIsCompletion) {
+                const targetTitle = (target.item_title || '').trim().toLowerCase();
+                const targetExt = (target.external_id || '').trim().toLowerCase();
+                const matchesWork = (targetExt && unitIdent.seriesExtId && targetExt === unitIdent.seriesExtId) ||
+                  (targetTitle && unitIdent.workTitle && targetTitle === unitIdent.workTitle) ||
+                  (targetTitle && item.item_title && item.item_title.toLowerCase().startsWith(targetTitle));
+
+                if (matchesWork) {
+                  // Replace the stand-alone completion event with this episode/issue event, marking it finished_work = true
+                  itemMeta.finished_work = true;
+                  item.metadata_json = JSON.stringify(itemMeta);
+                  consolidated[i] = item;
+                  mergedWithExisting = true;
+                  break;
+                }
+              }
+            }
+          }
+
+          if (!mergedWithExisting) {
+            consolidated.push(item);
+          }
         }
 
         setActivities(consolidated);

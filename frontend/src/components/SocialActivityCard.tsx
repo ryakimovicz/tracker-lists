@@ -325,7 +325,30 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
       const ePadded = episodeNum < 10 ? `0${episodeNum}` : `${episodeNum}`;
       const epCode = isEs ? `T${sPadded} | E${ePadded}` : `S${sPadded} | E${ePadded}`;
       const episodeName = (match[4] || '').trim();
-      return { seriesName, epCode, episodeName };
+      return { seriesName, epCode, episodeName, isSpecial: false };
+    }
+
+    // Special episode format in title: "Series - Especial / Special - Name"
+    const specialMatch = rawText.match(/^(.*?)\s*-\s*(?:Especial|Special)\s*-\s*(.*)$/i);
+    if (specialMatch) {
+      const seriesName = (specialMatch[1] || meta.show_name || meta.series_title || '').trim();
+      const episodeName = (specialMatch[2] || '').trim();
+      return { seriesName, epCode: isEs ? 'Especial' : 'Special', episodeName, isSpecial: true };
+    }
+
+    // Check metadata for special flag
+    if (meta.is_significant_special || meta.is_special || (meta.season_number === 0 && !meta.episode_number)) {
+      let seriesName = (meta.show_name || meta.series_title || '').trim();
+      let episodeName = '';
+      if (!seriesName && rawText.includes(' - ')) {
+        seriesName = rawText.split(' - ')[0].trim();
+      }
+      if (rawText.includes(' - ')) {
+        episodeName = rawText.split(' - ').slice(1).join(' - ').replace(/^(?:Especial|Special)\s*-\s*/i, '').trim();
+      } else if (!rawText.startsWith('Episode (')) {
+        episodeName = rawText;
+      }
+      return { seriesName, epCode: isEs ? 'Especial' : 'Special', episodeName, isSpecial: true };
     }
 
     // Fallback: check metadata for season & episode numbers
@@ -347,7 +370,7 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
         episodeName = rawText;
       }
 
-      return { seriesName, epCode, episodeName };
+      return { seriesName, epCode, episodeName, isSpecial: false };
     }
 
     // Fallback for "Series - Episode Name" when it's an episode activity
@@ -355,7 +378,7 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
       const parts = rawText.split(' - ');
       const seriesName = (meta.show_name || meta.series_title || parts[0]).trim();
       const episodeName = parts.slice(1).join(' - ').trim();
-      return { seriesName, epCode: '', episodeName };
+      return { seriesName, epCode: '', episodeName, isSpecial: false };
     }
 
     // Fallback for "Episode (tvm-ep-XXXX)"
@@ -720,11 +743,23 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
                 : activity.activity_type === 'item_reviewed'
                 ? (isEs ? 'Reseñó el' : 'Reviewed')
                 : (isEs ? 'Vio el' : 'Watched');
+
+              const isFinished = Boolean(meta.finished_work);
+              const workType = (activity.item_type || meta.item_type || '').toLowerCase();
+              let finishingSuffix = '';
+              if (isFinished) {
+                if (workType === 'anime' || (parsedEpisode.seriesName && parsedEpisode.seriesName.toLowerCase().includes('anime'))) {
+                  finishingSuffix = isEs ? ' y terminó el anime.' : ' and finished the anime.';
+                } else {
+                  finishingSuffix = isEs ? ' y terminó la serie.' : ' and finished the series.';
+                }
+              }
+
               return (
                 <>
                   <span style={{ marginRight: '0.35rem' }}>{verb}</span>
                   <span style={{ fontWeight: 600, color: 'var(--text-primary)', marginRight: '0.35rem' }}>
-                    {parsedEpisode.epCode}
+                    {parsedEpisode.isSpecial ? (isEs ? 'Especial' : 'Special') : parsedEpisode.epCode}
                   </span>
                   {parsedEpisode.episodeName && (
                     <span style={{ color: 'var(--text-secondary)', marginRight: '0.35rem' }}>
@@ -733,6 +768,9 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
                   )}
                   <span style={{ marginRight: '0.35rem' }}>{isEs ? 'de' : 'of'}</span>
                   {renderTitleWithBadge(parsedEpisode.seriesName)}
+                  {finishingSuffix && (
+                    <span style={{ marginLeft: '0.2rem' }}>{finishingSuffix}</span>
+                  )}
                 </>
               );
             })()
@@ -743,6 +781,18 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
                 : activity.activity_type === 'item_reviewed'
                 ? (isEs ? 'Reseñó el' : 'Reviewed')
                 : (isEs ? 'Leyó el' : 'Read');
+
+              const isFinished = Boolean(meta.finished_work);
+              const workType = (activity.item_type || meta.item_type || '').toLowerCase();
+              let finishingSuffix = '';
+              if (isFinished) {
+                if (workType === 'manga') {
+                  finishingSuffix = isEs ? ' y terminó el manga.' : ' and finished the manga.';
+                } else {
+                  finishingSuffix = isEs ? ' y terminó el cómic.' : ' and finished the comic.';
+                }
+              }
+
               return (
                 <>
                   <span style={{ marginRight: '0.35rem' }}>{verb}</span>
@@ -761,6 +811,9 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
                       <span style={{ marginRight: '0.35rem' }}>{isEs ? 'de' : 'of'}</span>
                       {renderTitleWithBadge(parsedComicIssue.seriesName)}
                     </>
+                  )}
+                  {finishingSuffix && (
+                    <span style={{ marginLeft: '0.2rem' }}>{finishingSuffix}</span>
                   )}
                 </>
               );
