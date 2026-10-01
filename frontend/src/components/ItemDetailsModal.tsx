@@ -1361,6 +1361,15 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     effectiveListId?: number;
   } | null>(null);
 
+  // Dialog for series/anime episode status confirmations & re-watch / unmark options
+  const [seriesEpisodePrompt, setSeriesEpisodePrompt] = useState<{
+    type: 'unmark_watching' | 'unmark_dropped' | 'watched_options' | 'watched_to_watching';
+    cleanId: string;
+    extId: string;
+    epData: any;
+    effectiveListId?: number;
+  } | null>(null);
+
   const getMissingPreviousEpisodesForEp = (ep: any, passedAllEps?: any[]) => {
     const isComic = selectedItem?.item_type === 'comic' || String(selectedItem?.external_id || '').startsWith('cv_vol_') || String(selectedItem?.external_id || '').startsWith('cv_issue_');
     const cleanId = String(selectedItem?.external_id || selectedItem?.id || '').replace('tvm-ep-', '').replace('cv_vol_', '').replace('cv_issue_', '').replace('cv_', '');
@@ -2737,6 +2746,71 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                 pages_read: item.total_pages || item.page_count || 0,
                 total_pages: item.total_pages || item.page_count
               });
+            }
+          })
+          .catch(() => {});
+      } else if (!isComicIssueInit && isActualEpisode && item.external_id) {
+        const cleanId = String(item.external_id).replace('tvm-ep-', '');
+        const extId = `tvm-ep-${cleanId}`;
+        const effectiveTrackingListId = item.tracking_list_id || item.list_id || item.parent_series?.tracking_list_id;
+
+        // Check local list cache for completion
+        let isWatchedFromList = Boolean(item.is_completed || item.completed_at || globalProgress[extId]);
+        if (!isWatchedFromList && effectiveTrackingListId) {
+          const cachedList = getCachedSeries(`list_${effectiveTrackingListId}`);
+          if (Array.isArray(cachedList)) {
+            const found = cachedList.find((it: any) => {
+              const cId = String(it.external_id || it.id || '').replace('tvm-ep-', '');
+              return (cId === cleanId || it.external_id === extId) && it.is_completed;
+            });
+            if (found) isWatchedFromList = true;
+          }
+        }
+
+        const cachedEpState = getCachedSeries(`episode_state_tvm_ep_${cleanId}`) || getCachedSeries(`episode_state_${extId}`);
+
+        if (isWatchedFromList || (cachedEpState && (cachedEpState.status === 'completed' || cachedEpState.status === 'watched'))) {
+          item = {
+            ...item,
+            status: 'completed',
+            is_completed: true,
+            pages_read: item.total_pages || item.page_count || cachedEpState?.pages_read || item.pages_read || 0,
+            total_pages: cachedEpState?.total_pages !== undefined ? cachedEpState.total_pages : (item.total_pages || item.page_count || 45)
+          };
+          setPagesReadVal(item.pages_read || 0);
+          setTotalPagesVal(item.total_pages || 45);
+          setSelectedItem(item);
+        } else if (cachedEpState) {
+          item = {
+            ...item,
+            status: cachedEpState.status || item.status,
+            pages_read: cachedEpState.pages_read !== undefined ? cachedEpState.pages_read : item.pages_read,
+            total_pages: cachedEpState.total_pages !== undefined ? cachedEpState.total_pages : (item.total_pages || item.page_count || 45)
+          };
+          setPagesReadVal(item.pages_read || 0);
+          setTotalPagesVal(item.total_pages || 45);
+          setSelectedItem(item);
+        } else if (!item.total_pages && !item.page_count) {
+          setTotalPagesVal(45);
+        }
+
+        apiClient.post('/users/me/progress/bulk-check', { external_ids: [extId] })
+          .then(res => {
+            if (res.data && res.data[extId]) {
+              setGlobalProgress(prev => ({ ...prev, [extId]: true }));
+              setSelectedItem((prev: any) => prev ? {
+                ...prev,
+                status: 'completed',
+                is_completed: true,
+                pages_read: prev.total_pages || prev.page_count || prev.pages_read
+              } : null);
+              const watchedState = {
+                status: 'completed',
+                pages_read: item.total_pages || item.page_count || 45,
+                total_pages: item.total_pages || item.page_count || 45
+              };
+              setCachedSeries(`episode_state_${extId}`, watchedState);
+              setCachedSeries(`episode_state_tvm_ep_${cleanId}`, watchedState);
             }
           })
           .catch(() => {});
@@ -4464,12 +4538,355 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     onUpdate && onUpdate();
   };
 
+  const handleUnmarkSeriesEpisode = async () => {
+    if (!seriesEpisodePrompt) return;
+    const { cleanId, extId, epData, effectiveListId } = seriesEpisodePrompt;
+    setSeriesEpisodePrompt(null);
+
+    let stillCompleted = false;
+    let newCompletedAt: string | null = null;
+
+    if (effectiveListId) {
+      try {
+        const res = await apiClient.post(`/lists/${effectiveListId}/toggle-series-episode?action=remove`, {
+          episode_id: epData.id,
+          title: epData.title,
+          image_url: epData.image_url,
+          overview: epData.custom_notes || epData.overview || '',
+          season_number: epData.season_number || 1,
+          episode_number: epData.episode_number || 1
+        });
+        stillCompleted = Boolean(res.data?.is_completed);
+        newCompletedAt = res.data?.completed_at || null;
+      } catch (e) {
+        console.error("Failed to unmark series episode from tracking list", e);
+      }
+    }
+
+    const defaultDuration = selectedItem?.total_pages || selectedItem?.runtime || selectedItem?.page_count || 45;
+    const totalP = totalPagesVal !== '' ? totalPagesVal : defaultDuration;
+
+    if (stillCompleted) {
+      const watchedState = {
+        status: 'completed',
+        pages_read: totalP,
+        total_pages: totalP || null
+      };
+      setCachedSeries(`episode_state_${extId}`, watchedState);
+      setCachedSeries(`episode_state_tvm_ep_${cleanId}`, watchedState);
+      setGlobalProgress(prev => ({ ...prev, [extId]: true }));
+      setSelectedItem((prev: any) => prev ? {
+        ...prev,
+        status: 'completed',
+        is_completed: true,
+        completed_at: newCompletedAt || prev.completed_at,
+        pages_read: totalP
+      } : null);
+      setPagesReadVal(totalP);
+    } else {
+      const emptyState = {
+        status: '',
+        pages_read: 0,
+        total_pages: totalP || null
+      };
+      setCachedSeries(`episode_state_${extId}`, emptyState);
+      setCachedSeries(`episode_state_tvm_ep_${cleanId}`, emptyState);
+      setGlobalProgress(prev => ({ ...prev, [extId]: false }));
+      setSelectedItem((prev: any) => prev ? {
+        ...prev,
+        status: '',
+        is_completed: false,
+        completed_at: null,
+        pages_read: 0
+      } : null);
+      setPagesReadVal(0);
+    }
+
+    const targetHistoryKey = extId || cleanId || selectedItem?.external_id || selectedItem?.id;
+    if (targetHistoryKey && user?.is_pro) {
+      try {
+        const hRes = await apiClient.get(`/library/${targetHistoryKey}/consumption-history?item_type=episode`);
+        if (hRes.data) {
+          setConsumptionHistory(hRes.data.history || []);
+          setConsumptionEntries(hRes.data.entries || []);
+        }
+      } catch (e) {
+        console.error("Failed to refresh consumption history", e);
+      }
+    } else {
+      setConsumptionHistory([]);
+      setConsumptionEntries([]);
+    }
+
+    window.dispatchEvent(new Event('library-updated'));
+    onUpdate && onUpdate();
+  };
+
+  const handleSeriesEpisodeWatchedToWatching = async (keepHistory: boolean) => {
+    if (!seriesEpisodePrompt) return;
+    const { cleanId, extId, epData, effectiveListId } = seriesEpisodePrompt;
+    setSeriesEpisodePrompt(null);
+
+    if (!keepHistory && effectiveListId) {
+      try {
+        await apiClient.post(`/lists/${effectiveListId}/toggle-series-episode?action=remove`, {
+          episode_id: epData.id,
+          title: epData.title,
+          image_url: epData.image_url,
+          overview: epData.custom_notes || epData.overview || '',
+          season_number: epData.season_number || 1,
+          episode_number: epData.episode_number || 1
+        });
+      } catch (e) {
+        console.error("Failed to remove previous episode completion", e);
+      }
+    }
+
+    setGlobalProgress(prev => ({ ...prev, [extId]: false }));
+
+    const defaultDuration = selectedItem?.total_pages || selectedItem?.runtime || selectedItem?.page_count || 45;
+    const stateToSave = {
+      status: 'watching',
+      pages_read: 0,
+      total_pages: totalPagesVal !== '' ? totalPagesVal : defaultDuration
+    };
+    setCachedSeries(`episode_state_${extId}`, stateToSave);
+    setCachedSeries(`episode_state_tvm_ep_${cleanId}`, stateToSave);
+
+    setSelectedItem((prev: any) => prev ? {
+      ...prev,
+      status: 'watching',
+      is_completed: false,
+      completed_at: null,
+      pages_read: 0
+    } : null);
+    setPagesReadVal(0);
+
+    const targetHistoryKey = extId || cleanId || selectedItem?.external_id || selectedItem?.id;
+    if (targetHistoryKey && user?.is_pro) {
+      try {
+        const hRes = await apiClient.get(`/library/${targetHistoryKey}/consumption-history?item_type=episode`);
+        if (hRes.data) {
+          setConsumptionHistory(hRes.data.history || []);
+          setConsumptionEntries(hRes.data.entries || []);
+        }
+      } catch (e) {
+        console.error("Failed to refresh consumption history", e);
+      }
+    }
+
+    window.dispatchEvent(new Event('library-updated'));
+    onUpdate && onUpdate();
+  };
+
+  const handleToggleSeriesEpisodeStatus = async (newStatus: 'completed' | 'watching' | 'dropped', bypassPrompt = false) => {
+    if (!selectedItem) return;
+
+    const cleanId = String(selectedItem.external_id || selectedItem.id || '').replace('tvm-ep-', '');
+    const extId = `tvm-ep-${cleanId}`;
+    const effectiveListId = selectedItem.list_id || selectedItem.tracking_list_id || selectedItem.parent_series?.tracking_list_id;
+
+    const epData = {
+      id: selectedItem.rawEpisodeId || (selectedItem.external_id ? parseInt(cleanId) : selectedItem.id),
+      title: selectedItem.title,
+      image_url: selectedItem.image_url,
+      custom_notes: selectedItem.custom_notes || '',
+      overview: selectedItem.overview || selectedItem.custom_notes || '',
+      season_number: selectedItem.season_number || 1,
+      episode_number: selectedItem.episode_number || 1
+    };
+
+    if (!bypassPrompt) {
+      // 1. If currently 'watching' and clicks 'watching' -> confirm unmark
+      if (newStatus === 'watching' && selectedItem.status === 'watching' && !isEpisodeCompleted) {
+        setSeriesEpisodePrompt({ type: 'unmark_watching', cleanId, extId, epData, effectiveListId });
+        return;
+      }
+      // 2. If currently 'dropped' and clicks 'dropped' -> confirm unmark
+      if (newStatus === 'dropped' && selectedItem.status === 'dropped' && !isEpisodeCompleted) {
+        setSeriesEpisodePrompt({ type: 'unmark_dropped', cleanId, extId, epData, effectiveListId });
+        return;
+      }
+      // 3. If currently 'completed' and clicks 'completed' -> options (re-watch or unmark)
+      if (newStatus === 'completed' && (selectedItem.status === 'completed' || isEpisodeCompleted)) {
+        setSeriesEpisodePrompt({ type: 'watched_options', cleanId, extId, epData, effectiveListId });
+        return;
+      }
+      // 4. If currently 'completed' and clicks 'watching' -> options (new watching or replace/edit)
+      if (newStatus === 'watching' && (selectedItem.status === 'completed' || isEpisodeCompleted)) {
+        setSeriesEpisodePrompt({ type: 'watched_to_watching', cleanId, extId, epData, effectiveListId });
+        return;
+      }
+    }
+
+    // 1. Resolve parent series
+    let parentSer = selectedItem.parent_series;
+    if (!parentSer && selectedItem.external_id) {
+      try {
+        const epRes = await apiClient.get(`/search/episode/${selectedItem.external_id}`);
+        if (epRes.data?.parent_series) {
+          parentSer = epRes.data.parent_series;
+          setSelectedItem((prev: any) => ({ ...prev, parent_series: parentSer }));
+        }
+      } catch (e) {
+        console.error("Failed to fetch episode parent series", e);
+      }
+    }
+
+    // 2. Add or update parent series in user's library if needed
+    let parentLibItem: any = null;
+    if (parentSer && parentSer.external_id) {
+      try {
+        const parentType = parentSer.item_type || (selectedItem.category === 'anime' ? 'anime' : 'series');
+        const seriesTargetStatus = newStatus === 'dropped' ? 'dropped' : 'watching';
+
+        const serPostRes = await apiClient.post('/library/', {
+          external_id: parentSer.external_id,
+          title: parentSer.title,
+          image_url: parentSer.image_url,
+          description: parentSer.description || '',
+          item_type: parentType,
+          release_date: parentSer.release_date || null,
+          status: seriesTargetStatus
+        });
+        parentLibItem = serPostRes.data;
+
+        if (parentLibItem && parentLibItem.id) {
+          if (newStatus === 'dropped' && parentLibItem.status !== 'dropped') {
+            await apiClient.put(`/library/${parentLibItem.id}`, { status: 'dropped' });
+            parentLibItem.status = 'dropped';
+          } else if ((newStatus === 'watching' || newStatus === 'completed') && (parentLibItem.status === 'plan_to_watch' || parentLibItem.status === 'dropped' || parentLibItem.status === 'untracked')) {
+            await apiClient.put(`/library/${parentLibItem.id}`, { status: 'watching' });
+            parentLibItem.status = 'watching';
+          }
+        }
+
+        if (parentLibItem && !parentLibItem.tracking_list_id) {
+          try {
+            const trackRes = await apiClient.post(`/library/${parentLibItem.id}/ensure-tracking`);
+            if (trackRes.data?.tracking_list_id) {
+              parentLibItem.tracking_list_id = trackRes.data.tracking_list_id;
+            }
+          } catch (tErr) {
+            console.error("Failed to ensure tracking list for series", tErr);
+          }
+        }
+      } catch (sErr) {
+        console.error("Failed to add/update parent series in library", sErr);
+      }
+    }
+
+    // 3. Update Episode in Tracking List
+    const targetListId = effectiveListId || parentLibItem?.tracking_list_id;
+    if (targetListId) {
+      try {
+        if (newStatus === 'completed') {
+          const cachedList = getCachedSeries(`list_${targetListId}`) || [];
+          const isAlreadyCompleted = Array.isArray(cachedList) && cachedList.some((t: any) => {
+            const tCleanId = String(t.external_id || t.id || '').replace('tvm-ep-', '');
+            return (t.external_id === extId || tCleanId === cleanId || (epData.season_number != null && epData.episode_number != null && t.season_number === epData.season_number && t.episode_number === epData.episode_number)) && t.is_completed;
+          });
+          const actionParam = isAlreadyCompleted ? 'mark_again' : 'complete';
+
+          await apiClient.post(`/lists/${targetListId}/toggle-series-episode?action=${actionParam}`, {
+            episode_id: epData.id,
+            title: epData.title,
+            image_url: epData.image_url,
+            overview: epData.custom_notes || epData.overview || '',
+            season_number: epData.season_number || 1,
+            episode_number: epData.episode_number || 1
+          });
+          setGlobalProgress(prev => ({ ...prev, [extId]: true }));
+
+          // Update cached tracking list for instant Home / parent synchronization
+          try {
+            const listRes = await apiClient.get(`/lists/${targetListId}`);
+            if (listRes.data?.items) {
+              setCachedSeries(`list_${targetListId}`, listRes.data.items);
+              setEpisodes(listRes.data.items);
+            }
+          } catch (listErr) {
+            console.error("Failed to refresh cached list after completing episode", listErr);
+          }
+        } else if (newStatus === 'watching' || newStatus === 'dropped') {
+          const isComplete = Boolean(selectedItem.completed_at || selectedItem.is_completed || globalProgress[extId]);
+          if (isComplete) {
+            await apiClient.post(`/lists/${targetListId}/toggle-series-episode?action=remove`, {
+              episode_id: epData.id,
+              title: epData.title,
+              image_url: epData.image_url,
+              overview: epData.custom_notes || epData.overview || '',
+              season_number: epData.season_number || 1,
+              episode_number: epData.episode_number || 1
+            });
+
+            try {
+              const listRes = await apiClient.get(`/lists/${targetListId}`);
+              if (listRes.data?.items) {
+                setCachedSeries(`list_${targetListId}`, listRes.data.items);
+                setEpisodes(listRes.data.items);
+              }
+            } catch (listErr) {
+              console.error("Failed to refresh cached list after un-completing episode", listErr);
+            }
+          }
+          setGlobalProgress(prev => ({ ...prev, [extId]: false }));
+        }
+      } catch (tErr) {
+        console.error("Failed to update episode in tracking list", tErr);
+      }
+    }
+
+    // 4. Update cache
+    const defaultDuration = selectedItem.total_pages || selectedItem.runtime || selectedItem.page_count || 45;
+    const updatedPagesRead = newStatus === 'completed' ? (totalPagesVal || defaultDuration) : (pagesReadVal || 0);
+
+    const stateToSave = {
+      status: newStatus,
+      pages_read: updatedPagesRead,
+      total_pages: totalPagesVal !== '' ? totalPagesVal : defaultDuration
+    };
+    setCachedSeries(`episode_state_${extId}`, stateToSave);
+    setCachedSeries(`episode_state_tvm_ep_${cleanId}`, stateToSave);
+
+    // 5. Update local selectedItem state
+    if (newStatus === 'completed') {
+      const finalPages = totalPagesVal || defaultDuration;
+      setPagesReadVal(finalPages);
+    }
+
+    setSelectedItem((prev: any) => ({
+      ...prev,
+      status: newStatus,
+      is_completed: newStatus === 'completed',
+      completed_at: newStatus === 'completed' ? (prev?.completed_at || new Date().toISOString()) : null,
+      pages_read: updatedPagesRead,
+      parent_series: parentSer ? { ...parentSer, status: newStatus === 'dropped' ? 'dropped' : (parentLibItem?.status || 'watching') } : prev?.parent_series
+    }));
+
+    const targetHistoryKey = extId || cleanId || selectedItem.external_id || selectedItem.id;
+    if (targetHistoryKey && user?.is_pro) {
+      apiClient.get(`/library/${targetHistoryKey}/consumption-history?item_type=episode`)
+        .then(hRes => {
+          if (hRes.data) {
+            if (hRes.data.history) setConsumptionHistory(hRes.data.history);
+            if (hRes.data.entries) setConsumptionEntries(hRes.data.entries);
+          }
+        })
+        .catch(console.error);
+    }
+
+    window.dispatchEvent(new Event('library-updated'));
+    onUpdate && onUpdate();
+  };
+
   const handleSavePagesRead = async (pages: number) => {
     if (!selectedItem) return;
-    const cleanId = String(selectedItem.external_id || selectedItem.id || '').replace('cv_issue_', '').replace('cv_', '');
-    const extId = `cv_issue_${cleanId}`;
+    const cleanId = String(selectedItem.external_id || selectedItem.id || '').replace('cv_issue_', '').replace('cv_', '').replace('tvm-ep-', '');
+    const isEpisodeOnly = isEpisode && !isComicIssue;
 
     if (isComicIssue) {
+      const extId = `cv_issue_${cleanId}`;
       const stateToSave = {
         status: selectedItem.status || 'reading',
         pages_read: pages,
@@ -4477,6 +4894,22 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       };
       setCachedSeries(`issue_state_${extId}`, stateToSave);
       setCachedSeries(`issue_state_cv_issue_${cleanId}`, stateToSave);
+      setSelectedItem((prev: any) => prev ? { ...prev, pages_read: pages } : null);
+      window.dispatchEvent(new Event('library-updated'));
+      onUpdate && onUpdate();
+      return;
+    }
+
+    if (isEpisodeOnly) {
+      const extId = `tvm-ep-${cleanId}`;
+      const defaultDuration = selectedItem.total_pages || selectedItem.runtime || selectedItem.page_count || 45;
+      const stateToSave = {
+        status: selectedItem.status || 'watching',
+        pages_read: pages,
+        total_pages: totalPagesVal !== '' ? totalPagesVal : defaultDuration
+      };
+      setCachedSeries(`episode_state_${extId}`, stateToSave);
+      setCachedSeries(`episode_state_tvm_ep_${cleanId}`, stateToSave);
       setSelectedItem((prev: any) => prev ? { ...prev, pages_read: pages } : null);
       window.dispatchEvent(new Event('library-updated'));
       onUpdate && onUpdate();
@@ -5144,50 +5577,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                     </div>
                   )}
 
-                  {/* Completion Tick Button for Episodes (Top Right) */}
-                  {user && isEpisode && !isComicIssue && (
-                    <div style={{ position: 'relative' }}>
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          const isComplete = !!(selectedItem.completed_at || selectedItem.is_completed);
-                          const epData = {
-                            id: selectedItem.rawEpisodeId || (selectedItem.external_id ? parseInt(selectedItem.external_id.replace('tvm-ep-', '')) : selectedItem.id),
-                            title: selectedItem.title,
-                            image_url: selectedItem.image_url,
-                            custom_notes: selectedItem.custom_notes,
-                            season_number: selectedItem.season_number,
-                            episode_number: selectedItem.episode_number
-                          };
-                          const listId = selectedItem.list_id || selectedItem.tracking_list_id;
-                          if (isComplete) {
-                            setEpisodeActionItem({ ep: epData, listId });
-                          } else {
-                            await handleToggleEpisode(listId, epData);
-                          }
-                        }}
-                      title={language === 'es' ? 'Marcar como visto' : 'Mark as seen'}
-                      style={{
-                        background: (selectedItem.completed_at || selectedItem.is_completed) ? modalTheme.accent : 'transparent',
-                        border: (selectedItem.completed_at || selectedItem.is_completed) ? 'none' : '2px solid var(--text-muted)',
-                        borderRadius: '50%',
-                        width: '32px',
-                        height: '32px',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        cursor: 'pointer',
-                        color: (selectedItem.completed_at || selectedItem.is_completed) ? modalTheme.text : 'var(--text-muted)',
-                        opacity: (selectedItem.completed_at || selectedItem.is_completed) ? 1 : 0.6,
-                        transition: 'all 0.2s ease',
-                        padding: 0
-                      }}
 
-                    >
-                      <Check size={18} strokeWidth={3} />
-                    </button>
-                    </div>
-                  )}
 
                   {/* Favorite button for all items */}
                   {user && selectedItem?.id && !isEpisode && (() => {
@@ -5756,14 +6146,15 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
 
                   {/* Clean & Comfortable Hours and Minutes Picker */}
-                  {!isEpisode && !isCosmeticDlc && selectedItem && ( 
-                    (selectedItem.item_type === 'game' && ['completed', 'playing', 'dropped', 'endless'].includes(selectedItem.status)) || 
-                    (selectedItem.item_type === 'movie' && (['watching', 'dropped'].includes(selectedItem.status) || (hasInteractedWithTime && selectedItem.status === 'completed'))) 
+                  {!isCosmeticDlc && selectedItem && ( 
+                    (!isEpisode && selectedItem.item_type === 'game' && ['completed', 'playing', 'dropped', 'endless'].includes(selectedItem.status)) || 
+                    (!isEpisode && selectedItem.item_type === 'movie' && (['watching', 'dropped'].includes(selectedItem.status) || (hasInteractedWithTime && selectedItem.status === 'completed'))) ||
+                    (isEpisode && !isComicIssue && (['watching', 'dropped'].includes(selectedItem.status) || (hasInteractedWithTime && (selectedItem.status === 'completed' || isEpisodeCompleted))))
                   ) && (() => {
                     const currentTotalMins = typeof pagesReadVal === 'number' ? pagesReadVal : 0;
                     const currentHours = Math.floor(currentTotalMins / 60);
                     const currentMinutes = currentTotalMins % 60;
-                    const maxDurationMins = selectedItem.total_pages || selectedItem.page_count || 0;
+                    const maxDurationMins = selectedItem.total_pages || selectedItem.runtime || selectedItem.page_count || (isEpisode && !isComicIssue ? 45 : 0);
 
                     const updateDuration = (newTotalMins: number) => {
                       setHasInteractedWithTime(true);
@@ -5776,6 +6167,15 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                           }
                         } else if (selectedItem.status === 'completed') {
                           handleToggleStatus('watching');
+                        }
+                      } else if (isEpisode && !isComicIssue && maxDurationMins > 0) {
+                        if (finalMins >= maxDurationMins) {
+                          finalMins = maxDurationMins;
+                          if (selectedItem.status !== 'completed' && !isEpisodeCompleted) {
+                            handleToggleSeriesEpisodeStatus('completed');
+                          }
+                        } else if (selectedItem.status === 'completed' || isEpisodeCompleted) {
+                          handleToggleSeriesEpisodeStatus('watching');
                         }
                       }
                       setPagesReadVal(finalMins);
@@ -5814,7 +6214,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
                           <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                             <Clock size={15} color="var(--accent-primary)" />
-                            {selectedItem.item_type === 'movie' 
+                            {(selectedItem.item_type === 'movie' || isEpisode) 
                               ? (language === 'es' ? 'Tiempo visto:' : 'Time watched:')
                               : (language === 'es' ? 'Horas jugadas:' : 'Hours played:')}
                           </span>
@@ -5934,7 +6334,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
 
                   {/* Completion / Status Buttons */}
-                  {user && (!isEpisode || isComicIssue) && !isCosmeticDlc && (
+                  {user && !isCosmeticDlc && (
                     <div style={{ marginTop: '0.75rem' }}>
                       {selectedItem?.item_type === 'game' ? (
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.4rem' }}>
@@ -6105,6 +6505,73 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                           <button
                             type="button"
                             onClick={() => handleToggleComicIssueStatus('dropped')}
+                            style={{
+                              width: '100%',
+                              background: selectedItem?.status === 'dropped' ? '#ef4444' : 'var(--bg-tertiary)',
+                              border: selectedItem?.status === 'dropped' ? 'none' : '1px solid var(--border-color)',
+                              borderRadius: '8px',
+                              padding: '0.6rem 0.5rem',
+                              textAlign: 'center',
+                              cursor: 'pointer',
+                              color: selectedItem?.status === 'dropped' ? '#ffffff' : 'var(--text-primary)',
+                              fontSize: '0.85rem',
+                              fontWeight: 600,
+                              transition: 'all 0.2s ease'
+                            }}
+                          >
+                            {language === 'es' ? 'Abandonado' : 'Dropped'}
+                          </button>
+                        </div>
+                      ) : (isEpisode && !isComicIssue) ? (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleSeriesEpisodeStatus('completed')}
+                            style={{
+                              width: '100%',
+                              background: (selectedItem?.status === 'completed' || isEpisodeCompleted) ? modalTheme.accent : 'var(--bg-tertiary)',
+                              border: (selectedItem?.status === 'completed' || isEpisodeCompleted) ? 'none' : '1px solid var(--border-color)',
+                              borderRadius: '8px',
+                              padding: '0.6rem 0.5rem',
+                              textAlign: 'center',
+                              cursor: 'pointer',
+                              color: (selectedItem?.status === 'completed' || isEpisodeCompleted) ? modalTheme.text : 'var(--text-primary)',
+                              fontSize: '0.85rem',
+                              fontWeight: 600,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '0.35rem',
+                              transition: 'all 0.2s ease'
+                            }}
+                          >
+                            <Check size={14} strokeWidth={2.5} />
+                            <span>{language === 'es' ? 'Visto' : 'Watched'}</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleToggleSeriesEpisodeStatus('watching')}
+                            style={{
+                              width: '100%',
+                              background: (selectedItem?.status === 'watching' && !isEpisodeCompleted) ? modalTheme.accent : 'var(--bg-tertiary)',
+                              border: (selectedItem?.status === 'watching' && !isEpisodeCompleted) ? 'none' : '1px solid var(--border-color)',
+                              borderRadius: '8px',
+                              padding: '0.6rem 0.5rem',
+                              textAlign: 'center',
+                              cursor: 'pointer',
+                              color: (selectedItem?.status === 'watching' && !isEpisodeCompleted) ? modalTheme.text : 'var(--text-primary)',
+                              fontSize: '0.85rem',
+                              fontWeight: 600,
+                              transition: 'all 0.2s ease'
+                            }}
+                          >
+                            {language === 'es' ? 'Viendo' : 'Watching'}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleToggleSeriesEpisodeStatus('dropped')}
                             style={{
                               width: '100%',
                               background: selectedItem?.status === 'dropped' ? '#ef4444' : 'var(--bg-tertiary)',
@@ -10486,6 +10953,228 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                     <button
                       type="button"
                       onClick={() => setComicIssuePrompt(null)}
+                      style={{
+                        padding: '0.55rem',
+                        borderRadius: '6px',
+                        background: 'transparent',
+                        border: 'none',
+                        color: 'var(--text-secondary)',
+                        fontSize: '0.85rem',
+                        cursor: 'pointer',
+                        fontWeight: 500
+                      }}
+                    >
+                      {language === 'es' ? 'Cancelar' : 'Cancel'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Floating Modal 8: Series / Anime Episode Options / Decision Dialog */}
+              {seriesEpisodePrompt && (
+                <div
+                  style={{
+                    position: 'fixed',
+                    inset: 0,
+                    zIndex: 9999,
+                    background: 'rgba(0, 0, 0, 0.65)',
+                    backdropFilter: 'blur(4px)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '1rem'
+                  }}
+                  onClick={() => setSeriesEpisodePrompt(null)}
+                >
+                  <div
+                    className="glass-card"
+                    style={{
+                      width: '100%',
+                      maxWidth: '400px',
+                      background: 'var(--bg-secondary)',
+                      borderRadius: '12px',
+                      padding: '1.25rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '1rem',
+                      boxShadow: '0 12px 30px rgba(0,0,0,0.4)',
+                      border: '1px solid var(--border-color)'
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                        {seriesEpisodePrompt.type === 'unmark_watching'
+                          ? (language === 'es' ? '¿Desmarcar como Viendo?' : 'Unmark from Watching?')
+                          : seriesEpisodePrompt.type === 'unmark_dropped'
+                          ? (language === 'es' ? '¿Desmarcar como Abandonado?' : 'Unmark from Dropped?')
+                          : seriesEpisodePrompt.type === 'watched_options'
+                          ? (language === 'es' ? 'Opciones del episodio' : 'Episode options')
+                          : (language === 'es' ? 'Cambio de Estado' : 'Status Change')
+                        }
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={() => setSeriesEpisodePrompt(null)}
+                        style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '0.2rem' }}
+                      >
+                        <X size={18} />
+                      </button>
+                    </div>
+
+                    <div style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+                      {seriesEpisodePrompt.type === 'unmark_watching' && (
+                        <span>{language === 'es' ? 'El episodio dejará de estar marcado en progreso.' : 'This episode will no longer be marked as in progress.'}</span>
+                      )}
+                      {seriesEpisodePrompt.type === 'unmark_dropped' && (
+                        <span>{language === 'es' ? 'El episodio dejará de estar marcado como abandonado.' : 'This episode will no longer be marked as dropped.'}</span>
+                      )}
+                      {seriesEpisodePrompt.type === 'watched_options' && (
+                        <span>{language === 'es' ? 'Este episodio ya está marcado como visto. ¿Qué deseas hacer?' : 'This episode is already marked as watched. What would you like to do?'}</span>
+                      )}
+                      {seriesEpisodePrompt.type === 'watched_to_watching' && (
+                        <span>{language === 'es' ? 'Este episodio ya fue visto. ¿Cómo deseas guardar este nuevo estado a Viendo?' : 'This episode was already watched. How would you like to save this new status to Watching?'}</span>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                      {(seriesEpisodePrompt.type === 'unmark_watching' || seriesEpisodePrompt.type === 'unmark_dropped') && (
+                        <button
+                          type="button"
+                          onClick={handleUnmarkSeriesEpisode}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.65rem',
+                            padding: '0.75rem 1rem',
+                            borderRadius: '8px',
+                            background: 'rgba(239, 68, 68, 0.08)',
+                            border: '1px solid rgba(239, 68, 68, 0.25)',
+                            color: '#ef4444',
+                            fontWeight: 600,
+                            fontSize: '0.9rem',
+                            cursor: 'pointer',
+                            textAlign: 'left'
+                          }}
+                        >
+                          <Trash2 size={16} style={{ flexShrink: 0 }} />
+                          <span>{language === 'es' ? 'Desmarcar' : 'Unmark'}</span>
+                        </button>
+                      )}
+
+                      {seriesEpisodePrompt.type === 'watched_options' && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSeriesEpisodePrompt(null);
+                              handleToggleSeriesEpisodeStatus('completed', true);
+                            }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.65rem',
+                              padding: '0.75rem 1rem',
+                              borderRadius: '8px',
+                              background: 'var(--bg-tertiary)',
+                              border: '1px solid var(--border-color)',
+                              color: 'var(--text-primary)',
+                              fontWeight: 600,
+                              fontSize: '0.9rem',
+                              cursor: 'pointer',
+                              textAlign: 'left'
+                            }}
+                          >
+                            <RotateCcw size={16} style={{ flexShrink: 0, color: modalTheme.accent }} />
+                            <span>{language === 'es' ? 'Volver a marcar como visto (revisión)' : 'Mark as watched again'}</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={handleUnmarkSeriesEpisode}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.65rem',
+                              padding: '0.75rem 1rem',
+                              borderRadius: '8px',
+                              background: 'rgba(239, 68, 68, 0.08)',
+                              border: '1px solid rgba(239, 68, 68, 0.25)',
+                              color: '#ef4444',
+                              fontWeight: 600,
+                              fontSize: '0.9rem',
+                              cursor: 'pointer',
+                              textAlign: 'left'
+                            }}
+                          >
+                            <Trash2 size={16} style={{ flexShrink: 0 }} />
+                            <span>{language === 'es' ? 'Desmarcar episodio' : 'Unmark episode'}</span>
+                          </button>
+                        </>
+                      )}
+
+                      {seriesEpisodePrompt.type === 'watched_to_watching' && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => handleSeriesEpisodeWatchedToWatching(true)}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.65rem',
+                              padding: '0.75rem 1rem',
+                              borderRadius: '8px',
+                              background: 'var(--bg-tertiary)',
+                              border: '1px solid var(--border-color)',
+                              color: 'var(--text-primary)',
+                              fontWeight: 600,
+                              fontSize: '0.88rem',
+                              cursor: 'pointer',
+                              textAlign: 'left'
+                            }}
+                          >
+                            <RotateCcw size={16} style={{ flexShrink: 0, color: modalTheme.accent }} />
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                              <span>{language === 'es' ? 'Comenzar nueva visualización' : 'Start new watching'}</span>
+                              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 400 }}>
+                                {language === 'es' ? 'Conserva la vista anterior y pasa a Viendo' : 'Preserve past watched date and set status to Watching'}
+                              </span>
+                            </div>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleSeriesEpisodeWatchedToWatching(false)}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.65rem',
+                              padding: '0.75rem 1rem',
+                              borderRadius: '8px',
+                              background: 'rgba(239, 68, 68, 0.08)',
+                              border: '1px solid rgba(239, 68, 68, 0.25)',
+                              color: '#ef4444',
+                              fontWeight: 600,
+                              fontSize: '0.88rem',
+                              cursor: 'pointer',
+                              textAlign: 'left'
+                            }}
+                          >
+                            <Trash2 size={16} style={{ flexShrink: 0 }} />
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                              <span>{language === 'es' ? 'Reemplazar / Editar última vista' : 'Replace / Edit latest watch'}</span>
+                              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 400 }}>
+                                {language === 'es' ? 'Borra la finalización anterior y pasa a Viendo' : 'Delete previous completion and set status to Watching'}
+                              </span>
+                            </div>
+                          </button>
+                        </>
+                      )}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setSeriesEpisodePrompt(null)}
                       style={{
                         padding: '0.55rem',
                         borderRadius: '6px',

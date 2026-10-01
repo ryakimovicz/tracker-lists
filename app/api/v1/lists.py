@@ -1871,6 +1871,12 @@ def toggle_series_episode(
         )
         db.add(ch)
         
+        # Record activity log with parent series info and list_id
+        parent_ext_id = tracking_lib_item.external_id if tracking_lib_item else None
+        parent_title = tracking_lib_item.title if tracking_lib_item else (reading_list.name if reading_list else None)
+        parent_type = tracking_lib_item.item_type if tracking_lib_item else ("anime" if parent_ext_id and str(parent_ext_id).startswith("anime_") else "series")
+        parent_img = tracking_lib_item.image_url if tracking_lib_item and tracking_lib_item.image_url else None
+
         # Format clean item title if it's missing SxxExx format for TV series
         final_item_title = item.title
         if not is_comic and hasattr(ep_req, 'season_number') and hasattr(ep_req, 'episode_number') and ep_req.season_number and ep_req.episode_number:
@@ -1887,11 +1893,6 @@ def toggle_series_episode(
                 item.title = final_item_title
                 db.flush()
 
-        # Record activity log with parent series info and list_id
-        parent_ext_id = tracking_lib_item.external_id if tracking_lib_item else None
-        parent_title = tracking_lib_item.title if tracking_lib_item else (reading_list.name if reading_list else None)
-        parent_type = tracking_lib_item.item_type if tracking_lib_item else ("anime" if parent_ext_id and str(parent_ext_id).startswith("anime_") else "series")
-        parent_img = tracking_lib_item.image_url if tracking_lib_item and tracking_lib_item.image_url else None
         meta_dict = {
             "series_external_id": parent_ext_id,
             "series_title": parent_title,

@@ -835,6 +835,20 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
     if (Date.now() >= optimisticLockUntilRef.current) {
       fetchNextEpisode();
     }
+
+    const handleUpdate = () => {
+      if (Date.now() >= optimisticLockUntilRef.current) {
+        fetchNextEpisode(true);
+      }
+    };
+
+    window.addEventListener('library-updated', handleUpdate);
+    window.addEventListener('progress-updated', handleUpdate);
+
+    return () => {
+      window.removeEventListener('library-updated', handleUpdate);
+      window.removeEventListener('progress-updated', handleUpdate);
+    };
   }, [item.id, item.status, item.tracking_list_id]);
 
   const handleMarkSeen = async (e: React.MouseEvent) => {
