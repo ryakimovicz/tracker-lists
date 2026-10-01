@@ -1122,22 +1122,24 @@ export const Search: React.FC = () => {
   }, [selectedItem, currentShelfItem]);
 
   return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
+    <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.75rem', position: 'relative' }}>
       
-      {/* Sticky Search Header Form */}
+      {/* Sticky Search Header Panel */}
       <section 
         style={{ 
           position: 'sticky',
-          top: 0,
-          zIndex: 30,
-          background: 'var(--bg-primary)',
-          borderBottom: '1px solid var(--border-color)',
-          padding: '1rem 0',
-          marginTop: '-2rem',
-          paddingTop: '1.25rem',
+          top: '0px',
+          zIndex: 40,
+          background: 'var(--bg-secondary)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          border: '1px solid var(--border-color)',
+          borderRadius: '16px',
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.35)',
+          padding: '1.5rem 2rem',
           display: 'flex', 
           flexDirection: 'column', 
-          gap: '0.85rem' 
+          gap: '1.15rem' 
         }}
       >
         <form onSubmit={handleSearch} style={{ display: 'flex', gap: '1rem' }}>
@@ -1262,7 +1264,20 @@ export const Search: React.FC = () => {
       {submittedQuery === '' ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
           
-          <div style={{ display: "flex", alignItems: "center", gap: "1.5rem", borderBottom: "1px solid var(--border-color)", paddingBottom: "0.25rem", position: "relative" }}>
+          <div 
+            style={{ 
+              display: "flex", 
+              alignItems: "center", 
+              gap: "1.5rem", 
+              borderBottom: "1px solid var(--border-color)", 
+              paddingBottom: "0.25rem", 
+              position: "sticky",
+              top: "148px",
+              zIndex: 35,
+              background: "var(--bg-primary)",
+              paddingTop: "0.5rem"
+            }}
+          >
             <button 
               onClick={() => setExploreSubTab('nuevo')}
               style={{
