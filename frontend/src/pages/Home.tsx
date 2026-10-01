@@ -690,22 +690,8 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
           return { nextEp: null, isCaughtUp: true, initialLoad: false };
         }
         
-        let candidate = null;
-        const targetCycle = minSeen + 1;
-        let lastWatchedIndex = -1;
-        for (let i = aired.length - 1; i >= 0; i--) {
-          const count = airedCounts[i];
-          if (count >= targetCycle) {
-            lastWatchedIndex = i;
-            break;
-          }
-        }
-        if (lastWatchedIndex !== -1 && lastWatchedIndex + 1 < aired.length) {
-          candidate = aired.slice(lastWatchedIndex + 1).find((_, idx) => airedCounts[lastWatchedIndex + 1 + idx] < targetCycle) || null;
-        }
-        if (!candidate) {
-          candidate = aired.find((_, idx) => airedCounts[idx] < targetCycle) || null;
-        }
+        // Pick the first episode in chronological order that is still pending in the current cycle
+        let candidate = aired.find((_, idx) => airedCounts[idx] < targetCycle) || null;
         if (candidate) {
           return { nextEp: candidate, isCaughtUp: false, initialLoad: false };
         }
@@ -857,58 +843,6 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
 
     const currentEpToMark = nextEp;
 
-    // ⚡ INSTANT OPTIMISTIC UI: Compute and transition to the next episode/issue in 0ms
-    const cacheKeyAll = `${item.external_id}_all_episodes`;
-    const allEps = getCachedSeries(cacheKeyAll);
-    let nextCandidate: any = null;
-    let isLastEpisodeOfAll = false;
-
-    if (allEps && Array.isArray(allEps) && allEps.length > 0) {
-      const validEps = !isComic ? allEps.filter((ep: any) => !isExtraEpisode(ep)) : allEps;
-      const sortedAllEps = sortEpisodesChronologically(validEps);
-      const cleanCurrentId = String(currentEpToMark.id || '').replace('cv_issue_', '').replace('tvm-ep-', '');
-      const currentIndex = sortedAllEps.findIndex((ep: any) => {
-        const cleanEpId = String(ep.id || '').replace('cv_issue_', '').replace('tvm-ep-', '');
-        if (cleanEpId === cleanCurrentId) return true;
-        if (isComic && (currentEpToMark.issue_number != null || currentEpToMark.episode_number != null)) {
-          const numA = parseFloat(ep.issue_number ?? ep.episode_number ?? '-1');
-          const numB = parseFloat(currentEpToMark.issue_number ?? currentEpToMark.episode_number ?? '-2');
-          return numA > 0 && numA === numB;
-        }
-        return false;
-      });
-
-      if (currentIndex !== -1) {
-        if (currentIndex + 1 < sortedAllEps.length) {
-          const candidate = sortedAllEps[currentIndex + 1];
-          let isAired = true;
-          if (!isComic) {
-            if (candidate.airstamp) {
-              isAired = new Date(candidate.airstamp).getTime() <= Date.now();
-            } else if (candidate.airdate || candidate.air_date) {
-              const ad = candidate.airdate || candidate.air_date;
-              const at = candidate.airtime || '00:00';
-              isAired = new Date(`${ad}T${at}:00Z`).getTime() <= Date.now();
-            }
-          }
-          if (isAired) {
-            nextCandidate = candidate;
-          }
-        } else {
-          // Strictly verify that all valid episodes (regulars + significant specials) are completed
-          const allOtherWatched = sortedAllEps.every((ep: any) => {
-            const epId = String(ep.id || '').replace('cv_issue_', '').replace('tvm-ep-', '');
-            if (epId === cleanCurrentId) return true; // It is the one we are marking right now
-            const fullEpId = isComic ? (String(ep.id).startsWith('cv_issue_') ? String(ep.id) : `cv_issue_${ep.id}`) : (String(ep.id).startsWith('tvm-ep-') ? String(ep.id) : `tvm-ep-${ep.id}`);
-            return trackedEpisodes.has(fullEpId) || trackedEpisodes.has(epId);
-          });
-          if (allOtherWatched) {
-            isLastEpisodeOfAll = true;
-          }
-        }
-      }
-    }
-
     const isCurrentSpecial = isSpecialEpisode(currentEpToMark);
     const titleToSend = isComic
       ? (currentEpToMark.title || `${item.title} ${currentEpToMark.name || `#${currentEpToMark.issue_number || 1}`}`)
@@ -924,14 +858,7 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
       ? (String(currentEpToMark.id).startsWith('cv_') ? currentEpToMark.id : `cv_issue_${currentEpToMark.id}`)
       : currentEpToMark.id;
 
-    // Lock candidate re-computations for 3 seconds to avoid stale server responses overwriting nextEp
-    optimisticLockUntilRef.current = Date.now() + 3000;
-
-    // Immediately show next episode/issue so user can keep clicking without any delay
-    setNextEp(nextCandidate);
-    setCachedSeries(`next_candidate_${item.id}`, { nextEp: nextCandidate, isCaughtUp: isLastEpisodeOfAll });
-
-    // Optimistically update trackedEpisodes and cache so card never disappears on parent re-renders
+    // Optimistically update trackedEpisodes and cache immediately
     const newCompletedEpId = String(currentEpToMark.id || '');
     const cleanId = newCompletedEpId.replace('cv_issue_', '').replace('tvm-ep-', '');
     const updatedTracked = [...trackedEpisodes];
@@ -965,6 +892,36 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
     }
     setTrackedEpisodes(updatedTracked);
     setCachedSeries(`list_${item.tracking_list_id}`, updatedTracked);
+
+    // ⚡ INSTANT OPTIMISTIC UI: Compute next candidate based on updatedTracked
+    const allEps = getCachedSeries(`${item.external_id}_all_episodes`);
+    const recomputed = computeNextCandidate(updatedTracked, allEps);
+    let nextCandidate: any = recomputed.nextEp;
+    let isLastEpisodeOfAll = false;
+
+    if (!nextCandidate) {
+      // Check if all valid episodes are indeed completed
+      const validEps = !isComic ? allEps.filter((ep: any) => !isExtraEpisode(ep)) : allEps;
+      const sortedAllEps = sortEpisodesChronologically(validEps);
+      const allWatched = sortedAllEps.every((ep: any) => {
+        const epId = String(ep.id || '').replace('cv_issue_', '').replace('tvm-ep-', '');
+        const fullEpId = isComic ? (String(ep.id).startsWith('cv_issue_') ? String(ep.id) : `cv_issue_${ep.id}`) : (String(ep.id).startsWith('tvm-ep-') ? String(ep.id) : `tvm-ep-${ep.id}`);
+        return updatedTracked.some((t: any) => {
+          const tClean = String(t.external_id || t.id || '').replace('cv_issue_', '').replace('tvm-ep-', '');
+          return (tClean === epId || t.external_id === fullEpId) && t.is_completed;
+        });
+      });
+      if (allWatched) {
+        isLastEpisodeOfAll = true;
+      }
+    }
+
+    // Lock candidate re-computations for 3 seconds to avoid stale server responses overwriting nextEp
+    optimisticLockUntilRef.current = Date.now() + 3000;
+
+    // Immediately show next candidate (or pending skipped episode)
+    setNextEp(nextCandidate);
+    setCachedSeries(`next_candidate_${item.id}`, { nextEp: nextCandidate, isCaughtUp: isLastEpisodeOfAll });
 
     if (isComic) {
       setCachedSeries(`issue_state_cv_issue_${cleanId}`, {
