@@ -711,6 +711,9 @@ export const Search: React.FC = () => {
     setIsSearching(true);
     setErrorMsg('');
 
+    // Ensure results view is scrolled to top
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
     try {
       if (currentTab !== 'all' && ['comic', 'book', 'manga', 'game', 'movie', 'anime', 'series'].includes(currentTab)) {
         // 1. Fetch only the active category first (Super fast: ~150ms response)
@@ -1119,12 +1122,24 @@ export const Search: React.FC = () => {
   }, [selectedItem, currentShelfItem]);
 
   return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem 0', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+    <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
       
-      {/* Search Header Form */}
-      <section className="glass-card" style={{ padding: '2rem 2.5rem', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-        <h2>{t('searchTitle')}</h2>
-        
+      {/* Sticky Search Header Form */}
+      <section 
+        style={{ 
+          position: 'sticky',
+          top: 0,
+          zIndex: 30,
+          background: 'var(--bg-primary)',
+          borderBottom: '1px solid var(--border-color)',
+          padding: '1rem 0',
+          marginTop: '-2rem',
+          paddingTop: '1.25rem',
+          display: 'flex', 
+          flexDirection: 'column', 
+          gap: '0.85rem' 
+        }}
+      >
         <form onSubmit={handleSearch} style={{ display: 'flex', gap: '1rem' }}>
           <div style={{ flex: 1, position: 'relative' }}>
             <input
@@ -1194,8 +1209,8 @@ export const Search: React.FC = () => {
           display: 'flex',
           gap: '0.5rem',
           overflowX: 'auto',
-          paddingTop: '0.25rem',
-          paddingBottom: '0.25rem',
+          paddingTop: '0.15rem',
+          paddingBottom: '0.15rem',
           WebkitOverflowScrolling: 'touch'
         }}>
           {sortFilterTabs([
@@ -1245,7 +1260,7 @@ export const Search: React.FC = () => {
       </section>
 
       {submittedQuery === '' ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', marginTop: '1rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
           
           <div style={{ display: "flex", alignItems: "center", gap: "1.5rem", borderBottom: "1px solid var(--border-color)", paddingBottom: "0.25rem", position: "relative" }}>
             <button 
