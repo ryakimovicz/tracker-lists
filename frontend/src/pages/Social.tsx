@@ -340,61 +340,61 @@ export const Social: React.FC = () => {
   ];
 
   return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem 0', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-      {/* Header & Tabs */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        <div>
-          <h1 style={{ margin: '0 0 0.25rem 0', fontSize: '1.85rem', fontWeight: 800 }}>
-            {isEs ? 'Comunidad' : 'Community'}
-          </h1>
-          <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.95rem' }}>
-            {tabsConfig.find(t => t.id === activeTab)?.description}
-          </p>
-        </div>
-
-        {/* 4 Tabs Bar */}
-        <div
-          style={{
-            display: 'flex',
-            gap: '0.5rem',
-            background: 'var(--bg-secondary, rgba(255,255,255,0.03))',
-            padding: '0.4rem',
-            borderRadius: '12px',
-            border: '1px solid var(--border-color)',
-            overflowX: 'auto'
-          }}
-        >
-          {tabsConfig.map(tab => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => handleTabChange(tab.id)}
-                style={{
-                  flex: 1,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '0.5rem',
-                  padding: '0.65rem 1rem',
-                  border: 'none',
-                  borderRadius: '8px',
-                  background: isActive ? 'var(--accent-primary)' : 'transparent',
-                  color: isActive ? '#fff' : 'var(--text-secondary)',
-                  fontWeight: isActive ? 700 : 500,
-                  fontSize: '0.92rem',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                  whiteSpace: 'nowrap'
-                }}
-              >
-                <Icon size={18} />
-                <span>{tab.label}</span>
-              </button>
-            );
-          })}
-        </div>
+    <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+      {/* Unified Underline Tabs Bar */}
+      <div
+        style={{
+          display: 'flex',
+          gap: '1.75rem',
+          borderBottom: '1px solid var(--border-color)',
+          paddingBottom: '0.75rem',
+          marginBottom: '0.5rem',
+          position: 'sticky',
+          top: 0,
+          zIndex: 20,
+          background: 'var(--bg-primary)',
+          marginTop: '-2rem',
+          paddingTop: '0.85rem',
+          overflowX: 'auto'
+        }}
+      >
+        {tabsConfig.map(tab => {
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
+          return (
+            <div
+              key={tab.id}
+              onClick={() => handleTabChange(tab.id)}
+              style={{
+                fontSize: '1.05rem',
+                fontWeight: isActive ? 600 : 500,
+                color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
+                cursor: 'pointer',
+                padding: '0.25rem 0',
+                position: 'relative',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              <Icon size={18} style={{ color: isActive ? 'var(--accent-primary)' : 'inherit' }} />
+              <span>{tab.label}</span>
+              {isActive && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    bottom: '-0.75rem',
+                    left: 0,
+                    right: 0,
+                    height: '2px',
+                    background: 'var(--accent-primary)'
+                  }}
+                />
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {/* Floating Centered Refresh Button */}
