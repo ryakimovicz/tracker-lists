@@ -605,16 +605,42 @@ def add_to_library(
 
     # Record activity log: item_added_to_library
     from app.services.activity_service import ActivityService
+    t_str = item_in.item_type.value if hasattr(item_in.item_type, "value") else str(item_in.item_type)
+    stat_str = item_in.status.value if hasattr(item_in.status, "value") else str(item_in.status)
+
     ActivityService.record_activity(
         db=db,
         user_id=current_user.id,
         activity_type="item_added_to_library",
         item_title=item_in.title,
-        item_type=item_in.item_type.value if hasattr(item_in.item_type, "value") else str(item_in.item_type),
+        item_type=t_str,
         external_id=item_in.external_id,
         image_url=item_in.image_url,
-        details=item_in.status.value if hasattr(item_in.status, "value") else str(item_in.status)
+        details=stat_str
     )
+
+    # If the user directly marked the item with an active or terminal status (e.g. watched, completed, reading, playing, etc.),
+    # also record an item_status_changed event so Profile displays both individual events and Social can unify them.
+    if stat_str not in ("plan_to_watch", "plan_to_read"):
+        act_meta = {
+            "status": stat_str,
+            "is_hundred_percent": bool(item_in.is_hundred_percent if item_in.is_hundred_percent is not None else False),
+            "pages_read": new_lib_item.pages_read or 0,
+            "total_pages": new_lib_item.total_pages or 0,
+            "last_seen_episode": new_lib_item.last_seen_episode,
+            "item_type": t_str
+        }
+        ActivityService.record_activity(
+            db=db,
+            user_id=current_user.id,
+            activity_type="item_status_changed",
+            item_title=item_in.title,
+            item_type=t_str,
+            external_id=item_in.external_id,
+            image_url=item_in.image_url,
+            details=stat_str,
+            metadata=act_meta
+        )
     
     return new_lib_item
 

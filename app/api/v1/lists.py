@@ -2727,6 +2727,29 @@ def bulk_toggle_all_seasons(
                         db.delete(vol_hist)
             lib_item.updated_at = datetime.now(timezone.utc)
 
+            # Record activity when marking all completed
+            if req.completed:
+                from app.services.activity_service import ActivityService
+                t_str = lib_item.item_type.value if hasattr(lib_item.item_type, 'value') else str(lib_item.item_type)
+                stat_str = lib_item.status.value if hasattr(lib_item.status, 'value') else str(lib_item.status)
+                act_meta = {
+                    "status": stat_str,
+                    "finished_work": True,
+                    "last_seen_episode": lib_item.last_seen_episode,
+                    "item_type": t_str
+                }
+                ActivityService.record_activity(
+                    db=db,
+                    user_id=current_user.id,
+                    activity_type="item_status_changed",
+                    item_title=lib_item.title,
+                    item_type=t_str,
+                    external_id=lib_item.external_id,
+                    image_url=lib_item.image_url,
+                    details=stat_str,
+                    metadata=act_meta
+                )
+
         db.commit()
         return {"message": "All seasons progress toggled successfully", "status": lib_item.status.value if (lib_item and hasattr(lib_item.status, 'value')) else (lib_item.status if lib_item else ("read" if is_comic else "completed"))}
     except HTTPException:

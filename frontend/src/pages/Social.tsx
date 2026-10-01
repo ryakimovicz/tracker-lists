@@ -116,9 +116,63 @@ export const Social: React.FC = () => {
           const isUnitConsumption = (item.activity_type === 'episode_watched' || item.activity_type === 'issue_read' || item.activity_type === 'item_progress_updated' || item.activity_type === 'item_status_changed') &&
             ((item.external_id && (String(item.external_id).startsWith('tvm-ep-') || String(item.external_id).startsWith('cv_issue_'))) || item.item_type === 'episode');
 
+          const isShelfAdd = item.activity_type === 'shelf_add' || item.activity_type === 'item_added_to_library';
+          const isStatusChanged = item.activity_type === 'item_status_changed' || item.activity_type === 'item_completed';
+
           let mergedWithExisting = false;
 
-          if (isWorkCompletion) {
+          // Unify Shelf Add + Status Changed for unadded works marked directly (e.g. Added and watched / finished)
+          if (isShelfAdd) {
+            // Check if there is already a recent status change for this work
+            const itemWorkExt = (item.external_id || '').trim().toLowerCase();
+            const itemWorkTitle = (item.item_title || '').trim().toLowerCase();
+            for (let i = consolidated.length - 1; i >= Math.max(0, consolidated.length - 15); i--) {
+              const target = consolidated[i];
+              if (target.user_id !== item.user_id) continue;
+              const targetIsStatus = target.activity_type === 'item_status_changed' || target.activity_type === 'item_completed';
+              if (!targetIsStatus) continue;
+
+              const targetExt = (target.external_id || '').trim().toLowerCase();
+              const targetTitle = (target.item_title || '').trim().toLowerCase();
+              const matchesWork = (itemWorkExt && targetExt && itemWorkExt === targetExt) ||
+                (itemWorkTitle && targetTitle && itemWorkTitle === targetTitle);
+
+              if (matchesWork) {
+                // Merge into the status changed activity
+                const targetMeta = target.metadata_json ? (typeof target.metadata_json === 'string' ? JSON.parse(target.metadata_json) : target.metadata_json) : {};
+                targetMeta.also_added = true;
+                target.metadata_json = JSON.stringify(targetMeta);
+                mergedWithExisting = true;
+                break;
+              }
+            }
+          } else if (isStatusChanged) {
+            // Check if there is already a recent shelf add for this work
+            const itemWorkExt = (item.external_id || '').trim().toLowerCase();
+            const itemWorkTitle = (item.item_title || '').trim().toLowerCase();
+            for (let i = consolidated.length - 1; i >= Math.max(0, consolidated.length - 15); i--) {
+              const target = consolidated[i];
+              if (target.user_id !== item.user_id) continue;
+              const targetIsAdd = target.activity_type === 'shelf_add' || target.activity_type === 'item_added_to_library';
+              if (!targetIsAdd) continue;
+
+              const targetExt = (target.external_id || '').trim().toLowerCase();
+              const targetTitle = (target.item_title || '').trim().toLowerCase();
+              const matchesWork = (itemWorkExt && targetExt && itemWorkExt === targetExt) ||
+                (itemWorkTitle && targetTitle && itemWorkTitle === targetTitle);
+
+              if (matchesWork) {
+                // Replace the shelf_add with this item_status_changed, tagging also_added = true
+                itemMeta.also_added = true;
+                item.metadata_json = JSON.stringify(itemMeta);
+                consolidated[i] = item;
+                mergedWithExisting = true;
+                break;
+              }
+            }
+          }
+
+          if (!mergedWithExisting && isWorkCompletion) {
             // Find recent unit consumption event by the same user for this work (within the consolidated list)
             const itemWorkTitle = (item.item_title || '').trim().toLowerCase();
             const itemWorkExt = (item.external_id || '').trim().toLowerCase();
@@ -139,7 +193,7 @@ export const Social: React.FC = () => {
                 break;
               }
             }
-          } else if (isUnitConsumption) {
+          } else if (!mergedWithExisting && isUnitConsumption) {
             // Check if there is already a work completion event for this work in consolidated
             const unitIdent = getWorkIdent(item);
             for (let i = consolidated.length - 1; i >= Math.max(0, consolidated.length - 15); i--) {

@@ -849,52 +849,59 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
               if (activity.activity_type === 'item_status_changed' || activity.activity_type === 'item_completed') {
                 const status = (meta.status || activity.details || '').toLowerCase();
                 const isCompleted = activity.activity_type === 'item_completed' || status === 'completed' || status === 'read';
+                const alsoAdded = Boolean(meta.also_added);
 
                 if (isCompleted) {
                   if (rawType === 'movie') {
+                    const verb = alsoAdded ? (isEs ? 'Agregó y vio' : 'Added and watched') : (isEs ? 'Vio' : 'Watched');
                     return (
                       <>
-                        <span style={{ marginRight: '0.35rem' }}>{isEs ? 'Vio' : 'Watched'}</span>
+                        <span style={{ marginRight: '0.35rem' }}>{verb}</span>
                         {titleNode}
                       </>
                     );
                   }
                   if (['series', 'anime'].includes(rawType)) {
+                    const verb = alsoAdded ? (isEs ? 'Agregó y terminó de ver' : 'Added and finished watching') : (isEs ? 'Terminó de ver' : 'Finished watching');
                     return (
                       <>
-                        <span style={{ marginRight: '0.35rem' }}>{isEs ? 'Terminó de ver' : 'Finished watching'}</span>
+                        <span style={{ marginRight: '0.35rem' }}>{verb}</span>
                         {titleNode}
                       </>
                     );
                   }
                   if (isComicOrBook) {
+                    const verb = alsoAdded ? (isEs ? 'Agregó y terminó de leer' : 'Added and finished reading') : (isEs ? 'Terminó de leer' : 'Finished reading');
                     return (
                       <>
-                        <span style={{ marginRight: '0.35rem' }}>{isEs ? 'Terminó de leer' : 'Finished reading'}</span>
+                        <span style={{ marginRight: '0.35rem' }}>{verb}</span>
                         {titleNode}
                       </>
                     );
                   }
                   if (isGame) {
                     if (meta.is_hundred_percent) {
+                      const verb = alsoAdded ? (isEs ? 'Agregó y completó' : 'Added and completed') : (isEs ? 'Completó' : 'Completed');
                       return (
                         <>
-                          <span style={{ marginRight: '0.35rem' }}>{isEs ? 'Completó' : 'Completed'}</span>
+                          <span style={{ marginRight: '0.35rem' }}>{verb}</span>
                           {titleNode}
                           <span style={{ marginLeft: '0.35rem' }}>{isEs ? 'al 100%.' : '100%.'}</span>
                         </>
                       );
                     }
+                    const verb = alsoAdded ? (isEs ? 'Agregó y terminó el juego' : 'Added and finished the game') : (isEs ? 'Terminó el juego' : 'Finished the game');
                     return (
                       <>
-                        <span style={{ marginRight: '0.35rem' }}>{isEs ? 'Terminó el juego' : 'Finished the game'}</span>
+                        <span style={{ marginRight: '0.35rem' }}>{verb}</span>
                         {titleNode}
                       </>
                     );
                   }
+                  const verb = alsoAdded ? (isEs ? 'Agregó y terminó' : 'Added and finished') : (isEs ? 'Terminó' : 'Finished');
                   return (
                     <>
-                      <span style={{ marginRight: '0.35rem' }}>{isEs ? 'Terminó' : 'Finished'}</span>
+                      <span style={{ marginRight: '0.35rem' }}>{verb}</span>
                       {titleNode}
                     </>
                   );
@@ -902,33 +909,37 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
 
                 // In progress / consumption statuses
                 if (status === 'watching' || (isWatchable && status === 'in_progress')) {
+                  const verb = alsoAdded ? (isEs ? 'Agregó y comenzó a ver' : 'Added and started watching') : (isEs ? 'Comenzó a ver' : 'Started watching');
                   return (
                     <>
-                      <span style={{ marginRight: '0.35rem' }}>{isEs ? 'Comenzó a ver' : 'Started watching'}</span>
+                      <span style={{ marginRight: '0.35rem' }}>{verb}</span>
                       {titleNode}
                     </>
                   );
                 }
                 if (status === 'reading' || (isComicOrBook && status === 'in_progress')) {
+                  const verb = alsoAdded ? (isEs ? 'Agregó y comenzó a leer' : 'Added and started reading') : (isEs ? 'Comenzó a leer' : 'Started reading');
                   return (
                     <>
-                      <span style={{ marginRight: '0.35rem' }}>{isEs ? 'Comenzó a leer' : 'Started reading'}</span>
+                      <span style={{ marginRight: '0.35rem' }}>{verb}</span>
                       {titleNode}
                     </>
                   );
                 }
                 if (status === 'playing' || (isGame && status === 'in_progress')) {
+                  const verb = alsoAdded ? (isEs ? 'Agregó y comenzó a jugar a' : 'Added and started playing') : (isEs ? 'Comenzó a jugar a' : 'Started playing');
                   return (
                     <>
-                      <span style={{ marginRight: '0.35rem' }}>{isEs ? 'Comenzó a jugar a' : 'Started playing'}</span>
+                      <span style={{ marginRight: '0.35rem' }}>{verb}</span>
                       {titleNode}
                     </>
                   );
                 }
                 if (status === 'endless' && isGame) {
+                  const verb = alsoAdded ? (isEs ? 'Agregó y marcó' : 'Added and marked') : (isEs ? 'Marcó' : 'Marked');
                   return (
                     <>
-                      <span style={{ marginRight: '0.35rem' }}>{isEs ? 'Marcó' : 'Marked'}</span>
+                      <span style={{ marginRight: '0.35rem' }}>{verb}</span>
                       {titleNode}
                       <span style={{ marginLeft: '0.35rem' }}>{isEs ? 'como Infinito.' : 'as Endless.'}</span>
                     </>
