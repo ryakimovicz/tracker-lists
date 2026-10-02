@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../context/LanguageContext';
@@ -64,6 +64,7 @@ export const Sidebar: React.FC = () => {
   const [showProModal, setShowProModal] = useState(false);
   const [showNotifFlyout, setShowNotifFlyout] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const notifBtnRef = useRef<HTMLButtonElement>(null);
   const isUserLoggedIn = Boolean(user && isAuthenticated);
 
   // Poll or check unread notification count
@@ -165,7 +166,8 @@ export const Sidebar: React.FC = () => {
         {isUserLoggedIn && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
             <button
-              onClick={() => setShowNotifFlyout(!showNotifFlyout)}
+              ref={notifBtnRef}
+              onClick={() => setShowNotifFlyout(prev => !prev)}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -282,6 +284,7 @@ export const Sidebar: React.FC = () => {
         isOpen={showNotifFlyout}
         onClose={() => setShowNotifFlyout(false)}
         onUnreadCountChange={(cnt) => setUnreadCount(cnt)}
+        ignoreRef={notifBtnRef}
       />
     </div>
   );

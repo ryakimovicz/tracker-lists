@@ -22,12 +22,14 @@ interface NotificationFlyoutProps {
   isOpen: boolean;
   onClose: () => void;
   onUnreadCountChange?: (count: number) => void;
+  ignoreRef?: React.RefObject<HTMLElement | null>;
 }
 
 export const NotificationFlyout: React.FC<NotificationFlyoutProps> = ({
   isOpen,
   onClose,
-  onUnreadCountChange
+  onUnreadCountChange,
+  ignoreRef
 }) => {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
@@ -64,7 +66,11 @@ export const NotificationFlyout: React.FC<NotificationFlyoutProps> = ({
   // Click outside to close
   useEffect(() => {
     const handleOutsideClick = (e: MouseEvent) => {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (ignoreRef?.current && ignoreRef.current.contains(target)) {
+        return;
+      }
+      if (panelRef.current && !panelRef.current.contains(target)) {
         onClose();
       }
     };
@@ -74,7 +80,7 @@ export const NotificationFlyout: React.FC<NotificationFlyoutProps> = ({
     return () => {
       document.removeEventListener('mousedown', handleOutsideClick);
     };
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, ignoreRef]);
 
   const handleMarkAsRead = async (notifId: number) => {
     try {
@@ -257,11 +263,11 @@ export const NotificationFlyout: React.FC<NotificationFlyoutProps> = ({
         bottom: '20px',
         width: '380px',
         maxHeight: '560px',
-        background: 'var(--bg-secondary, #1e1e24)',
-        border: '1px solid var(--border-color, rgba(255,255,255,0.12))',
+        background: '#0f1523',
+        backgroundImage: 'linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.01) 100%)',
+        border: '1px solid rgba(255, 255, 255, 0.12)',
         borderRadius: '16px',
-        boxShadow: '0 20px 40px rgba(0,0,0,0.45), 0 0 20px rgba(124, 58, 237, 0.1)',
-        backdropFilter: 'blur(16px)',
+        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(255, 255, 255, 0.06)',
         zIndex: 9999,
         display: 'flex',
         flexDirection: 'column',
