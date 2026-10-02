@@ -47,15 +47,30 @@ export const CustomizePage: React.FC = () => {
   const { language, t } = useTranslation();
   const { theme } = useTheme();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const tokenProcessed = useRef(false);
   const isEs = language === 'es';
   const isLight = theme === 'light';
 
+  // Modal parameter handling: 'avatar' | 'banner' | 'background'
+  const modalParam = searchParams.get('modal');
+
+  const openModal = (modalName: 'avatar' | 'banner' | 'background') => {
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set('modal', modalName);
+    setSearchParams(newParams);
+  };
+
+  const closeModal = () => {
+    const newParams = new URLSearchParams(searchParams);
+    newParams.delete('modal');
+    setSearchParams(newParams);
+  };
+
   // Modal states
-  const [showAvatarModal, setShowAvatarModal] = useState(false);
-  const [showBannerModal, setShowBannerModal] = useState(false);
-  const [showBackgroundModal, setShowBackgroundModal] = useState(false);
+  const showAvatarModal = modalParam === 'avatar';
+  const showBannerModal = modalParam === 'banner';
+  const showBackgroundModal = modalParam === 'background';
   const [showProModal, setShowProModal] = useState(false);
   const [showDisconnectLastFmModal, setShowDisconnectLastFmModal] = useState(false);
   const [showMusicGuideModal, setShowMusicGuideModal] = useState(false);
@@ -386,12 +401,14 @@ export const CustomizePage: React.FC = () => {
             pointerEvents: 'none',
           }}
         >
-          {/* Subtle blur and dark atmospheric vignette */}
+          {/* Subtle blur and atmospheric vignette */}
           <div
             style={{
               position: 'absolute',
               inset: 0,
-              background: 'radial-gradient(circle at center, rgba(9, 13, 22, 0.65) 0%, rgba(9, 13, 22, 0.88) 75%, rgba(9, 13, 22, 0.97) 100%)',
+              background: isLight
+                ? 'radial-gradient(circle at center, rgba(241, 245, 249, 0.7) 0%, rgba(241, 245, 249, 0.88) 75%, rgba(241, 245, 249, 0.98) 100%)'
+                : 'radial-gradient(circle at center, rgba(9, 13, 22, 0.65) 0%, rgba(9, 13, 22, 0.88) 75%, rgba(9, 13, 22, 0.97) 100%)',
               backdropFilter: 'blur(3px)',
             }}
           />
@@ -412,8 +429,12 @@ export const CustomizePage: React.FC = () => {
             borderRadius: '20px',
             overflow: 'hidden',
             minHeight: '220px',
-            border: profile.is_pro && profile.banner_url ? '1px solid rgba(255, 255, 255, 0.12)' : undefined,
-            boxShadow: profile.is_pro && profile.banner_url ? '0 12px 30px rgba(0, 0, 0, 0.4)' : undefined,
+            border: profile.is_pro && profile.banner_url 
+              ? (isLight ? '1px solid rgba(0, 0, 0, 0.1)' : '1px solid rgba(255, 255, 255, 0.12)') 
+              : undefined,
+            boxShadow: profile.is_pro && profile.banner_url 
+              ? (isLight ? '0 12px 30px rgba(0, 0, 0, 0.08)' : '0 12px 30px rgba(0, 0, 0, 0.4)') 
+              : undefined,
           }}
         >
           {profile.is_pro && profile.banner_url && (
@@ -430,12 +451,14 @@ export const CustomizePage: React.FC = () => {
                   zIndex: 0,
                 }}
               />
-              {/* Darkening & Gradient overlay */}
+              {/* Atmospheric Gradient overlay */}
               <div
                 style={{
                   position: 'absolute',
                   inset: 0,
-                  background: 'linear-gradient(180deg, rgba(15, 15, 20, 0.45) 0%, rgba(15, 15, 20, 0.85) 55%, rgba(15, 15, 20, 0.98) 100%)',
+                  background: isLight
+                    ? 'linear-gradient(180deg, rgba(255, 255, 255, 0.4) 0%, rgba(241, 245, 249, 0.78) 55%, rgba(241, 245, 249, 0.94) 100%)'
+                    : 'linear-gradient(180deg, rgba(15, 15, 20, 0.45) 0%, rgba(15, 15, 20, 0.85) 55%, rgba(15, 15, 20, 0.98) 100%)',
                   zIndex: 1,
                 }}
               />
@@ -455,13 +478,13 @@ export const CustomizePage: React.FC = () => {
               alignItems: 'center',
               gap: '0.45rem',
               borderRadius: '24px',
-              background: 'rgba(0, 0, 0, 0.65)',
+              background: isLight ? 'rgba(255, 255, 255, 0.85)' : 'rgba(0, 0, 0, 0.65)',
               backdropFilter: 'blur(8px)',
-              border: '1px solid rgba(255, 255, 255, 0.2)',
-              color: 'white',
+              border: isLight ? '1px solid rgba(0, 0, 0, 0.12)' : '1px solid rgba(255, 255, 255, 0.2)',
+              color: isLight ? 'var(--text-primary)' : 'white',
               cursor: 'pointer',
               zIndex: 3,
-              boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+              boxShadow: isLight ? '0 4px 12px rgba(0,0,0,0.1)' : '0 4px 12px rgba(0,0,0,0.3)',
               transition: 'all 0.2s ease',
               fontSize: '0.85rem',
               fontWeight: 600
@@ -473,7 +496,11 @@ export const CustomizePage: React.FC = () => {
           </button>
 
           {/* Avatar */}
-          <div style={{ position: 'relative', zIndex: 2 }}>
+          <div
+            style={{ position: 'relative', zIndex: 2, cursor: 'pointer' }}
+            onClick={() => openModal('avatar')}
+            title={isEs ? 'Cambiar imagen de perfil' : 'Change profile picture'}
+          >
             {profile.photo_url ? (
               <img
                 src={profile.photo_url}
@@ -580,11 +607,11 @@ export const CustomizePage: React.FC = () => {
                   display: 'flex', 
                   alignItems: 'center', 
                   gap: '1rem', 
-                  background: 'rgba(255, 255, 255, 0.05)', 
+                  background: isLight ? 'rgba(255, 255, 255, 0.65)' : 'rgba(255, 255, 255, 0.05)', 
                   backdropFilter: 'blur(8px)',
                   padding: '0.65rem 1rem', 
                   borderRadius: '12px', 
-                  border: '1px solid var(--border-color)', 
+                  border: isLight ? '1px solid rgba(0, 0, 0, 0.08)' : '1px solid var(--border-color)', 
                   width: 'fit-content',
                   maxWidth: '100%',
                   height: '76px',
@@ -712,7 +739,7 @@ export const CustomizePage: React.FC = () => {
             {/* Imagen de Perfil */}
             <button
               type="button"
-              onClick={() => setShowAvatarModal(true)}
+              onClick={() => openModal('avatar')}
               className="glass-card"
               style={{
                 padding: '1.15rem 1rem',
@@ -764,7 +791,7 @@ export const CustomizePage: React.FC = () => {
               type="button"
               onClick={() => {
                 if (user?.is_pro) {
-                  setShowBannerModal(true);
+                  openModal('banner');
                 } else {
                   setShowProModal(true);
                 }
@@ -839,7 +866,7 @@ export const CustomizePage: React.FC = () => {
               type="button"
               onClick={() => {
                 if (user?.is_pro) {
-                  setShowBackgroundModal(true);
+                  openModal('background');
                 } else {
                   setShowProModal(true);
                 }
@@ -1432,7 +1459,7 @@ export const CustomizePage: React.FC = () => {
       {showAvatarModal && (
         <AvatarSelectorModal
           isOpen={showAvatarModal}
-          onClose={() => setShowAvatarModal(false)}
+          onClose={closeModal}
           currentPhotoUrl={profile.photo_url}
           onAvatarUpdated={(newUrl) => {
             setProfile((prev: any) => ({ ...prev, photo_url: newUrl }));
@@ -1444,7 +1471,7 @@ export const CustomizePage: React.FC = () => {
       {showBannerModal && (
         <BannerSelectorModal
           isOpen={showBannerModal}
-          onClose={() => setShowBannerModal(false)}
+          onClose={closeModal}
           currentBannerUrl={profile.banner_url}
           onBannerUpdated={(newUrl) => {
             setProfile((prev: any) => ({ ...prev, banner_url: newUrl }));
@@ -1456,7 +1483,7 @@ export const CustomizePage: React.FC = () => {
       {showBackgroundModal && (
         <BackgroundSelectorModal
           isOpen={showBackgroundModal}
-          onClose={() => setShowBackgroundModal(false)}
+          onClose={closeModal}
           currentBackgroundUrl={profile.background_url}
           onBackgroundUpdated={(newUrl) => {
             setProfile((prev: any) => ({ ...prev, background_url: newUrl }));

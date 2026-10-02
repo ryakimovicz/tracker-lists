@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { apiClient } from '../api/client';
 import { Search, X, Check, Loader2, Monitor, Trash2, Sparkles } from 'lucide-react';
 import { getOrderedCategories, getCategoryIcon } from '../utils/categoryOrder';
@@ -19,6 +20,9 @@ interface BackgroundSelectorModalProps {
   onBackgroundUpdated: (newUrl: string | null) => void;
 }
 
+// Client-side session cache for instant subsequent searches
+const backgroundClientCache = new Map<string, BackgroundItem[]>();
+
 export const BackgroundSelectorModal: React.FC<BackgroundSelectorModalProps> = ({
   isOpen,
   onClose,
@@ -27,7 +31,9 @@ export const BackgroundSelectorModal: React.FC<BackgroundSelectorModalProps> = (
 }) => {
   const { language } = useTranslation();
   const { user, refreshProfile } = useAuth();
+  const { theme } = useTheme();
   const isEs = language === 'es';
+  const isLight = theme === 'light';
 
   const [query, setQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<'all' | 'movie' | 'series' | 'anime' | 'book' | 'comic' | 'manga' | 'game'>('all');
@@ -44,6 +50,16 @@ export const BackgroundSelectorModal: React.FC<BackgroundSelectorModalProps> = (
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const fetchBackgrounds = async (searchTerm: string) => {
+    const trimmed = searchTerm.trim().toLowerCase();
+
+    // Instant cache hit
+    if (backgroundClientCache.has(trimmed)) {
+      setResults(backgroundClientCache.get(trimmed)!);
+      setVisibleCount(24);
+      setIsLoading(false);
+      return;
+    }
+
     const currentRequestId = ++activeRequestIdRef.current;
 
     if (abortControllerRef.current) {
@@ -61,7 +77,9 @@ export const BackgroundSelectorModal: React.FC<BackgroundSelectorModalProps> = (
       });
 
       if (currentRequestId === activeRequestIdRef.current) {
-        setResults(res.data || []);
+        const data = res.data || [];
+        backgroundClientCache.set(trimmed, data);
+        setResults(data);
         setVisibleCount(24);
         setIsLoading(false);
       }
@@ -147,11 +165,21 @@ export const BackgroundSelectorModal: React.FC<BackgroundSelectorModalProps> = (
     }
   };
 
+  const isBackdropMouseDownRef = useRef(false);
+
   if (!isOpen) return null;
 
   return (
     <div
-      onClick={onClose}
+      onMouseDown={(e) => {
+        isBackdropMouseDownRef.current = e.target === e.currentTarget;
+      }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget && isBackdropMouseDownRef.current) {
+          onClose();
+        }
+        isBackdropMouseDownRef.current = false;
+      }}
       style={{
         position: 'fixed',
         top: 0,
@@ -247,8 +275,10 @@ export const BackgroundSelectorModal: React.FC<BackgroundSelectorModalProps> = (
             borderRadius: '16px',
             overflow: 'hidden',
             background: 'var(--bg-primary)',
-            border: selectedUrl ? '1px solid rgba(255, 255, 255, 0.15)' : '1px solid var(--border-color)',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+            border: selectedUrl 
+              ? (isLight ? '1px solid rgba(0, 0, 0, 0.1)' : '1px solid rgba(255, 255, 255, 0.15)') 
+              : '1px solid var(--border-color)',
+            boxShadow: isLight ? '0 8px 24px rgba(0,0,0,0.08)' : '0 8px 24px rgba(0,0,0,0.4)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -269,12 +299,14 @@ export const BackgroundSelectorModal: React.FC<BackgroundSelectorModalProps> = (
                   zIndex: 0,
                 }}
               />
-              {/* Dark atmospheric vignette */}
+              {/* Atmospheric vignette */}
               <div
                 style={{
                   position: 'absolute',
                   inset: 0,
-                  background: 'radial-gradient(circle at center, rgba(9, 13, 22, 0.65) 0%, rgba(9, 13, 22, 0.88) 80%, rgba(9, 13, 22, 0.96) 100%)',
+                  background: isLight
+                    ? 'radial-gradient(circle at center, rgba(241, 245, 249, 0.7) 0%, rgba(241, 245, 249, 0.88) 80%, rgba(241, 245, 249, 0.98) 100%)'
+                    : 'radial-gradient(circle at center, rgba(9, 13, 22, 0.65) 0%, rgba(9, 13, 22, 0.88) 80%, rgba(9, 13, 22, 0.96) 100%)',
                   backdropFilter: 'blur(2px)',
                   zIndex: 1,
                 }}
@@ -299,14 +331,14 @@ export const BackgroundSelectorModal: React.FC<BackgroundSelectorModalProps> = (
               display: 'flex',
               alignItems: 'center',
               gap: '1.25rem',
-              background: 'rgba(18, 24, 38, 0.65)',
-              border: '1px solid rgba(255, 255, 255, 0.12)',
+              background: isLight ? 'rgba(255, 255, 255, 0.85)' : 'rgba(18, 24, 38, 0.65)',
+              border: isLight ? '1px solid rgba(0, 0, 0, 0.08)' : '1px solid rgba(255, 255, 255, 0.12)',
               borderRadius: '12px',
               padding: '0.85rem 1.25rem',
               backdropFilter: 'blur(8px)',
               maxWidth: '480px',
               width: '100%',
-              boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+              boxShadow: isLight ? '0 8px 24px rgba(0,0,0,0.1)' : '0 8px 24px rgba(0,0,0,0.5)',
             }}
           >
             {user?.photo_url ? (
@@ -375,11 +407,7 @@ export const BackgroundSelectorModal: React.FC<BackgroundSelectorModalProps> = (
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder={
-              isEs
-                ? 'Buscar fondo (ej. The Witcher, Cyberpunk, Batman, Attack on Titan)...'
-                : 'Search background (e.g., The Witcher, Cyberpunk, Batman, Attack on Titan)...'
-            }
+            placeholder={isEs ? 'Buscar fondo...' : 'Search background...'}
             style={{
               width: '100%',
               padding: '0.75rem 2.8rem 0.75rem 2.8rem',

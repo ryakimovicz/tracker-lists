@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { apiClient } from '../api/client';
 import { Search, X, Check, Loader2, Image as ImageIcon, Sparkles, Trash2 } from 'lucide-react';
 import { getOrderedCategories, getCategoryIcon } from '../utils/categoryOrder';
@@ -19,6 +20,9 @@ interface BannerSelectorModalProps {
   onBannerUpdated: (newUrl: string | null) => void;
 }
 
+// Client-side session cache for instant subsequent searches
+const bannerClientCache = new Map<string, BannerItem[]>();
+
 export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
   isOpen,
   onClose,
@@ -27,7 +31,9 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
 }) => {
   const { language } = useTranslation();
   const { user, refreshProfile } = useAuth();
+  const { theme } = useTheme();
   const isEs = language === 'es';
+  const isLight = theme === 'light';
 
   const [query, setQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<'all' | 'movie' | 'series' | 'anime' | 'book' | 'comic' | 'manga' | 'game'>('all');
@@ -39,12 +45,21 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-
   // Race condition prevention
   const activeRequestIdRef = useRef<number>(0);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const fetchBanners = async (searchTerm: string) => {
+    const trimmed = searchTerm.trim().toLowerCase();
+    
+    // Instant cache hit
+    if (bannerClientCache.has(trimmed)) {
+      setResults(bannerClientCache.get(trimmed)!);
+      setVisibleCount(24);
+      setIsLoading(false);
+      return;
+    }
+
     const currentRequestId = ++activeRequestIdRef.current;
 
     if (abortControllerRef.current) {
@@ -62,7 +77,9 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
       });
 
       if (currentRequestId === activeRequestIdRef.current) {
-        setResults(res.data || []);
+        const data = res.data || [];
+        bannerClientCache.set(trimmed, data);
+        setResults(data);
         setVisibleCount(24);
         setIsLoading(false);
       }
@@ -150,10 +167,21 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
     }
   };
 
+  const isBackdropMouseDownRef = useRef(false);
+
   if (!isOpen) return null;
 
   return (
     <div
+      onMouseDown={(e) => {
+        isBackdropMouseDownRef.current = e.target === e.currentTarget;
+      }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget && isBackdropMouseDownRef.current) {
+          onClose();
+        }
+        isBackdropMouseDownRef.current = false;
+      }}
       style={{
         position: 'fixed',
         inset: 0,
@@ -167,6 +195,7 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
       }}
     >
       <div
+        onClick={(e) => e.stopPropagation()}
         className="glass-card"
         style={{
           width: '100%',
@@ -245,8 +274,10 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
             borderRadius: '16px',
             overflow: 'hidden',
             background: 'var(--surface-color)',
-            border: selectedUrl ? '1px solid rgba(255, 255, 255, 0.12)' : '1px solid var(--border-color)',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
+            border: selectedUrl 
+              ? (isLight ? '1px solid rgba(0, 0, 0, 0.1)' : '1px solid rgba(255, 255, 255, 0.12)') 
+              : '1px solid var(--border-color)',
+            boxShadow: isLight ? '0 8px 24px rgba(0,0,0,0.08)' : '0 8px 24px rgba(0,0,0,0.35)',
             display: 'flex',
             alignItems: 'center',
             padding: '1.5rem 1.75rem',
@@ -267,12 +298,14 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
                   zIndex: 0,
                 }}
               />
-              {/* Darkening & Gradient overlay */}
+              {/* Atmospheric Gradient overlay */}
               <div
                 style={{
                   position: 'absolute',
                   inset: 0,
-                  background: 'linear-gradient(180deg, rgba(15, 15, 20, 0.4) 0%, rgba(15, 15, 20, 0.85) 55%, rgba(15, 15, 20, 0.98) 100%)',
+                  background: isLight
+                    ? 'linear-gradient(180deg, rgba(255, 255, 255, 0.4) 0%, rgba(241, 245, 249, 0.78) 55%, rgba(241, 245, 249, 0.94) 100%)'
+                    : 'linear-gradient(180deg, rgba(15, 15, 20, 0.4) 0%, rgba(15, 15, 20, 0.85) 55%, rgba(15, 15, 20, 0.98) 100%)',
                   zIndex: 1,
                 }}
               />
@@ -336,7 +369,7 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
                 PREMIUM
               </span>
             </div>
-            <span style={{ fontSize: '0.75rem', color: selectedUrl ? 'rgba(255,255,255,0.7)' : 'var(--text-muted)' }}>
+            <span style={{ fontSize: '0.75rem', color: selectedUrl ? (isLight ? 'var(--text-secondary)' : 'rgba(255,255,255,0.75)') : 'var(--text-muted)' }}>
               {selectedUrl
                 ? (isEs ? 'Vista previa de cómo se verá en tu perfil' : 'Live preview of your profile header')
                 : (isEs ? 'Sin portada' : 'No banner')}
@@ -352,11 +385,7 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
           <input
             type="text"
             className="input-field"
-            placeholder={
-              isEs
-                ? 'Buscar portada (Cyberpunk 2077, Attack on Titan, The Witcher, Interstellar, Breaking Bad...)'
-                : 'Search banner (Cyberpunk 2077, Attack on Titan, The Witcher, Interstellar, Breaking Bad...)'
-            }
+            placeholder={isEs ? 'Buscar portada...' : 'Search banner...'}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             style={{ paddingLeft: '2.5rem', width: '100%' }}

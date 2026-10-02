@@ -20,6 +20,9 @@ interface AvatarSelectorModalProps {
   onAvatarUpdated: (newUrl: string | null) => void;
 }
 
+// Client-side session cache for instant character searches
+const avatarClientCache = new Map<string, Character[]>();
+
 export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
   isOpen,
   onClose,
@@ -45,6 +48,16 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const fetchCharacters = async (searchTerm: string) => {
+    const trimmed = searchTerm.trim().toLowerCase();
+
+    // Instant cache hit
+    if (avatarClientCache.has(trimmed)) {
+      setResults(avatarClientCache.get(trimmed)!);
+      setVisibleCount(24);
+      setIsLoading(false);
+      return;
+    }
+
     const currentRequestId = ++activeRequestIdRef.current;
 
     // Abort previous in-flight request
@@ -61,6 +74,11 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
         params: { query: searchTerm.trim() },
         signal: controller.signal,
       });
+
+      // Save in cache
+      if (res.data) {
+        avatarClientCache.set(trimmed, res.data);
+      }
 
       // Only update state if this is still the latest active request
       if (currentRequestId === activeRequestIdRef.current) {
@@ -156,11 +174,21 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
   };
 
 
+  const isBackdropMouseDownRef = useRef(false);
+
   if (!isOpen) return null;
 
   return (
     <div
-      onClick={onClose}
+      onMouseDown={(e) => {
+        isBackdropMouseDownRef.current = e.target === e.currentTarget;
+      }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget && isBackdropMouseDownRef.current) {
+          onClose();
+        }
+        isBackdropMouseDownRef.current = false;
+      }}
       style={{
         position: 'fixed',
         top: 0,
@@ -210,7 +238,7 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
 
             <div>
               <h2 style={{ margin: 0, fontSize: '1.3rem', fontWeight: 700 }}>
-                {isEs ? 'Avatar de Personaje' : 'Character Avatar'}
+                {isEs ? 'Imagen de perfil' : 'Profile Picture'}
               </h2>
               <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                 {isEs
@@ -240,12 +268,7 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
           <input
             type="text"
             className="input-field"
-            placeholder={
-              isEs
-                ? 'Buscar personaje o portada (Batman, Inception, Breaking Bad, Goku, Hollow Knight, Harry Potter...)'
-                : 'Search character or cover (Batman, Inception, Breaking Bad, Goku, Hollow Knight, Harry Potter...)'
-            }
-
+            placeholder={isEs ? 'Buscar personaje...' : 'Search character...'}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             style={{ paddingLeft: '2.5rem', width: '100%' }}

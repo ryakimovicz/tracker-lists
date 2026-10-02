@@ -2,6 +2,8 @@ import json
 import urllib.request
 import urllib.parse
 import re
+import time
+import threading
 import concurrent.futures
 from typing import List, Dict, Any
 from app.core.config import settings
@@ -26,6 +28,11 @@ class CharacterSearchResult:
         }
 
 class CharacterService:
+    _cache: Dict[str, Any] = {}
+    _cache_lock = threading.Lock()
+    _CACHE_TTL = 3600  # 1 hour
+    _popular_cache: Dict[str, Any] = {}
+
     @staticmethod
     def _normalize_text(text: str) -> str:
         if not text:
@@ -87,24 +94,6 @@ class CharacterService:
             variants.extend(["hollow knight", "silksong", "hollow knight silksong"])
         elif "hollow" in q_lower and "knight" in q_lower:
             variants.extend(["hollow knight", "silksong", "hollow knight silksong"])
-
-        # Smart prefix expansion
-        q_raw = query.strip()
-        if len(q_raw) >= 2:
-            try:
-                url = f'https://suggestqueries.google.com/complete/search?client=firefox&q={urllib.parse.quote(q_raw)}'
-                req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
-                with urllib.request.urlopen(req, timeout=1.2) as res:
-                    data = json.loads(res.read().decode())
-                    if len(data) > 1 and isinstance(data[1], list):
-                        for sug in data[1]:
-                            sug_clean = re.sub(r'\s+(reparto|cast|pelicula|trailer|personajes|serie|libros|sin relleno|online|ver|completa|estreno|wallpaper|fondo|portada)$', '', sug.strip(), flags=re.IGNORECASE).strip()
-                            if sug_clean and len(sug_clean) >= 2 and sug_clean.lower() not in [x.lower() for x in variants]:
-                                variants.append(sug_clean)
-                                if len(variants) >= 6:
-                                    break
-            except Exception:
-                pass
 
         return list(dict.fromkeys([v for v in variants if len(v.strip()) >= 2]))
 
@@ -479,9 +468,10 @@ class CharacterService:
         for term in search_terms:
             encoded_query = urllib.parse.quote(term)
             shows_url = f"https://api.tvmaze.com/search/shows?q={encoded_query}"
+            shows_to_fetch_cast = []
             try:
                 req_shows = urllib.request.Request(shows_url, headers={"User-Agent": "Pathd/1.0"})
-                with urllib.request.urlopen(req_shows, timeout=5) as response:
+                with urllib.request.urlopen(req_shows, timeout=3.5) as response:
                     if response.status == 200:
                         shows_data = json.loads(response.read().decode())
                         for s_item in shows_data[:3]:
@@ -502,43 +492,61 @@ class CharacterService:
                                 ))
                             
                             if show_id:
-                                cast_url = f"https://api.tvmaze.com/shows/{show_id}/cast"
-                                req_cast = urllib.request.Request(cast_url, headers={"User-Agent": "Pathd/1.0"})
-                                try:
-                                    with urllib.request.urlopen(req_cast, timeout=5) as c_resp:
-                                        if c_resp.status == 200:
-                                            cast_data = json.loads(c_resp.read().decode())
-                                            for member in cast_data[:8]:
-                                                char_obj = member.get("character", {}) or {}
-                                                char_name = char_obj.get("name")
-                                                person_obj = member.get("person", {}) or {}
-                                                actor_name = person_obj.get("name")
-                                                
-                                                img_obj = char_obj.get("image") or person_obj.get("image") or {}
-                                                img_url = img_obj.get("medium") or img_obj.get("original")
-                                                
-                                                display_name = char_name or actor_name or "Character"
-                                                if char_name and actor_name and char_name != actor_name:
-                                                    display_name = f"{char_name} ({actor_name})"
-                                                    
-                                                if img_url and display_name not in seen_char_keys:
-                                                    seen_char_keys.add(display_name)
-                                                    results.append(CharacterSearchResult(
-                                                        name=display_name,
-                                                        image_url=img_url,
-                                                        category="series",
-                                                        origin=show_name
-                                                    ))
-                                except Exception:
-                                    pass
+                                shows_to_fetch_cast.append((show_id, show_name))
             except Exception as e:
-                print(f"TVMaze Show Cast Search Error: {e}")
+                print(f"TVMaze Show Search Error: {e}")
+
+            # Fetch casts in parallel to avoid sequential network bottleneck
+            if shows_to_fetch_cast:
+                def fetch_cast(show_id: int, s_name: str):
+                    cast_url = f"https://api.tvmaze.com/shows/{show_id}/cast"
+                    req_cast = urllib.request.Request(cast_url, headers={"User-Agent": "Pathd/1.0"})
+                    cast_members = []
+                    try:
+                        with urllib.request.urlopen(req_cast, timeout=2.5) as c_resp:
+                            if c_resp.status == 200:
+                                cast_data = json.loads(c_resp.read().decode())
+                                for member in cast_data[:8]:
+                                    char_obj = member.get("character", {}) or {}
+                                    char_name = char_obj.get("name")
+                                    person_obj = member.get("person", {}) or {}
+                                    actor_name = person_obj.get("name")
+                                    
+                                    img_obj = char_obj.get("image") or person_obj.get("image") or {}
+                                    img_url = img_obj.get("medium") or img_obj.get("original")
+                                    
+                                    display_name = char_name or actor_name or "Character"
+                                    if char_name and actor_name and char_name != actor_name:
+                                        display_name = f"{char_name} ({actor_name})"
+                                        
+                                    if img_url:
+                                        cast_members.append(CharacterSearchResult(
+                                            name=display_name,
+                                            image_url=img_url,
+                                            category="series",
+                                            origin=s_name
+                                        ))
+                    except Exception:
+                        pass
+                    return cast_members
+
+                with concurrent.futures.ThreadPoolExecutor(max_workers=min(4, len(shows_to_fetch_cast))) as executor:
+                    future_casts = [executor.submit(fetch_cast, s_id, s_name) for s_id, s_name in shows_to_fetch_cast]
+                    for f in concurrent.futures.as_completed(future_casts):
+                        try:
+                            cast_results = f.result()
+                            for cr in cast_results:
+                                if cr.name not in seen_char_keys:
+                                    seen_char_keys.add(cr.name)
+                                    results.append(cr)
+                        except Exception:
+                            pass
 
             # 2. Search people/actors
             people_url = f"https://api.tvmaze.com/search/people?q={encoded_query}"
             try:
                 req_people = urllib.request.Request(people_url, headers={"User-Agent": "Pathd/1.0"})
-                with urllib.request.urlopen(req_people, timeout=5) as p_resp:
+                with urllib.request.urlopen(req_people, timeout=3.0) as p_resp:
                     if p_resp.status == 200:
                         people_data = json.loads(p_resp.read().decode())
                         for p_item in people_data[:4]:
@@ -655,10 +663,14 @@ class CharacterService:
             
         return int(score)
 
-
-
     @classmethod
     def get_popular_suggestions(cls) -> List[Dict[str, Any]]:
+        now = time.time()
+        with cls._cache_lock:
+            cached = cls._popular_cache.get("popular")
+            if cached and (now - cached["timestamp"]) < cls._CACHE_TTL:
+                return cached["data"]
+
         popular_searches = [
             ("Goku", "anime"),
             ("Monkey D. Luffy", "anime"),
@@ -712,7 +724,10 @@ class CharacterService:
                 seen_images.add(r.image_url)
                 deduped.append(r.to_dict())
 
-        return deduped[:40]
+        final_res = deduped[:40]
+        with cls._cache_lock:
+            cls._popular_cache["popular"] = {"data": final_res, "timestamp": now}
+        return final_res
 
     @classmethod
     def search_all(cls, query: str) -> List[Dict[str, Any]]:
@@ -720,6 +735,12 @@ class CharacterService:
             return cls.get_popular_suggestions()
 
         raw_query = query.strip().lower()
+        now = time.time()
+        with cls._cache_lock:
+            cached = cls._cache.get(raw_query)
+            if cached and (now - cached["timestamp"]) < cls._CACHE_TTL:
+                return cached["data"]
+
         clean_query = cls._clean_query_terms(query).lower()
         search_term = clean_query if len(clean_query) >= 2 else raw_query
 
@@ -754,5 +775,8 @@ class CharacterService:
                 seen_images.add(r.image_url)
                 deduped.append(r.to_dict())
 
-        return deduped[:60]
+        final_res = deduped[:60]
+        with cls._cache_lock:
+            cls._cache[raw_query] = {"data": final_res, "timestamp": now}
+        return final_res
 

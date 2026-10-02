@@ -2640,12 +2640,14 @@ export const Profile: React.FC = () => {
             pointerEvents: 'none',
           }}
         >
-          {/* Subtle blur and dark atmospheric vignette */}
+          {/* Subtle blur and atmospheric vignette */}
           <div
             style={{
               position: 'absolute',
               inset: 0,
-              background: 'radial-gradient(circle at center, rgba(9, 13, 22, 0.65) 0%, rgba(9, 13, 22, 0.88) 75%, rgba(9, 13, 22, 0.97) 100%)',
+              background: isLight
+                ? 'radial-gradient(circle at center, rgba(241, 245, 249, 0.7) 0%, rgba(241, 245, 249, 0.88) 75%, rgba(241, 245, 249, 0.98) 100%)'
+                : 'radial-gradient(circle at center, rgba(9, 13, 22, 0.65) 0%, rgba(9, 13, 22, 0.88) 75%, rgba(9, 13, 22, 0.97) 100%)',
               backdropFilter: 'blur(3px)',
             }}
           />
@@ -2667,8 +2669,12 @@ export const Profile: React.FC = () => {
             borderRadius: '20px',
             overflow: 'hidden',
             minHeight: '220px',
-            border: profile.is_pro && profile.banner_url ? '1px solid rgba(255, 255, 255, 0.12)' : undefined,
-            boxShadow: profile.is_pro && profile.banner_url ? '0 12px 30px rgba(0, 0, 0, 0.4)' : undefined,
+            border: profile.is_pro && profile.banner_url 
+              ? (isLight ? '1px solid rgba(0, 0, 0, 0.1)' : '1px solid rgba(255, 255, 255, 0.12)') 
+              : undefined,
+            boxShadow: profile.is_pro && profile.banner_url 
+              ? (isLight ? '0 12px 30px rgba(0, 0, 0, 0.08)' : '0 12px 30px rgba(0, 0, 0, 0.4)') 
+              : undefined,
           }}
         >
           {profile.is_pro && profile.banner_url && (
@@ -2685,12 +2691,14 @@ export const Profile: React.FC = () => {
                   zIndex: 0,
                 }}
               />
-              {/* Darkening & Gradient overlay */}
+              {/* Atmospheric Gradient overlay */}
               <div
                 style={{
                   position: 'absolute',
                   inset: 0,
-                  background: 'linear-gradient(180deg, rgba(15, 15, 20, 0.45) 0%, rgba(15, 15, 20, 0.85) 55%, rgba(15, 15, 20, 0.98) 100%)',
+                  background: isLight
+                    ? 'linear-gradient(180deg, rgba(255, 255, 255, 0.4) 0%, rgba(241, 245, 249, 0.78) 55%, rgba(241, 245, 249, 0.94) 100%)'
+                    : 'linear-gradient(180deg, rgba(15, 15, 20, 0.45) 0%, rgba(15, 15, 20, 0.85) 55%, rgba(15, 15, 20, 0.98) 100%)',
                   zIndex: 1,
                 }}
               />
@@ -2711,13 +2719,13 @@ export const Profile: React.FC = () => {
                 alignItems: 'center',
                 justifyContent: 'center',
                 borderRadius: '50%',
-                background: 'rgba(0, 0, 0, 0.65)',
+                background: isLight ? 'rgba(255, 255, 255, 0.8)' : 'rgba(0, 0, 0, 0.65)',
                 backdropFilter: 'blur(8px)',
-                border: '1px solid rgba(255, 255, 255, 0.2)',
-                color: 'white',
+                border: isLight ? '1px solid rgba(0, 0, 0, 0.12)' : '1px solid rgba(255, 255, 255, 0.2)',
+                color: isLight ? 'var(--text-primary)' : 'white',
                 cursor: 'pointer',
                 zIndex: 3,
-                boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                boxShadow: isLight ? '0 4px 12px rgba(0,0,0,0.1)' : '0 4px 12px rgba(0,0,0,0.3)',
                 transition: 'all 0.2s ease',
               }}
               title={language === 'es' ? 'Personalizar perfil' : 'Customize profile'}
@@ -2925,11 +2933,11 @@ export const Profile: React.FC = () => {
                   display: 'flex', 
                   alignItems: 'center', 
                   gap: '1rem', 
-                  background: 'rgba(255, 255, 255, 0.05)', 
+                  background: isLight ? 'rgba(255, 255, 255, 0.65)' : 'rgba(255, 255, 255, 0.05)', 
                   backdropFilter: 'blur(8px)',
                   padding: '0.65rem 1rem', 
                   borderRadius: '12px', 
-                  border: '1px solid var(--border-color)', 
+                  border: isLight ? '1px solid rgba(0, 0, 0, 0.08)' : '1px solid var(--border-color)', 
                   width: 'fit-content',
                   maxWidth: '100%',
                   height: '76px',
@@ -2953,13 +2961,13 @@ export const Profile: React.FC = () => {
                 onMouseEnter={(e) => {
                   if (nowPlaying) {
                     e.currentTarget.style.borderColor = 'rgba(29, 185, 84, 0.5)';
-                    e.currentTarget.style.background = 'rgba(29, 185, 84, 0.08)';
+                    e.currentTarget.style.background = isLight ? 'rgba(29, 185, 84, 0.12)' : 'rgba(29, 185, 84, 0.08)';
                   }
                 }}
                 onMouseLeave={(e) => {
                   if (nowPlaying) {
-                    e.currentTarget.style.borderColor = 'var(--border-color)';
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                    e.currentTarget.style.borderColor = isLight ? 'rgba(0, 0, 0, 0.08)' : 'var(--border-color)';
+                    e.currentTarget.style.background = isLight ? 'rgba(255, 255, 255, 0.65)' : 'rgba(255, 255, 255, 0.05)';
                   }
                 }}
               >

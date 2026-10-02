@@ -7,14 +7,17 @@ from app.core.config import settings
 from app.services.igdb import IGDBService
 
 import re
+import time
+import threading
 
 class BannerSearchResult:
-    def __init__(self, title: str, image_url: str, category: str, origin: str = "", score: int = 0):
+    def __init__(self, title: str, image_url: str, category: str, origin: str = "", score: int = 0, kind: str = ""):
         self.title = title
         self.image_url = image_url
         self.category = category # 'game', 'anime', 'movie', 'series'
         self.origin = origin
         self.score = score
+        self.kind = kind # 'wallpaper', 'banner', 'screenshot', 'artwork', etc.
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -25,6 +28,10 @@ class BannerSearchResult:
         }
 
 class BannerService:
+    _cache: Dict[str, Any] = {}
+    _cache_lock = threading.Lock()
+    _CACHE_TTL = 3600  # 1 hour
+    _popular_cache: Dict[str, Any] = {}
     @staticmethod
     def _normalize_text(text: str) -> str:
         if not text:
@@ -43,23 +50,6 @@ class BannerService:
         cleaned = cls._clean_query_terms(q_raw)
         if cleaned != q_raw:
             variants.append(cleaned)
-
-        # Smart prefix expansion (placed high in priority for instant prefix resolution)
-        if len(q_raw) >= 2:
-            try:
-                url = f'https://suggestqueries.google.com/complete/search?client=firefox&q={urllib.parse.quote(q_raw)}'
-                req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
-                with urllib.request.urlopen(req, timeout=1.2) as res:
-                    data = json.loads(res.read().decode())
-                    if len(data) > 1 and isinstance(data[1], list):
-                        for sug in data[1]:
-                            sug_clean = re.sub(r'\s+(reparto|cast|pelicula|trailer|personajes|serie|libros|sin relleno|online|ver|completa|estreno|wallpaper|fondo|portada)$', '', sug.strip(), flags=re.IGNORECASE).strip()
-                            if sug_clean and len(sug_clean) >= 2 and sug_clean.lower() not in [x.lower() for x in variants]:
-                                variants.append(sug_clean)
-                                if len(variants) >= 6:
-                                    break
-            except Exception:
-                pass
 
         # Hyphens / Spaces
         if "-" in q_raw:
@@ -122,10 +112,11 @@ class BannerService:
                                     if url not in seen_images:
                                         seen_images.add(url)
                                         results.append(BannerSearchResult(
-                                            title=f"{gname} (Artwork)",
+                                            title=gname,
                                             image_url=url,
                                             category="game",
-                                            origin=gname
+                                            origin=gname,
+                                            kind="artwork"
                                         ))
                             
                             # Screenshots in 1080p (up to 3 per game)
@@ -136,10 +127,11 @@ class BannerService:
                                     if url not in seen_images:
                                         seen_images.add(url)
                                         results.append(BannerSearchResult(
-                                            title=f"{gname} (Screenshot)",
+                                            title=gname,
                                             image_url=url,
                                             category="game",
-                                            origin=gname
+                                            origin=gname,
+                                            kind="screenshot"
                                         ))
             except Exception as e:
                 print(f"IGDB Banner Search Error: {e}")
@@ -216,10 +208,10 @@ class BannerService:
             omdb_url = f"http://www.omdbapi.com/?s={encoded}&type=movie&apikey={settings.OMDB_API_KEY}"
             try:
                 req_omdb = urllib.request.Request(omdb_url, headers={"User-Agent": "TrackerLists/1.0"})
-                with urllib.request.urlopen(req_omdb, timeout=4) as resp:
+                with urllib.request.urlopen(req_omdb, timeout=2.0) as resp:
                     if resp.status == 200:
                         data = json.loads(resp.read().decode())
-                        for item in data.get("Search", [])[:6]:
+                        for item in data.get("Search", [])[:5]:
                             iid = item.get("imdbID")
                             mtitle = item.get("Title")
                             if iid and (iid, mtitle) not in imdb_ids:
@@ -227,26 +219,40 @@ class BannerService:
             except Exception:
                 pass
 
-        # Fetch backgrounds for each movie from Fanart.tv
-        for iid, mtitle in imdb_ids[:8]:
+        # Fetch backgrounds for movies from Fanart.tv concurrently
+        def fetch_movie_fanart(item_tuple):
+            iid, mtitle = item_tuple
             fan_url = f"https://webservice.fanart.tv/v3/movies/{iid}?api_key={settings.FANART_API_KEY}"
+            sub_results = []
             try:
                 req_fan = urllib.request.Request(fan_url, headers={"User-Agent": "TrackerLists/1.0"})
-                with urllib.request.urlopen(req_fan, timeout=3) as resp_f:
+                with urllib.request.urlopen(req_fan, timeout=1.8) as resp_f:
                     if resp_f.status == 200:
                         fan_data = json.loads(resp_f.read().decode())
                         for bg in fan_data.get("moviebackground", [])[:3]:
                             bg_url = bg.get("url")
-                            if bg_url and bg_url not in seen_images:
-                                seen_images.add(bg_url)
-                                results.append(BannerSearchResult(
-                                    title=f"{mtitle} (Wallpaper)",
+                            if bg_url:
+                                sub_results.append(BannerSearchResult(
+                                    title=mtitle,
                                     image_url=bg_url,
                                     category="movie",
-                                    origin=mtitle
+                                    origin=mtitle,
+                                    kind="wallpaper"
                                 ))
             except Exception:
                 pass
+            return sub_results
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as fan_executor:
+            future_to_movie = {fan_executor.submit(fetch_movie_fanart, m): m for m in imdb_ids[:5]}
+            for future in concurrent.futures.as_completed(future_to_movie):
+                try:
+                    for r in future.result():
+                        if r.image_url not in seen_images:
+                            seen_images.add(r.image_url)
+                            results.append(r)
+                except Exception:
+                    pass
 
         return results
 
@@ -257,81 +263,104 @@ class BannerService:
             
         results = []
         seen_images = set()
-        search_terms = cls._generate_query_variants(raw_query or query)[:3]
+        search_terms = cls._generate_query_variants(raw_query or query)[:2]
+
+        shows_to_process = []
+        seen_show_ids = set()
 
         for term in search_terms:
             encoded = urllib.parse.quote(term)
             url = f"https://api.tvmaze.com/search/shows?q={encoded}"
             try:
                 req = urllib.request.Request(url, headers={"User-Agent": "Pathd/1.0"})
-                with urllib.request.urlopen(req, timeout=4) as resp:
+                with urllib.request.urlopen(req, timeout=2.0) as resp:
                     if resp.status == 200:
                         shows = json.loads(resp.read().decode())
-                        for s in shows[:6]:
+                        for s in shows[:4]:
                             show = s.get("show", {}) or {}
                             show_id = show.get("id")
-                            sname = show.get("name") or "Series"
-                            externals = show.get("externals", {}) or {}
-                            thetvdb_id = externals.get("thetvdb")
-                            imdb_id = externals.get("imdb")
+                            if show_id and show_id not in seen_show_ids:
+                                seen_show_ids.add(show_id)
+                                sname = show.get("name") or "Series"
+                                externals = show.get("externals", {}) or {}
+                                thetvdb_id = externals.get("thetvdb")
+                                imdb_id = externals.get("imdb")
+                                shows_to_process.append((show_id, sname, thetvdb_id, imdb_id))
+            except Exception:
+                pass
 
-                            # 1. Fanart.tv Series Backgrounds
-                            if settings.FANART_API_KEY and (thetvdb_id or imdb_id):
-                                lookup_id = thetvdb_id or imdb_id
-                                fan_url = f"https://webservice.fanart.tv/v3/tv/{lookup_id}?api_key={settings.FANART_API_KEY}"
-                                try:
-                                    req_fan = urllib.request.Request(fan_url, headers={"User-Agent": "TrackerLists/1.0"})
-                                    with urllib.request.urlopen(req_fan, timeout=3) as r_fan:
-                                        if r_fan.status == 200:
-                                            fan_data = json.loads(r_fan.read().decode())
-                                            for bg in (fan_data.get("showbackground") or [])[:3]:
-                                                bg_url = bg.get("url")
-                                                if bg_url and bg_url not in seen_images:
-                                                    seen_images.add(bg_url)
-                                                    results.append(BannerSearchResult(
-                                                        title=f"{sname} (Wallpaper)",
-                                                        image_url=bg_url,
-                                                        category="series",
-                                                        origin=sname
-                                                    ))
-                                            for tb in (fan_data.get("tvthumb") or [])[:2]:
-                                                tb_url = tb.get("url")
-                                                if tb_url and tb_url not in seen_images:
-                                                    seen_images.add(tb_url)
-                                                    results.append(BannerSearchResult(
-                                                        title=f"{sname} (Banner)",
-                                                        image_url=tb_url,
-                                                        category="series",
-                                                        origin=sname
-                                                    ))
-                                except Exception:
-                                    pass
+        def process_show_images(show_tuple):
+            show_id, sname, thetvdb_id, imdb_id = show_tuple
+            show_res = []
 
-                            # 2. TVMaze Images
-                            if show_id:
-                                img_url = f"https://api.tvmaze.com/shows/{show_id}/images"
-                                req_img = urllib.request.Request(img_url, headers={"User-Agent": "Pathd/1.0"})
-                                try:
-                                    with urllib.request.urlopen(req_img, timeout=3) as r_img:
-                                        if r_img.status == 200:
-                                            images_data = json.loads(r_img.read().decode())
-                                            for im in images_data:
-                                                im_type = im.get("type")
-                                                if im_type in ("background", "banner"):
-                                                    resolutions = im.get("resolutions", {})
-                                                    orig = resolutions.get("original", {}).get("url")
-                                                    if orig and orig not in seen_images:
-                                                        seen_images.add(orig)
-                                                        results.append(BannerSearchResult(
-                                                            title=f"{sname} ({im_type.capitalize()})",
-                                                            image_url=orig,
-                                                            category="series",
-                                                            origin=sname
-                                                        ))
-                                except Exception:
-                                    pass
-            except Exception as e:
-                print(f"TVMaze Banner Search Error: {e}")
+            # 1. Fanart.tv Series Backgrounds
+            if settings.FANART_API_KEY and (thetvdb_id or imdb_id):
+                lookup_id = thetvdb_id or imdb_id
+                fan_url = f"https://webservice.fanart.tv/v3/tv/{lookup_id}?api_key={settings.FANART_API_KEY}"
+                try:
+                    req_fan = urllib.request.Request(fan_url, headers={"User-Agent": "TrackerLists/1.0"})
+                    with urllib.request.urlopen(req_fan, timeout=1.8) as r_fan:
+                        if r_fan.status == 200:
+                            fan_data = json.loads(r_fan.read().decode())
+                            for bg in (fan_data.get("showbackground") or [])[:3]:
+                                bg_url = bg.get("url")
+                                if bg_url:
+                                    show_res.append(BannerSearchResult(
+                                        title=sname,
+                                        image_url=bg_url,
+                                        category="series",
+                                        origin=sname,
+                                        kind="wallpaper"
+                                    ))
+                            for tb in (fan_data.get("tvthumb") or [])[:2]:
+                                tb_url = tb.get("url")
+                                if tb_url:
+                                    show_res.append(BannerSearchResult(
+                                        title=sname,
+                                        image_url=tb_url,
+                                        category="series",
+                                        origin=sname,
+                                        kind="banner"
+                                    ))
+                except Exception:
+                    pass
+
+            # 2. TVMaze Images
+            if show_id:
+                img_url = f"https://api.tvmaze.com/shows/{show_id}/images"
+                req_img = urllib.request.Request(img_url, headers={"User-Agent": "Pathd/1.0"})
+                try:
+                    with urllib.request.urlopen(req_img, timeout=1.8) as r_img:
+                        if r_img.status == 200:
+                            images_data = json.loads(r_img.read().decode())
+                            for im in images_data:
+                                im_type = im.get("type")
+                                if im_type in ("background", "banner"):
+                                    resolutions = im.get("resolutions", {})
+                                    orig = resolutions.get("original", {}).get("url")
+                                    if orig:
+                                        show_res.append(BannerSearchResult(
+                                            title=sname,
+                                            image_url=orig,
+                                            category="series",
+                                            origin=sname,
+                                            kind="banner" if im_type == "banner" else "wallpaper"
+                                        ))
+                except Exception:
+                    pass
+
+            return show_res
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as tv_executor:
+            future_to_show = {tv_executor.submit(process_show_images, sh): sh for sh in shows_to_process[:5]}
+            for future in concurrent.futures.as_completed(future_to_show):
+                try:
+                    for r in future.result():
+                        if r.image_url not in seen_images:
+                            seen_images.add(r.image_url)
+                            results.append(r)
+                except Exception:
+                    pass
                 
         return results
 
@@ -359,10 +388,11 @@ class BannerService:
                             if img_url and img_url not in seen_images:
                                 seen_images.add(img_url)
                                 results.append(BannerSearchResult(
-                                    title=f"{vname} (Comic)",
+                                    title=vname,
                                     image_url=img_url,
                                     category="comic",
-                                    origin=vname
+                                    origin=vname,
+                                    kind="comic"
                                 ))
             except Exception as e:
                 print(f"ComicVine Banner Search Error: {e}")
@@ -383,10 +413,11 @@ class BannerService:
                 if b.image_url and b.image_url not in seen_images:
                     seen_images.add(b.image_url)
                     results.append(BannerSearchResult(
-                        title=f"{b.title} (Book)",
+                        title=b.title,
                         image_url=b.image_url,
                         category="book",
-                        origin=b.title
+                        origin=b.title,
+                        kind="book"
                     ))
         except Exception as e:
             print(f"Google Books Banner Search Error: {e}")
@@ -446,23 +477,30 @@ class BannerService:
             score += (matches * 300)
 
         # Contextual boost: Banner vs Background priority
-        title_lower = item.title.lower()
+        kind = getattr(item, 'kind', '')
         if target_type == "background":
-            if "(wallpaper)" in title_lower or "(background)" in title_lower or "(screenshot)" in title_lower:
+            if kind in ("wallpaper", "screenshot"):
                 score += 800
-            elif "(artwork)" in title_lower:
+            elif kind == "artwork":
                 score += 400
         else:
             # Banner mode
-            if "(banner)" in title_lower or "(header)" in title_lower:
+            if kind in ("banner", "header"):
                 score += 800
-            elif "(artwork)" in title_lower or "(wallpaper)" in title_lower:
+            elif kind in ("artwork", "wallpaper"):
                 score += 400
             
         return score
 
     @classmethod
     def get_popular_suggestions(cls) -> List[Dict[str, Any]]:
+        now = time.time()
+        with cls._cache_lock:
+            cached = cls._popular_cache.get("data")
+            cached_time = cls._popular_cache.get("time", 0)
+            if cached and (now - cached_time) < cls._CACHE_TTL:
+                return cached
+
         popular_terms = [
             ("Cyberpunk 2077", "game"),
             ("The Witcher 3", "game"),
@@ -479,7 +517,7 @@ class BannerService:
         ]
         
         all_results = []
-        with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
             future_map = {}
             for term, cat in popular_terms:
                 if cat == "game":
@@ -507,7 +545,10 @@ class BannerService:
                 seen_urls.add(r.image_url)
                 deduped.append(r.to_dict())
 
-        return deduped[:50]
+        final_res = deduped[:50]
+        with cls._cache_lock:
+            cls._popular_cache = {"data": final_res, "time": now}
+        return final_res
 
     @classmethod
     def search_all(cls, query: str, target_type: str = "banner") -> List[Dict[str, Any]]:
@@ -517,6 +558,14 @@ class BannerService:
         raw_query = query.strip().lower()
         clean_query = cls._clean_query_terms(query).lower()
         search_term = clean_query if len(clean_query) >= 2 else raw_query
+
+        cache_key = f"{target_type}:{raw_query}"
+        now = time.time()
+        with cls._cache_lock:
+            if cache_key in cls._cache:
+                entry = cls._cache[cache_key]
+                if (now - entry["time"]) < cls._CACHE_TTL:
+                    return entry["data"]
 
         all_results = []
         with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
@@ -548,4 +597,12 @@ class BannerService:
                 seen_urls.add(r.image_url)
                 deduped.append(r.to_dict())
 
-        return deduped[:60]
+        final_data = deduped[:60]
+        with cls._cache_lock:
+            cls._cache[cache_key] = {"data": final_data, "time": now}
+            # Limit cache size to 500 items
+            if len(cls._cache) > 500:
+                oldest_key = min(cls._cache.keys(), key=lambda k: cls._cache[k]["time"])
+                cls._cache.pop(oldest_key, None)
+
+        return final_data
