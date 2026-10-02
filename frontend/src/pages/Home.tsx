@@ -3268,7 +3268,7 @@ export const Home: React.FC = () => {
               }
               fetchDashboard(true);
             }}
-            onOpenItem={(item) => setSelectedItem(item)}
+            onOpenItem={(item) => handleOpenItem(item)}
             isFavorite={isFav}
             onToggleFavorite={handleToggleFavorite}
           />
