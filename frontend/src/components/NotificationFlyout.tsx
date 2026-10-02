@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Bell, CheckCheck, Trash2, UserPlus, ThumbsUp, MessageSquare, Reply, UserCheck, X, ExternalLink, AtSign } from 'lucide-react';
+import { Bell, CheckCheck, Trash2, UserPlus, ThumbsUp, MessageSquare, Reply, UserCheck, X, ExternalLink, AtSign, AlertTriangle } from 'lucide-react';
 import { apiClient } from '../api/client';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from '../context/LanguageContext';
@@ -165,7 +165,10 @@ export const NotificationFlyout: React.FC<NotificationFlyoutProps> = ({
       handleMarkAsRead(notif.id);
     }
 
-    if (notif.notification_type === 'new_follower' || notif.notification_type === 'follow_request') {
+    if (notif.notification_type === 'admin_warning' || notif.entity_type === 'moderation') {
+      navigate('/profile');
+      onClose();
+    } else if (notif.notification_type === 'new_follower' || notif.notification_type === 'follow_request') {
       navigate(`/user/${encodeURIComponent(notif.actor_username)}`);
       onClose();
     } else if (notif.entity_type === 'item') {
@@ -197,6 +200,8 @@ export const NotificationFlyout: React.FC<NotificationFlyoutProps> = ({
 
   const renderIcon = (type: string) => {
     switch (type) {
+      case 'admin_warning':
+        return <AlertTriangle size={16} color="#ef4444" />;
       case 'activity_like':
         return <ThumbsUp size={16} color="#3b82f6" fill="#3b82f6" />;
       case 'activity_comment':
@@ -221,6 +226,13 @@ export const NotificationFlyout: React.FC<NotificationFlyoutProps> = ({
     } catch (e) {}
 
     switch (notif.notification_type) {
+      case 'admin_warning':
+        return (
+          <span style={{ color: '#ef4444' }}>
+            <strong>{isEs ? 'Aviso de Moderación:' : 'Moderation Notice:'}</strong>{' '}
+            {extra.message ? `"${extra.message}"` : (isEs ? 'Has recibido una advertencia administrativa.' : 'You received an administrative warning.')}
+          </span>
+        );
       case 'activity_like':
         return (
           <span>

@@ -842,8 +842,23 @@ def admin_warn_user(
     if user.is_admin:
         raise HTTPException(status_code=400, detail="Cannot warn an admin account")
 
-    user.admin_warning = req.message.strip()
+    clean_msg = req.message.strip()
+    user.admin_warning = clean_msg
     user.admin_warning_at = datetime.now(timezone.utc)
+
+    # Send in-app notification to the warned user
+    from app.models.social import Notification
+    import json
+    notif = Notification(
+        recipient_id=user.id,
+        actor_id=current_admin.id,
+        notification_type="admin_warning",
+        entity_type="moderation",
+        entity_id=str(user.id),
+        extra_data_json=json.dumps({"message": clean_msg})
+    )
+    db.add(notif)
+
     db.commit()
     return {"message": "Warning sent to user", "admin_warning": user.admin_warning}
 
