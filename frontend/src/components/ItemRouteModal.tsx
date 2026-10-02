@@ -11,10 +11,17 @@ interface ItemRouteModalProps {
 }
 
 export const ItemRouteModal: React.FC<ItemRouteModalProps> = ({ onClose, onUpdate }) => {
-  const { type, id } = useParams<{ type: string; id: string }>();
+  const params = useParams<{ type?: string; id?: string }>();
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
+
+  // If mounted outside of a matched Route, parse from location.pathname (/item/:type/:id)
+  const pathParts = location.pathname.split('/').filter(Boolean);
+  const routeType = params.type || (pathParts[0] === 'item' ? pathParts[1] : undefined);
+  const routeId = params.id || (pathParts[0] === 'item' ? pathParts.slice(2).join('/') : undefined);
+  const type = routeType;
+  const id = routeId;
 
   const stateItem = (location.state as any)?.item;
   const isDirectPage = !(location.state as any)?.backgroundLocation;

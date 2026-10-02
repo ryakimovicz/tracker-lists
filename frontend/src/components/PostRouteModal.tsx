@@ -8,9 +8,11 @@ import { PathdLoader } from './PathdLoader';
 import { useTranslation } from '../context/LanguageContext';
 
 export const PostRouteModal: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
+  const params = useParams<{ id?: string }>();
   const navigate = useNavigate();
   const location = useLocation();
+  const pathParts = location.pathname.split('/').filter(Boolean);
+  const id = params.id || (pathParts[0] === 'post' ? pathParts[1] : undefined);
   const { language } = useTranslation();
   const isEs = language === 'es';
 

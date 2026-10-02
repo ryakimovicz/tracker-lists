@@ -222,14 +222,18 @@ function AppContent() {
             </Routes>
           )}
 
-          {/* Also mount ItemRouteModal if on /item/:type/:id directly over fallback background */}
-          {!state?.backgroundLocation && location.pathname.startsWith('/item/') && (
-            <ItemRouteModal />
-          )}
-
-          {/* Also mount PostRouteModal if on /post/:id directly over fallback background */}
-          {!state?.backgroundLocation && location.pathname.startsWith('/post/') && (
-            <PostRouteModal />
+          {/* Also mount ItemRouteModal or PostRouteModal if accessed directly over fallback background */}
+          {!state?.backgroundLocation && (location.pathname.startsWith('/item/') || location.pathname.startsWith('/post/')) && (
+            <Routes>
+              <Route
+                path="/item/:type/:id"
+                element={<ItemRouteModal />}
+              />
+              <Route
+                path="/post/:id"
+                element={<PostRouteModal />}
+              />
+            </Routes>
           )}
         </main>
         <RightSidebarAd />
