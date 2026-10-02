@@ -4,9 +4,9 @@ import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../context/LanguageContext';
-import { ActivityCommentThread } from './ActivityCommentThread';
 import { StarRatingDisplay } from './ItemDetailsModal';
 import { renderFormattedContentWithMentions, AuthorUsername } from './MentionTag';
+import { ActivityModal } from './ActivityModal';
 
 export interface ActivityCardData {
   id: number;
@@ -513,46 +513,17 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
     );
   };
 
-  return (
-    <div
-      className="glass-card activity-card"
-      style={{
-        padding: '1.25rem',
-        borderRadius: '16px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '0.9rem',
-        opacity: isHidden ? 0.6 : 1,
-        position: 'relative',
-        background: 'var(--bg-secondary, rgba(255,255,255,0.03))',
-        border: isHidden ? '1px dashed var(--border-color)' : '1px solid var(--border-color)',
-        transition: 'border-color 0.2s ease, background 0.2s ease, transform 0.2s ease',
-        height: '100%',
-        justifyContent: 'space-between'
-      }}
-    >
-      {/* Clickable Card Body (Header + Poster + Action Description + Review) */}
-      <div
-        onClick={handleClickCard}
-        onMouseEnter={() => setIsCardHovered(true)}
-        onMouseLeave={() => setIsCardHovered(false)}
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '0.85rem',
-          cursor: isClickable ? 'pointer' : 'default',
-          flex: 1
-        }}
-      >
-        {/* 1. Header row: User avatar + Username + Timestamp + Menu */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
-          <div
-            onClick={(e) => {
-              e.stopPropagation();
-              navigate(`/user/${encodeURIComponent(activity.username)}`);
-            }}
-            style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', cursor: 'pointer', minWidth: 0 }}
-          >
+  const renderCardBodyContent = () => (
+    <>
+      {/* 1. Header row: User avatar + Username + Timestamp + Menu */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
+        <div
+          onClick={(e) => {
+            e.stopPropagation();
+            navigate(`/user/${encodeURIComponent(activity.username)}`);
+          }}
+          style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', cursor: 'pointer', minWidth: 0 }}
+        >
             {activity.user_photo_url ? (
               <img
                 src={activity.user_photo_url}
@@ -1076,11 +1047,46 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
             </span>
           </div>
         )}
-      </div>
+      </>
+    );
 
-      {/* Footer / Action Bar (Like + Comments) */}
+    return (
       <div
-        onClick={canHaveComments ? () => setShowComments(!showComments) : undefined}
+        className="glass-card activity-card"
+        style={{
+          padding: '1.25rem',
+          borderRadius: '16px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '0.9rem',
+          opacity: isHidden ? 0.6 : 1,
+          position: 'relative',
+          background: 'var(--bg-secondary, rgba(255,255,255,0.03))',
+          border: isHidden ? '1px dashed var(--border-color)' : '1px solid var(--border-color)',
+          transition: 'border-color 0.2s ease, background 0.2s ease, transform 0.2s ease',
+          height: '100%',
+          justifyContent: 'space-between'
+        }}
+      >
+        {/* Clickable Card Body (Header + Poster + Action Description + Review) */}
+        <div
+          onClick={handleClickCard}
+          onMouseEnter={() => setIsCardHovered(true)}
+          onMouseLeave={() => setIsCardHovered(false)}
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.85rem',
+            cursor: isClickable ? 'pointer' : 'default',
+            flex: 1
+          }}
+        >
+          {renderCardBodyContent()}
+        </div>
+
+        {/* Footer / Action Bar (Like + Comments) */}
+      <div
+        onClick={canHaveComments ? () => setShowComments(true) : undefined}
         onMouseEnter={() => setIsFooterHovered(true)}
         onMouseLeave={() => setIsFooterHovered(false)}
         style={{
@@ -1136,9 +1142,9 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
         {canHaveComments && (
           <div
             style={{
-              background: (showComments || (isFooterHovered && !isLikeHovered)) ? 'rgba(245, 158, 11, 0.12)' : 'transparent',
-              border: (showComments || (isFooterHovered && !isLikeHovered)) ? '1px solid rgba(245, 158, 11, 0.35)' : '1px solid transparent',
-              color: (showComments || (isFooterHovered && !isLikeHovered)) ? 'var(--accent-primary)' : 'var(--text-secondary)',
+              background: (isFooterHovered && !isLikeHovered) ? 'rgba(245, 158, 11, 0.12)' : 'transparent',
+              border: (isFooterHovered && !isLikeHovered) ? '1px solid rgba(245, 158, 11, 0.35)' : '1px solid transparent',
+              color: (isFooterHovered && !isLikeHovered) ? 'var(--accent-primary)' : 'var(--text-secondary)',
               borderRadius: '20px',
               padding: '0.35rem 0.75rem',
               display: 'inline-flex',
@@ -1155,11 +1161,18 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
         )}
       </div>
 
-      {/* Comments Accordion (Only if allowed) */}
-      {canHaveComments && showComments && (
-        <ActivityCommentThread
-          activityId={activity.id}
+      {/* Modal for Details & Comments */}
+      {canHaveComments && (
+        <ActivityModal
+          activity={activity}
+          isOpen={showComments}
+          onClose={() => setShowComments(false)}
+          likesCount={likesCount}
+          isLiked={isLiked}
+          onToggleLike={handleToggleLike}
+          commentsCount={commentsCount}
           onCommentsCountChange={(cnt) => setCommentsCount(cnt)}
+          renderCardBody={renderCardBodyContent}
         />
       )}
     </div>
