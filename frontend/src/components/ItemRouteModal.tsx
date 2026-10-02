@@ -62,6 +62,13 @@ export const ItemRouteModal: React.FC<ItemRouteModalProps> = ({ onClose, onUpdat
         if (isMounted) {
           setItem(res.data);
           setLoading(false);
+          // Auto-redirect URL if external_id was resolved or upgraded (e.g. wiki_... -> omdb_...)
+          if (res.data?.external_id && res.data.external_id !== id) {
+            navigate(`/item/${res.data.item_type || type}/${res.data.external_id}`, {
+              replace: true,
+              state: location.state
+            });
+          }
         }
       })
       .catch(err => {

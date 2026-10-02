@@ -3272,6 +3272,14 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         onUpdate && onUpdate();
                       }).catch(console.error);
                     }
+
+                    // If URL is currently showing the old wiki_ ID, silently update to the new omdb_ ID
+                    if (found.external_id && found.external_id.startsWith('omdb_') && window.location.pathname.includes('/item/')) {
+                      const newPath = window.location.pathname.replace(item.external_id, found.external_id);
+                      if (newPath !== window.location.pathname) {
+                        window.history.replaceState(window.history.state, '', newPath);
+                      }
+                    }
                   }
                 }
               })

@@ -868,6 +868,22 @@ def lookup_media_item(
                         "description": getattr(m_detail, "description", None),
                         "release_date": getattr(m_detail, "release_date", None)
                     }
+            elif ext_id_clean.startswith("wiki_"):
+                # If we have an existing database record, attempt to resolve via title in OMDb
+                search_title = existing.title if existing else None
+                if search_title:
+                    omdb_candidates = OMDbService.search_movies(search_title)
+                    if omdb_candidates:
+                        best = omdb_candidates[0]
+                        m_detail = OMDbService.get_movie_detail(best.external_id) or best
+                        result_data = {
+                            "external_id": getattr(m_detail, "external_id", best.external_id),
+                            "title": getattr(m_detail, "title", best.title),
+                            "item_type": "movie",
+                            "image_url": getattr(m_detail, "image_url", best.image_url),
+                            "description": getattr(m_detail, "description", best.description),
+                            "release_date": getattr(m_detail, "release_date", best.release_date)
+                        }
         elif type_clean in ("series", "anime"):
             if ext_id_clean.startswith("anime_"):
                 a_detail = AnilistService.get_anime_detail(ext_id_clean)
