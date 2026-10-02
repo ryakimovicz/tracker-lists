@@ -1,6 +1,6 @@
 # Pathd - Frontend SPA 🌌
 
-Frontend oficial de **Pathd (v0.9.8 Beta)**, desarrollado como una Single Page Application (SPA) moderna, fluida y de alto rendimiento construida con **React 19, TypeScript y Vite**.
+Frontend oficial de **Pathd (v0.9.9 Beta)**, desarrollado como una Single Page Application (SPA) moderna, fluida y de alto rendimiento construida con **React 19, TypeScript y Vite**.
 
 ---
 

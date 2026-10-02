@@ -5,7 +5,7 @@
   <p><strong>La plataforma definitiva para el seguimiento de tu universo multimedia, guías cronológicas y biblioteca personal</strong></p>
 
   <p>
-    <a href="https://pathd.net"><img src="https://img.shields.io/badge/Version-v0.9.8_Beta-f59e0b?style=for-the-badge&logo=rocket" alt="Pathd Version" /></a>
+    <a href="https://pathd.net"><img src="https://img.shields.io/badge/Version-v0.9.9_Beta-f59e0b?style=for-the-badge&logo=rocket" alt="Pathd Version" /></a>
     <a href="https://pathd.net"><img src="https://img.shields.io/badge/Production-Online-10b981?style=for-the-badge&logo=cloudflare" alt="Production Status" /></a>
     <a href="https://react.dev/"><img src="https://img.shields.io/badge/Frontend-React_19_+_TypeScript-61dafb?style=for-the-badge&logo=react" alt="React" /></a>
     <a href="https://fastapi.tiangolo.com/"><img src="https://img.shields.io/badge/Backend-FastAPI-009688?style=for-the-badge&logo=fastapi" alt="FastAPI" /></a>

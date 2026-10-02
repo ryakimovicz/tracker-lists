@@ -1,6 +1,6 @@
 # Pathd - Especificación Técnica & Referencia de API ⚡
 
-Documento de referencia para desarrolladores, arquitectura del sistema y catálogo completo de endpoints REST de **Pathd (v0.9.8 Beta)**.
+Documento de referencia para desarrolladores, arquitectura del sistema y catálogo completo de endpoints REST de **Pathd (v0.9.9 Beta)**.
 
 ---
 
