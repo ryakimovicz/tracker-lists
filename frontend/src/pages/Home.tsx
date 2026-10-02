@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import { useTranslation } from '../context/LanguageContext';
 import { getCachedSeries, setCachedSeries, clearCachedSeriesMatching } from '../utils/seriesCache';
@@ -1793,9 +1793,28 @@ const ActiveItemCard = ({ item, onUpdate, language, onOpenItem, themeColor, them
 
 export const Home: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { language } = useTranslation();
   const { user: currentUser } = useAuth();
-  const [activeTab, setActiveTab] = useState<"watching" | "guides" | "plan_to_watch" | "completed" | "dropped" | "upcoming">("watching");
+
+  const validHomeTabs = ["watching", "guides", "plan_to_watch", "completed", "dropped", "upcoming"] as const;
+  type HomeTab = typeof validHomeTabs[number];
+
+  const currentTabParam = searchParams.get('tab');
+  const activeTab: HomeTab = (currentTabParam && validHomeTabs.includes(currentTabParam as any))
+    ? (currentTabParam as HomeTab)
+    : "watching";
+
+  const handleTabChange = (tab: HomeTab) => {
+    const newParams = new URLSearchParams(searchParams);
+    if (tab === "watching") {
+      newParams.delete('tab');
+    } else {
+      newParams.set('tab', tab);
+    }
+    setSearchParams(newParams);
+  };
   
   const [libraryItems, setLibraryItems] = useState<any[]>(() => {
     try {
@@ -1822,7 +1841,6 @@ export const Home: React.FC = () => {
     } catch { return []; }
   });
   const [isSyncingEpisodes, setIsSyncingEpisodes] = useState<boolean>(false);
-  const location = useLocation();
   const [selectedItem, setSelectedItem] = useState<any>(null);
 
   const handleOpenItem = useCallback((item: any) => {
@@ -2498,7 +2516,7 @@ export const Home: React.FC = () => {
           return (
             <div 
               key={tab}
-              onClick={() => setActiveTab(tab as any)}
+              onClick={() => handleTabChange(tab as any)}
               style={{
                 fontSize: "1.05rem", fontWeight: isActive ? 600 : 500,
                 color: isActive ? "var(--text-primary)" : "var(--text-secondary)",

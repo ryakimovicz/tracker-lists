@@ -7,7 +7,7 @@ import { SocialActivityCard } from '../components/SocialActivityCard';
 import type { ActivityCardData } from '../components/SocialActivityCard';
 import { ItemDetailsModal } from '../components/ItemDetailsModal';
 import { PathdLoader } from '../components/PathdLoader';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 
 type SocialTab = 'following' | 'discover' | 'reviews' | 'me';
 
@@ -28,10 +28,16 @@ export const Social: React.FC = () => {
   const isEs = language === 'es';
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  const [activeTab, setActiveTab] = useState<SocialTab>('following');
-  const [activities, setActivities] = useState<ActivityCardData[]>(() => getCachedFeed('following'));
-  const [loading, setLoading] = useState<boolean>(() => getCachedFeed('following').length === 0);
+  const validTabs: SocialTab[] = ['following', 'discover', 'reviews', 'me'];
+  const tabParam = searchParams.get('tab');
+  const activeTab: SocialTab = (tabParam && validTabs.includes(tabParam as SocialTab))
+    ? (tabParam as SocialTab)
+    : 'following';
+
+  const [activities, setActivities] = useState<ActivityCardData[]>(() => getCachedFeed(activeTab));
+  const [loading, setLoading] = useState<boolean>(() => getCachedFeed(activeTab).length === 0);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedItem, setSelectedItem] = useState<any | null>(null);
 
@@ -312,7 +318,13 @@ export const Social: React.FC = () => {
 
   const handleTabChange = (tab: SocialTab) => {
     setHasNewUpdates(false);
-    setActiveTab(tab);
+    const newParams = new URLSearchParams(searchParams);
+    if (tab === 'following') {
+      newParams.delete('tab');
+    } else {
+      newParams.set('tab', tab);
+    }
+    setSearchParams(newParams);
   };
 
   const handleApplyUpdates = () => {
@@ -475,7 +487,7 @@ export const Social: React.FC = () => {
           </p>
           {activeTab === 'following' && (
             <button
-              onClick={() => setActiveTab('discover')}
+              onClick={() => handleTabChange('discover')}
               className="btn-primary"
               style={{ padding: '0.7rem 1.75rem', borderRadius: '25px', fontWeight: 600 }}
             >

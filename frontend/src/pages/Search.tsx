@@ -1,6 +1,6 @@
 import { HorizontalScroll } from '../components/HorizontalScroll';
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useTranslation } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { apiClient } from '../api/client';
@@ -467,9 +467,28 @@ export const Search: React.FC = () => {
     setVisibleCount(24);
   }, [activeTab, submittedQuery]);
 
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const validExploreTabs = ['nuevo', 'tendencias', 'guias'] as const;
+  type ExploreTab = typeof validExploreTabs[number];
+
+  const exploreTabParam = searchParams.get('tab');
+  const exploreSubTab: ExploreTab = (exploreTabParam && validExploreTabs.includes(exploreTabParam as any))
+    ? (exploreTabParam as ExploreTab)
+    : 'nuevo';
+
+  const handleExploreSubTabChange = (tab: ExploreTab) => {
+    const newParams = new URLSearchParams(searchParams);
+    if (tab === 'nuevo') {
+      newParams.delete('tab');
+    } else {
+      newParams.set('tab', tab);
+    }
+    setSearchParams(newParams);
+  };
+
   const [exploreData, setExploreData] = useState<any>(null);
   const [loadingExplore, setLoadingExplore] = useState(false);
-  const [exploreSubTab, setExploreSubTab] = useState<'nuevo' | 'tendencias' | 'guias'>('nuevo');
   const [guidesData, setGuidesData] = useState<any>(null);
   const [loadingGuides, setLoadingGuides] = useState(false);
 
@@ -1300,7 +1319,7 @@ export const Search: React.FC = () => {
             }}
           >
             <button 
-              onClick={() => setExploreSubTab('nuevo')}
+              onClick={() => handleExploreSubTabChange('nuevo')}
               style={{
                 fontSize: "1.05rem", fontWeight: exploreSubTab === 'nuevo' ? 600 : 500,
                 color: exploreSubTab === 'nuevo' ? "var(--text-primary)" : "var(--text-secondary)",
@@ -1323,7 +1342,7 @@ export const Search: React.FC = () => {
             </button>
 
             <button 
-              onClick={() => setExploreSubTab('tendencias')}
+              onClick={() => handleExploreSubTabChange('tendencias')}
               style={{
                 fontSize: "1.05rem", fontWeight: exploreSubTab === 'tendencias' ? 600 : 500,
                 color: exploreSubTab === 'tendencias' ? "var(--text-primary)" : "var(--text-secondary)",
@@ -1346,7 +1365,7 @@ export const Search: React.FC = () => {
             </button>
 
             <button 
-              onClick={() => setExploreSubTab('guias')}
+              onClick={() => handleExploreSubTabChange('guias')}
               style={{
                 fontSize: "1.05rem", fontWeight: exploreSubTab === 'guias' ? 600 : 500,
                 color: exploreSubTab === 'guias' ? "var(--text-primary)" : "var(--text-secondary)",

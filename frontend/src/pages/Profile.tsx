@@ -614,7 +614,7 @@ export const Profile: React.FC = () => {
   const { refreshProfile } = useAuth();
   const navigate = useNavigate();
   const { username: usernameParam } = useParams<{ username?: string }>();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const userIdParam = searchParams.get('user_id');
   const targetUserIdentifier = usernameParam || userIdParam;
   const location = useLocation();
@@ -678,7 +678,25 @@ export const Profile: React.FC = () => {
       } catch { return []; }
     }
   });
-  const [activeTab, setActiveTab] = useState<'shelf' | 'guides' | 'favorites' | 'music'>('shelf');
+
+  const validProfileTabs = ['shelf', 'guides', 'favorites', 'music'] as const;
+  type ProfileTab = typeof validProfileTabs[number];
+
+  const profileTabParam = searchParams.get('tab');
+  const activeTab: ProfileTab = (profileTabParam && validProfileTabs.includes(profileTabParam as any))
+    ? (profileTabParam as ProfileTab)
+    : 'shelf';
+
+  const handleTabChange = (tab: ProfileTab) => {
+    const newParams = new URLSearchParams(searchParams);
+    if (tab === 'shelf') {
+      newParams.delete('tab');
+    } else {
+      newParams.set('tab', tab);
+    }
+    setSearchParams(newParams);
+  };
+
   const [mediaFilter, setMediaFilter] = useState<'all' | 'movie' | 'series' | 'anime' | 'book' | 'comic' | 'manga' | 'game'>('all');
   const [shelfStatusFilter, setShelfStatusFilter] = useState<string>('all');
   const [favoritesMediaFilter, setFavoritesMediaFilter] = useState<'all' | 'movie' | 'series' | 'anime' | 'book' | 'comic' | 'manga' | 'game'>('all');
@@ -3149,7 +3167,7 @@ export const Profile: React.FC = () => {
           {/* Tab Navigation */}
           <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', gap: '1.5rem' }}>
             <button
-              onClick={() => setActiveTab('shelf')}
+              onClick={() => handleTabChange('shelf')}
               className={`profile-tab-btn ${activeTab === 'shelf' ? 'active' : ''}`}
               style={{
                 '--tab-color': 'var(--accent-primary)'
@@ -3177,7 +3195,7 @@ export const Profile: React.FC = () => {
             </button>
 
         <button
-          onClick={() => setActiveTab('guides')}
+          onClick={() => handleTabChange('guides')}
           className={`profile-tab-btn ${activeTab === 'guides' ? 'active' : ''}`}
           style={{
             '--tab-color': 'var(--color-guide, #2DD4BF)'
@@ -3208,7 +3226,7 @@ export const Profile: React.FC = () => {
         </button>
 
         <button
-          onClick={() => setActiveTab('favorites')}
+          onClick={() => handleTabChange('favorites')}
           className={`profile-tab-btn ${activeTab === 'favorites' ? 'active' : ''}`}
           style={{
             '--tab-color': '#F472B6'
@@ -3219,7 +3237,7 @@ export const Profile: React.FC = () => {
 
         {Boolean(profile?.lastfm_username) && (
           <button
-            onClick={() => setActiveTab('music')}
+            onClick={() => handleTabChange('music')}
             className={`profile-tab-btn ${activeTab === 'music' ? 'active' : ''}`}
             style={{
               '--tab-color': 'var(--color-music, #1DB954)'
