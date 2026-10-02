@@ -46,7 +46,8 @@ interface CommentTreeNode extends CommentItem {
 export const ViewGuide: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { hash } = useLocation();
+  const location = useLocation();
+  const { hash } = location;
   const { language } = useTranslation();
 
   const [guide, setGuide] = useState<any | null>(null);
@@ -464,7 +465,16 @@ export const ViewGuide: React.FC = () => {
   };
 
   const handleOpenItemDetails = (item: any) => {
-    setSelectedItem({ ...item, list_id: parseInt(id as string, 10) });
+    if (!item) return;
+    const targetType = item.item_type || 'movie';
+    const targetId = item.external_id || item.id;
+    if (targetType && targetId) {
+      navigate(`/item/${targetType}/${targetId}`, {
+        state: { backgroundLocation: location, item: { ...item, list_id: parseInt(id as string, 10) } }
+      });
+    } else {
+      setSelectedItem({ ...item, list_id: parseInt(id as string, 10) });
+    }
   };
 
   if (loading) {
@@ -1733,7 +1743,7 @@ export const ViewGuide: React.FC = () => {
               fetchListDetails();
               apiClient.get('/library/').then(res => setLibraryItems(res.data || [])).catch(() => {});
             }}
-            onOpenItem={(item) => setSelectedItem(item)}
+            onOpenItem={(item) => handleOpenItemDetails(item)}
             isFavorite={isFav}
             onToggleFavorite={handleToggleFavorite}
           />

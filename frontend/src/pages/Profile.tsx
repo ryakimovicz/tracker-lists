@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { useNavigate, useSearchParams, useParams, Link } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams, useParams, Link } from 'react-router-dom';
 import { useTranslation } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
@@ -617,6 +617,21 @@ export const Profile: React.FC = () => {
   const [searchParams] = useSearchParams();
   const userIdParam = searchParams.get('user_id');
   const targetUserIdentifier = usernameParam || userIdParam;
+  const location = useLocation();
+
+  const handleOpenItem = useCallback((item: any) => {
+    if (!item) return;
+    const targetType = item.item_type || 'movie';
+    const targetId = item.external_id || item.id;
+    if (targetType && targetId) {
+      navigate(`/item/${targetType}/${targetId}`, {
+        state: { backgroundLocation: location, item }
+      });
+    } else {
+      setSelectedItem(item);
+    }
+  }, [navigate, location]);
+
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
 
   const isLight = theme === 'light';
@@ -2236,7 +2251,7 @@ export const Profile: React.FC = () => {
 
 
   const handleOpenItemDetails = (item: any) => {
-    setSelectedItem(item);
+    handleOpenItem(item);
   };
 
   const handleDeleteItem = (itemId: number) => {
@@ -5874,7 +5889,7 @@ export const Profile: React.FC = () => {
                   language={language}
                   formatDate={formatDate}
                   libraryItems={libraryItems}
-                  setSelectedItem={setSelectedItem}
+                  setSelectedItem={handleOpenItem}
                 />
               ));
             })()
@@ -5901,7 +5916,7 @@ export const Profile: React.FC = () => {
             apiClient.get(userIdParam ? `/users/${userIdParam}/activity` : '/users/me/activity').then(res => setActivities(res.data));
           }}
           onOpenItem={(item) => {
-            setSelectedItem(item);
+            handleOpenItem(item);
           }}
           isFavorite={isFavorite}
           onToggleFavorite={handleToggleFavorite}

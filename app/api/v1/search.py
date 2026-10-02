@@ -828,4 +828,132 @@ def get_manga_relations(
         return {"sequels_prequels": [], "spin_offs_side_stories": [], "other_relations": []}
 
 
+@router.get("/lookup")
+def lookup_media_item(
+    item_type: str = Query(..., description="Type of media (movie, series, anime, book, comic, manga, game, episode)"),
+    external_id: str = Query(..., description="External ID of the media item"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_optional)
+):
+    type_clean = item_type.lower().strip()
+    ext_id_clean = str(external_id).strip()
+
+    # 1. First check if it already exists in the user's library or database UserLibraryItem
+    existing = None
+    if current_user:
+        existing = db.query(UserLibraryItem).filter(
+            UserLibraryItem.user_id == current_user.id,
+            UserLibraryItem.external_id == ext_id_clean
+        ).first()
+
+    if not existing:
+        # Check any user library item for this external_id to obtain cached title/image
+        existing = db.query(UserLibraryItem).filter(
+            UserLibraryItem.external_id == ext_id_clean
+        ).order_by(UserLibraryItem.id.desc()).first()
+
+    result_data = None
+
+    # 2. Try fetching from specific service based on type
+    try:
+        if type_clean == "movie":
+            if ext_id_clean.startswith("omdb_") or ext_id_clean.startswith("tt"):
+                m_detail = OMDbService.get_movie_detail(ext_id_clean)
+                if m_detail:
+                    result_data = {
+                        "external_id": getattr(m_detail, "external_id", ext_id_clean),
+                        "title": getattr(m_detail, "title", None),
+                        "item_type": "movie",
+                        "image_url": getattr(m_detail, "image_url", None),
+                        "description": getattr(m_detail, "description", None),
+                        "release_date": getattr(m_detail, "release_date", None)
+                    }
+        elif type_clean in ("series", "anime"):
+            if ext_id_clean.startswith("anime_"):
+                a_detail = AnilistService.get_anime_detail(ext_id_clean)
+                if a_detail:
+                    result_data = {
+                        "external_id": ext_id_clean,
+                        "title": a_detail.get("title"),
+                        "item_type": type_clean,
+                        "image_url": a_detail.get("image_url"),
+                        "description": a_detail.get("description"),
+                        "release_date": a_detail.get("release_date")
+                    }
+            else:
+                s_detail = TVMazeService.get_series_detail(ext_id_clean)
+                if s_detail:
+                    result_data = {
+                        "external_id": ext_id_clean,
+                        "title": s_detail.get("name") or s_detail.get("title"),
+                        "item_type": type_clean,
+                        "image_url": s_detail.get("image_url"),
+                        "description": s_detail.get("description") or s_detail.get("overview"),
+                        "release_date": s_detail.get("first_air_date") or s_detail.get("release_date"),
+                        "seasons": s_detail.get("seasons")
+                    }
+        elif type_clean == "comic":
+            if ext_id_clean.startswith("cv_vol_") or not ext_id_clean.startswith("cv_issue_"):
+                c_detail = ComicVineService.get_comic_volume_detail(ext_id_clean)
+                if c_detail:
+                    result_data = {
+                        "external_id": ext_id_clean,
+                        "title": c_detail.get("name") or c_detail.get("volume_name"),
+                        "item_type": "comic",
+                        "image_url": c_detail.get("image_url"),
+                        "description": c_detail.get("overview") or "",
+                        "release_date": c_detail.get("first_air_date"),
+                        "start_year": c_detail.get("start_year"),
+                        "is_ended": c_detail.get("is_ended"),
+                        "series_status": c_detail.get("status")
+                    }
+            else:
+                iss_detail = ComicVineService.get_comic_issue_detail(ext_id_clean)
+                if iss_detail:
+                    result_data = {
+                        "external_id": ext_id_clean,
+                        "title": iss_detail.get("name") or f"Issue #{iss_detail.get('issue_number')}",
+                        "item_type": "comic",
+                        "image_url": iss_detail.get("image_url"),
+                        "description": iss_detail.get("description") or "",
+                        "parent_series": iss_detail.get("parent_series")
+                    }
+    except Exception as e:
+        print(f"Error fetching external item detail in lookup: {e}")
+
+    # Fallback to database existing library item
+    if not result_data and existing:
+        result_data = {
+            "id": existing.id if (current_user and existing.user_id == current_user.id) else None,
+            "external_id": existing.external_id,
+            "title": existing.title,
+            "item_type": existing.item_type.value if hasattr(existing.item_type, "value") else str(existing.item_type),
+            "image_url": existing.image_url,
+            "release_date": existing.release_date,
+            "status": existing.status.value if hasattr(existing.status, "value") else str(existing.status) if (current_user and existing.user_id == current_user.id) else None,
+            "is_favorite": existing.is_favorite if (current_user and existing.user_id == current_user.id) else False,
+            "completed_at": existing.completed_at.isoformat() if (current_user and existing.user_id == current_user.id and existing.completed_at) else None,
+            "tracking_list_id": existing.tracking_list_id if (current_user and existing.user_id == current_user.id) else None
+        }
+
+    if not result_data:
+        # Return basic placeholder with the given ID and type so modal can still load and search
+        result_data = {
+            "external_id": ext_id_clean,
+            "title": ext_id_clean.replace("-", " ").replace("_", " ").title(),
+            "item_type": type_clean
+        }
+
+    # If current user has this item, attach their personal library fields
+    if current_user and existing and existing.user_id == current_user.id:
+        result_data["id"] = existing.id
+        result_data["status"] = existing.status.value if hasattr(existing.status, "value") else str(existing.status)
+        result_data["is_favorite"] = existing.is_favorite
+        result_data["tracking_list_id"] = existing.tracking_list_id
+        result_data["completed_at"] = existing.completed_at.isoformat() if existing.completed_at else None
+
+    return result_data
+
+
+
 

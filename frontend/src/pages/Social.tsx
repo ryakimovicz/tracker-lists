@@ -7,7 +7,7 @@ import { SocialActivityCard } from '../components/SocialActivityCard';
 import type { ActivityCardData } from '../components/SocialActivityCard';
 import { ItemDetailsModal } from '../components/ItemDetailsModal';
 import { PathdLoader } from '../components/PathdLoader';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 
 type SocialTab = 'following' | 'discover' | 'reviews' | 'me';
 
@@ -26,12 +26,27 @@ export const Social: React.FC = () => {
   const { user } = useAuth();
   const { language } = useTranslation();
   const isEs = language === 'es';
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const [activeTab, setActiveTab] = useState<SocialTab>('following');
   const [activities, setActivities] = useState<ActivityCardData[]>(() => getCachedFeed('following'));
   const [loading, setLoading] = useState<boolean>(() => getCachedFeed('following').length === 0);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedItem, setSelectedItem] = useState<any | null>(null);
+
+  const handleOpenItem = (item: any) => {
+    if (!item) return;
+    const targetType = item.item_type || 'movie';
+    const targetId = item.external_id || item.id;
+    if (targetType && targetId) {
+      navigate(`/item/${targetType}/${targetId}`, {
+        state: { backgroundLocation: location, item }
+      });
+    } else {
+      setSelectedItem(item);
+    }
+  };
 
   const fetchTabFeed = async (tab: SocialTab, isRefresh = false) => {
     const cached = getCachedFeed(tab);
@@ -483,7 +498,7 @@ export const Social: React.FC = () => {
               activity={act}
               isOwnActivity={Boolean(user && user.id === act.user_id)}
               onDelete={handleDeleteActivity}
-              onOpenItem={(item) => setSelectedItem(item)}
+              onOpenItem={(item) => handleOpenItem(item)}
             />
           ))}
         </div>
@@ -495,7 +510,7 @@ export const Social: React.FC = () => {
           isOwnProfile={true}
           profileId={user?.id}
           onClose={() => setSelectedItem(null)}
-          onOpenItem={(item) => setSelectedItem(item)}
+          onOpenItem={(item) => handleOpenItem(item)}
           onUpdate={() => {
             fetchTabFeed(activeTab, true);
           }}

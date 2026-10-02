@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Sidebar } from './components/Sidebar';
 import { RouteGuard } from './components/RouteGuard';
@@ -34,12 +34,16 @@ import { RightSidebarAd } from './components/RightSidebarAd';
 
 import { PathdLoader } from './components/PathdLoader';
 import { initGlobalPrefetch } from './utils/prefetch';
+import { ItemRouteModal } from './components/ItemRouteModal';
+import { PostRouteModal } from './components/PostRouteModal';
 import React, { useEffect } from 'react';
 
-function AppRoutes() {
+function AppContent() {
   const { isAuthenticated, isLoading } = useAuth();
   const [contentMarginRight, setContentMarginRight] = React.useState<number>(0);
   const hasToken = Boolean(localStorage.getItem('access_token'));
+  const location = useLocation();
+  const state = location.state as { backgroundLocation?: any } | undefined;
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -62,21 +66,9 @@ function AppRoutes() {
       // Must not overlap left sidebar (left >= sidebarWidth)
       // and must not collide with right browser/DevTools edge (right <= availableViewportWidth)
       if (leftInWindow >= sidebarWidth && rightInWindow <= availableViewportWidth) {
-        // To place 1200px content at leftInWindow, main-content margin-left is already 0 (after sidebar 250px).
-        // Since main-content has width: availableViewportWidth - sidebarWidth - marginRight,
-        // and flex aligns items center, centering inside main-content means:
-        // leftEdge = sidebarWidth + (effectiveMainWidth - contentWidth) / 2
-        // We want leftEdge = leftInWindow:
-        // (effectiveMainWidth - contentWidth) / 2 = leftInWindow - sidebarWidth
-        // effectiveMainWidth - contentWidth = 2 * (leftInWindow - sidebarWidth)
-        // effectiveMainWidth = contentWidth + 2 * (leftInWindow - sidebarWidth)
-        // Since effectiveMainWidth = availableViewportWidth - sidebarWidth - marginRight:
-        // marginRight = (availableViewportWidth - sidebarWidth) - (contentWidth + 2 * (leftInWindow - sidebarWidth))
         const requiredMarginRight = (availableViewportWidth - sidebarWidth) - (contentWidth + 2 * (leftInWindow - sidebarWidth));
         setContentMarginRight(Math.max(0, Math.round(requiredMarginRight)));
       } else {
-        // Space is not enough to maintain full-window centering without colliding with sidebar or DevTools:
-        // Center cleanly between sidebar and DevTools/right edge (marginRight = 0)
         setContentMarginRight(0);
       }
     };
@@ -87,17 +79,15 @@ function AppRoutes() {
   }, []);
 
   return (
-    <Router>
-      <div className="app-container">
-        <SuspendedAccountModal />
-        <Sidebar />
+    <div className="app-container">
+      <SuspendedAccountModal />
+      <Sidebar />
 
-        <main 
-          className="main-content"
-          style={{ '--main-content-margin-right': `${contentMarginRight}px` } as React.CSSProperties}
-        >
-
-          <Routes>
+      <main 
+        className="main-content"
+        style={{ '--main-content-margin-right': `${contentMarginRight}px` } as React.CSSProperties}
+      >
+        <Routes location={state?.backgroundLocation || location}>
             {/* Conditional homepage depending on authentication status */}
             <Route
               path="/"
@@ -196,16 +186,65 @@ function AppRoutes() {
                 </RouteGuard>
               }
             />
+
+            {/* Direct item view when accessed without backgroundLocation */}
+            <Route
+              path="/item/:type/:id"
+              element={
+                <RouteGuard>
+                  <Search />
+                </RouteGuard>
+              }
+            />
+
+            {/* Direct post / activity view when accessed without backgroundLocation */}
+            <Route
+              path="/post/:id"
+              element={
+                <RouteGuard>
+                  <Social />
+                </RouteGuard>
+              }
+            />
           </Routes>
+
+          {/* Modal overlay route when navigating from within the app */}
+          {state?.backgroundLocation && (
+            <Routes>
+              <Route
+                path="/item/:type/:id"
+                element={<ItemRouteModal />}
+              />
+              <Route
+                path="/post/:id"
+                element={<PostRouteModal />}
+              />
+            </Routes>
+          )}
+
+          {/* Also mount ItemRouteModal if on /item/:type/:id directly over fallback background */}
+          {!state?.backgroundLocation && location.pathname.startsWith('/item/') && (
+            <ItemRouteModal />
+          )}
+
+          {/* Also mount PostRouteModal if on /post/:id directly over fallback background */}
+          {!state?.backgroundLocation && location.pathname.startsWith('/post/') && (
+            <PostRouteModal />
+          )}
         </main>
         <RightSidebarAd />
         <CookieBanner />
       </div>
-    </Router>
   );
 }
 
-
+function AppRoutes() {
+  return (
+    <Router>
+      <AppContent />
+    </Router>
+  );
+}
 
 function App() {
   return (
@@ -223,4 +262,5 @@ function App() {
 
 // App Version: Pathd v0.9.8 Beta
 export default App;
+
 

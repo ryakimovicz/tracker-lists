@@ -916,6 +916,28 @@ def get_my_activity_feed(
             feed.append(item)
     return feed
 
+@router.get("/feed/activity/{activity_id}", response_model=ActivityFeedItemResponse)
+def get_activity_post(
+    activity_id: int,
+    request: Request,
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db)
+):
+    act = db.query(UserActivityLog).filter(UserActivityLog.id == activity_id).first()
+    if not act:
+        raise HTTPException(status_code=404, detail="Activity not found")
+
+    accept_lang = request.headers.get("Accept-Language", "es")
+    parts = accept_lang.split("-")
+    client_lang = parts[0].lower() if parts else "es"
+    client_country = parts[1].upper() if len(parts) > 1 else ("ES" if client_lang == "es" and "es-es" in accept_lang.lower() else "AR")
+    current_user_id = current_user.id if current_user else 0
+
+    item = _format_activity_item(act, db, current_user_id, client_lang, client_country)
+    if not item:
+        raise HTTPException(status_code=404, detail="Activity could not be processed")
+    return item
+
 @router.delete("/feed/activity/{activity_id}", status_code=status.HTTP_200_OK)
 def delete_activity_post(
     activity_id: int,

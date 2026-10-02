@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import { useTranslation } from '../context/LanguageContext';
 import { getCachedSeries, setCachedSeries, clearCachedSeriesMatching } from '../utils/seriesCache';
@@ -1822,7 +1822,21 @@ export const Home: React.FC = () => {
     } catch { return []; }
   });
   const [isSyncingEpisodes, setIsSyncingEpisodes] = useState<boolean>(false);
+  const location = useLocation();
   const [selectedItem, setSelectedItem] = useState<any>(null);
+
+  const handleOpenItem = useCallback((item: any) => {
+    if (!item) return;
+    const targetType = item.item_type || 'movie';
+    const targetId = item.external_id || item.id;
+    if (targetType && targetId) {
+      navigate(`/item/${targetType}/${targetId}`, {
+        state: { backgroundLocation: location, item }
+      });
+    } else {
+      setSelectedItem(item);
+    }
+  }, [navigate, location]);
   const [loading, setLoading] = useState(() => {
     try {
       const cached = localStorage.getItem('pathd_lib_cache') || sessionStorage.getItem('pathd_lib_cache');
@@ -2624,9 +2638,9 @@ export const Home: React.FC = () => {
                                 key={uItem.id}
                                 onClick={() => {
                                   if (uItem.parent_series) {
-                                    setSelectedItem(uItem.parent_series);
+                                    handleOpenItem(uItem.parent_series);
                                   } else if (uItem.rawItem) {
-                                    setSelectedItem(uItem.rawItem);
+                                    handleOpenItem(uItem.rawItem);
                                   }
                                 }}
                                 style={{
@@ -2768,7 +2782,7 @@ export const Home: React.FC = () => {
                     <div
                       key={uItem.id}
                       onClick={() => {
-                        if (uItem.rawItem) setSelectedItem(uItem.rawItem);
+                        if (uItem.rawItem) handleOpenItem(uItem.rawItem);
                       }}
                       style={{
                         display: 'flex',
@@ -2892,7 +2906,7 @@ export const Home: React.FC = () => {
                   subtitle1={bottomText1}
                   subtitle2={bottomText2}
                   onCheck={(e) => handleMarkCompleted(e, g)}
-                  onClick={() => setSelectedItem({ ...g, id: g.item_id })}
+                  onClick={() => handleOpenItem({ ...g, id: g.item_id })}
                   onTitleClick={(e) => { e.stopPropagation(); navigate(`/guide/${g.list_id}`); }}
                   language={language}
                 />
@@ -2976,7 +2990,7 @@ export const Home: React.FC = () => {
                             actionIcon={activeTab === "plan_to_watch" ? "play" : "check"}
                             variant={activeTab === "plan_to_watch" ? "poster" : "episode"}
                             onUpdate={() => fetchDashboard(true)}
-                            onOpenSeries={(seriesItem) => setSelectedItem(seriesItem)}
+                            onOpenSeries={(seriesItem) => handleOpenItem(seriesItem)}
                             themeColor={`var(--color-${item.item_type})`}
                             themeTextColor={`var(--color-text-${item.item_type})`}
                           />
@@ -2990,7 +3004,7 @@ export const Home: React.FC = () => {
                             item={item}
                             language={language}
                             onUpdate={() => fetchDashboard(true)}
-                            onOpenSeries={(seriesItem) => setSelectedItem(seriesItem)}
+                            onOpenSeries={(seriesItem) => handleOpenItem(seriesItem)}
                             themeColor={`var(--color-${item.item_type})`}
                             themeTextColor={`var(--color-text-${item.item_type})`}
                           />
@@ -3004,7 +3018,7 @@ export const Home: React.FC = () => {
                             item={item}
                             language={language}
                             onUpdate={() => fetchDashboard(true)}
-                            onOpenSeries={(seriesItem) => setSelectedItem(seriesItem)}
+                            onOpenSeries={(seriesItem) => handleOpenItem(seriesItem)}
                             themeColor={`var(--color-${item.item_type})`}
                             themeTextColor={`var(--color-text-${item.item_type})`}
                           />
@@ -3054,7 +3068,7 @@ export const Home: React.FC = () => {
                           })()}
                           onCheck={activeTab === 'plan_to_watch' || activeTab === 'watching' ? (e) => handleMarkCompleted(e, item) : undefined}
                           onPlay={activeTab === 'plan_to_watch' || activeTab === 'dropped' ? (e) => handleStartConsuming(e, item) : undefined}
-                          onClick={() => setSelectedItem(item)}
+                          onClick={() => handleOpenItem(item)}
                           language={language}
                         />
                       );

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ThumbsUp, MessageSquare, MoreVertical, Trash2, Star, Film, Tv, Sparkles, Book, Gamepad2, Compass, User } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../context/LanguageContext';
@@ -34,16 +34,21 @@ interface SocialActivityCardProps {
   isOwnActivity?: boolean;
   onDelete?: (id: number) => void;
   onOpenItem?: (item: any) => void;
+  renderOnlyBody?: boolean;
+  customCloseButton?: React.ReactNode;
 }
 
 export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
   activity,
   isOwnActivity = false,
   onDelete,
-  onOpenItem
+  onOpenItem,
+  renderOnlyBody = false,
+  customCloseButton
 }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const { language } = useTranslation();
   const isEs = language === 'es';
 
@@ -1023,6 +1028,17 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
       </>
     );
 
+    if (renderOnlyBody) {
+      return renderCardBodyContent(customCloseButton);
+    }
+
+    const handleOpenComments = () => {
+      if (!canHaveComments) return;
+      navigate(`/post/${activity.id}`, {
+        state: { backgroundLocation: location, activity }
+      });
+    };
+
     return (
       <div
         className="glass-card activity-card"
@@ -1058,7 +1074,7 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
 
         {/* Footer / Action Bar (Like + Comments) */}
       <div
-        onClick={canHaveComments ? () => setShowComments(true) : undefined}
+        onClick={canHaveComments ? handleOpenComments : undefined}
         onMouseEnter={() => setIsFooterHovered(true)}
         onMouseLeave={() => setIsFooterHovered(false)}
         style={{

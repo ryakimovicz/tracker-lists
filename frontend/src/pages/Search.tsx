@@ -1,6 +1,6 @@
 import { HorizontalScroll } from '../components/HorizontalScroll';
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { apiClient } from '../api/client';
@@ -555,8 +555,22 @@ export const Search: React.FC = () => {
   const [itemToRemoveFromShelf, setItemToRemoveFromShelf] = useState<any | null>(null);
 
   // Details Modal states
+  const location = useLocation();
   const [selectedItem, setSelectedItem] = useState<SearchResultItem | null>(null);
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
+
+  const handleOpenItem = (item: any) => {
+    if (!item) return;
+    const targetType = item.item_type || 'movie';
+    const targetId = item.external_id || item.id;
+    if (targetType && targetId) {
+      navigate(`/item/${targetType}/${targetId}`, {
+        state: { backgroundLocation: location, item }
+      });
+    } else {
+      setSelectedItem(item);
+    }
+  };
 
   // Replace Favorite Modal State & Pro Modal
   const [replaceModalState, setReplaceModalState] = useState<{
@@ -961,7 +975,7 @@ export const Search: React.FC = () => {
       navigate(`/guide/${(item as any).id}`);
       return;
     }
-    setSelectedItem(item);
+    handleOpenItem(item);
   };
 
   const handleToggleFollowUser = async (userId: number) => {
@@ -1806,7 +1820,7 @@ export const Search: React.FC = () => {
           isOwnProfile={true}
           profileId={currentUser?.id}
           onClose={() => setSelectedItem(null)}
-          onOpenItem={(item) => setSelectedItem(item)}
+          onOpenItem={(item) => handleOpenItem(item)}
           isFavorite={isFavorite}
           onToggleFavorite={handleToggleFavorite}
           onUpdate={(updatedItem) => {
