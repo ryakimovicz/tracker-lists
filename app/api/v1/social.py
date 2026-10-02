@@ -1152,6 +1152,26 @@ def post_activity_comment(
         )
         db.add(notif)
 
+    # Detect @mentions in comment content
+    if comment_in.content:
+        import re
+        mentioned_usernames = set(re.findall(r'@([a-zA-Z0-9_]+)', comment_in.content))
+        if mentioned_usernames:
+            mentioned_users = db.query(User).filter(User.username.in_(list(mentioned_usernames))).all()
+            raw_snippet = str(comment_in.content)[:60].replace('"', '')
+            for m_user in mentioned_users:
+                # Do not notify self or the recipient who already received an activity_comment/reply
+                if m_user.id != current_user.id and m_user.id != recipient_id:
+                    mention_notif = Notification(
+                        recipient_id=m_user.id,
+                        actor_id=current_user.id,
+                        notification_type="mention",
+                        entity_type="activity",
+                        entity_id=str(act.id),
+                        extra_data_json=f'{{"snippet": "{raw_snippet}"}}'
+                    )
+                    db.add(mention_notif)
+
     db.commit()
     db.refresh(new_comment)
 

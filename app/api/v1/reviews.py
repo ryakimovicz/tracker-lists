@@ -13,7 +13,9 @@ from app.schemas.review import MediaReviewCreate, MediaReviewResponse, ReviewRep
 
 router = APIRouter()
 
-from app.models.social import ActivityLike
+from app.models.social import ActivityLike, Notification
+import re
+import json
 
 @router.post("/{review_id}/vote")
 def toggle_review_vote(
@@ -372,10 +374,39 @@ def create_or_update_review(
         )
         db.add(reply_review)
 
+        # Notify parent review author if not self
+        if parent_review.user_id != current_user.id:
+            raw_snippet = str(review_in.content or '')[:60].replace('"', '')
+            reply_notif = Notification(
+                recipient_id=parent_review.user_id,
+                actor_id=current_user.id,
+                notification_type="comment_reply",
+                entity_type="item",
+                entity_id=f"{item_type_lower}/{external_id}",
+                extra_data_json=json.dumps({"snippet": raw_snippet, "item_title": resolved_title or external_id, "item_type": item_type_lower, "external_id": external_id})
+            )
+            db.add(reply_notif)
+
+        # Detect @mentions in reply content
+        if review_in.content:
+            mentioned_usernames = set(re.findall(r'@([a-zA-Z0-9_]+)', review_in.content))
+            if mentioned_usernames:
+                mentioned_users = db.query(User).filter(User.username.in_(list(mentioned_usernames))).all()
+                raw_snippet = str(review_in.content)[:60].replace('"', '')
+                for m_user in mentioned_users:
+                    if m_user.id != current_user.id and m_user.id != parent_review.user_id:
+                        mention_notif = Notification(
+                            recipient_id=m_user.id,
+                            actor_id=current_user.id,
+                            notification_type="mention",
+                            entity_type="item",
+                            entity_id=f"{item_type_lower}/{external_id}",
+                            extra_data_json=json.dumps({"snippet": raw_snippet, "item_title": resolved_title or external_id, "item_type": item_type_lower, "external_id": external_id})
+                        )
+                        db.add(mention_notif)
+
         db.commit()
         db.refresh(reply_review)
-
-        # Replies are community comments, not standalone review activities
 
         return MediaReviewResponse(
             id=reply_review.id,
@@ -408,6 +439,25 @@ def create_or_update_review(
             created_at=datetime.now(timezone.utc)
         )
         db.add(comment_record)
+
+        # Detect @mentions in root comment
+        if review_in.content:
+            mentioned_usernames = set(re.findall(r'@([a-zA-Z0-9_]+)', review_in.content))
+            if mentioned_usernames:
+                mentioned_users = db.query(User).filter(User.username.in_(list(mentioned_usernames))).all()
+                raw_snippet = str(review_in.content)[:60].replace('"', '')
+                for m_user in mentioned_users:
+                    if m_user.id != current_user.id:
+                        mention_notif = Notification(
+                            recipient_id=m_user.id,
+                            actor_id=current_user.id,
+                            notification_type="mention",
+                            entity_type="item",
+                            entity_id=f"{item_type_lower}/{external_id}",
+                            extra_data_json=json.dumps({"snippet": raw_snippet, "item_title": resolved_title or external_id, "item_type": item_type_lower, "external_id": external_id})
+                        )
+                        db.add(mention_notif)
+
         db.commit()
         db.refresh(comment_record)
 

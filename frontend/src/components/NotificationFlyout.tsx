@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Bell, CheckCheck, Trash2, UserPlus, ThumbsUp, MessageSquare, Reply, UserCheck, X, ExternalLink } from 'lucide-react';
+import { Bell, CheckCheck, Trash2, UserPlus, ThumbsUp, MessageSquare, Reply, UserCheck, X, ExternalLink, AtSign } from 'lucide-react';
 import { apiClient } from '../api/client';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from '../context/LanguageContext';
@@ -168,7 +168,14 @@ export const NotificationFlyout: React.FC<NotificationFlyoutProps> = ({
     if (notif.notification_type === 'new_follower' || notif.notification_type === 'follow_request') {
       navigate(`/user/${encodeURIComponent(notif.actor_username)}`);
       onClose();
-    } else if (notif.entity_type === 'activity' || notif.notification_type.startsWith('activity_')) {
+    } else if (notif.entity_type === 'item') {
+      if (notif.entity_id) {
+        navigate(`/item/${notif.entity_id}`, {
+          state: { backgroundLocation: location }
+        });
+      }
+      onClose();
+    } else if (notif.entity_type === 'activity' || notif.notification_type.startsWith('activity_') || notif.notification_type === 'mention') {
       if (notif.entity_id) {
         navigate(`/post/${notif.entity_id}`, {
           state: { backgroundLocation: location }
@@ -200,6 +207,8 @@ export const NotificationFlyout: React.FC<NotificationFlyoutProps> = ({
         return <UserCheck size={16} color="#10b981" />;
       case 'follow_request':
         return <UserPlus size={16} color="#f59e0b" />;
+      case 'mention':
+        return <AtSign size={16} color="#ec4899" />;
       default:
         return <Bell size={16} color="var(--accent-primary)" />;
     }
@@ -230,6 +239,14 @@ export const NotificationFlyout: React.FC<NotificationFlyoutProps> = ({
         return (
           <span>
             {isEs ? 'respondió a tu comentario' : 'replied to your comment'}
+            {extra.snippet ? `: "${extra.snippet}"` : ''}
+          </span>
+        );
+      case 'mention':
+        return (
+          <span>
+            {isEs ? 'te mencionó en un comentario' : 'mentioned you in a comment'}
+            {extra.item_title ? ` (${extra.item_title})` : ''}
             {extra.snippet ? `: "${extra.snippet}"` : ''}
           </span>
         );
