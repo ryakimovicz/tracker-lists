@@ -1,20 +1,52 @@
 import React from 'react';
 import { useTranslation } from '../context/LanguageContext';
-import { Shield, Lock, Eye, Database, Mail, ArrowLeft } from 'lucide-react';
+import { Shield, Lock, Eye, Database, Mail, ArrowLeft, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
-export const PrivacyPolicy: React.FC = () => {
+interface PrivacyPolicyProps {
+  onClose?: () => void;
+  isModal?: boolean;
+}
+
+export const PrivacyPolicy: React.FC<PrivacyPolicyProps> = ({ onClose, isModal }) => {
   const { language } = useTranslation();
 
   const isEs = language === 'es';
 
   return (
-    <div style={{ maxWidth: '800px', margin: '2rem auto', padding: '1rem 1.5rem', lineHeight: 1.7 }}>
-      <Link to="/" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', color: 'var(--accent-primary)', textDecoration: 'none', marginBottom: '1.5rem', fontSize: '0.9rem', fontWeight: 500 }}>
-        <ArrowLeft size={16} /> {isEs ? 'Volver al inicio' : 'Back to Home'}
-      </Link>
+    <div style={{ maxWidth: '800px', margin: isModal ? '0 auto' : '2rem auto', padding: isModal ? '0.5rem' : '1rem 1.5rem', lineHeight: 1.7 }}>
+      {!isModal && (
+        <Link to="/" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', color: 'var(--accent-primary)', textDecoration: 'none', marginBottom: '1.5rem', fontSize: '0.9rem', fontWeight: 500 }}>
+          <ArrowLeft size={16} /> {isEs ? 'Volver al inicio' : 'Back to Home'}
+        </Link>
+      )}
 
-      <div className="glass-card" style={{ padding: '2.5rem', borderRadius: '16px' }}>
+      <div className={isModal ? 'modal-card' : 'glass-card'} style={{ padding: '2.5rem', borderRadius: '16px', position: 'relative' }}>
+        {isModal && onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              position: 'absolute',
+              top: '1.5rem',
+              right: '1.5rem',
+              background: 'transparent',
+              border: 'none',
+              color: 'var(--text-secondary)',
+              cursor: 'pointer',
+              padding: '0.4rem',
+              borderRadius: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.2s ease'
+            }}
+            title={isEs ? 'Cerrar' : 'Close'}
+            aria-label={isEs ? 'Cerrar' : 'Close'}
+          >
+            <X size={20} />
+          </button>
+        )}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
           <Shield size={32} color="var(--accent-primary)" />
           <h1 style={{ margin: 0, fontSize: '2rem', fontWeight: 700 }}>

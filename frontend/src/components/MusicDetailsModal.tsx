@@ -197,6 +197,16 @@ const MusicDetailsModalInner: React.FC<MusicDetailsModalProps> = ({
     };
   }, [isOpen, activeItem.type, activeItem.artist, activeItem.name]);
 
+  useEffect(() => {
+    if (isOpen) {
+      const originalStyle = window.getComputedStyle(document.body).overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = originalStyle;
+      };
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const currentType = activeItem.type;

@@ -1,12 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
 import { apiClient } from '../api/client';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 
 import { 
-  Settings as SettingsIcon, 
   User, 
   Lock, 
   Eye, 
@@ -28,16 +27,48 @@ import {
 
 import { ProModal } from '../components/ProModal';
 import { ConfirmModal } from '../components/ConfirmModal';
+import { PrivacyPolicy } from './PrivacyPolicy';
+import { TermsOfService } from './TermsOfService';
 
 export const SettingsPage: React.FC = () => {
   const { user, refreshProfile, logout } = useAuth();
   const { language, setLanguage, t } = useTranslation();
   const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const isEs = language === 'es';
+  const isBackdropMouseDownRef = useRef(false);
+
+  // Modal parameter handling: 'privacy' | 'terms' | 'delete'
+  const modalParam = searchParams.get('modal');
+
+  const openModal = (modalName: 'privacy' | 'terms' | 'delete') => {
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set('modal', modalName);
+    setSearchParams(newParams);
+  };
+
+  const closeModal = () => {
+    const newParams = new URLSearchParams(searchParams);
+    newParams.delete('modal');
+    setSearchParams(newParams);
+  };
 
   // Modal states
+  const showPrivacyModal = modalParam === 'privacy';
+  const showTermsModal = modalParam === 'terms';
+  const showDeleteModal = modalParam === 'delete';
   const [showProModal, setShowProModal] = useState(false);
+
+  useEffect(() => {
+    if (showPrivacyModal || showTermsModal || showDeleteModal) {
+      const originalStyle = window.getComputedStyle(document.body).overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = originalStyle;
+      };
+    }
+  }, [showPrivacyModal, showTermsModal, showDeleteModal]);
 
   // Subscription management
   const [cancelSubLoading, setCancelSubLoading] = useState(false);
@@ -81,7 +112,6 @@ export const SettingsPage: React.FC = () => {
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
 
   // Delete account modal state
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [deleteError, setDeleteError] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
@@ -214,13 +244,6 @@ export const SettingsPage: React.FC = () => {
 
   return (
     <div style={{ maxWidth: '800px', margin: '2rem auto', padding: '1rem 1.5rem' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '2rem' }}>
-        <SettingsIcon size={28} color="var(--accent-primary)" />
-        <h1 style={{ margin: 0, fontSize: '1.85rem', fontWeight: 700 }}>
-          {isEs ? 'Ajustes' : 'Settings'}
-        </h1>
-      </div>
-
       <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
         {/* Section 1: Theme */}
         <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px' }}>
@@ -764,20 +787,22 @@ export const SettingsPage: React.FC = () => {
             {isEs ? 'Información sobre privacidad, términos de uso y APIs externas.' : 'Information regarding privacy, terms of use, and third-party APIs.'}
           </p>
           <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-            <Link
-              to="/privacy"
+            <button
+              type="button"
+              onClick={() => openModal('privacy')}
               className="btn-secondary"
-              style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', padding: '0.6rem 1rem' }}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', padding: '0.6rem 1rem', cursor: 'pointer' }}
             >
               <Shield size={16} /> {isEs ? 'Política de Privacidad' : 'Privacy Policy'}
-            </Link>
-            <Link
-              to="/terms"
+            </button>
+            <button
+              type="button"
+              onClick={() => openModal('terms')}
               className="btn-secondary"
-              style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', padding: '0.6rem 1rem' }}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', padding: '0.6rem 1rem', cursor: 'pointer' }}
             >
               <FileText size={16} /> {isEs ? 'Términos de Servicio y APIs' : 'Terms of Service & APIs'}
-            </Link>
+            </button>
           </div>
         </div>
 
@@ -804,9 +829,9 @@ export const SettingsPage: React.FC = () => {
           </p>
           <button
             onClick={() => {
-              setShowDeleteModal(true);
               setDeleteConfirmText('');
               setDeleteError('');
+              openModal('delete');
             }}
             style={{
               background: '#ef4444',
@@ -863,9 +888,20 @@ export const SettingsPage: React.FC = () => {
             zIndex: 9999,
             padding: '1rem',
           }}
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) {
+              isBackdropMouseDownRef.current = true;
+            }
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget && isBackdropMouseDownRef.current) {
+              isBackdropMouseDownRef.current = false;
+              closeModal();
+            }
+          }}
         >
           <div
-            className="glass-card"
+            className="modal-card"
             style={{
               width: '100%',
               maxWidth: '450px',
@@ -875,9 +911,10 @@ export const SettingsPage: React.FC = () => {
               boxShadow: '0 20px 40px rgba(0,0,0,0.6)',
               position: 'relative',
             }}
+            onClick={(e) => e.stopPropagation()}
           >
             <button
-              onClick={() => setShowDeleteModal(false)}
+              onClick={closeModal}
               style={{
                 position: 'absolute',
                 top: '1rem',
@@ -953,7 +990,7 @@ export const SettingsPage: React.FC = () => {
               <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
                 <button
                   type="button"
-                  onClick={() => setShowDeleteModal(false)}
+                  onClick={closeModal}
                   className="btn-secondary"
                   style={{ flex: 1 }}
                 >
@@ -1004,6 +1041,86 @@ export const SettingsPage: React.FC = () => {
         onConfirm={executeCancelSubscription}
         onClose={() => setShowCancelSubModal(false)}
       />
+
+      {/* Privacy Policy Modal */}
+      {showPrivacyModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            background: 'rgba(0, 0, 0, 0.75)',
+            backdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1.5rem'
+          }}
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) {
+              isBackdropMouseDownRef.current = true;
+            }
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget && isBackdropMouseDownRef.current) {
+              isBackdropMouseDownRef.current = false;
+              closeModal();
+            }
+          }}
+        >
+          <div
+            style={{
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              width: '100%',
+              maxWidth: '850px'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <PrivacyPolicy isModal={true} onClose={closeModal} />
+          </div>
+        </div>
+      )}
+
+      {/* Terms of Service Modal */}
+      {showTermsModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            background: 'rgba(0, 0, 0, 0.75)',
+            backdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1.5rem'
+          }}
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) {
+              isBackdropMouseDownRef.current = true;
+            }
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget && isBackdropMouseDownRef.current) {
+              isBackdropMouseDownRef.current = false;
+              closeModal();
+            }
+          }}
+        >
+          <div
+            style={{
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              width: '100%',
+              maxWidth: '850px'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <TermsOfService isModal={true} onClose={closeModal} />
+          </div>
+        </div>
+      )}
     </div>
   );
 };
