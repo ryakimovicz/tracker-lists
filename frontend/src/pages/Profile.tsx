@@ -2949,12 +2949,11 @@ export const Profile: React.FC = () => {
                 }}
                 onClick={() => {
                   if (nowPlaying) {
-                    setMusicDetailsModal({
-                      isOpen: true,
-                      type: 'track',
-                      artist: nowPlaying.artist,
-                      name: nowPlaying.name,
-                      image: nowPlaying.image
+                    navigate(`/music/track/${encodeURIComponent(nowPlaying.artist)}/${encodeURIComponent(nowPlaying.name)}`, {
+                      state: {
+                        backgroundLocation: location,
+                        image: nowPlaying.image
+                      }
                     });
                   }
                 }}
@@ -5710,12 +5709,14 @@ export const Profile: React.FC = () => {
                     key={`${item.name}-${i}`}
                     className="glass-card"
                     onClick={() => {
-                      setMusicDetailsModal({
-                        isOpen: true,
-                        type: modalItemType,
-                        artist: itemArtist,
-                        name: itemName,
-                        image: item.image
+                      const targetRoute = modalItemType === 'artist'
+                        ? `/music/artist/${encodeURIComponent(itemArtist)}`
+                        : `/music/${modalItemType}/${encodeURIComponent(itemArtist)}/${encodeURIComponent(itemName || '')}`;
+                      navigate(targetRoute, {
+                        state: {
+                          backgroundLocation: location,
+                          image: item.image
+                        }
                       });
                     }}
                     style={{

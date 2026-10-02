@@ -36,6 +36,7 @@ import { PathdLoader } from './components/PathdLoader';
 import { initGlobalPrefetch } from './utils/prefetch';
 import { ItemRouteModal } from './components/ItemRouteModal';
 import { PostRouteModal } from './components/PostRouteModal';
+import { MusicRouteModal } from './components/MusicRouteModal';
 import React, { useEffect } from 'react';
 
 function AppContent() {
@@ -206,6 +207,23 @@ function AppContent() {
                 </RouteGuard>
               }
             />
+            {/* Direct music view when accessed without backgroundLocation */}
+            <Route
+              path="/music/artist/:artist"
+              element={
+                <RouteGuard>
+                  <Profile />
+                </RouteGuard>
+              }
+            />
+            <Route
+              path="/music/:type/:artist/:name"
+              element={
+                <RouteGuard>
+                  <Profile />
+                </RouteGuard>
+              }
+            />
           </Routes>
 
           {/* Modal overlay route when navigating from within the app */}
@@ -219,11 +237,19 @@ function AppContent() {
                 path="/post/:id"
                 element={<PostRouteModal />}
               />
+              <Route
+                path="/music/artist/:artist"
+                element={<MusicRouteModal />}
+              />
+              <Route
+                path="/music/:type/:artist/:name"
+                element={<MusicRouteModal />}
+              />
             </Routes>
           )}
 
-          {/* Also mount ItemRouteModal or PostRouteModal if accessed directly over fallback background */}
-          {!state?.backgroundLocation && (location.pathname.startsWith('/item/') || location.pathname.startsWith('/post/')) && (
+          {/* Also mount ItemRouteModal, PostRouteModal or MusicRouteModal if accessed directly over fallback background */}
+          {!state?.backgroundLocation && (location.pathname.startsWith('/item/') || location.pathname.startsWith('/post/') || location.pathname.startsWith('/music/')) && (
             <Routes>
               <Route
                 path="/item/:type/:id"
@@ -232,6 +258,14 @@ function AppContent() {
               <Route
                 path="/post/:id"
                 element={<PostRouteModal />}
+              />
+              <Route
+                path="/music/artist/:artist"
+                element={<MusicRouteModal />}
+              />
+              <Route
+                path="/music/:type/:artist/:name"
+                element={<MusicRouteModal />}
               />
             </Routes>
           )}

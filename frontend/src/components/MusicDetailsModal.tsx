@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { X, Trophy, Disc, Mic, Headphones, Clock, Music, User as UserIcon, Calendar, ArrowRight, Star, ChevronDown, ChevronUp, Globe } from 'lucide-react';
 import { useTranslation } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
@@ -80,6 +80,8 @@ const MusicDetailsModalInner: React.FC<MusicDetailsModalProps> = ({
   const { language } = useTranslation();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const isBackdropMouseDownRef = useRef(false);
 
   // Internal item navigation state (allows jumping between track -> album -> artist without closing modal)
   const [activeItem, setActiveItem] = useState<{
@@ -93,6 +95,15 @@ const MusicDetailsModalInner: React.FC<MusicDetailsModalProps> = ({
     name: propName,
     image: initialImage
   });
+
+  useEffect(() => {
+    setActiveItem({
+      type: propType,
+      artist: propArtist,
+      name: propName,
+      image: initialImage
+    });
+  }, [propType, propArtist, propName, initialImage]);
 
   const initialCached = getCachedMusicDetails(propType, propArtist, propName);
   const [rankingPeriod, setRankingPeriod] = useState<'7day' | '1month' | 'overall'>('7day');
@@ -266,6 +277,17 @@ const MusicDetailsModalInner: React.FC<MusicDetailsModalProps> = ({
       name: newName,
       image: newImage
     });
+
+    // If currently on a /music/ URL or opened via route, sync the browser URL seamlessly
+    if (location.pathname.startsWith('/music/')) {
+      const targetPath = newType === 'artist'
+        ? `/music/artist/${encodeURIComponent(newArtist)}`
+        : `/music/${newType}/${encodeURIComponent(newArtist)}/${encodeURIComponent(newName || '')}`;
+      navigate(targetPath, {
+        replace: true,
+        state: location.state
+      });
+    }
   };
 
   const getRankBadge = (rank: number) => {
@@ -360,7 +382,17 @@ const MusicDetailsModalInner: React.FC<MusicDetailsModalProps> = ({
         justifyContent: 'center',
         padding: '1rem'
       }}
-      onClick={onClose}
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) {
+          isBackdropMouseDownRef.current = true;
+        }
+      }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget && isBackdropMouseDownRef.current) {
+          isBackdropMouseDownRef.current = false;
+          onClose();
+        }
+      }}
     >
       <div
         className="glass-card"

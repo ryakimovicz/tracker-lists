@@ -635,12 +635,11 @@ export const CustomizePage: React.FC = () => {
                 }}
                 onClick={() => {
                   if (nowPlaying) {
-                    setMusicDetailsModal({
-                      isOpen: true,
-                      type: 'track',
-                      artist: nowPlaying.artist,
-                      name: nowPlaying.name,
-                      image: nowPlaying.image
+                    navigate(`/music/track/${encodeURIComponent(nowPlaying.artist)}/${encodeURIComponent(nowPlaying.name)}`, {
+                      state: {
+                        backgroundLocation: location,
+                        image: nowPlaying.image
+                      }
                     });
                   }
                 }}
