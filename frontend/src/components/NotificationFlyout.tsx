@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Bell, CheckCheck, Trash2, UserPlus, ThumbsUp, MessageSquare, Reply, UserCheck, X, ExternalLink } from 'lucide-react';
 import { apiClient } from '../api/client';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from '../context/LanguageContext';
 
 export interface NotificationItem {
@@ -37,6 +37,7 @@ export const NotificationFlyout: React.FC<NotificationFlyoutProps> = ({
   const [processingId, setProcessingId] = useState<number | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  const location = useLocation();
   const { language } = useTranslation();
   const isEs = language === 'es';
 
@@ -168,7 +169,13 @@ export const NotificationFlyout: React.FC<NotificationFlyoutProps> = ({
       navigate(`/user/${encodeURIComponent(notif.actor_username)}`);
       onClose();
     } else if (notif.entity_type === 'activity' || notif.notification_type.startsWith('activity_')) {
-      navigate('/social');
+      if (notif.entity_id) {
+        navigate(`/post/${notif.entity_id}`, {
+          state: { backgroundLocation: location }
+        });
+      } else {
+        navigate('/social');
+      }
       onClose();
     } else if (notif.entity_type === 'guide') {
       navigate(`/guide/${notif.entity_id}`);
@@ -263,11 +270,10 @@ export const NotificationFlyout: React.FC<NotificationFlyoutProps> = ({
         bottom: '20px',
         width: '380px',
         maxHeight: '560px',
-        background: '#0f1523',
-        backgroundImage: 'linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.01) 100%)',
-        border: '1px solid rgba(255, 255, 255, 0.12)',
+        background: 'var(--bg-primary)',
+        border: '1px solid var(--border-color)',
         borderRadius: '16px',
-        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(255, 255, 255, 0.06)',
+        boxShadow: 'var(--card-shadow, 0 25px 50px -12px rgba(0, 0, 0, 0.4))',
         zIndex: 9999,
         display: 'flex',
         flexDirection: 'column',
@@ -279,11 +285,11 @@ export const NotificationFlyout: React.FC<NotificationFlyoutProps> = ({
       <div
         style={{
           padding: '1rem 1.25rem',
-          borderBottom: '1px solid var(--border-color, rgba(255,255,255,0.08))',
+          borderBottom: '1px solid var(--border-color)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          background: 'rgba(255,255,255,0.02)'
+          background: 'var(--bg-secondary)'
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
@@ -334,8 +340,8 @@ export const NotificationFlyout: React.FC<NotificationFlyoutProps> = ({
           display: 'flex',
           padding: '0.5rem 1rem',
           gap: '0.5rem',
-          borderBottom: '1px solid var(--border-color, rgba(255,255,255,0.06))',
-          background: 'rgba(0,0,0,0.1)'
+          borderBottom: '1px solid var(--border-color)',
+          background: 'var(--bg-tertiary)'
         }}
       >
         <button
@@ -349,7 +355,7 @@ export const NotificationFlyout: React.FC<NotificationFlyoutProps> = ({
             fontWeight: 600,
             cursor: 'pointer',
             background: filter === 'all' ? 'var(--accent-primary)' : 'transparent',
-            color: filter === 'all' ? '#fff' : 'var(--text-secondary)',
+            color: filter === 'all' ? 'var(--accent-text, #fff)' : 'var(--text-secondary)',
             transition: 'all 0.15s ease'
           }}
         >
@@ -366,7 +372,7 @@ export const NotificationFlyout: React.FC<NotificationFlyoutProps> = ({
             fontWeight: 600,
             cursor: 'pointer',
             background: filter === 'unread' ? 'var(--accent-primary)' : 'transparent',
-            color: filter === 'unread' ? '#fff' : 'var(--text-secondary)',
+            color: filter === 'unread' ? 'var(--accent-text, #fff)' : 'var(--text-secondary)',
             transition: 'all 0.15s ease'
           }}
         >
@@ -411,17 +417,17 @@ export const NotificationFlyout: React.FC<NotificationFlyoutProps> = ({
                   display: 'flex',
                   gap: '0.75rem',
                   alignItems: 'flex-start',
-                  borderBottom: '1px solid var(--border-color, rgba(255,255,255,0.04))',
-                  background: isUnread ? 'rgba(124, 58, 237, 0.08)' : 'transparent',
+                  borderBottom: '1px solid var(--border-color)',
+                  background: isUnread ? 'rgba(245, 158, 11, 0.08)' : 'transparent',
                   cursor: 'pointer',
                   transition: 'background 0.15s ease',
                   position: 'relative'
                 }}
                 onMouseEnter={e => {
-                  e.currentTarget.style.background = isUnread ? 'rgba(124, 58, 237, 0.13)' : 'rgba(255,255,255,0.03)';
+                  e.currentTarget.style.background = isUnread ? 'rgba(245, 158, 11, 0.14)' : 'rgba(125, 125, 125, 0.08)';
                 }}
                 onMouseLeave={e => {
-                  e.currentTarget.style.background = isUnread ? 'rgba(124, 58, 237, 0.08)' : 'transparent';
+                  e.currentTarget.style.background = isUnread ? 'rgba(245, 158, 11, 0.08)' : 'transparent';
                 }}
               >
                 {/* Avatar with type badge */}
