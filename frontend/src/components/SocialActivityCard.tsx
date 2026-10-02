@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ThumbsUp, MessageSquare, MoreVertical, EyeOff, Eye, Star, Film, Tv, Sparkles, Book, Gamepad2, Compass, User } from 'lucide-react';
+import { ThumbsUp, MessageSquare, MoreVertical, Trash2, Star, Film, Tv, Sparkles, Book, Gamepad2, Compass, User } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import { useAuth } from '../context/AuthContext';
@@ -7,6 +7,7 @@ import { useTranslation } from '../context/LanguageContext';
 import { StarRatingDisplay } from './ItemDetailsModal';
 import { renderFormattedContentWithMentions, AuthorUsername } from './MentionTag';
 import { ActivityModal } from './ActivityModal';
+import { ConfirmModal } from './ConfirmModal';
 
 export interface ActivityCardData {
   id: number;
@@ -31,14 +32,14 @@ export interface ActivityCardData {
 interface SocialActivityCardProps {
   activity: ActivityCardData;
   isOwnActivity?: boolean;
-  onVisibilityToggle?: (id: number, isHidden: boolean) => void;
+  onDelete?: (id: number) => void;
   onOpenItem?: (item: any) => void;
 }
 
 export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
   activity,
   isOwnActivity = false,
-  onVisibilityToggle,
+  onDelete,
   onOpenItem
 }) => {
   const { user } = useAuth();
@@ -50,8 +51,8 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
   const [isLiked, setIsLiked] = useState(activity.is_liked_by_me || false);
   const [commentsCount, setCommentsCount] = useState(activity.comments_count || 0);
   const [showComments, setShowComments] = useState(false);
-  const [showMenu, setShowMenu] = useState(false);
-  const [isHidden, setIsHidden] = useState(activity.is_hidden || false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [likeAnimating, setLikeAnimating] = useState(false);
 
   const handleToggleLike = async (e: React.MouseEvent) => {
@@ -79,17 +80,18 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
     }
   };
 
-  const handleToggleVisibility = async (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleDeleteActivity = async () => {
     try {
-      const res = await apiClient.patch(`/social/feed/activity/${activity.id}/visibility`);
-      setIsHidden(res.data.is_hidden);
-      setShowMenu(false);
-      if (onVisibilityToggle) {
-        onVisibilityToggle(activity.id, res.data.is_hidden);
+      setIsDeleting(true);
+      await apiClient.delete(`/social/feed/activity/${activity.id}`);
+      setShowDeleteConfirm(false);
+      if (onDelete) {
+        onDelete(activity.id);
       }
     } catch (err) {
-      console.error('Error toggling visibility:', err);
+      console.error('Error deleting activity:', err);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -513,7 +515,7 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
     );
   };
 
-  const renderCardBodyContent = () => (
+  const renderCardBodyContent = (closeButton?: React.ReactNode) => (
     <>
       {/* 1. Header row: User avatar + Username + Timestamp + Menu */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
@@ -522,7 +524,7 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
             e.stopPropagation();
             navigate(`/user/${encodeURIComponent(activity.username)}`);
           }}
-          style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', cursor: 'pointer', minWidth: 0 }}
+          style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', cursor: 'pointer', minWidth: 0, flex: 1 }}
         >
             {activity.user_photo_url ? (
               <img
@@ -565,66 +567,43 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
             </div>
           </div>
 
-          {/* 3-dots menu for owner */}
-          {isOwnActivity && (
-            <div style={{ position: 'relative', flexShrink: 0 }}>
+          {/* Top-right actions: Trash button (for owner) + optional closeButton (for modal) */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0 }}>
+            {/* Direct trash button for owner */}
+            {isOwnActivity && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  setShowMenu(!showMenu);
+                  setShowDeleteConfirm(true);
                 }}
+                title={isEs ? 'Eliminar publicación' : 'Delete post'}
                 style={{
                   background: 'transparent',
                   border: 'none',
                   color: 'var(--text-muted)',
                   cursor: 'pointer',
-                  padding: '0.2rem',
-                  borderRadius: '6px'
+                  padding: '0.25rem',
+                  borderRadius: '6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'color 0.15s ease, background 0.15s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.color = '#ef4444';
+                  e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.color = 'var(--text-muted)';
+                  e.currentTarget.style.background = 'transparent';
                 }}
               >
-                <MoreVertical size={16} />
+                <Trash2 size={16} />
               </button>
+            )}
 
-              {showMenu && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    right: 0,
-                    top: '100%',
-                    background: 'var(--bg-secondary, #1e1e24)',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: '8px',
-                    boxShadow: '0 10px 25px rgba(0,0,0,0.4)',
-                    zIndex: 20,
-                    minWidth: '180px',
-                    overflow: 'hidden'
-                  }}
-                >
-                  <button
-                    onClick={handleToggleVisibility}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      width: '100%',
-                      padding: '0.55rem 0.85rem',
-                      background: 'transparent',
-                      border: 'none',
-                      color: 'var(--text-primary)',
-                      fontSize: '0.82rem',
-                      textAlign: 'left',
-                      cursor: 'pointer'
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-                  >
-                    {isHidden ? <Eye size={14} /> : <EyeOff size={14} />}
-                    <span>{isHidden ? (isEs ? 'Mostrar en mi muro' : 'Show on feed') : (isEs ? 'Ocultar de mi muro' : 'Hide from feed')}</span>
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
+            {closeButton}
+          </div>
         </div>
 
         {/* 2. Prominent Poster Cover Art */}
@@ -1008,12 +987,6 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
               );
             })()
           )}
-
-          {isHidden && (
-            <span style={{ color: 'var(--text-muted)', fontSize: '0.74rem', fontStyle: 'italic', marginLeft: '0.35rem' }}>
-              ({isEs ? 'Oculto' : 'Hidden'})
-            </span>
-          )}
         </div>
 
         {/* 4. Review speech bubble if user reviewed */}
@@ -1059,10 +1032,9 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
           display: 'flex',
           flexDirection: 'column',
           gap: '0.9rem',
-          opacity: isHidden ? 0.6 : 1,
           position: 'relative',
           background: 'var(--bg-secondary, rgba(255,255,255,0.03))',
-          border: isHidden ? '1px dashed var(--border-color)' : '1px solid var(--border-color)',
+          border: '1px solid var(--border-color)',
           transition: 'border-color 0.2s ease, background 0.2s ease, transform 0.2s ease',
           height: '100%',
           justifyContent: 'space-between'
@@ -1172,9 +1144,26 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
           onToggleLike={handleToggleLike}
           commentsCount={commentsCount}
           onCommentsCountChange={(cnt) => setCommentsCount(cnt)}
-          renderCardBody={renderCardBodyContent}
+          renderCardBody={(closeBtn) => renderCardBodyContent(closeBtn)}
         />
       )}
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={showDeleteConfirm}
+        title={isEs ? 'Eliminar publicación' : 'Delete post'}
+        message={
+          isEs
+            ? '¿Estás seguro de que deseas eliminar esta publicación del muro? Esta acción la borrará para todos y no se puede deshacer.'
+            : 'Are you sure you want to delete this post from the feed? This action will remove it for everyone and cannot be undone.'
+        }
+        confirmText={isEs ? 'Eliminar' : 'Delete'}
+        cancelText={isEs ? 'Cancelar' : 'Cancel'}
+        type="danger"
+        isLoading={isDeleting}
+        onConfirm={handleDeleteActivity}
+        onClose={() => setShowDeleteConfirm(false)}
+      />
     </div>
   );
 };

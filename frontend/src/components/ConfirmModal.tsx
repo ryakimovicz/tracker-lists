@@ -112,9 +112,9 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
           maxWidth: '460px',
           padding: '2.25rem',
           borderRadius: '20px',
-          background: 'rgba(15, 23, 42, 0.95)',
-          border: '1px solid rgba(255, 255, 255, 0.12)',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7)',
+          background: 'var(--bg-primary, #ffffff)',
+          border: '1px solid var(--border-color, rgba(255, 255, 255, 0.12))',
+          boxShadow: 'var(--card-shadow, 0 25px 50px -12px rgba(0, 0, 0, 0.7))',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
@@ -167,7 +167,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
             margin: '0 0 0.75rem 0',
             fontSize: '1.35rem',
             fontWeight: 700,
-            color: '#f8fafc',
+            color: 'var(--text-primary, #f8fafc)',
           }}
         >
           {title}

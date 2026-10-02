@@ -306,10 +306,8 @@ export const Social: React.FC = () => {
     fetchTabFeed(activeTab, true);
   };
 
-  const handleVisibilityToggle = (id: number, isHidden: boolean) => {
-    setActivities(prev =>
-      prev.map(a => (a.id === id ? { ...a, is_hidden: isHidden } : a))
-    );
+  const handleDeleteActivity = (id: number) => {
+    setActivities(prev => prev.filter(a => a.id !== id));
   };
 
   const tabsConfig = [
@@ -484,7 +482,7 @@ export const Social: React.FC = () => {
               key={act.id}
               activity={act}
               isOwnActivity={Boolean(user && user.id === act.user_id)}
-              onVisibilityToggle={handleVisibilityToggle}
+              onDelete={handleDeleteActivity}
               onOpenItem={(item) => setSelectedItem(item)}
             />
           ))}

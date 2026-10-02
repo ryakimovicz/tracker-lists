@@ -916,22 +916,28 @@ def get_my_activity_feed(
             feed.append(item)
     return feed
 
-@router.patch("/feed/activity/{activity_id}/visibility", status_code=status.HTTP_200_OK)
-def toggle_activity_visibility(
+@router.delete("/feed/activity/{activity_id}", status_code=status.HTTP_200_OK)
+def delete_activity_post(
     activity_id: int,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    act = db.query(UserActivityLog).filter(
-        UserActivityLog.id == activity_id,
-        UserActivityLog.user_id == current_user.id
-    ).first()
+    query = db.query(UserActivityLog).filter(UserActivityLog.id == activity_id)
+    if not getattr(current_user, "is_admin", False):
+        query = query.filter(UserActivityLog.user_id == current_user.id)
+    act = query.first()
     if not act:
         raise HTTPException(status_code=404, detail="Activity not found or unauthorized")
 
-    act.is_hidden = not bool(getattr(act, "is_hidden", False))
+    # Delete related notifications for this activity
+    db.query(Notification).filter(
+        Notification.entity_type == "activity",
+        Notification.entity_id == str(activity_id)
+    ).delete(synchronize_session=False)
+
+    db.delete(act)
     db.commit()
-    return {"id": act.id, "is_hidden": act.is_hidden}
+    return {"message": "Activity deleted successfully", "id": activity_id}
 
 # Legacy backwards compatibility endpoint for previous social view
 @router.get("/users/feed/activity", response_model=List[ActivityFeedItemResponse])

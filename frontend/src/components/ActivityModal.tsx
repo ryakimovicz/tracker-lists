@@ -15,7 +15,7 @@ interface ActivityModalProps {
   onToggleLike: (e: React.MouseEvent) => void;
   commentsCount: number;
   onCommentsCountChange: (count: number) => void;
-  renderCardBody: () => React.ReactNode;
+  renderCardBody: (closeButton?: React.ReactNode) => React.ReactNode;
 }
 
 export const ActivityModal: React.FC<ActivityModalProps> = ({
@@ -32,6 +32,8 @@ export const ActivityModal: React.FC<ActivityModalProps> = ({
   const { user } = useAuth();
   const { language } = useTranslation();
   const isEs = language === 'es';
+
+  const mouseDownOnBackdropRef = React.useRef(false);
 
   // Handle ESC key to close
   useEffect(() => {
@@ -58,8 +60,47 @@ export const ActivityModal: React.FC<ActivityModalProps> = ({
 
   if (!isOpen) return null;
 
+  const closeButton = (
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        onClose();
+      }}
+      title={isEs ? 'Cerrar' : 'Close'}
+      style={{
+        background: 'transparent',
+        border: 'none',
+        color: 'var(--text-muted)',
+        cursor: 'pointer',
+        padding: '0.2rem',
+        borderRadius: '6px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        transition: 'all 0.15s ease'
+      }}
+      onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--text-primary)')}
+      onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
+    >
+      <X size={18} />
+    </button>
+  );
+
   return createPortal(
     <div
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) {
+          mouseDownOnBackdropRef.current = true;
+        } else {
+          mouseDownOnBackdropRef.current = false;
+        }
+      }}
+      onMouseUp={(e) => {
+        if (e.target === e.currentTarget && mouseDownOnBackdropRef.current) {
+          onClose();
+        }
+        mouseDownOnBackdropRef.current = false;
+      }}
       style={{
         position: 'fixed',
         inset: 0,
@@ -71,63 +112,24 @@ export const ActivityModal: React.FC<ActivityModalProps> = ({
         justifyContent: 'center',
         padding: '1.25rem'
       }}
-      onClick={onClose}
     >
       <div
+        onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
         style={{
-          background: '#0f1523',
-          backgroundImage: 'linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.01) 100%)',
-          border: '1px solid rgba(255, 255, 255, 0.12)',
+          background: 'var(--bg-primary, #0f1523)',
+          border: '1px solid var(--border-color, rgba(255, 255, 255, 0.12))',
           borderRadius: '16px',
           width: '100%',
           maxWidth: '620px',
           maxHeight: '90vh',
           display: 'flex',
           flexDirection: 'column',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(255, 255, 255, 0.06)',
+          boxShadow: 'var(--card-shadow, 0 25px 50px -12px rgba(0, 0, 0, 0.85))',
           overflow: 'hidden',
           animation: 'fadeInScale 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
         }}
       >
-        {/* Header with Title and Close Button */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '1rem 1.25rem',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-            background: 'rgba(255, 255, 255, 0.02)'
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <MessageSquare size={18} color="var(--accent-primary)" />
-            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-              {isEs ? 'Detalle y Comentarios' : 'Details & Comments'}
-            </h3>
-          </div>
-          <button
-            onClick={onClose}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: 'var(--text-muted)',
-              cursor: 'pointer',
-              padding: '0.35rem',
-              borderRadius: '8px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'all 0.15s ease'
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--text-primary)')}
-            onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
-          >
-            <X size={20} />
-          </button>
-        </div>
-
         {/* Scrollable Container for Card Preview + Comments Thread */}
         <div
           style={{
@@ -142,8 +144,8 @@ export const ActivityModal: React.FC<ActivityModalProps> = ({
           {/* Activity Event Card Preview */}
           <div
             style={{
-              background: 'rgba(255, 255, 255, 0.03)',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
+              background: 'var(--bg-secondary, rgba(255, 255, 255, 0.03))',
+              border: '1px solid var(--border-color, rgba(255, 255, 255, 0.08))',
               borderRadius: '12px',
               padding: '1rem',
               display: 'flex',
@@ -151,7 +153,7 @@ export const ActivityModal: React.FC<ActivityModalProps> = ({
               gap: '0.85rem'
             }}
           >
-            {renderCardBody()}
+            {renderCardBody(closeButton)}
 
             {/* Like & Comments Stats in preview */}
             <div
