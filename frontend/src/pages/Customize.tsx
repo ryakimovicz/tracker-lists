@@ -41,6 +41,7 @@ import { BackgroundSelectorModal } from '../components/BackgroundSelectorModal';
 import { ProModal } from '../components/ProModal';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { MusicServiceGuideModal } from '../components/MusicServiceGuideModal';
+import { MusicDetailsModal } from '../components/MusicDetailsModal';
 
 export const CustomizePage: React.FC = () => {
   const { user, refreshProfile } = useAuth();
@@ -74,6 +75,17 @@ export const CustomizePage: React.FC = () => {
   const [showProModal, setShowProModal] = useState(false);
   const [showDisconnectLastFmModal, setShowDisconnectLastFmModal] = useState(false);
   const [showMusicGuideModal, setShowMusicGuideModal] = useState(false);
+  const [musicDetailsModal, setMusicDetailsModal] = useState<{
+    isOpen: boolean;
+    type: 'artist' | 'album' | 'track';
+    artist: string;
+    name?: string;
+    image?: string;
+  }>({
+    isOpen: false,
+    type: 'track',
+    artist: ''
+  });
 
   // Profile data & counts for the header preview
   const [profile, setProfile] = useState<any>(user);
@@ -617,7 +629,32 @@ export const CustomizePage: React.FC = () => {
                   height: '76px',
                   minHeight: '76px',
                   maxHeight: '76px',
-                  boxSizing: 'border-box'
+                  boxSizing: 'border-box',
+                  cursor: nowPlaying ? 'pointer' : 'default',
+                  transition: 'all 0.2s ease'
+                }}
+                onClick={() => {
+                  if (nowPlaying) {
+                    setMusicDetailsModal({
+                      isOpen: true,
+                      type: 'track',
+                      artist: nowPlaying.artist,
+                      name: nowPlaying.name,
+                      image: nowPlaying.image
+                    });
+                  }
+                }}
+                onMouseEnter={(e) => {
+                  if (nowPlaying) {
+                    e.currentTarget.style.borderColor = 'rgba(29, 185, 84, 0.5)';
+                    e.currentTarget.style.background = isLight ? 'rgba(29, 185, 84, 0.12)' : 'rgba(29, 185, 84, 0.08)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (nowPlaying) {
+                    e.currentTarget.style.borderColor = isLight ? 'rgba(0, 0, 0, 0.08)' : 'var(--border-color)';
+                    e.currentTarget.style.background = isLight ? 'rgba(255, 255, 255, 0.65)' : 'rgba(255, 255, 255, 0.05)';
+                  }
                 }}
               >
                 {isLastFmLoading && !nowPlaying ? (
@@ -668,16 +705,12 @@ export const CustomizePage: React.FC = () => {
                           isEs ? 'Última canción escuchada' : 'Last Played'
                         )}
                       </span>
-                      <a 
-                        href={nowPlaying.url} 
-                        target="_blank" 
-                        rel="noopener noreferrer" 
+                      <div 
                         style={{ 
                           margin: '0.15rem 0', 
                           fontSize: '0.92rem', 
                           fontWeight: 600, 
                           color: 'var(--text-primary)', 
-                          textDecoration: 'none',
                           whiteSpace: 'nowrap',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
@@ -687,7 +720,7 @@ export const CustomizePage: React.FC = () => {
                         title={nowPlaying.name}
                       >
                         {nowPlaying.name}
-                      </a>
+                      </div>
                       <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '260px', lineHeight: 1.2 }}>
                         {nowPlaying.artist}
                       </span>
@@ -1512,6 +1545,16 @@ export const CustomizePage: React.FC = () => {
         type="danger"
         onConfirm={executeDisconnectLastFm}
         onClose={() => setShowDisconnectLastFmModal(false)}
+      />
+
+      {/* Music Item Details Modal */}
+      <MusicDetailsModal
+        isOpen={musicDetailsModal.isOpen}
+        onClose={() => setMusicDetailsModal(prev => ({ ...prev, isOpen: false }))}
+        type={musicDetailsModal.type}
+        artist={musicDetailsModal.artist}
+        name={musicDetailsModal.name}
+        initialImage={musicDetailsModal.image}
       />
     </div>
   );
