@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { apiClient } from '../api/client';
 
 import { useTranslation } from '../context/LanguageContext';
@@ -55,8 +55,40 @@ export const AdminPanel: React.FC = () => {
   const { language } = useTranslation();
   const isEs = language === 'es';
 
-  const [activeTab, setActiveTab] = useState<'users' | 'reports'>('users');
-  const [reportTab, setReportTab] = useState<'media' | 'reviews' | 'comments'>('media');
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const tabParam = searchParams.get('tab');
+  const activeTab: 'users' | 'reports' = tabParam === 'reports' ? 'reports' : 'users';
+
+  const subtabParam = searchParams.get('subtab');
+  const validReportTabs = ['media', 'reviews', 'comments'] as const;
+  type ReportTabType = typeof validReportTabs[number];
+  const reportTab: ReportTabType = (subtabParam && validReportTabs.includes(subtabParam as any))
+    ? (subtabParam as ReportTabType)
+    : 'media';
+
+  const handleActiveTabChange = (tab: 'users' | 'reports') => {
+    const newParams = new URLSearchParams(searchParams);
+    if (tab === 'users') {
+      newParams.delete('tab');
+      newParams.delete('subtab');
+    } else {
+      newParams.set('tab', 'reports');
+    }
+    setSearchParams(newParams);
+  };
+
+  const handleReportTabChange = (subtab: ReportTabType) => {
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set('tab', 'reports');
+    if (subtab === 'media') {
+      newParams.delete('subtab');
+    } else {
+      newParams.set('subtab', subtab);
+    }
+    setSearchParams(newParams);
+  };
+
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [reports, setReports] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -190,11 +222,6 @@ export const AdminPanel: React.FC = () => {
 
 
 
-  useEffect(() => {
-    fetchUsers();
-    fetchReports();
-  }, []);
-
   const fetchUsers = async (query = searchQuery) => {
     setLoading(true);
     try {
@@ -231,7 +258,72 @@ export const AdminPanel: React.FC = () => {
     setSuspensionValue(7);
     setSuspensionUnit('days');
     setModalFeedback(null);
+
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set('user', String(user.id));
+    setSearchParams(newParams);
   };
+
+  const handleCloseUserModal = () => {
+    setSelectedUser(null);
+    const newParams = new URLSearchParams(searchParams);
+    newParams.delete('user');
+    setSearchParams(newParams);
+  };
+
+  const userParam = searchParams.get('user');
+
+  useEffect(() => {
+    fetchUsers();
+    fetchReports();
+  }, []);
+
+  // When ?user= is in the URL, ensure the corresponding user modal opens
+  useEffect(() => {
+    if (!userParam) {
+      if (selectedUser) {
+        setSelectedUser(null);
+      }
+      return;
+    }
+
+    // Check if already open
+    if (selectedUser && (String(selectedUser.id) === userParam || selectedUser.username.toLowerCase() === userParam.toLowerCase())) {
+      return;
+    }
+
+    // Try finding in loaded users first
+    const found = users.find(u => String(u.id) === userParam || u.username.toLowerCase() === userParam.toLowerCase());
+    if (found) {
+      setSelectedUser(found);
+      setNewUserIdInput(found.id);
+      setNewUsernameInput(found.username);
+      setWarningMessage(found.admin_warning || '');
+      setSuspensionReason(found.suspension_reason || '');
+      setGiftMonths(1);
+      setSuspensionValue(7);
+      setSuspensionUnit('days');
+      setModalFeedback(null);
+    } else {
+      // Query backend if user is not in current page
+      apiClient.get('/admin/users', { params: { q: userParam, limit: 10 } })
+        .then(res => {
+          const directMatch = (res.data.users || []).find((u: AdminUser) => String(u.id) === userParam || u.username.toLowerCase() === userParam.toLowerCase());
+          if (directMatch) {
+            setSelectedUser(directMatch);
+            setNewUserIdInput(directMatch.id);
+            setNewUsernameInput(directMatch.username);
+            setWarningMessage(directMatch.admin_warning || '');
+            setSuspensionReason(directMatch.suspension_reason || '');
+            setGiftMonths(1);
+            setSuspensionValue(7);
+            setSuspensionUnit('days');
+            setModalFeedback(null);
+          }
+        })
+        .catch(console.error);
+    }
+  }, [userParam, users]);
 
 
   // Actions
@@ -400,7 +492,7 @@ export const AdminPanel: React.FC = () => {
         try {
           await apiClient.delete(`/admin/users/${selectedUser.id}`);
           setUsers(prev => prev.filter(u => u.id !== selectedUser.id));
-          setSelectedUser(null);
+          handleCloseUserModal();
         } catch (err: any) {
           setModalFeedback({ type: 'error', text: err.response?.data?.detail || 'Error deleting user.' });
         } finally {
@@ -589,14 +681,14 @@ export const AdminPanel: React.FC = () => {
           {/* Quick Tab Switcher */}
           <div style={{ display: 'flex', gap: '0.5rem', background: 'rgba(255, 255, 255, 0.05)', padding: '0.3rem', borderRadius: 12 }}>
             <button
-              onClick={() => setActiveTab('users')}
+              onClick={() => handleActiveTabChange('users')}
               className={activeTab === 'users' ? 'btn-primary' : 'btn-secondary'}
               style={{ padding: '0.45rem 1rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem', borderRadius: 8 }}
             >
               <Users size={16} /> {isEs ? 'Usuarios' : 'Users'} ({users.length})
             </button>
             <button
-              onClick={() => setActiveTab('reports')}
+              onClick={() => handleActiveTabChange('reports')}
               className={activeTab === 'reports' ? 'btn-primary' : 'btn-secondary'}
               style={{ padding: '0.45rem 1rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem', borderRadius: 8 }}
             >
@@ -749,7 +841,7 @@ export const AdminPanel: React.FC = () => {
             <div style={{ display: 'flex', gap: '0.4rem', background: 'rgba(255, 255, 255, 0.05)', padding: '0.3rem', borderRadius: 10 }}>
               <button
                 type="button"
-                onClick={() => setReportTab('media')}
+                onClick={() => handleReportTabChange('media')}
                 className={reportTab === 'media' ? 'btn-primary' : 'btn-secondary'}
                 style={{ padding: '0.35rem 0.85rem', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.35rem', borderRadius: 6 }}
               >
@@ -757,7 +849,7 @@ export const AdminPanel: React.FC = () => {
               </button>
               <button
                 type="button"
-                onClick={() => setReportTab('reviews')}
+                onClick={() => handleReportTabChange('reviews')}
                 className={reportTab === 'reviews' ? 'btn-primary' : 'btn-secondary'}
                 style={{ padding: '0.35rem 0.85rem', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.35rem', borderRadius: 6 }}
               >
@@ -765,7 +857,7 @@ export const AdminPanel: React.FC = () => {
               </button>
               <button
                 type="button"
-                onClick={() => setReportTab('comments')}
+                onClick={() => handleReportTabChange('comments')}
                 className={reportTab === 'comments' ? 'btn-primary' : 'btn-secondary'}
                 style={{ padding: '0.35rem 0.85rem', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.35rem', borderRadius: 6 }}
               >
@@ -1202,7 +1294,7 @@ export const AdminPanel: React.FC = () => {
           >
             {/* Close Button */}
             <button
-              onClick={() => setSelectedUser(null)}
+              onClick={handleCloseUserModal}
               style={{ position: 'absolute', top: 18, right: 18, background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}
             >
               <X size={22} />
