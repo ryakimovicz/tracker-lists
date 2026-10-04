@@ -139,6 +139,7 @@ export const ItemRouteModal: React.FC<ItemRouteModalProps> = ({ onClose, onUpdat
     const targetType = newItem.item_type || type || 'movie';
     const targetId = newItem.external_id || newItem.id;
     navigate(`/item/${targetType}/${targetId}`, {
+      replace: true,
       state: {
         backgroundLocation: (location.state as any)?.backgroundLocation || (isDirectPage ? { pathname: '/search' } : location),
         item: newItem

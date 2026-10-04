@@ -175,6 +175,7 @@ export const PostRouteModal: React.FC = () => {
             const targetId = item.external_id || item.id;
             if (targetType && targetId) {
               navigate(`/item/${targetType}/${targetId}`, {
+                replace: true,
                 state: { backgroundLocation: (location.state as any)?.backgroundLocation || location, item }
               });
             }
