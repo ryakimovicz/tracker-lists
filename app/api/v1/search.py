@@ -934,6 +934,111 @@ def lookup_media_item(
                         "description": iss_detail.get("description") or "",
                         "parent_series": iss_detail.get("parent_series")
                     }
+        elif type_clean == "episode":
+            # TVMaze episode lookup: e.g. tvm-ep-12345 or 12345
+            ep_raw_id = ext_id_clean.replace("tvm-ep-", "").replace("tvm_", "").strip()
+            if ep_raw_id.isdigit():
+                try:
+                    ep_url = f"https://api.tvmaze.com/episodes/{ep_raw_id}?embed=show"
+                    req = urllib.request.Request(ep_url, headers={"User-Agent": "TrackerLists/1.0"})
+                    with urllib.request.urlopen(req, timeout=5) as ep_res:
+                        if ep_res.status == 200:
+                            ep_json = json.loads(ep_res.read().decode())
+                            img_obj = ep_json.get("image") or {}
+                            img_url = img_obj.get("original") or img_obj.get("medium")
+                            show_obj = ep_json.get("_embedded", {}).get("show") or {}
+                            show_name = show_obj.get("name") or ""
+                            ep_name = ep_json.get("name") or "Episode"
+                            s_num = ep_json.get("season")
+                            e_num = ep_json.get("number")
+                            
+                            s_str = f"S{s_num:02d}" if s_num is not None else ""
+                            e_str = f"E{e_num:02d}" if e_num is not None else ""
+                            code_str = f"{s_str}{e_str}".strip()
+                            
+                            full_title = f"{show_name} - {code_str} - {ep_name}" if (show_name and code_str) else (f"{show_name} - {ep_name}" if show_name else ep_name)
+                            
+                            parent_series = None
+                            if show_obj.get("id"):
+                                parent_img = (show_obj.get("image") or {}).get("original") or (show_obj.get("image") or {}).get("medium")
+                                parent_series = {
+                                    "external_id": f"tvm_{show_obj['id']}",
+                                    "title": show_name,
+                                    "image_url": parent_img,
+                                    "item_type": "series"
+                                }
+
+                            result_data = {
+                                "external_id": ext_id_clean,
+                                "title": full_title,
+                                "name": ep_name,
+                                "item_type": "episode",
+                                "image_url": img_url or (parent_series.get("image_url") if parent_series else None),
+                                "description": ep_json.get("summary") or "",
+                                "release_date": ep_json.get("airdate"),
+                                "season_number": s_num,
+                                "episode_number": e_num,
+                                "parent_series": parent_series
+                            }
+                except Exception as ex:
+                    print(f"Error fetching TVMaze single episode {ext_id_clean}: {ex}")
+        elif type_clean == "game":
+            clean_gid = ext_id_clean.replace("igdb_", "").replace("game_", "").strip()
+            if clean_gid.isdigit():
+                body = f"fields id, name, category, game_type, parent_game, cover.image_id, first_release_date, summary; where id = {clean_gid}; limit 1;"
+                items = IGDBService._execute_query(body)
+                if items:
+                    g = items[0]
+                    result_data = {
+                        "external_id": ext_id_clean,
+                        "title": g.title,
+                        "item_type": "game",
+                        "image_url": g.image_url,
+                        "description": g.description,
+                        "release_date": g.release_date
+                    }
+        elif type_clean == "manga":
+            clean_mid = ext_id_clean.replace("manga_", "").replace("anilist_", "").strip()
+            if clean_mid.isdigit():
+                graphql_query = """
+                query ($id: Int) {
+                  Media(id: $id, type: MANGA) {
+                    id
+                    title { romaji english }
+                    coverImage { large extraLarge }
+                    description
+                    startDate { year month day }
+                  }
+                }
+                """
+                payload = json.dumps({
+                    "query": graphql_query,
+                    "variables": {"id": int(clean_mid)}
+                }).encode("utf-8")
+                req = urllib.request.Request(
+                    "https://graphql.anilist.co",
+                    data=payload,
+                    headers={"Content-Type": "application/json", "Accept": "application/json", "User-Agent": "TrackerLists/1.0"}
+                )
+                with urllib.request.urlopen(req, timeout=5) as m_res:
+                    if m_res.status == 200:
+                        m_data = json.loads(m_res.read().decode()).get("data", {}).get("Media")
+                        if m_data:
+                            t_obj = m_data.get("title") or {}
+                            m_title = t_obj.get("english") or t_obj.get("romaji") or "Untitled Manga"
+                            cov_obj = m_data.get("coverImage") or {}
+                            m_img = cov_obj.get("extraLarge") or cov_obj.get("large")
+                            start_d = m_data.get("startDate") or {}
+                            y, m, d = start_d.get("year"), start_d.get("month"), start_d.get("day")
+                            rel_d = f"{y:04d}-{m:02d}-{d:02d}" if (y and m and d) else (str(y) if y else None)
+                            result_data = {
+                                "external_id": ext_id_clean,
+                                "title": m_title,
+                                "item_type": "manga",
+                                "image_url": m_img,
+                                "description": m_data.get("description") or "",
+                                "release_date": rel_d
+                            }
     except Exception as e:
         print(f"Error fetching external item detail in lookup: {e}")
 

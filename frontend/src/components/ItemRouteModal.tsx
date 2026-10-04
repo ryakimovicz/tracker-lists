@@ -26,20 +26,44 @@ export const ItemRouteModal: React.FC<ItemRouteModalProps> = ({ onClose, onUpdat
   const stateItem = (location.state as any)?.item;
   const isDirectPage = !(location.state as any)?.backgroundLocation;
 
+  // Check if location state provides this item or an item matching this id
+  const matchesCurrentId = (candidate: any) => {
+    if (!candidate || !id) return false;
+    return (
+      candidate.external_id === id ||
+      String(candidate.id) === id ||
+      (type === 'game' && (String(candidate.external_id) === String(id) || String(candidate.id) === String(id)))
+    );
+  };
+
   const [item, setItem] = useState<any>(() => {
-    if (stateItem && (stateItem.external_id === id || String(stateItem.id) === id)) {
+    if (matchesCurrentId(stateItem)) {
       return stateItem;
     }
     return null;
   });
-  const [loading, setLoading] = useState<boolean>(!item);
+  const [loading, setLoading] = useState<boolean>(() => !matchesCurrentId(stateItem));
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // If we already have the matching item from navigation state, don't re-fetch
-    if (item && (item.external_id === id || String(item.id) === id)) {
-      setLoading(false);
-      return;
+    // If navigation state carries the item, sync it immediately
+    const navItem = (location.state as any)?.item;
+    if (matchesCurrentId(navItem)) {
+      setItem(navItem);
+      // For episodes, or items that already have rich information (title, images, etc.),
+      // we can stop loading right away.
+      if (type === 'episode' || navItem.item_type === 'episode' || navItem.still_path || navItem.name || navItem.image_url) {
+        setLoading(false);
+        return;
+      }
+    }
+
+    if (item && matchesCurrentId(item)) {
+      // If we already have the matching item and it has title/images, don't re-fetch
+      if (type === 'episode' || item.title || item.image_url) {
+        setLoading(false);
+        return;
+      }
     }
 
     if (!type || !id) {
@@ -60,7 +84,7 @@ export const ItemRouteModal: React.FC<ItemRouteModalProps> = ({ onClose, onUpdat
     })
       .then(res => {
         if (isMounted) {
-          setItem(res.data);
+          setItem((prev: any) => ({ ...(prev || {}), ...(res.data || {}) }));
           setLoading(false);
           // Auto-redirect URL if external_id was resolved or upgraded (e.g. wiki_... -> omdb_...)
           if (res.data?.external_id && res.data.external_id !== id) {
@@ -74,12 +98,18 @@ export const ItemRouteModal: React.FC<ItemRouteModalProps> = ({ onClose, onUpdat
       .catch(err => {
         if (isMounted) {
           console.error('Failed to lookup item for route:', err);
-          // Fallback to a bare item so the modal can still initialize its internal search/data fetchers
-          setItem({
-            external_id: id,
-            item_type: type,
-            title: id.replace(/[-_]/g, ' ')
-          });
+          // If we had a stateItem or previous item for this ID with details, preserve it!
+          const existingItem = matchesCurrentId(navItem) ? navItem : matchesCurrentId(item) ? item : null;
+          if (existingItem) {
+            setItem(existingItem);
+          } else {
+            // Fallback to a bare item so the modal can still initialize its internal search/data fetchers
+            setItem({
+              external_id: id,
+              item_type: type,
+              title: id.replace(/[-_]/g, ' ')
+            });
+          }
           setLoading(false);
         }
       });
@@ -87,7 +117,7 @@ export const ItemRouteModal: React.FC<ItemRouteModalProps> = ({ onClose, onUpdat
     return () => {
       isMounted = false;
     };
-  }, [type, id]);
+  }, [type, id, location.state]);
 
   const handleClose = () => {
     if (onClose) {

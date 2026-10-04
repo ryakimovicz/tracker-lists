@@ -231,19 +231,19 @@ function AppContent() {
             <Routes>
               <Route
                 path="/item/:type/:id"
-                element={<ItemRouteModal />}
+                element={<ItemRouteModal key={location.pathname} />}
               />
               <Route
                 path="/post/:id"
-                element={<PostRouteModal />}
+                element={<PostRouteModal key={location.pathname} />}
               />
               <Route
                 path="/music/artist/:artist"
-                element={<MusicRouteModal />}
+                element={<MusicRouteModal key={location.pathname} />}
               />
               <Route
                 path="/music/:type/:artist/:name"
-                element={<MusicRouteModal />}
+                element={<MusicRouteModal key={location.pathname} />}
               />
             </Routes>
           )}
@@ -253,19 +253,19 @@ function AppContent() {
             <Routes>
               <Route
                 path="/item/:type/:id"
-                element={<ItemRouteModal />}
+                element={<ItemRouteModal key={location.pathname} />}
               />
               <Route
                 path="/post/:id"
-                element={<PostRouteModal />}
+                element={<PostRouteModal key={location.pathname} />}
               />
               <Route
                 path="/music/artist/:artist"
-                element={<MusicRouteModal />}
+                element={<MusicRouteModal key={location.pathname} />}
               />
               <Route
                 path="/music/:type/:artist/:name"
-                element={<MusicRouteModal />}
+                element={<MusicRouteModal key={location.pathname} />}
               />
             </Routes>
           )}
