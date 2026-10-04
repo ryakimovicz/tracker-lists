@@ -37,7 +37,10 @@ export const MusicRouteModal: React.FC = () => {
 
   const handleClose = () => {
     const bg = (location.state as any)?.backgroundLocation;
-    if (bg || window.history.length > 1) {
+    if (bg) {
+      const targetUrl = typeof bg === 'string' ? bg : `${bg.pathname || '/'}${bg.search || ''}${bg.hash || ''}`;
+      navigate(targetUrl, { replace: true });
+    } else if (window.history.length > 1) {
       navigate(-1);
     } else {
       navigate('/profile');

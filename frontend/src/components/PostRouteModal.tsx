@@ -64,9 +64,11 @@ export const PostRouteModal: React.FC = () => {
   }, [id, stateActivity, isEs]);
 
   const handleClose = () => {
-    // If we have history or backgroundLocation, navigate(-1), otherwise go to /social
     const bg = (location.state as any)?.backgroundLocation;
-    if (bg || window.history.length > 1) {
+    if (bg) {
+      const targetUrl = typeof bg === 'string' ? bg : `${bg.pathname || '/'}${bg.search || ''}${bg.hash || ''}`;
+      navigate(targetUrl, { replace: true });
+    } else if (window.history.length > 1) {
       navigate(-1);
     } else {
       navigate('/social');

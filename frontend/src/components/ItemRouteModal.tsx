@@ -92,6 +92,11 @@ export const ItemRouteModal: React.FC<ItemRouteModalProps> = ({ onClose, onUpdat
   const handleClose = () => {
     if (onClose) {
       onClose();
+    }
+    const bg = (location.state as any)?.backgroundLocation;
+    if (bg) {
+      const targetUrl = typeof bg === 'string' ? bg : `${bg.pathname || '/'}${bg.search || ''}${bg.hash || ''}`;
+      navigate(targetUrl, { replace: true });
     } else if (isDirectPage) {
       navigate('/search');
     } else {
