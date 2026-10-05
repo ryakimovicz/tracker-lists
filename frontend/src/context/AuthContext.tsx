@@ -21,6 +21,8 @@ interface UserProfile {
   profile_color?: string;
   category_order?: string;
   lastfm_username?: string;
+  is_private?: boolean;
+  blur_unwatched_episodes?: boolean;
 }
 
 

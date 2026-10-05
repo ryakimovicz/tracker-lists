@@ -3,7 +3,7 @@ import { useTranslation } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
 import { getProfileTheme } from '../utils/profileThemes';
 import { apiClient } from '../api/client';
-import { Star, Heart, X, Flag, CheckCircle, Check, CheckCheck, Plus, MoreVertical, Trash2, ArrowLeft, Clock, ChevronUp, ChevronDown, RotateCcw, BookOpen, Gamepad2, Package, Sparkles, Puzzle, Layers, ChevronLeft, ChevronRight, Calendar, RefreshCw, AlertCircle, Globe, Repeat, Trophy, ShieldAlert, Infinity as InfinityIcon, Reply, ThumbsUp, Edit2, Image as ImageIcon, Volume2, VolumeX, Play, Pause, MessageSquare } from 'lucide-react';
+import { Star, Heart, X, Flag, CheckCircle, Check, CheckCheck, Plus, MoreVertical, Trash2, ArrowLeft, Clock, ChevronUp, ChevronDown, RotateCcw, BookOpen, Gamepad2, Package, Sparkles, Puzzle, Layers, ChevronLeft, ChevronRight, Calendar, RefreshCw, AlertCircle, Globe, Repeat, Trophy, ShieldAlert, Infinity as InfinityIcon, Reply, ThumbsUp, Edit2, Image as ImageIcon, Volume2, VolumeX, Play, Pause, MessageSquare, Eye, EyeOff } from 'lucide-react';
 
 
 
@@ -1269,6 +1269,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     return initialItem;
   });
   const [isCoverPeek, setIsCoverPeek] = useState(false);
+  const [isEpisodeCoverRevealed, setIsEpisodeCoverRevealed] = useState(false);
   
   const [itemReviews, setItemReviews] = useState<any[]>([]);
   const [userRating, setUserRating] = useState<number>(0);
@@ -2672,6 +2673,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       setHasInteractedWithTime(false);
       setItemReviews([]);
       setDescExpanded(false);
+      setIsEpisodeCoverRevealed(false);
       setGlobalProgress({});
       setEpisodes([]);
       setSeasonEpisodes({});
@@ -3644,6 +3646,13 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   };
 
   const epHeaderInfo = isEpisode ? getEpisodeHeaderInfo() : null;
+
+  const shouldBlurEpisodeCover = Boolean(
+    user?.blur_unwatched_episodes &&
+    isEpisode &&
+    !isEpisodeCompleted &&
+    !isEpisodeCoverRevealed
+  );
 
   const handleSaveReview = async (ratingVal: number, customContent?: string) => {
     if (!selectedItem || !selectedItem.external_id || !isItemTracked) return;
@@ -5691,20 +5700,77 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
               {/* Modal Body Info */}
               <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
                 {selectedItem.image_url && (
-                    <div style={{ position: 'relative', width: '130px', height: '190px' }}>
+                    <div style={{ position: 'relative', width: '130px', height: '190px', borderRadius: '8px', overflow: 'hidden' }}>
                       <img
                         src={selectedItem.image_url}
                         alt={selectedItem.title}
                         onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                        onClick={() => setZoomedImage(selectedItem.image_url)}
+                        onClick={() => {
+                          if (shouldBlurEpisodeCover) {
+                            setIsEpisodeCoverRevealed(true);
+                          } else {
+                            setZoomedImage(selectedItem.image_url);
+                          }
+                        }}
                         style={{ 
                           width: '100%', height: '100%', objectFit: 'cover', borderRadius: '8px', 
-                          cursor: 'zoom-in', 
+                          cursor: shouldBlurEpisodeCover ? 'pointer' : 'zoom-in', 
                           boxShadow: '0 5px 15px rgba(0,0,0,0.3)',
-                          filter: 'none'
+                          filter: shouldBlurEpisodeCover ? 'blur(16px)' : 'none',
+                          transform: shouldBlurEpisodeCover ? 'scale(1.08)' : 'scale(1)',
+                          transition: 'filter 0.3s ease, transform 0.3s ease'
                         }}
                       />
-                      {selectedItem.image_url && selectedItem.image_url.includes('489599849927-2ee91cede3ba') && (
+                      {shouldBlurEpisodeCover && (
+                        <div
+                          onClick={() => setIsEpisodeCoverRevealed(true)}
+                          style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '0.4rem',
+                            padding: '0.5rem',
+                            textAlign: 'center',
+                            cursor: 'pointer',
+                            background: 'rgba(0, 0, 0, 0.45)',
+                            backdropFilter: 'blur(2px)',
+                            color: '#fff',
+                            zIndex: 2,
+                            borderRadius: '8px',
+                            userSelect: 'none'
+                          }}
+                          title={language === 'es' ? 'Haz clic para revelar la portada' : 'Click to reveal cover'}
+                        >
+                          <div style={{
+                            background: 'rgba(0, 0, 0, 0.65)',
+                            borderRadius: '50%',
+                            width: '34px',
+                            height: '34px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            boxShadow: '0 4px 10px rgba(0,0,0,0.5)',
+                            border: '1px solid rgba(255,255,255,0.2)'
+                          }}>
+                            <Eye size={17} />
+                          </div>
+                          <span style={{
+                            fontSize: '0.75rem',
+                            fontWeight: 600,
+                            textShadow: '0 2px 4px rgba(0,0,0,0.9)',
+                            lineHeight: 1.2
+                          }}>
+                            {language === 'es' ? 'Revelar portada' : 'Reveal cover'}
+                          </span>
+                        </div>
+                      )}
+                      {selectedItem.image_url && selectedItem.image_url.includes('489599849927-2ee91cede3ba') && !shouldBlurEpisodeCover && (
                         <div style={{
                           position: 'absolute', top: 0, left: 0, width: '100%', height: '52%',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',

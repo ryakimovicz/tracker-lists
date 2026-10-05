@@ -24,6 +24,7 @@ class User(Base):
     is_admin = Column(Boolean, default=False, nullable=False)
     is_private = Column(Boolean, default=False, nullable=False)
     show_nsfw = Column(Boolean, default=False, nullable=False)
+    blur_unwatched_episodes = Column(Boolean, default=False, nullable=False)
     is_pro = Column(Boolean, default=False, nullable=False)
     is_pro_cancelled = Column(Boolean, default=False, nullable=False)
     is_vip = Column(Boolean, default=False, nullable=False)

@@ -76,6 +76,7 @@ def auto_migrate_schema():
                 ("dodo_customer_id", "VARCHAR(100)"),
                 ("is_pro_cancelled", "BOOLEAN DEFAULT FALSE"),
                 ("is_private", "BOOLEAN DEFAULT FALSE"),
+                ("blur_unwatched_episodes", "BOOLEAN DEFAULT FALSE"),
                 ("auth_provider", "VARCHAR(20) DEFAULT 'local'"),
                 ("category_order", "VARCHAR(200)"),
                 ("profile_color", "VARCHAR(20)"),

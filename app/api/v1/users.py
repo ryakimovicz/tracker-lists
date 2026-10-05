@@ -134,6 +134,7 @@ def get_user_dashboard(
         lastfm_username=current_user.lastfm_username,
         preferred_language=getattr(current_user, 'preferred_language', 'es') or 'es',
         is_private=bool(getattr(current_user, 'is_private', False)),
+        blur_unwatched_episodes=bool(getattr(current_user, 'blur_unwatched_episodes', False)),
         followers_count=followers_count,
         following_count=following_count,
         is_following=False,
@@ -846,10 +847,10 @@ def update_category_order(
 
 
 class UserSettingsUpdate(BaseModel):
-
     show_nsfw: bool | None = None
     is_pro: bool | None = None
     is_private: bool | None = None
+    blur_unwatched_episodes: bool | None = None
 
 @router.put("/me", response_model=UserResponse)
 def update_user_settings(
@@ -862,6 +863,11 @@ def update_user_settings(
     
     if req.is_private is not None:
         current_user.is_private = req.is_private
+
+    if req.blur_unwatched_episodes is not None:
+        if not check_user_is_pro(current_user):
+            raise HTTPException(status_code=403, detail="Esta función requiere una membresía Premium.")
+        current_user.blur_unwatched_episodes = req.blur_unwatched_episodes
 
     if req.is_pro is not None:
         was_pro = current_user.is_pro
@@ -1098,6 +1104,7 @@ def get_any_user_profile(
         category_order=user.category_order,
         lastfm_username=user.lastfm_username if not is_private_locked else None,
         is_private=is_user_private,
+        blur_unwatched_episodes=bool(getattr(user, 'blur_unwatched_episodes', False)),
         followers_count=followers_count,
         following_count=following_count,
         is_following=is_following,

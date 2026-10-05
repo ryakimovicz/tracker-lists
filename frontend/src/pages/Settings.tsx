@@ -143,6 +143,11 @@ export const SettingsPage: React.FC = () => {
   const [privacyLoading, setPrivacyLoading] = useState(false);
   const [privacyMsg, setPrivacyMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  // Anti-spoilers state (Blur unwatched episode thumbnails)
+  const [blurUnwatched, setBlurUnwatched] = useState<boolean>(Boolean(user?.blur_unwatched_episodes));
+  const [blurLoading, setBlurLoading] = useState(false);
+  const [blurMsg, setBlurMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
   useEffect(() => {
     refreshProfile();
   }, []);
@@ -150,9 +155,37 @@ export const SettingsPage: React.FC = () => {
   useEffect(() => {
     if (user) {
       setIsPrivate(Boolean((user as any)?.is_private));
+      setBlurUnwatched(Boolean(user?.blur_unwatched_episodes));
       setUsername(user.username || '');
     }
   }, [user]);
+
+  const handleToggleBlurUnwatched = async (newVal: boolean) => {
+    if (!user?.is_pro) {
+      setShowProModal(true);
+      return;
+    }
+    setBlurLoading(true);
+    setBlurMsg(null);
+    try {
+      await apiClient.put('/users/me', { blur_unwatched_episodes: newVal });
+      setBlurUnwatched(newVal);
+      await refreshProfile();
+      setBlurMsg({
+        type: 'success',
+        text: isEs
+          ? (newVal ? 'Anti-spoilers activado: las miniaturas de episodios no vistos estarán desenfocadas.' : 'Anti-spoilers desactivado.')
+          : (newVal ? 'Anti-spoilers enabled: unwatched episode covers will be blurred.' : 'Anti-spoilers disabled.')
+      });
+    } catch (err: any) {
+      setBlurMsg({
+        type: 'error',
+        text: err.response?.data?.detail || (isEs ? 'Error al actualizar la preferencia.' : 'Failed to update setting.')
+      });
+    } finally {
+      setBlurLoading(false);
+    }
+  };
 
   const handleTogglePrivacy = async (newVal: boolean) => {
     setPrivacyLoading(true);
@@ -773,6 +806,132 @@ export const SettingsPage: React.FC = () => {
                     : 'Your reviews and comments in public spaces will remain visible.'}
                 </span>
               </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Section: Anti-spoilers (Blur unwatched episodes) */}
+        <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+              <h2 style={{ fontSize: '1.2rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
+                <EyeOff size={20} color="var(--accent-primary)" />
+                {isEs ? 'Anti-Spoilers: Desenfocar Episodios' : 'Anti-Spoilers: Blur Episodes'}
+              </h2>
+              <span
+                style={{
+                  fontSize: '0.65rem',
+                  background: 'rgba(245, 158, 11, 0.15)',
+                  color: '#f59e0b',
+                  padding: '0.15rem 0.45rem',
+                  borderRadius: '4px',
+                  fontWeight: 700,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.25rem',
+                  border: '1px solid rgba(245, 158, 11, 0.3)'
+                }}
+              >
+                <Star size={10} fill="#f59e0b" />
+                PREMIUM
+              </span>
+            </div>
+            <span
+              style={{
+                fontSize: '0.78rem',
+                padding: '0.2rem 0.65rem',
+                borderRadius: '12px',
+                background: blurUnwatched ? 'rgba(16, 185, 129, 0.15)' : 'rgba(148, 163, 184, 0.15)',
+                color: blurUnwatched ? '#10b981' : 'var(--text-muted)',
+                border: `1px solid ${blurUnwatched ? 'rgba(16, 185, 129, 0.3)' : 'var(--border-color)'}`,
+                fontWeight: 700
+              }}
+            >
+              {blurUnwatched ? (isEs ? 'Activado' : 'Enabled') : (isEs ? 'Desactivado' : 'Disabled')}
+            </span>
+          </div>
+
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1.25rem', lineHeight: 1.5 }}>
+            {isEs
+              ? 'Desenfoca las portadas y miniaturas de los episodios que aún no has marcado como vistos para evitar spoilers. Al hacer clic sobre una portada desenfocada podrás revelarla individualmente.'
+              : 'Blurs the posters and thumbnails of episodes you have not yet marked as watched to prevent spoilers. Clicking any blurred poster will reveal it individually.'}
+          </p>
+
+          {blurMsg && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                padding: '0.75rem 1rem',
+                borderRadius: '8px',
+                marginBottom: '1rem',
+                fontSize: '0.85rem',
+                background: blurMsg.type === 'success' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                color: blurMsg.type === 'success' ? '#10b981' : '#ef4444',
+                border: `1px solid ${blurMsg.type === 'success' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`,
+              }}
+            >
+              {blurMsg.type === 'success' ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
+              <span>{blurMsg.text}</span>
+            </div>
+          )}
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
+            {/* Enabled Option */}
+            <div
+              onClick={() => !blurLoading && handleToggleBlurUnwatched(true)}
+              style={{
+                padding: '1.25rem',
+                borderRadius: '12px',
+                border: blurUnwatched ? '2px solid var(--accent-primary)' : '1px solid var(--border-color)',
+                background: blurUnwatched ? 'var(--border-glow)' : 'var(--bg-secondary)',
+                cursor: blurLoading ? 'not-allowed' : 'pointer',
+                transition: 'all 0.2s ease',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.5rem'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontWeight: 700, fontSize: '1rem', color: blurUnwatched ? 'var(--accent-primary)' : 'var(--text-primary)' }}>
+                  {isEs ? 'Desenfocar miniaturas' : 'Blur thumbnails'}
+                </span>
+                {blurUnwatched && <CheckCircle size={18} color="var(--accent-primary)" />}
+              </div>
+              <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                {isEs
+                  ? 'Aplica un filtro de desenfoque a todos los episodios no vistos. Haz clic para revelar cuando quieras.'
+                  : 'Applies a blur filter to all unwatched episodes. Click any cover to reveal it whenever you want.'}
+              </p>
+            </div>
+
+            {/* Disabled Option */}
+            <div
+              onClick={() => !blurLoading && handleToggleBlurUnwatched(false)}
+              style={{
+                padding: '1.25rem',
+                borderRadius: '12px',
+                border: !blurUnwatched ? '2px solid var(--accent-primary)' : '1px solid var(--border-color)',
+                background: !blurUnwatched ? 'var(--border-glow)' : 'var(--bg-secondary)',
+                cursor: blurLoading ? 'not-allowed' : 'pointer',
+                transition: 'all 0.2s ease',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.5rem'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontWeight: 700, fontSize: '1rem', color: !blurUnwatched ? 'var(--accent-primary)' : 'var(--text-primary)' }}>
+                  {isEs ? 'Mostrar nítidas (Predeterminado)' : 'Show sharp (Default)'}
+                </span>
+                {!blurUnwatched && <CheckCircle size={18} color="var(--accent-primary)" />}
+              </div>
+              <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                {isEs
+                  ? 'Todas las miniaturas de los episodios se verán con normalidad sin importar si fueron vistos o no.'
+                  : 'All episode thumbnails are displayed normally regardless of whether they have been watched.'}
+              </p>
             </div>
           </div>
         </div>

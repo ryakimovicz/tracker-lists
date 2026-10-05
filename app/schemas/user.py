@@ -30,6 +30,7 @@ class UserResponse(UserBase):
     lastfm_username: str | None = None
     preferred_language: str = "es"
     is_private: bool = False
+    blur_unwatched_episodes: bool = False
     followers_count: int = 0
     following_count: int = 0
     is_following: bool = False
@@ -72,6 +73,7 @@ class UserDashboardResponse(BaseModel):
     lastfm_username: str | None = None
     preferred_language: str = "es"
     is_private: bool = False
+    blur_unwatched_episodes: bool = False
     followers_count: int = 0
     following_count: int = 0
     is_following: bool = False
