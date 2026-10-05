@@ -370,7 +370,425 @@ export const SettingsPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Section 3: Username */}
+        {/* Section 3: Account Privacy (Public vs Private) */}
+        <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.5rem' }}>
+            <h2 style={{ fontSize: '1.2rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
+              <Lock size={20} color="var(--accent-primary)" />
+              {isEs ? 'Privacidad del Perfil' : 'Profile Privacy'}
+            </h2>
+            <span
+              style={{
+                fontSize: '0.78rem',
+                padding: '0.2rem 0.65rem',
+                borderRadius: '12px',
+                background: isPrivate ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)',
+                color: isPrivate ? '#ef4444' : '#10b981',
+                border: `1px solid ${isPrivate ? 'rgba(239, 68, 68, 0.3)' : 'rgba(16, 185, 129, 0.3)'}`,
+                fontWeight: 700
+              }}
+            >
+              {isPrivate ? (isEs ? 'Cuenta Privada' : 'Private Account') : (isEs ? 'Cuenta Pública' : 'Public Account')}
+            </span>
+          </div>
+
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1.25rem', lineHeight: 1.5 }}>
+            {isEs
+              ? 'Controla quién puede ver tu actividad cultural, listas y perfil. En modo privado, los usuarios deberán enviarte una solicitud de seguimiento que deberás aprobar.'
+              : 'Control who can view your cultural activity, lists, and profile. When private, users must send you a follow request that you can approve.'}
+          </p>
+
+          {privacyMsg && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                padding: '0.75rem 1rem',
+                borderRadius: '8px',
+                marginBottom: '1rem',
+                fontSize: '0.85rem',
+                background: privacyMsg.type === 'success' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                color: privacyMsg.type === 'success' ? '#10b981' : '#ef4444',
+                border: `1px solid ${privacyMsg.type === 'success' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`,
+              }}
+            >
+              {privacyMsg.type === 'success' ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
+              <span>{privacyMsg.text}</span>
+            </div>
+          )}
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
+            {/* Public Option */}
+            <div
+              onClick={() => !privacyLoading && handleTogglePrivacy(false)}
+              style={{
+                padding: '1.25rem',
+                borderRadius: '12px',
+                border: !isPrivate ? '2px solid var(--accent-primary)' : '1px solid var(--border-color)',
+                background: !isPrivate ? 'var(--border-glow)' : 'var(--bg-secondary)',
+                cursor: privacyLoading ? 'not-allowed' : 'pointer',
+                transition: 'all 0.2s ease',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.5rem'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontWeight: 700, fontSize: '1rem', color: !isPrivate ? 'var(--accent-primary)' : 'var(--text-primary)' }}>
+                  {isEs ? 'Perfil Público (Recomendado)' : 'Public Profile (Recommended)'}
+                </span>
+                {!isPrivate && <CheckCircle size={18} color="var(--accent-primary)" />}
+              </div>
+              <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                {isEs
+                  ? 'Cualquiera puede seguirte con 1 clic, ver tus guías públicas y tu actividad aparecerá en el feed de Descubrir.'
+                  : 'Anyone can follow you in 1 click, view your public guides, and your updates can appear in Discover.'}
+              </p>
+            </div>
+
+            {/* Private Option */}
+            <div
+              onClick={() => !privacyLoading && handleTogglePrivacy(true)}
+              style={{
+                padding: '1.25rem',
+                borderRadius: '12px',
+                border: isPrivate ? '2px solid var(--accent-primary)' : '1px solid var(--border-color)',
+                background: isPrivate ? 'var(--border-glow)' : 'var(--bg-secondary)',
+                cursor: privacyLoading ? 'not-allowed' : 'pointer',
+                transition: 'all 0.2s ease',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.5rem'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontWeight: 700, fontSize: '1rem', color: isPrivate ? 'var(--accent-primary)' : 'var(--text-primary)' }}>
+                  {isEs ? 'Perfil Privado' : 'Private Profile'}
+                </span>
+                {isPrivate && <CheckCircle size={18} color="var(--accent-primary)" />}
+              </div>
+              <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                {isEs
+                  ? 'Solo tus seguidores aprobados pueden ver tus listas y actividad. Quienes no te sigan deberán enviar solicitud.'
+                  : 'Only approved followers can view your lists and activity. Strangers must request to follow you.'}
+              </p>
+              <div style={{ marginTop: '0.25rem', paddingTop: '0.5rem', borderTop: '1px solid var(--border-color)', fontSize: '0.78rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                <Eye size={13} style={{ flexShrink: 0 }} />
+                <span>
+                  {isEs
+                    ? 'Tus reseñas y comentarios en espacios públicos seguirán siendo visibles.'
+                    : 'Your reviews and comments in public spaces will remain visible.'}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Section 4: Anti-spoilers (Blur unwatched episodes) */}
+        <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+              <h2 style={{ fontSize: '1.2rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
+                <EyeOff size={20} color="var(--accent-primary)" />
+                {isEs ? 'Anti-Spoilers: Desenfocar Episodios' : 'Anti-Spoilers: Blur Episodes'}
+              </h2>
+              <span
+                style={{
+                  fontSize: '0.65rem',
+                  background: 'rgba(245, 158, 11, 0.15)',
+                  color: '#f59e0b',
+                  padding: '0.15rem 0.45rem',
+                  borderRadius: '4px',
+                  fontWeight: 700,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.25rem',
+                  border: '1px solid rgba(245, 158, 11, 0.3)'
+                }}
+              >
+                <Star size={10} fill="#f59e0b" />
+                PREMIUM
+              </span>
+            </div>
+            <span
+              style={{
+                fontSize: '0.78rem',
+                padding: '0.2rem 0.65rem',
+                borderRadius: '12px',
+                background: blurUnwatched ? 'rgba(16, 185, 129, 0.15)' : 'rgba(148, 163, 184, 0.15)',
+                color: blurUnwatched ? '#10b981' : 'var(--text-muted)',
+                border: `1px solid ${blurUnwatched ? 'rgba(16, 185, 129, 0.3)' : 'var(--border-color)'}`,
+                fontWeight: 700
+              }}
+            >
+              {blurUnwatched ? (isEs ? 'Activado' : 'Enabled') : (isEs ? 'Desactivado' : 'Disabled')}
+            </span>
+          </div>
+
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1.25rem', lineHeight: 1.5 }}>
+            {isEs
+              ? 'Desenfoca las portadas y miniaturas de los episodios que aún no has marcado como vistos para evitar spoilers. Al hacer clic sobre una portada desenfocada podrás revelarla individualmente.'
+              : 'Blurs the posters and thumbnails of episodes you have not yet marked as watched to prevent spoilers. Clicking any blurred poster will reveal it individually.'}
+          </p>
+
+          {blurMsg && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                padding: '0.75rem 1rem',
+                borderRadius: '8px',
+                marginBottom: '1rem',
+                fontSize: '0.85rem',
+                background: blurMsg.type === 'success' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                color: blurMsg.type === 'success' ? '#10b981' : '#ef4444',
+                border: `1px solid ${blurMsg.type === 'success' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`,
+              }}
+            >
+              {blurMsg.type === 'success' ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
+              <span>{blurMsg.text}</span>
+            </div>
+          )}
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
+            {/* Enabled Option */}
+            <div
+              onClick={() => !blurLoading && handleToggleBlurUnwatched(true)}
+              style={{
+                padding: '1.25rem',
+                borderRadius: '12px',
+                border: blurUnwatched ? '2px solid var(--accent-primary)' : '1px solid var(--border-color)',
+                background: blurUnwatched ? 'var(--border-glow)' : 'var(--bg-secondary)',
+                cursor: blurLoading ? 'not-allowed' : 'pointer',
+                transition: 'all 0.2s ease',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.5rem'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontWeight: 700, fontSize: '1rem', color: blurUnwatched ? 'var(--accent-primary)' : 'var(--text-primary)' }}>
+                  {isEs ? 'Desenfocar miniaturas' : 'Blur thumbnails'}
+                </span>
+                {blurUnwatched && <CheckCircle size={18} color="var(--accent-primary)" />}
+              </div>
+              <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                {isEs
+                  ? 'Aplica un filtro de desenfoque a todos los episodios no vistos. Haz clic para revelar cuando quieras.'
+                  : 'Applies a blur filter to all unwatched episodes. Click any cover to reveal it whenever you want.'}
+              </p>
+            </div>
+
+            {/* Disabled Option */}
+            <div
+              onClick={() => !blurLoading && handleToggleBlurUnwatched(false)}
+              style={{
+                padding: '1.25rem',
+                borderRadius: '12px',
+                border: !blurUnwatched ? '2px solid var(--accent-primary)' : '1px solid var(--border-color)',
+                background: !blurUnwatched ? 'var(--border-glow)' : 'var(--bg-secondary)',
+                cursor: blurLoading ? 'not-allowed' : 'pointer',
+                transition: 'all 0.2s ease',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.5rem'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontWeight: 700, fontSize: '1rem', color: !blurUnwatched ? 'var(--accent-primary)' : 'var(--text-primary)' }}>
+                  {isEs ? 'Mostrar nítidas (Predeterminado)' : 'Show sharp (Default)'}
+                </span>
+                {!blurUnwatched && <CheckCircle size={18} color="var(--accent-primary)" />}
+              </div>
+              <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                {isEs
+                  ? 'Todas las miniaturas de los episodios se verán con normalidad sin importar si fueron vistos o no.'
+                  : 'All episode thumbnails are displayed normally regardless of whether they have been watched.'}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Section 5: Membership & Subscription Management */}
+        <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', marginBottom: '1rem' }}>
+            <div style={{ flex: 1, minWidth: '260px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                <h2 style={{ fontSize: '1.2rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0, color: 'var(--text-primary)' }}>
+                  <Star size={20} color="#f59e0b" fill="#f59e0b" />
+                  {isEs ? 'Membresía Pathd Premium' : 'Pathd Premium Membership'}
+                </h2>
+                {user?.is_admin ? (
+                  <span
+                    style={{
+                      fontSize: '0.75rem',
+                      padding: '0.2rem 0.55rem',
+                      borderRadius: '6px',
+                      background: 'rgba(239, 68, 68, 0.15)',
+                      color: '#ef4444',
+                      border: '1px solid rgba(239, 68, 68, 0.3)',
+                      fontWeight: 700
+                    }}
+                  >
+                    {isEs ? 'Acceso Administrador' : 'Administrator Access'}
+                  </span>
+                ) : user?.is_vip ? (
+                  <span
+                    style={{
+                      fontSize: '0.75rem',
+                      padding: '0.2rem 0.55rem',
+                      borderRadius: '6px',
+                      background: 'rgba(168, 85, 247, 0.15)',
+                      color: '#a855f7',
+                      border: '1px solid rgba(168, 85, 247, 0.3)',
+                      fontWeight: 700
+                    }}
+                  >
+                    {isEs ? 'Invitado VIP' : 'VIP Guest'}
+                  </span>
+                ) : user?.has_active_subscription ? (
+                  <span
+                    style={{
+                      fontSize: '0.75rem',
+                      padding: '0.2rem 0.55rem',
+                      borderRadius: '6px',
+                      background: 'rgba(16, 185, 129, 0.15)',
+                      color: '#10b981',
+                      border: '1px solid rgba(16, 185, 129, 0.3)',
+                      fontWeight: 600
+                    }}
+                  >
+                    {isEs ? 'Activa' : 'Active'}
+                  </span>
+                ) : user?.is_pro_cancelled ? (
+                  <span
+                    style={{
+                      fontSize: '0.75rem',
+                      padding: '0.2rem 0.55rem',
+                      borderRadius: '6px',
+                      background: 'rgba(239, 68, 68, 0.15)',
+                      color: '#ef4444',
+                      border: '1px solid rgba(239, 68, 68, 0.3)',
+                      fontWeight: 600
+                    }}
+                  >
+                    {isEs ? 'Renovación Cancelada' : 'Renewal Cancelled'}
+                  </span>
+                ) : user?.is_pro ? (
+                  <span
+                    style={{
+                      fontSize: '0.75rem',
+                      padding: '0.2rem 0.55rem',
+                      borderRadius: '6px',
+                      background: 'rgba(245, 158, 11, 0.15)',
+                      color: '#f59e0b',
+                      border: '1px solid rgba(245, 158, 11, 0.3)',
+                      fontWeight: 600
+                    }}
+                  >
+                    {isEs ? 'Acceso de Regalo' : 'Gifted Access'}
+                  </span>
+                ) : (
+                  <span
+                    style={{
+                      fontSize: '0.75rem',
+                      padding: '0.2rem 0.55rem',
+                      borderRadius: '6px',
+                      background: 'rgba(148, 163, 184, 0.15)',
+                      color: 'var(--text-muted)',
+                      border: '1px solid var(--border-color)',
+                      fontWeight: 600
+                    }}
+                  >
+                    {isEs ? 'Plan Gratuito' : 'Free Plan'}
+                  </span>
+                )}
+              </div>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: '0.4rem 0 0', lineHeight: 1.45 }}>
+                {user?.is_admin
+                  ? (isEs
+                    ? 'Tienes acceso vitalicio e ilimitado a todas las funcionalidades y beneficios de Pathd Premium como Administrador de la plataforma.'
+                    : 'You have lifetime unlimited access to all Pathd Premium features and benefits as a platform Administrator.')
+                  : user?.is_vip
+                  ? (isEs
+                    ? 'Tienes acceso exclusivo e ilimitado a todas las funciones Premium de Pathd como invitado de honor.'
+                    : 'You have exclusive unlimited access to all Pathd Premium features as an honored guest.')
+                  : user?.has_active_subscription
+                  ? (isEs
+                    ? 'Tu suscripción recurrente está activa. Puedes cancelar la renovación automática en cualquier momento.'
+                    : 'Your recurring subscription is active. You can cancel auto-renewal at any time.')
+                  : user?.is_pro_cancelled
+                  ? (isEs
+                    ? 'La renovación automática está desactivada. Mantienes el acceso Premium hasta el final de tu período y no se te cobrará ningún cargo futuro.'
+                    : 'Auto-renewal is turned off. You keep full Premium access until the end of your billing period and will not be charged again.')
+                  : user?.is_pro
+                  ? (isEs
+                    ? `Tienes acceso de regalo activo hasta el ${user?.pro_expires_at ? new Date(user.pro_expires_at).toLocaleDateString() : 'fin del período'}. Puedes activar tu suscripción ahora y el primer cobro se realizará recién al vencer el regalo.`
+                    : `You have gifted access active until ${user?.pro_expires_at ? new Date(user.pro_expires_at).toLocaleDateString() : 'end of period'}. You can subscribe now and your first billing will occur only after the gift expires.`)
+                  : (isEs
+                    ? 'Disfruta de la mejor experiencia: desenfoque anti-spoilers en episodios, temas y personalización exclusiva de perfil, insignia dorada de distinción y apoyo directo al desarrollo de Pathd.'
+                    : 'Enjoy the best experience: anti-spoiler blur on episodes, exclusive profile themes and customization, distinctive gold badge, and direct support to Pathd development.')}
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
+              {user?.has_active_subscription && !user?.is_pro_cancelled && !user?.is_admin && !user?.is_vip && (
+                <button
+                  type="button"
+                  disabled={cancelSubLoading}
+                  onClick={handleCancelSubscription}
+                  className="btn-secondary"
+                  style={{ color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.4)', fontSize: '0.85rem', padding: '0.55rem 1.1rem' }}
+                >
+                  {cancelSubLoading ? (isEs ? 'Cancelando...' : 'Cancelling...') : (isEs ? 'Cancelar Suscripción' : 'Cancel Subscription')}
+                </button>
+              )}
+
+              {(!user?.is_pro || (!user?.has_active_subscription && !user?.is_admin && !user?.is_vip)) && (
+                <button
+                  type="button"
+                  onClick={() => setShowProModal(true)}
+                  className="btn-primary"
+                  style={{
+                    background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                    border: 'none',
+                    color: '#fff',
+                    fontSize: '0.85rem',
+                    padding: '0.55rem 1.1rem',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.4rem',
+                    boxShadow: '0 2px 10px rgba(245, 158, 11, 0.3)',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <Crown size={15} />
+                  {user?.is_pro
+                    ? (isEs ? 'Mantener suscripción ($2.99/mes)' : 'Keep subscription ($2.99/mo)')
+                    : (isEs ? 'Mejorar a Premium ($2.99/mes)' : 'Upgrade to Premium ($2.99/mo)')}
+                </button>
+              )}
+            </div>
+          </div>
+
+          {cancelSubMsg && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', border: '1px solid #10b981', padding: '0.75rem 1rem', borderRadius: 10, fontSize: '0.85rem' }}>
+              <CheckCircle size={16} />
+              <span>{cancelSubMsg}</span>
+            </div>
+          )}
+
+          {cancelSubError && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', border: '1px solid #ef4444', padding: '0.75rem 1rem', borderRadius: 10, fontSize: '0.85rem' }}>
+              <AlertCircle size={16} />
+              <span>{cancelSubError}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Section 6: Username */}
         <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px' }}>
           <h2 style={{ fontSize: '1.2rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: 0 }}>
             <User size={20} color="var(--accent-primary)" />
@@ -423,7 +841,7 @@ export const SettingsPage: React.FC = () => {
           </form>
         </div>
 
-        {/* Section 4: Password Change */}
+        {/* Section 7: Password Change */}
         <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px' }}>
           <h2 style={{ fontSize: '1.2rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: 0 }}>
             <Lock size={20} color="var(--accent-primary)" />
@@ -573,370 +991,7 @@ export const SettingsPage: React.FC = () => {
           </form>
         </div>
 
-        {/* Section 5: Membership & Subscription Management */}
-        {user?.is_pro && !user?.is_admin && !user?.is_vip && (
-          <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', marginBottom: '1rem' }}>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                  <h2 style={{ fontSize: '1.2rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0, color: 'var(--text-primary)' }}>
-                    <Star size={20} color="#f59e0b" fill="#f59e0b" />
-                    {isEs ? 'Membresía Pathd Premium' : 'Pathd Premium Membership'}
-                  </h2>
-                  {user?.has_active_subscription ? (
-                    <span
-                      style={{
-                        fontSize: '0.75rem',
-                        padding: '0.2rem 0.55rem',
-                        borderRadius: '6px',
-                        background: 'rgba(16, 185, 129, 0.15)',
-                        color: '#10b981',
-                        border: '1px solid rgba(16, 185, 129, 0.3)',
-                        fontWeight: 600
-                      }}
-                    >
-                      {isEs ? 'Activa' : 'Active'}
-                    </span>
-                  ) : user?.is_pro_cancelled ? (
-                    <span
-                      style={{
-                        fontSize: '0.75rem',
-                        padding: '0.2rem 0.55rem',
-                        borderRadius: '6px',
-                        background: 'rgba(239, 68, 68, 0.15)',
-                        color: '#ef4444',
-                        border: '1px solid rgba(239, 68, 68, 0.3)',
-                        fontWeight: 600
-                      }}
-                    >
-                      {isEs ? 'Renovación Cancelada' : 'Renewal Cancelled'}
-                    </span>
-                  ) : (
-                    <span
-                      style={{
-                        fontSize: '0.75rem',
-                        padding: '0.2rem 0.55rem',
-                        borderRadius: '6px',
-                        background: 'rgba(245, 158, 11, 0.15)',
-                        color: '#f59e0b',
-                        border: '1px solid rgba(245, 158, 11, 0.3)',
-                        fontWeight: 600
-                      }}
-                    >
-                      {isEs ? 'Acceso de Regalo' : 'Gifted Access'}
-                    </span>
-                  )}
-                </div>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: '0.4rem 0 0' }}>
-                  {user?.has_active_subscription
-                    ? (isEs
-                      ? 'Tu suscripción recurrente está activa. Puedes cancelar la renovación automática en cualquier momento.'
-                      : 'Your recurring subscription is active. You can cancel auto-renewal at any time.')
-                    : user?.is_pro_cancelled
-                    ? (isEs
-                      ? 'La renovación automática está desactivada. Mantienes el acceso Premium hasta el final de tu período y no se te cobrará ningún cargo futuro.'
-                      : 'Auto-renewal is turned off. You keep full Premium access until the end of your billing period and will not be charged again.')
-                    : (isEs
-                      ? `Tienes acceso de regalo activo hasta el ${user?.pro_expires_at ? new Date(user.pro_expires_at).toLocaleDateString() : 'fin del período'}. Puedes activar tu suscripción ahora y el primer cobro se realizará recién al vencer el regalo.`
-                      : `You have gifted access active until ${user?.pro_expires_at ? new Date(user.pro_expires_at).toLocaleDateString() : 'end of period'}. You can subscribe now and your first billing will occur only after the gift expires.`)}
-                </p>
-              </div>
-
-              <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                {user?.has_active_subscription && !user?.is_pro_cancelled && (
-                  <button
-                    type="button"
-                    disabled={cancelSubLoading}
-                    onClick={handleCancelSubscription}
-                    className="btn-secondary"
-                    style={{ color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.4)', fontSize: '0.85rem', padding: '0.55rem 1.1rem' }}
-                  >
-                    {cancelSubLoading ? (isEs ? 'Cancelando...' : 'Cancelling...') : (isEs ? 'Cancelar Suscripción' : 'Cancel Subscription')}
-                  </button>
-                )}
-
-                {!user?.has_active_subscription && (
-                  <button
-                    type="button"
-                    onClick={() => setShowProModal(true)}
-                    className="btn-primary"
-                    style={{
-                      background: 'linear-gradient(135deg, #f59e0b, #d97706)',
-                      border: 'none',
-                      color: '#fff',
-                      fontSize: '0.85rem',
-                      padding: '0.55rem 1.1rem',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.4rem',
-                      boxShadow: '0 2px 10px rgba(245, 158, 11, 0.3)'
-                    }}
-                  >
-                    <Crown size={15} />
-                    {isEs ? 'Mantener suscripción ($2.99/mes)' : 'Keep subscription ($2.99/mo)'}
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {cancelSubMsg && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', border: '1px solid #10b981', padding: '0.75rem 1rem', borderRadius: 10, fontSize: '0.85rem' }}>
-                <CheckCircle size={16} />
-                <span>{cancelSubMsg}</span>
-              </div>
-            )}
-
-            {cancelSubError && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', border: '1px solid #ef4444', padding: '0.75rem 1rem', borderRadius: 10, fontSize: '0.85rem' }}>
-                <AlertCircle size={16} />
-                <span>{cancelSubError}</span>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Section: Account Privacy (Public vs Private) */}
-        <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.5rem' }}>
-            <h2 style={{ fontSize: '1.2rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
-              <Lock size={20} color="var(--accent-primary)" />
-              {isEs ? 'Privacidad del Perfil' : 'Profile Privacy'}
-            </h2>
-            <span
-              style={{
-                fontSize: '0.78rem',
-                padding: '0.2rem 0.65rem',
-                borderRadius: '12px',
-                background: isPrivate ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)',
-                color: isPrivate ? '#ef4444' : '#10b981',
-                border: `1px solid ${isPrivate ? 'rgba(239, 68, 68, 0.3)' : 'rgba(16, 185, 129, 0.3)'}`,
-                fontWeight: 700
-              }}
-            >
-              {isPrivate ? (isEs ? 'Cuenta Privada' : 'Private Account') : (isEs ? 'Cuenta Pública' : 'Public Account')}
-            </span>
-          </div>
-
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1.25rem', lineHeight: 1.5 }}>
-            {isEs
-              ? 'Controla quién puede ver tu actividad cultural, listas y perfil. En modo privado, los usuarios deberán enviarte una solicitud de seguimiento que deberás aprobar.'
-              : 'Control who can view your cultural activity, lists, and profile. When private, users must send you a follow request that you can approve.'}
-          </p>
-
-          {privacyMsg && (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                padding: '0.75rem 1rem',
-                borderRadius: '8px',
-                marginBottom: '1rem',
-                fontSize: '0.85rem',
-                background: privacyMsg.type === 'success' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                color: privacyMsg.type === 'success' ? '#10b981' : '#ef4444',
-                border: `1px solid ${privacyMsg.type === 'success' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`,
-              }}
-            >
-              {privacyMsg.type === 'success' ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
-              <span>{privacyMsg.text}</span>
-            </div>
-          )}
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
-            {/* Public Option */}
-            <div
-              onClick={() => !privacyLoading && handleTogglePrivacy(false)}
-              style={{
-                padding: '1.25rem',
-                borderRadius: '12px',
-                border: !isPrivate ? '2px solid var(--accent-primary)' : '1px solid var(--border-color)',
-                background: !isPrivate ? 'var(--border-glow)' : 'var(--bg-secondary)',
-                cursor: privacyLoading ? 'not-allowed' : 'pointer',
-                transition: 'all 0.2s ease',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '0.5rem'
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ fontWeight: 700, fontSize: '1rem', color: !isPrivate ? 'var(--accent-primary)' : 'var(--text-primary)' }}>
-                  {isEs ? 'Perfil Público (Recomendado)' : 'Public Profile (Recommended)'}
-                </span>
-                {!isPrivate && <CheckCircle size={18} color="var(--accent-primary)" />}
-              </div>
-              <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
-                {isEs
-                  ? 'Cualquiera puede seguirte con 1 clic, ver tus guías públicas y tu actividad aparecerá en el feed de Descubrir.'
-                  : 'Anyone can follow you in 1 click, view your public guides, and your updates can appear in Discover.'}
-              </p>
-            </div>
-
-            {/* Private Option */}
-            <div
-              onClick={() => !privacyLoading && handleTogglePrivacy(true)}
-              style={{
-                padding: '1.25rem',
-                borderRadius: '12px',
-                border: isPrivate ? '2px solid var(--accent-primary)' : '1px solid var(--border-color)',
-                background: isPrivate ? 'var(--border-glow)' : 'var(--bg-secondary)',
-                cursor: privacyLoading ? 'not-allowed' : 'pointer',
-                transition: 'all 0.2s ease',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '0.5rem'
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ fontWeight: 700, fontSize: '1rem', color: isPrivate ? 'var(--accent-primary)' : 'var(--text-primary)' }}>
-                  {isEs ? 'Perfil Privado' : 'Private Profile'}
-                </span>
-                {isPrivate && <CheckCircle size={18} color="var(--accent-primary)" />}
-              </div>
-              <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
-                {isEs
-                  ? 'Solo tus seguidores aprobados pueden ver tus listas y actividad. Quienes no te sigan deberán enviar solicitud.'
-                  : 'Only approved followers can view your lists and activity. Strangers must request to follow you.'}
-              </p>
-              <div style={{ marginTop: '0.25rem', paddingTop: '0.5rem', borderTop: '1px solid var(--border-color)', fontSize: '0.78rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                <Eye size={13} style={{ flexShrink: 0 }} />
-                <span>
-                  {isEs
-                    ? 'Tus reseñas y comentarios en espacios públicos seguirán siendo visibles.'
-                    : 'Your reviews and comments in public spaces will remain visible.'}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Section: Anti-spoilers (Blur unwatched episodes) */}
-        <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.5rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-              <h2 style={{ fontSize: '1.2rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
-                <EyeOff size={20} color="var(--accent-primary)" />
-                {isEs ? 'Anti-Spoilers: Desenfocar Episodios' : 'Anti-Spoilers: Blur Episodes'}
-              </h2>
-              <span
-                style={{
-                  fontSize: '0.65rem',
-                  background: 'rgba(245, 158, 11, 0.15)',
-                  color: '#f59e0b',
-                  padding: '0.15rem 0.45rem',
-                  borderRadius: '4px',
-                  fontWeight: 700,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.25rem',
-                  border: '1px solid rgba(245, 158, 11, 0.3)'
-                }}
-              >
-                <Star size={10} fill="#f59e0b" />
-                PREMIUM
-              </span>
-            </div>
-            <span
-              style={{
-                fontSize: '0.78rem',
-                padding: '0.2rem 0.65rem',
-                borderRadius: '12px',
-                background: blurUnwatched ? 'rgba(16, 185, 129, 0.15)' : 'rgba(148, 163, 184, 0.15)',
-                color: blurUnwatched ? '#10b981' : 'var(--text-muted)',
-                border: `1px solid ${blurUnwatched ? 'rgba(16, 185, 129, 0.3)' : 'var(--border-color)'}`,
-                fontWeight: 700
-              }}
-            >
-              {blurUnwatched ? (isEs ? 'Activado' : 'Enabled') : (isEs ? 'Desactivado' : 'Disabled')}
-            </span>
-          </div>
-
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1.25rem', lineHeight: 1.5 }}>
-            {isEs
-              ? 'Desenfoca las portadas y miniaturas de los episodios que aún no has marcado como vistos para evitar spoilers. Al hacer clic sobre una portada desenfocada podrás revelarla individualmente.'
-              : 'Blurs the posters and thumbnails of episodes you have not yet marked as watched to prevent spoilers. Clicking any blurred poster will reveal it individually.'}
-          </p>
-
-          {blurMsg && (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                padding: '0.75rem 1rem',
-                borderRadius: '8px',
-                marginBottom: '1rem',
-                fontSize: '0.85rem',
-                background: blurMsg.type === 'success' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                color: blurMsg.type === 'success' ? '#10b981' : '#ef4444',
-                border: `1px solid ${blurMsg.type === 'success' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`,
-              }}
-            >
-              {blurMsg.type === 'success' ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
-              <span>{blurMsg.text}</span>
-            </div>
-          )}
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
-            {/* Enabled Option */}
-            <div
-              onClick={() => !blurLoading && handleToggleBlurUnwatched(true)}
-              style={{
-                padding: '1.25rem',
-                borderRadius: '12px',
-                border: blurUnwatched ? '2px solid var(--accent-primary)' : '1px solid var(--border-color)',
-                background: blurUnwatched ? 'var(--border-glow)' : 'var(--bg-secondary)',
-                cursor: blurLoading ? 'not-allowed' : 'pointer',
-                transition: 'all 0.2s ease',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '0.5rem'
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ fontWeight: 700, fontSize: '1rem', color: blurUnwatched ? 'var(--accent-primary)' : 'var(--text-primary)' }}>
-                  {isEs ? 'Desenfocar miniaturas' : 'Blur thumbnails'}
-                </span>
-                {blurUnwatched && <CheckCircle size={18} color="var(--accent-primary)" />}
-              </div>
-              <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
-                {isEs
-                  ? 'Aplica un filtro de desenfoque a todos los episodios no vistos. Haz clic para revelar cuando quieras.'
-                  : 'Applies a blur filter to all unwatched episodes. Click any cover to reveal it whenever you want.'}
-              </p>
-            </div>
-
-            {/* Disabled Option */}
-            <div
-              onClick={() => !blurLoading && handleToggleBlurUnwatched(false)}
-              style={{
-                padding: '1.25rem',
-                borderRadius: '12px',
-                border: !blurUnwatched ? '2px solid var(--accent-primary)' : '1px solid var(--border-color)',
-                background: !blurUnwatched ? 'var(--border-glow)' : 'var(--bg-secondary)',
-                cursor: blurLoading ? 'not-allowed' : 'pointer',
-                transition: 'all 0.2s ease',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '0.5rem'
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ fontWeight: 700, fontSize: '1rem', color: !blurUnwatched ? 'var(--accent-primary)' : 'var(--text-primary)' }}>
-                  {isEs ? 'Mostrar nítidas (Predeterminado)' : 'Show sharp (Default)'}
-                </span>
-                {!blurUnwatched && <CheckCircle size={18} color="var(--accent-primary)" />}
-              </div>
-              <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
-                {isEs
-                  ? 'Todas las miniaturas de los episodios se verán con normalidad sin importar si fueron vistos o no.'
-                  : 'All episode thumbnails are displayed normally regardless of whether they have been watched.'}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Section 6: Legal & Policies */}
+        {/* Section 8: Legal & Policies */}
         <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px' }}>
           <h2 style={{ fontSize: '1.2rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: 0 }}>
             <FileText size={20} color="var(--accent-primary)" />
@@ -965,7 +1020,7 @@ export const SettingsPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Section 7: Danger Zone (Delete Account) */}
+        {/* Section 9: Danger Zone (Delete Account) */}
         <div
           className="glass-card"
           style={{

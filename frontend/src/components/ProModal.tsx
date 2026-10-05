@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { useTranslation } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
-import { Star, Check, X, Palette, Lock, Crown, Image as ImageIcon, RotateCcw } from 'lucide-react';
+import { Star, Check, X, Palette, Lock, Crown, Image as ImageIcon, RotateCcw, EyeOff } from 'lucide-react';
 import { apiClient } from '../api/client';
 
 
@@ -157,7 +157,24 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
             </div>
           </div>
 
-          {/* Benefit 1: 10 Favorites per category */}
+          {/* Benefit 1: Anti-Spoilers (Blur unwatched episodes) */}
+          <div style={{ display: 'flex', gap: '0.85rem', alignItems: 'flex-start' }}>
+            <div style={{ background: 'rgba(245, 158, 11, 0.15)', padding: '0.45rem', borderRadius: '8px', color: '#f59e0b', flexShrink: 0 }}>
+              <EyeOff size={18} />
+            </div>
+            <div>
+              <h4 style={{ margin: '0 0 0.15rem 0', fontSize: '0.92rem', fontWeight: 600 }}>
+                {isEs ? 'Protección Anti-Spoilers' : 'Anti-Spoiler Protection'}
+              </h4>
+              <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.35 }}>
+                {isEs
+                  ? 'Desenfoca automáticamente portadas y miniaturas de episodios no vistos para evitar spoilers mientras exploras tus series y animes. Revela con 1 clic cuando quieras.'
+                  : 'Automatically blurs posters and thumbnails of unwatched episodes to prevent spoilers while browsing your shows and anime. Reveal with 1 click anytime.'}
+              </p>
+            </div>
+          </div>
+
+          {/* Benefit 2: 10 Favorites per category */}
           <div style={{ display: 'flex', gap: '0.85rem', alignItems: 'flex-start' }}>
             <div style={{ background: 'rgba(245, 158, 11, 0.15)', padding: '0.45rem', borderRadius: '8px', color: '#f59e0b', flexShrink: 0 }}>
               <Star size={18} />
