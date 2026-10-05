@@ -37,6 +37,7 @@ import { initGlobalPrefetch } from './utils/prefetch';
 import { ItemRouteModal } from './components/ItemRouteModal';
 import { PostRouteModal } from './components/PostRouteModal';
 import { MusicRouteModal } from './components/MusicRouteModal';
+import { PremiumRouteModal } from './components/PremiumRouteModal';
 import React, { useEffect } from 'react';
 
 function AppContent() {
@@ -110,6 +111,30 @@ function AppContent() {
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route path="/terms" element={<TermsOfService />} />
+            <Route
+              path="/premium"
+              element={
+                isAuthenticated ? (
+                  <Home />
+                ) : isLoading && hasToken ? (
+                  <PathdLoader fullScreen />
+                ) : (
+                  <Landing />
+                )
+              }
+            />
+            <Route
+              path="/pro"
+              element={
+                isAuthenticated ? (
+                  <Home />
+                ) : isLoading && hasToken ? (
+                  <PathdLoader fullScreen />
+                ) : (
+                  <Landing />
+                )
+              }
+            />
 
             
             {/* Authenticated Routes */}
@@ -270,6 +295,7 @@ function AppContent() {
             </Routes>
           )}
         </main>
+        <PremiumRouteModal />
         <RightSidebarAd />
         <CookieBanner />
       </div>

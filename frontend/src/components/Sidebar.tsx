@@ -217,7 +217,7 @@ export const Sidebar: React.FC = () => {
           <>
             {user && !user.is_pro && (
               <button
-                onClick={() => setShowProModal(true)}
+                onClick={() => navigate('/premium', { state: { backgroundLocation: location } })}
                 className="btn-primary"
                 style={{
                   padding: '0.5rem 1rem',
@@ -236,7 +236,6 @@ export const Sidebar: React.FC = () => {
               >
                 <Star size={16} fill="#fff" /> {t('navUpgradePro') || (language === 'es' ? 'Hacerse Premium' : 'Get Premium')}
               </button>
-
             )}
 
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.5rem 1rem' }}>
@@ -276,8 +275,6 @@ export const Sidebar: React.FC = () => {
           </div>
         )}
       </div>
-
-      {showProModal && <ProModal onClose={() => setShowProModal(false)} />}
       
       {/* Notification Flyout */}
       <NotificationFlyout
