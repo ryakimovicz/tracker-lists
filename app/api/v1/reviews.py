@@ -380,10 +380,10 @@ def create_or_update_review(
         db.add(reply_review)
 
         # Notify parent review author if not self
-        if parent_review.user_id != current_user.id:
+        if parent_rev.user_id != current_user.id:
             raw_snippet = str(review_in.content or '')[:60].replace('"', '')
             reply_notif = Notification(
-                recipient_id=parent_review.user_id,
+                recipient_id=parent_rev.user_id,
                 actor_id=current_user.id,
                 notification_type="comment_reply",
                 entity_type="item",
@@ -399,7 +399,7 @@ def create_or_update_review(
                 mentioned_users = db.query(User).filter(User.username.in_(list(mentioned_usernames))).all()
                 raw_snippet = str(review_in.content)[:60].replace('"', '')
                 for m_user in mentioned_users:
-                    if m_user.id != current_user.id and m_user.id != parent_review.user_id:
+                    if m_user.id != current_user.id and m_user.id != parent_rev.user_id:
                         mention_notif = Notification(
                             recipient_id=m_user.id,
                             actor_id=current_user.id,

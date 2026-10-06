@@ -4001,11 +4001,16 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     if (!selectedItem || (!hasText && !hasMedia) || isSubmittingReply) return;
     setIsSubmittingReply(true);
     try {
+      const resolvedTitle = selectedItem.title || null;
+      const resolvedImage = selectedItem.image_url || selectedItem.poster_path || selectedItem.parent_series?.image_url || null;
+
       const res = await apiClient.post(`/reviews/${selectedItem.item_type}/${selectedItem.external_id}`, {
         content: customText.trim() || null,
         media_url: replyMedia?.url || null,
         media_type: replyMedia?.type || null,
-        parent_id: rootParentId
+        parent_id: rootParentId,
+        item_title: resolvedTitle,
+        image_url: resolvedImage
       });
       setItemReviews(prev => [...prev, res.data]);
       setReplyText('');
