@@ -17,6 +17,7 @@ class MediaReview(Base):
     media_type = Column(String(50), nullable=True)   # gif, sticker, meme, clip
     is_edited = Column(DateTime(timezone=True), nullable=True)  # Or boolean / timestamp
     is_deleted = Column(Boolean, default=False, nullable=False)
+    is_spoiler = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 
     # Relationships

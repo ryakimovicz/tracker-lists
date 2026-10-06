@@ -686,7 +686,8 @@ export const StarRatingDisplay: React.FC<{
 const RootReviewEditor: React.FC<{
   initialRating: number;
   initialReview: string;
-  onSave: (rating: number, content: string) => void;
+  initialIsSpoiler?: boolean;
+  onSave: (rating: number, content: string, isSpoiler: boolean) => void;
   onDelete: () => void;
   hasExistingReview: boolean;
   isSaving: boolean;
@@ -697,6 +698,7 @@ const RootReviewEditor: React.FC<{
 }> = React.memo(({
   initialRating,
   initialReview,
+  initialIsSpoiler = false,
   onSave,
   onDelete,
   hasExistingReview,
@@ -709,6 +711,7 @@ const RootReviewEditor: React.FC<{
   const [rating, setRating] = useState<number>(initialRating);
   const [hoverRating, setHoverRating] = useState<number>(0);
   const [text, setText] = useState<string>(initialReview);
+  const [isSpoiler, setIsSpoiler] = useState<boolean>(initialIsSpoiler);
 
   useEffect(() => {
     setRating(initialRating);
@@ -717,6 +720,10 @@ const RootReviewEditor: React.FC<{
   useEffect(() => {
     setText(initialReview);
   }, [initialReview]);
+
+  useEffect(() => {
+    setIsSpoiler(initialIsSpoiler);
+  }, [initialIsSpoiler]);
 
   // If already published/saved, display fixed review (stars + optional text) with a single "Eliminar reseña" button
   if (hasExistingReview) {
@@ -731,6 +738,23 @@ const RootReviewEditor: React.FC<{
             <span style={{ fontSize: '0.85rem', color: '#f59e0b', fontWeight: 700 }}>
               {initialRating}
             </span>
+            {initialIsSpoiler && (
+              <span style={{
+                fontSize: '0.72rem',
+                padding: '2px 6px',
+                borderRadius: '4px',
+                background: 'rgba(239, 68, 68, 0.15)',
+                color: '#ef4444',
+                border: '1px solid rgba(239, 68, 68, 0.3)',
+                fontWeight: 600,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '3px'
+              }}>
+                <EyeOff size={11} />
+                Spoiler
+              </span>
+            )}
           </div>
 
           <button
@@ -852,7 +876,7 @@ const RootReviewEditor: React.FC<{
         )}
       </div>
 
-      {/* Show text input and Guardar button once stars are selected */}
+      {/* Show text input, spoiler checkbox and Guardar button once stars are selected */}
       {user && isItemTracked && rating > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginTop: '0.2rem' }}>
           <textarea
@@ -863,10 +887,38 @@ const RootReviewEditor: React.FC<{
             style={{ width: '100%', minHeight: '80px', padding: '0.75rem', background: 'var(--bg-secondary)', resize: 'vertical' }}
           />
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <label style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.45rem',
+              cursor: 'pointer',
+              userSelect: 'none',
+              fontSize: '0.84rem',
+              color: isSpoiler ? '#ef4444' : 'var(--text-secondary)',
+              fontWeight: isSpoiler ? 600 : 400,
+              transition: 'color 0.2s ease'
+            }}>
+              <input
+                type="checkbox"
+                checked={isSpoiler}
+                onChange={(e) => setIsSpoiler(e.target.checked)}
+                style={{
+                  cursor: 'pointer',
+                  accentColor: '#ef4444',
+                  width: '15px',
+                  height: '15px'
+                }}
+              />
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                <EyeOff size={13} />
+                {language === 'es' ? 'Contiene spoilers' : 'Contains spoilers'}
+              </span>
+            </label>
+
             <button
               type="button"
-              onClick={() => onSave(rating, text)}
+              onClick={() => onSave(rating, text, isSpoiler)}
               className="btn-primary"
               disabled={isSaving || !user || rating === 0}
               style={{ padding: '0.4rem 1.25rem', fontSize: '0.85rem', fontWeight: 600 }}
@@ -1274,6 +1326,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   const [itemReviews, setItemReviews] = useState<any[]>([]);
   const [userRating, setUserRating] = useState<number>(0);
   const [userComment, setUserComment] = useState<string>('');
+  const [userIsSpoiler, setUserIsSpoiler] = useState<boolean>(false);
+  const [revealedReviewSpoilers, setRevealedReviewSpoilers] = useState<Record<number, boolean>>({});
   const [commentMedia, setCommentMedia] = useState<SelectedKlipyMedia | null>(null);
   const [newCommentText, setNewCommentText] = useState<string>('');
   const [newCommentMedia, setNewCommentMedia] = useState<SelectedKlipyMedia | null>(null);
@@ -3302,6 +3356,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
             if (myReview) {
               setUserRating(myReview.rating || 0);
               setUserComment(myReview.content || '');
+              setUserIsSpoiler(Boolean(myReview.is_spoiler));
               if (myReview.media_url) {
                 setCommentMedia({
                   url: myReview.media_url,
@@ -3327,6 +3382,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                 if (myReview) {
                   setUserRating(myReview.rating || 0);
                   setUserComment(myReview.content || '');
+                  setUserIsSpoiler(Boolean(myReview.is_spoiler));
                   if (myReview.media_url) {
                     setCommentMedia({
                       url: myReview.media_url,
@@ -3340,6 +3396,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                 } else if (!cachedRev) {
                   setUserRating(0);
                   setUserComment('');
+                  setUserIsSpoiler(false);
                   setCommentMedia(null);
                 }
               }
@@ -3533,6 +3590,15 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       globalProgress[selectedItem.external_id]
     ))
   ));
+  const isItemConsumed = isEpisode
+    ? isEpisodeCompleted
+    : Boolean(
+        selectedItem?.status === 'completed' ||
+        selectedItem?.status === 'read' ||
+        selectedItem?.completed_at ||
+        selectedItem?.is_completed ||
+        selectedItem?.is_hundred_percent
+      );
   const isItemTracked = isEpisode ? (isComicIssue ? Boolean(selectedItem?.status || isEpisodeCompleted) : isEpisodeCompleted) : Boolean(selectedItem?.id && selectedItem?.status);
 
   const getEpisodeHeaderInfo = () => {
@@ -3654,13 +3720,15 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     !isEpisodeCoverRevealed
   );
 
-  const handleSaveReview = async (ratingVal: number, customContent?: string) => {
+  const handleSaveReview = async (ratingVal: number, customContent?: string, customIsSpoiler?: boolean) => {
     if (!selectedItem || !selectedItem.external_id || !isItemTracked) return;
     const textToSave = customContent !== undefined ? customContent : userComment;
+    const spoilerVal = customIsSpoiler !== undefined ? customIsSpoiler : userIsSpoiler;
     setIsSavingReview(true);
     // Optimistic UI update
     setUserRating(ratingVal);
     setUserComment(textToSave);
+    setUserIsSpoiler(spoilerVal);
     try {
       let resolvedItemTitle: string | null = null;
       let resolvedImageUrl: string | null = selectedItem.image_url || selectedItem.poster_path || selectedItem.parent_series?.image_url || null;
@@ -3699,6 +3767,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
         content: textToSave.trim() ? textToSave : null,
         media_url: null,
         media_type: null,
+        is_spoiler: spoilerVal,
         item_title: resolvedItemTitle,
         image_url: resolvedImageUrl,
         metadata_json: reviewMeta ? JSON.stringify(reviewMeta) : null
@@ -3731,6 +3800,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     // Optimistically reset both stars and text
     setUserRating(0);
     setUserComment('');
+    setUserIsSpoiler(false);
     setCommentMedia(null);
     try {
       if (myRootReview?.id) {
@@ -3851,6 +3921,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
         if (myReview) {
           setUserComment(myReview.content || '');
           setUserRating(myReview.rating || 0);
+          setUserIsSpoiler(Boolean(myReview.is_spoiler));
           if (myReview.media_url) {
             setCommentMedia({
               url: myReview.media_url,
@@ -5939,6 +6010,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                           <RootReviewEditor
                             initialRating={userRating}
                             initialReview={userComment}
+                            initialIsSpoiler={Boolean(myRootReview?.is_spoiler ?? userIsSpoiler)}
                             onSave={handleSaveReview}
                             onDelete={handleDeleteComment}
                             hasExistingReview={hasExistingReview}
@@ -8724,6 +8796,23 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                               </div>
 
                               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                {!rootNode.is_deleted && rootNode.is_spoiler && (
+                                  <span style={{
+                                    fontSize: '0.72rem',
+                                    padding: '2px 6px',
+                                    borderRadius: '4px',
+                                    background: 'rgba(239, 68, 68, 0.15)',
+                                    color: '#ef4444',
+                                    border: '1px solid rgba(239, 68, 68, 0.3)',
+                                    fontWeight: 600,
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '3px'
+                                  }}>
+                                    <EyeOff size={11} />
+                                    Spoiler
+                                  </span>
+                                )}
                                 {!rootNode.is_deleted && rootNode.rating && (
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                                     <StarRatingDisplay rating={rootNode.rating} size={14} gap="2px" />
@@ -8831,16 +8920,54 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                 isSubmitting={isPostingComment}
                                 language={language}
                               />
-                            ) : (
-                              <>
-                                {rootNode.content && (
-                                  <p style={{ margin: 0, fontSize: '0.92rem', color: 'var(--text-primary)', whiteSpace: 'pre-wrap', lineHeight: '1.45' }}>
-                                    {renderReviewContent(rootNode.content)}
-                                  </p>
-                                )}
-                                {renderMediaAttachment(rootNode.media_url, rootNode.media_type)}
-                              </>
-                            )}
+                              ) : (
+                                <>
+                                  {rootNode.content && (() => {
+                                    const isAuthor = user?.id === rootNode.user_id;
+                                    const isSpoilerHidden = rootNode.is_spoiler && !isAuthor && !isItemConsumed && !revealedReviewSpoilers[rootNode.id];
+
+                                    if (isSpoilerHidden) {
+                                      return (
+                                        <div
+                                          onClick={() => setRevealedReviewSpoilers(prev => ({ ...prev, [rootNode.id]: true }))}
+                                          style={{
+                                            padding: '0.65rem 0.85rem',
+                                            borderRadius: '6px',
+                                            background: 'rgba(239, 68, 68, 0.08)',
+                                            border: '1px dashed rgba(239, 68, 68, 0.35)',
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'space-between',
+                                            gap: '0.5rem',
+                                            transition: 'background 0.2s ease'
+                                          }}
+                                          onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(239, 68, 68, 0.14)')}
+                                          onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)')}
+                                          title={language === 'es' ? 'Haz clic para revelar el spoiler' : 'Click to reveal spoiler'}
+                                        >
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', color: '#ef4444', fontSize: '0.85rem', fontWeight: 600 }}>
+                                            <EyeOff size={15} />
+                                            <span>
+                                              {language === 'es' ? 'Esta reseña contiene spoilers.' : 'This review contains spoilers.'}
+                                            </span>
+                                          </div>
+                                          <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', textDecoration: 'underline' }}>
+                                            {language === 'es' ? 'Clic para ver' : 'Click to view'}
+                                          </span>
+                                        </div>
+                                      );
+                                    }
+
+                                    return (
+                                      <p style={{ margin: 0, fontSize: '0.92rem', color: 'var(--text-primary)', whiteSpace: 'pre-wrap', lineHeight: '1.45' }}>
+                                        {renderReviewContent(rootNode.content)}
+                                      </p>
+                                    );
+                                  })()}
+                                  {renderMediaAttachment(rootNode.media_url, rootNode.media_type)}
+                                </>
+                              )}
 
                             {/* Actions */}
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '0.25rem', flexWrap: 'wrap' }}>

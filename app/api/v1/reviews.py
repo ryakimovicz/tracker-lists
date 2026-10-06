@@ -132,6 +132,8 @@ def edit_review_or_reply(
         review.media_type = review_in.media_type
     if "rating" in fields_set and review.parent_id is None:
         review.rating = review_in.rating
+    if "is_spoiler" in fields_set:
+        review.is_spoiler = bool(review_in.is_spoiler)
 
     db.commit()
     db.refresh(review)
@@ -155,6 +157,8 @@ def edit_review_or_reply(
         media_type=review.media_type,
         parent_id=review.parent_id,
         is_edited=review.is_edited,
+        is_deleted=review.is_deleted,
+        is_spoiler=bool(review.is_spoiler),
         created_at=review.created_at,
         vote_count=votes_count,
         is_voted_by_me=is_voted
@@ -284,6 +288,7 @@ def get_item_reviews(
                 parent_id=r.parent_id,
                 is_edited=r.is_edited if not r.is_deleted else None,
                 is_deleted=bool(r.is_deleted),
+                is_spoiler=bool(getattr(r, 'is_spoiler', False)),
                 created_at=r.created_at,
                 vote_count=votes_count,
                 is_voted_by_me=is_voted
@@ -509,6 +514,8 @@ def create_or_update_review(
             review.media_url = review_in.media_url
         if "media_type" in fields_set:
             review.media_type = review_in.media_type
+        if "is_spoiler" in fields_set:
+            review.is_spoiler = bool(review_in.is_spoiler)
     else:
         review = MediaReview(
             user_id=current_user.id,
@@ -519,6 +526,7 @@ def create_or_update_review(
             content=review_in.content,
             media_url=review_in.media_url,
             media_type=review_in.media_type,
+            is_spoiler=bool(review_in.is_spoiler),
             created_at=datetime.now(timezone.utc)
         )
         db.add(review)
@@ -538,6 +546,8 @@ def create_or_update_review(
     if has_content:
         # Single unified event for review (contains text and optional rating)
         meta = {"rating": review_in.rating} if has_rating else {}
+        if bool(review.is_spoiler):
+            meta["is_spoiler"] = True
         if act_meta:
             meta.update(act_meta)
         ActivityService.record_activity(
@@ -588,6 +598,8 @@ def create_or_update_review(
         media_type=review.media_type,
         parent_id=review.parent_id,
         is_edited=review.is_edited,
+        is_deleted=review.is_deleted,
+        is_spoiler=bool(review.is_spoiler),
         created_at=review.created_at,
         vote_count=votes_count,
         is_voted_by_me=is_voted

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ThumbsUp, MessageSquare, MoreVertical, Trash2, Star, Film, Tv, Sparkles, Book, Gamepad2, Compass, User } from 'lucide-react';
+import { ThumbsUp, MessageSquare, MoreVertical, Trash2, Star, Film, Tv, Sparkles, Book, Gamepad2, Compass, User, EyeOff } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import { useAuth } from '../context/AuthContext';
@@ -452,6 +452,9 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
   // Reviews do not have comments in Social
   const isReviewActivity = activity.activity_type === 'item_reviewed' || activity.activity_type === 'item_rated';
   const canHaveComments = !isReviewActivity;
+
+  const isReviewSpoiler = Boolean(meta?.is_spoiler);
+  const [isSpoilerRevealed, setIsSpoilerRevealed] = useState(false);
 
   const [isCardHovered, setIsCardHovered] = useState(false);
   const [isFooterHovered, setIsFooterHovered] = useState(false);
@@ -944,6 +947,25 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
                   <>
                     <span style={{ marginRight: '0.35rem' }}>{isEs ? 'Escribió una reseña de' : 'Reviewed'}</span>
                     {titleNode}
+                    {isReviewSpoiler && (
+                      <span style={{
+                        marginLeft: '0.45rem',
+                        fontSize: '0.7rem',
+                        padding: '1px 5px',
+                        borderRadius: '4px',
+                        background: 'rgba(239, 68, 68, 0.15)',
+                        color: '#ef4444',
+                        border: '1px solid rgba(239, 68, 68, 0.3)',
+                        fontWeight: 600,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '3px',
+                        verticalAlign: 'middle'
+                      }}>
+                        <EyeOff size={10} />
+                        Spoiler
+                      </span>
+                    )}
                   </>
                 );
               }
@@ -995,26 +1017,65 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
         </div>
 
         {/* 4. Review speech bubble if user reviewed */}
-        {isReviewComment && (
-          <div
-            style={{
-              background: 'rgba(255, 255, 255, 0.04)',
-              borderLeft: '3px solid var(--accent-primary)',
-              padding: '0.65rem 0.95rem',
-              borderRadius: '0 8px 8px 0',
-              fontSize: '0.86rem',
-              color: 'var(--text-primary)',
-              lineHeight: 1.45,
-              wordBreak: 'break-word',
-              display: '-webkit-box',
-              WebkitLineClamp: 3,
-              WebkitBoxOrient: 'vertical',
-              overflow: 'hidden'
-            }}
-          >
-            {renderFormattedContentWithMentions(activity.details)}
-          </div>
-        )}
+        {isReviewComment && (() => {
+          const isSpoilerProtected = isReviewSpoiler && !isOwnActivity && !isSpoilerRevealed;
+
+          if (isSpoilerProtected) {
+            return (
+              <div
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsSpoilerRevealed(true);
+                }}
+                style={{
+                  background: 'rgba(239, 68, 68, 0.08)',
+                  borderLeft: '3px solid #ef4444',
+                  padding: '0.65rem 0.95rem',
+                  borderRadius: '0 8px 8px 0',
+                  fontSize: '0.86rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '0.5rem',
+                  transition: 'background 0.2s ease'
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(239, 68, 68, 0.14)')}
+                onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)')}
+                title={isEs ? 'Haz clic para revelar el spoiler' : 'Click to reveal spoiler'}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', color: '#ef4444', fontSize: '0.84rem', fontWeight: 600 }}>
+                  <EyeOff size={14} />
+                  <span>{isEs ? 'Reseña con spoilers.' : 'Review with spoilers.'}</span>
+                </div>
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', textDecoration: 'underline' }}>
+                  {isEs ? 'Clic para ver' : 'Click to view'}
+                </span>
+              </div>
+            );
+          }
+
+          return (
+            <div
+              style={{
+                background: 'rgba(255, 255, 255, 0.04)',
+                borderLeft: '3px solid var(--accent-primary)',
+                padding: '0.65rem 0.95rem',
+                borderRadius: '0 8px 8px 0',
+                fontSize: '0.86rem',
+                color: 'var(--text-primary)',
+                lineHeight: 1.45,
+                wordBreak: 'break-word',
+                display: '-webkit-box',
+                WebkitLineClamp: 3,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden'
+              }}
+            >
+              {renderFormattedContentWithMentions(activity.details)}
+            </div>
+          );
+        })()}
 
         {/* 5. Star rating highlight */}
         {numericRating !== null && (

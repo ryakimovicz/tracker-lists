@@ -207,6 +207,7 @@ def auto_migrate_schema():
                 ("media_url", "VARCHAR(500)"),
                 ("media_type", "VARCHAR(50)"),
                 ("is_deleted", "BOOLEAN DEFAULT FALSE"),
+                ("is_spoiler", "BOOLEAN DEFAULT FALSE"),
             ]
             for col_name, col_type in rev_cols_to_add:
                 if col_name not in existing_rev_cols:

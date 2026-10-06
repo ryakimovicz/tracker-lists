@@ -12,6 +12,7 @@ class MediaReviewCreate(BaseModel):
     item_title: Optional[str] = Field(None, description="Resolved title of the item or episode/issue")
     image_url: Optional[str] = Field(None, description="Resolved image/poster/cover URL")
     metadata_json: Optional[str] = Field(None, description="Optional JSON metadata dictionary for episodes/issues")
+    is_spoiler: Optional[bool] = Field(False, description="True if review contains spoilers")
 
 class MediaReviewResponse(BaseModel):
     id: int
@@ -27,6 +28,7 @@ class MediaReviewResponse(BaseModel):
     parent_id: Optional[int] = None
     is_edited: Optional[datetime] = None
     is_deleted: bool = False
+    is_spoiler: bool = False
     created_at: datetime
     vote_count: int = 0
     is_voted_by_me: bool = False
