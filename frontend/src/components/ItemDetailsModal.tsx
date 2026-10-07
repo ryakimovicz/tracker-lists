@@ -15,6 +15,7 @@ import { KlipyPicker } from './KlipyPicker';
 import type { SelectedKlipyMedia } from './KlipyPicker';
 import { isKlipyFavorite, toggleKlipyFavorite } from '../utils/klipyFavorites';
 import { renderFormattedContentWithMentions, AuthorUsername } from './MentionTag';
+import { ConfirmModal } from './ConfirmModal';
 
 
 
@@ -1349,6 +1350,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   const [editingReplyText, setEditingReplyText] = useState<string>('');
   const [editingReplyMedia, setEditingReplyMedia] = useState<SelectedKlipyMedia | null>(null);
   const [activeBottomTab, setActiveBottomTab] = useState<'reviews' | 'comments'>('reviews');
+  const [showCommentsSpoilerModal, setShowCommentsSpoilerModal] = useState<boolean>(false);
 
   // Klipy Picker Modal state
   const [klipyPickerTarget, setKlipyPickerTarget] = useState<'comment' | 'reply' | 'edit_reply' | 'edit_comment' | null>(null);
@@ -2275,7 +2277,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     await handleMarkConsumedAgain(true);
   };
 
-  const isAnySubModalOpen = showReconsumedModal || showSeriesScopeModal || showHundredPercentDecisionModal || showStatusChangeModal || showRemoveShelfModal || showReportMediaModal || !!episodeActionItem || !!seasonActionItem || !!pendingPreviousPrompt || !!comicIssuePrompt;
+  const isAnySubModalOpen = showCommentsSpoilerModal || showReconsumedModal || showSeriesScopeModal || showHundredPercentDecisionModal || showStatusChangeModal || showRemoveShelfModal || showReportMediaModal || !!episodeActionItem || !!seasonActionItem || !!pendingPreviousPrompt || !!comicIssuePrompt;
 
   const handleRemoveLatestConsumption = async () => {
     if (!selectedItem || !selectedItem.id) return;
@@ -8625,7 +8627,14 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
                       <button
                         type="button"
-                        onClick={() => setActiveBottomTab('comments')}
+                        onClick={() => {
+                          if (activeBottomTab === 'comments') return;
+                          if (!isItemConsumed) {
+                            setShowCommentsSpoilerModal(true);
+                          } else {
+                            setActiveBottomTab('comments');
+                          }
+                        }}
                         style={{
                           background: activeBottomTab === 'comments' ? 'var(--accent-primary)' : 'transparent',
                           color: activeBottomTab === 'comments' ? '#fff' : 'var(--text-secondary)',
@@ -11433,6 +11442,30 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                     setEditingReplyMedia(media);
                   }
                   setKlipyPickerTarget(null);
+                }}
+              />
+
+              <ConfirmModal
+                isOpen={showCommentsSpoilerModal}
+                title={language === 'es' ? 'Advertencia de Spoilers' : 'Spoiler Warning'}
+                message={
+                  language === 'es'
+                    ? 'Todavía no has consumido esta obra y los comentarios pueden contener spoilers. ¿Deseas ver los comentarios de todas formas?'
+                    : 'You haven\'t completed this item yet and comments may contain spoilers. Do you want to view the comments anyway?'
+                }
+                type="warning"
+                confirmBtnStyle={{
+                  background: '#f59e0b',
+                  boxShadow: 'none'
+                }}
+                confirmText={language === 'es' ? 'Sí, ver comentarios' : 'Yes, show comments'}
+                cancelText={language === 'es' ? 'No, permanecer aquí' : 'No, stay here'}
+                onConfirm={() => {
+                  setShowCommentsSpoilerModal(false);
+                  setActiveBottomTab('comments');
+                }}
+                onClose={() => {
+                  setShowCommentsSpoilerModal(false);
                 }}
               />
     </div>

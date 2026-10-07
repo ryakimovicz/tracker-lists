@@ -10,6 +10,7 @@ export interface ConfirmModalProps {
   confirmText?: string;
   cancelText?: string;
   type?: 'danger' | 'warning' | 'info' | 'success';
+  confirmBtnStyle?: React.CSSProperties;
   isAlert?: boolean;
   isLoading?: boolean;
   onConfirm: () => void;
@@ -23,6 +24,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   confirmText,
   cancelText,
   type = 'warning',
+  confirmBtnStyle,
   isAlert = false,
   isLoading = false,
   onConfirm,
@@ -228,6 +230,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
               justifyContent: 'center',
               gap: '0.5rem',
               ...getConfirmBtnStyle(),
+              ...confirmBtnStyle,
             }}
           >
             {isLoading ? (isEs ? 'Procesando...' : 'Processing...') : (confirmText || (isEs ? 'Confirmar' : 'Confirm'))}
