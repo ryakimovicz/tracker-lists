@@ -514,15 +514,9 @@ class ComicVineService:
                     data = json.loads(response.read().decode())
                     results = []
                     
-                    # Keywords to identify manga magazines/anthologies in Comic Vine
-                    manga_keywords = [
-                        "shonen jump", "v jump", "shueisha", "kodansha", "manga", "kirara",
-                        "yuri hime", "champion red", "action pizazz", "office you", "dengeki",
-                        "young jump", "weekly shonen", "monthly shonen", "tankobon", "jump giga"
-                    ]
-
                     # Query blocked franchises/volumes from DB
                     blocked_vol_ids = set()
+                    blocked_names = []
                     try:
                         from app.core.database import SessionLocal
                         from app.models.social import BlockedFranchise
@@ -534,7 +528,7 @@ class ComicVineService:
                                 if raw_id.isdigit():
                                     blocked_vol_ids.add(int(raw_id))
                                 if bf.name:
-                                    manga_keywords.append(bf.name.lower())
+                                    blocked_names.append(bf.name.lower())
                     except Exception as e:
                         print(f"Notice loading blocked franchises: {e}")
 
@@ -550,7 +544,7 @@ class ComicVineService:
                         raw_title = item.get("name") or ""
                         
                         full_name_check = f"{vol_name} {raw_title}".lower()
-                        if any(k in full_name_check for k in manga_keywords):
+                        if any(name in full_name_check for name in blocked_names):
                             continue
 
                         if not is_safe_media_item(f"{vol_name} #{issue_num} {raw_title}", item.get("deck") or item.get("description") or ""):
@@ -622,10 +616,6 @@ class ComicVineService:
                         if norm in seen_titles:
                             continue
 
-                        # Filter out non-western comic/manga volumes if any
-                        manga_keywords = ["shonen", "tankobon", "manga", "kodansha", "shueisha"]
-                        if any(k in norm for k in manga_keywords):
-                            continue
 
                         desc = item.get("deck") or item.get("description") or ""
                         if not is_safe_media_item(vol_name, desc):
