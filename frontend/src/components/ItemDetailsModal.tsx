@@ -3713,6 +3713,106 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     };
   };
 
+  // Sync Bottom Tab ('reviews' | 'comments') and Spoiler Warning ('?warning=spoilers') with URL
+  const initialUrlCheckDone = useRef(false);
+
+  const updateModalUrlParams = useCallback((newTab: 'reviews' | 'comments', warningOpen: boolean) => {
+    if (typeof window === 'undefined') return;
+    const currentUrl = new URL(window.location.href);
+    if (warningOpen) {
+      currentUrl.searchParams.set('warning', 'spoilers');
+      currentUrl.searchParams.delete('tab');
+    } else {
+      currentUrl.searchParams.delete('warning');
+      if (newTab === 'comments') {
+        currentUrl.searchParams.set('tab', 'comments');
+      } else {
+        currentUrl.searchParams.delete('tab');
+      }
+    }
+    const newRelative = currentUrl.pathname + (currentUrl.search || '') + (currentUrl.hash || '');
+    const currentRelative = window.location.pathname + (window.location.search || '') + (window.location.hash || '');
+    if (newRelative !== currentRelative) {
+      window.history.replaceState(window.history.state, '', newRelative);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const tabParam = params.get('tab');
+    const warningParam = params.get('warning');
+
+    if (warningParam === 'spoilers') {
+      if (isItemConsumed) {
+        // If already consumed, bypass warning and show comments directly
+        setShowCommentsSpoilerModal(false);
+        setActiveBottomTab('comments');
+        updateModalUrlParams('comments', false);
+      } else {
+        setShowCommentsSpoilerModal(true);
+      }
+      initialUrlCheckDone.current = true;
+      return;
+    }
+
+    if (tabParam === 'comments') {
+      if (!isItemConsumed) {
+        // Not consumed: redirect to spoiler warning
+        setShowCommentsSpoilerModal(true);
+        updateModalUrlParams('reviews', true);
+      } else {
+        setActiveBottomTab('comments');
+      }
+      initialUrlCheckDone.current = true;
+      return;
+    }
+
+    initialUrlCheckDone.current = true;
+  }, [isItemConsumed, updateModalUrlParams]);
+
+  // Clean up URL parameters on unmount if they were set by this modal
+  useEffect(() => {
+    return () => {
+      if (typeof window !== 'undefined') {
+        const params = new URLSearchParams(window.location.search);
+        let changed = false;
+        if (params.get('warning') === 'spoilers') {
+          params.delete('warning');
+          changed = true;
+        }
+        if (params.get('tab') === 'comments') {
+          params.delete('tab');
+          changed = true;
+        }
+        if (changed) {
+          const newRelative = window.location.pathname + (params.toString() ? `?${params.toString()}` : '') + (window.location.hash || '');
+          window.history.replaceState(window.history.state, '', newRelative);
+        }
+      }
+    };
+  }, []);
+
+  const handleSelectBottomTab = (tab: 'reviews' | 'comments') => {
+    if (tab === 'reviews') {
+      setActiveBottomTab('reviews');
+      setShowCommentsSpoilerModal(false);
+      updateModalUrlParams('reviews', false);
+      return;
+    }
+    if (tab === 'comments') {
+      if (activeBottomTab === 'comments' && !showCommentsSpoilerModal) return;
+      if (!isItemConsumed) {
+        setShowCommentsSpoilerModal(true);
+        updateModalUrlParams('reviews', true);
+      } else {
+        setActiveBottomTab('comments');
+        setShowCommentsSpoilerModal(false);
+        updateModalUrlParams('comments', false);
+      }
+    }
+  };
+
   const epHeaderInfo = isEpisode ? getEpisodeHeaderInfo() : null;
 
   const shouldBlurEpisodeCover = Boolean(
@@ -8597,7 +8697,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
                       <button
                         type="button"
-                        onClick={() => setActiveBottomTab('reviews')}
+                        onClick={() => handleSelectBottomTab('reviews')}
                         style={{
                           background: activeBottomTab === 'reviews' ? 'var(--accent-primary)' : 'transparent',
                           color: activeBottomTab === 'reviews' ? '#fff' : 'var(--text-secondary)',
@@ -8627,14 +8727,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
                       <button
                         type="button"
-                        onClick={() => {
-                          if (activeBottomTab === 'comments') return;
-                          if (!isItemConsumed) {
-                            setShowCommentsSpoilerModal(true);
-                          } else {
-                            setActiveBottomTab('comments');
-                          }
-                        }}
+                        onClick={() => handleSelectBottomTab('comments')}
                         style={{
                           background: activeBottomTab === 'comments' ? 'var(--accent-primary)' : 'transparent',
                           color: activeBottomTab === 'comments' ? '#fff' : 'var(--text-secondary)',
@@ -11463,9 +11556,11 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                 onConfirm={() => {
                   setShowCommentsSpoilerModal(false);
                   setActiveBottomTab('comments');
+                  updateModalUrlParams('comments', false);
                 }}
                 onClose={() => {
                   setShowCommentsSpoilerModal(false);
+                  updateModalUrlParams('reviews', false);
                 }}
               />
     </div>
