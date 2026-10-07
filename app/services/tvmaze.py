@@ -519,114 +519,271 @@ class TVMazeService:
 
     @staticmethod
     def get_trending_series() -> List[SearchResultItem]:
-        cache_key = "tvmaze_trending_series_v2"
+        cache_key = "tvmaze_trending_series_wiki_v3"
         now_ts = time.time()
         if cache_key in TVMazeService._schedule_cache:
             ts, data = TVMazeService._schedule_cache[cache_key]
             if now_ts - ts < 14400:  # 4 hours
                 return data
 
-        import json, urllib.request
-        url = "https://api.tvmaze.com/shows"
-        req = urllib.request.Request(url, headers={"User-Agent": "TrackerLists/1.0"})
-        results = []
-        try:
-            with urllib.request.urlopen(req, timeout=6) as response:
-                if response.status == 200:
-                    data = json.loads(response.read().decode())
-                    series_list = []
-                    for show in data:
-                        network = show.get("network") if isinstance(show.get("network"), dict) else {}
-                        web_channel = show.get("webChannel") if isinstance(show.get("webChannel"), dict) else {}
-                        net_country = (network.get("country") or {}).get("code") if isinstance(network.get("country"), dict) else None
-                        web_country = (web_channel.get("country") or {}).get("code") if isinstance(web_channel.get("country"), dict) else None
-                        country_code = net_country or web_country
-                        genres = show.get("genres") or []
-                        is_anime = (country_code == "JP" and show.get("type") == "Animation") or "Anime" in genres
-                        if not is_anime:
-                            series_list.append(show)
+        import json, urllib.request, re, concurrent.futures
+        from datetime import datetime, timedelta
 
-                    sorted_shows = sorted(series_list, key=lambda x: (x.get("weight", 0), (x.get("rating") or {}).get("average") or 0), reverse=True)[:24]
-                    for show in sorted_shows:
-                        image_data = show.get("image")
-                        image_url = image_data.get("original") or image_data.get("medium") if image_data else None
-                        premiered = show.get("premiered")
-                        results.append(SearchResultItem(
-                            external_id=f"tvm_{show.get('id')}",
-                            title=show.get("name"),
-                            image_url=image_url,
-                            description=show.get("summary", ""),
-                            item_type="series",
-                            release_date=premiered,
-                            popularity=show.get("weight", 0)
-                        ))
-                    if results:
-                        TVMazeService._schedule_cache[cache_key] = (now_ts, results)
-                    return results
+        results: List[SearchResultItem] = []
+        seen_ids = set()
+        seen_titles = set()
+
+        # 1. Fetch top Wikipedia articles in the last 24-48 hours
+        try:
+            articles = []
+            for days_ago in [1, 2]:
+                dt = datetime.utcnow() - timedelta(days=days_ago)
+                ymd = dt.strftime("%Y/%m/%d")
+                top_url = f"https://wikimedia.org/api/rest_v1/metrics/pageviews/top/en.wikipedia/all-access/{ymd}"
+                try:
+                    req = urllib.request.Request(top_url, headers={"User-Agent": "TrackerLists/1.0 (contact@pathd.net)"})
+                    with urllib.request.urlopen(req, timeout=6) as resp:
+                        if resp.status == 200:
+                            data = json.loads(resp.read().decode())
+                            items = data.get("items", [{}])[0].get("articles", [])
+                            if items:
+                                articles = items
+                                break
+                except Exception:
+                    continue
+
+            series_titles = []
+            for a in articles:
+                art = a.get("article", "")
+                if (re.search(r'_\((?:\d{4}_)?TV_series\)$', art, re.IGNORECASE) or 
+                    re.search(r'_\([^\)]*television_series[^\)]*\)$', art, re.IGNORECASE) or
+                    re.search(r'_\([^\)]*miniseries[^\)]*\)$', art, re.IGNORECASE) or
+                    re.search(r'_\(season_\d+\)$', art, re.IGNORECASE)):
+                    clean = re.sub(r'_\([^\)]+\)', '', art)
+                    clean = re.sub(r'_season_\d+', '', clean, flags=re.IGNORECASE)
+                    clean = clean.replace('_', ' ').strip()
+                    if clean and clean not in series_titles and not art.startswith("List_of_"):
+                        series_titles.append(clean)
+
+            if series_titles:
+                def fetch_tvm_show(title_query: str):
+                    try:
+                        shows = TVMazeService.search_shows(title_query)
+                        if shows:
+                            return shows[0]
+                    except Exception:
+                        pass
+                    return None
+
+                with concurrent.futures.ThreadPoolExecutor(max_workers=6) as ex:
+                    matched_shows = list(ex.map(fetch_tvm_show, series_titles[:25]))
+
+                for show in matched_shows:
+                    if show and show.image_url and show.title:
+                        norm = show.title.lower().strip()
+                        if show.external_id not in seen_ids and norm not in seen_titles:
+                            seen_ids.add(show.external_id)
+                            seen_titles.add(norm)
+                            results.append(show)
+                        if len(results) >= 24:
+                            break
         except Exception as e:
-            print(f"Error fetching trending series from TVMaze: {e}")
-        return []
+            print(f"Error fetching trending series via Wikipedia/TVMaze: {e}")
+
+        # Fallback if Wikipedia yielded too few
+        if len(results) < 12:
+            try:
+                url = "https://api.tvmaze.com/shows"
+                req = urllib.request.Request(url, headers={"User-Agent": "TrackerLists/1.0"})
+                with urllib.request.urlopen(req, timeout=6) as response:
+                    if response.status == 200:
+                        data = json.loads(response.read().decode())
+                        series_list = []
+                        for show in data:
+                            network = show.get("network") if isinstance(show.get("network"), dict) else {}
+                            web_channel = show.get("webChannel") if isinstance(show.get("webChannel"), dict) else {}
+                            net_country = (network.get("country") or {}).get("code") if isinstance(network.get("country"), dict) else None
+                            web_country = (web_channel.get("country") or {}).get("code") if isinstance(web_channel.get("country"), dict) else None
+                            country_code = net_country or web_country
+                            genres = show.get("genres") or []
+                            is_anime = (country_code == "JP" and show.get("type") == "Animation") or "Anime" in genres
+                            if not is_anime:
+                                series_list.append(show)
+
+                        sorted_shows = sorted(series_list, key=lambda x: (x.get("weight", 0), (x.get("rating") or {}).get("average") or 0), reverse=True)
+                        for show in sorted_shows:
+                            image_data = show.get("image")
+                            image_url = image_data.get("original") or image_data.get("medium") if image_data else None
+                            ext_id = f"tvm_{show.get('id')}"
+                            norm = (show.get("name") or "").lower().strip()
+                            if ext_id not in seen_ids and norm not in seen_titles and image_url:
+                                seen_ids.add(ext_id)
+                                seen_titles.add(norm)
+                                results.append(SearchResultItem(
+                                    external_id=ext_id,
+                                    title=show.get("name"),
+                                    image_url=image_url,
+                                    description=show.get("summary", ""),
+                                    item_type="series",
+                                    release_date=show.get("premiered"),
+                                    popularity=show.get("weight", 0)
+                                ))
+                            if len(results) >= 24:
+                                break
+            except Exception as e:
+                print(f"Error in TVMaze fallback trending series: {e}")
+
+        if results:
+            TVMazeService._schedule_cache[cache_key] = (now_ts, results)
+        return results
 
     @staticmethod
     def get_trending_anime() -> List[SearchResultItem]:
-        cache_key = "tvmaze_trending_anime_v2"
+        cache_key = "tvmaze_trending_anime_anilist_v3"
         now_ts = time.time()
         if cache_key in TVMazeService._schedule_cache:
             ts, data = TVMazeService._schedule_cache[cache_key]
             if now_ts - ts < 14400:  # 4 hours
                 return data
 
-        import json, urllib.request, datetime
-        today = datetime.date.today()
-        # Fetch upcoming/recent schedule + shows endpoint to find high weight anime
-        dates = [(today - datetime.timedelta(days=i)).strftime("%Y-%m-%d") for i in range(7)]
-        urls = [
-            "https://api.tvmaze.com/schedule/web",
-            "https://api.tvmaze.com/schedule?country=JP",
-            "https://api.tvmaze.com/shows"
-        ]
-        for d in dates[:3]:
-            urls.append(f"https://api.tvmaze.com/schedule/web?date={d}")
-            urls.append(f"https://api.tvmaze.com/schedule?date={d}&country=JP")
+        import json, urllib.request, datetime, re
 
+        results: List[SearchResultItem] = []
+        seen_ids = set()
+        seen_titles = set()
+
+        # 1. Fetch current trending anime from AniList (pure community trending algorithm)
+        anilist_norms = []
+        try:
+            url_al = "https://graphql.anilist.co"
+            graphql_query = """
+            query {
+              Page(page: 1, perPage: 35) {
+                media(type: ANIME, sort: TRENDING_DESC, isAdult: false) {
+                  id
+                  title { romaji english }
+                  synonyms
+                }
+              }
+            }
+            """
+            payload = json.dumps({"query": graphql_query}).encode("utf-8")
+            headers = {"Content-Type": "application/json", "Accept": "application/json", "User-Agent": "TrackerLists/1.0"}
+            req_al = urllib.request.Request(url_al, data=payload, headers=headers)
+            with urllib.request.urlopen(req_al, timeout=5) as resp_al:
+                if resp_al.status == 200:
+                    al_data = json.loads(resp_al.read().decode())
+                    al_media = al_data.get("data", {}).get("Page", {}).get("media", [])
+                    for item in al_media:
+                        t_obj = item.get("title") or {}
+                        syns = item.get("synonyms") or []
+                        for raw_t in [t_obj.get("english"), t_obj.get("romaji")] + syns:
+                            if raw_t:
+                                norm = re.sub(r'[^a-z0-9]', '', raw_t.lower())
+                                if len(norm) >= 4 and norm not in anilist_norms:
+                                    anilist_norms.append(norm)
+        except Exception as e:
+            print(f"Error fetching AniList trending anime: {e}")
+
+        # 2. Fetch TVMaze anime airing this week (live daily releases)
+        today = datetime.date.today()
         anime_map = {}
-        for u in urls:
+        for days_ago in [0, 1, 2, 3]:
+            d = (today - datetime.timedelta(days=days_ago)).strftime("%Y-%m-%d")
+            urls = [
+                f"https://api.tvmaze.com/schedule?country=JP&date={d}",
+                f"https://api.tvmaze.com/schedule/web?date={d}"
+            ]
+            for u in urls:
+                try:
+                    req_s = urllib.request.Request(u, headers={"User-Agent": "TrackerLists/1.0"})
+                    with urllib.request.urlopen(req_s, timeout=4) as response_s:
+                        if response_s.status == 200:
+                            sdata = json.loads(response_s.read().decode())
+                            for item in sdata:
+                                show = item.get("_embedded", {}).get("show") if "_embedded" in item else item.get("show") or item
+                                if not show or not isinstance(show, dict) or not show.get("id"):
+                                    continue
+                                network = show.get("network") or {}
+                                web_channel = show.get("webChannel") or {}
+                                country_code = network.get("country", {}).get("code") or web_channel.get("country", {}).get("code")
+                                genres = show.get("genres") or []
+                                is_anime = (country_code == "JP" and show.get("type") == "Animation") or "Anime" in genres
+                                if is_anime:
+                                    sid = show.get("id")
+                                    if sid not in anime_map or show.get("weight", 0) > anime_map[sid].get("weight", 0):
+                                        anime_map[sid] = show
+                except Exception:
+                    continue
+
+        # Sort: first priority is matching AniList trending anime, then by TVMaze live weight/rating
+        def anime_sort_key(show):
+            name_norm = re.sub(r'[^a-z0-9]', '', (show.get("name") or "").lower())
+            is_trending = 1 if any(name_norm in an or an in name_norm for an in anilist_norms if len(an) >= 5) else 0
+            weight = show.get("weight", 0)
+            avg_rating = (show.get("rating") or {}).get("average") or 0
+            return (is_trending, weight, avg_rating)
+
+        sorted_anime = sorted(anime_map.values(), key=anime_sort_key, reverse=True)
+
+        for show in sorted_anime:
+            image_data = show.get("image")
+            image_url = image_data.get("original") or image_data.get("medium") if image_data else None
+            if not image_url:
+                continue
+
+            sid = f"tvm_{show.get('id')}"
+            norm = (show.get("name") or "").lower().strip()
+            if sid not in seen_ids and norm not in seen_titles:
+                seen_ids.add(sid)
+                seen_titles.add(norm)
+                results.append(SearchResultItem(
+                    external_id=sid,
+                    title=show.get("name"),
+                    image_url=image_url,
+                    description=show.get("summary", ""),
+                    item_type="anime",
+                    release_date=show.get("premiered"),
+                    popularity=show.get("weight", 0)
+                ))
+            if len(results) >= 24:
+                break
+
+        # Fallback if too few
+        if len(results) < 12:
             try:
-                req = urllib.request.Request(u, headers={"User-Agent": "TrackerLists/1.0"})
-                with urllib.request.urlopen(req, timeout=4) as response:
-                    if response.status == 200:
-                        data = json.loads(response.read().decode())
-                        for item in data:
-                            show = item.get("_embedded", {}).get("show") if "_embedded" in item else item.get("show") or item
-                            if not show or not isinstance(show, dict) or not show.get("id"):
-                                continue
+                url_fb = "https://api.tvmaze.com/shows"
+                req_fb = urllib.request.Request(url_fb, headers={"User-Agent": "TrackerLists/1.0"})
+                with urllib.request.urlopen(req_fb, timeout=5) as response_fb:
+                    if response_fb.status == 200:
+                        fb_shows = json.loads(response_fb.read().decode())
+                        for show in sorted(fb_shows, key=anime_sort_key, reverse=True):
                             network = show.get("network") or {}
                             web_channel = show.get("webChannel") or {}
                             country_code = network.get("country", {}).get("code") or web_channel.get("country", {}).get("code")
                             genres = show.get("genres") or []
                             is_anime = (country_code == "JP" and show.get("type") == "Animation") or "Anime" in genres
                             if is_anime:
-                                sid = show.get("id")
-                                if sid not in anime_map or show.get("weight", 0) > anime_map[sid].get("weight", 0):
-                                    anime_map[sid] = show
-            except Exception:
-                continue
-
-        sorted_anime = sorted(anime_map.values(), key=lambda x: (x.get("weight", 0), (x.get("rating") or {}).get("average") or 0), reverse=True)[:24]
-        results = []
-        for show in sorted_anime:
-            image_data = show.get("image")
-            image_url = image_data.get("original") or image_data.get("medium") if image_data else None
-            premiered = show.get("premiered")
-            results.append(SearchResultItem(
-                external_id=f"tvm_{show.get('id')}",
-                title=show.get("name"),
-                image_url=image_url,
-                description=show.get("summary", ""),
-                item_type="anime",
-                release_date=premiered,
-                popularity=show.get("weight", 0)
-            ))
+                                sid = f"tvm_{show.get('id')}"
+                                norm = (show.get("name") or "").lower().strip()
+                                image_data = show.get("image")
+                                image_url = image_data.get("original") or image_data.get("medium") if image_data else None
+                                if image_url and sid not in seen_ids and norm not in seen_titles:
+                                    seen_ids.add(sid)
+                                    seen_titles.add(norm)
+                                    results.append(SearchResultItem(
+                                        external_id=sid,
+                                        title=show.get("name"),
+                                        image_url=image_url,
+                                        description=show.get("summary", ""),
+                                        item_type="anime",
+                                        release_date=show.get("premiered"),
+                                        popularity=show.get("weight", 0)
+                                    ))
+                                if len(results) >= 24:
+                                    break
+            except Exception as e:
+                print(f"Error in TVMaze fallback anime: {e}")
 
         if results:
             TVMazeService._schedule_cache[cache_key] = (now_ts, results)

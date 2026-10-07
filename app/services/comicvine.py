@@ -584,8 +584,10 @@ class ComicVineService:
 
     @staticmethod
     def get_trending_comics() -> List[SearchResultItem]:
-        import time
-        cache_key = "cv_trending_comics_dynamic_v1"
+        import time, json, urllib.request, re, concurrent.futures
+        from datetime import datetime, timedelta
+
+        cache_key = "cv_trending_comics_wiki_store_v2"
         now_ts = time.time()
         if cache_key in ComicVineService._trending_comics_cache:
             ts, data = ComicVineService._trending_comics_cache[cache_key]
@@ -596,58 +598,159 @@ class ComicVineService:
         if not api_key:
             return []
 
-        results = []
+        results: List[SearchResultItem] = []
         seen_ids = set()
         seen_titles = set()
 
+        # 1. Check trending comic characters / graphic novels from Wikipedia Pageviews
         try:
-            # Query Comic Vine volumes sorted by community activity and updates
-            url = f"https://comicvine.gamespot.com/api/volumes/?api_key={api_key}&format=json&sort=date_last_updated:desc&limit=60"
-            req = urllib.request.Request(url, headers={"User-Agent": "TrackerLists/1.0 (contact@pathd.net)"})
-            with urllib.request.urlopen(req, timeout=8) as response:
-                if response.status == 200:
-                    data = json.loads(response.read().decode())
-                    for item in data.get("results", []):
-                        vol_name = (item.get("name") or "").strip()
-                        if not vol_name:
-                            continue
+            wiki_comic_names = []
+            for days_ago in [1, 2]:
+                dt = datetime.utcnow() - timedelta(days=days_ago)
+                ymd = dt.strftime("%Y/%m/%d")
+                top_url = f"https://wikimedia.org/api/rest_v1/metrics/pageviews/top/en.wikipedia/all-access/{ymd}"
+                try:
+                    req_w = urllib.request.Request(top_url, headers={"User-Agent": "TrackerLists/1.0 (contact@pathd.net)"})
+                    with urllib.request.urlopen(req_w, timeout=6) as resp_w:
+                        if resp_w.status == 200:
+                            data_w = json.loads(resp_w.read().decode())
+                            items_w = data_w.get("items", [{}])[0].get("articles", [])
+                            for a in items_w:
+                                art = a.get("article", "")
+                                if (re.search(r'_\((?:[^\)]*_)?comics?\)$', art, re.IGNORECASE) or 
+                                    re.search(r'_\([^\)]*comic_book[^\)]*\)$', art, re.IGNORECASE) or
+                                    re.search(r'_\([^\)]*graphic_novel[^\)]*\)$', art, re.IGNORECASE) or
+                                    re.search(r'_\([^\)]*character[^\)]*\)$', art, re.IGNORECASE)):
+                                    clean = re.sub(r'_\([^\)]+\)', '', art).replace('_', ' ').strip()
+                                    if clean and clean not in wiki_comic_names and not art.startswith("List_of_"):
+                                        wiki_comic_names.append(clean)
+                except Exception:
+                    continue
 
-                        norm = vol_name.lower()
-                        if norm in seen_titles:
-                            continue
-
-
-                        desc = item.get("deck") or item.get("description") or ""
-                        if not is_safe_media_item(vol_name, desc):
-                            continue
-
-                        image_data = item.get("image", {})
-                        image_url = image_data.get("super_url") or image_data.get("medium_url") or image_data.get("thumb_url")
-                        if not image_url:
-                            continue
-
-                        raw_id = str(item.get("id"))
-                        ext_id = f"cv_vol_{raw_id}"
-                        issue_count = item.get("count_of_issues")
-                        badge_val = f"{issue_count} Números" if issue_count else "Volumen"
-
-                        seen_ids.add(ext_id)
-                        seen_titles.add(norm)
-                        results.append(SearchResultItem(
-                            external_id=ext_id,
-                            title=vol_name,
-                            image_url=image_url,
-                            description=desc,
-                            item_type="comic",
-                            release_date=str(item.get("start_year")) if item.get("start_year") else None,
-                            page_count=issue_count,
-                            badge=badge_val
-                        ))
-
-                        if len(results) >= 24:
-                            break
+            for w_name in wiki_comic_names[:6]:
+                try:
+                    found_comics = ComicVineService.search_comics(w_name)
+                    for fc in found_comics:
+                        if fc and fc.image_url and fc.title:
+                            norm = fc.title.lower().strip()
+                            if fc.external_id not in seen_ids and norm not in seen_titles:
+                                seen_ids.add(fc.external_id)
+                                seen_titles.add(norm)
+                                results.append(fc)
+                                break  # Take top relevant match per trending character/comic
+                except Exception:
+                    pass
         except Exception as e:
-            print(f"Error fetching dynamic trending comics: {e}")
+            print(f"Error checking Wikipedia comic trends: {e}")
+
+        # 2. Query Comic Vine recently released issues to find hot, ongoing active volumes
+        try:
+            url_issues = f"https://comicvine.gamespot.com/api/issues/?api_key={api_key}&format=json&sort=store_date:desc&limit=100"
+            req_i = urllib.request.Request(url_issues, headers={"User-Agent": "TrackerLists/1.0 (contact@pathd.net)"})
+            with urllib.request.urlopen(req_i, timeout=10) as response_i:
+                if response_i.status == 200:
+                    data_i = json.loads(response_i.read().decode())
+                    volume_ids = []
+                    for iss in data_i.get("results", []):
+                        vol = iss.get("volume", {})
+                        vid = vol.get("id")
+                        if vid and str(vid) not in volume_ids:
+                            volume_ids.append(str(vid))
+
+                    if volume_ids:
+                        url_vols = f"https://comicvine.gamespot.com/api/volumes/?api_key={api_key}&format=json&filter=id:" + "|".join(volume_ids[:40])
+                        req_v = urllib.request.Request(url_vols, headers={"User-Agent": "TrackerLists/1.0 (contact@pathd.net)"})
+                        with urllib.request.urlopen(req_v, timeout=10) as response_v:
+                            if response_v.status == 200:
+                                data_v = json.loads(response_v.read().decode())
+                                vols = data_v.get("results", [])
+
+                                western_pubs = {
+                                    'DC Comics', 'Marvel', 'Image', 'Dark Horse Comics',
+                                    'Boom! Studios', 'IDW Publishing', 'Dynamite Entertainment',
+                                    'Valiant', 'Titan Comics', 'Oni Press', 'Aftershock'
+                                }
+                                vols_sorted = sorted(vols, key=lambda v: (
+                                    1 if (v.get("publisher") or {}).get("name") in western_pubs else 0,
+                                    v.get("count_of_issues") or 0
+                                ), reverse=True)
+
+                                for item in vols_sorted:
+                                    vol_name = (item.get("name") or "").strip()
+                                    if not vol_name:
+                                        continue
+
+                                    norm = vol_name.lower()
+                                    if norm in seen_titles:
+                                        continue
+
+                                    desc = item.get("deck") or item.get("description") or ""
+                                    if not is_safe_media_item(vol_name, desc):
+                                        continue
+
+                                    image_data = item.get("image", {})
+                                    image_url = image_data.get("super_url") or image_data.get("medium_url") or image_data.get("thumb_url")
+                                    if not image_url:
+                                        continue
+
+                                    ext_id = f"cv_vol_{item.get('id')}"
+                                    if ext_id in seen_ids:
+                                        continue
+
+                                    issue_count = item.get("count_of_issues")
+                                    badge_val = f"{issue_count} Números" if issue_count else "Volumen"
+
+                                    seen_ids.add(ext_id)
+                                    seen_titles.add(norm)
+                                    results.append(SearchResultItem(
+                                        external_id=ext_id,
+                                        title=vol_name,
+                                        image_url=image_url,
+                                        description=desc,
+                                        item_type="comic",
+                                        release_date=str(item.get("start_year")) if item.get("start_year") else None,
+                                        page_count=issue_count,
+                                        badge=badge_val
+                                    ))
+                                    if len(results) >= 24:
+                                        break
+        except Exception as e:
+            print(f"Error fetching trending comic volumes from ComicVine: {e}")
+
+        # Fallback if too few
+        if len(results) < 10:
+            try:
+                url_fb = f"https://comicvine.gamespot.com/api/volumes/?api_key={api_key}&format=json&sort=date_last_updated:desc&limit=30"
+                req_fb = urllib.request.Request(url_fb, headers={"User-Agent": "TrackerLists/1.0 (contact@pathd.net)"})
+                with urllib.request.urlopen(req_fb, timeout=8) as response_fb:
+                    if response_fb.status == 200:
+                        data_fb = json.loads(response_fb.read().decode())
+                        for item in data_fb.get("results", []):
+                            vol_name = (item.get("name") or "").strip()
+                            ext_id = f"cv_vol_{item.get('id')}"
+                            norm = vol_name.lower()
+                            if not vol_name or ext_id in seen_ids or norm in seen_titles:
+                                continue
+                            image_data = item.get("image", {})
+                            image_url = image_data.get("super_url") or image_data.get("medium_url")
+                            if not image_url:
+                                continue
+                            seen_ids.add(ext_id)
+                            seen_titles.add(norm)
+                            results.append(SearchResultItem(
+                                external_id=ext_id,
+                                title=vol_name,
+                                image_url=image_url,
+                                description=item.get("deck") or "",
+                                item_type="comic",
+                                release_date=str(item.get("start_year")) if item.get("start_year") else None,
+                                page_count=item.get("count_of_issues"),
+                                badge=f"{item.get('count_of_issues')} Números" if item.get("count_of_issues") else "Volumen"
+                            ))
+                            if len(results) >= 24:
+                                break
+            except Exception as e:
+                print(f"Error in fallback trending comics: {e}")
 
         if results:
             ComicVineService._trending_comics_cache[cache_key] = (now_ts, results)

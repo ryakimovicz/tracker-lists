@@ -14,7 +14,7 @@ import { prefetchMediaDetails } from '../utils/prefetch';
 import { removeCachedSeries, clearCachedSeriesMatching } from '../utils/seriesCache';
 import { getCachedShelfItems, setCachedShelfItems, createShelfMap, findInShelfMap } from '../utils/shelfCache';
 
-import { Search as SearchIcon, AlertCircle, CheckCircle, Plus, X, Heart, Star, Users, BookOpen, Package, Puzzle, Sparkles, Gamepad2, Trash2, Flame, TrendingUp, Trophy, Bookmark, Film, Tv, Book, MessageSquare, MessageCircle, Rocket } from 'lucide-react';
+import { Search as SearchIcon, AlertCircle, CheckCircle, Plus, X, Heart, Star, Users, BookOpen, Package, Puzzle, Sparkles, Gamepad2, Trash2, Flame, TrendingUp, Trophy, Bookmark, Film, Tv, Book, MessageSquare, MessageCircle, Rocket, Clock } from 'lucide-react';
 
 interface SearchResultItem {
   external_id: string;
@@ -236,7 +236,7 @@ const ExploreGuidesSection = React.memo<ExploreGuidesSectionProps>(({
     { 
       key: 'nuevas', 
       title: t('guidesNew'), 
-      icon: <Sparkles size={18} color="var(--accent-primary)" />, 
+      icon: <Clock size={18} color="var(--accent-primary)" />, 
       outlineColor: 'var(--accent-primary)',
       items: guidesData?.nuevas || [] 
     },
@@ -300,7 +300,7 @@ const ExploreGuidesSection = React.memo<ExploreGuidesSectionProps>(({
                 borderRadius: '10px',
                 transition: 'transform 0.2s ease, box-shadow 0.2s ease',
               }}
-              onClick={() => navigate(`/list/${guide.id}`)}
+              onClick={() => navigate(`/guide/${guide.id}`)}
             >
               {/* Cover Collage */}
               <div style={{
@@ -469,17 +469,24 @@ export const Search: React.FC = () => {
 
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const validExploreTabs = ['nuevo', 'tendencias', 'guias'] as const;
+  const validExploreTabs = ['new', 'trending', 'guides'] as const;
   type ExploreTab = typeof validExploreTabs[number];
 
-  const exploreTabParam = searchParams.get('tab');
-  const exploreSubTab: ExploreTab = (exploreTabParam && validExploreTabs.includes(exploreTabParam as any))
-    ? (exploreTabParam as ExploreTab)
-    : 'nuevo';
+  const exploreTabParamRaw = searchParams.get('tab');
+  // Backwards compatibility for legacy Spanish params: 'nuevo' -> 'new', 'tendencias' -> 'trending', 'guias' -> 'guides'
+  const normalizedTabParam = 
+    exploreTabParamRaw === 'nuevo' ? 'new' :
+    exploreTabParamRaw === 'tendencias' ? 'trending' :
+    exploreTabParamRaw === 'guias' ? 'guides' :
+    exploreTabParamRaw;
+
+  const exploreSubTab: ExploreTab = (normalizedTabParam && validExploreTabs.includes(normalizedTabParam as any))
+    ? (normalizedTabParam as ExploreTab)
+    : 'new';
 
   const handleExploreSubTabChange = (tab: ExploreTab) => {
     const newParams = new URLSearchParams(searchParams);
-    if (tab === 'nuevo') {
+    if (tab === 'new') {
       newParams.delete('tab');
     } else {
       newParams.set('tab', tab);
@@ -533,7 +540,7 @@ export const Search: React.FC = () => {
   }, [exploreData, language, user?.category_order]);
 
   const filteredExploreCategories = React.useMemo(() => {
-    const targetCats = exploreSubTab === 'tendencias' ? exploreTrendingCategories : exploreNewCategories;
+    const targetCats = exploreSubTab === 'trending' ? exploreTrendingCategories : exploreNewCategories;
     if (activeTab === 'all') return targetCats;
     return targetCats.filter(cat => cat.type === activeTab);
   }, [exploreSubTab, exploreTrendingCategories, exploreNewCategories, activeTab]);
@@ -702,7 +709,7 @@ export const Search: React.FC = () => {
   }, [submittedQuery]);
 
   useEffect(() => {
-    if (submittedQuery === '' && exploreSubTab === 'guias' && !guidesData) {
+    if (submittedQuery === '' && exploreSubTab === 'guides' && !guidesData) {
       const fetchGuides = async () => {
         const cachedRaw = sessionStorage.getItem('pathd_guides_explore_cache');
         if (cachedRaw) {
@@ -1319,10 +1326,10 @@ export const Search: React.FC = () => {
             }}
           >
             <button 
-              onClick={() => handleExploreSubTabChange('nuevo')}
+              onClick={() => handleExploreSubTabChange('new')}
               style={{
-                fontSize: "1.05rem", fontWeight: exploreSubTab === 'nuevo' ? 600 : 500,
-                color: exploreSubTab === 'nuevo' ? "var(--text-primary)" : "var(--text-secondary)",
+                fontSize: "1.05rem", fontWeight: exploreSubTab === 'new' ? 600 : 500,
+                color: exploreSubTab === 'new' ? "var(--text-primary)" : "var(--text-secondary)",
                 background: "transparent",
                 border: "none",
                 cursor: "pointer",
@@ -1334,18 +1341,18 @@ export const Search: React.FC = () => {
                 transition: "color 0.15s ease"
               }}
             >
-              <Rocket size={17} color={exploreSubTab === 'nuevo' ? "var(--accent-primary)" : "currentColor"} />
+              <Rocket size={17} color={exploreSubTab === 'new' ? "var(--accent-primary)" : "currentColor"} />
               <span>{t('exploreNew')}</span>
-              {exploreSubTab === 'nuevo' && (
+              {exploreSubTab === 'new' && (
                 <div style={{ position: "absolute", bottom: "-0.75rem", left: 0, right: 0, height: "2px", background: "var(--accent-primary)" }} />
               )}
             </button>
 
             <button 
-              onClick={() => handleExploreSubTabChange('tendencias')}
+              onClick={() => handleExploreSubTabChange('trending')}
               style={{
-                fontSize: "1.05rem", fontWeight: exploreSubTab === 'tendencias' ? 600 : 500,
-                color: exploreSubTab === 'tendencias' ? "var(--text-primary)" : "var(--text-secondary)",
+                fontSize: "1.05rem", fontWeight: exploreSubTab === 'trending' ? 600 : 500,
+                color: exploreSubTab === 'trending' ? "var(--text-primary)" : "var(--text-secondary)",
                 background: "transparent",
                 border: "none",
                 cursor: "pointer",
@@ -1357,18 +1364,18 @@ export const Search: React.FC = () => {
                 transition: "color 0.15s ease"
               }}
             >
-              <Flame size={17} color={exploreSubTab === 'tendencias' ? "#f97316" : "currentColor"} />
+              <Flame size={17} color={exploreSubTab === 'trending' ? "#f97316" : "currentColor"} />
               <span>{t('exploreTrending')}</span>
-              {exploreSubTab === 'tendencias' && (
+              {exploreSubTab === 'trending' && (
                 <div style={{ position: "absolute", bottom: "-0.75rem", left: 0, right: 0, height: "2px", background: "#f97316" }} />
               )}
             </button>
 
             <button 
-              onClick={() => handleExploreSubTabChange('guias')}
+              onClick={() => handleExploreSubTabChange('guides')}
               style={{
-                fontSize: "1.05rem", fontWeight: exploreSubTab === 'guias' ? 600 : 500,
-                color: exploreSubTab === 'guias' ? "var(--text-primary)" : "var(--text-secondary)",
+                fontSize: "1.05rem", fontWeight: exploreSubTab === 'guides' ? 600 : 500,
+                color: exploreSubTab === 'guides' ? "var(--text-primary)" : "var(--text-secondary)",
                 background: "transparent",
                 border: "none",
                 cursor: "pointer",
@@ -1380,9 +1387,9 @@ export const Search: React.FC = () => {
                 transition: "color 0.15s ease"
               }}
             >
-              <BookOpen size={17} color={exploreSubTab === 'guias' ? "var(--color-guide)" : "currentColor"} />
+              <BookOpen size={17} color={exploreSubTab === 'guides' ? "var(--color-guide)" : "currentColor"} />
               <span>{t('exploreGuides')}</span>
-              {exploreSubTab === 'guias' && (
+              {exploreSubTab === 'guides' && (
                 <div style={{ position: "absolute", bottom: "-0.75rem", left: 0, right: 0, height: "2px", background: "var(--color-guide)" }} />
               )}
             </button>
@@ -1393,7 +1400,7 @@ export const Search: React.FC = () => {
       {submittedQuery === '' ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem', marginTop: '1rem' }}>
 
-          {exploreSubTab === 'guias' ? (
+          {exploreSubTab === 'guides' ? (
             <ExploreGuidesSection
               loading={loadingGuides}
               guidesData={guidesData}
