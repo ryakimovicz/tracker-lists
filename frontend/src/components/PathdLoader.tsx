@@ -57,42 +57,12 @@ export const PathdLoader: React.FC<PathdLoaderProps> = ({
         }
       `}</style>
 
-      {/* Animated Pathd Letters / Colored Dots */}
-      <div
-        style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: gap,
-          fontSize: fontSize,
-          fontWeight: 800,
-          letterSpacing: '-0.5px',
-        }}
-      >
-        {DOTS.map((item, idx) => (
-          <span
-            key={idx}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: item.color,
-              textShadow: `0 0 16px ${item.glow}`,
-              animation: `pathdWave 1.4s ease-in-out infinite`,
-              animationDelay: item.delay,
-              willChange: 'transform, opacity, filter',
-            }}
-          >
-            {item.char}
-          </span>
-        ))}
-      </div>
-
-      {/* Pulsing Colored Mini-Dots Bar */}
+      {/* Pulsing Colored Dots */}
       <div
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '8px',
+          gap: gap,
         }}
       >
         {DOTS.map((item, idx) => (
