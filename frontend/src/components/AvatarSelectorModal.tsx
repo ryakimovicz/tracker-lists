@@ -195,8 +195,9 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
         left: 0,
         right: 0,
         bottom: 0,
-        background: 'rgba(0, 0, 0, 0.8)',
-        backdropFilter: 'blur(8px)',
+        background: 'var(--modal-backdrop-bg, rgba(0, 0, 0, 0.75))',
+        backdropFilter: 'blur(var(--modal-backdrop-blur, 6px))',
+        WebkitBackdropFilter: 'blur(var(--modal-backdrop-blur, 6px))',
         zIndex: 5000,
         display: 'flex',
         alignItems: 'center',
@@ -216,7 +217,7 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
           padding: '1.75rem',
           borderRadius: '20px',
           gap: '1.25rem',
-          boxShadow: '0 25px 50px rgba(0,0,0,0.5)',
+          boxShadow: 'var(--card-shadow, 0 25px 50px rgba(0,0,0,0.4))',
           overflow: 'hidden',
         }}
       >

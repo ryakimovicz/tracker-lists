@@ -385,8 +385,9 @@ const MusicDetailsModalInner: React.FC<MusicDetailsModalProps> = ({
         position: 'fixed',
         inset: 0,
         zIndex: 9999,
-        background: 'rgba(0, 0, 0, 0.8)',
-        backdropFilter: 'blur(8px)',
+        background: 'var(--modal-backdrop-bg, rgba(0, 0, 0, 0.75))',
+        backdropFilter: 'blur(var(--modal-backdrop-blur, 6px))',
+        WebkitBackdropFilter: 'blur(var(--modal-backdrop-blur, 6px))',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -416,7 +417,7 @@ const MusicDetailsModalInner: React.FC<MusicDetailsModalProps> = ({
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
-          boxShadow: '0 20px 50px rgba(0,0,0,0.6)'
+          boxShadow: 'var(--card-shadow, 0 20px 50px rgba(0,0,0,0.5))'
         }}
         onClick={(e) => e.stopPropagation()}
       >

@@ -22,6 +22,8 @@
   --btn-glow: var(--border-glow);
   --btn-glow-hover: rgba(245, 158, 11, 0.45);
   --card-shadow: 0 10px 40px -10px rgba(0,0,0,0.6);
+  --modal-backdrop-bg: rgba(0, 0, 0, 0.75);
+  --modal-backdrop-blur: 6px;
 
   /* Priority Color Levels (1 to 5) */
   --priority-1: #64748b;
@@ -81,6 +83,8 @@
   --btn-glow: rgba(245, 158, 11, 0.22);
   --btn-glow-hover: rgba(217, 119, 6, 0.35);
   --card-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05), 0 2px 6px -1px rgba(15, 23, 42, 0.02);
+  --modal-backdrop-bg: rgba(15, 23, 42, 0.45);
+  --modal-backdrop-blur: 6px;
 
   /* Scrollbar Theme Tokens (Light Mode) */
   --scrollbar-thumb: rgba(15, 23, 42, 0.16);
@@ -343,9 +347,9 @@ h1, h2, h3, h4, h5, h6 {
   left: 250px;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.75);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: var(--modal-backdrop-bg, rgba(0, 0, 0, 0.75));
+  backdrop-filter: blur(var(--modal-backdrop-blur, 6px));
+  -webkit-backdrop-filter: blur(var(--modal-backdrop-blur, 6px));
   display: flex;
   align-items: center;
   justify-content: center;

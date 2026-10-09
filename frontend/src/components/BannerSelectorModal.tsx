@@ -185,8 +185,9 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
       style={{
         position: 'fixed',
         inset: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.75)',
-        backdropFilter: 'blur(8px)',
+        backgroundColor: 'var(--modal-backdrop-bg, rgba(0, 0, 0, 0.75))',
+        backdropFilter: 'blur(var(--modal-backdrop-blur, 6px))',
+        WebkitBackdropFilter: 'blur(var(--modal-backdrop-blur, 6px))',
         zIndex: 9999,
         display: 'flex',
         alignItems: 'center',
@@ -208,7 +209,7 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
           gap: '1.25rem',
           border: '1px solid var(--border-color)',
           background: 'var(--bg-primary)',
-          boxShadow: '0 20px 40px rgba(0,0,0,0.5)',
+          boxShadow: 'var(--card-shadow, 0 20px 40px rgba(0,0,0,0.4))',
           overflow: 'hidden',
         }}
       >
