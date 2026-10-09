@@ -556,21 +556,21 @@ export const CustomizePage: React.FC = () => {
               {profile.is_pro && (
                 <span
                   style={{
+                    fontSize: '0.75rem',
+                    background: 'rgba(245, 158, 11, 0.15)',
+                    color: '#f59e0b',
+                    padding: '0.2rem 0.55rem',
+                    borderRadius: '6px',
+                    fontWeight: 700,
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '0.3rem',
-                    background: 'linear-gradient(135deg, #f59e0b, #d97706)',
-                    color: 'white',
-                    padding: '0.2rem 0.6rem',
-                    borderRadius: '12px',
-                    fontSize: '0.8rem',
-                    fontWeight: 700,
+                    border: '1px solid rgba(245, 158, 11, 0.3)',
                     cursor: 'default',
-                    boxShadow: '0 2px 8px rgba(245, 158, 11, 0.4)',
                     userSelect: 'none'
                   }}
                 >
-                  <Star size={12} fill="white" />
+                  <Star size={11} fill="#f59e0b" />
                   PREMIUM
                 </span>
               )}
@@ -630,31 +630,7 @@ export const CustomizePage: React.FC = () => {
                   height: '76px',
                   minHeight: '76px',
                   maxHeight: '76px',
-                  boxSizing: 'border-box',
-                  cursor: nowPlaying ? 'pointer' : 'default',
-                  transition: 'all 0.2s ease'
-                }}
-                onClick={() => {
-                  if (nowPlaying) {
-                    navigate(`/music/track/${encodeURIComponent(nowPlaying.artist)}/${encodeURIComponent(nowPlaying.name)}`, {
-                      state: {
-                        backgroundLocation: location,
-                        image: nowPlaying.image
-                      }
-                    });
-                  }
-                }}
-                onMouseEnter={(e) => {
-                  if (nowPlaying) {
-                    e.currentTarget.style.borderColor = 'rgba(29, 185, 84, 0.5)';
-                    e.currentTarget.style.background = isLight ? 'rgba(29, 185, 84, 0.12)' : 'rgba(29, 185, 84, 0.08)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (nowPlaying) {
-                    e.currentTarget.style.borderColor = isLight ? 'rgba(0, 0, 0, 0.08)' : 'var(--border-color)';
-                    e.currentTarget.style.background = isLight ? 'rgba(255, 255, 255, 0.65)' : 'rgba(255, 255, 255, 0.05)';
-                  }
+                  boxSizing: 'border-box'
                 }}
               >
                 {isLastFmLoading && !nowPlaying ? (

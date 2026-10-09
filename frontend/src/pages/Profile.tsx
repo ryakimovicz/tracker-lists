@@ -2776,21 +2776,21 @@ export const Profile: React.FC = () => {
               {profile.is_pro && (
                 <span 
                   style={{ 
+                    fontSize: '0.75rem',
+                    background: 'rgba(245, 158, 11, 0.15)',
+                    color: '#f59e0b',
+                    padding: '0.2rem 0.55rem',
+                    borderRadius: '6px',
+                    fontWeight: 700,
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '0.3rem',
-                    background: 'linear-gradient(135deg, #f59e0b, #d97706)',
-                    color: 'white',
-                    padding: '0.2rem 0.6rem',
-                    borderRadius: '12px',
-                    fontSize: '0.8rem',
-                    fontWeight: 700,
+                    border: '1px solid rgba(245, 158, 11, 0.3)',
                     cursor: 'default',
-                    boxShadow: '0 2px 8px rgba(245, 158, 11, 0.4)',
                     userSelect: 'none'
                   }}
                 >
-                  <Star size={12} fill="white" />
+                  <Star size={11} fill="#f59e0b" />
                   PREMIUM
                 </span>
               )}
