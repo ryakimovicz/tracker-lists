@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ThumbsUp, MessageSquare, MoreVertical, Trash2, Star, Film, Tv, Sparkles, Book, Gamepad2, Compass, User, EyeOff } from 'lucide-react';
+import { ThumbsUp, MessageSquare, MoreVertical, Trash2, Star, Film, Tv, Sparkles, Book, Gamepad2, Compass, User, EyeOff, Mic, Headphones, Music } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import { useAuth } from '../context/AuthContext';
@@ -287,6 +287,14 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
           icon: <Compass size={13} />,
           className: 'tag-badge tag-guide',
           themeColor: 'var(--color-guide)'
+        };
+      case 'music':
+      case 'artist':
+        return {
+          label: isEs ? 'Música' : 'Music',
+          icon: <Mic size={13} />,
+          className: 'tag-badge tag-music',
+          themeColor: 'var(--color-music, #1DB954)'
         };
       default:
         return {
@@ -615,32 +623,74 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
         </div>
 
         {/* 2. Prominent Poster Cover Art */}
-        {activity.image_url && (
-          <div
-            style={{
-              width: '100%',
-              height: '240px',
-              borderRadius: '12px',
-              overflow: 'hidden',
-              background: 'var(--bg-tertiary, rgba(0,0,0,0.2))',
-              position: 'relative',
-              boxShadow: '0 6px 18px rgba(0,0,0,0.3)',
-              border: '1px solid rgba(255,255,255,0.08)'
-            }}
-          >
-            <img
-              src={activity.image_url}
-              alt={activity.item_title || 'Cover'}
+        {activity.image_url && (() => {
+          const isMusicArtist = (activity.item_type || meta.item_type) === 'music' || activity.external_id?.startsWith('artist:');
+          if (isMusicArtist) {
+            return (
+              <div
+                style={{
+                  width: '100%',
+                  display: 'flex',
+                  justifyContent: 'center',
+                  padding: '1rem 0'
+                }}
+              >
+                <div
+                  style={{
+                    width: '140px',
+                    height: '140px',
+                    borderRadius: '50%',
+                    overflow: 'hidden',
+                    background: 'var(--bg-tertiary, rgba(0,0,0,0.2))',
+                    position: 'relative',
+                    boxShadow: '0 6px 18px rgba(0,0,0,0.3)',
+                    border: '2px solid rgba(29, 185, 84, 0.4)'
+                  }}
+                >
+                  <img
+                    src={activity.image_url}
+                    alt={activity.item_title || 'Artist'}
+                    referrerPolicy="no-referrer"
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                      transform: isCardHovered ? 'scale(1.06)' : 'scale(1)',
+                      transition: 'transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+                    }}
+                  />
+                </div>
+              </div>
+            );
+          }
+
+          return (
+            <div
               style={{
                 width: '100%',
-                height: '100%',
-                objectFit: 'cover',
-                transform: isCardHovered ? 'scale(1.04)' : 'scale(1)',
-                transition: 'transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+                height: '240px',
+                borderRadius: '12px',
+                overflow: 'hidden',
+                background: 'var(--bg-tertiary, rgba(0,0,0,0.2))',
+                position: 'relative',
+                boxShadow: '0 6px 18px rgba(0,0,0,0.3)',
+                border: '1px solid rgba(255,255,255,0.08)'
               }}
-            />
-          </div>
-        )}
+            >
+              <img
+                src={activity.image_url}
+                alt={activity.item_title || 'Cover'}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  transform: isCardHovered ? 'scale(1.04)' : 'scale(1)',
+                  transition: 'transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+                }}
+              />
+            </div>
+          );
+        })()}
 
         {/* 3. Action Sentence with badge */}
         <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>

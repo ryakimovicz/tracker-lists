@@ -2355,9 +2355,6 @@ export const Profile: React.FC = () => {
 
       window.dispatchEvent(new CustomEvent('library-updated'));
 
-      setSuccessMsg(language === 'es' ? 'Artista agregado a destacados.' : 'Artist added to featured favorites.');
-      setTimeout(() => setSuccessMsg(''), 4000);
-
       // Refresh activities
       const targetActivityUrl = userIdParam ? `/users/${userIdParam}/activity` : '/users/me/activity';
       const actRes = await apiClient.get(targetActivityUrl);
@@ -2607,6 +2604,7 @@ export const Profile: React.FC = () => {
 
   const visualLibraryItems = useMemo<LibraryItem[]>(() => {
     return libraryItems.filter((item: LibraryItem) => {
+      if (item.item_type === 'music') return false;
       if (item.external_id?.startsWith('cv_issue_')) return false;
       const isLooseType = item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tvm-ep-');
       if (!isLooseType) return true;
@@ -2622,6 +2620,7 @@ export const Profile: React.FC = () => {
   const filteredItems = useMemo<LibraryItem[]>(() => {
     return libraryItems
       .filter((item: LibraryItem) => {
+        if (item.item_type === 'music') return false;
         if (item.external_id?.startsWith('cv_issue_')) return false;
         let matchesMedia = false;
         if (mediaFilter === 'all') matchesMedia = true;
@@ -3382,6 +3381,7 @@ export const Profile: React.FC = () => {
                 const baseTypes = ['all', ...orderedMedia] as const;
                 const allowedTypes = baseTypes.filter(type => {
                   if (type === 'all') return true;
+                  if (type === 'music') return false;
                   if (type === 'series') return libraryItems.some(item => item.item_type === 'series' || item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tvm-ep-'));
                   if (type === 'anime') return libraryItems.some(item => item.item_type === 'anime');
                   return libraryItems.some(item => item.item_type === type);
@@ -6519,6 +6519,13 @@ const ProfileActivityCardItem: React.FC<ProfileActivityCardItemProps> = ({
           icon: <Compass size={13} />,
           themeColor: 'var(--color-guide)'
         };
+      case 'music':
+      case 'artist':
+        return {
+          label: isEs ? 'Música' : 'Music',
+          icon: <Mic size={13} />,
+          themeColor: 'var(--color-music, #1DB954)'
+        };
       default:
         return {
           label: isEs ? 'Obra' : 'Media',
@@ -6529,7 +6536,7 @@ const ProfileActivityCardItem: React.FC<ProfileActivityCardItemProps> = ({
   };
 
   const isGuideActivity = act.activity_type.startsWith('guide_');
-  const catMeta = isGuideActivity ? getCategoryMeta('guide') : getCategoryMeta(act.item_type || meta.item_type || 'series');
+  const catMeta = isGuideActivity ? getCategoryMeta('guide') : getCategoryMeta(act.item_type || meta.item_type || (act.external_id?.startsWith('artist:') ? 'music' : 'series'));
 
   // Render title with hover color and Lucide category icon badge on the right
   const renderTitle = (titleText: string) => {
@@ -7122,9 +7129,9 @@ const ProfileActivityCardItem: React.FC<ProfileActivityCardItemProps> = ({
       {/* Left: Thumbnail poster or Category icon */}
       {targetPoster ? (
         <div style={{
-          width: '42px',
-          height: '58px',
-          borderRadius: '6px',
+          width: act.item_type === 'music' || meta.item_type === 'music' || act.external_id?.startsWith('artist:') ? '46px' : '42px',
+          height: act.item_type === 'music' || meta.item_type === 'music' || act.external_id?.startsWith('artist:') ? '46px' : '58px',
+          borderRadius: act.item_type === 'music' || meta.item_type === 'music' || act.external_id?.startsWith('artist:') ? '50%' : '6px',
           overflow: 'hidden',
           flexShrink: 0,
           background: 'var(--bg-tertiary)',
@@ -7134,6 +7141,7 @@ const ProfileActivityCardItem: React.FC<ProfileActivityCardItemProps> = ({
           <img
             src={targetPoster}
             alt={rawTitle || 'Media'}
+            referrerPolicy="no-referrer"
             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
           />
         </div>

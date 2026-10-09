@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Any
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from pydantic import BaseModel
@@ -610,44 +610,59 @@ def add_to_library(
     db.commit()
     db.refresh(new_lib_item)
 
-    # Record activity log: item_added_to_library
+    # Record activity log: item_added_to_library (skip for music artists as they only live in favorites)
     from app.services.activity_service import ActivityService
     t_str = item_in.item_type.value if hasattr(item_in.item_type, "value") else str(item_in.item_type)
     stat_str = item_in.status.value if hasattr(item_in.status, "value") else str(item_in.status)
 
-    ActivityService.record_activity(
-        db=db,
-        user_id=current_user.id,
-        activity_type="item_added_to_library",
-        item_title=item_in.title,
-        item_type=t_str,
-        external_id=item_in.external_id,
-        image_url=item_in.image_url,
-        details=stat_str
-    )
-
-    # If the user directly marked the item with an active or terminal status (e.g. watched, completed, reading, playing, etc.),
-    # also record an item_status_changed event so Profile displays both individual events and Social can unify them.
-    if stat_str not in ("plan_to_watch", "plan_to_read"):
-        act_meta = {
-            "status": stat_str,
-            "is_hundred_percent": bool(item_in.is_hundred_percent if item_in.is_hundred_percent is not None else False),
-            "pages_read": new_lib_item.pages_read or 0,
-            "total_pages": new_lib_item.total_pages or 0,
-            "last_seen_episode": new_lib_item.last_seen_episode,
-            "item_type": t_str
-        }
+    if t_str != "music":
         ActivityService.record_activity(
             db=db,
             user_id=current_user.id,
-            activity_type="item_status_changed",
+            activity_type="item_added_to_library",
             item_title=item_in.title,
             item_type=t_str,
             external_id=item_in.external_id,
             image_url=item_in.image_url,
-            details=stat_str,
-            metadata=act_meta
+            details=stat_str
         )
+
+        # If the user directly marked the item with an active or terminal status (e.g. watched, completed, reading, playing, etc.),
+        # also record an item_status_changed event so Profile displays both individual events and Social can unify them.
+        if stat_str not in ("plan_to_watch", "plan_to_read"):
+            act_meta = {
+                "status": stat_str,
+                "is_hundred_percent": bool(item_in.is_hundred_percent if item_in.is_hundred_percent is not None else False),
+                "pages_read": new_lib_item.pages_read or 0,
+                "total_pages": new_lib_item.total_pages or 0,
+                "last_seen_episode": new_lib_item.last_seen_episode,
+                "item_type": t_str
+            }
+            ActivityService.record_activity(
+                db=db,
+                user_id=current_user.id,
+                activity_type="item_status_changed",
+                item_title=item_in.title,
+                item_type=t_str,
+                external_id=item_in.external_id,
+                image_url=item_in.image_url,
+                details=stat_str,
+                metadata=act_meta
+            )
+    else:
+        # If created directly as favorite, record item_favorited with item_type="music"
+        if item_in.is_favorite:
+            ActivityService.record_activity(
+                db=db,
+                user_id=current_user.id,
+                activity_type="item_favorited",
+                item_title=item_in.title,
+                item_type="music",
+                external_id=item_in.external_id,
+                image_url=item_in.image_url,
+                details="favorited",
+                metadata={"item_type": "music"}
+            )
     
     return new_lib_item
 
@@ -907,6 +922,18 @@ def get_library(
 
     return res
 
+def reorder_favorites_after_delete(db: Session, user_id: int, deleted_order: int, item_type: Any):
+    """Shift down favorite_order for remaining favorites of the user after one is removed"""
+    db.query(UserLibraryItem).filter(
+        UserLibraryItem.user_id == user_id,
+        UserLibraryItem.item_type == item_type,
+        UserLibraryItem.is_favorite == True,
+        UserLibraryItem.favorite_order > deleted_order
+    ).update(
+        {UserLibraryItem.favorite_order: UserLibraryItem.favorite_order - 1},
+        synchronize_session=False
+    )
+
 @router.put("/favorites/reorder")
 def reorder_favorites(
     req: ReorderFavoritesRequest,
@@ -1109,7 +1136,8 @@ def update_library_item(
                 item_type=t_str,
                 external_id=lib_item.external_id,
                 image_url=lib_item.image_url,
-                details="favorited"
+                details="favorited",
+                metadata={"item_type": t_str}
             )
         else:
             lib_item.favorited_at = None
