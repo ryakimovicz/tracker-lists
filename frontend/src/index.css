@@ -741,8 +741,8 @@ h1, h2, h3, h4, h5, h6 {
 
 /* Unified Pink Favorite Heart Button */
 .btn-favorite-heart {
-  background: rgba(9, 9, 12, 0.75);
-  border: 1px solid transparent;
+  background: rgba(9, 13, 22, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 50%;
   display: inline-flex;
   align-items: center;
@@ -750,6 +750,15 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--text-secondary);
   cursor: pointer;
   transition: all 0.2s ease;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+[data-theme="light"] .btn-favorite-heart {
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  color: #64748b;
 }
 
 .btn-favorite-heart:hover:not(:disabled) {
@@ -758,8 +767,18 @@ h1, h2, h3, h4, h5, h6 {
   transform: scale(1.1);
 }
 
+[data-theme="light"] .btn-favorite-heart:hover:not(:disabled) {
+  background: #ffffff;
+  box-shadow: 0 4px 10px rgba(244, 114, 182, 0.25);
+}
+
 .btn-favorite-heart.is-favorite {
   color: var(--color-user, #F472B6) !important;
+  border-color: var(--color-user, #F472B6) !important;
+}
+
+[data-theme="light"] .btn-favorite-heart.is-favorite {
+  background: #ffffff;
   border-color: var(--color-user, #F472B6) !important;
 }
 
