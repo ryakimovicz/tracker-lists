@@ -122,14 +122,19 @@ export const ReplaceFavoriteModal: React.FC<ReplaceFavoriteModalProps> = ({
                 <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
                   {isEs ? 'Actual' : 'Current'}
                 </span>
-                <div style={{ width: '90px', height: '130px', borderRadius: '8px', overflow: 'hidden' }}>
+                <div style={{
+                  width: currentActive.item_type === 'music' && currentActive.external_id?.startsWith('artist:') ? '100px' : '90px',
+                  height: currentActive.item_type === 'music' && currentActive.external_id?.startsWith('artist:') ? '100px' : '130px',
+                  borderRadius: currentActive.item_type === 'music' && currentActive.external_id?.startsWith('artist:') ? '50%' : '8px',
+                  overflow: 'hidden'
+                }}>
                   <MediaPoster
                     src={currentActive.image_url}
                     title={currentActive.title}
                     itemType={currentActive.item_type}
                     height="100%"
                     width="100%"
-                    borderRadius="8px"
+                    borderRadius={currentActive.item_type === 'music' && currentActive.external_id?.startsWith('artist:') ? '50%' : '8px'}
                   />
                 </div>
                 <span style={{ fontSize: '0.85rem', fontWeight: 600, maxWidth: '110px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={currentActive.title}>
@@ -146,14 +151,20 @@ export const ReplaceFavoriteModal: React.FC<ReplaceFavoriteModalProps> = ({
                 <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--accent-primary)', textTransform: 'uppercase' }}>
                   {isEs ? 'Nuevo' : 'New'}
                 </span>
-                <div style={{ width: '90px', height: '130px', borderRadius: '8px', overflow: 'hidden', border: '2px solid var(--accent-primary)' }}>
+                <div style={{
+                  width: newItem.item_type === 'music' && newItem.external_id?.startsWith('artist:') ? '100px' : '90px',
+                  height: newItem.item_type === 'music' && newItem.external_id?.startsWith('artist:') ? '100px' : '130px',
+                  borderRadius: newItem.item_type === 'music' && newItem.external_id?.startsWith('artist:') ? '50%' : '8px',
+                  overflow: 'hidden',
+                  border: '2px solid var(--accent-primary)'
+                }}>
                   <MediaPoster
                     src={newItem.image_url}
                     title={newItem.title}
                     itemType={newItem.item_type}
                     height="100%"
                     width="100%"
-                    borderRadius="8px"
+                    borderRadius={newItem.item_type === 'music' && newItem.external_id?.startsWith('artist:') ? '50%' : '8px'}
                   />
                 </div>
                 <span style={{ fontSize: '0.85rem', fontWeight: 600, maxWidth: '110px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={newItem.title}>
@@ -218,14 +229,19 @@ export const ReplaceFavoriteModal: React.FC<ReplaceFavoriteModalProps> = ({
                     borderRadius: '10px'
                   }}
                 >
-                  <div style={{ width: '80px', height: '115px', borderRadius: '6px', overflow: 'hidden' }}>
+                  <div style={{
+                    width: fav.item_type === 'music' && fav.external_id?.startsWith('artist:') ? '80px' : '80px',
+                    height: fav.item_type === 'music' && fav.external_id?.startsWith('artist:') ? '80px' : '115px',
+                    borderRadius: fav.item_type === 'music' && fav.external_id?.startsWith('artist:') ? '50%' : '6px',
+                    overflow: 'hidden'
+                  }}>
                     <MediaPoster
                       src={fav.image_url}
                       title={fav.title}
                       itemType={fav.item_type}
                       height="100%"
                       width="100%"
-                      borderRadius="6px"
+                      borderRadius={fav.item_type === 'music' && fav.external_id?.startsWith('artist:') ? '50%' : '6px'}
                     />
                   </div>
                   <span style={{ fontSize: '0.8rem', fontWeight: 600, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={fav.title}>

@@ -147,6 +147,7 @@ export const getTagClass = (type: string) => {
     case 'game': return 'tag-badge tag-game';
     case 'guide': return 'tag-badge tag-guide';
     case 'user': return 'tag-badge tag-user';
+    case 'music': return 'tag-badge tag-music';
     default: return 'tag-badge tag-series';
   }
 };
@@ -623,6 +624,14 @@ export const Profile: React.FC = () => {
     if (!item) return;
     const targetType = item.item_type || 'movie';
     const targetId = item.external_id || item.id;
+    if (targetType === 'music') {
+      const isArtist = typeof targetId === 'string' && targetId.startsWith('artist:');
+      const cleanArtist = isArtist ? targetId.replace('artist:', '') : (item.title || '');
+      navigate(`/music/artist/${encodeURIComponent(cleanArtist)}`, {
+        state: { backgroundLocation: location, image: item.image_url }
+      });
+      return;
+    }
     if (targetType && targetId) {
       navigate(`/item/${targetType}/${targetId}`, {
         state: { backgroundLocation: location, item }
@@ -2219,39 +2228,55 @@ export const Profile: React.FC = () => {
   };
 
   const handleConfirmReplace = async (itemToReplaceId: number, newItemId: number) => {
-    const newItemObj = libraryItems.find(li => li.id === newItemId);
+    let newItemObj = libraryItems.find(li => li.id === newItemId);
+    if (!newItemObj && replaceModalState.newItem?.id === newItemId) {
+      newItemObj = replaceModalState.newItem;
+    }
     if (!newItemObj) return;
 
     try {
       const nowIso = new Date().toISOString();
       // 1. Unfavorite the old item
       await apiClient.put(`/library/${itemToReplaceId}`, { is_favorite: false });
-      // 2. Favorite the new item
-      await apiClient.put(`/library/${newItemId}`, { is_favorite: true });
+      
+      let finalNewItem = newItemObj;
+      // 2. Favorite the new item (create if synthetic id < 0)
+      if (newItemId < 0) {
+        const createRes = await apiClient.post('/library/', {
+          item_type: newItemObj.item_type,
+          external_id: newItemObj.external_id,
+          title: newItemObj.title,
+          image_url: newItemObj.image_url || '',
+          status: 'completed',
+          is_favorite: true
+        });
+        finalNewItem = createRes.data;
+      } else {
+        await apiClient.put(`/library/${newItemId}`, { is_favorite: true });
+      }
 
       setLibraryItems(prev => {
-        return prev.map(item => {
-          if (item.id === itemToReplaceId) {
-            return { ...item, is_favorite: false, favorited_at: undefined };
-          }
-          if (item.id === newItemId) {
-            return { ...item, is_favorite: true, favorited_at: nowIso, favorite_order: 0 };
-          }
-          if (item.is_favorite) {
-            return { ...item, favorite_order: (item.favorite_order ?? 0) + 1 };
-          }
-          return item;
-        });
+        const filtered = prev.filter(item => item.id !== itemToReplaceId && item.id !== finalNewItem.id);
+        const unFavReplaced = prev.find(item => item.id === itemToReplaceId);
+        const updatedReplaced = unFavReplaced ? [{ ...unFavReplaced, is_favorite: false, favorited_at: undefined }] : [];
+        const nextList = [
+          { ...finalNewItem, is_favorite: true, favorited_at: nowIso, favorite_order: 0 },
+          ...filtered.map(item => item.is_favorite ? { ...item, favorite_order: (item.favorite_order ?? 0) + 1 } : item),
+          ...updatedReplaced
+        ];
+        return nextList;
       });
 
       setFavorites(prev => {
-        const filtered = prev.filter(li => li.id !== itemToReplaceId && li.id !== newItemId);
+        const filtered = prev.filter(li => li.id !== itemToReplaceId && li.id !== finalNewItem.id);
         const shifted = filtered.map(li => ({
           ...li,
           favorite_order: (li.favorite_order ?? 0) + 1
         }));
-        return [{ ...newItemObj, is_favorite: true, favorited_at: nowIso, favorite_order: 0 }, ...shifted];
+        return [{ ...finalNewItem, is_favorite: true, favorited_at: nowIso, favorite_order: 0 }, ...shifted];
       });
+
+      window.dispatchEvent(new CustomEvent('library-updated'));
 
       setSuccessMsg(language === 'es' ? 'Obra destacada actualizada correctamente.' : 'Featured item updated successfully.');
       setTimeout(() => setSuccessMsg(''), 4000);
@@ -2262,6 +2287,83 @@ export const Profile: React.FC = () => {
       setActivities(actRes.data);
     } catch(err: any) {
       setErrorMsg(err.response?.data?.detail || (language === 'es' ? 'Error al reemplazar destacado' : 'Failed to replace favorite'));
+      setTimeout(() => setErrorMsg(''), 5000);
+    }
+  };
+
+  const handleToggleArtistFavorite = async (artistName: string, imageUrl?: string) => {
+    if (!artistName) return;
+    const cleanName = artistName.trim().toLowerCase();
+    const targetExternalId = `artist:${cleanName}`;
+    const existing = libraryItems.find(li => li.item_type === 'music' && (li.external_id?.toLowerCase() === targetExternalId || li.title?.toLowerCase() === cleanName));
+
+    if (existing) {
+      handleToggleFavorite(existing.id, Boolean(existing.is_favorite));
+      return;
+    }
+
+    // Artist is not yet in library
+    const isPro = Boolean(profile?.is_pro || currentUser?.is_pro || currentUser?.is_admin || currentUser?.is_vip);
+    const sameCategoryFavs = displayedFavorites.filter(f => f.item_type === 'music');
+    const maxAllowed = isPro ? 10 : 1;
+
+    if (sameCategoryFavs.length >= maxAllowed) {
+      const syntheticItem: LibraryItem = {
+        id: -Date.now(),
+        item_type: 'music',
+        external_id: targetExternalId,
+        title: artistName.trim(),
+        image_url: imageUrl || '',
+        status: 'completed',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        is_favorite: false
+      };
+      setReplaceModalState({
+        isOpen: true,
+        newItem: syntheticItem,
+        currentFavorites: sameCategoryFavs
+      });
+      return;
+    }
+
+    // Under limit: create directly with is_favorite: true
+    try {
+      const nowIso = new Date().toISOString();
+      const res = await apiClient.post('/library/', {
+        item_type: 'music',
+        external_id: targetExternalId,
+        title: artistName.trim(),
+        image_url: imageUrl || '',
+        status: 'completed',
+        is_favorite: true
+      });
+      const createdItem: LibraryItem = res.data;
+
+      setLibraryItems(prev => [
+        { ...createdItem, is_favorite: true, favorited_at: nowIso, favorite_order: 0 },
+        ...prev.map(item => item.is_favorite ? { ...item, favorite_order: (item.favorite_order ?? 0) + 1 } : item)
+      ]);
+
+      setFavorites(prev => {
+        const shifted = prev.map(li => ({
+          ...li,
+          favorite_order: (li.favorite_order ?? 0) + 1
+        }));
+        return [{ ...createdItem, is_favorite: true, favorited_at: nowIso, favorite_order: 0 }, ...shifted];
+      });
+
+      window.dispatchEvent(new CustomEvent('library-updated'));
+
+      setSuccessMsg(language === 'es' ? 'Artista agregado a destacados.' : 'Artist added to featured favorites.');
+      setTimeout(() => setSuccessMsg(''), 4000);
+
+      // Refresh activities
+      const targetActivityUrl = userIdParam ? `/users/${userIdParam}/activity` : '/users/me/activity';
+      const actRes = await apiClient.get(targetActivityUrl);
+      setActivities(actRes.data);
+    } catch (err: any) {
+      setErrorMsg(err.response?.data?.detail || (language === 'es' ? 'Error al destacar artista' : 'Failed to feature artist'));
       setTimeout(() => setErrorMsg(''), 5000);
     }
   };
@@ -4626,7 +4728,7 @@ export const Profile: React.FC = () => {
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
               {(() => {
                 const orderedMedia = getOrderedCategories(profile?.category_order || currentUser?.category_order);
-                const baseTypes = ['all', ...orderedMedia] as const;
+                const baseTypes = ['all', ...orderedMedia, 'music'] as const;
                 const allowedTypes = baseTypes.filter(type => {
                   if (type === 'all') return true;
                   if (type === 'series') return displayedFavorites.some(item => item.item_type === 'series' || item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tvm-ep-'));
@@ -4663,7 +4765,8 @@ export const Profile: React.FC = () => {
                          type === 'book' ? (language === 'es' ? 'Libros' : 'Books') :
                          type === 'comic' ? (language === 'es' ? 'Cómics' : 'Comics') :
                          type === 'manga' ? 'Mangas' :
-                         type === 'game' ? (language === 'es' ? 'Juegos' : 'Games') : type}
+                         type === 'game' ? (language === 'es' ? 'Juegos' : 'Games') :
+                         type === 'music' ? (language === 'es' ? 'Música' : 'Music') : type}
                       </span>
                     </button>
                   );
@@ -4872,7 +4975,7 @@ export const Profile: React.FC = () => {
                       color: 'var(--color-user, #F472B6)',
                       border: '1px solid rgba(244, 114, 182, 0.3)'
                     }}>
-                      {displayedFavorites.length} / {profile?.is_pro ? '70' : '7'} {language === 'es' ? 'destacados' : 'featured'}
+                      {displayedFavorites.length} / {profile?.is_pro ? '80' : '8'} {language === 'es' ? 'destacados' : 'featured'}
                     </span>
 
                     {isOwnProfile && favoritesMediaFilter === 'all' && displayedFavorites.length > 1 && (
@@ -5757,6 +5860,40 @@ export const Profile: React.FC = () => {
                     }}>
                       #{i + 1}
                     </span>
+
+                    {/* Artist Favorite Button (Only on own profile and artists view) */}
+                    {isOwnProfile && musicType === 'artists' && (() => {
+                      const cleanName = (item.name || '').trim().toLowerCase();
+                      const targetExt = `artist:${cleanName}`;
+                      const isArtistFav = displayedFavorites.some(f => f.item_type === 'music' && (f.external_id?.toLowerCase() === targetExt || f.title?.toLowerCase() === cleanName));
+
+                      return (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleToggleArtistFavorite(item.name, item.image);
+                          }}
+                          className={`btn-favorite-heart ${isArtistFav ? 'is-favorite' : ''}`}
+                          style={{
+                            position: 'absolute',
+                            top: '0.5rem',
+                            right: '0.5rem',
+                            width: '32px',
+                            height: '32px',
+                            cursor: 'pointer',
+                            zIndex: 3,
+                            color: isArtistFav ? 'var(--color-user, #F472B6)' : 'var(--text-secondary)'
+                          }}
+                          title={isArtistFav
+                            ? (language === 'es' ? 'Quitar Destacado' : 'Remove Featured')
+                            : (language === 'es' ? 'Destacar Artista' : 'Feature Artist')
+                          }
+                        >
+                          <Heart size={16} fill={isArtistFav ? 'var(--color-user, #F472B6)' : 'none'} />
+                        </button>
+                      );
+                    })()}
 
                     {/* Artwork / Poster / Avatar */}
                     <div style={{

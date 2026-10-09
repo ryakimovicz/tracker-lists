@@ -26,6 +26,7 @@ export const getTagClass = (type: string) => {
     case 'game': return 'tag-badge tag-game';
     case 'guide': return 'tag-badge tag-guide';
     case 'user': return 'tag-badge tag-user';
+    case 'music': return 'tag-badge tag-music';
     default: return 'tag-badge tag-series';
   }
 };

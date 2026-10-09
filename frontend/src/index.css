@@ -585,6 +585,12 @@ h1, h2, h3, h4, h5, h6 {
   border-color: rgba(0, 0, 0, 0.08);
 }
 
+.tag-music {
+  background-color: var(--color-music);
+  color: var(--color-text-music, #FFFFFF);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
 /* Feed Updates Hover Effects */
 .feed-update-card:hover:not(:has(.feed-update-user-link:hover)) .feed-update-guide {
   color: var(--accent-primary);

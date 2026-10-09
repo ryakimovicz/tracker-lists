@@ -50,6 +50,13 @@ def validate_media_status(item_type: str, status_val: UserLibraryStatusEnum):
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid status for book. Must be 'plan_to_read', 'reading', 'read', or 'dropped'."
             )
+    elif t_lower == "music":
+        allowed = {UserLibraryStatusEnum.COMPLETED, UserLibraryStatusEnum.WATCHING}
+        if status_val not in allowed:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid status for music. Must be 'completed' or 'watching'."
+            )
 
 def bulk_complete_series_episodes(db: Session, user_id: int, tracking_list_id: int, external_id: str, title: str):
     try:

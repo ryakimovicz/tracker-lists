@@ -83,12 +83,13 @@ export const MediaPoster: React.FC<MediaPosterProps> = ({
           label: 'Juego'
         };
       case 'music':
+      case 'artist':
       case 'album':
       case 'track':
         return {
-          icon: <Disc size={36} color="#ec4899" />,
-          color: '#ec4899',
-          bg: 'linear-gradient(145deg, rgba(236, 72, 153, 0.12) 0%, rgba(15, 23, 42, 0.95) 100%)',
+          icon: <Disc size={36} color="var(--color-music, #1DB954)" />,
+          color: 'var(--color-music, #1DB954)',
+          bg: 'linear-gradient(145deg, rgba(29, 185, 84, 0.12) 0%, rgba(15, 23, 42, 0.95) 100%)',
           label: 'Música'
         };
       default:

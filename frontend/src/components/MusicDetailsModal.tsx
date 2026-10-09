@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { X, Trophy, Disc, Mic, Headphones, Clock, Music, User as UserIcon, Calendar, ArrowRight, Star, ChevronDown, ChevronUp, Globe } from 'lucide-react';
+import { X, Trophy, Disc, Mic, Headphones, Clock, Music, User as UserIcon, Calendar, ArrowRight, Star, ChevronDown, ChevronUp, Globe, Heart } from 'lucide-react';
 import { useTranslation } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { apiClient } from '../api/client';
 import { PathdLoader } from './PathdLoader';
+import { ReplaceFavoriteModal } from './ReplaceFavoriteModal';
+import { ProModal } from './ProModal';
 
 import { getCachedMusicDetails, setCachedMusicDetails, batchPrefetchMusicItems, prefetchMusicDetails } from '../utils/musicPrefetch';
 
@@ -116,6 +118,40 @@ const MusicDetailsModalInner: React.FC<MusicDetailsModalProps> = ({
   const [loading, setLoading] = useState<boolean>(!initialCached);
   const [data, setData] = useState<any>(initialCached || null);
   const [error, setError] = useState<string>('');
+
+  // Favorites tracking for artist
+  const [shelfFavorites, setShelfFavorites] = useState<any[]>([]);
+  const [replaceModalState, setReplaceModalState] = useState<{
+    isOpen: boolean;
+    newItem: any | null;
+    currentFavorites: any[];
+  }>({
+    isOpen: false,
+    newItem: null,
+    currentFavorites: []
+  });
+  const [showProModal, setShowProModal] = useState(false);
+
+  const loadFavorites = async () => {
+    if (!user) return;
+    try {
+      const res = await apiClient.get('/library/favorites');
+      if (Array.isArray(res.data)) {
+        setShelfFavorites(res.data);
+      }
+    } catch (e) {
+      console.error('Failed to load shelf favorites in MusicDetailsModal', e);
+    }
+  };
+
+  useEffect(() => {
+    loadFavorites();
+    const handleLibUpdated = () => {
+      loadFavorites();
+    };
+    window.addEventListener('library-updated', handleLibUpdated);
+    return () => window.removeEventListener('library-updated', handleLibUpdated);
+  }, [user]);
 
   useEffect(() => {
     if (!activeItem.artist) return;
@@ -379,6 +415,102 @@ const MusicDetailsModalInner: React.FC<MusicDetailsModalProps> = ({
     return item.record_type === discographyFilter;
   });
 
+  // Artist favorite logic
+  const cleanActiveArtist = (activeItem.artist || '').trim().toLowerCase();
+  const activeArtistExternalId = `artist:${cleanActiveArtist}`;
+  const isCurrentArtistFavorite = currentType === 'artist' && shelfFavorites.some(
+    f => f.item_type === 'music' && (f.external_id?.toLowerCase() === activeArtistExternalId || f.title?.toLowerCase() === cleanActiveArtist)
+  );
+
+  const handleToggleArtistFavorite = async () => {
+    if (!user || currentType !== 'artist' || !activeItem.artist) return;
+    const existing = shelfFavorites.find(
+      f => f.item_type === 'music' && (f.external_id?.toLowerCase() === activeArtistExternalId || f.title?.toLowerCase() === cleanActiveArtist)
+    );
+
+    if (existing) {
+      try {
+        await apiClient.put(`/library/${existing.id}`, { is_favorite: false });
+        setShelfFavorites(prev => prev.filter(f => f.id !== existing.id));
+        window.dispatchEvent(new CustomEvent('library-updated'));
+      } catch (e) {
+        console.error('Failed to unfavorite artist', e);
+      }
+      return;
+    }
+
+    // Not in favorites yet: check limits
+    const isPro = Boolean(user.is_pro || (user as any).is_admin || (user as any).is_vip);
+    const musicFavorites = shelfFavorites.filter(f => f.item_type === 'music');
+    const maxAllowed = isPro ? 10 : 1;
+
+    if (musicFavorites.length >= maxAllowed) {
+      const syntheticItem = {
+        id: -Date.now(),
+        user_id: user.id,
+        item_type: 'music',
+        external_id: activeArtistExternalId,
+        title: activeItem.artist.trim(),
+        image_url: displayImage || '',
+        status: 'completed',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        is_favorite: false
+      };
+      setReplaceModalState({
+        isOpen: true,
+        newItem: syntheticItem,
+        currentFavorites: musicFavorites
+      });
+      return;
+    }
+
+    // Under limit: add directly
+    try {
+      const res = await apiClient.post('/library/', {
+        item_type: 'music',
+        external_id: activeArtistExternalId,
+        title: activeItem.artist.trim(),
+        image_url: displayImage || '',
+        status: 'completed',
+        is_favorite: true
+      });
+      setShelfFavorites(prev => [res.data, ...prev]);
+      window.dispatchEvent(new CustomEvent('library-updated'));
+    } catch (e) {
+      console.error('Failed to favorite artist', e);
+    }
+  };
+
+  const handleConfirmReplace = async (itemToReplaceId: number, newItemId: number) => {
+    try {
+      await apiClient.put(`/library/${itemToReplaceId}`, { is_favorite: false });
+      let finalNewItem: any = null;
+      if (newItemId < 0 && replaceModalState.newItem) {
+        const createRes = await apiClient.post('/library/', {
+          item_type: 'music',
+          external_id: replaceModalState.newItem.external_id,
+          title: replaceModalState.newItem.title,
+          image_url: replaceModalState.newItem.image_url || '',
+          status: 'completed',
+          is_favorite: true
+        });
+        finalNewItem = createRes.data;
+      } else {
+        const updateRes = await apiClient.put(`/library/${newItemId}`, { is_favorite: true });
+        finalNewItem = updateRes.data;
+      }
+
+      setShelfFavorites(prev => {
+        const filtered = prev.filter(f => f.id !== itemToReplaceId && f.id !== finalNewItem.id);
+        return [finalNewItem, ...filtered];
+      });
+      window.dispatchEvent(new CustomEvent('library-updated'));
+    } catch (e) {
+      console.error('Failed to replace favorite in modal', e);
+    }
+  };
+
   return (
     <div
       style={{
@@ -459,27 +591,54 @@ const MusicDetailsModalInner: React.FC<MusicDetailsModalProps> = ({
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={onClose}
-            className="btn-close-modal"
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: 'var(--text-secondary)',
-              cursor: 'pointer',
-              padding: '0.4rem',
-              borderRadius: '8px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'color 0.2s, background 0.2s'
-            }}
-            title={isEs ? 'Cerrar' : 'Close'}
-            aria-label={isEs ? 'Cerrar' : 'Close'}
-          >
-            <X size={20} />
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            {/* Feature Artist Heart button */}
+            {user && currentType === 'artist' && (
+              <button
+                type="button"
+                onClick={handleToggleArtistFavorite}
+                className={`btn-favorite-heart ${isCurrentArtistFavorite ? 'is-favorite' : ''}`}
+                style={{
+                  width: '36px',
+                  height: '36px',
+                  cursor: 'pointer',
+                  borderRadius: '8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: isCurrentArtistFavorite ? 'var(--color-user, #F472B6)' : 'var(--text-secondary)'
+                }}
+                title={isCurrentArtistFavorite
+                  ? (isEs ? 'Quitar Destacado' : 'Remove Featured')
+                  : (isEs ? 'Destacar Artista' : 'Feature Artist')
+                }
+              >
+                <Heart size={18} fill={isCurrentArtistFavorite ? 'var(--color-user, #F472B6)' : 'none'} />
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="btn-close-modal"
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: 'var(--text-secondary)',
+                cursor: 'pointer',
+                padding: '0.4rem',
+                borderRadius: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'color 0.2s, background 0.2s'
+              }}
+              title={isEs ? 'Cerrar' : 'Close'}
+              aria-label={isEs ? 'Cerrar' : 'Close'}
+            >
+              <X size={20} />
+            </button>
+          </div>
         </div>
 
         {/* Scrollable Content */}
@@ -1264,6 +1423,22 @@ const MusicDetailsModalInner: React.FC<MusicDetailsModalProps> = ({
           )}
         </div>
       </div>
+
+      {/* Pro Modal */}
+      {showProModal && (
+        <ProModal onClose={() => setShowProModal(false)} />
+      )}
+
+      {/* Replace Favorite Modal for Music Artist */}
+      <ReplaceFavoriteModal
+        isOpen={replaceModalState.isOpen}
+        onClose={() => setReplaceModalState({ isOpen: false, newItem: null, currentFavorites: [] })}
+        newItem={replaceModalState.newItem}
+        currentFavorites={replaceModalState.currentFavorites}
+        isPro={Boolean(user?.is_pro || (user as any)?.is_admin || (user as any)?.is_vip)}
+        onConfirmReplace={handleConfirmReplace}
+        onOpenProModal={() => setShowProModal(true)}
+      />
     </div>
   );
 };
