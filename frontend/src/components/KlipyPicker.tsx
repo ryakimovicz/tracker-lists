@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Search, X, Loader2, Sparkles, Image as ImageIcon, Smile, Film, FileQuestion, Volume2, VolumeX, Heart, FolderHeart, ArrowLeft } from 'lucide-react';
 import { useTranslation } from '../context/LanguageContext';
@@ -488,6 +488,123 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
 
   const containerRef = useRef<HTMLDivElement>(null);
   const searchTimeoutRef = useRef<any>(null);
+  const isClosingViaBackRef = useRef(false);
+  const hasPushedModalHistoryRef = useRef(false);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  // Sync with URL query parameters: ?modal=media&media_tab=gifs|stickers|memes|clips&folder=favorites
+  const updateKlipyUrlParams = useCallback((isOpenState: boolean, tab: 'gifs' | 'stickers' | 'memes' | 'clips', isFavs: boolean, usePush: boolean = false) => {
+    if (typeof window === 'undefined') return;
+    const currentUrl = new URL(window.location.href);
+    if (isOpenState) {
+      currentUrl.searchParams.set('modal', 'media');
+      if (tab === 'gifs') {
+        currentUrl.searchParams.delete('media_tab');
+      } else {
+        currentUrl.searchParams.set('media_tab', tab);
+      }
+      if (isFavs) {
+        currentUrl.searchParams.set('folder', 'favorites');
+      } else {
+        currentUrl.searchParams.delete('folder');
+      }
+    } else {
+      currentUrl.searchParams.delete('modal');
+      currentUrl.searchParams.delete('media_tab');
+      currentUrl.searchParams.delete('folder');
+    }
+    const newRelative = currentUrl.pathname + (currentUrl.search || '') + (currentUrl.hash || '');
+    const currentRelative = window.location.pathname + (window.location.search || '') + (window.location.hash || '');
+    if (newRelative !== currentRelative) {
+      if (usePush) {
+        window.history.pushState(window.history.state, '', newRelative);
+      } else {
+        window.history.replaceState(window.history.state, '', newRelative);
+      }
+    }
+  }, []);
+
+  // Handle URL change or back button to close or restore modal state
+  useEffect(() => {
+    if (!isOpen) {
+      hasPushedModalHistoryRef.current = false;
+      return;
+    }
+
+    // Check if initial URL already had parameters
+    const params = new URLSearchParams(window.location.search);
+    const mediaTabParam = params.get('media_tab');
+    const folderParam = params.get('folder');
+
+    let effectiveTab: 'gifs' | 'stickers' | 'memes' | 'clips' = initialTab;
+    if (mediaTabParam && ['gifs', 'stickers', 'memes', 'clips'].includes(mediaTabParam)) {
+      effectiveTab = mediaTabParam as any;
+    }
+    const effectiveFavs = folderParam === 'favorites';
+
+    setActiveTab(effectiveTab);
+    setViewFavorites(effectiveFavs);
+
+    // Only push history once when the modal is opened if not already having modal=media in URL
+    const alreadyHadModal = params.get('modal') === 'media';
+    if (!hasPushedModalHistoryRef.current) {
+      hasPushedModalHistoryRef.current = true;
+      updateKlipyUrlParams(true, effectiveTab, effectiveFavs, !alreadyHadModal);
+    }
+
+    const handlePopState = () => {
+      const p = new URLSearchParams(window.location.search);
+      if (p.get('modal') !== 'media') {
+        isClosingViaBackRef.current = true;
+        onCloseRef.current();
+      } else {
+        const mt = p.get('media_tab');
+        if (mt && ['gifs', 'stickers', 'memes', 'clips'].includes(mt)) {
+          setActiveTab(mt as any);
+        } else {
+          setActiveTab('gifs');
+        }
+        setViewFavorites(p.get('folder') === 'favorites');
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [isOpen, initialTab, updateKlipyUrlParams]);
+
+  // Clean URL when picker is closed
+  useEffect(() => {
+    if (!isOpen) {
+      if (isClosingViaBackRef.current) {
+        // Already popped history entry via back button, just reset ref
+        isClosingViaBackRef.current = false;
+      } else {
+        // Closed via X, click outside, or item selection: if ?modal=media is in URL, pop the entry
+        if (typeof window !== 'undefined') {
+          const p = new URLSearchParams(window.location.search);
+          if (p.get('modal') === 'media') {
+            window.history.back();
+          } else {
+            updateKlipyUrlParams(false, 'gifs', false, false);
+          }
+        }
+      }
+    }
+  }, [isOpen, updateKlipyUrlParams]);
+
+  const handleTabSelect = (tab: 'gifs' | 'stickers' | 'memes' | 'clips') => {
+    setActiveTab(tab);
+    setViewFavorites(false);
+    updateKlipyUrlParams(true, tab, false, true);
+  };
+
+  const handleToggleFavoritesView = (showFavs: boolean) => {
+    setViewFavorites(showFavs);
+    updateKlipyUrlParams(true, activeTab, showFavs, true);
+  };
 
   // Close on Escape or click outside
   useEffect(() => {
@@ -503,17 +620,15 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
   // Reset state when modal opens or closes
   useEffect(() => {
     if (isOpen) {
-      setActiveTab(initialTab);
       setSearchQuery('');
       setSelectedCategory(null);
-      setViewFavorites(false);
       setUnmutedClipId(null);
       setFavoritesList(getKlipyFavorites());
     } else {
       setUnmutedClipId(null);
       setViewFavorites(false);
     }
-  }, [isOpen, initialTab]);
+  }, [isOpen]);
 
   // Load Categories & Media when Tab Changes or Modal Opens
   useEffect(() => {
@@ -762,20 +877,15 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
         {/* Modal Header & Tabs */}
         <div style={{ padding: '0.9rem 1rem 0.5rem', borderBottom: '1px solid var(--border-color, rgba(255,255,255,0.08))' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
-              <div style={{
-                background: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
-                borderRadius: '8px',
-                padding: '0.3rem 0.4rem',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
-                <KlipyLogo size={18} />
-              </div>
-              <span style={{ fontWeight: 800, fontSize: '1.05rem', letterSpacing: '0.02em', color: 'var(--text-primary)' }}>
-                KLIPY
+            <div>
+              <span style={{ fontWeight: 700, fontSize: '1.05rem', letterSpacing: '0.01em', color: 'var(--text-primary)' }}>
+                {viewFavorites 
+                  ? (language === 'es' 
+                      ? (activeTab === 'stickers' ? 'Stickers favoritos' : activeTab === 'memes' ? 'Memes favoritos' : activeTab === 'clips' ? 'Clips favoritos' : 'GIFs favoritos')
+                      : (activeTab === 'stickers' ? 'Favorite Stickers' : activeTab === 'memes' ? 'Favorite Memes' : activeTab === 'clips' ? 'Favorite Clips' : 'Favorite GIFs'))
+                  : (language === 'es' 
+                      ? (activeTab === 'stickers' ? 'Seleccionar Sticker' : activeTab === 'memes' ? 'Seleccionar Meme' : activeTab === 'clips' ? 'Seleccionar Clip' : 'Seleccionar GIF')
+                      : (activeTab === 'stickers' ? 'Select Sticker' : activeTab === 'memes' ? 'Select Meme' : activeTab === 'clips' ? 'Select Clip' : 'Select GIF'))}
               </span>
             </div>
 
@@ -802,7 +912,7 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
           {/* Navigation Tabs */}
           <div style={{ display: 'flex', gap: '0.4rem', background: 'var(--bg-secondary, rgba(255,255,255,0.04))', padding: '0.25rem', borderRadius: '10px' }}>
             <button
-              onClick={() => setActiveTab('gifs')}
+              onClick={() => handleTabSelect('gifs')}
               style={{
                 flex: 1,
                 padding: '0.4rem 0.6rem',
@@ -824,7 +934,7 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
               GIFs
             </button>
             <button
-              onClick={() => setActiveTab('stickers')}
+              onClick={() => handleTabSelect('stickers')}
               style={{
                 flex: 1,
                 padding: '0.4rem 0.6rem',
@@ -846,7 +956,7 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
               Stickers
             </button>
             <button
-              onClick={() => setActiveTab('memes')}
+              onClick={() => handleTabSelect('memes')}
               style={{
                 flex: 1,
                 padding: '0.4rem 0.6rem',
@@ -868,7 +978,7 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
               Memes
             </button>
             <button
-              onClick={() => setActiveTab('clips')}
+              onClick={() => handleTabSelect('clips')}
               style={{
                 flex: 1,
                 padding: '0.4rem 0.6rem',
@@ -976,7 +1086,7 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
             borderBottom: '1px solid rgba(255, 255, 255, 0.06)'
           }}>
             <button
-              onClick={() => setViewFavorites(false)}
+              onClick={() => handleToggleFavoritesView(false)}
               style={{
                 background: 'rgba(255, 255, 255, 0.06)',
                 border: '1px solid rgba(255, 255, 255, 0.1)',
@@ -1020,7 +1130,7 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
           {/* Favorites Folder as the very first item when not searching and not inside folder */}
           {!searchQuery && !viewFavorites && (
             <div
-              onClick={() => setViewFavorites(true)}
+              onClick={() => handleToggleFavoritesView(true)}
               style={{
                 position: 'relative',
                 width: '100%',

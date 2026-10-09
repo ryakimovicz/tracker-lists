@@ -3715,8 +3715,9 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
   // Sync Bottom Tab ('reviews' | 'comments') and Spoiler Warning ('?warning=spoilers') with URL
   const initialUrlCheckDone = useRef(false);
+  const isClosingSpoilerViaBackRef = useRef(false);
 
-  const updateModalUrlParams = useCallback((newTab: 'reviews' | 'comments', warningOpen: boolean) => {
+  const updateModalUrlParams = useCallback((newTab: 'reviews' | 'comments', warningOpen: boolean, usePush: boolean = false) => {
     if (typeof window === 'undefined') return;
     const currentUrl = new URL(window.location.href);
     if (warningOpen) {
@@ -3733,10 +3734,15 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     const newRelative = currentUrl.pathname + (currentUrl.search || '') + (currentUrl.hash || '');
     const currentRelative = window.location.pathname + (window.location.search || '') + (window.location.hash || '');
     if (newRelative !== currentRelative) {
-      window.history.replaceState(window.history.state, '', newRelative);
+      if (usePush) {
+        window.history.pushState(window.history.state, '', newRelative);
+      } else {
+        window.history.replaceState(window.history.state, '', newRelative);
+      }
     }
   }, []);
 
+  // Initial check on mount or when consumption status changes
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const params = new URLSearchParams(window.location.search);
@@ -3758,9 +3764,9 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
     if (tabParam === 'comments') {
       if (!isItemConsumed) {
-        // Not consumed: redirect to spoiler warning
+        // Not consumed: show spoiler warning and push state
         setShowCommentsSpoilerModal(true);
-        updateModalUrlParams('reviews', true);
+        updateModalUrlParams('reviews', true, true);
       } else {
         setActiveBottomTab('comments');
       }
@@ -3770,6 +3776,40 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
     initialUrlCheckDone.current = true;
   }, [isItemConsumed, updateModalUrlParams]);
+
+  // Listen for browser Back/Forward (popstate) to handle spoiler warning modal and tab changes
+  useEffect(() => {
+    const handlePopState = () => {
+      const params = new URLSearchParams(window.location.search);
+      const warningParam = params.get('warning');
+      const tabParam = params.get('tab');
+      const modalParam = params.get('modal');
+
+      // If Klipy modal is active, let KlipyPicker handle its own popstate
+      if (modalParam === 'media') return;
+
+      if (warningParam === 'spoilers') {
+        setShowCommentsSpoilerModal(true);
+      } else {
+        // If spoiler warning was open and user pressed back, close warning and return to reviews
+        setShowCommentsSpoilerModal(prev => {
+          if (prev) {
+            isClosingSpoilerViaBackRef.current = true;
+          }
+          return false;
+        });
+
+        if (tabParam === 'comments') {
+          setActiveBottomTab('comments');
+        } else {
+          setActiveBottomTab('reviews');
+        }
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   // Clean up URL parameters on unmount if they were set by this modal
   useEffect(() => {
@@ -3804,7 +3844,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       if (activeBottomTab === 'comments' && !showCommentsSpoilerModal) return;
       if (!isItemConsumed) {
         setShowCommentsSpoilerModal(true);
-        updateModalUrlParams('reviews', true);
+        // Push state so pressing Back returns to the item details modal without closing it
+        updateModalUrlParams('reviews', true, true);
       } else {
         setActiveBottomTab('comments');
         setShowCommentsSpoilerModal(false);
@@ -11556,11 +11597,18 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                 onConfirm={() => {
                   setShowCommentsSpoilerModal(false);
                   setActiveBottomTab('comments');
-                  updateModalUrlParams('comments', false);
+                  // Replace warning=spoilers with tab=comments without pushing another entry
+                  updateModalUrlParams('comments', false, false);
                 }}
                 onClose={() => {
                   setShowCommentsSpoilerModal(false);
-                  updateModalUrlParams('reviews', false);
+                  // If closed via UI button and URL has warning=spoilers, navigate back to remove the pushed entry
+                  const p = new URLSearchParams(window.location.search);
+                  if (p.get('warning') === 'spoilers') {
+                    window.history.back();
+                  } else {
+                    updateModalUrlParams('reviews', false, false);
+                  }
                 }}
               />
     </div>
