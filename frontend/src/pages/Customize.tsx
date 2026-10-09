@@ -53,10 +53,10 @@ export const CustomizePage: React.FC = () => {
   const isEs = language === 'es';
   const isLight = theme === 'light';
 
-  // Modal parameter handling: 'avatar' | 'banner' | 'background'
+  // Modal parameter handling: 'avatar' | 'banner' | 'background' | 'music-guide'
   const modalParam = searchParams.get('modal');
 
-  const openModal = (modalName: 'avatar' | 'banner' | 'background') => {
+  const openModal = (modalName: 'avatar' | 'banner' | 'background' | 'music-guide') => {
     const newParams = new URLSearchParams(searchParams);
     newParams.set('modal', modalName);
     setSearchParams(newParams);
@@ -65,6 +65,7 @@ export const CustomizePage: React.FC = () => {
   const closeModal = () => {
     const newParams = new URLSearchParams(searchParams);
     newParams.delete('modal');
+    newParams.delete('tab');
     setSearchParams(newParams);
   };
 
@@ -72,9 +73,9 @@ export const CustomizePage: React.FC = () => {
   const showAvatarModal = modalParam === 'avatar';
   const showBannerModal = modalParam === 'banner';
   const showBackgroundModal = modalParam === 'background';
+  const showMusicGuideModal = modalParam === 'music-guide' || modalParam === 'music_guide';
   const [showProModal, setShowProModal] = useState(false);
   const [showDisconnectLastFmModal, setShowDisconnectLastFmModal] = useState(false);
-  const [showMusicGuideModal, setShowMusicGuideModal] = useState(false);
   const [musicDetailsModal, setMusicDetailsModal] = useState<{
     isOpen: boolean;
     type: 'artist' | 'album' | 'track';
@@ -1390,7 +1391,7 @@ export const CustomizePage: React.FC = () => {
 
             <button
               type="button"
-              onClick={() => setShowMusicGuideModal(true)}
+              onClick={() => openModal('music-guide')}
               style={{
                 background: 'transparent',
                 border: 'none',
@@ -1528,7 +1529,7 @@ export const CustomizePage: React.FC = () => {
 
       <MusicServiceGuideModal
         isOpen={showMusicGuideModal}
-        onClose={() => setShowMusicGuideModal(false)}
+        onClose={closeModal}
       />
 
       <ConfirmModal

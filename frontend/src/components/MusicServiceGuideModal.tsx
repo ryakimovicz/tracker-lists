@@ -1,16 +1,45 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { X, HelpCircle, ExternalLink } from 'lucide-react';
 import { useTranslation } from '../context/LanguageContext';
+
+export type MusicGuideTabId = 'spotify' | 'applemusic' | 'ytmusic_other' | 'deezer_tidal';
 
 interface MusicServiceGuideModalProps {
   isOpen: boolean;
   onClose: () => void;
+  defaultTab?: MusicGuideTabId;
 }
 
-export const MusicServiceGuideModal: React.FC<MusicServiceGuideModalProps> = ({ isOpen, onClose }) => {
+const VALID_TABS: Record<string, MusicGuideTabId> = {
+  spotify: 'spotify',
+  applemusic: 'applemusic',
+  'apple-music': 'applemusic',
+  ytmusic_other: 'ytmusic_other',
+  'ytmusic-other': 'ytmusic_other',
+  ytmusic: 'ytmusic_other',
+  'youtube-music': 'ytmusic_other',
+  deezer_tidal: 'deezer_tidal',
+  'deezer-tidal': 'deezer_tidal',
+  deezer: 'deezer_tidal',
+  tidal: 'deezer_tidal',
+};
+
+export const MusicServiceGuideModal: React.FC<MusicServiceGuideModalProps> = ({ isOpen, onClose, defaultTab }) => {
   const { language } = useTranslation();
   const isEs = language === 'es';
-  const [activeTab, setActiveTab] = useState<'spotify' | 'applemusic' | 'ytmusic_other' | 'deezer_tidal'>('spotify');
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const rawTabParam = searchParams.get('tab')?.toLowerCase();
+  const activeTab: MusicGuideTabId = (rawTabParam && VALID_TABS[rawTabParam]) 
+    ? VALID_TABS[rawTabParam] 
+    : (defaultTab || 'spotify');
+
+  const handleTabChange = (tabId: MusicGuideTabId) => {
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set('tab', tabId);
+    setSearchParams(newParams);
+  };
 
   if (!isOpen) return null;
 
@@ -27,8 +56,9 @@ export const MusicServiceGuideModal: React.FC<MusicServiceGuideModalProps> = ({ 
         position: 'fixed',
         inset: 0,
         zIndex: 9999,
-        background: 'rgba(0, 0, 0, 0.75)',
-        backdropFilter: 'blur(5px)',
+        background: 'var(--modal-backdrop-bg, rgba(0, 0, 0, 0.75))',
+        backdropFilter: 'blur(var(--modal-backdrop-blur, 6px))',
+        WebkitBackdropFilter: 'blur(var(--modal-backdrop-blur, 6px))',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -48,7 +78,7 @@ export const MusicServiceGuideModal: React.FC<MusicServiceGuideModalProps> = ({ 
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
-          boxShadow: '0 16px 40px rgba(0,0,0,0.5)',
+          boxShadow: 'var(--card-shadow, 0 16px 40px rgba(0,0,0,0.5))',
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -122,7 +152,7 @@ export const MusicServiceGuideModal: React.FC<MusicServiceGuideModalProps> = ({ 
               <button
                 key={p.id}
                 type="button"
-                onClick={() => setActiveTab(p.id as any)}
+                onClick={() => handleTabChange(p.id as any)}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
