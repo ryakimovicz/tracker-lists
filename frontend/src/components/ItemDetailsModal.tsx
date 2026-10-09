@@ -5490,90 +5490,74 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       }
     }
 
-    const colorConfig: Record<string, { accent: string; text: string; border: string; glow: string }> = {
-      movie: {
-        accent: 'var(--color-movie)',
-        text: 'var(--color-text-movie)',
-        border: 'rgba(74, 222, 128, 0.35)',
-        glow: 'rgba(74, 222, 128, 0.25)'
-      },
-      series: {
-        accent: 'var(--color-series)',
-        text: 'var(--color-text-series)',
-        border: 'rgba(253, 224, 71, 0.35)',
-        glow: 'rgba(253, 224, 71, 0.25)'
-      },
-      anime: {
-        accent: 'var(--color-anime)',
-        text: 'var(--color-text-anime)',
-        border: 'rgba(251, 146, 60, 0.35)',
-        glow: 'rgba(251, 146, 60, 0.25)'
-      },
-      game: {
-        accent: 'var(--color-game)',
-        text: 'var(--color-text-game)',
-        border: 'rgba(192, 132, 252, 0.35)',
-        glow: 'rgba(192, 132, 252, 0.25)'
-      },
-      comic: {
-        accent: 'var(--color-comic)',
-        text: 'var(--color-text-comic)',
-        border: 'rgba(248, 113, 113, 0.35)',
-        glow: 'rgba(248, 113, 113, 0.25)'
-      },
-      manga: {
-        accent: 'var(--color-manga)',
-        text: 'var(--color-text-manga)',
-        border: 'rgba(96, 165, 250, 0.35)',
-        glow: 'rgba(96, 165, 250, 0.25)'
-      },
-      book: {
-        accent: 'var(--color-book)',
-        text: 'var(--color-text-book)',
-        border: 'rgba(180, 83, 9, 0.4)',
-        glow: 'rgba(180, 83, 9, 0.3)'
-      },
-      music: {
-        accent: 'var(--color-user)',
-        text: 'var(--color-text-user)',
-        border: 'rgba(244, 114, 182, 0.35)',
-        glow: 'rgba(244, 114, 182, 0.25)'
-      }
+    // Category color mapping dynamically referencing theme tokens
+    const categoryTokens: Record<string, { colorVar: string; textVar: string; lightHex: string; darkHex: string }> = {
+      movie: { colorVar: '--color-movie', textVar: '--color-text-movie', lightHex: '#16A34A', darkHex: '#4ADE80' },
+      series: { colorVar: '--color-series', textVar: '--color-text-series', lightHex: '#FACC15', darkHex: '#FDE047' },
+      anime: { colorVar: '--color-anime', textVar: '--color-text-anime', lightHex: '#EA580C', darkHex: '#FF8833' },
+      game: { colorVar: '--color-game', textVar: '--color-text-game', lightHex: '#9333EA', darkHex: '#C084FC' },
+      comic: { colorVar: '--color-comic', textVar: '--color-text-comic', lightHex: '#DC2626', darkHex: '#F87171' },
+      manga: { colorVar: '--color-manga', textVar: '--color-text-manga', lightHex: '#2563EB', darkHex: '#60A5FA' },
+      book: { colorVar: '--color-book', textVar: '--color-text-book', lightHex: '#7C4A27', darkHex: '#A26946' },
+      music: { colorVar: '--color-music', textVar: '--color-text-music', lightHex: '#15803D', darkHex: '#1DB954' }
     };
-    const cfg = colorConfig[cat] || colorConfig.movie;
-    const isLightMode = document.documentElement.getAttribute('data-theme') === 'light';
-    const bgGradient = isLightMode
-      ? `linear-gradient(180deg, ${cfg.border} 0%, rgba(255, 255, 255, 0.98) 45%)`
-      : `linear-gradient(180deg, ${cfg.border} 0%, rgba(9, 13, 22, 0.98) 45%)`;
 
+    const token = categoryTokens[cat] || categoryTokens.movie;
+    const isLightMode = typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme') === 'light';
+
+    // In light mode: use refined, subtle tint with high contrast border and soft studio shadow
+    // In dark mode: use immersive neon glow with deep charcoal card
+    const accentVar = `var(${token.colorVar})`;
+    const textVar = `var(${token.textVar})`;
+    const activeHex = isLightMode ? token.lightHex : token.darkHex;
+
+    const bgGradient = isLightMode
+      ? `linear-gradient(180deg, color-mix(in srgb, ${activeHex} 14%, #ffffff) 0%, #ffffff 260px)`
+      : `linear-gradient(180deg, color-mix(in srgb, ${activeHex} 22%, #090d16) 0%, rgba(9, 13, 22, 0.98) 280px)`;
+
+    const borderColor = isLightMode
+      ? `color-mix(in srgb, ${activeHex} 30%, rgba(203, 213, 225, 0.8))`
+      : `color-mix(in srgb, ${activeHex} 38%, transparent)`;
+
+    const glowColor = isLightMode
+      ? `color-mix(in srgb, ${activeHex} 15%, transparent)`
+      : `color-mix(in srgb, ${activeHex} 28%, transparent)`;
+
+    const modalBoxShadow = isLightMode
+      ? `0 20px 45px -10px rgba(15, 23, 42, 0.12), 0 0 25px ${glowColor}`
+      : `0 25px 60px rgba(0, 0, 0, 0.7), 0 0 35px ${glowColor}`;
 
     return {
       category: cat,
-      ...cfg,
+      accent: accentVar,
+      text: textVar,
+      border: borderColor,
+      glow: glowColor,
       cssVariables: {
-        '--accent-primary': cfg.accent,
-        '--accent-secondary': cfg.accent,
-        '--accent-hover': cfg.accent,
-        '--border-color': cfg.border,
-        '--border-glow': cfg.glow,
-        '--btn-glow': cfg.border,
-        '--btn-glow-hover': cfg.accent,
-        '--accent-text': cfg.text,
-        '--accent-text-hover': cfg.text,
-        '--card-shadow': `0 20px 50px -10px ${cfg.glow}`,
-        '--scrollbar-thumb': cfg.border,
-        '--scrollbar-thumb-hover': cfg.accent,
-        '--scrollbar-track': isLightMode ? 'rgba(0, 0, 0, 0.05)' : 'rgba(0, 0, 0, 0.25)'
+        '--accent-primary': accentVar,
+        '--accent-secondary': accentVar,
+        '--accent-hover': accentVar,
+        '--border-color': borderColor,
+        '--border-glow': glowColor,
+        '--btn-glow': borderColor,
+        '--btn-glow-hover': accentVar,
+        '--accent-text': textVar,
+        '--accent-text-hover': textVar,
+        '--card-shadow': isLightMode ? `0 12px 30px -8px rgba(15, 23, 42, 0.08)` : `0 20px 50px -10px ${glowColor}`,
+        '--scrollbar-thumb': isLightMode ? `color-mix(in srgb, ${activeHex} 45%, rgba(15, 23, 42, 0.18))` : borderColor,
+        '--scrollbar-thumb-hover': accentVar,
+        '--scrollbar-track': isLightMode ? `color-mix(in srgb, ${activeHex} 8%, rgba(0, 0, 0, 0.04))` : 'rgba(0, 0, 0, 0.25)'
       } as React.CSSProperties,
       modalStyles: {
         background: bgGradient,
-        border: `1px solid ${cfg.border}`,
-        boxShadow: `0 25px 50px rgba(0,0,0,0.6), 0 0 35px ${cfg.glow}`
+        border: `1px solid ${borderColor}`,
+        boxShadow: modalBoxShadow
       }
     };
   };
 
   const modalTheme = getModalTheme();
+  const isCurrentLightMode = typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme') === 'light';
 
   if (!selectedItem) return null;
   
@@ -5595,8 +5579,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       style={{
         position: 'fixed',
         top: 0, left: 0, right: 0, bottom: 0,
-        background: 'rgba(0, 0, 0, 0.75)',
-        backdropFilter: 'blur(4px)',
+        background: isCurrentLightMode ? 'rgba(15, 23, 42, 0.45)' : 'rgba(0, 0, 0, 0.75)',
+        backdropFilter: 'blur(6px)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',

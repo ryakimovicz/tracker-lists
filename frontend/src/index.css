@@ -61,36 +61,36 @@
 }
 
 [data-theme="light"] {
-  /* Premium Light Theme Color Tokens (Gallery Slate-Ice & Amber Style) */
-  --bg-primary: #f1f5f9; /* Slate-100 Soft Slate Ice - harmonizes with dark slate/charcoal */
-  --bg-secondary: rgba(255, 255, 255, 0.88); /* Translucent crisp white card */
-  --bg-tertiary: rgba(226, 232, 240, 0.6); /* Slate-200 subtle surface */
+  /* Premium Light Theme Color Tokens (Clean Modern Studio Style) */
+  --bg-primary: #f8fafc; /* Slate-50 Clean Soft Canvas */
+  --bg-secondary: #ffffff; /* Crisp white card */
+  --bg-tertiary: #f1f5f9; /* Slate-100 subtle surface */
   
-  --text-primary: #0f172a; /* Slate-900 */
-  --text-secondary: #475569; /* Slate-600 */
+  --text-primary: #0f172a; /* Slate-900 high contrast */
+  --text-secondary: #475569; /* Slate-600 readable secondary */
   --text-muted: #94a3b8; /* Slate-400 */
   
-  --accent-primary: #d97706; /* Rich Amber */
-  --accent-secondary: #b45309; /* Deep Ochre */
-  --accent-hover: #b45309;
-  --accent-text: #ffffff;
+  --accent-primary: #f59e0b; /* Solar Brand Amber */
+  --accent-secondary: #d97706; /* Deep Amber */
+  --accent-hover: #d97706;
+  --accent-text: #0f172a; /* Dark text for bright amber button */
   --accent-text-hover: #ffffff;
   
-  --border-color: rgba(217, 119, 6, 0.16);
-  --border-glow: rgba(217, 119, 6, 0.25);
-  --btn-glow: var(--border-glow);
+  --border-color: rgba(226, 232, 240, 0.95); /* Clean neutral slate border instead of yellowish */
+  --border-glow: rgba(245, 158, 11, 0.3);
+  --btn-glow: rgba(245, 158, 11, 0.22);
   --btn-glow-hover: rgba(217, 119, 6, 0.35);
-  --card-shadow: 0 10px 40px -10px rgba(15, 23, 42, 0.08);
+  --card-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05), 0 2px 6px -1px rgba(15, 23, 42, 0.02);
 
   /* Scrollbar Theme Tokens (Light Mode) */
-  --scrollbar-thumb: rgba(15, 23, 42, 0.18);
-  --scrollbar-thumb-hover: var(--accent-primary, #d97706);
-  --scrollbar-track: rgba(0, 0, 0, 0.05);
+  --scrollbar-thumb: rgba(15, 23, 42, 0.16);
+  --scrollbar-thumb-hover: var(--accent-secondary, #d97706);
+  --scrollbar-track: rgba(0, 0, 0, 0.03);
 
   /* Category Colors (Light Theme) */
   --color-movie: #16A34A;
   --color-text-movie: #FFFFFF;
-  --color-series: #FACC15; /* Pure Vibrant Yellow */
+  --color-series: #EAB308; /* Golden Yellow with excellent light contrast */
   --color-text-series: #0F172A;
   --color-anime: #EA580C;
   --color-text-anime: #FFFFFF;
@@ -375,15 +375,15 @@ h1, h2, h3, h4, h5, h6 {
   padding: 0.75rem 1.5rem;
   font-weight: 600;
   cursor: pointer;
-  box-shadow: 0 4px 14px var(--btn-glow, color-mix(in srgb, var(--btn-bg, var(--accent-primary)) 35%, transparent));
+  box-shadow: 0 4px 14px var(--btn-glow, rgba(245, 158, 11, 0.25));
   transition: background-color 0.2s, transform 0.2s, box-shadow 0.2s, color 0.2s;
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: var(--btn-hover-bg, var(--accent-hover, var(--btn-bg, var(--accent-primary))));
+  background: var(--btn-hover-bg, var(--accent-hover, var(--accent-secondary)));
   color: var(--btn-hover-text, var(--accent-text-hover, #ffffff));
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px var(--btn-glow-hover, var(--btn-glow, color-mix(in srgb, var(--btn-hover-bg, var(--accent-hover, var(--btn-bg, var(--accent-primary)))) 45%, transparent)));
+  box-shadow: 0 6px 20px var(--btn-glow-hover, rgba(217, 119, 6, 0.35));
 }
 
 .btn-primary:disabled {
@@ -414,19 +414,21 @@ h1, h2, h3, h4, h5, h6 {
   padding: 0.75rem 1.5rem;
   font-weight: 500;
   cursor: pointer;
-  transition: border-color 0.2s, transform 0.2s;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  transition: border-color 0.2s, transform 0.2s, background-color 0.2s, color 0.2s, box-shadow 0.2s;
 }
 
 .btn-secondary:hover {
   border-color: var(--accent-primary);
+  background: var(--bg-secondary);
+  color: var(--accent-primary);
   transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
 .input-field {
   width: 100%;
   background: var(--bg-tertiary);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
   border: 1px solid var(--border-color);
   color: var(--text-primary);
   padding: 0.75rem 1rem;
@@ -434,11 +436,13 @@ h1, h2, h3, h4, h5, h6 {
   font-size: 0.95rem;
   outline: none;
   font-family: inherit;
+  transition: border-color 0.2s, box-shadow 0.2s, background-color 0.2s;
 }
 
 .input-field:focus {
+  background: var(--bg-secondary);
   border-color: var(--accent-primary);
-  box-shadow: 0 0 0 2px var(--border-glow);
+  box-shadow: 0 0 0 3px var(--border-glow);
 }
 
 /* Badges for Priority Levels */
