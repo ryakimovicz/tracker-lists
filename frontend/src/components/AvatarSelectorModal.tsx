@@ -34,7 +34,7 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
   const isEs = language === 'es';
 
   const [query, setQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<'all' | 'movie' | 'series' | 'anime' | 'comic' | 'manga' | 'book' | 'game'>('all');
+  const [selectedCategory, setSelectedCategory] = useState<'all' | 'movie' | 'series' | 'anime' | 'comic' | 'manga' | 'book' | 'game' | 'music'>('all');
   const [results, setResults] = useState<Character[]>([]);
   const [visibleCount, setVisibleCount] = useState<number>(24);
   const [isLoading, setIsLoading] = useState(false);
@@ -303,7 +303,7 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
         {/* Category Filters */}
         {(() => {
           const ordered = getOrderedCategories(user?.category_order);
-          const allCategories = ['all', ...ordered] as const;
+          const allCategories = ['all', ...ordered, 'music'] as const;
 
           return (
             <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -322,6 +322,7 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
                     case 'comic': return isEs ? 'Cómics' : 'Comics';
                     case 'manga': return 'Manga';
                     case 'game': return isEs ? 'Juegos' : 'Games';
+                    case 'music': return isEs ? 'Música' : 'Music';
                     default: return cat;
                   }
                 };

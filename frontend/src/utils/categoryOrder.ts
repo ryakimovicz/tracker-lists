@@ -1,5 +1,5 @@
 import React from 'react';
-import { Film, Tv, Sparkles, BookOpen, Gamepad2, Book, MessageSquare, MessageCircle, Users, Layers } from 'lucide-react';
+import { Film, Tv, Sparkles, BookOpen, Gamepad2, Book, MessageSquare, MessageCircle, Users, Layers, Music } from 'lucide-react';
 
 export const DEFAULT_CATEGORY_ORDER = [
   'movie',
@@ -137,6 +137,7 @@ export function getCategoryLabel(type: string, isEs: boolean, plural: boolean = 
       case 'game': return plural ? 'Juegos' : 'Juego';
       case 'guide': return plural ? 'Guías' : 'Guía';
       case 'user': return plural ? 'Usuarios' : 'Usuario';
+      case 'music': return plural ? 'Música' : 'Música';
       default: return type;
     }
   }
@@ -152,6 +153,7 @@ export function getCategoryLabel(type: string, isEs: boolean, plural: boolean = 
     case 'game': return plural ? 'Games' : 'Game';
     case 'guide': return plural ? 'Guides' : 'Guide';
     case 'user': return plural ? 'Users' : 'User';
+    case 'music': return plural ? 'Music' : 'Music';
     default: return type;
   }
 }
@@ -176,6 +178,7 @@ export function getCategoryIcon(
     game: 'var(--color-game)',
     guide: 'var(--color-guide)',
     user: 'var(--color-user, #ec4899)',
+    music: 'var(--color-music, #1DB954)',
     all: 'currentColor'
   };
 
@@ -204,6 +207,8 @@ export function getCategoryIcon(
       return React.createElement(BookOpen, props);
     case 'user':
       return React.createElement(Users, props);
+    case 'music':
+      return React.createElement(Music, props);
     case 'all':
       return React.createElement(Layers, props);
     default:

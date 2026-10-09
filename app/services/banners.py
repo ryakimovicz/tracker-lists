@@ -425,6 +425,83 @@ class BannerService:
         return results
 
     @classmethod
+    def _search_music(cls, query: str, target_type: str = "banner") -> List[BannerSearchResult]:
+        if not query or not settings.FANART_API_KEY:
+            return []
+
+        results = []
+        seen_images = set()
+
+        try:
+            # 1. Search MusicBrainz for artist MBID
+            clean_q = urllib.parse.quote(query.strip())
+            mb_url = f"https://musicbrainz.org/ws/2/artist/?query={clean_q}&fmt=json&limit=3"
+            req_mb = urllib.request.Request(mb_url, headers={"User-Agent": "PathdApp/1.0 (contact@pathd.net)"})
+            with urllib.request.urlopen(req_mb, timeout=3.5) as mb_resp:
+                if mb_resp.status == 200:
+                    mb_data = json.loads(mb_resp.read().decode('utf-8', errors='replace'))
+                    artists = mb_data.get("artists", [])
+
+                    for art in artists[:2]:
+                        mbid = art.get("id")
+                        art_name = art.get("name")
+                        if not mbid or not art_name:
+                            continue
+
+                        # 2. Query Fanart.tv for widescreen music banners and artist wallpapers
+                        fan_url = f"https://webservice.fanart.tv/v3/music/{mbid}?api_key={settings.FANART_API_KEY}"
+                        try:
+                            req_fan = urllib.request.Request(fan_url, headers={"User-Agent": "PathdApp/1.0"})
+                            with urllib.request.urlopen(req_fan, timeout=3.0) as fan_resp:
+                                if fan_resp.status == 200:
+                                    fan_data = json.loads(fan_resp.read().decode('utf-8', errors='replace'))
+                                    
+                                    # Horizontal banners (for banner modal)
+                                    if target_type == "banner":
+                                        for b in fan_data.get("musicbanner", [])[:3]:
+                                            b_url = b.get("url")
+                                            if b_url and b_url not in seen_images:
+                                                seen_images.add(b_url)
+                                                results.append(BannerSearchResult(
+                                                    title=art_name,
+                                                    image_url=b_url,
+                                                    category="music",
+                                                    origin=f"Artista • {art_name}",
+                                                    kind="banner"
+                                                ))
+                                        # Also include wallpapers as banner options
+                                        for bg in fan_data.get("artistbackground", [])[:3]:
+                                            bg_url = bg.get("url")
+                                            if bg_url and bg_url not in seen_images:
+                                                seen_images.add(bg_url)
+                                                results.append(BannerSearchResult(
+                                                    title=art_name,
+                                                    image_url=bg_url,
+                                                    category="music",
+                                                    origin=f"Artista • {art_name}",
+                                                    kind="wallpaper"
+                                                ))
+                                    else:
+                                        # Full widescreen 1920x1080 wallpapers (for background modal)
+                                        for bg in fan_data.get("artistbackground", [])[:4]:
+                                            bg_url = bg.get("url")
+                                            if bg_url and bg_url not in seen_images:
+                                                seen_images.add(bg_url)
+                                                results.append(BannerSearchResult(
+                                                    title=art_name,
+                                                    image_url=bg_url,
+                                                    category="music",
+                                                    origin=f"Artista • {art_name}",
+                                                    kind="wallpaper"
+                                                ))
+                        except Exception:
+                            pass
+        except Exception as e:
+            pass
+
+        return results
+
+    @classmethod
     def _calculate_relevance(cls, item: BannerSearchResult, clean_query: str, raw_query: str, target_type: str = "banner") -> int:
         score = 0
         name_norm = cls._normalize_text(item.title)
@@ -513,11 +590,14 @@ class BannerService:
             ("Blade Runner 2049", "movie"),
             ("Breaking Bad", "series"),
             ("The Flash", "series"),
-            ("Stranger Things", "series")
+            ("Stranger Things", "series"),
+            ("Coldplay", "music"),
+            ("Queen", "music"),
+            ("Daft Punk", "music")
         ]
         
         all_results = []
-        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=9) as executor:
             future_map = {}
             for term, cat in popular_terms:
                 if cat == "game":
@@ -526,6 +606,8 @@ class BannerService:
                     f = executor.submit(cls._search_anilist, term)
                 elif cat == "movie":
                     f = executor.submit(cls._search_fanart_movies, term)
+                elif cat == "music":
+                    f = executor.submit(cls._search_music, term, "banner")
                 else:
                     f = executor.submit(cls._search_tvmaze, term)
                 future_map[f] = (term, cat)
@@ -568,15 +650,16 @@ class BannerService:
                     return entry["data"]
 
         all_results = []
-        with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=7) as executor:
             f_igdb = executor.submit(cls._search_igdb, search_term)
             f_ani = executor.submit(cls._search_anilist, search_term)
             f_movies = executor.submit(cls._search_fanart_movies, search_term)
             f_tv = executor.submit(cls._search_tvmaze, clean_query, raw_query)
             f_comic = executor.submit(cls._search_comicvine, search_term)
             f_books = executor.submit(cls._search_books, search_term)
+            f_music = executor.submit(cls._search_music, search_term, target_type)
 
-            for future in (f_igdb, f_ani, f_movies, f_tv, f_comic, f_books):
+            for future in (f_igdb, f_ani, f_movies, f_tv, f_comic, f_books, f_music):
                 try:
                     res = future.result()
                     all_results.extend(res)

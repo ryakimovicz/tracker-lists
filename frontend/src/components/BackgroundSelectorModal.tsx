@@ -36,7 +36,7 @@ export const BackgroundSelectorModal: React.FC<BackgroundSelectorModalProps> = (
   const isLight = theme === 'light';
 
   const [query, setQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<'all' | 'movie' | 'series' | 'anime' | 'book' | 'comic' | 'manga' | 'game'>('all');
+  const [selectedCategory, setSelectedCategory] = useState<'all' | 'movie' | 'series' | 'anime' | 'book' | 'comic' | 'manga' | 'game' | 'music'>('all');
 
   const [results, setResults] = useState<BackgroundItem[]>([]);
   const [visibleCount, setVisibleCount] = useState<number>(24);
@@ -439,7 +439,7 @@ export const BackgroundSelectorModal: React.FC<BackgroundSelectorModalProps> = (
         {/* Category Filters (Canonical Order) */}
         {(() => {
           const ordered = getOrderedCategories(user?.category_order);
-          const allCategories = ['all', ...ordered] as const;
+          const allCategories = ['all', ...ordered, 'music'] as const;
 
           return (
             <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -458,6 +458,7 @@ export const BackgroundSelectorModal: React.FC<BackgroundSelectorModalProps> = (
                     case 'comic': return isEs ? 'Cómics' : 'Comics';
                     case 'manga': return 'Manga';
                     case 'game': return isEs ? 'Juegos' : 'Games';
+                    case 'music': return isEs ? 'Música' : 'Music';
                     default: return cat;
                   }
                 };

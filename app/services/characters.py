@@ -608,6 +608,58 @@ class CharacterService:
         return results
 
     @classmethod
+    def _search_music(cls, query: str) -> List[CharacterSearchResult]:
+        if not query:
+            return []
+        results = []
+        clean_q = urllib.parse.quote(query.strip())
+        headers = {"User-Agent": "PathdApp/1.0"}
+
+        # 1. Deezer Artists (1:1 square pictures of musicians)
+        try:
+            url = f"https://api.deezer.com/search/artist?q={clean_q}&limit=8"
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req, timeout=3.5) as response:
+                if response.status == 200:
+                    data = json.loads(response.read().decode('utf-8', errors='replace'))
+                    for a in data.get("data", []):
+                        pic = a.get("picture_xl") or a.get("picture_big") or a.get("picture_medium")
+                        if pic and "2a96cbd8" not in pic and "d41d8cd9" not in pic:
+                            name = a.get("name", "")
+                            results.append(CharacterSearchResult(
+                                name=name,
+                                image_url=pic,
+                                category="music",
+                                origin="Artista"
+                            ))
+        except Exception as e:
+            pass
+
+        # 2. Deezer Albums (1:1 square album/single/EP cover art)
+        try:
+            url = f"https://api.deezer.com/search/album?q={clean_q}&limit=8"
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req, timeout=3.5) as response:
+                if response.status == 200:
+                    data = json.loads(response.read().decode('utf-8', errors='replace'))
+                    for alb in data.get("data", []):
+                        pic = alb.get("cover_xl") or alb.get("cover_big") or alb.get("cover_medium")
+                        if pic and "2a96cbd8" not in pic and "d41d8cd9" not in pic:
+                            title = alb.get("title", "")
+                            artist_name = (alb.get("artist") or {}).get("name", "")
+                            origin_str = f"Álbum • {artist_name}" if artist_name else "Álbum"
+                            results.append(CharacterSearchResult(
+                                name=title,
+                                image_url=pic,
+                                category="music",
+                                origin=origin_str
+                            ))
+        except Exception as e:
+            pass
+
+        return results
+
+    @classmethod
     def _calculate_relevance(cls, item: CharacterSearchResult, clean_query: str, raw_query: str) -> int:
         score = 0
         name_norm = cls._normalize_text(item.name)
@@ -689,10 +741,13 @@ class CharacterService:
             ("Interstellar", "movie"),
             ("Pulp Fiction", "movie"),
             ("Harry Potter", "book"),
+            ("The Beatles", "music"),
+            ("Queen", "music"),
+            ("Daft Punk", "music"),
         ]
         
         all_results = []
-        with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=7) as executor:
             future_map = {}
             for name, cat in popular_searches:
                 if cat == "anime":
@@ -705,6 +760,8 @@ class CharacterService:
                     f = executor.submit(cls._search_movies, name)
                 elif cat == "book":
                     f = executor.submit(cls._search_books, name)
+                elif cat == "music":
+                    f = executor.submit(cls._search_music, name)
                 else:
                     f = executor.submit(cls._search_tvmaze, name, name)
                 future_map[f] = (name, cat)
@@ -745,15 +802,16 @@ class CharacterService:
         search_term = clean_query if len(clean_query) >= 2 else raw_query
 
         all_results = []
-        with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=7) as executor:
             f_anilist = executor.submit(cls._search_anilist, search_term)
             f_comicvine = executor.submit(cls._search_comicvine, search_term)
             f_igdb = executor.submit(cls._search_igdb, search_term)
             f_tvmaze = executor.submit(cls._search_tvmaze, search_term, raw_query)
             f_movies = executor.submit(cls._search_movies, search_term)
             f_books = executor.submit(cls._search_books, search_term)
+            f_music = executor.submit(cls._search_music, search_term)
 
-            for future in (f_anilist, f_comicvine, f_igdb, f_tvmaze, f_movies, f_books):
+            for future in (f_anilist, f_comicvine, f_igdb, f_tvmaze, f_movies, f_books, f_music):
                 try:
                     res = future.result()
                     all_results.extend(res)
