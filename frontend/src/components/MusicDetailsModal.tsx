@@ -135,9 +135,9 @@ const MusicDetailsModalInner: React.FC<MusicDetailsModalProps> = ({
   const loadFavorites = async () => {
     if (!user) return;
     try {
-      const res = await apiClient.get('/library/favorites');
+      const res = await apiClient.get('/library/shelf');
       if (Array.isArray(res.data)) {
-        setShelfFavorites(res.data);
+        setShelfFavorites(res.data.filter((item: any) => item.is_favorite));
       }
     } catch (e) {
       console.error('Failed to load shelf favorites in MusicDetailsModal', e);
