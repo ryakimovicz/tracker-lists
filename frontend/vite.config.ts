@@ -5,4 +5,13 @@ import react from '@vitejs/plugin-react'
 // Trigger Vite full server restart (v0.9.9)
 export default defineConfig({
   plugins: [react()],
+  server: {
+    host: true,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
+    },
+  },
 })
