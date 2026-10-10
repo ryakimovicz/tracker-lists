@@ -7,9 +7,10 @@ interface HorizontalScrollProps {
   title?: React.ReactNode;
   outlineColor?: string;
   className?: string;
+  itemCount?: number;
 }
 
-export const HorizontalScroll: React.FC<HorizontalScrollProps> = ({ children, title, outlineColor, className = "" }) => {
+export const HorizontalScroll: React.FC<HorizontalScrollProps> = ({ children, title, outlineColor, className = "", itemCount }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
@@ -81,6 +82,22 @@ export const HorizontalScroll: React.FC<HorizontalScrollProps> = ({ children, ti
             }}
           >
             {title}
+            {itemCount !== undefined && (
+              <span
+                className="category-count-badge"
+                style={{
+                  fontSize: '0.8rem',
+                  fontWeight: 700,
+                  padding: '0.15rem 0.55rem',
+                  borderRadius: '12px',
+                  background: 'rgba(255, 255, 255, 0.08)',
+                  color: outlineColor || 'var(--text-primary)',
+                  border: `1px solid ${outlineColor || 'var(--border-color)'}`
+                }}
+              >
+                {itemCount}
+              </span>
+            )}
           </h3>
         </div>
       )}

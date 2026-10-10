@@ -932,6 +932,21 @@ h1, h2, h3, h4, h5, h6 {
   display: inline;
 }
 
+/* Hide mobile-only home subbar on desktop */
+.home-mobile-only {
+  display: none !important;
+}
+
+@media (max-width: 768px) {
+  .home-mobile-only {
+    display: grid !important;
+  }
+
+  .home-desktop-only {
+    display: none !important;
+  }
+}
+
 /* ==========================================================================
    MOBILE APP-LIKE RESPONSIVE LAYOUT (Header & Bottom Nav)
    ========================================================================== */
@@ -1213,7 +1228,7 @@ h1, h2, h3, h4, h5, h6 {
     margin-top: -1rem !important;
     padding-top: 0.65rem !important;
     padding-bottom: 0.75rem !important;
-    margin-bottom: 1.25rem !important;
+    margin-bottom: 0.5rem !important;
     display: flex !important;
     justify-content: space-around !important;
     align-items: center !important;
@@ -1225,6 +1240,18 @@ h1, h2, h3, h4, h5, h6 {
     padding-left: 0.5rem !important;
     padding-right: 0.5rem !important;
     box-sizing: border-box !important;
+  }
+
+  /* Home second filter bar on mobile: 8 icons (Todos + 7 categories) */
+  .home-category-filters-container {
+    display: grid !important;
+    grid-template-columns: repeat(4, 1fr) !important;
+    gap: 0.45rem !important;
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+    margin-bottom: 1.25rem !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
   }
 
   .home-tabs-container::-webkit-scrollbar,
@@ -1364,9 +1391,9 @@ h1, h2, h3, h4, h5, h6 {
     display: flex !important;
     flex-direction: row !important;
     align-items: center !important;
-    width: 280px !important;
-    min-width: 280px !important;
-    max-width: 280px !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
     height: 70px !important;
     min-height: 70px !important;
     max-height: 70px !important;
@@ -1569,14 +1596,14 @@ h1, h2, h3, h4, h5, h6 {
   .profile-guides-carousel .profile-guide-item-wrapper {
     min-width: 0 !important;
     max-width: none !important;
-    width: 280px !important;
+    width: calc(100vw - 3rem) !important;
     flex-shrink: 0 !important;
   }
 
   .profile-guide-card {
-    width: 280px !important;
-    min-width: 280px !important;
-    max-width: 280px !important;
+    width: calc(100vw - 3rem) !important;
+    min-width: calc(100vw - 3rem) !important;
+    max-width: calc(100vw - 3rem) !important;
     height: 70px !important;
     min-height: 70px !important;
     max-height: 70px !important;
@@ -1592,16 +1619,22 @@ h1, h2, h3, h4, h5, h6 {
 
   /* -------------------------------------------------------------------------
      Mobile Scroll Carousel: 2 Rows by column (4 rows when expanded)
+     Full-width card columns edge-to-edge leaving margins
      ------------------------------------------------------------------------- */
   .home-scroll-carousel {
     display: grid !important;
     grid-auto-flow: column !important;
     grid-template-rows: repeat(2, 70px) !important;
-    grid-auto-columns: 280px !important;
+    grid-auto-columns: calc(100vw - 3rem) !important;
     gap: 0.65rem !important;
     padding-left: 0.5rem !important;
     padding-right: 0.5rem !important;
     padding-bottom: 0.5rem !important;
+    scroll-snap-type: x mandatory !important;
+  }
+
+  .home-scroll-carousel > * {
+    scroll-snap-align: start !important;
   }
 
   .home-scroll-carousel.has-single-item {
@@ -1643,6 +1676,36 @@ h1, h2, h3, h4, h5, h6 {
     padding: 1rem !important;
     border-radius: 14px !important;
     box-sizing: border-box !important;
+  }
+
+  /* -------------------------------------------------------------------------
+     Mobile Vertical Stack Mode (Full-width edge-to-edge cards when filtered)
+     ------------------------------------------------------------------------- */
+  .mobile-vertical-stack {
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    gap: 0.65rem !important;
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+    box-sizing: border-box !important;
+  }
+
+  .mobile-vertical-stack .activity-card,
+  .mobile-vertical-stack .profile-guide-item-wrapper,
+  .mobile-vertical-stack .profile-guide-card {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Header count badge in category rows */
+  .category-count-badge {
+    font-size: 0.8rem !important;
+    font-weight: 700 !important;
+    padding: 0.15rem 0.55rem !important;
+    border-radius: 12px !important;
   }
 }
 

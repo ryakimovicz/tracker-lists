@@ -11,7 +11,7 @@ import { ProModal } from '../components/ProModal';
 import { PathdLoader } from '../components/PathdLoader';
 import { ChevronLeft, ChevronRight, ChevronDown, ChevronsDown, Check, Play, BookOpen, Bookmark, CheckCircle, XCircle, Calendar, Sparkles } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { getOrderedCategories, getCategoryLabel, getCategoryIcon } from '../utils/categoryOrder';
+import { getOrderedCategories, getCategoryLabel, getCategoryIcon, sortFilterTabs } from '../utils/categoryOrder';
 import { prefetchMediaDetails } from '../utils/prefetch';
 import { useContinuousScroll } from '../hooks/useContinuousScroll';
 
@@ -325,6 +325,22 @@ const ScrollRow = ({
             >
               {icon && <span style={{ display: "inline-flex", alignItems: "center" }}>{icon}</span>}
               <span>{title}</span>
+              {itemCount !== undefined && (
+                <span
+                  className="category-count-badge"
+                  style={{
+                    fontSize: '0.8rem',
+                    fontWeight: 700,
+                    padding: '0.15rem 0.55rem',
+                    borderRadius: '12px',
+                    background: 'rgba(255, 255, 255, 0.08)',
+                    color: outlineColor || 'var(--text-primary)',
+                    border: `1px solid ${outlineColor || 'var(--border-color)'}`
+                  }}
+                >
+                  {itemCount}
+                </span>
+              )}
               <span style={{ display: "inline-flex", alignItems: "center", color: outlineColor || "var(--accent-primary)" }}>
                 {effectiveRowMode === 'collapsed' ? (
                   <ChevronRight size={18} />
@@ -1898,6 +1914,7 @@ export const Home: React.FC = () => {
   });
   const [gameFilter, setGameFilter] = useState<"playing" | "endless">("playing");
   const [upcomingFilter, setUpcomingFilter] = useState<"calendar" | "tba">("calendar");
+  const [homeCategoryFilter, setHomeCategoryFilter] = useState<string>("all");
 
   const lastFetchRef = useRef<number>(Date.now());
 
@@ -2580,6 +2597,68 @@ export const Home: React.FC = () => {
         })}
       </div>
 
+      {/* Mobile Category Filters Bar (Todos + 7 Categorías) - Only visible on mobile, persistent across tab switches */}
+      {activeTab !== 'guides' && (
+        <div 
+          className="home-category-filters-container home-mobile-only"
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(4, 1fr)',
+            gap: '0.45rem',
+            width: '100%',
+            boxSizing: 'border-box'
+          }}
+        >
+          {sortFilterTabs([
+            { value: 'all', label: language === 'es' ? 'Todo' : 'All' },
+            { value: 'movie', label: language === 'es' ? 'Películas' : 'Movies' },
+            { value: 'series', label: language === 'es' ? 'Series' : 'Shows' },
+            { value: 'anime', label: 'Anime' },
+            { value: 'book', label: language === 'es' ? 'Libros' : 'Books' },
+            { value: 'comic', label: language === 'es' ? 'Cómics' : 'Comics' },
+            { value: 'manga', label: 'Mangas' },
+            { value: 'game', label: language === 'es' ? 'Juegos' : 'Games' }
+          ], currentUser?.category_order).map(tab => {
+            const isSelected = homeCategoryFilter === tab.value;
+
+            const tabColor = tab.value === 'all' 
+              ? 'var(--accent-primary)' 
+              : `var(--color-${tab.value})`;
+            const tabTextColor = tab.value === 'all' 
+              ? '#ffffff' 
+              : `var(--color-text-${tab.value})`;
+
+            const handleFilterClick = () => {
+              setHomeCategoryFilter(tab.value);
+            };
+
+            return (
+              <button
+                key={tab.value}
+                type="button"
+                onClick={handleFilterClick}
+                className={`profile-category-tab search-filter-btn ${isSelected ? 'selected' : ''}`}
+                title={tab.label}
+                style={{
+                  padding: '0.35rem 0.85rem',
+                  fontSize: '0.85rem',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                '--tab-color': tabColor,
+                '--tab-text': tabTextColor
+              } as React.CSSProperties}
+            >
+              <span className="search-filter-icon" style={{ display: 'inline-flex', alignItems: 'center' }}>
+                {getCategoryIcon(tab.value, { size: 14, color: isSelected ? tabTextColor : tabColor })}
+              </span>
+              <span className="search-filter-label">{tab.label}</span>
+            </button>
+          );
+        })}
+      </div>
+      )}
+
       {/* Media Row */}
       {activeTab === "upcoming" ? (
         <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
@@ -2930,221 +3009,360 @@ export const Home: React.FC = () => {
         </div>
       ) : activeTab === "guides" ? (
         upNextGuides.length > 0 ? (
-          <ScrollRow 
-            key="guides_row"
-            title={language === 'es' ? "Guías" : "Guides"} 
-            icon={getCategoryIcon('guide', { size: 18 })}
-            outlineColor="var(--color-guide)"
-            itemCount={upNextGuides.length}
-            storageKey="guides_guides"
-          >
-            {upNextGuides.map(g => {
-              let insideTop = g.title;
-              let bottomText1 = '';
-              let bottomText2 = '';
-              
+          <>
+            {/* Mobile Vertical Stack for Guides */}
+            <div className="mobile-vertical-stack home-mobile-only">
+              {upNextGuides.map(g => {
+                let insideTop = g.title;
+                let bottomText1 = '';
+                let bottomText2 = '';
 
-              const match = g.title.match(/^(.*?)\s*-\s*S(\d+)E(\d+)(.*)$/i);
-              if (match) {
-                insideTop = match[1].trim();
-                const s = match[2];
-                const e = match[3];
-                bottomText1 = language === 'es' ? `T${s} | E${e}` : `S${s} | E${e}`;
-                bottomText2 = match[4].replace(/^\s*-\s*/, '').trim();
-              } else {
-                const sMatch = g.title.match(/S(\d+)E(\d+)/i);
-                if (sMatch) {
-                  const s = sMatch[1];
-                  const e = sMatch[2];
+                const match = g.title.match(/^(.*?)\s*-\s*S(\d+)E(\d+)(.*)$/i);
+                if (match) {
+                  insideTop = match[1].trim();
+                  const s = match[2];
+                  const e = match[3];
                   bottomText1 = language === 'es' ? `T${s} | E${e}` : `S${s} | E${e}`;
-                  insideTop = g.title.replace(sMatch[0], '').replace(/-\s*-/, '-').trim();
+                  bottomText2 = match[4].replace(/^\s*-\s*/, '').trim();
+                } else {
+                  const sMatch = g.title.match(/S(\d+)E(\d+)/i);
+                  if (sMatch) {
+                    const s = sMatch[1];
+                    const e = sMatch[2];
+                    bottomText1 = language === 'es' ? `T${s} | E${e}` : `S${s} | E${e}`;
+                    insideTop = g.title.replace(sMatch[0], '').replace(/-\s*-/, '-').trim();
+                  }
                 }
-              }
 
-              return (
-                <CustomCard 
-                  key={g.item_id}
-                  title={g.list_title}
-                  coverUrl={g.image_url}
-                  itemType="guide"
-                  preSubtitle={insideTop}
-                  themeColor="var(--color-guide)"
-                  themeTextColor="var(--color-text-guide)"
-                  coverBottomText={undefined}
-                  subtitle1={bottomText1}
-                  subtitle2={bottomText2}
-                  onCheck={(e) => handleMarkCompleted(e, g)}
-                  onClick={() => handleOpenItem({ ...g, id: g.item_id })}
-                  onTitleClick={(e) => { e.stopPropagation(); navigate(`/guide/${g.list_id}`); }}
-                  language={language}
-                />
-              );
-            })}
-          </ScrollRow>
+                return (
+                  <CustomCard 
+                    key={g.item_id}
+                    title={g.list_title}
+                    coverUrl={g.image_url}
+                    itemType="guide"
+                    preSubtitle={insideTop}
+                    themeColor="var(--color-guide)"
+                    themeTextColor="var(--color-text-guide)"
+                    coverBottomText={undefined}
+                    subtitle1={bottomText1}
+                    subtitle2={bottomText2}
+                    onCheck={(e) => handleMarkCompleted(e, g)}
+                    onClick={() => handleOpenItem({ ...g, id: g.item_id })}
+                    onTitleClick={(e) => { e.stopPropagation(); navigate(`/guide/${g.list_id}`); }}
+                    language={language}
+                  />
+                );
+              })}
+            </div>
+
+            {/* Desktop ScrollRow for Guides */}
+            <div className="home-desktop-only" style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
+              <ScrollRow 
+                key="guides_row"
+                title={language === 'es' ? "Guías" : "Guides"} 
+                icon={getCategoryIcon('guide', { size: 18 })}
+                outlineColor="var(--color-guide)"
+                itemCount={upNextGuides.length}
+                storageKey="guides_guides"
+              >
+                {upNextGuides.map(g => {
+                  let insideTop = g.title;
+                  let bottomText1 = '';
+                  let bottomText2 = '';
+
+                  const match = g.title.match(/^(.*?)\s*-\s*S(\d+)E(\d+)(.*)$/i);
+                  if (match) {
+                    insideTop = match[1].trim();
+                    const s = match[2];
+                    const e = match[3];
+                    bottomText1 = language === 'es' ? `T${s} | E${e}` : `S${s} | E${e}`;
+                    bottomText2 = match[4].replace(/^\s*-\s*/, '').trim();
+                  } else {
+                    const sMatch = g.title.match(/S(\d+)E(\d+)/i);
+                    if (sMatch) {
+                      const s = sMatch[1];
+                      const e = sMatch[2];
+                      bottomText1 = language === 'es' ? `T${s} | E${e}` : `S${s} | E${e}`;
+                      insideTop = g.title.replace(sMatch[0], '').replace(/-\s*-/, '-').trim();
+                    }
+                  }
+
+                  return (
+                    <CustomCard 
+                      key={g.item_id}
+                      title={g.list_title}
+                      coverUrl={g.image_url}
+                      itemType="guide"
+                      preSubtitle={insideTop}
+                      themeColor="var(--color-guide)"
+                      themeTextColor="var(--color-text-guide)"
+                      coverBottomText={undefined}
+                      subtitle1={bottomText1}
+                      subtitle2={bottomText2}
+                      onCheck={(e) => handleMarkCompleted(e, g)}
+                      onClick={() => handleOpenItem({ ...g, id: g.item_id })}
+                      onTitleClick={(e) => { e.stopPropagation(); navigate(`/guide/${g.list_id}`); }}
+                      language={language}
+                    />
+                  );
+                })}
+              </ScrollRow>
+            </div>
+          </>
         ) : (
           <div style={{ color: "var(--text-secondary)", padding: "1rem 0" }}>No hay guías seguidas.</div>
         )
       ) : (
         filteredItems.length > 0 ? (
           <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-            {getOrderedCategories(currentUser?.category_order).map(category => {
-              let catItems = filteredItems.filter(i => i.item_type === category);
-              if (catItems.length === 0 && (category !== "game" || activeTab !== "watching")) return null;
+            {(() => {
+              // Helper to render an item card in either row or vertical stack
+              const renderItemCard = (item: any) => {
+                const isTrackedComic = item.item_type === "comic" && !!item.tracking_list_id;
+                if ((activeTab === "watching" || activeTab === "plan_to_watch") && (item.item_type === "series" || item.item_type === "anime" || isTrackedComic)) {
+                  return (
+                    <ActiveSeriesCard 
+                      key={item.id}
+                      item={item}
+                      language={language}
+                      actionIcon={activeTab === "plan_to_watch" ? "play" : "check"}
+                      variant={activeTab === "plan_to_watch" ? "poster" : "episode"}
+                      onUpdate={() => fetchDashboard(true)}
+                      onOpenSeries={(seriesItem) => handleOpenItem(seriesItem)}
+                      themeColor={`var(--color-${item.item_type})`}
+                      themeTextColor={`var(--color-text-${item.item_type})`}
+                    />
+                  );
+                }
 
-              const headerExtra = (category === "game" && activeTab === "watching") ? (
-                <div style={{ display: "flex", background: "var(--bg-tertiary)", padding: "3px", borderRadius: "8px", gap: "4px", border: "1px solid var(--border-color)" }}>
-                  <button
-                    type="button"
-                    onClick={() => setGameFilter("playing")}
-                    style={{
-                      border: "none",
-                      background: gameFilter === "playing" ? "var(--color-game, #10b981)" : "transparent",
-                      color: gameFilter === "playing" ? "var(--color-text-game, #ffffff)" : "var(--text-secondary)",
-                      padding: "4px 10px",
-                      borderRadius: "6px",
-                      fontSize: "0.8rem",
-                      fontWeight: 600,
-                      cursor: "pointer",
-                      transition: "all 0.2s ease"
-                    }}
-                  >
-                    {language === "es" ? "Jugando" : "Playing"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setGameFilter("endless")}
-                    style={{
-                      border: "none",
-                      background: gameFilter === "endless" ? "var(--color-game, #10b981)" : "transparent",
-                      color: gameFilter === "endless" ? "var(--color-text-game, #ffffff)" : "var(--text-secondary)",
-                      padding: "4px 10px",
-                      borderRadius: "6px",
-                      fontSize: "0.8rem",
-                      fontWeight: 600,
-                      cursor: "pointer",
-                      transition: "all 0.2s ease"
-                    }}
-                  >
-                    {language === "es" ? "Infinito" : "Endless"}
-                  </button>
-                </div>
-              ) : undefined;
+                if (activeTab === "completed" && (item.item_type === "series" || item.item_type === "anime" || isTrackedComic)) {
+                  return (
+                    <CompletedSeriesCard 
+                      key={item.id}
+                      item={item}
+                      language={language}
+                      onUpdate={() => fetchDashboard(true)}
+                      onOpenSeries={(seriesItem) => handleOpenItem(seriesItem)}
+                      themeColor={`var(--color-${item.item_type})`}
+                      themeTextColor={`var(--color-text-${item.item_type})`}
+                    />
+                  );
+                }
 
-              return (
-                <ScrollRow 
-                  key={`${activeTab}_${category}`} 
-                  title={getTypeCat(category, true)} 
-                  icon={getCategoryIcon(category, { size: 18 })}
-                  outlineColor={`var(--color-${category})`} 
-                  headerExtra={headerExtra} 
-                  itemCount={catItems.length}
-                  storageKey={`${activeTab}_${category}`}
-                >
-                  {catItems.length === 0 ? (
-                    <div style={{ padding: "1rem 0", color: "var(--text-secondary)", fontSize: "0.9rem" }}>
-                      {language === "es" 
-                        ? (gameFilter === "endless" ? "No hay juegos infinitos." : "No hay juegos en curso.") 
-                        : (gameFilter === "endless" ? "No endless games." : "No games in progress.")}
+                if (activeTab === "dropped" && (item.item_type === "series" || item.item_type === "anime" || isTrackedComic)) {
+                  return (
+                    <DroppedSeriesCard 
+                      key={item.id}
+                      item={item}
+                      language={language}
+                      onUpdate={() => fetchDashboard(true)}
+                      onOpenSeries={(seriesItem) => handleOpenItem(seriesItem)}
+                      themeColor={`var(--color-${item.item_type})`}
+                      themeTextColor={`var(--color-text-${item.item_type})`}
+                    />
+                  );
+                }
+                
+                return (
+                  <CustomCard 
+                    key={item.id}
+                    title={item.title}
+                    coverUrl={item.image_url}
+                    itemType={item.item_type}
+                    rawItem={item}
+                    themeColor={`var(--color-${item.item_type})`}
+                    themeTextColor={`var(--color-text-${item.item_type})`}
+                    coverBottomText={undefined}
+                    actionIcon={activeTab === 'plan_to_watch' || item.status === 'dropped' ? 'play' : 'check'}
+                    subtitle1={undefined}
+                    subtitle2={(() => {
+                      const formatTime = (mins: number) => {
+                        if (!mins) return '';
+                        const h = Math.floor(mins / 60);
+                        const m = mins % 60;
+                        return h > 0 ? `${h}h ${m > 0 ? `${String(m).padStart(2, '0')}m` : '00m'}` : `${m}m`;
+                      };
+
+                      if (item.status === 'plan_to_watch') {
+                        if (item.item_type === 'movie') return formatTime(item.total_pages);
+                        return '';
+                      }
+                      if (['completed', 'read', 'endless'].includes(item.status)) {
+                        if (['book', 'comic', 'manga'].includes(item.item_type)) return item.total_pages ? `${item.total_pages} ${language === 'es' ? 'páginas' : 'pages'}` : '';
+                        if (item.item_type === 'movie') return formatTime(item.total_pages);
+                        if (item.item_type === 'game') return formatTime(item.pages_read);
+                        return '';
+                      }
+                      if (item.status === 'dropped') {
+                        if (['book', 'comic', 'manga'].includes(item.item_type)) return item.pages_read > 0 ? `${item.pages_read} ${language === 'es' ? 'páginas' : 'pages'}` : '';
+                        if (['game', 'movie'].includes(item.item_type)) return formatTime(item.pages_read);
+                        return '';
+                      }
+                      if (['watching', 'reading', 'playing'].includes(item.status)) {
+                        if (['game', 'movie'].includes(item.item_type)) return formatTime(item.pages_read);
+                        if (['book', 'comic', 'manga'].includes(item.item_type)) return item.pages_read > 0 ? `${item.pages_read} ${language === 'es' ? 'páginas' : 'pages'}` : '';
+                      }
+                      return "";
+                    })()}
+                    onCheck={activeTab === 'plan_to_watch' || activeTab === 'watching' ? (e) => handleMarkCompleted(e, item) : undefined}
+                    onPlay={activeTab === 'plan_to_watch' || activeTab === 'dropped' ? (e) => handleStartConsuming(e, item) : undefined}
+                    onClick={() => handleOpenItem(item)}
+                    language={language}
+                  />
+                );
+              };
+
+              // Helper for guide card
+              const renderGuideCardItem = (g: any) => {
+                let insideTop = g.title;
+                let bottomText1 = '';
+                let bottomText2 = '';
+
+                const match = g.title.match(/^(.*?)\s*-\s*S(\d+)E(\d+)(.*)$/i);
+                if (match) {
+                  insideTop = match[1].trim();
+                  const s = match[2];
+                  const e = match[3];
+                  bottomText1 = language === 'es' ? `T${s} | E${e}` : `S${s} | E${e}`;
+                  bottomText2 = match[4].replace(/^\s*-\s*/, '').trim();
+                } else {
+                  const sMatch = g.title.match(/S(\d+)E(\d+)/i);
+                  if (sMatch) {
+                    const s = sMatch[1];
+                    const e = sMatch[2];
+                    bottomText1 = language === 'es' ? `T${s} | E${e}` : `S${s} | E${e}`;
+                    insideTop = g.title.replace(sMatch[0], '').replace(/-\s*-/, '-').trim();
+                  }
+                }
+
+                return (
+                  <CustomCard 
+                    key={g.item_id}
+                    title={g.list_title}
+                    coverUrl={g.image_url}
+                    itemType="guide"
+                    preSubtitle={insideTop}
+                    themeColor="var(--color-guide)"
+                    themeTextColor="var(--color-text-guide)"
+                    coverBottomText={undefined}
+                    subtitle1={bottomText1}
+                    subtitle2={bottomText2}
+                    onCheck={(e) => handleMarkCompleted(e, g)}
+                    onClick={() => handleOpenItem({ ...g, id: g.item_id })}
+                    onTitleClick={(e) => { e.stopPropagation(); navigate(`/guide/${g.list_id}`); }}
+                    language={language}
+                  />
+                );
+              };
+
+              // If a specific category filter is active (not 'all' and not 'guide'),
+              // render desktop standard or mobile vertical stack
+              if (homeCategoryFilter !== 'all' && homeCategoryFilter !== 'guide') {
+                const specificItems = filteredItems.filter(i => i.item_type === homeCategoryFilter);
+                if (specificItems.length === 0) {
+                  return (
+                    <div style={{ color: "var(--text-secondary)", padding: "1rem 0" }}>
+                      {language === 'es' ? 'No hay elementos en esta categoría.' : 'No items in this category.'}
                     </div>
-                  ) : (
-                    catItems.map(item => {
-                      const isTrackedComic = item.item_type === "comic" && !!item.tracking_list_id;
-                      if ((activeTab === "watching" || activeTab === "plan_to_watch") && (item.item_type === "series" || item.item_type === "anime" || isTrackedComic)) {
-                        return (
-                          <ActiveSeriesCard 
-                            key={item.id}
-                            item={item}
-                            language={language}
-                            actionIcon={activeTab === "plan_to_watch" ? "play" : "check"}
-                            variant={activeTab === "plan_to_watch" ? "poster" : "episode"}
-                            onUpdate={() => fetchDashboard(true)}
-                            onOpenSeries={(seriesItem) => handleOpenItem(seriesItem)}
-                            themeColor={`var(--color-${item.item_type})`}
-                            themeTextColor={`var(--color-text-${item.item_type})`}
-                          />
-                        );
-                      }
+                  );
+                }
 
-                      if (activeTab === "completed" && (item.item_type === "series" || item.item_type === "anime" || isTrackedComic)) {
-                        return (
-                          <CompletedSeriesCard 
-                            key={item.id}
-                            item={item}
-                            language={language}
-                            onUpdate={() => fetchDashboard(true)}
-                            onOpenSeries={(seriesItem) => handleOpenItem(seriesItem)}
-                            themeColor={`var(--color-${item.item_type})`}
-                            themeTextColor={`var(--color-text-${item.item_type})`}
-                          />
-                        );
-                      }
+                return (
+                  <>
+                    {/* Mobile vertical stack (edge to edge full width) */}
+                    <div className="mobile-vertical-stack home-mobile-only">
+                      {specificItems.map(item => renderItemCard(item))}
+                    </div>
 
-                      if (activeTab === "dropped" && (item.item_type === "series" || item.item_type === "anime" || isTrackedComic)) {
-                        return (
-                          <DroppedSeriesCard 
-                            key={item.id}
-                            item={item}
-                            language={language}
-                            onUpdate={() => fetchDashboard(true)}
-                            onOpenSeries={(seriesItem) => handleOpenItem(seriesItem)}
-                            themeColor={`var(--color-${item.item_type})`}
-                            themeTextColor={`var(--color-text-${item.item_type})`}
-                          />
-                        );
-                      }
-                      
-                      return (
-                        <CustomCard 
-                          key={item.id}
-                          title={item.title}
-                          coverUrl={item.image_url}
-                          itemType={item.item_type}
-                          rawItem={item}
-                          themeColor={`var(--color-${item.item_type})`}
-                          themeTextColor={`var(--color-text-${item.item_type})`}
-                          coverBottomText={undefined}
-                          actionIcon={activeTab === 'plan_to_watch' || item.status === 'dropped' ? 'play' : 'check'}
-                          subtitle1={undefined}
-                          subtitle2={(() => {
-                            const formatTime = (mins: number) => {
-                              if (!mins) return '';
-                              const h = Math.floor(mins / 60);
-                              const m = mins % 60;
-                              return h > 0 ? `${h}h ${m > 0 ? `${String(m).padStart(2, '0')}m` : '00m'}` : `${m}m`;
-                            };
+                    {/* Desktop horizontal row */}
+                    <div className="home-desktop-only" style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
+                      <ScrollRow 
+                        key={`${activeTab}_${homeCategoryFilter}`} 
+                        title={getTypeCat(homeCategoryFilter, true)} 
+                        icon={getCategoryIcon(homeCategoryFilter, { size: 18 })}
+                        outlineColor={`var(--color-${homeCategoryFilter})`} 
+                        itemCount={specificItems.length}
+                        storageKey={`${activeTab}_${homeCategoryFilter}`}
+                      >
+                        {specificItems.map(item => renderItemCard(item))}
+                      </ScrollRow>
+                    </div>
+                  </>
+                );
+              }
 
-                            if (item.status === 'plan_to_watch') {
-                              if (item.item_type === 'movie') return formatTime(item.total_pages);
-                              return '';
-                            }
-                            if (['completed', 'read', 'endless'].includes(item.status)) {
-                              if (['book', 'comic', 'manga'].includes(item.item_type)) return item.total_pages ? `${item.total_pages} ${language === 'es' ? 'páginas' : 'pages'}` : '';
-                              if (item.item_type === 'movie') return formatTime(item.total_pages);
-                              if (item.item_type === 'game') return formatTime(item.pages_read);
-                              return '';
-                            }
-                            if (item.status === 'dropped') {
-                              if (['book', 'comic', 'manga'].includes(item.item_type)) return item.pages_read > 0 ? `${item.pages_read} ${language === 'es' ? 'páginas' : 'pages'}` : '';
-                              if (['game', 'movie'].includes(item.item_type)) return formatTime(item.pages_read);
-                              return '';
-                            }
-                            if (['watching', 'reading', 'playing'].includes(item.status)) {
-                              if (['game', 'movie'].includes(item.item_type)) return formatTime(item.pages_read);
-                              if (['book', 'comic', 'manga'].includes(item.item_type)) return item.pages_read > 0 ? `${item.pages_read} ${language === 'es' ? 'páginas' : 'pages'}` : '';
-                            }
-                            return "";
-                          })()}
-                          onCheck={activeTab === 'plan_to_watch' || activeTab === 'watching' ? (e) => handleMarkCompleted(e, item) : undefined}
-                          onPlay={activeTab === 'plan_to_watch' || activeTab === 'dropped' ? (e) => handleStartConsuming(e, item) : undefined}
-                          onClick={() => handleOpenItem(item)}
-                          language={language}
-                        />
-                      );
-                    })
-                  )}
-                </ScrollRow>
+              // Default ('all'): show all categories as rows, and on mobile show followed guides at the bottom
+              return (
+                <>
+                  {getOrderedCategories(currentUser?.category_order).map(category => {
+                    let catItems = filteredItems.filter(i => i.item_type === category);
+                    if (catItems.length === 0 && (category !== "game" || activeTab !== "watching")) return null;
+
+                    const headerExtra = (category === "game" && activeTab === "watching") ? (
+                      <div style={{ display: "flex", background: "var(--bg-tertiary)", padding: "3px", borderRadius: "8px", gap: "4px", border: "1px solid var(--border-color)" }}>
+                        <button
+                          type="button"
+                          onClick={() => setGameFilter("playing")}
+                          style={{
+                            border: "none",
+                            background: gameFilter === "playing" ? "var(--color-game, #10b981)" : "transparent",
+                            color: gameFilter === "playing" ? "var(--color-text-game, #ffffff)" : "var(--text-secondary)",
+                            padding: "4px 10px",
+                            borderRadius: "6px",
+                            fontSize: "0.8rem",
+                            fontWeight: 600,
+                            cursor: "pointer",
+                            transition: "all 0.2s ease"
+                          }}
+                        >
+                          {language === "es" ? "Jugando" : "Playing"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setGameFilter("endless")}
+                          style={{
+                            border: "none",
+                            background: gameFilter === "endless" ? "var(--color-game, #10b981)" : "transparent",
+                            color: gameFilter === "endless" ? "var(--color-text-game, #ffffff)" : "var(--text-secondary)",
+                            padding: "4px 10px",
+                            borderRadius: "6px",
+                            fontSize: "0.8rem",
+                            fontWeight: 600,
+                            cursor: "pointer",
+                            transition: "all 0.2s ease"
+                          }}
+                        >
+                          {language === "es" ? "Infinito" : "Endless"}
+                        </button>
+                      </div>
+                    ) : undefined;
+
+                    return (
+                      <ScrollRow 
+                        key={`${activeTab}_${category}`} 
+                        title={getTypeCat(category, true)} 
+                        icon={getCategoryIcon(category, { size: 18 })}
+                        outlineColor={`var(--color-${category})`} 
+                        headerExtra={headerExtra} 
+                        itemCount={catItems.length}
+                        storageKey={`${activeTab}_${category}`}
+                      >
+                        {catItems.length === 0 ? (
+                          <div style={{ padding: "1rem 0", color: "var(--text-secondary)", fontSize: "0.9rem" }}>
+                            {language === "es" 
+                              ? (gameFilter === "endless" ? "No hay juegos infinitos." : "No hay juegos en curso.") 
+                              : (gameFilter === "endless" ? "No endless games." : "No games in progress.")}
+                          </div>
+                        ) : (
+                          catItems.map(item => renderItemCard(item))
+                        )}
+                      </ScrollRow>
+                    );
+                  })}
+
+                </>
               );
-            })}
+            })()}
           </div>
         ) : (
           <div style={{ color: "var(--text-secondary)", padding: "1rem 0" }}>No hay elementos en esta categoria.</div>

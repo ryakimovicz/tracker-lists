@@ -108,6 +108,7 @@ interface ExploreSectionProps {
   currentUser: any;
   onOpenItem: (item: any) => void;
   getTagClass: (type: string) => string;
+  isFiltered?: boolean;
 }
 
 const ExploreSection = React.memo<ExploreSectionProps>(({
@@ -117,7 +118,8 @@ const ExploreSection = React.memo<ExploreSectionProps>(({
   language,
   currentUser,
   onOpenItem,
-  getTagClass
+  getTagClass,
+  isFiltered = false
 }) => {
   if (loading) {
     return <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '3rem' }}>{language === 'es' ? 'Cargando...' : 'Loading...'}</div>;
@@ -127,134 +129,167 @@ const ExploreSection = React.memo<ExploreSectionProps>(({
     return <div style={{ color: "var(--text-secondary)", padding: "1rem 0" }}>{language === 'es' ? 'No hay elementos disponibles.' : 'No items available.'}</div>;
   }
 
+  const renderCard = (item: any, idx: number) => {
+    const epSubtitle = (item.item_type === 'series' || item.item_type === 'anime') && item.latest_episode != null
+      ? `${language === 'es' ? 'T' : 'S'}${String(item.latest_season || 1).padStart(2, '0')} | E${String(item.latest_episode).padStart(2, '0')}`
+      : null;
+    const statusLabel = item.status && ['completed', 'watching', 'dropped', 'read', 'reading'].includes(item.status)
+      ? ((item.status === 'completed' || item.status === 'read') 
+          ? (item.item_type === 'series' || item.item_type === 'anime' ? (language === 'es' ? 'Terminado' : 'Completed') : ['book', 'comic', 'manga'].includes(item.item_type) ? (language === 'es' ? 'Leído' : 'Read') : (language === 'es' ? 'Visto' : 'Watched'))
+          : (item.status === 'watching' || item.status === 'reading') 
+          ? (item.item_type === 'movie' ? (language === 'es' ? 'En pausa' : 'Paused') : ['book', 'comic', 'manga'].includes(item.item_type) ? (language === 'es' ? 'Leyendo' : 'Reading') : (language === 'es' ? 'Viendo' : 'Watching')) 
+          : (language === 'es' ? 'Abandonado' : 'Dropped'))
+      : null;
+
+    return (
+      <div 
+        key={idx} 
+        className="activity-card activity-card-portrait" 
+        style={{ 
+          minWidth: '180px', 
+          maxWidth: '180px', 
+          background: 'var(--bg-secondary)', 
+          border: `1px solid var(--border-color)`,
+          borderRadius: '12px', 
+          overflow: 'hidden', 
+          cursor: 'pointer', 
+          position: 'relative',
+          display: 'flex',
+          flexDirection: 'column'
+        }} 
+        onClick={() => onOpenItem(item)} 
+        onMouseEnter={() => prefetchMediaDetails(item)}
+      >
+        {/* Title */}
+        <div 
+          className="card-item-title" 
+          style={{ 
+            padding: '0.5rem 0.75rem', 
+            fontSize: '0.85rem', 
+            fontWeight: 600, 
+            borderBottom: '1px solid var(--border-color)', 
+            whiteSpace: 'nowrap', 
+            overflow: 'hidden', 
+            textOverflow: 'ellipsis' 
+          }} 
+          title={item.title}
+        >
+          {item.title}
+        </div>
+
+        {/* Poster Thumbnail */}
+        <div className="card-media-cover" style={{ width: '100%', height: '240px', background: 'var(--bg-tertiary)', position: 'relative' }}>
+          <MediaPoster
+            src={item.image_url}
+            title={item.title}
+            itemType={item.item_type}
+            isUpcomingMovie={item.item_type === 'movie'}
+            height="100%"
+            width="100%"
+            borderRadius={0}
+          />
+
+          {/* Game/Media Badge (Colección, DLC, etc.) - exclude comic issue numbers */}
+          {item.item_type !== 'comic' && renderMediaBadge(item.badge, language)}
+
+          {/* Status Badge */}
+          {statusLabel && (
+            <div style={{ 
+              position: 'absolute', top: '0.5rem', right: '0.5rem', 
+              padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 600,
+              background: (item.status === 'completed' || item.status === 'read') ? 'var(--color-movie)' : (item.status === 'watching' || item.status === 'reading') ? '#3b82f6' : '#ef4444',
+              color: (item.status === 'completed' || item.status === 'read') ? 'var(--color-text-movie)' : '#ffffff',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.5)'
+            }}>
+              {statusLabel}
+            </div>
+          )}
+        </div>
+
+        {/* Body Content / Subtitle */}
+        <div className="card-body-content" style={{ padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.2rem', flex: 1, minHeight: '2.5rem', justifyContent: 'center' }}>
+          {item.item_type === 'comic' && item.badge ? (
+            <>
+              <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                {item.badge}
+              </div>
+              {item.release_date && (
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
+                  {item.release_date}
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              {epSubtitle && (
+                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                  {epSubtitle}
+                </div>
+              )}
+              {item.release_date ? (
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
+                  {item.release_date}
+                </div>
+              ) : !epSubtitle ? (
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 500 }}>
+                  {item.title}
+                </div>
+              ) : null}
+            </>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       {categories.map(({ type, title, items }) => (
-        <HorizontalScroll 
-          key={`${subTab}_${type}`} 
-          title={
+        <React.Fragment key={`${subTab}_${type}`}>
+          {isFiltered ? (
             <>
-              <span style={{ display: 'inline-flex', alignItems: 'center' }}>
-                {getCategoryIcon(type, { size: 18 })}
-              </span>
-              <span>{title}</span>
-            </>
-          } 
-          outlineColor={`var(--color-${type})`}
-        >
-          {items.map((item: any, idx: number) => {
-            const epSubtitle = (item.item_type === 'series' || item.item_type === 'anime') && item.latest_episode != null
-              ? `${language === 'es' ? 'T' : 'S'}${String(item.latest_season || 1).padStart(2, '0')} | E${String(item.latest_episode).padStart(2, '0')}`
-              : null;
-            const statusLabel = item.status && ['completed', 'watching', 'dropped', 'read', 'reading'].includes(item.status)
-              ? ((item.status === 'completed' || item.status === 'read') 
-                  ? (item.item_type === 'series' || item.item_type === 'anime' ? (language === 'es' ? 'Terminado' : 'Completed') : ['book', 'comic', 'manga'].includes(item.item_type) ? (language === 'es' ? 'Leído' : 'Read') : (language === 'es' ? 'Visto' : 'Watched'))
-                  : (item.status === 'watching' || item.status === 'reading') 
-                  ? (item.item_type === 'movie' ? (language === 'es' ? 'En pausa' : 'Paused') : ['book', 'comic', 'manga'].includes(item.item_type) ? (language === 'es' ? 'Leyendo' : 'Reading') : (language === 'es' ? 'Viendo' : 'Watching')) 
-                  : (language === 'es' ? 'Abandonado' : 'Dropped'))
-              : null;
-
-            return (
-              <div 
-                key={idx} 
-                className="activity-card activity-card-portrait" 
-                style={{ 
-                  minWidth: '180px', 
-                  maxWidth: '180px', 
-                  background: 'var(--bg-secondary)', 
-                  border: `1px solid var(--border-color)`,
-                  borderRadius: '12px', 
-                  overflow: 'hidden', 
-                  cursor: 'pointer', 
-                  position: 'relative',
-                  display: 'flex',
-                  flexDirection: 'column'
-                }} 
-                onClick={() => onOpenItem(item)} 
-                onMouseEnter={() => prefetchMediaDetails(item)}
-              >
-                {/* Title */}
-                <div 
-                  className="card-item-title" 
-                  style={{ 
-                    padding: '0.5rem 0.75rem', 
-                    fontSize: '0.85rem', 
-                    fontWeight: 600, 
-                    borderBottom: '1px solid var(--border-color)', 
-                    whiteSpace: 'nowrap', 
-                    overflow: 'hidden', 
-                    textOverflow: 'ellipsis' 
-                  }} 
-                  title={item.title}
-                >
-                  {item.title}
-                </div>
-
-                {/* Poster Thumbnail */}
-                <div className="card-media-cover" style={{ width: '100%', height: '240px', background: 'var(--bg-tertiary)', position: 'relative' }}>
-                  <MediaPoster
-                    src={item.image_url}
-                    title={item.title}
-                    itemType={item.item_type}
-                    isUpcomingMovie={item.item_type === 'movie'}
-                    height="100%"
-                    width="100%"
-                    borderRadius={0}
-                  />
-
-                  {/* Game/Media Badge (Colección, DLC, etc.) - exclude comic issue numbers */}
-                  {item.item_type !== 'comic' && renderMediaBadge(item.badge, language)}
-
-                  {/* Status Badge */}
-                  {statusLabel && (
-                    <div style={{ 
-                      position: 'absolute', top: '0.5rem', right: '0.5rem', 
-                      padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 600,
-                      background: (item.status === 'completed' || item.status === 'read') ? 'var(--color-movie)' : (item.status === 'watching' || item.status === 'reading') ? '#3b82f6' : '#ef4444',
-                      color: (item.status === 'completed' || item.status === 'read') ? 'var(--color-text-movie)' : '#ffffff',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.5)'
-                    }}>
-                      {statusLabel}
-                    </div>
-                  )}
-                </div>
-
-                {/* Body Content / Subtitle */}
-                <div className="card-body-content" style={{ padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.2rem', flex: 1, minHeight: '2.5rem', justifyContent: 'center' }}>
-                  {item.item_type === 'comic' && item.badge ? (
-                    <>
-                      <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                        {item.badge}
-                      </div>
-                      {item.release_date && (
-                        <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
-                          {item.release_date}
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      {epSubtitle && (
-                        <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                          {epSubtitle}
-                        </div>
-                      )}
-                      {item.release_date ? (
-                        <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
-                          {item.release_date}
-                        </div>
-                      ) : !epSubtitle ? (
-                        <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 500 }}>
-                          {item.title}
-                        </div>
-                      ) : null}
-                    </>
-                  )}
-                </div>
+              {/* Mobile vertical stack (edge to edge full width) */}
+              <div className="mobile-vertical-stack home-mobile-only">
+                {items.map((item: any, idx: number) => renderCard(item, idx))}
               </div>
-            );
-          })}
-        </HorizontalScroll>
+
+              {/* Desktop horizontal row */}
+              <div className="home-desktop-only" style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
+                <HorizontalScroll 
+                  key={`${subTab}_${type}`} 
+                  title={
+                    <>
+                      <span style={{ display: 'inline-flex', alignItems: 'center' }}>
+                        {getCategoryIcon(type, { size: 18 })}
+                      </span>
+                      <span>{title}</span>
+                    </>
+                  } 
+                  outlineColor={`var(--color-${type})`}
+                  itemCount={items.length}
+                >
+                  {items.map((item: any, idx: number) => renderCard(item, idx))}
+                </HorizontalScroll>
+              </div>
+            </>
+          ) : (
+            <HorizontalScroll 
+              key={`${subTab}_${type}`} 
+              title={
+                <>
+                  <span style={{ display: 'inline-flex', alignItems: 'center' }}>
+                    {getCategoryIcon(type, { size: 18 })}
+                  </span>
+                  <span>{title}</span>
+                </>
+              } 
+              outlineColor={`var(--color-${type})`}
+              itemCount={items.length}
+            >
+              {items.map((item: any, idx: number) => renderCard(item, idx))}
+            </HorizontalScroll>
+          )}
+        </React.Fragment>
       ))}
     </div>
   );
@@ -352,6 +387,7 @@ const ExploreGuidesSection = React.memo<ExploreGuidesSectionProps>(({
             </>
           } 
           outlineColor={row.outlineColor}
+          itemCount={row.items.length}
         >
           {row.items.map((guide: any) => (
             <div
@@ -1507,6 +1543,7 @@ export const Search: React.FC = () => {
               currentUser={currentUser}
               onOpenItem={handleOpenItemDetails}
               getTagClass={getTagClass}
+              isFiltered={activeTab !== 'all'}
             />
           )}
         </div>
