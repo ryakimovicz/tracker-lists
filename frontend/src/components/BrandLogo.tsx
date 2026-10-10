@@ -15,7 +15,11 @@ const LETTERS: LetterConfig[] = [
   { char: 'd', colorVar: 'var(--color-anime)', glow: 'rgba(255, 136, 51, 0.65)' },
 ];
 
-export const BrandLogo: React.FC = () => {
+interface BrandLogoProps {
+  fontSize?: string;
+}
+
+export const BrandLogo: React.FC<BrandLogoProps> = ({ fontSize = '2.15rem' }) => {
   // activeLetter is the letter currently highlighted by wave or hover (-1 when in idle state)
   const [activeLetter, setActiveLetter] = useState<number>(-1);
   const isHoveredRef = useRef(false);
@@ -139,7 +143,7 @@ export const BrandLogo: React.FC = () => {
         alignItems: 'center',
         textDecoration: 'none',
         userSelect: 'none',
-        fontSize: '2.15rem',
+        fontSize,
         fontWeight: 800,
         letterSpacing: '-0.5px',
         lineHeight: 1,

@@ -51,19 +51,23 @@ export const HorizontalScroll: React.FC<HorizontalScrollProps> = ({ children, ti
   return (
     <div className={`horizontal-scroll-container ${className}`} style={{ position: "relative", marginBottom: "2rem", width: "100%", maxWidth: "100%", overflow: "hidden" }}>
       {title && (
-        <div style={{ display: "flex", paddingLeft: "45px", marginBottom: "1rem" }}>
-          <h3 style={{ 
-            fontSize: "1.2rem", 
-            fontWeight: 600, 
-            color: "var(--text-primary)", 
-            border: `2px solid ${outlineColor || "var(--border-color)"}`, 
-            borderRadius: "8px", 
-            padding: "0.2rem 0.75rem", 
-            background: "var(--bg-secondary)",
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "0.45rem"
-          }}>
+        <div className="home-category-header-wrap" style={{ display: "flex", paddingLeft: "45px", marginBottom: "1rem" }}>
+          <h3 
+            className="home-category-toggle-btn"
+            style={{ 
+              fontSize: "1.2rem", 
+              fontWeight: 600, 
+              color: "var(--text-primary)", 
+              border: `2px solid ${outlineColor || "var(--border-color)"}`, 
+              borderRadius: "8px", 
+              padding: "0.2rem 0.75rem", 
+              background: "var(--bg-secondary)",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.45rem",
+              margin: 0
+            }}
+          >
             {title}
           </h3>
         </div>
@@ -123,6 +127,7 @@ export const HorizontalScroll: React.FC<HorizontalScrollProps> = ({ children, ti
           <>
             <button 
               type="button"
+              className="scroll-nav-arrow scroll-nav-arrow-left"
               onClick={() => handleClick("left")}
               onMouseEnter={handleMouseEnter}
               onMouseLeave={handleMouseLeave}
@@ -145,13 +150,14 @@ export const HorizontalScroll: React.FC<HorizontalScrollProps> = ({ children, ti
             
             <div 
               ref={scrollRef} 
+              className="home-scroll-carousel"
               style={{ 
                 display: "flex", 
                 gap: "1.25rem", 
                 overflowX: "auto", 
                 scrollbarWidth: "none", 
                 msOverflowStyle: "none", 
-                paddingTop: "8px",
+                paddingTop: "8px", 
                 paddingBottom: "1.5rem", 
                 paddingLeft: "60px", 
                 paddingRight: "60px",
@@ -165,6 +171,7 @@ export const HorizontalScroll: React.FC<HorizontalScrollProps> = ({ children, ti
             {/* Left fade click-blocking zone */}
             {canScrollLeft && (
               <div 
+                className="scroll-fade-zone scroll-fade-zone-left"
                 style={{
                   position: "absolute",
                   left: 0,
@@ -181,6 +188,7 @@ export const HorizontalScroll: React.FC<HorizontalScrollProps> = ({ children, ti
 
             <button 
               type="button"
+              className="scroll-nav-arrow scroll-nav-arrow-right"
               onClick={() => handleClick("right")}
               onMouseEnter={handleMouseEnter}
               onMouseLeave={handleMouseLeave}
@@ -204,6 +212,7 @@ export const HorizontalScroll: React.FC<HorizontalScrollProps> = ({ children, ti
             {/* Right fade click-blocking zone */}
             {canScrollRight && (
               <div 
+                className="scroll-fade-zone scroll-fade-zone-right"
                 style={{
                   position: "absolute",
                   right: 0,

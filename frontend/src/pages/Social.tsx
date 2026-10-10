@@ -368,6 +368,7 @@ export const Social: React.FC = () => {
     <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
       {/* Unified Underline Tabs Bar */}
       <div
+        className="social-tabs-container"
         style={{
           display: 'flex',
           gap: '1.75rem',
@@ -390,6 +391,8 @@ export const Social: React.FC = () => {
             <div
               key={tab.id}
               onClick={() => handleTabChange(tab.id)}
+              className={`social-tab-item ${isActive ? 'active' : ''}`}
+              title={tab.label}
               style={{
                 fontSize: '1.05rem',
                 fontWeight: isActive ? 600 : 500,
@@ -403,10 +406,13 @@ export const Social: React.FC = () => {
                 whiteSpace: 'nowrap'
               }}
             >
-              <Icon size={18} style={{ color: isActive ? 'var(--accent-primary)' : 'inherit' }} />
-              <span>{tab.label}</span>
+              <span className="social-tab-icon">
+                <Icon size={18} style={{ color: isActive ? 'var(--accent-primary)' : 'inherit' }} />
+              </span>
+              <span className="social-tab-label">{tab.label}</span>
               {isActive && (
                 <div
+                  className="social-tab-indicator"
                   style={{
                     position: 'absolute',
                     bottom: '-0.75rem',
@@ -497,6 +503,7 @@ export const Social: React.FC = () => {
         </div>
       ) : (
         <div
+          className="social-feed-grid"
           style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',

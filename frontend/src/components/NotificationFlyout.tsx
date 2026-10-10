@@ -293,6 +293,7 @@ export const NotificationFlyout: React.FC<NotificationFlyoutProps> = ({
   return (
     <div
       ref={panelRef}
+      className="notification-flyout-panel"
       style={{
         position: 'fixed',
         left: '270px',

@@ -196,8 +196,9 @@ export const MediaPoster: React.FC<MediaPosterProps> = ({
       }}
     >
       {/* Title in top-center area */}
-      <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '44px', marginTop: '0.25rem' }}>
+      <div className="media-poster-title-wrap" style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '44px', marginTop: '0.25rem' }}>
         <span
+          className="media-poster-title"
           style={{
             color: isLight ? '#0f172a' : '#f8fafc',
             fontSize: '0.92rem',

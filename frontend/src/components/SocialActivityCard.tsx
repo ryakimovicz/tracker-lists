@@ -1152,7 +1152,7 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
 
     return (
       <div
-        className="glass-card activity-card"
+        className="glass-card social-feed-card"
         style={{
           padding: '1.25rem',
           borderRadius: '16px',

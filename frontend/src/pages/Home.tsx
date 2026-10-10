@@ -9,7 +9,7 @@ import { AdBanner } from '../components/AdBanner';
 import { ReplaceFavoriteModal } from '../components/ReplaceFavoriteModal';
 import { ProModal } from '../components/ProModal';
 import { PathdLoader } from '../components/PathdLoader';
-import { ChevronLeft, ChevronRight, ChevronDown, ChevronsDown, Check, Play } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronDown, ChevronsDown, Check, Play, BookOpen, Bookmark, CheckCircle, XCircle, Calendar, Sparkles } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { getOrderedCategories, getCategoryLabel, getCategoryIcon } from '../utils/categoryOrder';
 import { prefetchMediaDetails } from '../utils/prefetch';
@@ -136,11 +136,21 @@ const ScrollRow = ({
   }, []);
 
   const actualItemCount = itemCount !== undefined ? itemCount : React.Children.count(children);
-  // Available width accounting for 45px padding on each side (90px total)
-  // Each card is 180px wide with a 16px (1rem) gap
-  const availableWidth = Math.max(0, containerWidth - 90);
-  const maxVisibleInOneRow = Math.max(1, Math.floor((availableWidth + 16) / 196));
-  const canExpandMore = actualItemCount > maxVisibleInOneRow;
+  const isMobile = containerWidth < 768;
+
+  // Available width accounting for paddings
+  // Desktop: 1 card = 180px + 16px gap, 1 row baseline
+  // Mobile: 1 card = ~260px wide, and baseline is already 2 rows per column (each column shows 2 items)
+  const availableWidth = Math.max(0, containerWidth - (isMobile ? 16 : 90));
+  const maxVisibleInOneRow = isMobile
+    ? Math.max(1, Math.floor((availableWidth + 10) / 270))
+    : Math.max(1, Math.floor((availableWidth + 16) / 196));
+
+  // On mobile, since baseline is 2 cards per column, the category fits on screen without scroll
+  // if actualItemCount <= 2 * maxVisibleInOneRow.
+  const canExpandMore = isMobile
+    ? actualItemCount > 2 * maxVisibleInOneRow
+    : actualItemCount > maxVisibleInOneRow;
 
   // Use effectiveRowMode so loading states or temporary resize don't destroy user preference
   const effectiveRowMode = (rowMode === 'two-rows' && !canExpandMore) ? 'one-row' : rowMode;
@@ -268,10 +278,14 @@ const ScrollRow = ({
   return (
     <div ref={containerRef} style={{ position: "relative" }}>
       {title && (
-        <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", paddingLeft: "45px", paddingRight: "45px", marginBottom: effectiveRowMode === 'collapsed' ? "0.5rem" : "1rem" }}>
+        <div 
+          className="home-category-header-wrap"
+          style={{ display: "flex", flexDirection: "column", gap: "0.5rem", paddingLeft: "45px", paddingRight: "45px", marginBottom: effectiveRowMode === 'collapsed' ? "0.5rem" : "1rem" }}
+        >
           <div style={{ display: "flex", alignItems: "center" }}>
             <button
               type="button"
+              className="home-category-toggle-btn"
               onClick={handleToggle}
               title={getTooltip()}
               style={{
@@ -322,6 +336,7 @@ const ScrollRow = ({
           {/* Left fade click-blocking zone */}
           {canScrollLeft && (
             <div 
+              className="scroll-fade-zone scroll-fade-zone-left"
               style={{
                 position: "absolute",
                 left: 0,
@@ -338,6 +353,7 @@ const ScrollRow = ({
 
           <button 
             type="button"
+            className="scroll-nav-arrow scroll-nav-arrow-left"
             onClick={() => handleClick("left", effectiveRowMode === 'two-rows' ? 360 : 300)}
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
@@ -360,6 +376,7 @@ const ScrollRow = ({
           
           <div 
             ref={scrollRef} 
+            className={`home-scroll-carousel ${isTwoRows ? 'is-expanded' : ''} ${actualItemCount === 1 ? 'has-single-item' : ''}`}
             style={{ 
               display: isTwoRows ? "grid" : "flex",
               gridTemplateColumns: isTwoRowsByRow ? `repeat(${maxVisibleInOneRow}, max-content)` : undefined,
@@ -385,6 +402,7 @@ const ScrollRow = ({
 
           <button 
             type="button"
+            className="scroll-nav-arrow scroll-nav-arrow-right"
             onClick={() => handleClick("right", effectiveRowMode === 'two-rows' ? 360 : 300)}
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
@@ -408,6 +426,7 @@ const ScrollRow = ({
           {/* Right fade click-blocking zone */}
           {canScrollRight && (
             <div 
+              className="scroll-fade-zone scroll-fade-zone-right"
               style={{
                 position: "absolute",
                 right: 0,
@@ -479,7 +498,7 @@ const ScrollRow = ({
         boxShadow: themeColor ? `0 0 10px ${themeColor}33` : "none",
         "--title-hover-color": themeColor
       } as React.CSSProperties}
-      className="activity-card"
+      className="activity-card activity-card-portrait"
     >
       <div 
         onClick={onTitleClick ? (e) => { e.stopPropagation(); onTitleClick(e); } : undefined}
@@ -508,7 +527,7 @@ const ScrollRow = ({
           title
         )}
       </div>
-      <div style={{ width: "100%", height: "240px", background: "var(--bg-tertiary)", position: "relative" }}>
+      <div className="card-media-cover" style={{ width: "100%", height: "240px", background: "var(--bg-tertiary)", position: "relative" }}>
         <MediaPoster
           src={coverUrl}
           title={title}
@@ -536,13 +555,13 @@ const ScrollRow = ({
           </div>
         )}
       </div>
-      <div style={{ padding: "0.75rem", display: "flex", flexDirection: "column", gap: "0.25rem", flex: 1, minHeight: "2.5rem", paddingRight: showBoth ? "75px" : hasAction ? "40px" : "0.75rem" }}>
+      <div className="card-body-content" style={{ padding: "0.75rem", display: "flex", flexDirection: "column", gap: "0.25rem", flex: 1, minHeight: "2.5rem", paddingRight: showBoth ? "75px" : hasAction ? "40px" : "0.75rem" }}>
         {preSubtitle && <div style={{ fontSize: "0.95rem", color: "var(--text-primary)", fontWeight: 800, lineHeight: 1.2, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{preSubtitle}</div>}
         {subtitle1 && <div style={{ fontSize: "0.9rem", color: "var(--text-primary)", fontWeight: 700 }}>{subtitle1}</div>}
         {subtitle2 && <div style={{ fontSize: "0.8rem", color: "var(--text-secondary)", fontWeight: 500, lineHeight: 1.2, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{subtitle2}</div>}
       </div>
       {showBoth ? (
-        <div style={{ position: "absolute", bottom: "0.5rem", right: "0.5rem", display: "flex", gap: "0.35rem", zIndex: 2 }}>
+        <div className="card-actions-wrap" style={{ position: "absolute", bottom: "0.5rem", right: "0.5rem", display: "flex", gap: "0.35rem", zIndex: 2 }}>
           <button 
             onClick={onCheck}
             className="btn-check-seen"
@@ -575,22 +594,23 @@ const ScrollRow = ({
           </button>
         </div>
       ) : hasAction ? (
-        <button 
-          onClick={onCheck || onPlay}
-          className="btn-check-seen"
-          title={onPlay ? (language === 'es' ? 'Reanudar en Continuar' : 'Resume in Continue') : (language === 'es' ? 'Marcar como completado' : 'Mark as completed')}
-          style={{
-            position: "absolute", bottom: "0.5rem", right: "0.5rem",
-            width: "32px", height: "32px", borderRadius: "50%",
-            background: "var(--bg-tertiary)", border: `2px solid ${themeColor || "var(--text-muted)"}`,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            cursor: "pointer", color: themeColor || "var(--text-primary)",
-            "--btn-hover-bg": themeColor,
-            "--btn-hover-text": themeTextColor
-          } as React.CSSProperties}
-        >
-          {actionIcon === 'play' || onPlay ? <Play size={15} style={{ marginLeft: '2px' }} /> : <Check size={16} />}
-        </button>
+        <div className="card-actions-wrap" style={{ position: "absolute", bottom: "0.5rem", right: "0.5rem", zIndex: 2 }}>
+          <button 
+            onClick={onCheck || onPlay}
+            className="btn-check-seen"
+            title={onPlay ? (language === 'es' ? 'Reanudar en Continuar' : 'Resume in Continue') : (language === 'es' ? 'Marcar como completado' : 'Mark as completed')}
+            style={{
+              width: "32px", height: "32px", borderRadius: "50%",
+              background: "var(--bg-tertiary)", border: `2px solid ${themeColor || "var(--text-muted)"}`,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              cursor: "pointer", color: themeColor || "var(--text-primary)",
+              "--btn-hover-bg": themeColor,
+              "--btn-hover-text": themeTextColor
+            } as React.CSSProperties}
+          >
+            {actionIcon === 'play' || onPlay ? <Play size={15} style={{ marginLeft: '2px' }} /> : <Check size={16} />}
+          </button>
+        </div>
       ) : null}
     </div>
   );
@@ -1152,8 +1172,8 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
         onClick={handleCardClick}
         onMouseEnter={() => prefetchMediaDetails(item)}
         style={{ 
-          minWidth: isPoster ? "180px" : "220px",
-          maxWidth: isPoster ? "180px" : "220px",
+          minWidth: (isPoster || isComic) ? "180px" : "220px",
+          maxWidth: (isPoster || isComic) ? "180px" : "220px",
           background: "var(--bg-secondary)", 
           border: `1px solid ${themeColor || "var(--border-color)"}`,
           borderRadius: "12px", 
@@ -1165,7 +1185,7 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
           boxShadow: themeColor ? `0 0 10px ${themeColor}33` : "none",
           "--title-hover-color": themeColor
         } as React.CSSProperties}
-        className="activity-card"
+        className={`activity-card ${isPoster || isComic ? 'activity-card-portrait' : 'activity-card-landscape'}`}
       >
         <div 
           onClick={(e) => { e.stopPropagation(); onOpenSeries(item); }}
@@ -1177,7 +1197,7 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
           {!isPoster && <ChevronRight size={14} style={{ flexShrink: 0, marginLeft: "0.25rem", opacity: 0.7 }} />}
         </div>
         
-        <div style={{ width: "100%", height: isPoster ? "240px" : "125px", background: "var(--bg-tertiary)", position: "relative" }}>
+        <div className="card-media-cover" style={{ width: "100%", height: (isPoster || isComic) ? "240px" : "125px", background: "var(--bg-tertiary)", position: "relative" }}>
           <MediaPoster
             src={isPoster ? item.image_url : coverUrl}
             title={item.title}
@@ -1188,7 +1208,7 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
           />
         </div>
         
-        <div style={{ padding: "0.75rem", display: "flex", flexDirection: "column", gap: "0.25rem", flex: 1, minHeight: isPoster ? "2.5rem" : undefined, paddingRight: isPoster ? "75px" : undefined }}>
+        <div className="card-body-content" style={{ padding: "0.75rem", display: "flex", flexDirection: "column", gap: "0.25rem", flex: 1, minHeight: isPoster ? "2.5rem" : undefined, paddingRight: isPoster ? "75px" : undefined }}>
           {isInitialLoad ? (
             <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem", marginTop: "auto", marginBottom: "auto" }}>
               <div style={{ width: "65px", height: "14px", borderRadius: "4px", background: "var(--bg-tertiary)", animation: "pulse 1.5s infinite" }} />
@@ -1210,7 +1230,7 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
         
         {nextEp && !isInitialLoad && (
           isPoster ? (
-            <div style={{ position: "absolute", bottom: "0.5rem", right: "0.5rem", display: "flex", gap: "0.35rem", zIndex: 2 }}>
+            <div className="card-actions-wrap" style={{ position: "absolute", bottom: "0.5rem", right: "0.5rem", display: "flex", gap: "0.35rem", zIndex: 2 }}>
               <button 
                 onClick={handleMarkSeen}
                 className="btn-check-seen"
@@ -1243,21 +1263,22 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
               </button>
             </div>
           ) : (
-            <button 
-              onClick={handleMarkSeen}
-              className="btn-check-seen"
-              style={{
-                position: "absolute", bottom: "0.5rem", right: "0.5rem",
-                width: "32px", height: "32px", borderRadius: "50%",
-                background: "var(--bg-tertiary)", border: `2px solid ${themeColor || "var(--text-muted)"}`,
-                display: "flex", alignItems: "center", justifyContent: "center",
-                cursor: "pointer", color: themeColor || "var(--text-primary)",
-                "--btn-hover-bg": themeColor,
-                "--btn-hover-text": themeTextColor
-              } as React.CSSProperties}
-            >
-              <Check size={16} />
-            </button>
+            <div className="card-actions-wrap" style={{ position: "absolute", bottom: "0.5rem", right: "0.5rem", zIndex: 2 }}>
+              <button 
+                onClick={handleMarkSeen}
+                className="btn-check-seen"
+                style={{
+                  width: "32px", height: "32px", borderRadius: "50%",
+                  background: "var(--bg-tertiary)", border: `2px solid ${themeColor || "var(--text-muted)"}`,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  cursor: "pointer", color: themeColor || "var(--text-primary)",
+                  "--btn-hover-bg": themeColor,
+                  "--btn-hover-text": themeTextColor
+                } as React.CSSProperties}
+              >
+                <Check size={16} />
+              </button>
+            </div>
           )
         )}
       </div>
@@ -1438,7 +1459,7 @@ const CompletedSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColo
         {item.title}
       </div>
 
-      <div style={{ width: "100%", height: "240px", background: "var(--bg-tertiary)", position: "relative" }}>
+      <div className="card-media-cover" style={{ width: "100%", height: "240px", background: "var(--bg-tertiary)", position: "relative" }}>
         <MediaPoster
           src={item.image_url}
           title={item.title}
@@ -1449,7 +1470,7 @@ const CompletedSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColo
         />
       </div>
       
-      <div style={{ padding: "0.75rem", display: "flex", flexDirection: "column", gap: "0.2rem", flex: 1, minHeight: "2.5rem", justifyContent: "center" }}>
+      <div className="card-body-content" style={{ padding: "0.75rem", display: "flex", flexDirection: "column", gap: "0.2rem", flex: 1, minHeight: "2.5rem", justifyContent: "center" }}>
         {seriesTotals ? (
           isComic ? (
             <>
@@ -1617,7 +1638,7 @@ const DroppedSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor,
         {item.title}
       </div>
 
-      <div style={{ width: "100%", height: "240px", background: "var(--bg-tertiary)", position: "relative" }}>
+      <div className="card-media-cover" style={{ width: "100%", height: "240px", background: "var(--bg-tertiary)", position: "relative" }}>
         <MediaPoster
           src={item.image_url}
           title={item.title}
@@ -1628,7 +1649,7 @@ const DroppedSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor,
         />
       </div>
       
-      <div style={{ padding: "0.75rem", display: "flex", flexDirection: "column", gap: "0.25rem", flex: 1, minHeight: "2.5rem", paddingRight: "40px" }}>
+      <div className="card-body-content" style={{ padding: "0.75rem", display: "flex", flexDirection: "column", gap: "0.25rem", flex: 1, minHeight: "2.5rem", paddingRight: "40px" }}>
         {lastEpInfo ? (
           <>
             <div style={{ fontSize: "0.88rem", color: "var(--text-primary)", fontWeight: 700 }}>{lastEpInfo.seasonText}</div>
@@ -1645,24 +1666,25 @@ const DroppedSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor,
         )}
       </div>
       
-      <button 
-        onClick={handleResume}
-        disabled={isLoading}
-        className="btn-check-seen"
-        title={language === 'es' ? 'Reanudar en Continuar' : 'Resume in Continue'}
-        style={{
-          position: "absolute", bottom: "0.5rem", right: "0.5rem",
-          width: "32px", height: "32px", borderRadius: "50%",
-          background: "var(--bg-tertiary)", border: `2px solid ${themeColor || "var(--text-muted)"}`,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          cursor: isLoading ? "wait" : "pointer", color: themeColor || "var(--text-primary)",
-          opacity: isLoading ? 0.5 : 1,
-          "--btn-hover-bg": themeColor,
-          "--btn-hover-text": themeTextColor
-        } as React.CSSProperties}
-      >
-        <Play size={15} style={{ marginLeft: '2px' }} />
-      </button>
+      <div className="card-actions-wrap" style={{ position: "absolute", bottom: "0.5rem", right: "0.5rem", zIndex: 2 }}>
+        <button 
+          onClick={handleResume}
+          disabled={isLoading}
+          className="btn-check-seen"
+          title={language === 'es' ? 'Reanudar en Continuar' : 'Resume in Continue'}
+          style={{
+            width: "32px", height: "32px", borderRadius: "50%",
+            background: "var(--bg-tertiary)", border: `2px solid ${themeColor || "var(--text-muted)"}`,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            cursor: isLoading ? "wait" : "pointer", color: themeColor || "var(--text-primary)",
+            opacity: isLoading ? 0.5 : 1,
+            "--btn-hover-bg": themeColor,
+            "--btn-hover-text": themeTextColor
+          } as React.CSSProperties}
+        >
+          <Play size={15} style={{ marginLeft: '2px' }} />
+        </button>
+      </div>
     </div>
   );
 };
@@ -2496,36 +2518,51 @@ export const Home: React.FC = () => {
     <div style={{ maxWidth: "1200px", margin: "0 auto", display: "flex", flexDirection: "column", gap: "2rem" }}>
       
       {/* Tabs */}
-      <div style={{ 
-        display: "flex", 
-        gap: "1.75rem", 
-        borderBottom: "1px solid var(--border-color)", 
-        paddingBottom: "0.75rem", 
-        marginBottom: "1.75rem",
-        position: "sticky", 
-        top: 0, 
-        zIndex: 20, 
-        background: "var(--bg-primary)", 
-        marginTop: "-2rem",
-        paddingTop: "0.85rem" 
-      }}>
+      <div 
+        className="home-tabs-container"
+        style={{ 
+          display: "flex", 
+          gap: "1.75rem", 
+          borderBottom: "1px solid var(--border-color)", 
+          paddingBottom: "0.75rem", 
+          marginBottom: "1.75rem",
+          position: "sticky", 
+          top: 0, 
+          zIndex: 20, 
+          background: "var(--bg-primary)", 
+          marginTop: "-2rem",
+          paddingTop: "0.85rem" 
+        }}
+      >
         {["watching", "guides", "plan_to_watch", "completed", "dropped", "upcoming"].map((tab) => {
           const labels: any = language === 'es'
             ? { "watching": "Continuar", "guides": "Guías", "plan_to_watch": "No comenzado", "completed": "Terminado", "dropped": "Abandonado", "upcoming": "Próximos" }
             : { "watching": "Continue", "guides": "Guides", "plan_to_watch": "Not started", "completed": "Completed", "dropped": "Dropped", "upcoming": "Upcoming" };
+          const icons: any = {
+            "watching": <Play size={18} />,
+            "guides": <BookOpen size={18} />,
+            "plan_to_watch": <Bookmark size={18} />,
+            "completed": <CheckCircle size={18} />,
+            "dropped": <XCircle size={18} />,
+            "upcoming": <Calendar size={18} />
+          };
           const isActive = activeTab === tab;
           return (
             <div 
               key={tab}
               onClick={() => handleTabChange(tab as any)}
+              className={`home-tab-item ${isActive ? 'active' : ''}`}
+              title={labels[tab]}
               style={{
                 fontSize: "1.05rem", fontWeight: isActive ? 600 : 500,
                 color: isActive ? "var(--text-primary)" : "var(--text-secondary)",
-                cursor: "pointer", padding: "0.25rem 0", position: "relative"
+                cursor: "pointer", padding: "0.25rem 0", position: "relative",
+                whiteSpace: "nowrap"
               }}
             >
-              {labels[tab]}
-              {isActive && <div style={{ position: "absolute", bottom: "-0.75rem", left: 0, right: 0, height: "2px", background: "var(--accent-primary)" }} />}
+              <span className="home-tab-icon">{icons[tab]}</span>
+              <span className="home-tab-label">{labels[tab]}</span>
+              {isActive && <div className="home-tab-indicator" style={{ position: "absolute", bottom: "-0.75rem", left: 0, right: 0, height: "2px", background: "var(--accent-primary)" }} />}
             </div>
           );
         })}

@@ -128,7 +128,7 @@ const ExploreSection = React.memo<ExploreSectionProps>(({
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       {categories.map(({ type, title, items }) => (
         <HorizontalScroll 
           key={`${subTab}_${type}`} 
@@ -142,50 +142,118 @@ const ExploreSection = React.memo<ExploreSectionProps>(({
           } 
           outlineColor={`var(--color-${type})`}
         >
-          {items.map((item: any, idx: number) => (
-            <div key={idx} className="glass-card" style={{ minWidth: '200px', width: '200px', padding: '1rem', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '0.75rem' }} onClick={() => onOpenItem(item)} onMouseEnter={() => prefetchMediaDetails(item)}>
-              <div style={{ position: 'relative', width: '100%', height: '280px', overflow: 'hidden', borderRadius: '8px' }}>
-                <MediaPoster
-                  src={item.image_url}
+          {items.map((item: any, idx: number) => {
+            const epSubtitle = (item.item_type === 'series' || item.item_type === 'anime') && item.latest_episode != null
+              ? `${language === 'es' ? 'T' : 'S'}${String(item.latest_season || 1).padStart(2, '0')} | E${String(item.latest_episode).padStart(2, '0')}`
+              : null;
+            const statusLabel = item.status && ['completed', 'watching', 'dropped', 'read', 'reading'].includes(item.status)
+              ? ((item.status === 'completed' || item.status === 'read') 
+                  ? (item.item_type === 'series' || item.item_type === 'anime' ? (language === 'es' ? 'Terminado' : 'Completed') : ['book', 'comic', 'manga'].includes(item.item_type) ? (language === 'es' ? 'Leído' : 'Read') : (language === 'es' ? 'Visto' : 'Watched'))
+                  : (item.status === 'watching' || item.status === 'reading') 
+                  ? (item.item_type === 'movie' ? (language === 'es' ? 'En pausa' : 'Paused') : ['book', 'comic', 'manga'].includes(item.item_type) ? (language === 'es' ? 'Leyendo' : 'Reading') : (language === 'es' ? 'Viendo' : 'Watching')) 
+                  : (language === 'es' ? 'Abandonado' : 'Dropped'))
+              : null;
+
+            return (
+              <div 
+                key={idx} 
+                className="activity-card activity-card-portrait" 
+                style={{ 
+                  minWidth: '180px', 
+                  maxWidth: '180px', 
+                  background: 'var(--bg-secondary)', 
+                  border: `1px solid var(--border-color)`,
+                  borderRadius: '12px', 
+                  overflow: 'hidden', 
+                  cursor: 'pointer', 
+                  position: 'relative',
+                  display: 'flex',
+                  flexDirection: 'column'
+                }} 
+                onClick={() => onOpenItem(item)} 
+                onMouseEnter={() => prefetchMediaDetails(item)}
+              >
+                {/* Title */}
+                <div 
+                  className="card-item-title" 
+                  style={{ 
+                    padding: '0.5rem 0.75rem', 
+                    fontSize: '0.85rem', 
+                    fontWeight: 600, 
+                    borderBottom: '1px solid var(--border-color)', 
+                    whiteSpace: 'nowrap', 
+                    overflow: 'hidden', 
+                    textOverflow: 'ellipsis' 
+                  }} 
                   title={item.title}
-                  itemType={item.item_type}
-                  isUpcomingMovie={item.item_type === 'movie'}
-                  height="100%"
-                  width="100%"
-                  borderRadius="8px"
-                />
+                >
+                  {item.title}
+                </div>
 
-                {/* Game/Media Badge (Colección, DLC, etc.) */}
-                {renderMediaBadge(item.badge, language)}
+                {/* Poster Thumbnail */}
+                <div className="card-media-cover" style={{ width: '100%', height: '240px', background: 'var(--bg-tertiary)', position: 'relative' }}>
+                  <MediaPoster
+                    src={item.image_url}
+                    title={item.title}
+                    itemType={item.item_type}
+                    isUpcomingMovie={item.item_type === 'movie'}
+                    height="100%"
+                    width="100%"
+                    borderRadius={0}
+                  />
 
-                {/* Status Badge */}
-                {item.status && ['completed', 'watching', 'dropped', 'read', 'reading'].includes(item.status) && (
-                  <div style={{ 
-                    position: 'absolute', top: '0.5rem', right: '0.5rem', 
-                    padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600,
-                    background: (item.status === 'completed' || item.status === 'read') ? 'var(--color-movie)' : (item.status === 'watching' || item.status === 'reading') ? '#3b82f6' : '#ef4444',
-                    color: (item.status === 'completed' || item.status === 'read') ? 'var(--color-text-movie)' : '#ffffff',
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.5)'
-                  }}>
-                    {(item.status === 'completed' || item.status === 'read') ? (item.item_type === 'series' || item.item_type === 'anime' ? (language === 'es' ? 'Terminado' : 'Completed') : ['book', 'comic', 'manga'].includes(item.item_type) ? (language === 'es' ? 'Leído' : 'Read') : (language === 'es' ? 'Visto' : 'Watched')) : (item.status === 'watching' || item.status === 'reading') ? (item.item_type === 'movie' ? (language === 'es' ? 'En pausa' : 'Paused') : ['book', 'comic', 'manga'].includes(item.item_type) ? (language === 'es' ? 'Leyendo' : 'Reading') : (language === 'es' ? 'Viendo' : 'Watching')) : (language === 'es' ? 'Abandonado' : 'Dropped')}
-                  </div>
-                )}
+                  {/* Game/Media Badge (Colección, DLC, etc.) - exclude comic issue numbers */}
+                  {item.item_type !== 'comic' && renderMediaBadge(item.badge, language)}
+
+                  {/* Status Badge */}
+                  {statusLabel && (
+                    <div style={{ 
+                      position: 'absolute', top: '0.5rem', right: '0.5rem', 
+                      padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 600,
+                      background: (item.status === 'completed' || item.status === 'read') ? 'var(--color-movie)' : (item.status === 'watching' || item.status === 'reading') ? '#3b82f6' : '#ef4444',
+                      color: (item.status === 'completed' || item.status === 'read') ? 'var(--color-text-movie)' : '#ffffff',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.5)'
+                    }}>
+                      {statusLabel}
+                    </div>
+                  )}
+                </div>
+
+                {/* Body Content / Subtitle */}
+                <div className="card-body-content" style={{ padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.2rem', flex: 1, minHeight: '2.5rem', justifyContent: 'center' }}>
+                  {item.item_type === 'comic' && item.badge ? (
+                    <>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                        {item.badge}
+                      </div>
+                      {item.release_date && (
+                        <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
+                          {item.release_date}
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      {epSubtitle && (
+                        <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                          {epSubtitle}
+                        </div>
+                      )}
+                      {item.release_date ? (
+                        <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
+                          {item.release_date}
+                        </div>
+                      ) : !epSubtitle ? (
+                        <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 500 }}>
+                          {item.title}
+                        </div>
+                      ) : null}
+                    </>
+                  )}
+                </div>
               </div>
-              <div>
-                <h4 style={{ margin: '0 0 0.25rem 0', fontSize: '1rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.title}>{item.title}</h4>
-                {(item.item_type === 'series' || item.item_type === 'anime') && item.latest_episode != null ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
-                    <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--accent-primary)' }}>
-                      {language === 'es' ? 'T' : 'S'}{String(item.latest_season || 1).padStart(2, '0')} | E{String(item.latest_episode).padStart(2, '0')}
-                    </span>
-                    {item.release_date && <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{item.release_date}</span>}
-                  </div>
-                ) : (
-                  item.release_date && <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{item.release_date}</span>
-                )}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </HorizontalScroll>
       ))}
     </div>
@@ -288,31 +356,49 @@ const ExploreGuidesSection = React.memo<ExploreGuidesSectionProps>(({
           {row.items.map((guide: any) => (
             <div
               key={guide.id}
-              className="glass-card"
+              className="activity-card activity-card-portrait guide-explore-card"
               style={{
                 minWidth: '240px',
                 width: '240px',
-                padding: '0.85rem',
+                background: 'var(--bg-secondary)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '12px',
+                overflow: 'hidden',
                 cursor: 'pointer',
+                position: 'relative',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '0.65rem',
-                borderRadius: '10px',
                 transition: 'transform 0.2s ease, box-shadow 0.2s ease',
               }}
               onClick={() => navigate(`/guide/${guide.id}`)}
             >
+              {/* Desktop Title / Card Title */}
+              <div 
+                className="card-item-title"
+                style={{ 
+                  padding: '0.5rem 0.75rem', 
+                  fontSize: '0.85rem', 
+                  fontWeight: 600, 
+                  borderBottom: '1px solid var(--border-color)', 
+                  whiteSpace: 'nowrap', 
+                  overflow: 'hidden', 
+                  textOverflow: 'ellipsis' 
+                }}
+                title={guide.title}
+              >
+                {guide.title}
+              </div>
+
               {/* Cover Collage */}
-              <div style={{
+              <div className="card-media-cover" style={{
                 position: 'relative',
                 width: '100%',
                 height: '140px',
-                borderRadius: '8px',
-                overflow: 'hidden',
                 background: 'linear-gradient(135deg, rgba(255,255,255,0.05), rgba(0,0,0,0.4))',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center'
+                justifyContent: 'center',
+                overflow: 'hidden'
               }}>
                 {guide.covers && guide.covers.length > 0 ? (
                   <div style={{
@@ -340,53 +426,42 @@ const ExploreGuidesSection = React.memo<ExploreGuidesSectionProps>(({
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', color: 'var(--text-secondary)' }}>
-                    <BookOpen size={36} color="var(--color-guide)" />
+                    <BookOpen size={28} color="var(--color-guide)" />
                   </div>
                 )}
 
                 {/* Items count overlay */}
-                <div style={{
-                  position: 'absolute',
-                  bottom: '6px',
-                  right: '6px',
-                  background: 'rgba(0,0,0,0.75)',
-                  backdropFilter: 'blur(4px)',
-                  padding: '2px 7px',
-                  borderRadius: '4px',
-                  fontSize: '0.72rem',
-                  fontWeight: 600,
-                  color: '#fff'
-                }}>
+                <div 
+                  className="guide-items-badge"
+                  style={{
+                    position: 'absolute',
+                    bottom: '6px',
+                    right: '6px',
+                    background: 'rgba(0,0,0,0.75)',
+                    backdropFilter: 'blur(4px)',
+                    padding: '2px 7px',
+                    borderRadius: '4px',
+                    fontSize: '0.72rem',
+                    fontWeight: 600,
+                    color: '#fff'
+                  }}
+                >
                   {guide.items_count} {t('guidesWorksCount')}
                 </div>
               </div>
 
-              {/* Title & Creator */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', flexGrow: 1 }}>
-                <h4 style={{
-                  margin: 0,
-                  fontSize: '0.95rem',
-                  fontWeight: 600,
-                  color: 'var(--text-primary)',
-                  display: '-webkit-box',
-                  WebkitLineClamp: 2,
-                  WebkitBoxOrient: 'vertical',
-                  overflow: 'hidden',
-                  lineHeight: '1.25'
-                }} title={guide.title}>
-                  {guide.title}
-                </h4>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginTop: '0.15rem' }}>
+              {/* Body Content */}
+              <div className="card-body-content" style={{ padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.25rem', flex: 1, minHeight: '2.5rem', justifyContent: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                   <div style={{
-                    width: '18px',
-                    height: '18px',
+                    width: '16px',
+                    height: '16px',
                     borderRadius: '50%',
                     background: 'var(--accent-primary)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    fontSize: '0.65rem',
+                    fontSize: '0.62rem',
                     fontWeight: 700,
                     color: '#fff',
                     overflow: 'hidden',
@@ -402,24 +477,19 @@ const ExploreGuidesSection = React.memo<ExploreGuidesSectionProps>(({
                     {guide.creator_username}
                   </span>
                 </div>
-              </div>
 
-              {/* Badges & Metrics Footer */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '0.4rem', marginTop: 'auto' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  {guide.media_types?.map((mt: string) => renderMediaIcon(mt))}
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                {/* Badges / Metrics */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                  <span>{guide.items_count} {t('guidesWorksCount')}</span>
                   {guide.average_rating != null && (
                     <span style={{ display: 'flex', alignItems: 'center', gap: '2px', color: '#eab308', fontWeight: 600 }}>
-                      <Star size={12} fill="#eab308" color="#eab308" />
+                      <Star size={11} fill="#eab308" color="#eab308" />
                       {guide.average_rating}
                     </span>
                   )}
                   {guide.saves_count > 0 && (
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '2px', color: '#ec4899', fontWeight: 600 }} title={language === 'es' ? 'Guardados' : 'Saved'}>
-                      <Plus size={12} strokeWidth={2.5} />
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '2px', color: '#ec4899', fontWeight: 600 }}>
+                      <Plus size={11} strokeWidth={2.5} />
                       {guide.saves_count}
                     </span>
                   )}
@@ -1162,171 +1232,180 @@ export const Search: React.FC = () => {
   }, [selectedItem, currentShelfItem]);
 
   return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+    <div className="explore-page-container" style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
       
-      {/* Sticky Header Wrapper: Contains Search Panel AND (when not searching) Explore Subtabs */}
-      <div
+      {/* Sticky Search Bar Header (permanently visible on mobile and desktop) */}
+      <div 
+        className="explore-sticky-search-bar"
         style={{
           position: 'sticky',
           top: 0,
-          zIndex: 50,
+          zIndex: 45,
           background: 'var(--bg-primary)',
-          marginTop: '-2rem',
-          paddingTop: '2rem',
-          paddingBottom: 0,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '1.25rem'
+          paddingTop: '1rem',
+          paddingBottom: '0.5rem',
+          marginTop: '-1rem'
         }}
       >
-        {/* Search Header Panel */}
-        <section 
-          style={{ 
-            background: 'var(--bg-secondary)',
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
-            border: '1px solid var(--border-color)',
-            borderRadius: '16px',
-            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.25)',
-            padding: '1.25rem 1.75rem',
-            display: 'flex', 
-            flexDirection: 'column', 
-            gap: '1rem' 
-          }}
-        >
-          <form onSubmit={handleSearch} style={{ display: 'flex', gap: '1rem' }}>
-            <div style={{ flex: 1, position: 'relative' }}>
-              <input
-                type="text"
-                required
-                className="input-field"
-                placeholder={activeTab === 'all' 
-                  ? t('searchPlaceholder')
-                  : (language === 'es' ? `Buscar en ${getCategoryLabel(activeTab)}...` : `Search in ${getCategoryLabel(activeTab)}...`)}
-                value={query}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setQuery(val);
-                  if (val.trim() === '') {
-                    setSubmittedQuery('');
-                    setResults([]);
-                  }
+        <form onSubmit={handleSearch} style={{ display: 'flex', gap: '1rem' }}>
+          <div style={{ flex: 1, position: 'relative' }}>
+            <input
+              type="text"
+              required
+              className="input-field"
+              placeholder={activeTab === 'all' 
+                ? t('searchPlaceholder')
+                : (language === 'es' ? `Buscar en ${getCategoryLabel(activeTab)}...` : `Search in ${getCategoryLabel(activeTab)}...`)}
+              value={query}
+              onChange={(e) => {
+                const val = e.target.value;
+                setQuery(val);
+                if (val.trim() === '') {
+                  setSubmittedQuery('');
+                  setResults([]);
+                }
+              }}
+              style={{ paddingLeft: '2.5rem', paddingRight: query ? '2.5rem' : '1rem' }}
+            />
+            <SearchIcon size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)' }} />
+            {query && (
+              <button
+                type="button"
+                onClick={handleClearSearch}
+                title={language === 'es' ? 'Limpiar búsqueda' : 'Clear search'}
+                aria-label={language === 'es' ? 'Limpiar búsqueda' : 'Clear search'}
+                style={{
+                  position: 'absolute',
+                  right: '0.75rem',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '22px',
+                  height: '22px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  color: 'var(--text-muted)',
+                  padding: 0,
+                  transition: 'background 0.2s, color 0.2s'
                 }}
-                style={{ paddingLeft: '2.5rem', paddingRight: query ? '2.5rem' : '1rem' }}
-              />
-              <SearchIcon size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)' }} />
-              {query && (
-                <button
-                  type="button"
-                  onClick={handleClearSearch}
-                  title={language === 'es' ? 'Limpiar búsqueda' : 'Clear search'}
-                  aria-label={language === 'es' ? 'Limpiar búsqueda' : 'Clear search'}
-                  style={{
-                    position: 'absolute',
-                    right: '0.75rem',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    background: 'rgba(255, 255, 255, 0.1)',
-                    border: 'none',
-                    borderRadius: '50%',
-                    width: '22px',
-                    height: '22px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                    color: 'var(--text-muted)',
-                    padding: 0,
-                    transition: 'background 0.2s, color 0.2s'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.25)';
-                    e.currentTarget.style.color = '#ffffff';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-                    e.currentTarget.style.color = 'var(--text-muted)';
-                  }}
-                >
-                  <X size={14} />
-                </button>
-              )}
-            </div>
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.25)';
+                  e.currentTarget.style.color = '#ffffff';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                  e.currentTarget.style.color = 'var(--text-muted)';
+                }}
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
 
-            <button type="submit" disabled={isSearching} className="btn-primary" style={{ padding: '0 2.5rem' }}>
-              {isSearching ? '...' : t('searchButton')}
-            </button>
-          </form>
+          <button type="submit" disabled={isSearching} className="btn-primary" style={{ padding: '0 2.5rem' }}>
+            {isSearching ? '...' : t('searchButton')}
+          </button>
+        </form>
+      </div>
 
-          {/* Permanent Category Tabs */}
-          <div style={{
+      {/* Category Filters (Scrolls normally; hides as you scroll down, reappears as you scroll up) */}
+      <section 
+        className="search-panel-section explore-filters-section"
+        style={{ 
+          background: 'var(--bg-secondary)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          border: '1px solid var(--border-color)',
+          borderRadius: '16px',
+          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.25)',
+          padding: '1rem 1.25rem',
+          display: 'flex', 
+          flexDirection: 'column', 
+          gap: '1rem' 
+        }}
+      >
+        <div 
+          className="search-category-filters"
+          style={{
             display: 'flex',
             gap: '0.5rem',
             overflowX: 'auto',
             paddingTop: '0.15rem',
             paddingBottom: '0.15rem',
             WebkitOverflowScrolling: 'touch'
-          }}>
-            {sortFilterTabs([
-              { value: 'all', label: language === 'es' ? 'Todo' : 'All' },
-              { value: 'movie', label: language === 'es' ? 'Películas' : 'Movies' },
-              { value: 'series', label: language === 'es' ? 'Series' : 'Shows' },
-              { value: 'anime', label: 'Anime' },
-              { value: 'book', label: language === 'es' ? 'Libros' : 'Books' },
-              { value: 'comic', label: language === 'es' ? 'Cómics' : 'Comics' },
-              { value: 'manga', label: 'Mangas' },
-              { value: 'game', label: language === 'es' ? 'Juegos' : 'Games' },
-              { value: 'user', label: language === 'es' ? 'Usuarios' : 'Users' },
-              { value: 'guide', label: language === 'es' ? 'Guías' : 'Guides' }
-            ], user?.category_order).map(tab => {
-              const isSelected = activeTab === tab.value;
-              const tabColor = tab.value === 'all' 
-                ? 'var(--accent-primary)' 
-                : tab.value === 'user' 
-                ? 'var(--color-user, #ec4899)' 
-                : `var(--color-${tab.value})`;
-              const tabTextColor = tab.value === 'all' 
-                ? '#ffffff' 
-                : `var(--color-text-${tab.value})`;
+          }}
+        >
+          {sortFilterTabs([
+            { value: 'all', label: language === 'es' ? 'Todo' : 'All' },
+            { value: 'movie', label: language === 'es' ? 'Películas' : 'Movies' },
+            { value: 'series', label: language === 'es' ? 'Series' : 'Shows' },
+            { value: 'anime', label: 'Anime' },
+            { value: 'book', label: language === 'es' ? 'Libros' : 'Books' },
+            { value: 'comic', label: language === 'es' ? 'Cómics' : 'Comics' },
+            { value: 'manga', label: 'Mangas' },
+            { value: 'game', label: language === 'es' ? 'Juegos' : 'Games' },
+            { value: 'user', label: language === 'es' ? 'Usuarios' : 'Users' },
+            { value: 'guide', label: language === 'es' ? 'Guías' : 'Guides' }
+          ], user?.category_order).map(tab => {
+            const isSelected = activeTab === tab.value;
+            const tabColor = tab.value === 'all' 
+              ? 'var(--accent-primary)' 
+              : tab.value === 'user' 
+              ? 'var(--color-user, #ec4899)' 
+              : `var(--color-${tab.value})`;
+            const tabTextColor = tab.value === 'all' 
+              ? '#ffffff' 
+              : `var(--color-text-${tab.value})`;
 
-              return (
-                <button
-                  key={tab.value}
-                  type="button"
-                  onClick={() => handleTabClick(tab.value as any)}
-                  className={`profile-category-tab ${isSelected ? 'selected' : ''}`}
-                  style={{
-                    padding: '0.35rem 0.85rem',
-                    fontSize: '0.85rem',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.4rem',
-                    '--tab-color': tabColor,
-                    '--tab-text': tabTextColor
-                  } as React.CSSProperties}
-                >
+            return (
+              <button
+                key={tab.value}
+                type="button"
+                onClick={() => handleTabClick(tab.value as any)}
+                className={`profile-category-tab search-filter-btn ${isSelected ? 'selected' : ''}`}
+                title={tab.label}
+                style={{
+                  padding: '0.35rem 0.85rem',
+                  fontSize: '0.85rem',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                  '--tab-color': tabColor,
+                  '--tab-text': tabTextColor
+                } as React.CSSProperties}
+              >
+                <span className="search-filter-icon" style={{ display: 'inline-flex', alignItems: 'center' }}>
                   {getCategoryIcon(tab.value, { size: 14, color: isSelected ? tabTextColor : tabColor })}
-                  <span>{tab.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </section>
+                </span>
+                <span className="search-filter-label">{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
 
-        {/* Explore Subtabs (Novedades, Tendencias, Guías) stick directly under the Search Panel */}
-        {submittedQuery === '' && (
-          <div 
-            style={{ 
-              display: "flex", 
-              alignItems: "center", 
-              gap: "1.75rem", 
-              borderBottom: "1px solid var(--border-color)",
-              paddingBottom: "0.75rem",
-              paddingTop: "0.25rem"
-            }}
-          >
+      {/* Explore Subtabs (Novedades, Tendencias, Guías) - Sticks just like Home & Social tabs */}
+      {submittedQuery === '' && (
+        <div 
+          className="explore-subtabs-container"
+          style={{ 
+            display: "flex", 
+            alignItems: "center", 
+            gap: "1.75rem", 
+            borderBottom: "1px solid var(--border-color)",
+            paddingBottom: "0.75rem",
+            paddingTop: "0.25rem"
+          }}
+        >
             <button 
+              type="button"
+              className={`explore-subtab-item ${exploreSubTab === 'new' ? 'active' : ''}`}
               onClick={() => handleExploreSubTabChange('new')}
+              title={t('exploreNew')}
               style={{
                 fontSize: "1.05rem", fontWeight: exploreSubTab === 'new' ? 600 : 500,
                 color: exploreSubTab === 'new' ? "var(--text-primary)" : "var(--text-secondary)",
@@ -1341,15 +1420,20 @@ export const Search: React.FC = () => {
                 transition: "color 0.15s ease"
               }}
             >
-              <Rocket size={17} color={exploreSubTab === 'new' ? "var(--accent-primary)" : "currentColor"} />
-              <span>{t('exploreNew')}</span>
+              <span className="explore-subtab-icon">
+                <Rocket size={17} color={exploreSubTab === 'new' ? "var(--accent-primary)" : "currentColor"} />
+              </span>
+              <span className="explore-subtab-label">{t('exploreNew')}</span>
               {exploreSubTab === 'new' && (
-                <div style={{ position: "absolute", bottom: "-0.75rem", left: 0, right: 0, height: "2px", background: "var(--accent-primary)" }} />
+                <div className="explore-subtab-indicator" style={{ position: "absolute", bottom: "-0.75rem", left: 0, right: 0, height: "2px", background: "var(--accent-primary)" }} />
               )}
             </button>
 
             <button 
+              type="button"
+              className={`explore-subtab-item ${exploreSubTab === 'trending' ? 'active' : ''}`}
               onClick={() => handleExploreSubTabChange('trending')}
+              title={t('exploreTrending')}
               style={{
                 fontSize: "1.05rem", fontWeight: exploreSubTab === 'trending' ? 600 : 500,
                 color: exploreSubTab === 'trending' ? "var(--text-primary)" : "var(--text-secondary)",
@@ -1364,15 +1448,20 @@ export const Search: React.FC = () => {
                 transition: "color 0.15s ease"
               }}
             >
-              <Flame size={17} color={exploreSubTab === 'trending' ? "#f97316" : "currentColor"} />
-              <span>{t('exploreTrending')}</span>
+              <span className="explore-subtab-icon">
+                <Flame size={17} color={exploreSubTab === 'trending' ? "#f97316" : "currentColor"} />
+              </span>
+              <span className="explore-subtab-label">{t('exploreTrending')}</span>
               {exploreSubTab === 'trending' && (
-                <div style={{ position: "absolute", bottom: "-0.75rem", left: 0, right: 0, height: "2px", background: "#f97316" }} />
+                <div className="explore-subtab-indicator" style={{ position: "absolute", bottom: "-0.75rem", left: 0, right: 0, height: "2px", background: "#f97316" }} />
               )}
             </button>
 
             <button 
+              type="button"
+              className={`explore-subtab-item ${exploreSubTab === 'guides' ? 'active' : ''}`}
               onClick={() => handleExploreSubTabChange('guides')}
+              title={t('exploreGuides')}
               style={{
                 fontSize: "1.05rem", fontWeight: exploreSubTab === 'guides' ? 600 : 500,
                 color: exploreSubTab === 'guides' ? "var(--text-primary)" : "var(--text-secondary)",
@@ -1387,15 +1476,16 @@ export const Search: React.FC = () => {
                 transition: "color 0.15s ease"
               }}
             >
-              <BookOpen size={17} color={exploreSubTab === 'guides' ? "var(--color-guide)" : "currentColor"} />
-              <span>{t('exploreGuides')}</span>
+              <span className="explore-subtab-icon">
+                <BookOpen size={17} color={exploreSubTab === 'guides' ? "var(--color-guide)" : "currentColor"} />
+              </span>
+              <span className="explore-subtab-label">{t('exploreGuides')}</span>
               {exploreSubTab === 'guides' && (
-                <div style={{ position: "absolute", bottom: "-0.75rem", left: 0, right: 0, height: "2px", background: "var(--color-guide)" }} />
+                <div className="explore-subtab-indicator" style={{ position: "absolute", bottom: "-0.75rem", left: 0, right: 0, height: "2px", background: "var(--color-guide)" }} />
               )}
             </button>
           </div>
         )}
-      </div>
 
       {submittedQuery === '' ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem', marginTop: '1rem' }}>

@@ -782,10 +782,14 @@ export const Profile: React.FC = () => {
   const [favoritesPage, setFavoritesPage] = useState(1);
   const [shelfViewMode, setShelfViewMode] = useState<'grid' | 'list'>(() => {
     try {
-      const saved = localStorage.getItem('pathd_shelf_view_mode');
-      return (saved === 'list' || saved === 'grid') ? saved : 'grid';
+      const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
+      const storageKey = isMobile ? 'pathd_shelf_view_mode_mobile' : 'pathd_shelf_view_mode';
+      const saved = localStorage.getItem(storageKey);
+      if (saved === 'list' || saved === 'grid') return saved;
+      return isMobile ? 'list' : 'grid';
     } catch {
-      return 'grid';
+      const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
+      return isMobile ? 'list' : 'grid';
     }
   });
   const [currentPage, setCurrentPage] = useState(1);
@@ -1085,7 +1089,11 @@ export const Profile: React.FC = () => {
     }
 
     setShelfViewMode(newMode);
-    try { localStorage.setItem('pathd_shelf_view_mode', newMode); } catch {}
+    try {
+      const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
+      const storageKey = isMobile ? 'pathd_shelf_view_mode_mobile' : 'pathd_shelf_view_mode';
+      localStorage.setItem(storageKey, newMode);
+    } catch {}
 
     requestAnimationFrame(() => {
       if (newMode === 'list') {
@@ -2776,7 +2784,7 @@ export const Profile: React.FC = () => {
       {/* Profile Header Card */}
       {profile && (
         <div 
-          className="glass-card" 
+          className="glass-card profile-header-card" 
           style={{ 
             position: 'relative',
             display: 'flex', 
@@ -2799,6 +2807,7 @@ export const Profile: React.FC = () => {
             <>
               {/* Banner Image Layer */}
               <div
+                className="profile-banner-image-layer"
                 style={{
                   position: 'absolute',
                   inset: 0,
@@ -2827,7 +2836,7 @@ export const Profile: React.FC = () => {
           {isOwnProfile && (
             <button
               onClick={() => navigate('/customize')}
-              className="btn-secondary"
+              className="btn-secondary profile-customize-btn"
               style={{
                 position: 'absolute',
                 top: '1.25rem',
@@ -2852,141 +2861,151 @@ export const Profile: React.FC = () => {
             </button>
           )}
 
-          <div style={{ position: 'relative', zIndex: 2 }}>
-            {profile.photo_url ? (
-              <img
-                src={profile.photo_url}
-                alt={profile.username}
-                style={{
-                  width: 100,
-                  height: 100,
-                  borderRadius: '50%',
-                  objectFit: 'cover',
-                  border: '3px solid var(--accent-primary)',
-                  boxShadow: 'var(--shadow-md)',
-                }}
-              />
-            ) : (
-              <div
-                style={{
-                  width: 100,
-                  height: 100,
-                  borderRadius: '50%',
-                  border: '3px solid var(--accent-primary)',
-                  boxShadow: 'var(--shadow-md)',
-                  background: 'linear-gradient(135deg, var(--accent-primary), #4f46e5)',
-                  color: 'white',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '2.2rem',
-                  fontWeight: 800,
-                }}
-              >
-                {profile.username?.charAt(0).toUpperCase() || 'U'}
+          {/* Top user row on mobile / Left avatar on desktop */}
+          <div className="profile-header-top-row" style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', width: '100%', position: 'relative', zIndex: 2 }}>
+            <div className="profile-avatar-wrap" style={{ position: 'relative', zIndex: 2, flexShrink: 0 }}>
+              {profile.photo_url ? (
+                <img
+                  src={profile.photo_url}
+                  alt={profile.username}
+                  className="profile-avatar-img"
+                  style={{
+                    width: 100,
+                    height: 100,
+                    borderRadius: '50%',
+                    objectFit: 'cover',
+                    border: '3px solid var(--accent-primary)',
+                    boxShadow: 'var(--shadow-md)',
+                  }}
+                />
+              ) : (
+                <div
+                  className="profile-avatar-img"
+                  style={{
+                    width: 100,
+                    height: 100,
+                    borderRadius: '50%',
+                    border: '3px solid var(--accent-primary)',
+                    boxShadow: 'var(--shadow-md)',
+                    background: 'linear-gradient(135deg, var(--accent-primary), #4f46e5)',
+                    color: 'white',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '2.2rem',
+                    fontWeight: 800,
+                  }}
+                >
+                  {profile.username?.charAt(0).toUpperCase() || 'U'}
+                </div>
+              )}
+            </div>
+
+            <div className="profile-user-identity" style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', minWidth: 0, flex: 1, textAlign: 'left' }}>
+              <h1 className="profile-username-heading" style={{ margin: 0, fontSize: '2rem', fontWeight: 800, lineHeight: 1.2 }}>{profile.username}</h1>
+              
+              {/* Badges / Labels row below username */}
+              <div className="profile-badges-row" style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
+                {profile.is_pro && (
+                  <span 
+                    style={{ 
+                      fontSize: '0.75rem',
+                      background: 'rgba(245, 158, 11, 0.15)',
+                      color: '#f59e0b',
+                      padding: '0.2rem 0.55rem',
+                      borderRadius: '6px',
+                      fontWeight: 700,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.3rem',
+                      border: '1px solid rgba(245, 158, 11, 0.3)',
+                      cursor: 'default',
+                      userSelect: 'none'
+                    }}
+                  >
+                    <Star size={11} fill="#f59e0b" />
+                    PREMIUM
+                  </span>
+                )}
+
+                {/* VIP Badge - only visible if viewer is Admin or VIP */}
+                {profile.is_vip && (currentUser?.is_admin || currentUser?.is_vip) && (
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.3rem',
+                      background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)',
+                      color: 'white',
+                      padding: '0.2rem 0.6rem',
+                      borderRadius: '12px',
+                      fontSize: '0.8rem',
+                      fontWeight: 700,
+                      boxShadow: '0 2px 8px rgba(139, 92, 246, 0.4)'
+                    }}
+                    title={language === 'es' ? 'Usuario VIP (Insignia visible solo para Admins y VIPs)' : 'VIP User (Badge visible only to Admins & VIPs)'}
+                  >
+                    <Crown size={12} fill="white" />
+                    VIP
+                  </span>
+                )}
+
+                {profile.is_admin && (
+                  <span style={{ fontSize: '0.75rem', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: 600 }}>
+                    ADMIN
+                  </span>
+                )}
+
+                {/* Follow / Unfollow / Request button on other users' profiles */}
+                {!isOwnProfile && currentUser && (
+                  <button
+                    type="button"
+                    onClick={handleToggleFollowProfileUser}
+                    className={profile.is_following || (profile as any).follow_request_pending ? 'btn-secondary' : 'btn-primary'}
+                    style={{
+                      padding: '0.35rem 0.9rem',
+                      fontSize: '0.85rem',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.4rem',
+                      borderRadius: '8px',
+                      marginLeft: 'auto'
+                    }}
+                  >
+                    {profile.is_following ? (
+                      <>
+                        <UserCheck size={16} />
+                        {language === 'es' ? 'Siguiendo' : 'Following'}
+                      </>
+                    ) : (profile as any).follow_request_pending ? (
+                      <>
+                        <UserCheck size={16} color="var(--accent-primary)" />
+                        {language === 'es' ? 'Solicitud enviada' : 'Requested'}
+                      </>
+                    ) : (profile as any).is_private ? (
+                      <>
+                        <UserPlus size={16} />
+                        {language === 'es' ? 'Solicitar seguir' : 'Request to follow'}
+                      </>
+                    ) : (
+                      <>
+                        <UserPlus size={16} />
+                        {language === 'es' ? 'Seguir' : 'Follow'}
+                      </>
+                    )}
+                  </button>
+                )}
               </div>
-            )}
+            </div>
           </div>
 
-          <div style={{ position: 'relative', zIndex: 2, flex: 1, minWidth: 250, textAlign: 'left' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.4rem', flexWrap: 'wrap' }}>
-              <h1 style={{ margin: 0, fontSize: '2rem', fontWeight: 800 }}>{profile.username}</h1>
-              {profile.is_pro && (
-                <span 
-                  style={{ 
-                    fontSize: '0.75rem',
-                    background: 'rgba(245, 158, 11, 0.15)',
-                    color: '#f59e0b',
-                    padding: '0.2rem 0.55rem',
-                    borderRadius: '6px',
-                    fontWeight: 700,
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.3rem',
-                    border: '1px solid rgba(245, 158, 11, 0.3)',
-                    cursor: 'default',
-                    userSelect: 'none'
-                  }}
-                >
-                  <Star size={11} fill="#f59e0b" />
-                  PREMIUM
-                </span>
-              )}
-
-              {/* VIP Badge - only visible if viewer is Admin or VIP */}
-              {profile.is_vip && (currentUser?.is_admin || currentUser?.is_vip) && (
-                <span
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.3rem',
-                    background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)',
-                    color: 'white',
-                    padding: '0.2rem 0.6rem',
-                    borderRadius: '12px',
-                    fontSize: '0.8rem',
-                    fontWeight: 700,
-                    boxShadow: '0 2px 8px rgba(139, 92, 246, 0.4)'
-                  }}
-                  title={language === 'es' ? 'Usuario VIP (Insignia visible solo para Admins y VIPs)' : 'VIP User (Badge visible only to Admins & VIPs)'}
-                >
-                  <Crown size={12} fill="white" />
-                  VIP
-                </span>
-              )}
-
-              {profile.is_admin && (
-                <span style={{ fontSize: '0.75rem', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: 600 }}>
-                  ADMIN
-                </span>
-              )}
-
-
-              {/* Follow / Unfollow / Request button on other users' profiles */}
-              {!isOwnProfile && currentUser && (
-                <button
-                  type="button"
-                  onClick={handleToggleFollowProfileUser}
-                  className={profile.is_following || (profile as any).follow_request_pending ? 'btn-secondary' : 'btn-primary'}
-                  style={{
-                    padding: '0.35rem 0.9rem',
-                    fontSize: '0.85rem',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.4rem',
-                    borderRadius: '8px',
-                    marginLeft: 'auto'
-                  }}
-                >
-                  {profile.is_following ? (
-                    <>
-                      <UserCheck size={16} />
-                      {language === 'es' ? 'Siguiendo' : 'Following'}
-                    </>
-                  ) : (profile as any).follow_request_pending ? (
-                    <>
-                      <UserCheck size={16} color="var(--accent-primary)" />
-                      {language === 'es' ? 'Solicitud enviada' : 'Requested'}
-                    </>
-                  ) : (profile as any).is_private ? (
-                    <>
-                      <UserPlus size={16} />
-                      {language === 'es' ? 'Solicitar seguir' : 'Request to follow'}
-                    </>
-                  ) : (
-                    <>
-                      <UserPlus size={16} />
-                      {language === 'es' ? 'Seguir' : 'Follow'}
-                    </>
-                  )}
-                </button>
-              )}
-
-            </div>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', margin: '0 0 0.8rem 0', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <Calendar size={16} /> {language === 'es' ? 'Miembro desde' : 'Joined'} {formatDate(new Date(profile.created_at))}
+          {/* Details below top row: Join date, stats, and last.fm */}
+          <div className="profile-header-details-wrap" style={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', gap: '0.65rem', width: '100%', textAlign: 'left' }}>
+            <p className="profile-join-date" style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <Calendar size={15} /> {language === 'es' ? 'Miembro desde' : 'Joined'} {formatDate(new Date(profile.created_at))}
             </p>
-            <div style={{ display: 'flex', gap: '1.5rem', fontSize: '0.9rem', flexWrap: 'wrap', alignItems: 'center' }}>
+
+            <div className="profile-stats-row" style={{ display: 'flex', gap: '1.25rem', fontSize: '0.9rem', flexWrap: 'wrap', alignItems: 'center' }}>
               {isOwnProfile ? (
                 <>
                   <button
@@ -3046,8 +3065,9 @@ export const Profile: React.FC = () => {
             {/* Now Playing / Last.fm Widget */}
             {Boolean(profile?.lastfm_username) && (
               <div 
+                className="profile-lastfm-widget"
                 style={{ 
-                  marginTop: '1.25rem', 
+                  marginTop: '0.5rem', 
                   display: 'flex', 
                   alignItems: 'center', 
                   gap: '1rem', 
@@ -3175,7 +3195,6 @@ export const Profile: React.FC = () => {
                 )}
               </div>
             )}
-
           </div>
         </div>
       )}
@@ -3290,10 +3309,11 @@ export const Profile: React.FC = () => {
       ) : (
         <>
           {/* Tab Navigation */}
-          <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', gap: '1.5rem' }}>
+          <div className="profile-tabs-nav" style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', gap: '1.5rem' }}>
             <button
               onClick={() => handleTabChange('shelf')}
               className={`profile-tab-btn ${activeTab === 'shelf' ? 'active' : ''}`}
+              title={language === 'es' ? 'Estantería' : 'My Shelf'}
               style={{
                 '--tab-color': 'var(--accent-primary)'
               } as React.CSSProperties}
@@ -3316,12 +3336,13 @@ export const Profile: React.FC = () => {
               ) : (
                 <Grid size={18} strokeWidth={1.8} />
               )}
-              <span>{language === 'es' ? 'Estantería' : 'My Shelf'}</span>
+              <span className="profile-tab-label">{language === 'es' ? 'Estantería' : 'My Shelf'}</span>
             </button>
 
         <button
           onClick={() => handleTabChange('guides')}
           className={`profile-tab-btn ${activeTab === 'guides' ? 'active' : ''}`}
+          title={language === 'es' ? 'Guías' : 'Guides'}
           style={{
             '--tab-color': 'var(--color-guide, #2DD4BF)'
           } as React.CSSProperties}
@@ -3347,13 +3368,14 @@ export const Profile: React.FC = () => {
           ) : (
             <BookOpen size={18} strokeWidth={1.8} />
           )}
-          <span>{language === 'es' ? 'Guías' : 'Guides'}</span>
+          <span className="profile-tab-label">{language === 'es' ? 'Guías' : 'Guides'}</span>
         </button>
 
         {Boolean(profile?.lastfm_username) && (
           <button
             onClick={() => handleTabChange('music')}
             className={`profile-tab-btn ${activeTab === 'music' ? 'active' : ''}`}
+            title={language === 'es' ? 'Música' : 'Music'}
             style={{
               '--tab-color': 'var(--color-music, #1DB954)'
             } as React.CSSProperties}
@@ -3372,18 +3394,20 @@ export const Profile: React.FC = () => {
               <circle cx="6" cy="18" r="3" fill={activeTab === 'music' ? 'currentColor' : 'none'} />
               <circle cx="18" cy="16" r="3" fill={activeTab === 'music' ? 'currentColor' : 'none'} />
             </svg>
-            <span>{language === 'es' ? 'Música' : 'Music'}</span>
+            <span className="profile-tab-label">{language === 'es' ? 'Música' : 'Music'}</span>
           </button>
         )}
 
         <button
           onClick={() => handleTabChange('favorites')}
           className={`profile-tab-btn ${activeTab === 'favorites' ? 'active' : ''}`}
+          title={language === 'es' ? 'Destacados' : 'Favorites'}
           style={{
             '--tab-color': '#F472B6'
           } as React.CSSProperties}
         >
-          <Heart size={18} fill={activeTab === 'favorites' ? 'currentColor' : 'none'} strokeWidth={activeTab === 'favorites' ? 2 : 1.8} /> {language === 'es' ? 'Destacados' : 'Favorites'}
+          <Heart size={18} fill={activeTab === 'favorites' ? 'currentColor' : 'none'} strokeWidth={activeTab === 'favorites' ? 2 : 1.8} />
+          <span className="profile-tab-label">{language === 'es' ? 'Destacados' : 'Favorites'}</span>
         </button>
       </div>
 
@@ -3419,6 +3443,14 @@ export const Profile: React.FC = () => {
                         setCurrentPage(1);
                       }}
                       className={`profile-category-tab ${isSelected ? 'selected' : ''}`}
+                      title={type === 'all' ? (language === 'es' ? 'Todo' : 'All') :
+                             type === 'movie' ? (language === 'es' ? 'Películas' : 'Movies') :
+                             type === 'series' ? (language === 'es' ? 'Series' : 'Shows') :
+                             type === 'anime' ? 'Anime' :
+                             type === 'book' ? (language === 'es' ? 'Libros' : 'Books') :
+                             type === 'comic' ? (language === 'es' ? 'Cómics' : 'Comics') :
+                             type === 'manga' ? 'Mangas' :
+                             type === 'game' ? (language === 'es' ? 'Juegos' : 'Games') : type}
                       style={{
                         padding: '0.35rem 0.85rem',
                         fontSize: '0.85rem',
@@ -3430,8 +3462,10 @@ export const Profile: React.FC = () => {
                         '--tab-text': typeTextColor
                       } as React.CSSProperties}
                     >
-                      {getCategoryIcon(type, { size: 14, color: isSelected ? typeTextColor : typeColor })}
-                      <span>
+                      <span className="profile-category-icon" style={{ display: 'inline-flex', alignItems: 'center' }}>
+                        {getCategoryIcon(type, { size: 14, color: isSelected ? typeTextColor : typeColor })}
+                      </span>
+                      <span className="profile-category-label">
                         {type === 'all' ? (language === 'es' ? 'Todo' : 'All') :
                          type === 'movie' ? (language === 'es' ? 'Películas' : 'Movies') :
                          type === 'series' ? (language === 'es' ? 'Series' : 'Shows') :
@@ -3442,6 +3476,7 @@ export const Profile: React.FC = () => {
                          type === 'game' ? (language === 'es' ? 'Juegos' : 'Games') : type}
                       </span>
                       <span
+                        className="profile-category-count"
                         style={{
                           fontSize: '0.78rem',
                           opacity: isSelected ? 0.85 : 0.6,
@@ -4076,45 +4111,69 @@ export const Profile: React.FC = () => {
 
             // Helper to render a single guide card
             const renderGuideCard = (list: any, isSaved: boolean) => {
+              const guideItemsCount = list.items_count ?? list.items?.length ?? 0;
               return (
                 <div
                   key={list.id}
-                  className="glass-card"
+                  className="activity-card activity-card-portrait guide-explore-card profile-guide-card"
                   style={{
-                    padding: '0.85rem',
+                    minWidth: '240px',
+                    width: '240px',
+                    background: 'var(--bg-secondary)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '12px',
+                    overflow: 'hidden',
+                    cursor: 'pointer',
+                    position: 'relative',
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: '0.65rem',
-                    borderRadius: '12px',
-                    position: 'relative'
+                    transition: 'transform 0.2s ease, box-shadow 0.2s ease',
                   }}
+                  onClick={() => handleOpenGuide(list.id)}
                 >
+                  {/* Desktop Title / Card Title */}
+                  <div
+                    className="card-item-title"
+                    style={{
+                      padding: '0.5rem 0.75rem',
+                      fontSize: '0.85rem',
+                      fontWeight: 600,
+                      borderBottom: '1px solid var(--border-color)',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis'
+                    }}
+                    title={list.title}
+                  >
+                    {list.title}
+                  </div>
+
                   {/* Cover Collage */}
                   <div
+                    className="card-media-cover"
                     style={{
                       position: 'relative',
                       width: '100%',
                       height: '140px',
-                      borderRadius: '8px',
-                      overflow: 'hidden',
                       background: 'linear-gradient(135deg, rgba(255,255,255,0.05), rgba(0,0,0,0.4))',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      cursor: 'pointer'
+                      overflow: 'hidden'
                     }}
-                    onClick={() => handleOpenGuide(list.id)}
                   >
                     {list.covers && list.covers.length > 0 ? (
-                      <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: list.covers.length >= 2 ? '1fr 1fr' : '1fr',
-                        gridTemplateRows: list.covers.length >= 3 ? '1fr 1fr' : '1fr',
-                        width: '100%',
-                        height: '100%',
-                        gap: '2px',
-                        background: '#000'
-                      }}>
+                      <div
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: list.covers.length >= 2 ? '1fr 1fr' : '1fr',
+                          gridTemplateRows: list.covers.length >= 3 ? '1fr 1fr' : '1fr',
+                          width: '100%',
+                          height: '100%',
+                          gap: '2px',
+                          background: '#000'
+                        }}
+                      >
                         {list.covers.slice(0, 4).map((img: string, cIdx: number) => (
                           <img
                             key={cIdx}
@@ -4127,25 +4186,28 @@ export const Profile: React.FC = () => {
                       </div>
                     ) : (
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', color: 'var(--text-secondary)' }}>
-                        <BookOpen size={36} color="var(--color-guide, #2DD4BF)" />
+                        <BookOpen size={28} color="var(--color-guide, #2DD4BF)" />
                       </div>
                     )}
 
                     {/* Visibility badge overlay (top-left) */}
                     {!isSaved && (
-                      <span style={{
-                        position: 'absolute',
-                        top: '6px',
-                        left: '6px',
-                        fontSize: '0.7rem',
-                        padding: '0.15rem 0.45rem',
-                        borderRadius: '4px',
-                        background: list.visibility === 'draft' ? 'rgba(245, 158, 11, 0.9)' : list.visibility === 'private' ? 'rgba(15, 23, 42, 0.85)' : 'rgba(45, 212, 191, 0.9)',
-                        color: list.visibility === 'draft' ? '#0f172a' : '#ffffff',
-                        fontWeight: 700,
-                        backdropFilter: 'blur(4px)',
-                        zIndex: 2
-                      }}>
+                      <span
+                        className="guide-visibility-badge"
+                        style={{
+                          position: 'absolute',
+                          top: '6px',
+                          left: '6px',
+                          fontSize: '0.7rem',
+                          padding: '0.15rem 0.45rem',
+                          borderRadius: '4px',
+                          background: list.visibility === 'draft' ? 'rgba(245, 158, 11, 0.9)' : list.visibility === 'private' ? 'rgba(15, 23, 42, 0.85)' : 'rgba(45, 212, 191, 0.9)',
+                          color: list.visibility === 'draft' ? '#0f172a' : '#ffffff',
+                          fontWeight: 700,
+                          backdropFilter: 'blur(4px)',
+                          zIndex: 2
+                        }}
+                      >
                         {list.visibility === 'draft'
                           ? (language === 'es' ? 'Borrador' : 'Draft')
                           : (list.visibility === 'private'
@@ -4157,8 +4219,9 @@ export const Profile: React.FC = () => {
                     )}
 
                     {/* Items count overlay (bottom-right) */}
-                    {(list.items_count != null || (list.items && Array.isArray(list.items))) && (
-                      <div style={{
+                    <div
+                      className="guide-items-badge"
+                      style={{
                         position: 'absolute',
                         bottom: '6px',
                         right: '6px',
@@ -4170,110 +4233,128 @@ export const Profile: React.FC = () => {
                         fontWeight: 600,
                         color: '#fff',
                         zIndex: 2
-                      }}>
-                        {list.items_count ?? list.items?.length ?? 0} {t('guidesWorksCount')}
-                      </div>
-                    )}
+                      }}
+                    >
+                      {guideItemsCount} {t('guidesWorksCount')}
+                    </div>
                   </div>
 
-                  {/* Title & Description */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', flexGrow: 1 }}>
-                    <h4
-                      style={{
-                        margin: 0,
-                        fontSize: '0.95rem',
-                        fontWeight: 600,
-                        color: 'var(--text-primary)',
-                        display: '-webkit-box',
-                        WebkitLineClamp: 1,
-                        WebkitBoxOrient: 'vertical',
-                        overflow: 'hidden',
-                        cursor: 'pointer'
-                      }}
-                      title={list.title}
-                      onClick={() => handleOpenGuide(list.id)}
-                    >
-                      {list.title}
-                    </h4>
-
-                    {list.description && (
-                      <p style={{
-                        color: 'var(--text-secondary)',
-                        fontSize: '0.8rem',
-                        margin: 0,
-                        display: '-webkit-box',
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: 'vertical',
-                        overflow: 'hidden',
-                        lineHeight: 1.3
-                      }}>
+                  {/* Body Content */}
+                  <div
+                    className="card-body-content"
+                    style={{
+                      padding: '0.75rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.35rem',
+                      flex: 1,
+                      minHeight: '2.5rem',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    {list.description ? (
+                      <p
+                        className="profile-guide-desc"
+                        style={{
+                          color: 'var(--text-secondary)',
+                          fontSize: '0.78rem',
+                          margin: 0,
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                          lineHeight: 1.25
+                        }}
+                      >
                         {list.description}
                       </p>
-                    )}
-                  </div>
+                    ) : null}
 
-                  {/* Media Types & Rating Header */}
-                  {list.media_types && list.media_types.length > 0 && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                      {list.media_types.map((mt: string) => renderGuideMediaIcon(mt))}
-                    </div>
-                  )}
-
-                  {/* Actions Footer */}
-                  <div style={{
-                    display: 'flex',
-                    gap: '0.4rem',
-                    alignItems: 'center',
-                    justifyContent: 'flex-start',
-                    borderTop: '1px solid var(--border-color)',
-                    paddingTop: '0.5rem',
-                    marginTop: 'auto'
-                  }}>
-                    <button
-                      type="button"
-                      onClick={() => handleOpenGuide(list.id)}
-                      className="btn-secondary"
-                      style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.78rem', padding: '0.3rem 0.6rem', flex: 1, justifyContent: 'center' }}
-                    >
-                      <Eye size={13} /> {language === 'es' ? 'Ver' : 'View'}
-                    </button>
-                    {!isSaved && isOwnProfile && (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (list.can_edit !== false) {
-                              navigate(`/create?edit=${list.id}`);
-                            } else {
-                              setShowProModal(true);
-                            }
-                          }}
-                          className="btn-secondary"
+                    {/* Metrics / Info bar */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                      <span>{guideItemsCount} {t('guidesWorksCount')}</span>
+                      {list.media_types && list.media_types.length > 0 && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                          {list.media_types.map((mt: string) => renderGuideMediaIcon(mt))}
+                        </div>
+                      )}
+                      {!isSaved && (
+                        <span
+                          className="profile-guide-status-inline"
                           style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.3rem',
-                            fontSize: '0.78rem',
-                            padding: '0.3rem 0.6rem',
-                            color: list.can_edit === false ? '#f59e0b' : 'inherit',
-                            borderColor: list.can_edit === false ? 'rgba(245, 158, 11, 0.3)' : 'var(--border-color)'
+                            fontSize: '0.7rem',
+                            fontWeight: 600,
+                            color: list.visibility === 'draft' ? '#f59e0b' : list.visibility === 'private' ? 'var(--text-secondary)' : 'var(--color-guide, #2DD4BF)'
                           }}
-                          title={language === 'es' ? 'Editar' : 'Edit'}
                         >
-                          {list.can_edit === false ? <Lock size={13} /> : <Edit size={13} />}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteGuide(list.id)}
-                          className="btn-secondary"
-                          style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.78rem', padding: '0.3rem 0.6rem', color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.2)' }}
-                          title={language === 'es' ? 'Eliminar' : 'Delete'}
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      </>
-                    )}
+                          • {list.visibility === 'draft'
+                              ? (language === 'es' ? 'Borrador' : 'Draft')
+                              : (list.visibility === 'private'
+                                  ? (language === 'es' ? 'Privada' : 'Private')
+                                  : (language === 'es' ? 'Pública' : 'Public')
+                                )
+                            }
+                        </span>
+                      )}
+                    </div>
                   </div>
+
+                  {/* Right Actions Wrap on mobile / Footer on desktop */}
+                  {!isSaved && isOwnProfile ? (
+                    <div
+                      className="card-actions-wrap profile-guide-actions"
+                      onClick={(e) => e.stopPropagation()}
+                      style={{
+                        display: 'flex',
+                        gap: '0.35rem',
+                        alignItems: 'center',
+                        padding: '0.5rem 0.75rem',
+                        borderTop: '1px solid var(--border-color)',
+                        background: 'rgba(0,0,0,0.15)'
+                      }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => handleOpenGuide(list.id)}
+                        className="btn-secondary"
+                        style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.78rem', padding: '0.25rem 0.55rem', flex: 1, justifyContent: 'center' }}
+                      >
+                        <Eye size={13} /> {language === 'es' ? 'Ver' : 'View'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (list.can_edit !== false) {
+                            navigate(`/create?edit=${list.id}`);
+                          } else {
+                            setShowProModal(true);
+                          }
+                        }}
+                        className="btn-secondary"
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.3rem',
+                          fontSize: '0.78rem',
+                          padding: '0.25rem 0.55rem',
+                          color: list.can_edit === false ? '#f59e0b' : 'inherit',
+                          borderColor: list.can_edit === false ? 'rgba(245, 158, 11, 0.3)' : 'var(--border-color)'
+                        }}
+                        title={language === 'es' ? 'Editar' : 'Edit'}
+                      >
+                        {list.can_edit === false ? <Lock size={13} /> : <Edit size={13} />}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteGuide(list.id)}
+                        className="btn-secondary"
+                        style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.78rem', padding: '0.25rem 0.55rem', color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.2)' }}
+                        title={language === 'es' ? 'Eliminar' : 'Delete'}
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  ) : null}
                 </div>
               );
             };
@@ -4463,6 +4544,7 @@ export const Profile: React.FC = () => {
                       <div
                         ref={createdGuidesScrollRef}
                         onScroll={updateCreatedGuidesScrollState}
+                        className={`home-scroll-carousel profile-guides-carousel ${isCreatedTwoRows ? 'is-expanded' : ''} ${profile.created_lists.length === 1 ? 'has-single-item' : ''}`}
                         style={{
                           display: isCreatedTwoRows ? 'grid' : 'flex',
                           gridTemplateColumns: isCreatedTwoRowsByRow ? `repeat(${maxGuidesInOneRow}, max-content)` : undefined,
@@ -4484,7 +4566,7 @@ export const Profile: React.FC = () => {
                         }}
                       >
                         {profile.created_lists.map(list => (
-                          <div key={list.id} style={{ minWidth: '260px', maxWidth: '260px', flexShrink: 0 }}>
+                          <div key={list.id} className="profile-guide-item-wrapper" style={{ minWidth: '260px', maxWidth: '260px', flexShrink: 0 }}>
                             {renderGuideCard(list, false)}
                           </div>
                         ))}
@@ -4647,6 +4729,7 @@ export const Profile: React.FC = () => {
                       <div
                         ref={savedGuidesScrollRef}
                         onScroll={updateSavedGuidesScrollState}
+                        className={`home-scroll-carousel profile-guides-carousel ${isSavedTwoRows ? 'is-expanded' : ''} ${profile.saved_lists.length === 1 ? 'has-single-item' : ''}`}
                         style={{
                           display: isSavedTwoRows ? 'grid' : 'flex',
                           gridTemplateColumns: isSavedTwoRowsByRow ? `repeat(${maxGuidesInOneRow}, max-content)` : undefined,
@@ -4668,7 +4751,7 @@ export const Profile: React.FC = () => {
                         }}
                       >
                         {profile.saved_lists.map(list => (
-                          <div key={list.id} style={{ minWidth: '260px', maxWidth: '260px', flexShrink: 0 }}>
+                          <div key={list.id} className="profile-guide-item-wrapper" style={{ minWidth: '260px', maxWidth: '260px', flexShrink: 0 }}>
                             {renderGuideCard(list, true)}
                           </div>
                         ))}

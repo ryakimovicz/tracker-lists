@@ -38,6 +38,8 @@ import { ItemRouteModal } from './components/ItemRouteModal';
 import { PostRouteModal } from './components/PostRouteModal';
 import { MusicRouteModal } from './components/MusicRouteModal';
 import { PremiumRouteModal } from './components/PremiumRouteModal';
+import { MobileHeader } from './components/MobileHeader';
+import { MobileBottomNav } from './components/MobileBottomNav';
 import React, { useEffect } from 'react';
 
 function AppContent() {
@@ -84,6 +86,7 @@ function AppContent() {
     <div className="app-container">
       <SuspendedAccountModal />
       <Sidebar />
+      <MobileHeader />
 
       <main 
         className="main-content"
@@ -298,6 +301,7 @@ function AppContent() {
         <PremiumRouteModal />
         <RightSidebarAd />
         <CookieBanner />
+        <MobileBottomNav />
       </div>
   );
 }
