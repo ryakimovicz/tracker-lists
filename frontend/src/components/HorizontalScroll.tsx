@@ -38,6 +38,18 @@ export const HorizontalScroll: React.FC<HorizontalScrollProps> = ({ children, ti
   }, [updateScrollState, children]);
 
   const getMaskImage = () => {
+    const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
+    if (isMobile) {
+      if (canScrollLeft && canScrollRight) {
+        return 'linear-gradient(to right, transparent 0px, black 28px, black calc(100% - 28px), transparent 100%)';
+      } else if (canScrollLeft) {
+        return 'linear-gradient(to right, transparent 0px, black 28px, black 100%)';
+      } else if (canScrollRight) {
+        return 'linear-gradient(to right, black 0px, black calc(100% - 28px), transparent 100%)';
+      }
+      return 'none';
+    }
+
     if (canScrollLeft && canScrollRight) {
       return 'linear-gradient(to right, transparent 0px, transparent 55px, black 110px, black calc(100% - 110px), transparent calc(100% - 55px), transparent 100%)';
     } else if (canScrollLeft) {
