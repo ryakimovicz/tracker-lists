@@ -1913,14 +1913,36 @@ export const Home: React.FC = () => {
     } catch { return true; }
   });
   const [gameFilter, setGameFilter] = useState<"playing" | "endless">("playing");
-  const [upcomingFilter, setUpcomingFilter] = useState<"calendar" | "tba">("calendar");
+  const currentViewParam = searchParams.get('view');
+  const upcomingFilter: "calendar" | "tba" = (currentViewParam === "tba") ? "tba" : "calendar";
+
   const [homeCategoryFilter, setHomeCategoryFilter] = useState<string>("all");
   const upcomingSwipeRef = useRef<HTMLDivElement>(null);
   const isProgrammaticUpcomingScrollRef = useRef(false);
   const upcomingScrollTimeoutRef = useRef<any>(null);
 
+  // Synchronize mobile swipe scroll position when entering upcoming tab or changing view
+  useEffect(() => {
+    if (activeTab === "upcoming" && upcomingSwipeRef.current) {
+      const el = upcomingSwipeRef.current;
+      const maxScroll = el.scrollWidth - el.clientWidth;
+      const targetScroll = upcomingFilter === "calendar" ? 0 : (maxScroll > 0 ? maxScroll : el.clientWidth);
+      // Synchronize without smooth animation on initial view restoration
+      if (Math.abs(el.scrollLeft - targetScroll) > 10) {
+        el.scrollTo({ left: targetScroll, behavior: 'instant' as any });
+      }
+    }
+  }, [activeTab, upcomingFilter]);
+
   const handleSelectUpcomingSubtab = (mode: "calendar" | "tba") => {
-    setUpcomingFilter(mode);
+    const newParams = new URLSearchParams(searchParams);
+    if (mode === "tba") {
+      newParams.set('view', 'tba');
+    } else {
+      newParams.delete('view');
+    }
+    setSearchParams(newParams);
+
     if (upcomingSwipeRef.current) {
       const el = upcomingSwipeRef.current;
       isProgrammaticUpcomingScrollRef.current = true;
@@ -1946,10 +1968,15 @@ export const Home: React.FC = () => {
     
     // Switch active tab once user crosses halfway of available scroll
     const scrollFraction = scrollPos / maxScroll;
-    if (scrollFraction >= 0.5 && upcomingFilter !== "tba") {
-      setUpcomingFilter("tba");
-    } else if (scrollFraction < 0.5 && upcomingFilter !== "calendar") {
-      setUpcomingFilter("calendar");
+    const newMode: "calendar" | "tba" = scrollFraction >= 0.5 ? "tba" : "calendar";
+    if (newMode !== upcomingFilter) {
+      const newParams = new URLSearchParams(searchParams);
+      if (newMode === "tba") {
+        newParams.set('view', 'tba');
+      } else {
+        newParams.delete('view');
+      }
+      setSearchParams(newParams, { replace: true });
     }
   };
 
@@ -2562,6 +2589,15 @@ export const Home: React.FC = () => {
     tbaAllItems.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
   }
 
+  // Filter upcoming and TBA lists by selected category if not 'all'
+  const filteredUpcomingAllItems = homeCategoryFilter === 'all'
+    ? upcomingAllItems
+    : upcomingAllItems.filter(u => u.item_type === homeCategoryFilter);
+
+  const filteredTbaAllItems = homeCategoryFilter === 'all'
+    ? tbaAllItems
+    : tbaAllItems.filter(u => u.item_type === homeCategoryFilter);
+
   const getTypeCat = (type: string, plural: boolean = false) => {
     return getCategoryLabel(type, language === 'es', plural);
   };
@@ -2581,7 +2617,7 @@ export const Home: React.FC = () => {
   };
 
   return (
-    <div style={{ maxWidth: "1200px", margin: "0 auto", display: "flex", flexDirection: "column", gap: "2rem" }}>
+    <div className="home-main-container" style={{ maxWidth: "1200px", margin: "0 auto", display: "flex", flexDirection: "column", gap: "2rem" }}>
       
       {/* Tabs */}
       <div 
@@ -2634,18 +2670,9 @@ export const Home: React.FC = () => {
         })}
       </div>
 
-      {/* Mobile Category Filters Bar (Todos + 7 Categorías) - Only visible on mobile, persistent across tab switches */}
+      {/* Category Filters Bar (Todos + 7 Categorías) - Persistent across tabs */}
       {activeTab !== 'guides' && (
-        <div 
-          className="home-category-filters-container home-mobile-only"
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(4, 1fr)',
-            gap: '0.45rem',
-            width: '100%',
-            boxSizing: 'border-box'
-          }}
-        >
+        <div className="home-category-filters-container">
           {sortFilterTabs([
             { value: 'all', label: language === 'es' ? 'Todo' : 'All' },
             { value: 'movie', label: language === 'es' ? 'Películas' : 'Movies' },
@@ -2698,7 +2725,7 @@ export const Home: React.FC = () => {
 
       {/* Media Row */}
       {activeTab === "upcoming" ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
           {/* Sub-tabs: Calendario / Por confirmar (Desktop Button Pills) */}
           <div className="home-desktop-only" style={{ display: "flex", alignItems: "center" }}>
             <div style={{ display: "flex", background: "var(--bg-tertiary)", padding: "3px", borderRadius: "8px", gap: "4px", border: "1px solid var(--border-color)" }}>
@@ -2762,14 +2789,14 @@ export const Home: React.FC = () => {
           {/* Desktop view (pill tabs already rendered above) */}
           <div className="home-desktop-only" style={{ width: "100%" }}>
             {upcomingFilter === "calendar" ? (
-            upcomingAllItems.length > 0 ? (
+            filteredUpcomingAllItems.length > 0 ? (
               <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
                 {(() => {
                   // Group upcoming items by month key (e.g. "2026-09" or "2027-01")
                   const currentYear = new Date().getFullYear();
                   const groups: { [key: string]: { label: string; items: any[] } } = {};
 
-                  upcomingAllItems.forEach(uItem => {
+                  filteredUpcomingAllItems.forEach(uItem => {
                     let dateObj: Date | null = null;
                     if (uItem.airstamp) {
                       dateObj = new Date(uItem.airstamp);
@@ -2808,7 +2835,7 @@ export const Home: React.FC = () => {
                     groups[groupKey].items.push(uItem);
                   });
 
-                  return Object.keys(groups).map(gKey => {
+                  return Object.keys(groups).map((gKey, gIdx) => {
                     const group = groups[gKey];
                     return (
                       <div key={gKey} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
@@ -2819,7 +2846,7 @@ export const Home: React.FC = () => {
                           gap: '0.75rem',
                           paddingBottom: '0.35rem',
                           borderBottom: '1px solid var(--border-color)',
-                          marginTop: '0.5rem'
+                          marginTop: gIdx === 0 ? 0 : '1rem'
                         }}>
                           <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)' }}>
                             {group.label}
@@ -2980,9 +3007,9 @@ export const Home: React.FC = () => {
             )
           ) : (
             /* TBA (Por confirmar) View */
-            tbaAllItems.length > 0 ? (
+            filteredTbaAllItems.length > 0 ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                {tbaAllItems.map(uItem => {
+                {filteredTbaAllItems.map(uItem => {
                   const catLabel = getTypeCat(uItem.item_type);
                   return (
                     <div
@@ -3075,13 +3102,13 @@ export const Home: React.FC = () => {
           >
             {/* Slide 1: Calendario */}
             <div className="upcoming-mobile-swipe-slide">
-              {upcomingAllItems.length > 0 ? (
+              {filteredUpcomingAllItems.length > 0 ? (
                 <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
                   {(() => {
                     const currentYear = new Date().getFullYear();
                     const groups: { [key: string]: { label: string; items: any[] } } = {};
 
-                    upcomingAllItems.forEach(uItem => {
+                    filteredUpcomingAllItems.forEach(uItem => {
                       let dateObj: Date | null = null;
                       if (uItem.airstamp) {
                         dateObj = new Date(uItem.airstamp);
@@ -3120,7 +3147,7 @@ export const Home: React.FC = () => {
                       groups[groupKey].items.push(uItem);
                     });
 
-                    return Object.keys(groups).map(gKey => {
+                    return Object.keys(groups).map((gKey, gIdx) => {
                       const group = groups[gKey];
                       return (
                         <div key={gKey} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
@@ -3130,7 +3157,7 @@ export const Home: React.FC = () => {
                             gap: '0.75rem',
                             paddingBottom: '0.35rem',
                             borderBottom: '1px solid var(--border-color)',
-                            marginTop: '0.5rem'
+                            marginTop: gIdx === 0 ? 0 : '1rem'
                           }}>
                             <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)' }}>
                               {group.label}
@@ -3276,9 +3303,9 @@ export const Home: React.FC = () => {
 
             {/* Slide 2: Por confirmar (TBA) */}
             <div className="upcoming-mobile-swipe-slide">
-              {tbaAllItems.length > 0 ? (
+              {filteredTbaAllItems.length > 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  {tbaAllItems.map(uItem => {
+                  {filteredTbaAllItems.map(uItem => {
                     const catLabel = getTypeCat(uItem.item_type);
                     return (
                       <div
@@ -3354,7 +3381,7 @@ export const Home: React.FC = () => {
         upNextGuides.length > 0 ? (
           <>
             {/* Mobile Vertical Stack for Guides */}
-            <div className="mobile-vertical-stack home-mobile-only">
+            <div className="mobile-vertical-stack mobile-guides-stack home-mobile-only">
               {upNextGuides.map(g => {
                 let insideTop = g.title;
                 let bottomText1 = '';
@@ -3617,18 +3644,29 @@ export const Home: React.FC = () => {
                       {specificItems.map(item => renderItemCard(item))}
                     </div>
 
-                    {/* Desktop horizontal row */}
-                    <div className="home-desktop-only" style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
-                      <ScrollRow 
-                        key={`${activeTab}_${homeCategoryFilter}`} 
-                        title={getTypeCat(homeCategoryFilter, true)} 
-                        icon={getCategoryIcon(homeCategoryFilter, { size: 18 })}
-                        outlineColor={`var(--color-${homeCategoryFilter})`} 
-                        itemCount={specificItems.length}
-                        storageKey={`${activeTab}_${homeCategoryFilter}`}
-                      >
+                    {/* Desktop multi-column grid */}
+                    <div className="home-desktop-only" style={{ display: 'flex', flexDirection: 'column', width: '100%', gap: '1rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                        {getCategoryIcon(homeCategoryFilter, { size: 20, color: `var(--color-${homeCategoryFilter})` })}
+                        <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                          {getTypeCat(homeCategoryFilter, true)}
+                        </h3>
+                        <span style={{
+                          fontSize: '0.8rem',
+                          fontWeight: 700,
+                          padding: '0.15rem 0.55rem',
+                          borderRadius: '12px',
+                          background: 'rgba(255, 255, 255, 0.08)',
+                          color: `var(--color-${homeCategoryFilter})`,
+                          border: `1px solid var(--color-${homeCategoryFilter})`
+                        }}>
+                          {specificItems.length}
+                        </span>
+                      </div>
+
+                      <div className="desktop-category-grid">
                         {specificItems.map(item => renderItemCard(item))}
-                      </ScrollRow>
+                      </div>
                     </div>
                   </>
                 );
@@ -3718,7 +3756,7 @@ export const Home: React.FC = () => {
           {/* AdBanner before updates in followed guides */}
           <AdBanner style={{ margin: "1rem auto 2rem auto" }} />
 
-          <h3 style={{ fontSize: "1.2rem", marginBottom: "0.5rem", fontWeight: 600 }}>{language === 'es' ? 'Novedades en guías seguidas' : 'Updates in followed guides'}</h3>
+          <h3 className="mobile-guide-updates-title" style={{ fontSize: "1.2rem", marginBottom: "0.5rem", fontWeight: 600 }}>{language === 'es' ? 'Novedades en guías seguidas' : 'Updates in followed guides'}</h3>
           <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
             {(() => {
               const normalizedUpdates: any[] = [];
