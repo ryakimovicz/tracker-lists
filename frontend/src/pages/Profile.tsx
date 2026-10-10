@@ -3350,16 +3350,6 @@ export const Profile: React.FC = () => {
           <span>{language === 'es' ? 'Guías' : 'Guides'}</span>
         </button>
 
-        <button
-          onClick={() => handleTabChange('favorites')}
-          className={`profile-tab-btn ${activeTab === 'favorites' ? 'active' : ''}`}
-          style={{
-            '--tab-color': '#F472B6'
-          } as React.CSSProperties}
-        >
-          <Heart size={18} fill={activeTab === 'favorites' ? 'currentColor' : 'none'} strokeWidth={activeTab === 'favorites' ? 2 : 1.8} /> {language === 'es' ? 'Destacados' : 'Favorites'}
-        </button>
-
         {Boolean(profile?.lastfm_username) && (
           <button
             onClick={() => handleTabChange('music')}
@@ -3385,6 +3375,16 @@ export const Profile: React.FC = () => {
             <span>{language === 'es' ? 'Música' : 'Music'}</span>
           </button>
         )}
+
+        <button
+          onClick={() => handleTabChange('favorites')}
+          className={`profile-tab-btn ${activeTab === 'favorites' ? 'active' : ''}`}
+          style={{
+            '--tab-color': '#F472B6'
+          } as React.CSSProperties}
+        >
+          <Heart size={18} fill={activeTab === 'favorites' ? 'currentColor' : 'none'} strokeWidth={activeTab === 'favorites' ? 2 : 1.8} /> {language === 'es' ? 'Destacados' : 'Favorites'}
+        </button>
       </div>
 
       {/* Tab Contents */}
