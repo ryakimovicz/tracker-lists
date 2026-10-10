@@ -1915,6 +1915,43 @@ export const Home: React.FC = () => {
   const [gameFilter, setGameFilter] = useState<"playing" | "endless">("playing");
   const [upcomingFilter, setUpcomingFilter] = useState<"calendar" | "tba">("calendar");
   const [homeCategoryFilter, setHomeCategoryFilter] = useState<string>("all");
+  const upcomingSwipeRef = useRef<HTMLDivElement>(null);
+  const isProgrammaticUpcomingScrollRef = useRef(false);
+  const upcomingScrollTimeoutRef = useRef<any>(null);
+
+  const handleSelectUpcomingSubtab = (mode: "calendar" | "tba") => {
+    setUpcomingFilter(mode);
+    if (upcomingSwipeRef.current) {
+      const el = upcomingSwipeRef.current;
+      isProgrammaticUpcomingScrollRef.current = true;
+      if (upcomingScrollTimeoutRef.current) clearTimeout(upcomingScrollTimeoutRef.current);
+      
+      const maxScroll = el.scrollWidth - el.clientWidth;
+      const targetScroll = mode === "calendar" ? 0 : (maxScroll > 0 ? maxScroll : el.clientWidth);
+      el.scrollTo({ left: targetScroll, behavior: 'smooth' });
+
+      upcomingScrollTimeoutRef.current = setTimeout(() => {
+        isProgrammaticUpcomingScrollRef.current = false;
+      }, 500);
+    }
+  };
+
+  const handleUpcomingSwipeScroll = () => {
+    if (!upcomingSwipeRef.current) return;
+    if (isProgrammaticUpcomingScrollRef.current) return;
+    const el = upcomingSwipeRef.current;
+    const scrollPos = el.scrollLeft;
+    const maxScroll = el.scrollWidth - el.clientWidth;
+    if (maxScroll <= 0) return;
+    
+    // Switch active tab once user crosses halfway of available scroll
+    const scrollFraction = scrollPos / maxScroll;
+    if (scrollFraction >= 0.5 && upcomingFilter !== "tba") {
+      setUpcomingFilter("tba");
+    } else if (scrollFraction < 0.5 && upcomingFilter !== "calendar") {
+      setUpcomingFilter("calendar");
+    }
+  };
 
   const lastFetchRef = useRef<number>(Date.now());
 
@@ -2662,12 +2699,12 @@ export const Home: React.FC = () => {
       {/* Media Row */}
       {activeTab === "upcoming" ? (
         <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-          {/* Sub-tabs: Calendario / Por confirmar */}
-          <div style={{ display: "flex", alignItems: "center" }}>
+          {/* Sub-tabs: Calendario / Por confirmar (Desktop Button Pills) */}
+          <div className="home-desktop-only" style={{ display: "flex", alignItems: "center" }}>
             <div style={{ display: "flex", background: "var(--bg-tertiary)", padding: "3px", borderRadius: "8px", gap: "4px", border: "1px solid var(--border-color)" }}>
               <button
                 type="button"
-                onClick={() => setUpcomingFilter("calendar")}
+                onClick={() => handleSelectUpcomingSubtab("calendar")}
                 style={{
                   border: "none",
                   background: upcomingFilter === "calendar" ? "var(--accent-primary, #6366f1)" : "transparent",
@@ -2684,7 +2721,7 @@ export const Home: React.FC = () => {
               </button>
               <button
                 type="button"
-                onClick={() => setUpcomingFilter("tba")}
+                onClick={() => handleSelectUpcomingSubtab("tba")}
                 style={{
                   border: "none",
                   background: upcomingFilter === "tba" ? "var(--accent-primary, #6366f1)" : "transparent",
@@ -2702,7 +2739,29 @@ export const Home: React.FC = () => {
             </div>
           </div>
 
-          {upcomingFilter === "calendar" ? (
+          {/* Sub-tabs: Calendario / Por confirmar (Mobile Top-Bar-Style Full Width Tabs) */}
+          <div className="upcoming-mobile-tabs-container home-mobile-only">
+            <button
+              type="button"
+              className={`upcoming-mobile-tab-btn ${upcomingFilter === "calendar" ? "active" : ""}`}
+              onClick={() => handleSelectUpcomingSubtab("calendar")}
+            >
+              <span>{language === "es" ? "Calendario" : "Calendar"}</span>
+              {upcomingFilter === "calendar" && <div className="upcoming-tab-indicator" />}
+            </button>
+            <button
+              type="button"
+              className={`upcoming-mobile-tab-btn ${upcomingFilter === "tba" ? "active" : ""}`}
+              onClick={() => handleSelectUpcomingSubtab("tba")}
+            >
+              <span>{language === "es" ? "Por confirmar" : "Por confirmar (TBA)"}</span>
+              {upcomingFilter === "tba" && <div className="upcoming-tab-indicator" />}
+            </button>
+          </div>
+
+          {/* Desktop view (pill tabs already rendered above) */}
+          <div className="home-desktop-only" style={{ width: "100%" }}>
+            {upcomingFilter === "calendar" ? (
             upcomingAllItems.length > 0 ? (
               <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
                 {(() => {
@@ -3006,6 +3065,290 @@ export const Home: React.FC = () => {
               </div>
             )
           )}
+          </div>
+
+          {/* Mobile swipe view (edge-to-edge swipeable container between Calendario & Por confirmar) */}
+          <div
+            ref={upcomingSwipeRef}
+            onScroll={handleUpcomingSwipeScroll}
+            className="upcoming-mobile-swipe-wrapper home-mobile-only"
+          >
+            {/* Slide 1: Calendario */}
+            <div className="upcoming-mobile-swipe-slide">
+              {upcomingAllItems.length > 0 ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+                  {(() => {
+                    const currentYear = new Date().getFullYear();
+                    const groups: { [key: string]: { label: string; items: any[] } } = {};
+
+                    upcomingAllItems.forEach(uItem => {
+                      let dateObj: Date | null = null;
+                      if (uItem.airstamp) {
+                        dateObj = new Date(uItem.airstamp);
+                      } else if (uItem.airdate) {
+                        const parts = uItem.airdate.split('-');
+                        if (parts.length === 3) dateObj = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+                      } else if (uItem.release_date) {
+                        const parts = uItem.release_date.split('-');
+                        if (parts.length === 3) dateObj = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+                        else if (parts.length === 1) dateObj = new Date(parseInt(parts[0]), 0, 1);
+                      } else if (uItem.timestamp) {
+                        dateObj = new Date(uItem.timestamp);
+                      }
+
+                      let groupKey = 'unknown';
+                      let groupLabel = language === 'es' ? 'Próximamente' : 'Coming Soon';
+
+                      if (dateObj && !isNaN(dateObj.getTime())) {
+                        const itemYear = dateObj.getFullYear();
+                        const monthNum = String(dateObj.getMonth() + 1).padStart(2, '0');
+                        groupKey = `${itemYear}-${monthNum}`;
+
+                        const monthName = dateObj.toLocaleDateString(language === 'es' ? 'es-ES' : 'en-US', { month: 'long' });
+                        const capitalizedMonth = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+                        
+                        if (itemYear !== currentYear) {
+                          groupLabel = `${capitalizedMonth} ${itemYear}`;
+                        } else {
+                          groupLabel = capitalizedMonth;
+                        }
+                      }
+
+                      if (!groups[groupKey]) {
+                        groups[groupKey] = { label: groupLabel, items: [] };
+                      }
+                      groups[groupKey].items.push(uItem);
+                    });
+
+                    return Object.keys(groups).map(gKey => {
+                      const group = groups[gKey];
+                      return (
+                        <div key={gKey} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.75rem',
+                            paddingBottom: '0.35rem',
+                            borderBottom: '1px solid var(--border-color)',
+                            marginTop: '0.5rem'
+                          }}>
+                            <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                              {group.label}
+                            </h4>
+                            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
+                              ({group.items.length} {group.items.length === 1 ? (language === 'es' ? 'estreno' : 'release') : (language === 'es' ? 'estrenos' : 'releases')})
+                            </span>
+                          </div>
+
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                            {group.items.map(uItem => {
+                              const isEpisodeItem = uItem.season_number !== undefined && uItem.episode_number !== undefined;
+                              const sStr = isEpisodeItem ? String(uItem.season_number).padStart(2, '0') : '';
+                              const eStr = isEpisodeItem ? String(uItem.episode_number).padStart(2, '0') : '';
+                              const epLabel = isEpisodeItem ? (language === 'es' ? `T${sStr} | E${eStr}` : `S${sStr} | E${eStr}`) : '';
+                              const formattedDate = formatUpcomingDate(uItem.airdate || uItem.release_date, uItem.airstamp);
+                              const catLabel = getTypeCat(uItem.item_type);
+
+                              return (
+                                <div
+                                  key={uItem.id}
+                                  onClick={() => {
+                                    if (uItem.parent_series) {
+                                      handleOpenItem(uItem.parent_series);
+                                    } else if (uItem.rawItem) {
+                                      handleOpenItem(uItem.rawItem);
+                                    }
+                                  }}
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '1rem',
+                                    padding: '0.6rem 0.85rem',
+                                    background: 'var(--bg-secondary)',
+                                    border: '1px solid var(--border-color)',
+                                    borderRadius: '8px',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s ease'
+                                  }}
+                                >
+                                  <img
+                                    src={uItem.coverUrl}
+                                    alt={uItem.title}
+                                    style={{
+                                      width: '42px',
+                                      height: '60px',
+                                      objectFit: 'cover',
+                                      borderRadius: '4px',
+                                      flexShrink: 0,
+                                      background: 'var(--bg-tertiary)'
+                                    }}
+                                    onError={(e) => {
+                                      (e.target as HTMLElement).style.display = 'none';
+                                    }}
+                                  />
+                                  <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                      <span style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        {uItem.title}
+                                      </span>
+                                      {isEpisodeItem && (
+                                        <span style={{
+                                          fontSize: '0.75rem',
+                                          fontWeight: 700,
+                                          color: uItem.themeTextColor || '#ffffff',
+                                          background: uItem.themeColor || 'var(--accent-primary)',
+                                          padding: '0.1rem 0.4rem',
+                                          borderRadius: '4px'
+                                        }}>
+                                          {epLabel}
+                                        </span>
+                                      )}
+                                      {isEpisodeItem && uItem.name && (
+                                        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                          - {uItem.name}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                      <span>{language === 'es' ? 'Estreno:' : 'Airs:'}</span>
+                                      <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{formattedDate}</span>
+                                    </div>
+                                  </div>
+                                  <div style={{
+                                    padding: '0.25rem 0.6rem',
+                                    borderRadius: '12px',
+                                    fontSize: '0.7rem',
+                                    fontWeight: 600,
+                                    background: uItem.themeColor ? `color-mix(in srgb, ${uItem.themeColor} 18%, transparent)` : 'var(--bg-tertiary)',
+                                    color: uItem.themeColor || 'var(--text-secondary)',
+                                    border: `1px solid ${uItem.themeColor ? `color-mix(in srgb, ${uItem.themeColor} 40%, transparent)` : 'var(--border-color)'}`,
+                                    whiteSpace: 'nowrap',
+                                    flexShrink: 0,
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '0.3rem'
+                                  }}>
+                                    {getCategoryIcon(uItem.item_type, { size: 12, color: uItem.themeColor || 'var(--text-secondary)' })}
+                                    <span>{catLabel}</span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
+                  {isSyncingEpisodes && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-secondary)', fontSize: '0.85rem', padding: '0.5rem 0' }}>
+                      <div style={{
+                        width: '12px',
+                        height: '12px',
+                        border: '2px solid var(--border-color)',
+                        borderTopColor: 'var(--accent-primary, #6366f1)',
+                        borderRadius: '50%',
+                        animation: 'spin 0.8s linear infinite'
+                      }} />
+                      <span>{language === 'es' ? 'Sincronizando calendario de series...' : 'Syncing series calendar...'}</span>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div style={{ color: "var(--text-secondary)", padding: "1rem 0", display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  {isSyncingEpisodes ? (
+                    <>
+                      <div style={{
+                        width: '14px',
+                        height: '14px',
+                        border: '2px solid var(--border-color)',
+                        borderTopColor: 'var(--accent-primary, #6366f1)',
+                        borderRadius: '50%',
+                        animation: 'spin 0.8s linear infinite'
+                      }} />
+                      <span>{language === 'es' ? 'Cargando próximos episodios...' : 'Loading upcoming episodes...'}</span>
+                    </>
+                  ) : (
+                    <span>{language === 'es' ? 'No hay estrenos o episodios próximos en el calendario.' : 'No upcoming releases or episodes in the calendar.'}</span>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Slide 2: Por confirmar (TBA) */}
+            <div className="upcoming-mobile-swipe-slide">
+              {tbaAllItems.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  {tbaAllItems.map(uItem => {
+                    const catLabel = getTypeCat(uItem.item_type);
+                    return (
+                      <div
+                        key={uItem.id}
+                        onClick={() => {
+                          if (uItem.rawItem) handleOpenItem(uItem.rawItem);
+                        }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '1rem',
+                          padding: '0.6rem 0.85rem',
+                          background: 'var(--bg-secondary)',
+                          border: '1px solid var(--border-color)',
+                          borderRadius: '8px',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease'
+                        }}
+                      >
+                        <img
+                          src={uItem.coverUrl}
+                          alt={uItem.title}
+                          style={{
+                            width: '42px',
+                            height: '60px',
+                            objectFit: 'cover',
+                            borderRadius: '4px',
+                            flexShrink: 0,
+                            background: 'var(--bg-tertiary)'
+                          }}
+                          onError={(e) => {
+                            (e.target as HTMLElement).style.display = 'none';
+                          }}
+                        />
+                        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                          <span style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {uItem.title}
+                          </span>
+                          <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                            {language === 'es' ? 'Fecha por confirmar (TBA)' : 'Release date to be announced (TBA)'}
+                          </div>
+                        </div>
+                        <div style={{
+                          padding: '0.25rem 0.6rem',
+                          borderRadius: '12px',
+                          fontSize: '0.7rem',
+                          fontWeight: 600,
+                          background: uItem.themeColor ? `color-mix(in srgb, ${uItem.themeColor} 18%, transparent)` : 'var(--bg-tertiary)',
+                          color: uItem.themeColor || 'var(--text-secondary)',
+                          border: `1px solid ${uItem.themeColor ? `color-mix(in srgb, ${uItem.themeColor} 40%, transparent)` : 'var(--border-color)'}`,
+                          whiteSpace: 'nowrap',
+                          flexShrink: 0,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.3rem'
+                        }}>
+                          {getCategoryIcon(uItem.item_type, { size: 12, color: uItem.themeColor || 'var(--text-secondary)' })}
+                          <span>{catLabel}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div style={{ color: "var(--text-secondary)", padding: "1rem 0" }}>
+                  {language === 'es' ? 'No hay obras agregadas con fecha por confirmar.' : 'No works added with release date to be announced.'}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       ) : activeTab === "guides" ? (
         upNextGuides.length > 0 ? (

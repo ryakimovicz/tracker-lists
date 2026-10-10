@@ -1707,6 +1707,79 @@ h1, h2, h3, h4, h5, h6 {
     padding: 0.15rem 0.55rem !important;
     border-radius: 12px !important;
   }
+
+  /* Mobile Upcoming Sub-tabs (Calendario / Por confirmar) */
+  .upcoming-mobile-tabs-container {
+    display: flex !important;
+    width: 100% !important;
+    border-bottom: 1px solid var(--border-color) !important;
+    padding-bottom: 0 !important;
+    margin-top: -0.75rem !important;
+    margin-bottom: 1rem !important;
+    box-sizing: border-box !important;
+  }
+
+  .upcoming-mobile-tab-btn {
+    flex: 1 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 0.65rem 0 !important;
+    font-size: 0.95rem !important;
+    font-weight: 600 !important;
+    color: var(--text-secondary) !important;
+    background: transparent !important;
+    border: none !important;
+    position: relative !important;
+    cursor: pointer !important;
+    transition: color 0.15s ease !important;
+  }
+
+  .upcoming-mobile-tab-btn.active {
+    color: var(--accent-primary) !important;
+  }
+
+  .upcoming-mobile-tab-btn .upcoming-tab-indicator {
+    position: absolute !important;
+    bottom: -1px !important;
+    left: 10% !important;
+    right: 10% !important;
+    height: 2px !important;
+    background: var(--accent-primary) !important;
+    border-radius: 9999px !important;
+  }
+
+  /* Mobile Upcoming Swipe Views Container */
+  .upcoming-mobile-swipe-wrapper {
+    display: flex !important;
+    width: 100% !important;
+    gap: 1.5rem !important;
+    overflow-x: auto !important;
+    scroll-snap-type: x mandatory !important;
+    scroll-padding-left: 0.5rem !important;
+    scroll-padding-right: 0.5rem !important;
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+    min-height: calc(100vh - 280px) !important;
+    touch-action: pan-x pan-y !important;
+    -webkit-overflow-scrolling: touch !important;
+    padding-bottom: 2rem !important;
+    box-sizing: border-box !important;
+  }
+
+  .upcoming-mobile-swipe-wrapper::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .upcoming-mobile-swipe-slide {
+    flex: 0 0 100% !important;
+    width: 100% !important;
+    min-width: 100% !important;
+    scroll-snap-align: start !important;
+    box-sizing: border-box !important;
+    padding: 0 0.5rem !important;
+    min-height: 100% !important;
+  }
 }
 
 
