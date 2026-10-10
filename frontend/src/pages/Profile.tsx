@@ -2185,43 +2185,50 @@ export const Profile: React.FC = () => {
       }
     }
 
-    try {
-      const nowIso = new Date().toISOString();
-      await apiClient.put(`/library/${itemId}`, { is_favorite: !currentFav });
-      
-      setLibraryItems(prev => {
-        if (!currentFav) {
-          return prev.map(item => {
-            if (item.id === itemId) {
-              return { ...item, is_favorite: true, favorited_at: nowIso, favorite_order: 0 };
-            }
-            if (item.is_favorite) {
-              return { ...item, favorite_order: (item.favorite_order ?? 0) + 1 };
-            }
-            return item;
-          });
-        } else {
-          return prev.map(item => item.id === itemId ? { ...item, is_favorite: false, favorited_at: undefined } : item);
-        }
-      });
-      
-      setFavorites(prev => {
-        if (!currentFav) {
-          const shifted = prev.map(li => ({
-            ...li,
-            favorite_order: (li.favorite_order ?? 0) + 1
-          }));
-          return [{ ...targetItem, is_favorite: true, favorited_at: nowIso, favorite_order: 0 }, ...shifted];
-        } else {
-          return prev.filter(li => li.id !== itemId);
-        }
-      });
+    // Optimistic state backup for rollback
+    const prevLibraryItems = [...libraryItems];
+    const prevFavorites = [...favorites];
+    const nowIso = new Date().toISOString();
 
-      // Refresh activities
+    // 1. Optimistic Update (Immediate UI response: 0ms delay)
+    setLibraryItems(prev => {
+      if (!currentFav) {
+        return prev.map(item => {
+          if (item.id === itemId) {
+            return { ...item, is_favorite: true, favorited_at: nowIso, favorite_order: 0 };
+          }
+          if (item.is_favorite) {
+            return { ...item, favorite_order: (item.favorite_order ?? 0) + 1 };
+          }
+          return item;
+        });
+      } else {
+        return prev.map(item => item.id === itemId ? { ...item, is_favorite: false, favorited_at: undefined } : item);
+      }
+    });
+
+    setFavorites(prev => {
+      if (!currentFav) {
+        const shifted = prev.map(li => ({
+          ...li,
+          favorite_order: (li.favorite_order ?? 0) + 1
+        }));
+        return [{ ...targetItem, is_favorite: true, favorited_at: nowIso, favorite_order: 0 }, ...shifted];
+      } else {
+        return prev.filter(li => li.id !== itemId);
+      }
+    });
+
+    try {
+      await apiClient.put(`/library/${itemId}`, { is_favorite: !currentFav });
+
+      // Refresh activities in background without blocking UI
       const targetActivityUrl = userIdParam ? `/users/${userIdParam}/activity` : '/users/me/activity';
-      const actRes = await apiClient.get(targetActivityUrl);
-      setActivities(actRes.data);
+      apiClient.get(targetActivityUrl).then(actRes => setActivities(actRes.data)).catch(() => {});
     } catch(err: any) {
+      // Rollback on failure
+      setLibraryItems(prevLibraryItems);
+      setFavorites(prevFavorites);
       setErrorMsg(err.response?.data?.detail || (language === 'es' ? 'Error al actualizar destacado' : 'Failed to update favorite'));
       setTimeout(() => setErrorMsg(''), 5000);
     }
@@ -2276,8 +2283,6 @@ export const Profile: React.FC = () => {
         return [{ ...finalNewItem, is_favorite: true, favorited_at: nowIso, favorite_order: 0 }, ...shifted];
       });
 
-      window.dispatchEvent(new CustomEvent('library-updated'));
-
       setSuccessMsg(language === 'es' ? 'Obra destacada actualizada correctamente.' : 'Featured item updated successfully.');
       setTimeout(() => setSuccessMsg(''), 4000);
 
@@ -2307,29 +2312,50 @@ export const Profile: React.FC = () => {
     const sameCategoryFavs = displayedFavorites.filter(f => f.item_type === 'music');
     const maxAllowed = isPro ? 10 : 1;
 
+    const syntheticId = -Date.now();
+    const nowIso = new Date().toISOString();
+    const tempArtistItem: LibraryItem = {
+      id: syntheticId,
+      item_type: 'music',
+      external_id: targetExternalId,
+      title: artistName.trim(),
+      image_url: imageUrl || '',
+      status: 'completed',
+      created_at: nowIso,
+      updated_at: nowIso,
+      is_favorite: true,
+      favorited_at: nowIso,
+      favorite_order: 0
+    };
+
     if (sameCategoryFavs.length >= maxAllowed) {
-      const syntheticItem: LibraryItem = {
-        id: -Date.now(),
-        item_type: 'music',
-        external_id: targetExternalId,
-        title: artistName.trim(),
-        image_url: imageUrl || '',
-        status: 'completed',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        is_favorite: false
-      };
       setReplaceModalState({
         isOpen: true,
-        newItem: syntheticItem,
+        newItem: { ...tempArtistItem, is_favorite: false },
         currentFavorites: sameCategoryFavs
       });
       return;
     }
 
-    // Under limit: create directly with is_favorite: true
+    // Optimistic Update: Immediately register artist in favorites and library items
+    const prevLibraryItems = [...libraryItems];
+    const prevFavorites = [...favorites];
+
+    setLibraryItems(prev => [
+      tempArtistItem,
+      ...prev.map(item => item.is_favorite ? { ...item, favorite_order: (item.favorite_order ?? 0) + 1 } : item)
+    ]);
+
+    setFavorites(prev => {
+      const shifted = prev.map(li => ({
+        ...li,
+        favorite_order: (li.favorite_order ?? 0) + 1
+      }));
+      return [tempArtistItem, ...shifted];
+    });
+
+    // Background sync with API
     try {
-      const nowIso = new Date().toISOString();
       const res = await apiClient.post('/library/', {
         item_type: 'music',
         external_id: targetExternalId,
@@ -2340,26 +2366,17 @@ export const Profile: React.FC = () => {
       });
       const createdItem: LibraryItem = res.data;
 
-      setLibraryItems(prev => [
-        { ...createdItem, is_favorite: true, favorited_at: nowIso, favorite_order: 0 },
-        ...prev.map(item => item.is_favorite ? { ...item, favorite_order: (item.favorite_order ?? 0) + 1 } : item)
-      ]);
+      // Replace temporary synthetic ID with actual created item
+      setLibraryItems(prev => prev.map(item => item.id === syntheticId ? { ...createdItem, is_favorite: true, favorited_at: nowIso, favorite_order: 0 } : item));
+      setFavorites(prev => prev.map(item => item.id === syntheticId ? { ...createdItem, is_favorite: true, favorited_at: nowIso, favorite_order: 0 } : item));
 
-      setFavorites(prev => {
-        const shifted = prev.map(li => ({
-          ...li,
-          favorite_order: (li.favorite_order ?? 0) + 1
-        }));
-        return [{ ...createdItem, is_favorite: true, favorited_at: nowIso, favorite_order: 0 }, ...shifted];
-      });
-
-      window.dispatchEvent(new CustomEvent('library-updated'));
-
-      // Refresh activities
+      // Refresh activities in background
       const targetActivityUrl = userIdParam ? `/users/${userIdParam}/activity` : '/users/me/activity';
-      const actRes = await apiClient.get(targetActivityUrl);
-      setActivities(actRes.data);
+      apiClient.get(targetActivityUrl).then(actRes => setActivities(actRes.data)).catch(() => {});
     } catch (err: any) {
+      // Rollback on error
+      setLibraryItems(prevLibraryItems);
+      setFavorites(prevFavorites);
       setErrorMsg(err.response?.data?.detail || (language === 'es' ? 'Error al destacar artista' : 'Failed to feature artist'));
       setTimeout(() => setErrorMsg(''), 5000);
     }
