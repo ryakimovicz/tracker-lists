@@ -2396,18 +2396,18 @@ h1, h2, h3, h4, h5, h6 {
     position: relative !important;
     padding-top: 0.25rem !important;
     padding-right: 0 !important;
-    align-items: flex-end !important;
+    align-items: flex-start !important;
     gap: 0.75rem !important;
   }
 
-  /* Actions container layout inside header on mobile - sits at the bottom of the header row aligned under X */
+  /* Actions container layout inside header on mobile - cleanly separated downwards from X */
   .item-details-actions {
     display: flex !important;
     align-items: center !important;
     gap: 0.6rem !important;
     flex-shrink: 0 !important;
     margin-left: auto !important;
-    margin-top: 1.25rem !important;
+    margin-top: 2.25rem !important;
     align-self: flex-end !important;
   }
 }
