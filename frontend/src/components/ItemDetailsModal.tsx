@@ -5700,6 +5700,70 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                 </div>
 
                 <div className="item-details-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  {/* Report Media Button */}
+                  {user && !isEpisode && (
+                    <button
+                      type="button"
+                      onClick={() => setShowReportMediaModal(true)}
+                      className="btn-circle-action"
+                      title={language === 'es' ? 'Reportar obra' : 'Report media'}
+                      style={{
+                        width: '34px',
+                        height: '34px',
+                        minWidth: '34px',
+                        minHeight: '34px',
+                        padding: 0,
+                        borderRadius: '50%',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                        cursor: 'pointer',
+                        color: 'var(--text-secondary)',
+                        border: '1px solid var(--border-color)',
+                        background: 'transparent',
+                        transition: 'all 0.2s ease'
+                      }}
+                    >
+                      <ShieldAlert size={17} />
+                    </button>
+                  )}
+
+                  {/* Favorite button for all items */}
+                  {user && selectedItem?.id && !isEpisode && (() => {
+                    const isDlcOrExpansion = selectedItem?.item_type === 'game' && ['dlc', 'expansion'].includes(selectedItem?.badge || selectedItem?.custom_badge);
+                    const isUnconsumed = !isDlcOrExpansion && ['plan_to_watch', 'plan_to_read', 'plan_to_play'].includes(selectedItem?.status);
+                    return (
+                      <button
+                        type="button"
+                        disabled={isUnconsumed && !isFavorite}
+                        onClick={() => onToggleFavorite && onToggleFavorite(selectedItem.id, isFavorite)}
+                        className={`btn-favorite-heart ${isFavorite ? 'is-favorite' : ''}`}
+                        title={isUnconsumed && !isFavorite
+                          ? (language === 'es' ? 'Empieza a consumir la obra para poder destacarla' : 'Start consuming this item to feature it')
+                          : isFavorite
+                          ? (language === 'es' ? 'Quitar Destacado' : 'Remove Featured')
+                          : (language === 'es' ? 'Destacar (Favorito)' : 'Feature (Favorite)')
+                        }
+                        style={{
+                          width: '34px',
+                          height: '34px',
+                          minWidth: '34px',
+                          minHeight: '34px',
+                          flexShrink: 0,
+                          cursor: (isUnconsumed && !isFavorite) ? 'not-allowed' : 'pointer',
+                          opacity: (isUnconsumed && !isFavorite) ? 0.4 : 1,
+                          color: isFavorite ? 'var(--color-user, #F472B6)' : 'var(--text-secondary)',
+                          border: isFavorite ? '1px solid var(--color-user, #F472B6)' : '1px solid var(--border-color)',
+                          background: isFavorite ? 'rgba(244, 114, 182, 0.12)' : 'rgba(255, 255, 255, 0.05)',
+                          transition: 'all 0.2s ease'
+                        }}
+                      >
+                        <Heart size={18} fill={isFavorite ? 'var(--color-user, #F472B6)' : 'none'} />
+                      </button>
+                    );
+                  })()}
+
                   {/* Button + (Add to Shelf / Follow) */}
                   {user && !isEpisode && (
                     <div style={{ position: 'relative' }}>
@@ -5748,72 +5812,6 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         <Plus size={18} />
                       </button>
                     </div>
-                  )}
-
-
-
-                  {/* Favorite button for all items */}
-                  {user && selectedItem?.id && !isEpisode && (() => {
-                    const isDlcOrExpansion = selectedItem?.item_type === 'game' && ['dlc', 'expansion'].includes(selectedItem?.badge || selectedItem?.custom_badge);
-                    const isUnconsumed = !isDlcOrExpansion && ['plan_to_watch', 'plan_to_read', 'plan_to_play'].includes(selectedItem?.status);
-                    return (
-                      <button
-                        type="button"
-                        disabled={isUnconsumed && !isFavorite}
-                        onClick={() => onToggleFavorite && onToggleFavorite(selectedItem.id, isFavorite)}
-                        className={`btn-favorite-heart ${isFavorite ? 'is-favorite' : ''}`}
-                        title={isUnconsumed && !isFavorite
-                          ? (language === 'es' ? 'Empieza a consumir la obra para poder destacarla' : 'Start consuming this item to feature it')
-                          : isFavorite
-                          ? (language === 'es' ? 'Quitar Destacado' : 'Remove Featured')
-                          : (language === 'es' ? 'Destacar (Favorito)' : 'Feature (Favorite)')
-                        }
-                        style={{
-                          width: '34px',
-                          height: '34px',
-                          minWidth: '34px',
-                          minHeight: '34px',
-                          flexShrink: 0,
-                          cursor: (isUnconsumed && !isFavorite) ? 'not-allowed' : 'pointer',
-                          opacity: (isUnconsumed && !isFavorite) ? 0.4 : 1,
-                          color: isFavorite ? 'var(--color-user, #F472B6)' : 'var(--text-secondary)',
-                          border: isFavorite ? '1px solid var(--color-user, #F472B6)' : '1px solid var(--border-color)',
-                          background: isFavorite ? 'rgba(244, 114, 182, 0.12)' : 'rgba(255, 255, 255, 0.05)',
-                          transition: 'all 0.2s ease'
-                        }}
-                      >
-                        <Heart size={18} fill={isFavorite ? 'var(--color-user, #F472B6)' : 'none'} />
-                      </button>
-                    );
-                  })()}
-
-                  {/* Report Media Button */}
-                  {user && !isEpisode && (
-                    <button
-                      type="button"
-                      onClick={() => setShowReportMediaModal(true)}
-                      className="btn-circle-action"
-                      title={language === 'es' ? 'Reportar obra' : 'Report media'}
-                      style={{
-                        width: '34px',
-                        height: '34px',
-                        minWidth: '34px',
-                        minHeight: '34px',
-                        padding: 0,
-                        borderRadius: '50%',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexShrink: 0,
-                        cursor: 'pointer',
-                        color: 'var(--text-secondary)',
-                        border: '1px solid var(--border-color)',
-                        background: 'transparent',
-                        transition: 'all 0.2s ease'
-                      }}
-                    >
-                      <ShieldAlert size={17} />
-                    </button>
                   )}
 
                   <button

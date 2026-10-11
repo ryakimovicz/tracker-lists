@@ -2363,31 +2363,39 @@ h1, h2, h3, h4, h5, h6 {
   }
 
   .item-details-modal-card {
-    padding-top: calc(1.25rem + env(safe-area-inset-top, 0px)) !important;
+    padding-top: calc(1rem + env(safe-area-inset-top, 0px)) !important;
   }
 
-  /* Modal Close button (X) positioning and spacing */
+  /* Modal Close button (X): top-right without circular border */
   .item-details-close-btn {
-    position: static !important;
-    width: 34px !important;
-    height: 34px !important;
-    min-width: 34px !important;
-    min-height: 34px !important;
-    border-radius: 50% !important;
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    padding: 0 !important;
-    background: rgba(255, 255, 255, 0.05) !important;
-    border: 1px solid var(--border-color) !important;
-    margin-left: 0.25rem !important;
+    position: absolute !important;
+    top: calc(0.85rem + env(safe-area-inset-top, 0px)) !important;
+    right: 1rem !important;
+    width: auto !important;
+    height: auto !important;
+    min-width: unset !important;
+    min-height: unset !important;
+    border-radius: 0 !important;
+    border: none !important;
+    background: transparent !important;
+    padding: 0.35rem !important;
+    color: var(--text-secondary) !important;
+    z-index: 20 !important;
   }
 
   [data-theme="light"] .item-details-close-btn {
-    background: rgba(0, 0, 0, 0.04) !important;
+    background: transparent !important;
+    border: none !important;
   }
 
-  /* Actions container layout inside header */
+  /* Header layout on mobile with room for top-right close button */
+  .item-details-header {
+    position: relative !important;
+    padding-top: 1.75rem !important;
+    align-items: flex-start !important;
+  }
+
+  /* Actions container layout inside header on mobile */
   .item-details-actions {
     display: flex !important;
     align-items: center !important;
