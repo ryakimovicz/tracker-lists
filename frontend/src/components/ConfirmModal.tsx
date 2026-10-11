@@ -2,6 +2,9 @@ import React, { useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { AlertTriangle, AlertCircle, Info, CheckCircle2, X } from 'lucide-react';
 import { useTranslation } from '../context/LanguageContext';
+import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
+import { getProfileTheme } from '../utils/profileThemes';
 
 export interface ConfirmModalProps {
   isOpen: boolean;
@@ -32,6 +35,16 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
 }) => {
   const { language } = useTranslation();
   const isEs = language === 'es';
+  const { user } = useAuth();
+  const { resolvedTheme } = useTheme();
+  const isLight = resolvedTheme === 'light';
+
+  const profileTheme = React.useMemo(() => {
+    if (user?.is_pro && user?.profile_color) {
+      return getProfileTheme(user.profile_color, isLight);
+    }
+    return getProfileTheme('amber', isLight);
+  }, [user?.is_pro, user?.profile_color, isLight]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -49,7 +62,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
       case 'danger':
         return <AlertTriangle size={32} color="#ef4444" />;
       case 'warning':
-        return <AlertCircle size={32} color="#f59e0b" />;
+        return <AlertCircle size={32} color="var(--accent-primary, #f59e0b)" />;
       case 'success':
         return <CheckCircle2 size={32} color="#10b981" />;
       case 'info':
@@ -63,7 +76,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
       case 'danger':
         return 'rgba(239, 68, 68, 0.15)';
       case 'warning':
-        return 'rgba(245, 158, 11, 0.15)';
+        return 'color-mix(in srgb, var(--accent-primary, #f59e0b) 15%, transparent)';
       case 'success':
         return 'rgba(16, 185, 129, 0.15)';
       case 'info':
@@ -81,9 +94,9 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
       };
     }
     return {
-      background: 'linear-gradient(135deg, #f59e0b, #d97706)',
-      color: '#fff',
-      boxShadow: '0 4px 15px rgba(245, 158, 11, 0.35)',
+      background: 'linear-gradient(135deg, var(--accent-primary, #f59e0b), var(--accent-secondary, #d97706))',
+      color: 'var(--accent-text, #ffffff)',
+      boxShadow: '0 4px 15px color-mix(in srgb, var(--accent-primary, #f59e0b) 35%, transparent)',
     };
   };
 
@@ -104,6 +117,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
         zIndex: 999999,
         padding: '1.25rem',
         animation: 'fadeIn 0.2s ease-out',
+        ...profileTheme.cssVariables,
       }}
       onClick={!isLoading ? onClose : undefined}
     >
@@ -122,6 +136,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
           alignItems: 'center',
           textAlign: 'center',
           position: 'relative',
+          ...profileTheme.cssVariables,
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -242,3 +257,4 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
 
   return ReactDOM.createPortal(modalContent, document.body);
 };
+

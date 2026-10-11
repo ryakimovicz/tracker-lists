@@ -11513,10 +11513,6 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                     : 'You haven\'t completed this item yet and comments may contain spoilers. Do you want to view the comments anyway?'
                 }
                 type="warning"
-                confirmBtnStyle={{
-                  background: '#f59e0b',
-                  boxShadow: 'none'
-                }}
                 confirmText={language === 'es' ? 'Sí, ver comentarios' : 'Yes, show comments'}
                 cancelText={language === 'es' ? 'No, permanecer aquí' : 'No, stay here'}
                 onConfirm={() => {
