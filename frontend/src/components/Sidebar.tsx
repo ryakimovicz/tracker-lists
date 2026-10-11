@@ -6,6 +6,7 @@ import { useTheme } from '../context/ThemeContext';
 import type { Theme } from '../context/ThemeContext';
 import { LogOut, Shield, Globe, Sun, Moon, Monitor, Home, Users, PlusCircle, Compass, User, Star, Settings, Bell } from 'lucide-react';
 import { prefetchRoute } from '../utils/prefetch';
+import { CreateGuideIcon } from './CreateGuideIcon';
 
 import { ProModal } from './ProModal';
 import { BrandLogo } from './BrandLogo';
@@ -140,7 +141,16 @@ export const Sidebar: React.FC = () => {
         {isUserLoggedIn && (
           <>
             <NavItem to="/social" icon={Users} label={t('navSocial') || 'Social'} currentPath={location.pathname} currentSearch={location.search} currentUserId={user?.id} />
-            <NavItem to="/create" icon={PlusCircle} label={t('navCreate') || 'Crear'} currentPath={location.pathname} currentSearch={location.search} currentUserId={user?.id} />
+            <NavItem
+              to="/create"
+              icon={({ size }: { size?: number }) => (
+                <CreateGuideIcon size={size || 20} idSuffix="sidebar" />
+              )}
+              label={t('navCreate') || 'Crear'}
+              currentPath={location.pathname}
+              currentSearch={location.search}
+              currentUserId={user?.id}
+            />
             <NavItem to="/search" icon={Compass} label={t('navExplore') || 'Explorar'} currentPath={location.pathname} currentSearch={location.search} currentUserId={user?.id} />
             <NavItem to="/profile" icon={User} label={t('navProfile') || 'Perfil'} currentPath={location.pathname} currentSearch={location.search} currentUserId={user?.id} />
           </>
