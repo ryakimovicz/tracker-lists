@@ -2309,4 +2309,60 @@ h1, h2, h3, h4, h5, h6 {
     user-select: none !important;
     -webkit-user-select: none !important;
   }
+
+  /* Fullscreen mobile modals without side margins, headers/navbars, or rounded corners */
+  .item-details-modal-overlay,
+  .content-modal-overlay,
+  div[style*="zIndex: 2000"],
+  div[style*="z-index: 2000"],
+  div[style*="zIndex: 9999"],
+  div[style*="z-index: 9999"],
+  div[style*="zIndex: 10000"],
+  div[style*="z-index: 10000"] {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+    z-index: 99999 !important;
+  }
+
+  .item-details-modal-card,
+  .modal-card,
+  .item-details-modal-overlay > .glass-card,
+  .content-modal-overlay > .modal-card,
+  .content-modal-overlay > .glass-card {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100vw !important;
+    max-width: 100vw !important;
+    min-width: 100vw !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+    max-height: 100vh !important;
+    max-height: 100dvh !important;
+    border-radius: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+    padding-top: calc(1rem + env(safe-area-inset-top, 0px)) !important;
+    padding-bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px)) !important;
+    overflow-y: auto !important;
+    box-sizing: border-box !important;
+  }
+
+  .item-details-modal-card {
+    padding-top: calc(4rem + env(safe-area-inset-top, 0px)) !important;
+  }
 }

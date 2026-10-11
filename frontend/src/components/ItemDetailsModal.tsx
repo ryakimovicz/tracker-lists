@@ -5576,6 +5576,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
         }
         mouseDownOnBackdropRef.current = false;
       }}
+      className="item-details-modal-overlay"
       style={{
         position: 'fixed',
         top: 0, left: 0, right: 0, bottom: 0,
@@ -5589,7 +5590,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       }}
     >
       <div
-        className="glass-card"
+        className="glass-card item-details-modal-card"
         onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
         style={{
