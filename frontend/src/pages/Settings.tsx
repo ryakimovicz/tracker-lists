@@ -22,7 +22,8 @@ import {
   Sun, 
   Moon, 
   Monitor, 
-  Crown 
+  Crown,
+  LogOut 
 } from 'lucide-react';
 
 import { ProModal } from '../components/ProModal';
@@ -272,6 +273,22 @@ export const SettingsPage: React.FC = () => {
         err.response?.data?.detail || (isEs ? 'Error al eliminar la cuenta.' : 'Failed to delete account.')
       );
       setIsDeleting(false);
+    }
+  };
+
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  const handleConfirmLogout = async () => {
+    setIsLoggingOut(true);
+    try {
+      await logout();
+      navigate('/login');
+    } catch (err) {
+      console.error('Failed to log out:', err);
+    } finally {
+      setIsLoggingOut(false);
+      setShowLogoutModal(false);
     }
   };
 
@@ -1019,7 +1036,37 @@ export const SettingsPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Section 9: Danger Zone (Delete Account) */}
+        {/* Section 9: Session (Log Out) */}
+        <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px' }}>
+          <h2 style={{ fontSize: '1.2rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: 0 }}>
+            <LogOut size={20} color="var(--accent-primary)" />
+            {isEs ? 'Sesión' : 'Session'}
+          </h2>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1.25rem' }}>
+            {isEs
+              ? 'Finaliza tu sesión actual en este dispositivo de forma segura.'
+              : 'Safely end your current session on this device.'}
+          </p>
+          <button
+            type="button"
+            onClick={() => setShowLogoutModal(true)}
+            className="btn-secondary"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              padding: '0.65rem 1.25rem',
+              fontSize: '0.9rem',
+              fontWeight: 600,
+              cursor: 'pointer'
+            }}
+          >
+            <LogOut size={16} />
+            {isEs ? 'Cerrar Sesión' : 'Log Out'}
+          </button>
+        </div>
+
+        {/* Section 10: Danger Zone (Delete Account) */}
         <div
           className="glass-card"
           style={{
@@ -1253,6 +1300,23 @@ export const SettingsPage: React.FC = () => {
         isLoading={cancelSubLoading}
         onConfirm={executeCancelSubscription}
         onClose={() => setShowCancelSubModal(false)}
+      />
+
+      {/* Logout Confirmation Modal */}
+      <ConfirmModal
+        isOpen={showLogoutModal}
+        title={isEs ? '¿Cerrar sesión?' : 'Log out?'}
+        message={
+          isEs
+            ? '¿Estás seguro de que deseas cerrar tu sesión en esta cuenta?'
+            : 'Are you sure you want to log out of your account?'
+        }
+        confirmText={isEs ? 'Cerrar Sesión' : 'Log Out'}
+        cancelText={isEs ? 'Cancelar' : 'Cancel'}
+        type="danger"
+        isLoading={isLoggingOut}
+        onConfirm={handleConfirmLogout}
+        onClose={() => setShowLogoutModal(false)}
       />
 
       {/* Privacy Policy Modal */}
