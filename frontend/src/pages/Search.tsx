@@ -249,6 +249,27 @@ const ExploreSection = React.memo<ExploreSectionProps>(({
         <React.Fragment key={`${subTab}_${type}`}>
           {isFiltered ? (
             <>
+              {/* Category Title & Badge on Mobile */}
+              <div className="home-mobile-only" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', paddingLeft: '0.5rem', paddingRight: '0.5rem', marginBottom: '0.25rem' }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center' }}>
+                  {getCategoryIcon(type, { size: 20, color: `var(--color-${type})` })}
+                </span>
+                <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                  {title}
+                </h3>
+                <span style={{
+                  fontSize: '0.8rem',
+                  fontWeight: 700,
+                  padding: '0.15rem 0.55rem',
+                  borderRadius: '12px',
+                  background: 'rgba(255, 255, 255, 0.08)',
+                  color: `var(--color-${type})`,
+                  border: `1px solid var(--color-${type})`
+                }}>
+                  {items.length}
+                </span>
+              </div>
+
               {/* Mobile vertical stack (edge to edge full width) */}
               <div className="mobile-vertical-stack home-mobile-only">
                 {items.map((item: any, idx: number) => renderCard(item, idx))}

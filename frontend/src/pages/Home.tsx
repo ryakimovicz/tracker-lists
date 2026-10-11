@@ -3745,6 +3745,25 @@ export const Home: React.FC = () => {
 
                 return (
                   <>
+                    {/* Unified category header title and count badge for both Mobile and Desktop */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', paddingLeft: '0.5rem', paddingRight: '0.5rem', marginBottom: '0.25rem' }}>
+                      {getCategoryIcon(homeCategoryFilter, { size: 20, color: `var(--color-${homeCategoryFilter})` })}
+                      <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                        {getTypeCat(homeCategoryFilter, true)}
+                      </h3>
+                      <span style={{
+                        fontSize: '0.8rem',
+                        fontWeight: 700,
+                        padding: '0.15rem 0.55rem',
+                        borderRadius: '12px',
+                        background: 'rgba(255, 255, 255, 0.08)',
+                        color: `var(--color-${homeCategoryFilter})`,
+                        border: `1px solid var(--color-${homeCategoryFilter})`
+                      }}>
+                        {specificItems.length}
+                      </span>
+                    </div>
+
                     {/* Mobile vertical stack (edge to edge full width) */}
                     <div className="mobile-vertical-stack home-mobile-only">
                       {specificItems.map(item => renderItemCard(item))}
@@ -3752,24 +3771,6 @@ export const Home: React.FC = () => {
 
                     {/* Desktop multi-column grid */}
                     <div className="home-desktop-only" style={{ display: 'flex', flexDirection: 'column', width: '100%', gap: '1rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                        {getCategoryIcon(homeCategoryFilter, { size: 20, color: `var(--color-${homeCategoryFilter})` })}
-                        <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                          {getTypeCat(homeCategoryFilter, true)}
-                        </h3>
-                        <span style={{
-                          fontSize: '0.8rem',
-                          fontWeight: 700,
-                          padding: '0.15rem 0.55rem',
-                          borderRadius: '12px',
-                          background: 'rgba(255, 255, 255, 0.08)',
-                          color: `var(--color-${homeCategoryFilter})`,
-                          border: `1px solid var(--color-${homeCategoryFilter})`
-                        }}>
-                          {specificItems.length}
-                        </span>
-                      </div>
-
                       <div className={`desktop-category-grid ${activeTab === 'watching' && (homeCategoryFilter === 'series' || homeCategoryFilter === 'anime') ? 'desktop-category-grid-landscape' : ''}`}>
                         {specificItems.map(item => renderItemCard(item))}
                       </div>
