@@ -5662,15 +5662,12 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                     }}
                   className="item-details-back-btn"
                   style={{ 
-                    position: 'absolute',
-                    top: '1.25rem',
-                    left: '1.25rem',
                     background: 'rgba(255, 255, 255, 0.05)',
                     border: '1px solid var(--border-color)',
                     color: 'var(--text-primary)',
                     cursor: 'pointer',
                     padding: '0.4rem 0.6rem',
-                    display: 'flex',
+                    display: 'inline-flex',
                     alignItems: 'center',
                     gap: '0.35rem',
                     borderRadius: '8px',

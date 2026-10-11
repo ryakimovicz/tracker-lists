@@ -2363,13 +2363,15 @@ h1, h2, h3, h4, h5, h6 {
   }
 
   .item-details-modal-card {
-    padding-top: calc(4.75rem + env(safe-area-inset-top, 0px)) !important;
+    padding-top: calc(1.25rem + env(safe-area-inset-top, 0px)) !important;
   }
 
-  /* Keep Back button cleanly above content */
+  /* Back button in document flow - no overlapping */
   .item-details-back-btn {
-    top: calc(1rem + env(safe-area-inset-top, 0px)) !important;
-    left: 1rem !important;
+    position: static !important;
+    display: inline-flex !important;
+    align-self: flex-start !important;
+    margin-bottom: 0.25rem !important;
   }
 
   /* Modal Close button (X) positioning and spacing */
