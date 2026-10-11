@@ -3,7 +3,7 @@ import { useTranslation } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
 import { getProfileTheme } from '../utils/profileThemes';
 import { apiClient } from '../api/client';
-import { Star, Heart, X, Flag, CheckCircle, Check, CheckCheck, Plus, MoreVertical, Trash2, ArrowLeft, Clock, ChevronUp, ChevronDown, RotateCcw, BookOpen, Gamepad2, Package, Sparkles, Puzzle, Layers, ChevronLeft, ChevronRight, Calendar, RefreshCw, AlertCircle, Globe, Repeat, Trophy, ShieldAlert, Infinity as InfinityIcon, Reply, ThumbsUp, Edit2, Image as ImageIcon, Volume2, VolumeX, Play, Pause, MessageSquare, Eye, EyeOff } from 'lucide-react';
+import { Star, Heart, X, Flag, CheckCircle, Check, CheckCheck, Plus, MoreVertical, Trash2, Clock, ChevronUp, ChevronDown, RotateCcw, BookOpen, Gamepad2, Package, Sparkles, Puzzle, Layers, ChevronLeft, ChevronRight, Calendar, RefreshCw, AlertCircle, Globe, Repeat, Trophy, ShieldAlert, Infinity as InfinityIcon, Reply, ThumbsUp, Edit2, Image as ImageIcon, Volume2, VolumeX, Play, Pause, MessageSquare, Eye, EyeOff } from 'lucide-react';
 
 
 
@@ -5607,80 +5607,6 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
           ...modalTheme.cssVariables
         }}
       >
-
-              {/* Back Button (for episode or game history navigation) */}
-
-              {(isEpisode || historyStack.length > 0) && (
-                <button
-                    onClick={async () => {
-                      if (historyStack.length > 0) {
-                        handleGoBackHistory();
-                        return;
-                      }
-                      if (selectedItem.parent_series && selectedItem.parent_series.external_id && onOpenItem) {
-                        onOpenItem(selectedItem.parent_series);
-                      } else if (onOpenItem) {
-                        try {
-                            if (selectedItem.list_id || selectedItem.tracking_list_id) {
-                              const libRes = await apiClient.get('/library/');
-                              const libraryItems = libRes.data || [];
-                              const parentSeriesInLib = libraryItems.find((li: any) => 
-                                (['series', 'anime', 'comic'].includes(li.item_type)) && 
-                                li.tracking_list_id && 
-                                (li.tracking_list_id === selectedItem.tracking_list_id || li.tracking_list_id === selectedItem.list_id)
-                              );
-                              if (parentSeriesInLib) {
-                                 onOpenItem(parentSeriesInLib);
-                                 return;
-                              }
-                            }
-                            
-                            const match = selectedItem.title?.match(/^(.*?)\s*-\s*S(\d+)E(\d+)/i);
-                            const seriesName = selectedItem.parent_series?.title || selectedItem.series_title || selectedItem.last_seen_episode || (match ? match[1].trim() : null);
-                            
-                            if (seriesName) {
-                               const searchType = selectedItem.item_type === 'comic' ? 'comic' : 'series';
-                               const searchRes = await apiClient.get(`/search?q=${encodeURIComponent(seriesName)}&type=${searchType}`);
-                               if (searchRes.data && searchRes.data.length > 0) {
-                                  const matchedSeries = searchRes.data[0];
-                                  const libRes2 = await apiClient.get('/library/');
-                                  const libSeries = (libRes2.data || []).find((li: any) => 
-                                     li.external_id === matchedSeries.external_id || 
-                                     ( (li.item_type === matchedSeries.item_type) && li.title.toLowerCase() === matchedSeries.title.toLowerCase() )
-                                  );
-                                  onOpenItem(libSeries || matchedSeries);
-                                  return;
-                               }
-                            }
-                            onClose();
-                        } catch {
-                            onClose();
-                        }
-                      } else {
-                        onClose();
-                      }
-                    }}
-                  className="item-details-back-btn"
-                  style={{ 
-                    background: 'rgba(255, 255, 255, 0.05)',
-                    border: '1px solid var(--border-color)',
-                    color: 'var(--text-primary)',
-                    cursor: 'pointer',
-                    padding: '0.4rem 0.6rem',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.35rem',
-                    borderRadius: '8px',
-                    fontSize: '0.8rem',
-                    fontWeight: 600,
-                    zIndex: 10
-                  }}
-                  title={historyStack.length > 0 ? (language === 'es' ? 'Volver al elemento anterior' : 'Back to previous item') : (language === 'es' ? 'Volver a la serie' : 'Back to series')}
-                >
-                  <ArrowLeft size={16} />
-                  <span>{language === 'es' ? 'Volver' : 'Back'}</span>
-                </button>
-              )}
 
               {/* Modal Header */}
               <div className="item-details-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem' }}>

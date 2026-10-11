@@ -2366,14 +2366,6 @@ h1, h2, h3, h4, h5, h6 {
     padding-top: calc(1.25rem + env(safe-area-inset-top, 0px)) !important;
   }
 
-  /* Back button in document flow - no overlapping */
-  .item-details-back-btn {
-    position: static !important;
-    display: inline-flex !important;
-    align-self: flex-start !important;
-    margin-bottom: 0.25rem !important;
-  }
-
   /* Modal Close button (X) positioning and spacing */
   .item-details-close-btn {
     position: static !important;
