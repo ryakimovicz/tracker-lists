@@ -109,12 +109,24 @@ export const CustomizePage: React.FC = () => {
   const [pointerDrag, setPointerDrag] = useState<{
     cat: string;
     sourceIndex: number;
+    startX: number;
+    startY: number;
     currentY: number;
+    pointerType?: 'mouse' | 'touch';
+    isDragging?: boolean;
   } | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   const pointerDragRef = useRef<typeof pointerDrag>(null);
   const dragOverIndexRef = useRef<typeof dragOverIndex>(null);
+  const categoryLongPressTimerRef = useRef<any>(null);
+
+  const clearCategoryLongPressTimer = () => {
+    if (categoryLongPressTimerRef.current) {
+      clearTimeout(categoryLongPressTimerRef.current);
+      categoryLongPressTimerRef.current = null;
+    }
+  };
 
   useEffect(() => {
     pointerDragRef.current = pointerDrag;
@@ -179,12 +191,39 @@ export const CustomizePage: React.FC = () => {
   useEffect(() => {
     if (!pointerDrag) return;
 
-    document.body.style.userSelect = 'none';
-    document.body.style.cursor = 'grabbing';
+    if (pointerDrag.isDragging) {
+      document.body.style.userSelect = 'none';
+      document.body.style.cursor = 'grabbing';
+    }
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (pointerDragRef.current?.isDragging && e.cancelable) {
+        e.preventDefault();
+      }
+    };
 
     const handlePointerMove = (e: PointerEvent) => {
       const currentDrag = pointerDragRef.current;
       if (!currentDrag) return;
+
+      const dist = Math.hypot(e.clientX - currentDrag.startX, e.clientY - currentDrag.startY);
+
+      // If user moved finger before long-press timer triggered, cancel long-press so they can scroll
+      if (currentDrag.pointerType === 'touch' && !currentDrag.isDragging) {
+        if (dist > 10) {
+          clearCategoryLongPressTimer();
+          setPointerDrag(null);
+        }
+        return;
+      }
+
+      // If dragging on desktop, activate after small threshold
+      if (currentDrag.pointerType !== 'touch' && !currentDrag.isDragging && dist > 5) {
+        setPointerDrag(prev => prev ? { ...prev, isDragging: true } : null);
+      }
+
+      // Only search for drop target if actively dragging
+      if (!currentDrag.isDragging) return;
 
       const elements = document.elementsFromPoint(e.clientX, e.clientY);
       const rowEl = elements.map(el => el.closest('[data-category-row-index]')).find(Boolean) as HTMLElement | undefined;
@@ -200,10 +239,11 @@ export const CustomizePage: React.FC = () => {
     };
 
     const handlePointerUp = () => {
+      clearCategoryLongPressTimer();
       const currentDrag = pointerDragRef.current;
       const targetIdx = dragOverIndexRef.current;
 
-      if (currentDrag && targetIdx !== null && targetIdx !== undefined) {
+      if (currentDrag?.isDragging && targetIdx !== null && targetIdx !== undefined) {
         setLocalCategoryOrder(prev => {
           const newOrder = [...prev];
           const [moved] = newOrder.splice(currentDrag.sourceIndex, 1);
@@ -222,12 +262,17 @@ export const CustomizePage: React.FC = () => {
       document.body.style.cursor = '';
     };
 
+    window.addEventListener('touchmove', handleTouchMove, { passive: false });
     window.addEventListener('pointermove', handlePointerMove);
     window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('pointercancel', handlePointerUp);
 
     return () => {
+      clearCategoryLongPressTimer();
+      window.removeEventListener('touchmove', handleTouchMove);
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('pointercancel', handlePointerUp);
       document.body.style.userSelect = '';
       document.body.style.cursor = '';
     };
@@ -1104,8 +1149,8 @@ export const CustomizePage: React.FC = () => {
 
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', margin: '0 0 1.25rem 0', lineHeight: 1.5 }}>
             {isEs
-              ? 'Arrastra las categorías con el mouse o usa las flechas para personalizar su orden en el Inicio, Estantería, Explorar, Guías y modales.'
-              : 'Drag categories with your mouse or use the arrows to customize their order across Home, Shelf, Explore, Guides, and modals.'}
+              ? 'Mantén presionada una categoría para arrastrarla y personalizar su orden en el Inicio, Estantería, Explorar y Guías.'
+              : 'Press and hold a category to drag and customize its order across Home, Shelf, Explore, and Guides.'}
           </p>
 
           {categoryOrderMsg && (
@@ -1136,7 +1181,7 @@ export const CustomizePage: React.FC = () => {
               const isLast = idx === localCategoryOrder.length - 1;
 
               const isRowBeingDragged = pointerDrag?.cat === cat;
-              const isDropTargetTop = dragOverIndex === idx && !isRowBeingDragged;
+              const isDropTargetTop = pointerDrag?.isDragging && dragOverIndex === idx && !isRowBeingDragged;
 
               return (
                 <React.Fragment key={cat}>
@@ -1164,46 +1209,86 @@ export const CustomizePage: React.FC = () => {
 
                   <div
                     data-category-row-index={idx}
+                    onPointerDown={(e) => {
+                      if (e.button !== 0) return;
+                      const target = e.target as HTMLElement;
+                      if (target.closest('button')) return;
+
+                      const isTouch = e.pointerType === 'touch';
+                      const startX = e.clientX;
+                      const startY = e.clientY;
+
+                      clearCategoryLongPressTimer();
+
+                      if (isTouch) {
+                        setPointerDrag({
+                          cat,
+                          sourceIndex: idx,
+                          startX,
+                          startY,
+                          currentY: startY,
+                          pointerType: 'touch',
+                          isDragging: false,
+                        });
+
+                        categoryLongPressTimerRef.current = setTimeout(() => {
+                          if (!user?.is_pro) {
+                            setShowProModal(true);
+                            setPointerDrag(null);
+                            return;
+                          }
+                          setPointerDrag(prev => {
+                            if (!prev || prev.cat !== cat) return null;
+                            return { ...prev, isDragging: true };
+                          });
+                          if (typeof window !== 'undefined' && 'vibrate' in navigator) {
+                            try { navigator.vibrate(40); } catch {}
+                          }
+                        }, 380);
+                      } else {
+                        // Desktop: click and drag directly
+                        if (!user?.is_pro) {
+                          setShowProModal(true);
+                          return;
+                        }
+                        setPointerDrag({
+                          cat,
+                          sourceIndex: idx,
+                          startX,
+                          startY,
+                          currentY: startY,
+                          pointerType: 'mouse',
+                          isDragging: false,
+                        });
+                      }
+                    }}
                     style={{
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
                       padding: '0.65rem 0.85rem',
                       borderRadius: '10px',
-                      background: isRowBeingDragged ? 'rgba(30, 41, 59, 0.4)' : 'var(--bg-secondary)',
-                      borderTop: isRowBeingDragged ? '1px dashed var(--accent-primary)' : '1px solid var(--border-color)',
-                      borderRight: isRowBeingDragged ? '1px dashed var(--accent-primary)' : '1px solid var(--border-color)',
-                      borderBottom: isRowBeingDragged ? '1px dashed var(--accent-primary)' : '1px solid var(--border-color)',
+                      background: isRowBeingDragged && pointerDrag?.isDragging ? 'rgba(30, 41, 59, 0.4)' : 'var(--bg-secondary)',
+                      borderTop: isRowBeingDragged && pointerDrag?.isDragging ? '1px dashed var(--accent-primary)' : '1px solid var(--border-color)',
+                      borderRight: isRowBeingDragged && pointerDrag?.isDragging ? '1px dashed var(--accent-primary)' : '1px solid var(--border-color)',
+                      borderBottom: isRowBeingDragged && pointerDrag?.isDragging ? '1px dashed var(--accent-primary)' : '1px solid var(--border-color)',
                       borderLeft: `4px solid ${catColor}`,
                       transition: 'all 0.15s ease',
-                      opacity: isRowBeingDragged ? 0.45 : 1,
-                      transform: isRowBeingDragged ? 'scale(0.98)' : 'none',
-                      userSelect: 'none'
+                      opacity: isRowBeingDragged && pointerDrag?.isDragging ? 0.45 : 1,
+                      transform: isRowBeingDragged && pointerDrag?.isDragging ? 'scale(0.98)' : 'none',
+                      userSelect: 'none',
+                      cursor: user?.is_pro ? (pointerDrag?.isDragging ? 'grabbing' : 'grab') : 'default',
+                      touchAction: pointerDrag?.isDragging ? 'none' : 'pan-y',
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                       <div
-                        onPointerDown={(e) => {
-                          if (e.button !== 0) return;
-                          if (!user?.is_pro) {
-                            setShowProModal(true);
-                            return;
-                          }
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setPointerDrag({
-                            cat,
-                            sourceIndex: idx,
-                            currentY: e.clientY
-                          });
-                        }}
                         style={{
                           display: 'flex',
                           alignItems: 'center',
                           color: user?.is_pro ? 'var(--text-muted)' : 'rgba(255, 255, 255, 0.2)',
-                          cursor: user?.is_pro ? 'grab' : 'not-allowed',
                           padding: '0.2rem 0.15rem',
-                          borderRadius: '4px'
+                          borderRadius: '4px',
                         }}
                         title={isEs ? 'Arrastrar para reordenar' : 'Drag to reorder'}
                       >
@@ -1235,7 +1320,7 @@ export const CustomizePage: React.FC = () => {
                       </span>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <div className="category-order-arrows-desktop" style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                       <button
                         type="button"
                         onClick={() => handleMoveCategory(idx, 'up')}
@@ -1284,7 +1369,7 @@ export const CustomizePage: React.FC = () => {
             })}
 
             {/* Animated Drop Slot at bottom of category list */}
-            {pointerDrag && dragOverIndex === localCategoryOrder.length && (
+            {pointerDrag?.isDragging && dragOverIndex === localCategoryOrder.length && (
               <div
                 style={{
                   height: '42px',
@@ -1307,7 +1392,17 @@ export const CustomizePage: React.FC = () => {
           </div>
 
           {/* Botones de acción abajo */}
-          <div style={{ display: 'flex', gap: '0.65rem', marginTop: '1.25rem', maxWidth: '480px', flexWrap: 'wrap' }}>
+          <div 
+            style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: '0.65rem', 
+              marginTop: '1.25rem', 
+              maxWidth: '480px', 
+              flexWrap: 'wrap' 
+            }}
+          >
             <button
               type="button"
               onClick={handleResetCategoryOrder}
@@ -1331,6 +1426,7 @@ export const CustomizePage: React.FC = () => {
               disabled={isSavingCategoryOrder}
               className="btn-primary"
               style={{
+                marginLeft: 'auto',
                 padding: '0.5rem 1.15rem',
                 fontSize: '0.85rem',
                 display: 'inline-flex',
@@ -1340,7 +1436,7 @@ export const CustomizePage: React.FC = () => {
               }}
             >
               <CheckCircle size={15} />
-              {isSavingCategoryOrder ? (isEs ? 'Guardando...' : 'Saving...') : (isEs ? 'Guardar orden' : 'Save Order')}
+              {isSavingCategoryOrder ? (isEs ? 'Guardando...' : 'Saving...') : (isEs ? 'Guardar' : 'Save')}
             </button>
           </div>
         </div>
