@@ -779,7 +779,98 @@ export const Profile: React.FC = () => {
   const [isSavedGuidesExpanded, setIsSavedGuidesExpanded] = useState(false);
   const [createdGuidesPage, setCreatedGuidesPage] = useState(1);
   const [savedGuidesPage, setSavedGuidesPage] = useState(1);
-  const [profileGuidesSubTab, setProfileGuidesSubTab] = useState<'created' | 'saved'>('created');
+
+  const guidesSubTabParam = searchParams.get('subtab');
+  const profileGuidesSubTab: 'created' | 'saved' = (guidesSubTabParam === 'saved') ? 'saved' : 'created';
+
+  const guidesSwipeRef = useRef<HTMLDivElement>(null);
+  const isUserTouchingGuidesSwipeRef = useRef(false);
+  const isProgrammaticGuidesScrollRef = useRef(false);
+  const guidesScrollTimeoutRef = useRef<any>(null);
+  const guidesSwipeDebounceRef = useRef<any>(null);
+
+  const handleSelectGuidesSubtab = useCallback((mode: 'created' | 'saved') => {
+    const newParams = new URLSearchParams(searchParams);
+    if (newParams.get('tab') !== 'guides') {
+      newParams.set('tab', 'guides');
+    }
+    if (mode === 'saved') {
+      newParams.set('subtab', 'saved');
+    } else {
+      newParams.delete('subtab');
+    }
+    setSearchParams(newParams);
+
+    if (guidesSwipeRef.current) {
+      const el = guidesSwipeRef.current;
+      isProgrammaticGuidesScrollRef.current = true;
+      if (guidesScrollTimeoutRef.current) clearTimeout(guidesScrollTimeoutRef.current);
+
+      const maxScroll = el.scrollWidth - el.clientWidth;
+      const targetScroll = mode === 'created' ? 0 : (maxScroll > 0 ? maxScroll : el.clientWidth);
+      el.scrollTo({ left: targetScroll, behavior: 'smooth' });
+
+      guidesScrollTimeoutRef.current = setTimeout(() => {
+        isProgrammaticGuidesScrollRef.current = false;
+      }, 500);
+    }
+  }, [searchParams, setSearchParams]);
+
+  const checkGuidesSwipeSettled = useCallback(() => {
+    if (!guidesSwipeRef.current) return;
+    if (isProgrammaticGuidesScrollRef.current) return;
+    if (isUserTouchingGuidesSwipeRef.current) return;
+    const el = guidesSwipeRef.current;
+    const scrollPos = el.scrollLeft;
+    const maxScroll = el.scrollWidth - el.clientWidth;
+    if (maxScroll <= 0) return;
+
+    const scrollFraction = scrollPos / maxScroll;
+    if (scrollFraction > 0.25 && scrollFraction < 0.75) {
+      if (guidesSwipeDebounceRef.current) clearTimeout(guidesSwipeDebounceRef.current);
+      guidesSwipeDebounceRef.current = setTimeout(() => {
+        checkGuidesSwipeSettled();
+      }, 100);
+      return;
+    }
+
+    const newMode: 'created' | 'saved' = scrollFraction >= 0.5 ? 'saved' : 'created';
+    if (newMode !== profileGuidesSubTab) {
+      const newParams = new URLSearchParams(searchParams);
+      if (newParams.get('tab') !== 'guides') {
+        newParams.set('tab', 'guides');
+      }
+      if (newMode === 'saved') {
+        newParams.set('subtab', 'saved');
+      } else {
+        newParams.delete('subtab');
+      }
+      setSearchParams(newParams);
+    }
+  }, [profileGuidesSubTab, searchParams, setSearchParams]);
+
+  const handleGuidesSwipeScroll = useCallback(() => {
+    if (!guidesSwipeRef.current) return;
+    if (isProgrammaticGuidesScrollRef.current) return;
+
+    if (guidesSwipeDebounceRef.current) clearTimeout(guidesSwipeDebounceRef.current);
+    guidesSwipeDebounceRef.current = setTimeout(() => {
+      checkGuidesSwipeSettled();
+    }, 180);
+  }, [checkGuidesSwipeSettled]);
+
+  // Synchronize mobile swipe scroll position when entering guides tab or changing view
+  useEffect(() => {
+    if (activeTab === 'guides' && guidesSwipeRef.current) {
+      if (isUserTouchingGuidesSwipeRef.current) return;
+      const el = guidesSwipeRef.current;
+      const maxScroll = el.scrollWidth - el.clientWidth;
+      const targetScroll = profileGuidesSubTab === 'created' ? 0 : (maxScroll > 0 ? maxScroll : el.clientWidth);
+      if (Math.abs(el.scrollLeft - targetScroll) > 10) {
+        el.scrollTo({ left: targetScroll, behavior: 'instant' as any });
+      }
+    }
+  }, [activeTab, profileGuidesSubTab]);
   const [favoritesPage, setFavoritesPage] = useState(1);
   const [shelfViewMode, setShelfViewMode] = useState<'grid' | 'list'>(() => {
     try {
@@ -4524,460 +4615,500 @@ export const Profile: React.FC = () => {
 
             return (
               <>
-                {/* Mobile Sub-tabs for Guides */}
-                <div className="home-mobile-only" style={{ marginBottom: '1rem' }}>
-                  <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.65rem' }}>
-                    <button
-                      type="button"
-                      className={`btn-subtab ${profileGuidesSubTab === 'created' ? 'active' : ''}`}
-                      onClick={() => setProfileGuidesSubTab('created')}
-                      style={{
-                        padding: '0.45rem 0.9rem',
-                        fontSize: '0.85rem',
-                        fontWeight: 600,
-                        borderRadius: '20px',
-                        border: '1px solid',
-                        borderColor: profileGuidesSubTab === 'created' ? 'var(--color-guide, #2DD4BF)' : 'var(--border-color)',
-                        background: profileGuidesSubTab === 'created' ? 'rgba(45, 212, 191, 0.15)' : 'var(--bg-secondary)',
-                        color: profileGuidesSubTab === 'created' ? 'var(--color-guide, #2DD4BF)' : 'var(--text-secondary)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.45rem',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      <span>{language === 'es' ? 'Guías creadas' : 'Created Guides'}</span>
-                      <span style={{ fontSize: '0.75rem', opacity: 0.85 }}>({profile.created_lists.length})</span>
-                    </button>
-                    <button
-                      type="button"
-                      className={`btn-subtab ${profileGuidesSubTab === 'saved' ? 'active' : ''}`}
-                      onClick={() => setProfileGuidesSubTab('saved')}
-                      style={{
-                        padding: '0.45rem 0.9rem',
-                        fontSize: '0.85rem',
-                        fontWeight: 600,
-                        borderRadius: '20px',
-                        border: '1px solid',
-                        borderColor: profileGuidesSubTab === 'saved' ? 'var(--color-guide, #2DD4BF)' : 'var(--border-color)',
-                        background: profileGuidesSubTab === 'saved' ? 'rgba(45, 212, 191, 0.15)' : 'var(--bg-secondary)',
-                        color: profileGuidesSubTab === 'saved' ? 'var(--color-guide, #2DD4BF)' : 'var(--text-secondary)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.45rem',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      <span>{language === 'es' ? 'Guías guardadas' : 'Saved Guides'}</span>
-                      <span style={{ fontSize: '0.75rem', opacity: 0.85 }}>({profile.saved_lists.length})</span>
-                    </button>
+                {/* Mobile Sub-tabs for Guides (Horizontal Top-Bar-Style Full Width Tabs) */}
+                <div className="upcoming-mobile-tabs-container home-mobile-only">
+                  <button
+                    type="button"
+                    className={`profile-guides-mobile-tab-btn ${profileGuidesSubTab === 'created' ? 'active' : ''}`}
+                    onClick={() => handleSelectGuidesSubtab('created')}
+                  >
+                    <span>{language === 'es' ? 'Guías creadas' : 'Created Guides'}</span>
+                    <span style={{ fontSize: '0.78rem', opacity: 0.85, marginLeft: '0.35rem' }}>({profile.created_lists.length})</span>
+                    {profileGuidesSubTab === 'created' && <div className="profile-guides-tab-indicator" />}
+                  </button>
+                  <button
+                    type="button"
+                    className={`profile-guides-mobile-tab-btn ${profileGuidesSubTab === 'saved' ? 'active' : ''}`}
+                    onClick={() => handleSelectGuidesSubtab('saved')}
+                  >
+                    <span>{language === 'es' ? 'Guías guardadas' : 'Saved Guides'}</span>
+                    <span style={{ fontSize: '0.78rem', opacity: 0.85, marginLeft: '0.35rem' }}>({profile.saved_lists.length})</span>
+                    {profileGuidesSubTab === 'saved' && <div className="profile-guides-tab-indicator" />}
+                  </button>
+                </div>
+
+                {/* Mobile Swipe View (edge-to-edge swipeable container between Guías creadas & Guías guardadas) */}
+                <div
+                  ref={guidesSwipeRef}
+                  onTouchStart={() => {
+                    isUserTouchingGuidesSwipeRef.current = true;
+                  }}
+                  onTouchEnd={() => {
+                    isUserTouchingGuidesSwipeRef.current = false;
+                    setTimeout(() => {
+                      checkGuidesSwipeSettled();
+                    }, 60);
+                  }}
+                  onScroll={handleGuidesSwipeScroll}
+                  className="upcoming-mobile-swipe-wrapper home-mobile-only"
+                >
+                  {/* Slide 1: Guías creadas */}
+                  <div className="upcoming-mobile-swipe-slide">
+                    {profile.created_lists.length === 0 ? (
+                      <div className="glass-card" style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                        {language === 'es' ? 'Aún no has creado ninguna guía.' : 'You have not created any guides yet.'}
+                      </div>
+                    ) : (
+                      <div className="mobile-vertical-stack">
+                        {profile.created_lists.map(list => (
+                          <div key={list.id} className="profile-guide-item-wrapper" style={{ width: '100%' }}>
+                            {renderGuideCard(list, false)}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
-                  {/* Mobile active subtab content: vertical stack */}
-                  <div style={{ marginTop: '1rem' }}>
-                    {profileGuidesSubTab === 'created' ? (
-                      profile.created_lists.length === 0 ? (
-                        <div className="glass-card" style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                          {language === 'es' ? 'Aún no has creado ninguna guía.' : 'You have not created any guides yet.'}
-                        </div>
-                      ) : (
-                        <div className="mobile-vertical-stack">
-                          {profile.created_lists.map(list => (
-                            <div key={list.id} className="profile-guide-item-wrapper" style={{ width: '100%' }}>
-                              {renderGuideCard(list, false)}
-                            </div>
-                          ))}
-                        </div>
-                      )
+                  {/* Slide 2: Guías guardadas */}
+                  <div className="upcoming-mobile-swipe-slide">
+                    {profile.saved_lists.length === 0 ? (
+                      <div className="glass-card" style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                        {language === 'es' ? 'Aún no tienes guías guardadas.' : 'You have no saved guides yet.'}
+                      </div>
                     ) : (
-                      profile.saved_lists.length === 0 ? (
-                        <div className="glass-card" style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                          {language === 'es' ? 'Aún no tienes guías guardadas.' : 'You have no saved guides yet.'}
-                        </div>
-                      ) : (
-                        <div className="mobile-vertical-stack">
-                          {profile.saved_lists.map(list => (
-                            <div key={list.id} className="profile-guide-item-wrapper" style={{ width: '100%' }}>
-                              {renderGuideCard(list, true)}
-                            </div>
-                          ))}
-                        </div>
-                      )
+                      <div className="mobile-vertical-stack">
+                        {profile.saved_lists.map(list => (
+                          <div key={list.id} className="profile-guide-item-wrapper" style={{ width: '100%' }}>
+                            {renderGuideCard(list, true)}
+                          </div>
+                        ))}
+                      </div>
                     )}
                   </div>
                 </div>
 
-                {/* Desktop layout: Keep both sections stacked horizontally */}
-                <div className="home-desktop-only" style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem', width: '100%' }}>
-                  {/* 1. Created Guides Section */}
-                  <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                        <h3 style={{ margin: 0 }}>{language === 'es' ? 'Guías Creadas' : 'Created Guides'}</h3>
-                        <span
-                          style={{
-                            fontSize: '0.8rem',
-                            fontWeight: 700,
-                            padding: '0.15rem 0.55rem',
-                            borderRadius: '12px',
-                            background: 'rgba(45, 212, 191, 0.15)',
-                            color: 'var(--color-guide, #2DD4BF)',
-                            border: '1px solid rgba(45, 212, 191, 0.3)'
-                          }}
-                        >
-                          {profile.created_lists.length}
-                        </span>
-                      </div>
-                      {canExpandCreated && (
-                        <button
-                          type="button"
-                          onClick={handleToggleCreatedGuidesExpanded}
-                          className="shelf-view-toggle-btn"
-                          title={isCreatedGuidesExpanded
-                            ? (language === 'es' ? 'Contraer' : 'Collapse')
-                            : (language === 'es' ? 'Expandir' : 'Expand')
-                          }
-                          aria-label={isCreatedGuidesExpanded
-                            ? (language === 'es' ? 'Contraer' : 'Collapse')
-                            : (language === 'es' ? 'Expandir' : 'Expand')
-                          }
-                          style={{ padding: '0.3rem 0.55rem', borderRadius: '6px' }}
-                        >
-                          {isCreatedGuidesExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                        </button>
-                      )}
+                {/* Desktop layout: Subtabs pills navigation and conditional single-subtab view */}
+                <div className="home-desktop-only" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', width: '100%' }}>
+                  {/* Desktop Sub-tabs Pills (Created / Saved Guides) */}
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', background: 'var(--bg-tertiary)', padding: '3px', borderRadius: '8px', gap: '4px', border: '1px solid var(--border-color)' }}>
+                      <button
+                        type="button"
+                        onClick={() => handleSelectGuidesSubtab('created')}
+                        style={{
+                          border: 'none',
+                          background: profileGuidesSubTab === 'created' ? 'var(--color-guide, #2DD4BF)' : 'transparent',
+                          color: profileGuidesSubTab === 'created' ? '#0f172a' : 'var(--text-secondary)',
+                          padding: '6px 14px',
+                          borderRadius: '6px',
+                          fontSize: '0.85rem',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.45rem'
+                        }}
+                      >
+                        <span>{language === 'es' ? 'Guías creadas' : 'Created Guides'}</span>
+                        <span style={{ fontSize: '0.78rem', opacity: 0.9 }}>({profile.created_lists.length})</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSelectGuidesSubtab('saved')}
+                        style={{
+                          border: 'none',
+                          background: profileGuidesSubTab === 'saved' ? 'var(--color-guide, #2DD4BF)' : 'transparent',
+                          color: profileGuidesSubTab === 'saved' ? '#0f172a' : 'var(--text-secondary)',
+                          padding: '6px 14px',
+                          borderRadius: '6px',
+                          fontSize: '0.85rem',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.45rem'
+                        }}
+                      >
+                        <span>{language === 'es' ? 'Guías guardadas' : 'Saved Guides'}</span>
+                        <span style={{ fontSize: '0.78rem', opacity: 0.9 }}>({profile.saved_lists.length})</span>
+                      </button>
                     </div>
-
-                    {profile.created_lists.length === 0 ? (
-                      <div className="glass-card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                        {language === 'es' ? 'Aún no has creado ninguna guía.' : 'You have not created any guides yet.'}
-                      </div>
-                    ) : (
-                      <div style={{ position: 'relative', width: '100%' }}>
-                        {/* Left fade click-blocking zone */}
-                        {canCreatedGuidesScrollLeft && (
-                          <div
-                            style={{
-                              position: 'absolute',
-                              left: 0,
-                              top: 0,
-                              bottom: 0,
-                              width: '70px',
-                              zIndex: 8,
-                              pointerEvents: 'auto',
-                              cursor: 'default'
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                          />
-                        )}
-
-                        {/* Left Arrow Button */}
-                        <button
-                          type="button"
-                          onClick={() => createdContinuousScroll.handleClick('left', isCreatedGuidesExpanded ? 480 : 360)}
-                          onMouseEnter={handleMouseEnterGuideBtn}
-                          onMouseLeave={(e) => {
-                            handleMouseLeaveGuideBtn(e);
-                            createdContinuousScroll.stopScrolling();
-                          }}
-                          onMouseDown={(e) => {
-                            handleMouseDownGuideBtn(e);
-                            createdContinuousScroll.startScrolling('left');
-                          }}
-                          onMouseUp={(e) => {
-                            handleMouseUpGuideBtn(e);
-                            createdContinuousScroll.stopScrolling();
-                          }}
-                          onTouchStart={() => createdContinuousScroll.startScrolling('left')}
-                          onTouchEnd={createdContinuousScroll.stopScrolling}
-                          onTouchCancel={createdContinuousScroll.stopScrolling}
-                          style={{
-                            ...guideBtnBaseStyle,
-                            left: '0px',
-                            opacity: canCreatedGuidesScrollLeft ? 1 : 0,
-                            visibility: canCreatedGuidesScrollLeft ? 'visible' : 'hidden',
-                            pointerEvents: canCreatedGuidesScrollLeft ? 'auto' : 'none'
-                          }}
-                          aria-label={language === 'es' ? 'Desplazar a la izquierda' : 'Scroll left'}
-                        >
-                          <ChevronLeft size={20} color="currentColor" />
-                        </button>
-
-                        {/* Cards Scroll Container */}
-                        <div
-                          ref={createdGuidesScrollRef}
-                          onScroll={updateCreatedGuidesScrollState}
-                          className={`home-scroll-carousel profile-guides-carousel ${isCreatedTwoRows ? 'is-expanded' : ''} ${profile.created_lists.length === 1 ? 'has-single-item' : ''}`}
-                          style={{
-                            display: isCreatedTwoRows ? 'grid' : 'flex',
-                            gridTemplateColumns: isCreatedTwoRowsByRow ? `repeat(${maxGuidesInOneRow}, max-content)` : undefined,
-                            gridTemplateRows: isCreatedTwoRows ? 'repeat(2, auto)' : undefined,
-                            gridAutoFlow: isCreatedTwoRows ? (isCreatedTwoRowsByColumn ? 'column' : 'row') : undefined,
-                            gridAutoColumns: isCreatedTwoRowsByColumn ? 'max-content' : undefined,
-                            justifyContent: 'start',
-                            alignContent: 'start',
-                            gap: '1rem',
-                            overflowX: 'auto',
-                            scrollbarWidth: 'none',
-                            msOverflowStyle: 'none',
-                            paddingTop: '8px',
-                            paddingBottom: '1rem',
-                            paddingLeft: '45px',
-                            paddingRight: '45px',
-                            WebkitMaskImage: getCreatedMaskImage(),
-                            maskImage: getCreatedMaskImage()
-                          }}
-                        >
-                          {profile.created_lists.map(list => (
-                            <div key={list.id} className="profile-guide-item-wrapper" style={{ minWidth: '260px', maxWidth: '260px', flexShrink: 0 }}>
-                              {renderGuideCard(list, false)}
-                            </div>
-                          ))}
-                        </div>
-
-                        {/* Right Arrow Button */}
-                        <button
-                          type="button"
-                          onClick={() => createdContinuousScroll.handleClick('right', isCreatedGuidesExpanded ? 480 : 360)}
-                          onMouseEnter={handleMouseEnterGuideBtn}
-                          onMouseLeave={(e) => {
-                            handleMouseLeaveGuideBtn(e);
-                            createdContinuousScroll.stopScrolling();
-                          }}
-                          onMouseDown={(e) => {
-                            handleMouseDownGuideBtn(e);
-                            createdContinuousScroll.startScrolling('right');
-                          }}
-                          onMouseUp={(e) => {
-                            handleMouseUpGuideBtn(e);
-                            createdContinuousScroll.stopScrolling();
-                          }}
-                          onTouchStart={() => createdContinuousScroll.startScrolling('right')}
-                          onTouchEnd={createdContinuousScroll.stopScrolling}
-                          onTouchCancel={createdContinuousScroll.stopScrolling}
-                          style={{
-                            ...guideBtnBaseStyle,
-                            right: '0px',
-                            opacity: canCreatedGuidesScrollRight ? 1 : 0,
-                            visibility: canCreatedGuidesScrollRight ? 'visible' : 'hidden',
-                            pointerEvents: canCreatedGuidesScrollRight ? 'auto' : 'none'
-                          }}
-                          aria-label={language === 'es' ? 'Desplazar a la derecha' : 'Scroll right'}
-                        >
-                          <ChevronRight size={20} color="currentColor" />
-                        </button>
-
-                        {/* Right fade click-blocking zone */}
-                        {canCreatedGuidesScrollRight && (
-                          <div
-                            style={{
-                              position: 'absolute',
-                              right: 0,
-                              top: 0,
-                              bottom: 0,
-                              width: '70px',
-                              zIndex: 8,
-                              pointerEvents: 'auto',
-                              cursor: 'default'
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                          />
-                        )}
-
-                        {/* Created Guides Page indicator */}
-                        {totalCreatedPages > 1 && (
-                          <div style={{ textAlign: 'center', marginTop: '0.75rem', fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
-                            {language === 'es' ? `Página ${currentCreatedPage} de ${totalCreatedPages}` : `Page ${currentCreatedPage} of ${totalCreatedPages}`}
-                          </div>
-                        )}
-                      </div>
-                    )}
                   </div>
 
-                  {/* 2. Saved Guides Section */}
-                  <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '2rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                        <h3 style={{ margin: 0 }}>{language === 'es' ? 'Guías Guardadas' : 'Saved Guides'}</h3>
-                        <span
-                          style={{
-                            fontSize: '0.8rem',
-                            fontWeight: 700,
-                            padding: '0.15rem 0.55rem',
-                            borderRadius: '12px',
-                            background: 'rgba(45, 212, 191, 0.15)',
-                            color: 'var(--color-guide, #2DD4BF)',
-                            border: '1px solid rgba(45, 212, 191, 0.3)'
-                          }}
-                        >
-                          {profile.saved_lists.length}
-                        </span>
+                  {/* Active Sub-tab Section Content */}
+                  {profileGuidesSubTab === 'created' ? (
+                    /* 1. Created Guides Section */
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                          <h3 style={{ margin: 0 }}>{language === 'es' ? 'Guías Creadas' : 'Created Guides'}</h3>
+                          <span
+                            style={{
+                              fontSize: '0.8rem',
+                              fontWeight: 700,
+                              padding: '0.15rem 0.55rem',
+                              borderRadius: '12px',
+                              background: 'rgba(45, 212, 191, 0.15)',
+                              color: 'var(--color-guide, #2DD4BF)',
+                              border: '1px solid rgba(45, 212, 191, 0.3)'
+                            }}
+                          >
+                            {profile.created_lists.length}
+                          </span>
+                        </div>
+                        {canExpandCreated && (
+                          <button
+                            type="button"
+                            onClick={handleToggleCreatedGuidesExpanded}
+                            className="shelf-view-toggle-btn"
+                            title={isCreatedGuidesExpanded
+                              ? (language === 'es' ? 'Contraer' : 'Collapse')
+                              : (language === 'es' ? 'Expandir' : 'Expand')
+                            }
+                            aria-label={isCreatedGuidesExpanded
+                              ? (language === 'es' ? 'Contraer' : 'Collapse')
+                              : (language === 'es' ? 'Expandir' : 'Expand')
+                            }
+                            style={{ padding: '0.3rem 0.55rem', borderRadius: '6px' }}
+                          >
+                            {isCreatedGuidesExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                          </button>
+                        )}
                       </div>
-                      {canExpandSaved && (
-                        <button
-                          type="button"
-                          onClick={handleToggleSavedGuidesExpanded}
-                          className="shelf-view-toggle-btn"
-                          title={isSavedGuidesExpanded
-                            ? (language === 'es' ? 'Contraer' : 'Collapse')
-                            : (language === 'es' ? 'Expandir' : 'Expand')
-                          }
-                          aria-label={isSavedGuidesExpanded
-                            ? (language === 'es' ? 'Contraer' : 'Collapse')
-                            : (language === 'es' ? 'Expandir' : 'Expand')
-                          }
-                          style={{ padding: '0.3rem 0.55rem', borderRadius: '6px' }}
-                        >
-                          {isSavedGuidesExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                        </button>
+
+                      {profile.created_lists.length === 0 ? (
+                        <div className="glass-card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                          {language === 'es' ? 'Aún no has creado ninguna guía.' : 'You have not created any guides yet.'}
+                        </div>
+                      ) : (
+                        <div style={{ position: 'relative', width: '100%' }}>
+                          {/* Left fade click-blocking zone */}
+                          {canCreatedGuidesScrollLeft && (
+                            <div
+                              style={{
+                                position: 'absolute',
+                                left: 0,
+                                top: 0,
+                                bottom: 0,
+                                width: '70px',
+                                zIndex: 8,
+                                pointerEvents: 'auto',
+                                cursor: 'default'
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          )}
+
+                          {/* Left Arrow Button */}
+                          <button
+                            type="button"
+                            onClick={() => createdContinuousScroll.handleClick('left', isCreatedGuidesExpanded ? 480 : 360)}
+                            onMouseEnter={handleMouseEnterGuideBtn}
+                            onMouseLeave={(e) => {
+                              handleMouseLeaveGuideBtn(e);
+                              createdContinuousScroll.stopScrolling();
+                            }}
+                            onMouseDown={(e) => {
+                              handleMouseDownGuideBtn(e);
+                              createdContinuousScroll.startScrolling('left');
+                            }}
+                            onMouseUp={(e) => {
+                              handleMouseUpGuideBtn(e);
+                              createdContinuousScroll.stopScrolling();
+                            }}
+                            onTouchStart={() => createdContinuousScroll.startScrolling('left')}
+                            onTouchEnd={createdContinuousScroll.stopScrolling}
+                            onTouchCancel={createdContinuousScroll.stopScrolling}
+                            style={{
+                              ...guideBtnBaseStyle,
+                              left: '0px',
+                              opacity: canCreatedGuidesScrollLeft ? 1 : 0,
+                              visibility: canCreatedGuidesScrollLeft ? 'visible' : 'hidden',
+                              pointerEvents: canCreatedGuidesScrollLeft ? 'auto' : 'none'
+                            }}
+                            aria-label={language === 'es' ? 'Desplazar a la izquierda' : 'Scroll left'}
+                          >
+                            <ChevronLeft size={20} color="currentColor" />
+                          </button>
+
+                          {/* Cards Scroll Container */}
+                          <div
+                            ref={createdGuidesScrollRef}
+                            onScroll={updateCreatedGuidesScrollState}
+                            className={`home-scroll-carousel profile-guides-carousel ${isCreatedTwoRows ? 'is-expanded' : ''} ${profile.created_lists.length === 1 ? 'has-single-item' : ''}`}
+                            style={{
+                              display: isCreatedTwoRows ? 'grid' : 'flex',
+                              gridTemplateColumns: isCreatedTwoRowsByRow ? `repeat(${maxGuidesInOneRow}, max-content)` : undefined,
+                              gridTemplateRows: isCreatedTwoRows ? 'repeat(2, auto)' : undefined,
+                              gridAutoFlow: isCreatedTwoRows ? (isCreatedTwoRowsByColumn ? 'column' : 'row') : undefined,
+                              gridAutoColumns: isCreatedTwoRowsByColumn ? 'max-content' : undefined,
+                              justifyContent: 'start',
+                              alignContent: 'start',
+                              gap: '1rem',
+                              overflowX: 'auto',
+                              scrollbarWidth: 'none',
+                              msOverflowStyle: 'none',
+                              paddingTop: '8px',
+                              paddingBottom: '1rem',
+                              paddingLeft: '45px',
+                              paddingRight: '45px',
+                              WebkitMaskImage: getCreatedMaskImage(),
+                              maskImage: getCreatedMaskImage()
+                            }}
+                          >
+                            {profile.created_lists.map(list => (
+                              <div key={list.id} className="profile-guide-item-wrapper" style={{ minWidth: '260px', maxWidth: '260px', flexShrink: 0 }}>
+                                {renderGuideCard(list, false)}
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Right Arrow Button */}
+                          <button
+                            type="button"
+                            onClick={() => createdContinuousScroll.handleClick('right', isCreatedGuidesExpanded ? 480 : 360)}
+                            onMouseEnter={handleMouseEnterGuideBtn}
+                            onMouseLeave={(e) => {
+                              handleMouseLeaveGuideBtn(e);
+                              createdContinuousScroll.stopScrolling();
+                            }}
+                            onMouseDown={(e) => {
+                              handleMouseDownGuideBtn(e);
+                              createdContinuousScroll.startScrolling('right');
+                            }}
+                            onMouseUp={(e) => {
+                              handleMouseUpGuideBtn(e);
+                              createdContinuousScroll.stopScrolling();
+                            }}
+                            onTouchStart={() => createdContinuousScroll.startScrolling('right')}
+                            onTouchEnd={createdContinuousScroll.stopScrolling}
+                            onTouchCancel={createdContinuousScroll.stopScrolling}
+                            style={{
+                              ...guideBtnBaseStyle,
+                              right: '0px',
+                              opacity: canCreatedGuidesScrollRight ? 1 : 0,
+                              visibility: canCreatedGuidesScrollRight ? 'visible' : 'hidden',
+                              pointerEvents: canCreatedGuidesScrollRight ? 'auto' : 'none'
+                            }}
+                            aria-label={language === 'es' ? 'Desplazar a la derecha' : 'Scroll right'}
+                          >
+                            <ChevronRight size={20} color="currentColor" />
+                          </button>
+
+                          {/* Right fade click-blocking zone */}
+                          {canCreatedGuidesScrollRight && (
+                            <div
+                              style={{
+                                position: 'absolute',
+                                right: 0,
+                                top: 0,
+                                bottom: 0,
+                                width: '70px',
+                                zIndex: 8,
+                                pointerEvents: 'auto',
+                                cursor: 'default'
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          )}
+
+                          {/* Created Guides Page indicator */}
+                          {totalCreatedPages > 1 && (
+                            <div style={{ textAlign: 'center', marginTop: '0.75rem', fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
+                              {language === 'es' ? `Página ${currentCreatedPage} de ${totalCreatedPages}` : `Page ${currentCreatedPage} of ${totalCreatedPages}`}
+                            </div>
+                          )}
+                        </div>
                       )}
                     </div>
-
-                    {profile.saved_lists.length === 0 ? (
-                      <div className="glass-card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                        {language === 'es' ? 'Aún no tienes guías guardadas.' : 'You have no saved guides yet.'}
-                      </div>
-                    ) : (
-                      <div style={{ position: 'relative', width: '100%' }}>
-                        {/* Left fade click-blocking zone */}
-                        {canSavedGuidesScrollLeft && (
-                          <div
+                  ) : (
+                    /* 2. Saved Guides Section */
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                          <h3 style={{ margin: 0 }}>{language === 'es' ? 'Guías Guardadas' : 'Saved Guides'}</h3>
+                          <span
                             style={{
-                              position: 'absolute',
-                              left: 0,
-                              top: 0,
-                              bottom: 0,
-                              width: '70px',
-                              zIndex: 8,
-                              pointerEvents: 'auto',
-                              cursor: 'default'
+                              fontSize: '0.8rem',
+                              fontWeight: 700,
+                              padding: '0.15rem 0.55rem',
+                              borderRadius: '12px',
+                              background: 'rgba(45, 212, 191, 0.15)',
+                              color: 'var(--color-guide, #2DD4BF)',
+                              border: '1px solid rgba(45, 212, 191, 0.3)'
                             }}
-                            onClick={(e) => e.stopPropagation()}
-                          />
-                        )}
-
-                        {/* Left Arrow Button */}
-                        <button
-                          type="button"
-                          onClick={() => savedContinuousScroll.handleClick('left', isSavedGuidesExpanded ? 480 : 360)}
-                          onMouseEnter={handleMouseEnterGuideBtn}
-                          onMouseLeave={(e) => {
-                            handleMouseLeaveGuideBtn(e);
-                            savedContinuousScroll.stopScrolling();
-                          }}
-                          onMouseDown={(e) => {
-                            handleMouseDownGuideBtn(e);
-                            savedContinuousScroll.startScrolling('left');
-                          }}
-                          onMouseUp={(e) => {
-                            handleMouseUpGuideBtn(e);
-                            savedContinuousScroll.stopScrolling();
-                          }}
-                          onTouchStart={() => savedContinuousScroll.startScrolling('left')}
-                          onTouchEnd={savedContinuousScroll.stopScrolling}
-                          onTouchCancel={savedContinuousScroll.stopScrolling}
-                          style={{
-                            ...guideBtnBaseStyle,
-                            left: '0px',
-                            opacity: canSavedGuidesScrollLeft ? 1 : 0,
-                            visibility: canSavedGuidesScrollLeft ? 'visible' : 'hidden',
-                            pointerEvents: canSavedGuidesScrollLeft ? 'auto' : 'none'
-                          }}
-                          aria-label={language === 'es' ? 'Desplazar a la izquierda' : 'Scroll left'}
-                        >
-                          <ChevronLeft size={20} color="currentColor" />
-                        </button>
-
-                        {/* Cards Scroll Container */}
-                        <div
-                          ref={savedGuidesScrollRef}
-                          onScroll={updateSavedGuidesScrollState}
-                          className={`home-scroll-carousel profile-guides-carousel ${isSavedTwoRows ? 'is-expanded' : ''} ${profile.saved_lists.length === 1 ? 'has-single-item' : ''}`}
-                          style={{
-                            display: isSavedTwoRows ? 'grid' : 'flex',
-                            gridTemplateColumns: isSavedTwoRowsByRow ? `repeat(${maxGuidesInOneRow}, max-content)` : undefined,
-                            gridTemplateRows: isSavedTwoRows ? 'repeat(2, auto)' : undefined,
-                            gridAutoFlow: isSavedTwoRows ? (isSavedTwoRowsByColumn ? 'column' : 'row') : undefined,
-                            gridAutoColumns: isSavedTwoRowsByColumn ? 'max-content' : undefined,
-                            justifyContent: 'start',
-                            alignContent: 'start',
-                            gap: '1rem',
-                            overflowX: 'auto',
-                            scrollbarWidth: 'none',
-                            msOverflowStyle: 'none',
-                            paddingTop: '8px',
-                            paddingBottom: '1rem',
-                            paddingLeft: '45px',
-                            paddingRight: '45px',
-                            WebkitMaskImage: getSavedMaskImage(),
-                            maskImage: getSavedMaskImage()
-                          }}
-                        >
-                          {profile.saved_lists.map(list => (
-                            <div key={list.id} className="profile-guide-item-wrapper" style={{ minWidth: '260px', maxWidth: '260px', flexShrink: 0 }}>
-                              {renderGuideCard(list, true)}
-                            </div>
-                          ))}
+                          >
+                            {profile.saved_lists.length}
+                          </span>
                         </div>
-
-                        {/* Right Arrow Button */}
-                        <button
-                          type="button"
-                          onClick={() => savedContinuousScroll.handleClick('right', isSavedGuidesExpanded ? 480 : 360)}
-                          onMouseEnter={handleMouseEnterGuideBtn}
-                          onMouseLeave={(e) => {
-                            handleMouseLeaveGuideBtn(e);
-                            savedContinuousScroll.stopScrolling();
-                          }}
-                          onMouseDown={(e) => {
-                            handleMouseDownGuideBtn(e);
-                            savedContinuousScroll.startScrolling('right');
-                          }}
-                          onMouseUp={(e) => {
-                            handleMouseUpGuideBtn(e);
-                            savedContinuousScroll.stopScrolling();
-                          }}
-                          onTouchStart={() => savedContinuousScroll.startScrolling('right')}
-                          onTouchEnd={savedContinuousScroll.stopScrolling}
-                          onTouchCancel={savedContinuousScroll.stopScrolling}
-                          style={{
-                            ...guideBtnBaseStyle,
-                            right: '0px',
-                            opacity: canSavedGuidesScrollRight ? 1 : 0,
-                            visibility: canSavedGuidesScrollRight ? 'visible' : 'hidden',
-                            pointerEvents: canSavedGuidesScrollRight ? 'auto' : 'none'
-                          }}
-                          aria-label={language === 'es' ? 'Desplazar a la derecha' : 'Scroll right'}
-                        >
-                          <ChevronRight size={20} color="currentColor" />
-                        </button>
-
-                        {/* Right fade click-blocking zone */}
-                        {canSavedGuidesScrollRight && (
-                          <div
-                            style={{
-                              position: 'absolute',
-                              right: 0,
-                              top: 0,
-                              bottom: 0,
-                              width: '70px',
-                              zIndex: 8,
-                              pointerEvents: 'auto',
-                              cursor: 'default'
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                          />
-                        )}
-
-                        {/* Saved Guides Page indicator */}
-                        {totalSavedPages > 1 && (
-                          <div style={{ textAlign: 'center', marginTop: '0.75rem', fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
-                            {language === 'es' ? `Página ${currentSavedPage} de ${totalSavedPages}` : `Page ${currentSavedPage} of ${totalSavedPages}`}
-                          </div>
+                        {canExpandSaved && (
+                          <button
+                            type="button"
+                            onClick={handleToggleSavedGuidesExpanded}
+                            className="shelf-view-toggle-btn"
+                            title={isSavedGuidesExpanded
+                              ? (language === 'es' ? 'Contraer' : 'Collapse')
+                              : (language === 'es' ? 'Expandir' : 'Expand')
+                            }
+                            aria-label={isSavedGuidesExpanded
+                              ? (language === 'es' ? 'Contraer' : 'Collapse')
+                              : (language === 'es' ? 'Expandir' : 'Expand')
+                            }
+                            style={{ padding: '0.3rem 0.55rem', borderRadius: '6px' }}
+                          >
+                            {isSavedGuidesExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                          </button>
                         )}
                       </div>
-                    )}
-                  </div>
+
+                      {profile.saved_lists.length === 0 ? (
+                        <div className="glass-card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                          {language === 'es' ? 'Aún no tienes guías guardadas.' : 'You have no saved guides yet.'}
+                        </div>
+                      ) : (
+                        <div style={{ position: 'relative', width: '100%' }}>
+                          {/* Left fade click-blocking zone */}
+                          {canSavedGuidesScrollLeft && (
+                            <div
+                              style={{
+                                position: 'absolute',
+                                left: 0,
+                                top: 0,
+                                bottom: 0,
+                                width: '70px',
+                                zIndex: 8,
+                                pointerEvents: 'auto',
+                                cursor: 'default'
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          )}
+
+                          {/* Left Arrow Button */}
+                          <button
+                            type="button"
+                            onClick={() => savedContinuousScroll.handleClick('left', isSavedGuidesExpanded ? 480 : 360)}
+                            onMouseEnter={handleMouseEnterGuideBtn}
+                            onMouseLeave={(e) => {
+                              handleMouseLeaveGuideBtn(e);
+                              savedContinuousScroll.stopScrolling();
+                            }}
+                            onMouseDown={(e) => {
+                              handleMouseDownGuideBtn(e);
+                              savedContinuousScroll.startScrolling('left');
+                            }}
+                            onMouseUp={(e) => {
+                              handleMouseUpGuideBtn(e);
+                              savedContinuousScroll.stopScrolling();
+                            }}
+                            onTouchStart={() => savedContinuousScroll.startScrolling('left')}
+                            onTouchEnd={savedContinuousScroll.stopScrolling}
+                            onTouchCancel={savedContinuousScroll.stopScrolling}
+                            style={{
+                              ...guideBtnBaseStyle,
+                              left: '0px',
+                              opacity: canSavedGuidesScrollLeft ? 1 : 0,
+                              visibility: canSavedGuidesScrollLeft ? 'visible' : 'hidden',
+                              pointerEvents: canSavedGuidesScrollLeft ? 'auto' : 'none'
+                            }}
+                            aria-label={language === 'es' ? 'Desplazar a la izquierda' : 'Scroll left'}
+                          >
+                            <ChevronLeft size={20} color="currentColor" />
+                          </button>
+
+                          {/* Cards Scroll Container */}
+                          <div
+                            ref={savedGuidesScrollRef}
+                            onScroll={updateSavedGuidesScrollState}
+                            className={`home-scroll-carousel profile-guides-carousel ${isSavedTwoRows ? 'is-expanded' : ''} ${profile.saved_lists.length === 1 ? 'has-single-item' : ''}`}
+                            style={{
+                              display: isSavedTwoRows ? 'grid' : 'flex',
+                              gridTemplateColumns: isSavedTwoRowsByRow ? `repeat(${maxGuidesInOneRow}, max-content)` : undefined,
+                              gridTemplateRows: isSavedTwoRows ? 'repeat(2, auto)' : undefined,
+                              gridAutoFlow: isSavedTwoRows ? (isSavedTwoRowsByColumn ? 'column' : 'row') : undefined,
+                              gridAutoColumns: isSavedTwoRowsByColumn ? 'max-content' : undefined,
+                              justifyContent: 'start',
+                              alignContent: 'start',
+                              gap: '1rem',
+                              overflowX: 'auto',
+                              scrollbarWidth: 'none',
+                              msOverflowStyle: 'none',
+                              paddingTop: '8px',
+                              paddingBottom: '1rem',
+                              paddingLeft: '45px',
+                              paddingRight: '45px',
+                              WebkitMaskImage: getSavedMaskImage(),
+                              maskImage: getSavedMaskImage()
+                            }}
+                          >
+                            {profile.saved_lists.map(list => (
+                              <div key={list.id} className="profile-guide-item-wrapper" style={{ minWidth: '260px', maxWidth: '260px', flexShrink: 0 }}>
+                                {renderGuideCard(list, true)}
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Right Arrow Button */}
+                          <button
+                            type="button"
+                            onClick={() => savedContinuousScroll.handleClick('right', isSavedGuidesExpanded ? 480 : 360)}
+                            onMouseEnter={handleMouseEnterGuideBtn}
+                            onMouseLeave={(e) => {
+                              handleMouseLeaveGuideBtn(e);
+                              savedContinuousScroll.stopScrolling();
+                            }}
+                            onMouseDown={(e) => {
+                              handleMouseDownGuideBtn(e);
+                              savedContinuousScroll.startScrolling('right');
+                            }}
+                            onMouseUp={(e) => {
+                              handleMouseUpGuideBtn(e);
+                              savedContinuousScroll.stopScrolling();
+                            }}
+                            onTouchStart={() => savedContinuousScroll.startScrolling('right')}
+                            onTouchEnd={savedContinuousScroll.stopScrolling}
+                            onTouchCancel={savedContinuousScroll.stopScrolling}
+                            style={{
+                              ...guideBtnBaseStyle,
+                              right: '0px',
+                              opacity: canSavedGuidesScrollRight ? 1 : 0,
+                              visibility: canSavedGuidesScrollRight ? 'visible' : 'hidden',
+                              pointerEvents: canSavedGuidesScrollRight ? 'auto' : 'none'
+                            }}
+                            aria-label={language === 'es' ? 'Desplazar a la derecha' : 'Scroll right'}
+                          >
+                            <ChevronRight size={20} color="currentColor" />
+                          </button>
+
+                          {/* Right fade click-blocking zone */}
+                          {canSavedGuidesScrollRight && (
+                            <div
+                              style={{
+                                position: 'absolute',
+                                right: 0,
+                                top: 0,
+                                bottom: 0,
+                                width: '70px',
+                                zIndex: 8,
+                                pointerEvents: 'auto',
+                                cursor: 'default'
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          )}
+
+                          {/* Saved Guides Page indicator */}
+                          {totalSavedPages > 1 && (
+                            <div style={{ textAlign: 'center', marginTop: '0.75rem', fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
+                              {language === 'es' ? `Página ${currentSavedPage} de ${totalSavedPages}` : `Page ${currentSavedPage} of ${totalSavedPages}`}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </>
             );

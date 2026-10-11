@@ -1996,6 +1996,37 @@ h1, h2, h3, h4, h5, h6 {
     border-radius: 9999px !important;
   }
 
+  /* Profile Guides Mobile Sub-tabs */
+  .profile-guides-mobile-tab-btn {
+    flex: 1 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 0.55rem 0 !important;
+    font-size: 0.95rem !important;
+    font-weight: 600 !important;
+    color: var(--text-secondary) !important;
+    background: transparent !important;
+    border: none !important;
+    position: relative !important;
+    cursor: pointer !important;
+    transition: color 0.15s ease !important;
+  }
+
+  .profile-guides-mobile-tab-btn.active {
+    color: var(--color-guide, #2DD4BF) !important;
+  }
+
+  .profile-guides-mobile-tab-btn .profile-guides-tab-indicator {
+    position: absolute !important;
+    bottom: -1px !important;
+    left: 10% !important;
+    right: 10% !important;
+    height: 2px !important;
+    background: var(--color-guide, #2DD4BF) !important;
+    border-radius: 9999px !important;
+  }
+
   /* Mobile Upcoming Swipe Views Container */
   .upcoming-mobile-swipe-wrapper {
     display: flex !important;
