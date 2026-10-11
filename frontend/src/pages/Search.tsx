@@ -9,6 +9,7 @@ import { MediaPoster } from '../components/MediaPoster';
 import { AdBanner } from '../components/AdBanner';
 import { ReplaceFavoriteModal } from '../components/ReplaceFavoriteModal';
 import { ProModal } from '../components/ProModal';
+import { PathdLoader } from '../components/PathdLoader';
 import { getOrderedCategories, sortFilterTabs, getCategoryIcon } from '../utils/categoryOrder';
 import { prefetchMediaDetails } from '../utils/prefetch';
 import { removeCachedSeries, clearCachedSeriesMatching } from '../utils/seriesCache';
@@ -840,7 +841,6 @@ export const Search: React.FC = () => {
     }
   }, [submittedQuery, exploreSubTab, guidesData]);
 
-  const debounceTimerRef = React.useRef<any>(null);
   const searchRequestIdRef = React.useRef<number>(0);
 
   const executeSearch = async (targetQuery: string, currentTab: string) => {
@@ -921,52 +921,15 @@ export const Search: React.FC = () => {
     }
   };
 
-  // Auto-search debounce after 600ms of inactivity if query is at least 3 characters
-  useEffect(() => {
-    const cleanQuery = query.trim();
-
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
-      debounceTimerRef.current = null;
-    }
-
-    if (!cleanQuery) {
-      setSubmittedQuery('');
-      setResults([]);
-      setIsSearching(false);
-      return;
-    }
-
-    if (cleanQuery.length >= 3 && cleanQuery !== submittedQuery) {
-      debounceTimerRef.current = setTimeout(() => {
-        executeSearch(cleanQuery, activeTab);
-      }, 600);
-    }
-
-    return () => {
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
-      }
-    };
-  }, [query, activeTab]);
-
   const handleSearch = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
-      debounceTimerRef.current = null;
-    }
     executeSearch(query, activeTab);
   };
 
   const handleTabClick = (tabValue: any) => {
     setActiveTab(tabValue);
     const cleanQuery = query.trim();
-    if (cleanQuery) {
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
-        debounceTimerRef.current = null;
-      }
+    if (cleanQuery && submittedQuery) {
       executeSearch(cleanQuery, tabValue);
     }
   };
@@ -1239,10 +1202,6 @@ export const Search: React.FC = () => {
     setSubmittedQuery('');
     setResults([]);
     setIsSearching(false);
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
-      debounceTimerRef.current = null;
-    }
   };
 
   const normType = selectedItem ? (selectedItem.item_type === 'anime' ? 'series' : selectedItem.item_type) : '';
@@ -1398,8 +1357,13 @@ export const Search: React.FC = () => {
               )}
             </div>
 
-            <button type="submit" disabled={isSearching} className="btn-primary" style={{ padding: '0 2.5rem' }}>
-              {isSearching ? '...' : t('searchButton')}
+            <button 
+              type="submit" 
+              disabled={isSearching} 
+              className="btn-primary home-desktop-only" 
+              style={{ padding: '0 2.5rem' }}
+            >
+              {t('searchButton')}
             </button>
           </form>
         </div>
@@ -1599,8 +1563,15 @@ export const Search: React.FC = () => {
         </div>
       )}
 
+      {/* Loading Animation with Colored Pulsing Dots */}
+      {isSearching && (
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '4rem 1rem' }}>
+          <PathdLoader size="medium" message={language === 'es' ? 'Buscando...' : 'Searching...'} />
+        </div>
+      )}
+
       {/* Search Results Display */}
-      {filteredResults.length > 0 && (
+      {!isSearching && filteredResults.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1.5rem' }}>
             {filteredResults.slice(0, visibleCount).map((item) => {
@@ -1851,7 +1822,7 @@ export const Search: React.FC = () => {
         </div>
       )}
 
-      {results.length > 0 && filteredResults.length === 0 && (
+      {!isSearching && results.length > 0 && filteredResults.length === 0 && (
         <div className="glass-card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
           {language === 'es' ? 'No se encontraron elementos en esta categoría.' : 'No items found in this category.'}
         </div>
