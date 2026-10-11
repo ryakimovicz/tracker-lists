@@ -362,13 +362,18 @@ h1, h2, h3, h4, h5, h6 {
     left: 0;
   }
   /* -------------------------------------------------------------------------
-     Mobile Profile Header Card (Landscape Format)
+     Mobile Profile Page Spacing & Header Card
      ------------------------------------------------------------------------- */
+  .profile-page-container {
+    padding-top: 0.25rem !important;
+    gap: 1.15rem !important;
+  }
+
   .profile-header-card {
-    padding: 1.25rem 1rem !important;
-    gap: 0.75rem !important;
+    padding: 0.85rem 0.85rem !important;
+    gap: 0.55rem !important;
     min-height: auto !important;
-    border-radius: 16px !important;
+    border-radius: 14px !important;
     flex-direction: column !important;
     align-items: flex-start !important;
   }

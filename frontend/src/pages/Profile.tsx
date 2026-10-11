@@ -2784,6 +2784,7 @@ export const Profile: React.FC = () => {
 
   return (
     <div 
+      className="profile-page-container"
       style={{ 
         position: 'relative',
         zIndex: 1,
