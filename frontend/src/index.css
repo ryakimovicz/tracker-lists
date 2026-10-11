@@ -144,16 +144,50 @@
 }
 
 /* Global Reset & Base */
-* {
+*, *::before, *::after {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
 }
 
-/* Accessibility: Clear Keyboard Focus Ring for tab navigation */
+/* Prevent unwanted selection and tap frames on interactive controls */
+button,
+a,
+input[type="button"],
+input[type="submit"],
+input[type="reset"],
+[role="button"],
+.interactive,
+nav,
+nav * {
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Keep input fields selectable */
+input[type="text"],
+input[type="search"],
+input[type="password"],
+input[type="email"],
+input[type="number"],
+input[type="url"],
+textarea,
+[contenteditable="true"] {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* Keyboard Navigation Outline */
 :focus-visible {
   outline: 2px solid var(--accent-primary, #f59e0b);
   outline-offset: 2px;
+}
+
+/* Eliminate focus outlines when touched/clicked with mouse/touch */
+:focus:not(:focus-visible) {
+  outline: none !important;
 }
 
 /* Accessibility: Respect users who prefer reduced motion */
@@ -2219,5 +2253,42 @@ h1, h2, h3, h4, h5, h6 {
 
   .category-order-arrows-desktop {
     display: none !important;
+  }
+
+  /* Disable hover/active enlargement on mobile */
+  *, *::before, *::after {
+    -webkit-tap-highlight-color: transparent !important;
+  }
+
+  /* No hover/active scale-up or enlargement on touch devices */
+  button:active,
+  a:active,
+  .btn-primary:active,
+  .btn-secondary:active,
+  .btn-check-seen:active,
+  .btn-card-add-shelf:active,
+  .btn-favorite-heart:active,
+  .mobile-header-icon-btn:active,
+  .mobile-bottom-nav-item:active,
+  .activity-card:hover,
+  .glass-card:hover,
+  .btn-primary:hover,
+  .btn-secondary:hover,
+  .btn-check-seen:hover,
+  .btn-card-add-shelf:hover,
+  .btn-favorite-heart:hover {
+    transform: none !important;
+  }
+
+  /* Prevent text and callout menus when pressing or holding buttons/links */
+  button,
+  a,
+  [role="button"],
+  .interactive,
+  svg,
+  img {
+    -webkit-touch-callout: none !important;
+    user-select: none !important;
+    -webkit-user-select: none !important;
   }
 }
