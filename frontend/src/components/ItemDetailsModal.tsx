@@ -5796,21 +5796,28 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                             handleAddToShelf();
                           }
                         }}
-                        className="btn-secondary"
+                        className="btn-circle-action"
                         title={selectedItem?.id 
                           ? (language === 'es' ? 'Quitar' : 'Remove')
                           : (language === 'es' ? 'Agregar' : 'Add')
                         }
                         style={{
-                          padding: '0.4rem',
+                          width: '34px',
+                          height: '34px',
+                          minWidth: '34px',
+                          minHeight: '34px',
+                          padding: 0,
                           borderRadius: '50%',
-                          display: 'flex',
+                          display: 'inline-flex',
                           alignItems: 'center',
                           justifyContent: 'center',
+                          flexShrink: 0,
+                          border: '1px solid',
                           background: selectedItem?.id ? `var(--color-${selectedItem.item_type || 'movie'})` : 'var(--bg-tertiary)',
                           borderColor: selectedItem?.id ? `var(--color-${selectedItem.item_type || 'movie'})` : 'var(--border-color)',
                           color: selectedItem?.id ? `var(--color-text-${selectedItem.item_type || 'movie'})` : 'var(--text-primary)',
-                          cursor: 'pointer'
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease'
                         }}
                       >
                         <Plus size={18} />
@@ -5839,6 +5846,9 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         style={{
                           width: '34px',
                           height: '34px',
+                          minWidth: '34px',
+                          minHeight: '34px',
+                          flexShrink: 0,
                           cursor: (isUnconsumed && !isFavorite) ? 'not-allowed' : 'pointer',
                           opacity: (isUnconsumed && !isFavorite) ? 0.4 : 1,
                           color: isFavorite ? 'var(--color-user, #F472B6)' : 'var(--text-secondary)',
@@ -5857,14 +5867,19 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                     <button
                       type="button"
                       onClick={() => setShowReportMediaModal(true)}
-                      className="btn-secondary"
+                      className="btn-circle-action"
                       title={language === 'es' ? 'Reportar obra' : 'Report media'}
                       style={{
-                        padding: '0.45rem',
+                        width: '34px',
+                        height: '34px',
+                        minWidth: '34px',
+                        minHeight: '34px',
+                        padding: 0,
                         borderRadius: '50%',
-                        display: 'flex',
+                        display: 'inline-flex',
                         alignItems: 'center',
                         justifyContent: 'center',
+                        flexShrink: 0,
                         cursor: 'pointer',
                         color: 'var(--text-secondary)',
                         border: '1px solid var(--border-color)',

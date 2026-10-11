@@ -946,6 +946,24 @@ h1, h2, h3, h4, h5, h6 {
   border-color: var(--color-user, #F472B6) !important;
 }
 
+/* Circular Action Buttons (Add, Report, Favorite, etc.) */
+.btn-circle-action {
+  width: 34px !important;
+  height: 34px !important;
+  min-width: 34px !important;
+  min-height: 34px !important;
+  max-width: 34px !important;
+  max-height: 34px !important;
+  padding: 0 !important;
+  border-radius: 50% !important;
+  aspect-ratio: 1 / 1 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+  flex-shrink: 0 !important;
+}
+
 /* Shelf List Item Row Hover */
 .shelf-list-item-row {
   display: flex;
