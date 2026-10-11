@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Users, PlusCircle, Compass, User } from 'lucide-react';
+import { Home, Users, BookOpen, Plus, Compass, User } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../context/LanguageContext';
 import { prefetchRoute } from '../utils/prefetch';
@@ -35,7 +35,7 @@ export const MobileBottomNav: React.FC = () => {
     {
       to: '/create',
       label: t('navCreate') || 'Crear',
-      icon: PlusCircle,
+      icon: 'create-guide',
       isActive: currentPath.startsWith('/create')
     },
     {
@@ -55,7 +55,6 @@ export const MobileBottomNav: React.FC = () => {
   return (
     <nav className="mobile-bottom-nav">
       {navItems.map((item) => {
-        const Icon = item.icon;
         const activeClass = item.isActive ? 'active' : '';
 
         return (
@@ -66,11 +65,23 @@ export const MobileBottomNav: React.FC = () => {
             onMouseEnter={() => prefetchRoute(item.to)}
             onTouchStart={() => prefetchRoute(item.to)}
             aria-label={item.label}
+            title={item.label}
           >
             <div className="mobile-bottom-nav-icon-wrap">
-              <Icon size={22} strokeWidth={item.isActive ? 2.4 : 1.8} />
+              {item.icon === 'create-guide' ? (
+                <div className="mobile-nav-create-icon" aria-hidden="true">
+                  <BookOpen size={24} strokeWidth={item.isActive ? 2.4 : 1.9} />
+                  <span className="mobile-nav-create-plus-badge">
+                    <Plus size={11} strokeWidth={3.2} />
+                  </span>
+                </div>
+              ) : (
+                (() => {
+                  const Icon = item.icon as React.ElementType;
+                  return <Icon size={24} strokeWidth={item.isActive ? 2.4 : 1.9} />;
+                })()
+              )}
             </div>
-            <span className="mobile-bottom-nav-label">{item.label}</span>
           </Link>
         );
       })}
