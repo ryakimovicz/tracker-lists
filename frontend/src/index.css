@@ -2394,7 +2394,8 @@ h1, h2, h3, h4, h5, h6 {
   /* Header layout on mobile with room for top-right close button */
   .item-details-header {
     position: relative !important;
-    padding-top: 2.75rem !important;
+    padding-top: 0.25rem !important;
+    padding-right: 2.75rem !important;
     align-items: flex-start !important;
     flex-wrap: wrap !important;
     gap: 0.75rem !important;
