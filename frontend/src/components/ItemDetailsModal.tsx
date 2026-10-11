@@ -5597,7 +5597,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
           position: 'relative',
           width: '650px',
           maxHeight: '90vh',
-          padding: '4rem 2rem 2rem 2rem',
+          padding: '2rem',
           display: 'flex',
           flexDirection: 'column',
           gap: '1.5rem',
