@@ -1251,24 +1251,6 @@ h1, h2, h3, h4, h5, h6 {
     color: var(--accent-primary, #f59e0b);
   }
 
-  .mobile-nav-create-icon {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .mobile-nav-create-plus-badge {
-    position: absolute;
-    top: -4px;
-    right: -6px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: currentColor;
-    pointer-events: none;
-  }
-
   /* -------------------------------------------------------------------------
      Mobile Notification Flyout Repositioning
      ------------------------------------------------------------------------- */
