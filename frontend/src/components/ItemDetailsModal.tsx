@@ -7255,7 +7255,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                       <h4 style={{ margin: 0, fontSize: '1.1rem' }}>
                         {selectedItem.item_type === 'comic' 
                           ? (language === 'es' ? 'Seguimiento de Números' : 'Issues Tracking')
-                          : (language === 'es' ? 'Seguimiento de Temporadas' : 'Season Tracking')}
+                          : (language === 'es' ? 'Temporadas' : 'Seasons')}
                       </h4>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                         {selectedItem.item_type === 'comic' ? (
