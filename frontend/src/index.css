@@ -2366,11 +2366,11 @@ h1, h2, h3, h4, h5, h6 {
     padding-top: calc(1.25rem + env(safe-area-inset-top, 0px)) !important;
   }
 
-  /* Modal Close button (X): top-right without circular border, aligned with card content edge */
+  /* Modal Close button (X): top-right without circular border, aligned with card content edge / plus button */
   .item-details-close-btn {
     position: absolute !important;
-    top: calc(1.25rem + env(safe-area-inset-top, 0px)) !important;
-    right: 1.25rem !important;
+    top: calc(0.75rem + env(safe-area-inset-top, 0px)) !important;
+    right: 1rem !important;
     width: 34px !important;
     height: 34px !important;
     min-width: 34px !important;
@@ -2394,7 +2394,7 @@ h1, h2, h3, h4, h5, h6 {
   /* Header layout on mobile with room for top-right close button */
   .item-details-header {
     position: relative !important;
-    padding-top: 3.25rem !important;
+    padding-top: 2rem !important;
     align-items: flex-start !important;
     flex-wrap: wrap !important;
     gap: 0.75rem !important;
