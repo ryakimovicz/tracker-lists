@@ -290,7 +290,7 @@ export const SettingsPage: React.FC = () => {
               : 'Customize the visual scheme of the interface to your preference.'}
           </p>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem', maxWidth: '360px' }}>
             {[
               { id: 'light', label: isEs ? 'Claro' : 'Light', icon: Sun },
               { id: 'system', label: isEs ? 'Sistema' : 'System', icon: Monitor },
@@ -303,23 +303,22 @@ export const SettingsPage: React.FC = () => {
                   key={item.id}
                   type="button"
                   onClick={() => setTheme(item.id as any)}
+                  aria-label={item.label}
+                  title={item.label}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: '0.6rem',
                     padding: '0.85rem 1rem',
                     borderRadius: '12px',
                     border: isSelected ? '2px solid var(--accent-primary)' : '1px solid var(--border-color)',
                     background: isSelected ? 'var(--border-glow)' : 'var(--bg-secondary)',
                     color: isSelected ? 'var(--accent-primary)' : 'var(--text-primary)',
-                    fontWeight: isSelected ? 600 : 500,
                     cursor: 'pointer',
                     transition: 'all 0.2s ease',
                   }}
                 >
-                  <Icon size={18} />
-                  <span>{item.label}</span>
+                  <Icon size={20} />
                 </button>
               );
             })}
