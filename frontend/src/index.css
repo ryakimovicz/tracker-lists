@@ -2395,19 +2395,19 @@ h1, h2, h3, h4, h5, h6 {
   .item-details-header {
     position: relative !important;
     padding-top: 0.25rem !important;
-    padding-right: 2.75rem !important;
-    align-items: flex-start !important;
-    flex-wrap: wrap !important;
+    padding-right: 0 !important;
+    align-items: flex-end !important;
     gap: 0.75rem !important;
   }
 
-  /* Actions container layout inside header on mobile - cleanly aligned with right edge under X */
+  /* Actions container layout inside header on mobile - sits at the bottom of the header row aligned under X */
   .item-details-actions {
     display: flex !important;
     align-items: center !important;
     gap: 0.6rem !important;
     flex-shrink: 0 !important;
     margin-left: auto !important;
-    margin-top: 0.25rem !important;
+    margin-top: 1.25rem !important;
+    align-self: flex-end !important;
   }
 }
