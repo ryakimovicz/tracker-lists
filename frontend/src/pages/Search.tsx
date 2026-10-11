@@ -249,7 +249,7 @@ const ExploreSection = React.memo<ExploreSectionProps>(({
         <React.Fragment key={`${subTab}_${type}`}>
           {isFiltered ? (
             <>
-              {/* Category Title & Badge on Mobile */}
+              {/* Single Unified Category Title & Badge (Without painted border, matches Home) */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', paddingLeft: '0.5rem', paddingRight: '0.5rem', marginBottom: '0.25rem' }}>
                 <span style={{ display: 'inline-flex', alignItems: 'center' }}>
                   {getCategoryIcon(type, { size: 20, color: `var(--color-${type})` })}
@@ -275,23 +275,11 @@ const ExploreSection = React.memo<ExploreSectionProps>(({
                 {items.map((item: any, idx: number) => renderCard(item, idx))}
               </div>
 
-              {/* Desktop horizontal row */}
-              <div className="home-desktop-only" style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
-                <HorizontalScroll 
-                  key={`${subTab}_${type}`} 
-                  title={
-                    <>
-                      <span style={{ display: 'inline-flex', alignItems: 'center' }}>
-                        {getCategoryIcon(type, { size: 18 })}
-                      </span>
-                      <span>{title}</span>
-                    </>
-                  } 
-                  outlineColor={`var(--color-${type})`}
-                  itemCount={items.length}
-                >
+              {/* Desktop multi-column grid (wrap into multiple rows without horizontal scrolling) */}
+              <div className="home-desktop-only" style={{ display: 'flex', flexDirection: 'column', width: '100%', gap: '1rem' }}>
+                <div className="desktop-category-grid">
                   {items.map((item: any, idx: number) => renderCard(item, idx))}
-                </HorizontalScroll>
+                </div>
               </div>
             </>
           ) : (
