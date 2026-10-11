@@ -2410,4 +2410,17 @@ h1, h2, h3, h4, h5, h6 {
     margin-top: 2.25rem !important;
     align-self: flex-end !important;
   }
+
+  /* Episode cards in series/anime modals: taller, comfortable touch target on mobile */
+  .episode-item-row {
+    min-height: 48px !important;
+    padding: 0.65rem 0.85rem !important;
+    border-radius: 6px !important;
+    transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease !important;
+  }
+
+  .episode-item-row:active {
+    transform: scale(0.995);
+  }
 }
+
