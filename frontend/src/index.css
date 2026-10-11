@@ -2380,7 +2380,7 @@ h1, h2, h3, h4, h5, h6 {
     background: transparent !important;
     padding: 0.35rem !important;
     color: var(--text-secondary) !important;
-    z-index: 20 !important;
+    z-index: 30 !important;
   }
 
   [data-theme="light"] .item-details-close-btn {
@@ -2391,16 +2391,19 @@ h1, h2, h3, h4, h5, h6 {
   /* Header layout on mobile with room for top-right close button */
   .item-details-header {
     position: relative !important;
-    padding-top: 1.75rem !important;
+    padding-top: 2.25rem !important;
     align-items: flex-start !important;
+    flex-wrap: wrap !important;
+    gap: 0.75rem !important;
   }
 
-  /* Actions container layout inside header on mobile */
+  /* Actions container layout inside header on mobile - cleanly under X */
   .item-details-actions {
     display: flex !important;
     align-items: center !important;
-    gap: 0.5rem !important;
+    gap: 0.6rem !important;
     flex-shrink: 0 !important;
-    margin-left: 0.5rem !important;
+    margin-left: auto !important;
+    margin-top: 0.5rem !important;
   }
 }
