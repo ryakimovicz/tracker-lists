@@ -2366,8 +2366,39 @@ h1, h2, h3, h4, h5, h6 {
     padding-top: calc(4.75rem + env(safe-area-inset-top, 0px)) !important;
   }
 
-  .modal-back-btn {
+  /* Keep Back button cleanly above content */
+  .item-details-back-btn {
     top: calc(1rem + env(safe-area-inset-top, 0px)) !important;
     left: 1rem !important;
+  }
+
+  /* Modal Close button (X) positioning and spacing */
+  .item-details-close-btn {
+    position: static !important;
+    width: 34px !important;
+    height: 34px !important;
+    min-width: 34px !important;
+    min-height: 34px !important;
+    border-radius: 50% !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 0 !important;
+    background: rgba(255, 255, 255, 0.05) !important;
+    border: 1px solid var(--border-color) !important;
+    margin-left: 0.25rem !important;
+  }
+
+  [data-theme="light"] .item-details-close-btn {
+    background: rgba(0, 0, 0, 0.04) !important;
+  }
+
+  /* Actions container layout inside header */
+  .item-details-actions {
+    display: flex !important;
+    align-items: center !important;
+    gap: 0.5rem !important;
+    flex-shrink: 0 !important;
+    margin-left: 0.5rem !important;
   }
 }

@@ -5612,7 +5612,6 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
               {(isEpisode || historyStack.length > 0) && (
                 <button
-                    className="modal-back-btn"
                     onClick={async () => {
                       if (historyStack.length > 0) {
                         handleGoBackHistory();
@@ -5661,6 +5660,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         onClose();
                       }
                     }}
+                  className="item-details-back-btn"
                   style={{ 
                     position: 'absolute',
                     top: '1.25rem',
@@ -5686,7 +5686,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
               )}
 
               {/* Modal Header */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem' }}>
+              <div className="item-details-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem' }}>
                 <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
                   {isEpisode && epHeaderInfo ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
@@ -5776,7 +5776,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                   )}
                 </div>
 
-                <div className="modal-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexShrink: 0 }}>
+                <div className="item-details-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                   {/* Button + (Add to Shelf / Follow) */}
                   {user && !isEpisode && (
                     <div style={{ position: 'relative' }}>
@@ -5896,16 +5896,19 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                   <button
                     type="button"
                     onClick={() => onClose()}
-                    className="modal-close-btn"
+                    className="item-details-close-btn"
                     title={language === 'es' ? 'Cerrar' : 'Close'}
                     style={{
+                      position: 'absolute',
+                      top: '1.25rem',
+                      right: '1.25rem',
                       background: 'transparent',
                       border: 'none',
                       color: 'var(--text-secondary)',
                       cursor: 'pointer',
-                      padding: '0.35rem',
+                      padding: '0.25rem',
                       borderRadius: '50%',
-                      display: 'inline-flex',
+                      display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center'
                     }}
