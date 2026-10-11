@@ -2363,6 +2363,11 @@ h1, h2, h3, h4, h5, h6 {
   }
 
   .item-details-modal-card {
-    padding-top: calc(4rem + env(safe-area-inset-top, 0px)) !important;
+    padding-top: calc(4.75rem + env(safe-area-inset-top, 0px)) !important;
+  }
+
+  .modal-back-btn {
+    top: calc(1rem + env(safe-area-inset-top, 0px)) !important;
+    left: 1rem !important;
   }
 }

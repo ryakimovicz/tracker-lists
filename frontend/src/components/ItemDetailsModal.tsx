@@ -5612,6 +5612,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
               {(isEpisode || historyStack.length > 0) && (
                 <button
+                    className="modal-back-btn"
                     onClick={async () => {
                       if (historyStack.length > 0) {
                         handleGoBackHistory();
@@ -5775,7 +5776,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                   )}
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                <div className="modal-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexShrink: 0 }}>
                   {/* Button + (Add to Shelf / Follow) */}
                   {user && !isEpisode && (
                     <div style={{ position: 'relative' }}>
@@ -5895,18 +5896,16 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                   <button
                     type="button"
                     onClick={() => onClose()}
+                    className="modal-close-btn"
                     title={language === 'es' ? 'Cerrar' : 'Close'}
                     style={{
-                      position: 'absolute',
-                      top: '1.25rem',
-                      right: '1.25rem',
                       background: 'transparent',
                       border: 'none',
                       color: 'var(--text-secondary)',
                       cursor: 'pointer',
-                      padding: '0.25rem',
+                      padding: '0.35rem',
                       borderRadius: '50%',
-                      display: 'flex',
+                      display: 'inline-flex',
                       alignItems: 'center',
                       justifyContent: 'center'
                     }}
