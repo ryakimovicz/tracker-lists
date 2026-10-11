@@ -2363,22 +2363,25 @@ h1, h2, h3, h4, h5, h6 {
   }
 
   .item-details-modal-card {
-    padding-top: calc(1rem + env(safe-area-inset-top, 0px)) !important;
+    padding-top: calc(1.25rem + env(safe-area-inset-top, 0px)) !important;
   }
 
-  /* Modal Close button (X): top-right without circular border */
+  /* Modal Close button (X): top-right without circular border, aligned with card content edge */
   .item-details-close-btn {
     position: absolute !important;
-    top: calc(0.85rem + env(safe-area-inset-top, 0px)) !important;
-    right: 1rem !important;
-    width: auto !important;
-    height: auto !important;
-    min-width: unset !important;
-    min-height: unset !important;
+    top: calc(1.25rem + env(safe-area-inset-top, 0px)) !important;
+    right: 1.25rem !important;
+    width: 34px !important;
+    height: 34px !important;
+    min-width: 34px !important;
+    min-height: 34px !important;
     border-radius: 0 !important;
     border: none !important;
     background: transparent !important;
-    padding: 0.35rem !important;
+    padding: 0 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
     color: var(--text-secondary) !important;
     z-index: 30 !important;
   }
@@ -2391,19 +2394,19 @@ h1, h2, h3, h4, h5, h6 {
   /* Header layout on mobile with room for top-right close button */
   .item-details-header {
     position: relative !important;
-    padding-top: 2.25rem !important;
+    padding-top: 3.25rem !important;
     align-items: flex-start !important;
     flex-wrap: wrap !important;
     gap: 0.75rem !important;
   }
 
-  /* Actions container layout inside header on mobile - cleanly under X */
+  /* Actions container layout inside header on mobile - cleanly aligned with right edge under X */
   .item-details-actions {
     display: flex !important;
     align-items: center !important;
     gap: 0.6rem !important;
     flex-shrink: 0 !important;
     margin-left: auto !important;
-    margin-top: 0.5rem !important;
+    margin-top: 0.25rem !important;
   }
 }
