@@ -765,7 +765,7 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
             </button>
           ) : <div />}
 
-          <div style={{ display: 'flex', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', gap: '0.75rem', marginLeft: 'auto', alignItems: 'center' }}>
             <button onClick={onClose} className="btn-secondary" disabled={isSaving}>
               {isEs ? 'Cancelar' : 'Cancel'}
             </button>
@@ -788,8 +788,8 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
                   ? 'Guardando...'
                   : 'Saving...'
                 : isEs
-                ? 'Guardar Portada'
-                : 'Save Banner'}
+                ? 'Guardar'
+                : 'Save'}
             </button>
           </div>
         </div>

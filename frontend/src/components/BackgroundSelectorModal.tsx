@@ -774,7 +774,7 @@ export const BackgroundSelectorModal: React.FC<BackgroundSelectorModalProps> = (
             <div />
           )}
 
-          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '0.75rem', marginLeft: 'auto', alignItems: 'center' }}>
             <button
               onClick={onClose}
               disabled={isSaving}
@@ -804,8 +804,8 @@ export const BackgroundSelectorModal: React.FC<BackgroundSelectorModalProps> = (
                   ? 'Guardando...'
                   : 'Saving...'
                 : isEs
-                ? 'Guardar Fondo'
-                : 'Save Background'}
+                ? 'Guardar'
+                : 'Save'}
             </button>
           </div>
         </div>
