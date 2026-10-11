@@ -3770,7 +3770,7 @@ export const Home: React.FC = () => {
                         </span>
                       </div>
 
-                      <div className="desktop-category-grid">
+                      <div className={`desktop-category-grid ${activeTab === 'watching' && (homeCategoryFilter === 'series' || homeCategoryFilter === 'anime') ? 'desktop-category-grid-landscape' : ''}`}>
                         {specificItems.map(item => renderItemCard(item))}
                       </div>
                     </div>

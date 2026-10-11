@@ -1010,10 +1010,14 @@ h1, h2, h3, h4, h5, h6 {
 /* Desktop Grid when a single category is filtered in Home */
 .desktop-category-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, 180px);
+  grid-template-columns: repeat(auto-fill, minmax(180px, 180px));
   gap: 1.25rem;
   width: 100%;
   justify-content: start;
+}
+
+.desktop-category-grid.desktop-category-grid-landscape {
+  grid-template-columns: repeat(auto-fill, minmax(220px, 220px));
 }
 
 /* Hide mobile-only home subbar on desktop */
