@@ -374,13 +374,13 @@ export const Social: React.FC = () => {
           gap: '1.75rem',
           borderBottom: '1px solid var(--border-color)',
           paddingBottom: '0.75rem',
-          marginBottom: '0.5rem',
+          marginBottom: '0.75rem',
           position: 'sticky',
           top: 0,
           zIndex: 20,
           background: 'var(--bg-primary)',
           marginTop: '-2rem',
-          paddingTop: '0.85rem',
+          paddingTop: '1.35rem',
           overflowX: 'auto'
         }}
       >

@@ -3583,18 +3583,77 @@ export const Profile: React.FC = () => {
                 </div>
             )}
             
-            <div style={{ width: '100%', maxWidth: '400px' }}>
-              <input
-                type="text"
-                className="input-field"
-                value={shelfSearchQuery}
-                onChange={(e) => {
-                  setShelfSearchQuery(e.target.value);
-                  setCurrentPage(1);
-                }}
-                placeholder={language === 'es' ? 'Buscar en mi estantería...' : 'Search my shelf...'}
-                style={{ width: '100%', padding: '0.5rem 1rem', fontSize: '0.9rem' }}
-              />
+            {/* Search Input Bar & Shelf Controls Row */}
+            <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
+              <div style={{ width: '100%', maxWidth: '400px' }}>
+                <input
+                  type="text"
+                  className="input-field"
+                  value={shelfSearchQuery}
+                  onChange={(e) => {
+                    setShelfSearchQuery(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  placeholder={language === 'es' ? 'Buscar en mi estantería...' : 'Search my shelf...'}
+                  style={{ width: '100%', padding: '0.5rem 1rem', fontSize: '0.9rem' }}
+                />
+              </div>
+
+              {filteredItems.length > 0 && (() => {
+                const isMobileScreen = typeof window !== 'undefined' && window.innerWidth <= 768;
+                const isGrid = !isMobileScreen && shelfViewMode === 'grid';
+                const availableWidth = Math.max(0, shelfContainerWidth - 90);
+                const maxVisibleInOneRow = Math.max(1, Math.floor((availableWidth + 16) / 196));
+                const canExpandMore = isGrid ? (filteredItems.length > maxVisibleInOneRow) : (filteredItems.length > 4);
+
+                return (
+                  <div className="home-desktop-only" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '0.6rem' }}>
+                    {/* View Mode Toggle Buttons (Desktop only) */}
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', background: 'var(--bg-secondary)', padding: '0.2rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                      <button
+                        type="button"
+                        onClick={() => handleSetShelfViewMode('grid')}
+                        className={`shelf-view-toggle-btn ${shelfViewMode === 'grid' ? 'active' : ''}`}
+                        title={language === 'es' ? 'Modo Cuadrícula' : 'Grid View'}
+                        aria-label={language === 'es' ? 'Modo Cuadrícula' : 'Grid View'}
+                        style={{ padding: '0.3rem 0.55rem', borderRadius: '6px' }}
+                      >
+                        <LayoutGrid size={16} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSetShelfViewMode('list')}
+                        className={`shelf-view-toggle-btn ${shelfViewMode === 'list' ? 'active' : ''}`}
+                        title={language === 'es' ? 'Modo Lista' : 'List View'}
+                        aria-label={language === 'es' ? 'Modo Lista' : 'List View'}
+                        style={{ padding: '0.3rem 0.55rem', borderRadius: '6px' }}
+                      >
+                        <List size={16} />
+                      </button>
+                    </div>
+
+                    {/* Expand / Collapse Control - Shown if items exceed compact view limit (Desktop only) */}
+                    {canExpandMore && (
+                      <button
+                        type="button"
+                        onClick={handleToggleShelfExpanded}
+                        className="shelf-view-toggle-btn"
+                        title={isShelfExpanded
+                          ? (language === 'es' ? 'Contraer' : 'Collapse')
+                          : (language === 'es' ? 'Expandir' : 'Expand')
+                        }
+                        aria-label={isShelfExpanded
+                          ? (language === 'es' ? 'Contraer' : 'Collapse')
+                          : (language === 'es' ? 'Expandir' : 'Expand')
+                        }
+                        style={{ padding: '0.3rem 0.55rem', borderRadius: '6px' }}
+                      >
+                        {isShelfExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                      </button>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           </div>
 
@@ -3604,7 +3663,7 @@ export const Profile: React.FC = () => {
             </div>
           ) : (
             <div ref={shelfContainerRef} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-              {/* Shelf Header Controls: Mode Toggler (Grid/List) & Expand/Collapse */}
+              {/* Shelf Items */}
               {(() => {
                 const isMobileScreen = typeof window !== 'undefined' && window.innerWidth <= 768;
                 const isGrid = !isMobileScreen && shelfViewMode === 'grid';
@@ -3643,51 +3702,6 @@ export const Profile: React.FC = () => {
 
                 return (
                   <>
-                    <div className="home-desktop-only" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '0.6rem' }}>
-                      {/* View Mode Toggle Buttons (Desktop only) */}
-                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', background: 'var(--bg-secondary)', padding: '0.2rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                        <button
-                          type="button"
-                          onClick={() => handleSetShelfViewMode('grid')}
-                          className={`shelf-view-toggle-btn ${shelfViewMode === 'grid' ? 'active' : ''}`}
-                          title={language === 'es' ? 'Modo Cuadrícula' : 'Grid View'}
-                          aria-label={language === 'es' ? 'Modo Cuadrícula' : 'Grid View'}
-                          style={{ padding: '0.3rem 0.55rem', borderRadius: '6px' }}
-                        >
-                          <LayoutGrid size={16} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleSetShelfViewMode('list')}
-                          className={`shelf-view-toggle-btn ${shelfViewMode === 'list' ? 'active' : ''}`}
-                          title={language === 'es' ? 'Modo Lista' : 'List View'}
-                          aria-label={language === 'es' ? 'Modo Lista' : 'List View'}
-                          style={{ padding: '0.3rem 0.55rem', borderRadius: '6px' }}
-                        >
-                          <List size={16} />
-                        </button>
-                      </div>
-
-                      {/* Expand / Collapse Control - Shown if items exceed compact view limit (Desktop only) */}
-                      {canExpandMore && (
-                        <button
-                          type="button"
-                          onClick={handleToggleShelfExpanded}
-                          className="shelf-view-toggle-btn"
-                          title={isShelfExpanded
-                            ? (language === 'es' ? 'Contraer' : 'Collapse')
-                            : (language === 'es' ? 'Expandir' : 'Expand')
-                          }
-                          aria-label={isShelfExpanded
-                            ? (language === 'es' ? 'Contraer' : 'Collapse')
-                            : (language === 'es' ? 'Expandir' : 'Expand')
-                          }
-                          style={{ padding: '0.3rem 0.55rem', borderRadius: '6px' }}
-                        >
-                          {isShelfExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                        </button>
-                      )}
-                    </div>
 
                     {/* Items Container */}
                     {(() => {
