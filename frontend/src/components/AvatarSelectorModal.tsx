@@ -572,6 +572,7 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
                       case 'manga': return 'Manga';
                       case 'book': return isEs ? 'Libro' : 'Book';
                       case 'game': return isEs ? 'Juego' : 'Game';
+                      case 'music': return isEs ? 'Música' : 'Music';
                       default: return isEs ? 'Serie' : 'Show';
                     }
                   };

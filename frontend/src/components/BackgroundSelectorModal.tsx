@@ -670,7 +670,8 @@ export const BackgroundSelectorModal: React.FC<BackgroundSelectorModalProps> = (
                          b.category === 'manga' ? 'Manga' :
                          b.category === 'comic' ? (isEs ? 'Cómic' : 'Comic') :
                          b.category === 'book' ? (isEs ? 'Libro' : 'Book') :
-                         b.category === 'movie' ? (isEs ? 'Película' : 'Movie') : (isEs ? 'Serie' : 'Show')}
+                         b.category === 'movie' ? (isEs ? 'Película' : 'Movie') :
+                         b.category === 'music' ? (isEs ? 'Música' : 'Music') : (isEs ? 'Serie' : 'Show')}
                       </span>
                     )}
                   </div>
