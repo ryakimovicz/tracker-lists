@@ -2,8 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { apiClient } from '../api/client';
-import { Search, X, Check, Loader2, User as UserIcon } from 'lucide-react';
+import { Search, X, Check, User as UserIcon } from 'lucide-react';
 import { getOrderedCategories, getCategoryIcon } from '../utils/categoryOrder';
+import { PathdLoader } from './PathdLoader';
 
 interface Character {
   name: string;
@@ -29,7 +30,7 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
   currentPhotoUrl,
   onAvatarUpdated,
 }) => {
-  const { language } = useTranslation();
+  const { language, t } = useTranslation();
   const { user, refreshProfile } = useAuth();
   const isEs = language === 'es';
 
@@ -109,7 +110,6 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-
       setSelectedUrl(currentPhotoUrl || null);
       setErrorMsg('');
       setQuery('');
@@ -121,19 +121,15 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
     }
   }, [isOpen]);
 
-  // Debounced search
-  useEffect(() => {
-    if (!isOpen) return;
+  const handleSearchSubmit = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    fetchCharacters(query);
+  };
 
-    // Skip if query is empty because isOpen effect handles initial empty fetch
-    if (!query.trim()) return;
-
-    const timer = setTimeout(() => {
-      fetchCharacters(query);
-    }, 300);
-
-    return () => clearTimeout(timer);
-  }, [query, isOpen]);
+  const handleClearSearch = () => {
+    setQuery('');
+    fetchCharacters('');
+  };
 
 
 
@@ -264,41 +260,97 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
           </button>
         </div>
 
-        {/* Search Input */}
-        <div style={{ position: 'relative' }}>
-          <input
-            type="text"
-            className="input-field"
-            placeholder={isEs ? 'Buscar personaje...' : 'Search character...'}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            style={{ paddingLeft: '2.5rem', width: '100%' }}
-            autoFocus
-          />
-          <Search
-            size={16}
-            color="var(--text-muted)"
-            style={{
-              position: 'absolute',
-              left: '1rem',
-              top: '50%',
-              transform: 'translateY(-50%)',
-            }}
-          />
-          {isLoading && (
-            <Loader2
+        {/* Search Input & Submit Button */}
+        <form onSubmit={handleSearchSubmit} style={{ display: 'flex', gap: '0.75rem', width: '100%' }}>
+          <div style={{ position: 'relative', flex: 1 }}>
+            <input
+              type="search"
+              enterKeyHint="search"
+              className="input-field"
+              placeholder={isEs ? 'Buscar personaje...' : 'Search character...'}
+              value={query}
+              onChange={(e) => {
+                const val = e.target.value;
+                setQuery(val);
+                if (val.trim() === '') {
+                  fetchCharacters('');
+                }
+              }}
+              style={{
+                paddingLeft: '2.5rem',
+                paddingRight: query ? '2.5rem' : '1rem',
+                width: '100%',
+                boxSizing: 'border-box'
+              }}
+              autoFocus
+            />
+            <Search
               size={16}
-              className="animate-spin"
+              color="var(--text-muted)"
               style={{
                 position: 'absolute',
-                right: '1rem',
+                left: '1rem',
                 top: '50%',
                 transform: 'translateY(-50%)',
-                color: 'var(--accent-primary)',
+                pointerEvents: 'none'
               }}
             />
-          )}
-        </div>
+            {query && (
+              <button
+                type="button"
+                onClick={handleClearSearch}
+                title={isEs ? 'Limpiar búsqueda' : 'Clear search'}
+                aria-label={isEs ? 'Limpiar búsqueda' : 'Clear search'}
+                style={{
+                  position: 'absolute',
+                  right: '0.75rem',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '22px',
+                  height: '22px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  color: 'var(--text-muted)',
+                  padding: 0,
+                  transition: 'background 0.2s, color 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.25)';
+                  e.currentTarget.style.color = '#ffffff';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                  e.currentTarget.style.color = 'var(--text-muted)';
+                }}
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="btn-primary home-desktop-only"
+            style={{
+              padding: '0 1.75rem',
+              height: '42px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '0.9rem',
+              fontWeight: 600,
+              flexShrink: 0
+            }}
+          >
+            {isEs ? 'Buscar' : 'Search'}
+          </button>
+        </form>
 
         {/* Category Filters */}
         {(() => {
@@ -372,23 +424,29 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
           </div>
         )}
 
-        {/* Characters Grid */}
+        {/* Characters Grid / Loading State */}
         <div
           style={{
             flex: 1,
             overflowY: 'auto',
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))',
-            gridAutoRows: 'max-content',
-            alignContent: 'start',
+            display: isLoading ? 'flex' : 'grid',
+            justifyContent: isLoading ? 'center' : undefined,
+            alignItems: isLoading ? 'center' : undefined,
+            gridTemplateColumns: isLoading ? undefined : 'repeat(auto-fill, minmax(110px, 1fr))',
+            gridAutoRows: isLoading ? undefined : 'max-content',
+            alignContent: isLoading ? undefined : 'start',
             gap: '1rem',
             padding: '0.5rem 0.25rem',
           }}
         >
-          {(() => {
+          {isLoading ? (
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '3rem 1rem', width: '100%' }}>
+              <PathdLoader size="medium" message={isEs ? 'Buscando personajes...' : 'Searching characters...'} />
+            </div>
+          ) : (() => {
             const filteredResults = results.filter(ch => selectedCategory === 'all' || ch.category === selectedCategory);
 
-            if (filteredResults.length === 0 && !isLoading) {
+            if (filteredResults.length === 0) {
               return (
                 <div
                   style={{

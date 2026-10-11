@@ -3,8 +3,9 @@ import { useTranslation } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { apiClient } from '../api/client';
-import { Search, X, Check, Loader2, Monitor, Trash2, Sparkles } from 'lucide-react';
+import { Search, X, Check, Monitor, Trash2, Sparkles } from 'lucide-react';
 import { getOrderedCategories, getCategoryIcon } from '../utils/categoryOrder';
+import { PathdLoader } from './PathdLoader';
 
 interface BackgroundItem {
   title: string;
@@ -29,7 +30,7 @@ export const BackgroundSelectorModal: React.FC<BackgroundSelectorModalProps> = (
   currentBackgroundUrl,
   onBackgroundUpdated,
 }) => {
-  const { language } = useTranslation();
+  const { language, t } = useTranslation();
   const { user, refreshProfile } = useAuth();
   const { theme } = useTheme();
   const isEs = language === 'es';
@@ -105,7 +106,6 @@ export const BackgroundSelectorModal: React.FC<BackgroundSelectorModalProps> = (
 
   useEffect(() => {
     if (isOpen) {
-
       setSelectedUrl(currentBackgroundUrl || null);
       setErrorMsg('');
       setQuery('');
@@ -117,16 +117,15 @@ export const BackgroundSelectorModal: React.FC<BackgroundSelectorModalProps> = (
     }
   }, [isOpen, currentBackgroundUrl]);
 
-  useEffect(() => {
-    if (!isOpen) return;
-    if (!query.trim()) return;
+  const handleSearchSubmit = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    fetchBackgrounds(query);
+  };
 
-    const timer = setTimeout(() => {
-      fetchBackgrounds(query);
-    }, 300);
-
-    return () => clearTimeout(timer);
-  }, [query, isOpen]);
+  const handleClearSearch = () => {
+    setQuery('');
+    fetchBackgrounds('');
+  };
 
 
   const handleSaveBackground = async () => {
@@ -391,50 +390,97 @@ export const BackgroundSelectorModal: React.FC<BackgroundSelectorModalProps> = (
           </div>
         </div>
 
-        {/* Search Bar */}
-        <div style={{ position: 'relative', width: '100%' }}>
-          <Search
-            size={18}
-            style={{
-              position: 'absolute',
-              left: '1rem',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              color: 'var(--text-muted)',
-              pointerEvents: 'none',
-            }}
-          />
-          <input
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder={isEs ? 'Buscar fondo...' : 'Search background...'}
-            style={{
-              width: '100%',
-              padding: '0.75rem 2.8rem 0.75rem 2.8rem',
-              borderRadius: '12px',
-              border: '1px solid var(--border-color)',
-              background: 'var(--bg-secondary)',
-              color: 'var(--text-primary)',
-              fontSize: '0.9rem',
-              outline: 'none',
-            }}
-            autoFocus
-          />
-          {isLoading && (
-            <Loader2
-              size={18}
-              className="animate-spin"
+        {/* Search Input & Submit Button */}
+        <form onSubmit={handleSearchSubmit} style={{ display: 'flex', gap: '0.75rem', width: '100%' }}>
+          <div style={{ position: 'relative', flex: 1 }}>
+            <input
+              type="search"
+              enterKeyHint="search"
+              className="input-field"
+              value={query}
+              onChange={(e) => {
+                const val = e.target.value;
+                setQuery(val);
+                if (val.trim() === '') {
+                  fetchBackgrounds('');
+                }
+              }}
+              placeholder={isEs ? 'Buscar fondo...' : 'Search background...'}
+              style={{
+                width: '100%',
+                paddingLeft: '2.5rem',
+                paddingRight: query ? '2.5rem' : '1rem',
+                boxSizing: 'border-box'
+              }}
+              autoFocus
+            />
+            <Search
+              size={16}
+              color="var(--text-muted)"
               style={{
                 position: 'absolute',
-                right: '1rem',
+                left: '1rem',
                 top: '50%',
                 transform: 'translateY(-50%)',
-                color: '#10b981',
+                pointerEvents: 'none',
               }}
             />
-          )}
-        </div>
+            {query && (
+              <button
+                type="button"
+                onClick={handleClearSearch}
+                title={isEs ? 'Limpiar búsqueda' : 'Clear search'}
+                aria-label={isEs ? 'Limpiar búsqueda' : 'Clear search'}
+                style={{
+                  position: 'absolute',
+                  right: '0.75rem',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '22px',
+                  height: '22px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  color: 'var(--text-muted)',
+                  padding: 0,
+                  transition: 'background 0.2s, color 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.25)';
+                  e.currentTarget.style.color = '#ffffff';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                  e.currentTarget.style.color = 'var(--text-muted)';
+                }}
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="btn-primary home-desktop-only"
+            style={{
+              padding: '0 1.75rem',
+              height: '42px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '0.9rem',
+              fontWeight: 600,
+              flexShrink: 0
+            }}
+          >
+            {isEs ? 'Buscar' : 'Search'}
+          </button>
+        </form>
 
         {/* Category Filters (Canonical Order) */}
         {(() => {
@@ -508,23 +554,29 @@ export const BackgroundSelectorModal: React.FC<BackgroundSelectorModalProps> = (
           </div>
         )}
 
-        {/* Backgrounds Grid */}
+        {/* Backgrounds Grid / Loading State */}
         <div
           style={{
             flex: 1,
             overflowY: 'auto',
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-            gridAutoRows: 'max-content',
-            alignContent: 'start',
+            display: isLoading ? 'flex' : 'grid',
+            justifyContent: isLoading ? 'center' : undefined,
+            alignItems: isLoading ? 'center' : undefined,
+            gridTemplateColumns: isLoading ? undefined : 'repeat(auto-fill, minmax(200px, 1fr))',
+            gridAutoRows: isLoading ? undefined : 'max-content',
+            alignContent: isLoading ? undefined : 'start',
             gap: '1rem',
             padding: '0.5rem 0.25rem',
           }}
         >
-          {(() => {
+          {isLoading ? (
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '3rem 1rem', width: '100%' }}>
+              <PathdLoader size="medium" message={isEs ? 'Buscando fondos...' : 'Searching backgrounds...'} />
+            </div>
+          ) : (() => {
             const filteredResults = results.filter(b => selectedCategory === 'all' || b.category === selectedCategory);
 
-            if (filteredResults.length === 0 && !isLoading) {
+            if (filteredResults.length === 0) {
               return (
                 <div
                   style={{

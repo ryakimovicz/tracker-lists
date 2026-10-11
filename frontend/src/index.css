@@ -558,6 +558,15 @@ h1, h2, h3, h4, h5, h6 {
   transition: border-color 0.2s, box-shadow 0.2s, background-color 0.2s;
 }
 
+.input-field::-webkit-search-cancel-button,
+.input-field::-webkit-search-decoration,
+.input-field::-webkit-search-results-button,
+.input-field::-webkit-search-results-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+  display: none;
+}
+
 .input-field:focus {
   background: var(--bg-secondary);
   border-color: var(--accent-primary);

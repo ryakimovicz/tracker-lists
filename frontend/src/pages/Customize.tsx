@@ -431,7 +431,7 @@ export const CustomizePage: React.FC = () => {
       {/* Header Preview Card (Identical to Profile Header) */}
       {profile && (
         <div
-          className="glass-card"
+          className="glass-card profile-header-card"
           style={{
             position: 'relative',
             display: 'flex',
@@ -454,6 +454,7 @@ export const CustomizePage: React.FC = () => {
             <>
               {/* Banner Image Layer */}
               <div
+                className="profile-banner-image-layer"
                 style={{
                   position: 'absolute',
                   inset: 0,
@@ -508,105 +509,116 @@ export const CustomizePage: React.FC = () => {
             <span>{isEs ? 'Ver Perfil' : 'View Profile'}</span>
           </button>
 
-          {/* Avatar */}
-          <div
-            style={{ position: 'relative', zIndex: 2, cursor: 'pointer' }}
-            onClick={() => openModal('avatar')}
-            title={isEs ? 'Cambiar imagen de perfil' : 'Change profile picture'}
-          >
-            {profile.photo_url ? (
-              <img
-                src={profile.photo_url}
-                alt={profile.username}
-                style={{
-                  width: 100,
-                  height: 100,
-                  borderRadius: '50%',
-                  objectFit: 'cover',
-                  border: '3px solid var(--accent-primary)',
-                  boxShadow: 'var(--shadow-md)',
-                }}
-              />
-            ) : (
-              <div
-                style={{
-                  width: 100,
-                  height: 100,
-                  borderRadius: '50%',
-                  border: '3px solid var(--accent-primary)',
-                  boxShadow: 'var(--shadow-md)',
-                  background: 'linear-gradient(135deg, var(--accent-primary), #4f46e5)',
-                  color: 'white',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '2.2rem',
-                  fontWeight: 800,
-                }}
-              >
-                {profile.username?.charAt(0).toUpperCase() || 'U'}
-              </div>
-            )}
-          </div>
-
-          {/* Profile Info */}
-          <div style={{ position: 'relative', zIndex: 2, flex: 1, minWidth: 250, textAlign: 'left' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.4rem', flexWrap: 'wrap' }}>
-              <h1 style={{ margin: 0, fontSize: '2rem', fontWeight: 800 }}>{profile.username}</h1>
-              {profile.is_pro && (
-                <span
+          {/* Top user row on mobile / Left avatar on desktop */}
+          <div className="profile-header-top-row" style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', width: '100%', position: 'relative', zIndex: 2 }}>
+            {/* Avatar */}
+            <div
+              className="profile-avatar-wrap"
+              style={{ position: 'relative', zIndex: 2, cursor: 'pointer', flexShrink: 0 }}
+              onClick={() => openModal('avatar')}
+              title={isEs ? 'Cambiar imagen de perfil' : 'Change profile picture'}
+            >
+              {profile.photo_url ? (
+                <img
+                  src={profile.photo_url}
+                  alt={profile.username}
+                  className="profile-avatar-img"
                   style={{
-                    fontSize: '0.75rem',
-                    background: 'rgba(245, 158, 11, 0.15)',
-                    color: '#f59e0b',
-                    padding: '0.2rem 0.55rem',
-                    borderRadius: '6px',
-                    fontWeight: 700,
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.3rem',
-                    border: '1px solid rgba(245, 158, 11, 0.3)',
-                    cursor: 'default',
-                    userSelect: 'none'
+                    width: 100,
+                    height: 100,
+                    borderRadius: '50%',
+                    objectFit: 'cover',
+                    border: '3px solid var(--accent-primary)',
+                    boxShadow: 'var(--shadow-md)',
                   }}
-                >
-                  <Star size={11} fill="#f59e0b" />
-                  PREMIUM
-                </span>
-              )}
-
-              {profile.is_vip && (
-                <span
+                />
+              ) : (
+                <div
+                  className="profile-avatar-img"
                   style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.3rem',
-                    background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)',
+                    width: 100,
+                    height: 100,
+                    borderRadius: '50%',
+                    border: '3px solid var(--accent-primary)',
+                    boxShadow: 'var(--shadow-md)',
+                    background: 'linear-gradient(135deg, var(--accent-primary), #4f46e5)',
                     color: 'white',
-                    padding: '0.2rem 0.6rem',
-                    borderRadius: '12px',
-                    fontSize: '0.8rem',
-                    fontWeight: 700,
-                    boxShadow: '0 2px 8px rgba(139, 92, 246, 0.4)'
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '2.2rem',
+                    fontWeight: 800,
                   }}
                 >
-                  <Crown size={12} fill="white" />
-                  VIP
-                </span>
-              )}
-
-              {profile.is_admin && (
-                <span style={{ fontSize: '0.75rem', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: 600 }}>
-                  ADMIN
-                </span>
+                  {profile.username?.charAt(0).toUpperCase() || 'U'}
+                </div>
               )}
             </div>
 
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', margin: '0 0 0.8rem 0', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <Calendar size={16} /> {isEs ? 'Miembro desde' : 'Joined'} {formatDate(new Date(profile.created_at || Date.now()))}
+            {/* User Identity: Username & Badges */}
+            <div className="profile-user-identity" style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', minWidth: 0, flex: 1, textAlign: 'left' }}>
+              <h1 className="profile-username-heading" style={{ margin: 0, fontSize: '2rem', fontWeight: 800, lineHeight: 1.2 }}>{profile.username}</h1>
+              
+              {/* Badges / Labels row below username */}
+              <div className="profile-badges-row" style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
+                {profile.is_pro && (
+                  <span
+                    style={{
+                      fontSize: '0.75rem',
+                      background: 'rgba(245, 158, 11, 0.15)',
+                      color: '#f59e0b',
+                      padding: '0.2rem 0.55rem',
+                      borderRadius: '6px',
+                      fontWeight: 700,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.3rem',
+                      border: '1px solid rgba(245, 158, 11, 0.3)',
+                      cursor: 'default',
+                      userSelect: 'none'
+                    }}
+                  >
+                    <Star size={11} fill="#f59e0b" />
+                    PREMIUM
+                  </span>
+                )}
+
+                {profile.is_vip && (
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.3rem',
+                      background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)',
+                      color: 'white',
+                      padding: '0.2rem 0.6rem',
+                      borderRadius: '12px',
+                      fontSize: '0.8rem',
+                      fontWeight: 700,
+                      boxShadow: '0 2px 8px rgba(139, 92, 246, 0.4)'
+                    }}
+                  >
+                    <Crown size={12} fill="white" />
+                    VIP
+                  </span>
+                )}
+
+                {profile.is_admin && (
+                  <span style={{ fontSize: '0.75rem', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: 600 }}>
+                    ADMIN
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Details below top row: Join date, stats, and last.fm */}
+          <div className="profile-header-details-wrap" style={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', gap: '0.65rem', width: '100%', textAlign: 'left' }}>
+            <p className="profile-join-date" style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <Calendar size={15} /> {isEs ? 'Miembro desde' : 'Joined'} {formatDate(new Date(profile.created_at || Date.now()))}
             </p>
 
-            <div style={{ display: 'flex', gap: '1.5rem', fontSize: '0.9rem', flexWrap: 'wrap', alignItems: 'center' }}>
+            <div className="profile-stats-row" style={{ display: 'flex', gap: '1.25rem', fontSize: '0.9rem', flexWrap: 'wrap', alignItems: 'center' }}>
               <span><strong style={{ color: 'var(--text-primary)' }}>{profile.followers_count ?? 0}</strong> {isEs ? 'Seguidores' : 'Followers'}</span>
               <span><strong style={{ color: 'var(--text-primary)' }}>{profile.following_count ?? 0}</strong> {isEs ? 'Seguidos' : 'Following'}</span>
               <span><strong style={{ color: 'var(--text-primary)' }}>{shelfCount}</strong> {isEs ? 'En Estantería' : 'On Shelf'}</span>
@@ -615,8 +627,9 @@ export const CustomizePage: React.FC = () => {
             {/* Now Playing / Last.fm Widget */}
             {Boolean(profile?.lastfm_username) && (
               <div 
+                className="profile-lastfm-widget"
                 style={{ 
-                  marginTop: '1.25rem', 
+                  marginTop: '0.5rem', 
                   display: 'flex', 
                   alignItems: 'center', 
                   gap: '1rem', 
