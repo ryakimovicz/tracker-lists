@@ -112,7 +112,7 @@ const translations: Translations = {
 
   // Search Page
   searchTitle: { en: 'Explore media', es: 'Explorar obras' },
-  searchPlaceholder: { en: 'Search games, movies, series, books, anime, manga...', es: 'Buscar juegos, películas, series, libros, anime, manga...' },
+  searchPlaceholder: { en: 'Search titles, users, and guides...', es: 'Buscar obras, usuarios y guías...' },
   searchButton: { en: 'Search', es: 'Buscar' },
   searchNoResults: { en: 'No results found.', es: 'No se encontraron resultados.' },
   loadMoreResults: { en: 'Load more results', es: 'Mostrar más resultados' },
