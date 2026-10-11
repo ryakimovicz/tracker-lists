@@ -250,7 +250,7 @@ const ExploreSection = React.memo<ExploreSectionProps>(({
           {isFiltered ? (
             <>
               {/* Category Title & Badge on Mobile */}
-              <div className="home-mobile-only" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', paddingLeft: '0.5rem', paddingRight: '0.5rem', marginBottom: '0.25rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', paddingLeft: '0.5rem', paddingRight: '0.5rem', marginBottom: '0.25rem' }}>
                 <span style={{ display: 'inline-flex', alignItems: 'center' }}>
                   {getCategoryIcon(type, { size: 20, color: `var(--color-${type})` })}
                 </span>
