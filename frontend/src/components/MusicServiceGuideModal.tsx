@@ -41,14 +41,57 @@ export const MusicServiceGuideModal: React.FC<MusicServiceGuideModalProps> = ({ 
     setSearchParams(newParams);
   };
 
+  const touchStartRef = React.useRef<{ x: number; y: number } | null>(null);
+
+  React.useEffect(() => {
+    if (!isOpen) return;
+    const originalStyle = window.getComputedStyle(document.body).overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = originalStyle;
+    };
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const platforms = [
     { id: 'spotify', name: 'Spotify' },
     { id: 'applemusic', name: 'Apple Music' },
-    { id: 'ytmusic_other', name: isEs ? 'YT Music / Otros' : 'YT Music / Other' },
     { id: 'deezer_tidal', name: 'Deezer / Tidal' },
+    { id: 'ytmusic_other', name: isEs ? 'Otros' : 'Other' },
   ];
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      touchStartRef.current = {
+        x: e.touches[0].clientX,
+        y: e.touches[0].clientY,
+      };
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (!touchStartRef.current || e.changedTouches.length === 0) return;
+    const endX = e.changedTouches[0].clientX;
+    const endY = e.changedTouches[0].clientY;
+    const diffX = endX - touchStartRef.current.x;
+    const diffY = endY - touchStartRef.current.y;
+    touchStartRef.current = null;
+
+    // Minimum 45px horizontal movement and predominantly horizontal swipe
+    if (Math.abs(diffX) > 45 && Math.abs(diffX) > Math.abs(diffY) * 1.5) {
+      const currentIndex = platforms.findIndex((p) => p.id === activeTab);
+      if (currentIndex !== -1) {
+        if (diffX < 0 && currentIndex < platforms.length - 1) {
+          // Swipe Left -> next tab
+          handleTabChange(platforms[currentIndex + 1].id as MusicGuideTabId);
+        } else if (diffX > 0 && currentIndex > 0) {
+          // Swipe Right -> previous tab
+          handleTabChange(platforms[currentIndex - 1].id as MusicGuideTabId);
+        }
+      }
+    }
+  };
 
   return (
     <div
@@ -178,8 +221,10 @@ export const MusicServiceGuideModal: React.FC<MusicServiceGuideModalProps> = ({ 
           })}
         </div>
 
-        {/* Tab Content Body */}
+        {/* Tab Content Body (Supports swipe gestures on mobile) */}
         <div
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
           style={{
             padding: '1.5rem',
             overflowY: 'auto',
@@ -189,6 +234,7 @@ export const MusicServiceGuideModal: React.FC<MusicServiceGuideModalProps> = ({ 
             fontSize: '0.88rem',
             lineHeight: 1.5,
             color: 'var(--text-secondary)',
+            touchAction: 'pan-y',
           }}
         >
           {/* Spotify */}
@@ -348,16 +394,16 @@ export const MusicServiceGuideModal: React.FC<MusicServiceGuideModalProps> = ({ 
                   </ol>
                 </div>
 
-                <div style={{ background: 'var(--bg-tertiary)', padding: '1rem', borderRadius: '10px' }}>
-                  <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
-                    {isEs ? 'En Celulares Android' : 'On Android Phones'}
+                  <div style={{ background: 'var(--bg-tertiary)', padding: '1rem', borderRadius: '10px' }}>
+                    <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
+                      {isEs ? 'En Celulares Android' : 'On Android Phones'}
+                    </div>
+                    <p style={{ margin: 0 }}>
+                      {isEs
+                        ? 'Instala una app de scrobbling como Pano Scrobbler (recomendada) o la app oficial de Last.fm desde Google Play Store y conéctala a tu cuenta para registrar YouTube Music o cualquier reproductor de tu teléfono.'
+                        : 'Install a scrobbling app like Pano Scrobbler (recommended) or the official Last.fm app from Google Play Store and connect it to your account to track YouTube Music or any music player on your phone.'}
+                    </p>
                   </div>
-                  <p style={{ margin: 0 }}>
-                    {isEs
-                      ? 'Instala la app Pano Scrobbler o la app oficial de Last.fm desde Google Play Store y activa el acceso a notificaciones multimedia para registrar YouTube Music o cualquier app de música del celular.'
-                      : 'Install Pano Scrobbler or the official Last.fm app from Google Play Store and enable media notification access to track YouTube Music or any music app on your phone.'}
-                  </p>
-                </div>
               </div>
             </div>
           )}
