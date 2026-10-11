@@ -72,7 +72,7 @@ export const MobileBottomNav: React.FC = () => {
                 <div className="mobile-nav-create-icon" aria-hidden="true">
                   <BookOpen size={24} strokeWidth={item.isActive ? 2.4 : 1.9} />
                   <span className="mobile-nav-create-plus-badge">
-                    <Plus size={11} strokeWidth={3.2} />
+                    <Plus size={13} strokeWidth={item.isActive ? 3 : 2.5} />
                   </span>
                 </div>
               ) : (
