@@ -3082,12 +3082,17 @@ export const Profile: React.FC = () => {
           {isOwnProfile && (
             <button
               onClick={() => navigate('/customize')}
-              className="btn-secondary profile-customize-btn"
+              className="profile-customize-btn"
               style={{
                 position: 'absolute',
                 top: '1.25rem',
                 right: '1.25rem',
-                padding: '0.55rem',
+                width: '38px',
+                height: '38px',
+                minWidth: '38px',
+                minHeight: '38px',
+                aspectRatio: '1 / 1',
+                padding: 0,
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -3100,10 +3105,11 @@ export const Profile: React.FC = () => {
                 zIndex: 3,
                 boxShadow: isLight ? '0 4px 12px rgba(0,0,0,0.1)' : '0 4px 12px rgba(0,0,0,0.3)',
                 transition: 'all 0.2s ease',
+                flexShrink: 0
               }}
               title={language === 'es' ? 'Personalizar perfil' : 'Customize profile'}
             >
-              <Pencil size={19} />
+              <Pencil size={18} />
             </button>
           )}
 
