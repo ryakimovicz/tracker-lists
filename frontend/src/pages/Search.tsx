@@ -1348,33 +1348,9 @@ export const Search: React.FC = () => {
         </form>
       </div>
 
-      {/* Category Filters (Scrolls normally; hides as you scroll down, reappears as you scroll up) */}
-      <section 
-        className="search-panel-section explore-filters-section"
-        style={{ 
-          background: 'var(--bg-secondary)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
-          border: '1px solid var(--border-color)',
-          borderRadius: '16px',
-          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.25)',
-          padding: '1rem 1.25rem',
-          display: 'flex', 
-          flexDirection: 'column', 
-          gap: '1rem' 
-        }}
-      >
-        <div 
-          className="search-category-filters"
-          style={{
-            display: 'flex',
-            gap: '0.5rem',
-            overflowX: 'auto',
-            paddingTop: '0.15rem',
-            paddingBottom: '0.15rem',
-            WebkitOverflowScrolling: 'touch'
-          }}
-        >
+      {/* Category Filters (Loose buttons just like Home) */}
+      <section className="search-panel-section explore-filters-section">
+        <div className="search-category-filters">
           {sortFilterTabs([
             { value: 'all', label: language === 'es' ? 'Todo' : 'All' },
             { value: 'movie', label: language === 'es' ? 'Películas' : 'Movies' },

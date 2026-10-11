@@ -1919,11 +1919,13 @@ export const Home: React.FC = () => {
   const [homeCategoryFilter, setHomeCategoryFilter] = useState<string>("all");
   const upcomingSwipeRef = useRef<HTMLDivElement>(null);
   const isProgrammaticUpcomingScrollRef = useRef(false);
+  const isUserTouchingSwipeRef = useRef(false);
   const upcomingScrollTimeoutRef = useRef<any>(null);
 
   // Synchronize mobile swipe scroll position when entering upcoming tab or changing view
   useEffect(() => {
     if (activeTab === "upcoming" && upcomingSwipeRef.current) {
+      if (isUserTouchingSwipeRef.current) return;
       const el = upcomingSwipeRef.current;
       const maxScroll = el.scrollWidth - el.clientWidth;
       const targetScroll = upcomingFilter === "calendar" ? 0 : (maxScroll > 0 ? maxScroll : el.clientWidth);
@@ -1958,16 +1960,29 @@ export const Home: React.FC = () => {
     }
   };
 
-  const handleUpcomingSwipeScroll = () => {
+  const upcomingSwipeDebounceRef = useRef<any>(null);
+
+  const checkSwipeSettled = () => {
     if (!upcomingSwipeRef.current) return;
     if (isProgrammaticUpcomingScrollRef.current) return;
+    if (isUserTouchingSwipeRef.current) return;
     const el = upcomingSwipeRef.current;
     const scrollPos = el.scrollLeft;
     const maxScroll = el.scrollWidth - el.clientWidth;
     if (maxScroll <= 0) return;
-    
-    // Switch active tab once user crosses halfway of available scroll
+
+    // Check if scroll has settled near one of the edges (within 20% of 0 or maxScroll)
+    // so we don't trigger state updates while momentum scrolling in the middle
     const scrollFraction = scrollPos / maxScroll;
+    if (scrollFraction > 0.25 && scrollFraction < 0.75) {
+      // Still in transit or deceleration, wait for scroll-snap to finish
+      if (upcomingSwipeDebounceRef.current) clearTimeout(upcomingSwipeDebounceRef.current);
+      upcomingSwipeDebounceRef.current = setTimeout(() => {
+        checkSwipeSettled();
+      }, 100);
+      return;
+    }
+
     const newMode: "calendar" | "tba" = scrollFraction >= 0.5 ? "tba" : "calendar";
     if (newMode !== upcomingFilter) {
       const newParams = new URLSearchParams(searchParams);
@@ -1976,8 +1991,19 @@ export const Home: React.FC = () => {
       } else {
         newParams.delete('view');
       }
-      setSearchParams(newParams, { replace: true });
+      setSearchParams(newParams);
     }
+  };
+
+  const handleUpcomingSwipeScroll = () => {
+    if (!upcomingSwipeRef.current) return;
+    if (isProgrammaticUpcomingScrollRef.current) return;
+    
+    // Clear debounce timer and wait for scroll to stop
+    if (upcomingSwipeDebounceRef.current) clearTimeout(upcomingSwipeDebounceRef.current);
+    upcomingSwipeDebounceRef.current = setTimeout(() => {
+      checkSwipeSettled();
+    }, 180);
   };
 
   const lastFetchRef = useRef<number>(Date.now());
@@ -3097,6 +3123,15 @@ export const Home: React.FC = () => {
           {/* Mobile swipe view (edge-to-edge swipeable container between Calendario & Por confirmar) */}
           <div
             ref={upcomingSwipeRef}
+            onTouchStart={() => {
+              isUserTouchingSwipeRef.current = true;
+            }}
+            onTouchEnd={() => {
+              isUserTouchingSwipeRef.current = false;
+              setTimeout(() => {
+                checkSwipeSettled();
+              }, 60);
+            }}
             onScroll={handleUpcomingSwipeScroll}
             className="upcoming-mobile-swipe-wrapper home-mobile-only"
           >

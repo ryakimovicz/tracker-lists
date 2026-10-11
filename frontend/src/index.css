@@ -943,6 +943,27 @@ h1, h2, h3, h4, h5, h6 {
   margin-bottom: 0;
 }
 
+/* Explore Category Filters Bar on Desktop (Loose buttons like Home, close to search bar and subtabs) */
+.explore-filters-section {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  margin-top: -1.25rem !important;
+  margin-bottom: -1rem !important;
+  display: flex !important;
+  flex-direction: column !important;
+  width: 100% !important;
+}
+
+.search-category-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+}
+
 /* Desktop Grid when a single category is filtered in Home */
 .desktop-category-grid {
   display: grid;
