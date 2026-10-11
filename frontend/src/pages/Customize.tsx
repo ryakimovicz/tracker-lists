@@ -991,30 +991,18 @@ export const CustomizePage: React.FC = () => {
             </p>
           </div>
 
-          {colorMsg && (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                padding: '0.65rem 1rem',
-                borderRadius: '8px',
-                fontSize: '0.85rem',
-                marginBottom: '1rem',
-                background: colorMsg.type === 'success' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                color: colorMsg.type === 'success' ? '#10b981' : '#ef4444',
-                border: `1px solid ${colorMsg.type === 'success' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`,
-              }}
-            >
-              {colorMsg.type === 'success' ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
-              <span>{colorMsg.text}</span>
-            </div>
-          )}
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '0.85rem' }}>
+          <div 
+            style={{ 
+              display: 'flex', 
+              flexWrap: 'wrap', 
+              justifyContent: 'center', 
+              gap: '0.85rem' 
+            }}
+          >
             {PROFILE_THEME_COLORS.map((col) => {
               const activeColor = theme === 'light' ? col.light.accent : col.dark.accent;
-              const isSelected = selectedProfileColor === col.id || selectedProfileColor === col.dark.accent || selectedProfileColor === col.light.accent;
+              const isSelected = selectedProfileColor === col.id || selectedProfileColor === col.dark.accent || selectedProfileColor === col.light.accent || (col.id === 'amber' && (!selectedProfileColor || selectedProfileColor === 'default'));
+              const isDefault = col.id === 'amber';
 
               return (
                 <button
@@ -1023,10 +1011,14 @@ export const CustomizePage: React.FC = () => {
                   onClick={() => handleSelectProfileColor(col.id)}
                   disabled={isUpdatingColor}
                   style={{
+                    position: 'relative',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
                     gap: '0.6rem',
+                    width: '135px',
+                    flexGrow: 1,
+                    maxWidth: '160px',
                     padding: '0.9rem 0.75rem',
                     borderRadius: '12px',
                     border: isSelected ? `2px solid ${activeColor}` : '1px solid var(--border-color)',
@@ -1051,16 +1043,34 @@ export const CustomizePage: React.FC = () => {
                   >
                     {isSelected && <CheckCircle size={16} color="#ffffff" />}
                   </div>
-                  <span
-                    style={{
-                      fontSize: '0.8rem',
-                      fontWeight: isSelected ? 700 : 500,
-                      color: isSelected ? activeColor : 'var(--text-primary)',
-                      textAlign: 'center',
-                    }}
-                  >
-                    {isEs ? col.name.es : col.name.en}
-                  </span>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.2rem' }}>
+                    <span
+                      style={{
+                        fontSize: '0.8rem',
+                        fontWeight: isSelected ? 700 : 500,
+                        color: isSelected ? activeColor : 'var(--text-primary)',
+                        textAlign: 'center',
+                        lineHeight: 1.2,
+                      }}
+                    >
+                      {isEs ? col.name.es : col.name.en}
+                    </span>
+                    {isDefault && (
+                      <span
+                        style={{
+                          fontSize: '0.62rem',
+                          color: '#f59e0b',
+                          background: 'rgba(245, 158, 11, 0.12)',
+                          padding: '0.1rem 0.35rem',
+                          borderRadius: '4px',
+                          fontWeight: 600,
+                          letterSpacing: '0.02em',
+                        }}
+                      >
+                        {isEs ? 'Predeterminado' : 'Default'}
+                      </span>
+                    )}
+                  </div>
                 </button>
               );
             })}
@@ -1545,6 +1555,28 @@ export const CustomizePage: React.FC = () => {
         name={musicDetailsModal.name}
         initialImage={musicDetailsModal.image}
       />
+
+      {/* Floating Toast Notification for Profile Color Changes */}
+      {colorMsg && (
+        <div
+          className="customize-floating-toast"
+          style={{
+            background: isLight ? 'rgba(255, 255, 255, 0.94)' : 'rgba(15, 23, 42, 0.94)',
+            color: colorMsg.type === 'success' ? activeProfileTheme.accent : '#ef4444',
+            border: `1.5px solid ${colorMsg.type === 'success' ? activeProfileTheme.border : 'rgba(239, 68, 68, 0.35)'}`,
+            boxShadow: colorMsg.type === 'success'
+              ? `0 12px 36px rgba(0, 0, 0, 0.45), 0 0 24px ${activeProfileTheme.glow}`
+              : '0 12px 36px rgba(0, 0, 0, 0.45), 0 0 20px rgba(239, 68, 68, 0.2)',
+          }}
+        >
+          {colorMsg.type === 'success' ? (
+            <CheckCircle size={18} color={activeProfileTheme.accent} />
+          ) : (
+            <AlertCircle size={18} color="#ef4444" />
+          )}
+          <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{colorMsg.text}</span>
+        </div>
+      )}
     </div>
   );
 };

@@ -23,8 +23,9 @@ import { PrivacyPolicy } from './pages/PrivacyPolicy';
 import { TermsOfService } from './pages/TermsOfService';
 
 import { LanguageProvider } from './context/LanguageContext';
-import { ThemeProvider } from './context/ThemeContext';
+import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { GoogleOAuthProvider } from '@react-oauth/google';
+import { getProfileTheme } from './utils/profileThemes';
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 
@@ -43,7 +44,9 @@ import { MobileBottomNav } from './components/MobileBottomNav';
 import React, { useEffect } from 'react';
 
 function AppContent() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
+  const { resolvedTheme } = useTheme();
+  const isLight = resolvedTheme === 'light';
   const [contentMarginRight, setContentMarginRight] = React.useState<number>(0);
   const hasToken = Boolean(localStorage.getItem('access_token'));
   const location = useLocation();
@@ -82,8 +85,18 @@ function AppContent() {
     return () => window.removeEventListener('resize', updateCentering);
   }, []);
 
+  const appProfileTheme = React.useMemo(() => {
+    if (user?.is_pro && user?.profile_color) {
+      return getProfileTheme(user.profile_color, isLight);
+    }
+    return null;
+  }, [user?.is_pro, user?.profile_color, isLight]);
+
   return (
-    <div className="app-container">
+    <div 
+      className="app-container"
+      style={appProfileTheme?.cssVariables}
+    >
       <SuspendedAccountModal />
       <Sidebar />
       <MobileHeader />
