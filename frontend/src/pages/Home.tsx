@@ -1922,6 +1922,74 @@ export const Home: React.FC = () => {
   const isUserTouchingSwipeRef = useRef(false);
   const upcomingScrollTimeoutRef = useRef<any>(null);
 
+  // Scroll direction state for category filters:
+  // When scrolling down past threshold, filters hide.
+  // When scrolling up even a little bit, filters reappear!
+  const [showFiltersOnScroll, setShowFiltersOnScroll] = useState<boolean>(true);
+  const lastScrollYRef = useRef<number>(0);
+  const scrollAccumulatorRef = useRef<number>(0);
+
+  useEffect(() => {
+    // Only monitor scroll behavior on mobile screens (width <= 768)
+    if (typeof window === 'undefined') return;
+
+    lastScrollYRef.current = Math.max(0, window.scrollY || document.documentElement.scrollTop || 0);
+    let ticking = false;
+    
+    const handleScroll = () => {
+      if (window.innerWidth > 768) {
+        setShowFiltersOnScroll(true);
+        return;
+      }
+
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          const currentScrollY = Math.max(0, window.scrollY || document.documentElement.scrollTop || 0);
+          const delta = currentScrollY - lastScrollYRef.current;
+          lastScrollYRef.current = currentScrollY;
+
+          // While within the initial header scroll area (0 to 140px), keep filters visible without any flickering
+          if (currentScrollY <= 140) {
+            setShowFiltersOnScroll(true);
+            scrollAccumulatorRef.current = 0;
+            ticking = false;
+            return;
+          }
+
+          // Ignore tiny noise (< 2px)
+          if (Math.abs(delta) < 2) {
+            ticking = false;
+            return;
+          }
+
+          // Reset accumulator when changing scroll direction
+          if ((delta > 0 && scrollAccumulatorRef.current < 0) || (delta < 0 && scrollAccumulatorRef.current > 0)) {
+            scrollAccumulatorRef.current = 0;
+          }
+
+          scrollAccumulatorRef.current += delta;
+
+          // Only hide after user has scrolled down past the top zone and accumulated > 60px of downward movement
+          if (scrollAccumulatorRef.current > 60) {
+            setShowFiltersOnScroll(false);
+            scrollAccumulatorRef.current = 0;
+          }
+          // Only show when user scrolls back up with intentional movement (> 40px)
+          else if (scrollAccumulatorRef.current < -40) {
+            setShowFiltersOnScroll(true);
+            scrollAccumulatorRef.current = 0;
+          }
+
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
   // Synchronize mobile swipe scroll position when entering upcoming tab or changing view
   useEffect(() => {
     if (activeTab === "upcoming" && upcomingSwipeRef.current) {
@@ -2645,109 +2713,112 @@ export const Home: React.FC = () => {
   return (
     <div className="home-main-container" style={{ maxWidth: "1200px", margin: "0 auto", display: "flex", flexDirection: "column", gap: "2rem" }}>
       
-      {/* Tabs */}
-      <div 
-        className="home-tabs-container"
-        style={{ 
-          display: "flex", 
-          gap: "1.75rem", 
-          borderBottom: "1px solid var(--border-color)", 
-          paddingBottom: "0.75rem", 
-          marginBottom: "1.75rem",
-          position: "sticky", 
-          top: 0, 
-          zIndex: 20, 
-          background: "var(--bg-primary)", 
-          marginTop: "-2rem",
-          paddingTop: "0.85rem" 
-        }}
-      >
-        {["watching", "guides", "plan_to_watch", "completed", "dropped", "upcoming"].map((tab) => {
-          const labels: any = language === 'es'
-            ? { "watching": "Continuar", "guides": "Guías", "plan_to_watch": "No comenzado", "completed": "Terminado", "dropped": "Abandonado", "upcoming": "Próximos" }
-            : { "watching": "Continue", "guides": "Guides", "plan_to_watch": "Not started", "completed": "Completed", "dropped": "Dropped", "upcoming": "Upcoming" };
-          const icons: any = {
-            "watching": <Play size={18} />,
-            "guides": <BookOpen size={18} />,
-            "plan_to_watch": <Bookmark size={18} />,
-            "completed": <CheckCircle size={18} />,
-            "dropped": <XCircle size={18} />,
-            "upcoming": <Calendar size={18} />
-          };
-          const isActive = activeTab === tab;
-          return (
-            <div 
-              key={tab}
-              onClick={() => handleTabChange(tab as any)}
-              className={`home-tab-item ${isActive ? 'active' : ''}`}
-              title={labels[tab]}
-              style={{
-                fontSize: "1.05rem", fontWeight: isActive ? 600 : 500,
-                color: isActive ? "var(--text-primary)" : "var(--text-secondary)",
-                cursor: "pointer", padding: "0.25rem 0", position: "relative",
-                whiteSpace: "nowrap"
-              }}
-            >
-              <span className="home-tab-icon">{icons[tab]}</span>
-              <span className="home-tab-label">{labels[tab]}</span>
-              {isActive && <div className="home-tab-indicator" style={{ position: "absolute", bottom: "-0.75rem", left: 0, right: 0, height: "2px", background: "var(--accent-primary)" }} />}
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Category Filters Bar (Todos + 7 Categorías) - Persistent across tabs */}
-      {activeTab !== 'guides' && (
-        <div className="home-category-filters-container">
-          {sortFilterTabs([
-            { value: 'all', label: language === 'es' ? 'Todo' : 'All' },
-            { value: 'movie', label: language === 'es' ? 'Películas' : 'Movies' },
-            { value: 'series', label: language === 'es' ? 'Series' : 'Shows' },
-            { value: 'anime', label: 'Anime' },
-            { value: 'book', label: language === 'es' ? 'Libros' : 'Books' },
-            { value: 'comic', label: language === 'es' ? 'Cómics' : 'Comics' },
-            { value: 'manga', label: 'Mangas' },
-            { value: 'game', label: language === 'es' ? 'Juegos' : 'Games' }
-          ], currentUser?.category_order).map(tab => {
-            const isSelected = homeCategoryFilter === tab.value;
-
-            const tabColor = tab.value === 'all' 
-              ? 'var(--accent-primary)' 
-              : `var(--color-${tab.value})`;
-            const tabTextColor = tab.value === 'all' 
-              ? '#ffffff' 
-              : `var(--color-text-${tab.value})`;
-
-            const handleFilterClick = () => {
-              setHomeCategoryFilter(tab.value);
+      {/* Sticky Header: Tabs + Category Filters unified below tabs */}
+      <div className="home-sticky-header-wrapper">
+        {/* Tabs */}
+        <div 
+          className="home-tabs-container"
+          style={{ 
+            display: "flex", 
+            gap: "1.75rem", 
+            borderBottom: "1px solid var(--border-color)", 
+            paddingBottom: "0.75rem", 
+            marginBottom: "0.75rem",
+            position: "relative",
+            zIndex: 2, 
+            background: "var(--bg-primary)", 
+            paddingTop: "0.5rem" 
+          }}
+        >
+          {["watching", "guides", "plan_to_watch", "completed", "dropped", "upcoming"].map((tab) => {
+            const labels: any = language === 'es'
+              ? { "watching": "Continuar", "guides": "Guías", "plan_to_watch": "No comenzado", "completed": "Terminado", "dropped": "Abandonado", "upcoming": "Próximos" }
+              : { "watching": "Continue", "guides": "Guides", "plan_to_watch": "Not started", "completed": "Completed", "dropped": "Dropped", "upcoming": "Upcoming" };
+            const icons: any = {
+              "watching": <Play size={18} />,
+              "guides": <BookOpen size={18} />,
+              "plan_to_watch": <Bookmark size={18} />,
+              "completed": <CheckCircle size={18} />,
+              "dropped": <XCircle size={18} />,
+              "upcoming": <Calendar size={18} />
             };
-
+            const isActive = activeTab === tab;
             return (
-              <button
-                key={tab.value}
-                type="button"
-                onClick={handleFilterClick}
-                className={`profile-category-tab search-filter-btn ${isSelected ? 'selected' : ''}`}
-                title={tab.label}
+              <div 
+                key={tab}
+                onClick={() => handleTabChange(tab as any)}
+                className={`home-tab-item ${isActive ? 'active' : ''}`}
+                title={labels[tab]}
                 style={{
-                  padding: '0.35rem 0.85rem',
-                  fontSize: '0.85rem',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.4rem',
-                '--tab-color': tabColor,
-                '--tab-text': tabTextColor
-              } as React.CSSProperties}
-            >
-              <span className="search-filter-icon" style={{ display: 'inline-flex', alignItems: 'center' }}>
-                {getCategoryIcon(tab.value, { size: 14, color: isSelected ? tabTextColor : tabColor })}
-              </span>
-              <span className="search-filter-label">{tab.label}</span>
-            </button>
-          );
-        })}
+                  fontSize: "1.05rem", fontWeight: isActive ? 600 : 500,
+                  color: isActive ? "var(--text-primary)" : "var(--text-secondary)",
+                  cursor: "pointer", padding: "0.25rem 0", position: "relative",
+                  whiteSpace: "nowrap"
+                }}
+              >
+                <span className="home-tab-icon">{icons[tab]}</span>
+                <span className="home-tab-label">{labels[tab]}</span>
+                {isActive && <div className="home-tab-indicator" style={{ position: "absolute", bottom: "-0.75rem", left: 0, right: 0, height: "2px", background: "var(--accent-primary)" }} />}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Category Filters Bar (Todos + 7 Categorías) - Positioned right below tabs */}
+        {activeTab !== 'guides' && (
+          <div className={`home-category-filters-container ${showFiltersOnScroll ? 'show' : 'hide'}`}>
+            <div className="home-category-filters-container-inner">
+              {sortFilterTabs([
+                { value: 'all', label: language === 'es' ? 'Todo' : 'All' },
+                { value: 'movie', label: language === 'es' ? 'Películas' : 'Movies' },
+                { value: 'series', label: language === 'es' ? 'Series' : 'Shows' },
+                { value: 'anime', label: 'Anime' },
+                { value: 'book', label: language === 'es' ? 'Libros' : 'Books' },
+                { value: 'comic', label: language === 'es' ? 'Cómics' : 'Comics' },
+                { value: 'manga', label: 'Mangas' },
+                { value: 'game', label: language === 'es' ? 'Juegos' : 'Games' }
+              ], currentUser?.category_order).map(tab => {
+                const isSelected = homeCategoryFilter === tab.value;
+
+                const tabColor = tab.value === 'all' 
+                  ? 'var(--accent-primary)' 
+                  : `var(--color-${tab.value})`;
+                const tabTextColor = tab.value === 'all' 
+                  ? '#ffffff' 
+                  : `var(--color-text-${tab.value})`;
+
+                const handleFilterClick = () => {
+                  setHomeCategoryFilter(tab.value);
+                };
+
+                return (
+                  <button
+                    key={tab.value}
+                    type="button"
+                    onClick={handleFilterClick}
+                    className={`profile-category-tab search-filter-btn ${isSelected ? 'selected' : ''}`}
+                    title={tab.label}
+                    style={{
+                      padding: '0.35rem 0.85rem',
+                      fontSize: '0.85rem',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.4rem',
+                      '--tab-color': tabColor,
+                      '--tab-text': tabTextColor
+                    } as React.CSSProperties}
+                  >
+                    <span className="search-filter-icon" style={{ display: 'inline-flex', alignItems: 'center' }}>
+                      {getCategoryIcon(tab.value, { size: 14, color: isSelected ? tabTextColor : tabColor })}
+                    </span>
+                    <span className="search-filter-label">{tab.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
-      )}
 
       {/* Media Row */}
       {activeTab === "upcoming" ? (

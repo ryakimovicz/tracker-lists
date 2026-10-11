@@ -932,15 +932,32 @@ h1, h2, h3, h4, h5, h6 {
   display: inline;
 }
 
-/* Home Category Filters Bar on Desktop */
+/* Unified Sticky Header for Home (Desktop) */
+.home-sticky-header-wrapper {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: var(--bg-primary);
+  margin-top: -2rem;
+  padding-top: 0.85rem;
+  width: 100%;
+}
+
+/* Home Category Filters Bar on Desktop (Always visible on desktop) */
 .home-category-filters-container {
+  display: flex;
+  width: 100%;
+  padding-bottom: 0.75rem;
+  box-sizing: border-box;
+}
+
+.home-category-filters-container-inner {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
   width: 100%;
-  margin-top: -2.75rem;
-  margin-bottom: 0;
+  box-sizing: border-box;
 }
 
 /* Explore Category Filters Bar on Desktop (Loose buttons like Home, close to search bar and subtabs) */
@@ -1262,10 +1279,43 @@ h1, h2, h3, h4, h5, h6 {
     gap: 0 !important;
   }
 
-  /* -------------------------------------------------------------------------
-     Mobile Home Tabs (Single row with smooth horizontal scroll)
-     ------------------------------------------------------------------------- */
-  .home-tabs-container,
+  /* Mobile Sticky Header (Tabs + Filter Bar sticky together) */
+  .home-sticky-header-wrapper {
+    position: sticky !important;
+    top: calc(56px + env(safe-area-inset-top, 0px)) !important;
+    z-index: 50 !important;
+    background: var(--bg-primary) !important;
+    margin-top: -1rem !important;
+    padding-top: 0.5rem !important;
+    padding-bottom: 0.35rem !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+  }
+
+  .home-tabs-container {
+    position: relative !important;
+    top: auto !important;
+    z-index: 2 !important;
+    background: var(--bg-primary) !important;
+    margin-top: 0 !important;
+    padding-top: 0.25rem !important;
+    padding-bottom: 0.5rem !important;
+    margin-bottom: 0 !important;
+    display: flex !important;
+    justify-content: space-around !important;
+    align-items: center !important;
+    gap: 0 !important;
+    overflow-x: hidden !important;
+    overflow-y: hidden !important;
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+    box-sizing: border-box !important;
+    border-bottom: 1px solid var(--border-color) !important;
+  }
+
   .social-tabs-container {
     position: sticky !important;
     top: calc(56px + env(safe-area-inset-top, 0px)) !important;
@@ -1288,17 +1338,50 @@ h1, h2, h3, h4, h5, h6 {
     box-sizing: border-box !important;
   }
 
-  /* Home second filter bar on mobile: 8 icons (Todos + 7 categories) */
+  /* Home Category Filter Buttons on mobile: Clean, loose button appearance below tabs that smoothly slides away on scroll down and returns on scroll up */
   .home-category-filters-container {
+    height: auto !important;
+    max-height: 120px !important;
+    margin-top: 0.5rem !important;
+    margin-bottom: 0.15rem !important;
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
+    position: relative !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    transition: opacity 0.28s cubic-bezier(0.2, 0, 0, 1), transform 0.28s cubic-bezier(0.2, 0, 0, 1), max-height 0.3s cubic-bezier(0.2, 0, 0, 1), margin 0.3s cubic-bezier(0.2, 0, 0, 1) !important;
+    transform: translateY(0);
+    opacity: 1;
+    overflow: hidden !important;
+  }
+
+  .home-category-filters-container.hide {
+    max-height: 0 !important;
+    opacity: 0 !important;
+    transform: translateY(-16px) !important;
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+    pointer-events: none !important;
+  }
+
+  .home-category-filters-container.show {
+    max-height: 120px !important;
+    opacity: 1 !important;
+    transform: translateY(0) !important;
+    pointer-events: auto !important;
+  }
+
+  .home-category-filters-container-inner {
     display: grid !important;
     grid-template-columns: repeat(4, 1fr) !important;
     gap: 0.45rem !important;
-    padding-left: 0.5rem !important;
-    padding-right: 0.5rem !important;
-    margin-top: 0 !important;
-    margin-bottom: 1.35rem !important;
-    box-sizing: border-box !important;
     width: 100% !important;
+    box-sizing: border-box !important;
   }
 
   .home-tabs-container::-webkit-scrollbar,
