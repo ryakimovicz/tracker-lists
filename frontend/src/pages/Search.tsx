@@ -1249,6 +1249,71 @@ export const Search: React.FC = () => {
   const currentShelfItem = selectedItem ? findInShelfMap(shelfMap, selectedItem.item_type, selectedItem.external_id) : null;
   const isFavorite = Boolean(currentShelfItem?.is_favorite);
 
+  // Scroll direction state for explore category filters (matches Home behavior)
+  const [showFiltersOnScroll, setShowFiltersOnScroll] = useState<boolean>(true);
+  const lastScrollYRef = useRef<number>(0);
+  const scrollAccumulatorRef = useRef<number>(0);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    lastScrollYRef.current = Math.max(0, window.scrollY || document.documentElement.scrollTop || 0);
+    let ticking = false;
+
+    const handleScroll = () => {
+      if (window.innerWidth > 768) {
+        setShowFiltersOnScroll(true);
+        return;
+      }
+
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          const currentScrollY = Math.max(0, window.scrollY || document.documentElement.scrollTop || 0);
+          const delta = currentScrollY - lastScrollYRef.current;
+          lastScrollYRef.current = currentScrollY;
+
+          // While within the initial header scroll area (0 to 140px), keep filters visible
+          if (currentScrollY <= 140) {
+            setShowFiltersOnScroll(true);
+            scrollAccumulatorRef.current = 0;
+            ticking = false;
+            return;
+          }
+
+          // Ignore tiny noise (< 2px)
+          if (Math.abs(delta) < 2) {
+            ticking = false;
+            return;
+          }
+
+          // Reset accumulator when changing scroll direction
+          if ((delta > 0 && scrollAccumulatorRef.current < 0) || (delta < 0 && scrollAccumulatorRef.current > 0)) {
+            scrollAccumulatorRef.current = 0;
+          }
+
+          scrollAccumulatorRef.current += delta;
+
+          // Only hide after user has scrolled down past the top zone and accumulated > 60px of downward movement
+          if (scrollAccumulatorRef.current > 60) {
+            setShowFiltersOnScroll(false);
+            scrollAccumulatorRef.current = 0;
+          }
+          // Only show when user scrolls back up with intentional movement (> 40px)
+          else if (scrollAccumulatorRef.current < -40) {
+            setShowFiltersOnScroll(true);
+            scrollAccumulatorRef.current = 0;
+          }
+
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
   const modalItem = React.useMemo(() => {
     if (!selectedItem) return null;
     if (selectedItem.item_type === 'guide' || selectedItem.item_type === 'user') {
@@ -1270,234 +1335,228 @@ export const Search: React.FC = () => {
   return (
     <div className="explore-page-container" style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
       
-      {/* Sticky Search Bar Header (permanently visible on mobile and desktop) */}
-      <div 
-        className="explore-sticky-search-bar"
-        style={{
-          position: 'sticky',
-          top: 0,
-          zIndex: 45,
-          background: 'var(--bg-primary)',
-          paddingTop: '1rem',
-          paddingBottom: '0.5rem',
-          marginTop: '-1rem'
-        }}
-      >
-        <form onSubmit={handleSearch} style={{ display: 'flex', gap: '1rem' }}>
-          <div style={{ flex: 1, position: 'relative' }}>
-            <input
-              type="text"
-              required
-              className="input-field"
-              placeholder={activeTab === 'all' 
-                ? t('searchPlaceholder')
-                : (language === 'es' ? `Buscar en ${getCategoryLabel(activeTab)}...` : `Search in ${getCategoryLabel(activeTab)}...`)}
-              value={query}
-              onChange={(e) => {
-                const val = e.target.value;
-                setQuery(val);
-                if (val.trim() === '') {
-                  setSubmittedQuery('');
-                  setResults([]);
-                }
-              }}
-              style={{ paddingLeft: '2.5rem', paddingRight: query ? '2.5rem' : '1rem' }}
-            />
-            <SearchIcon size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)' }} />
-            {query && (
-              <button
-                type="button"
-                onClick={handleClearSearch}
-                title={language === 'es' ? 'Limpiar búsqueda' : 'Clear search'}
-                aria-label={language === 'es' ? 'Limpiar búsqueda' : 'Clear search'}
-                style={{
-                  position: 'absolute',
-                  right: '0.75rem',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  background: 'rgba(255, 255, 255, 0.1)',
-                  border: 'none',
-                  borderRadius: '50%',
-                  width: '22px',
-                  height: '22px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  color: 'var(--text-muted)',
-                  padding: 0,
-                  transition: 'background 0.2s, color 0.2s'
+      {/* Unified Sticky Header for Explore: Search bar, category filters, and subtabs */}
+      <div className="explore-sticky-header-wrapper">
+        {/* Search Bar Header */}
+        <div className="explore-sticky-search-bar">
+          <form onSubmit={handleSearch} style={{ display: 'flex', gap: '1rem' }}>
+            <div style={{ flex: 1, position: 'relative' }}>
+              <input
+                type="text"
+                required
+                className="input-field"
+                placeholder={activeTab === 'all' 
+                  ? t('searchPlaceholder')
+                  : (language === 'es' ? `Buscar en ${getCategoryLabel(activeTab)}...` : `Search in ${getCategoryLabel(activeTab)}...`)}
+                value={query}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setQuery(val);
+                  if (val.trim() === '') {
+                    setSubmittedQuery('');
+                    setResults([]);
+                  }
                 }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.25)';
-                  e.currentTarget.style.color = '#ffffff';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-                  e.currentTarget.style.color = 'var(--text-muted)';
-                }}
-              >
-                <X size={14} />
-              </button>
-            )}
-          </div>
+                style={{ paddingLeft: '2.5rem', paddingRight: query ? '2.5rem' : '1rem' }}
+              />
+              <SearchIcon size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)' }} />
+              {query && (
+                <button
+                  type="button"
+                  onClick={handleClearSearch}
+                  title={language === 'es' ? 'Limpiar búsqueda' : 'Clear search'}
+                  aria-label={language === 'es' ? 'Limpiar búsqueda' : 'Clear search'}
+                  style={{
+                    position: 'absolute',
+                    right: '0.75rem',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'rgba(255, 255, 255, 0.1)',
+                    border: 'none',
+                    borderRadius: '50%',
+                    width: '22px',
+                    height: '22px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    color: 'var(--text-muted)',
+                    padding: 0,
+                    transition: 'background 0.2s, color 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.25)';
+                    e.currentTarget.style.color = '#ffffff';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                    e.currentTarget.style.color = 'var(--text-muted)';
+                  }}
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
 
-          <button type="submit" disabled={isSearching} className="btn-primary" style={{ padding: '0 2.5rem' }}>
-            {isSearching ? '...' : t('searchButton')}
-          </button>
-        </form>
-      </div>
-
-      {/* Category Filters (Loose buttons just like Home) */}
-      <section className="search-panel-section explore-filters-section">
-        <div className="search-category-filters">
-          {sortFilterTabs([
-            { value: 'all', label: language === 'es' ? 'Todo' : 'All' },
-            { value: 'movie', label: language === 'es' ? 'Películas' : 'Movies' },
-            { value: 'series', label: language === 'es' ? 'Series' : 'Shows' },
-            { value: 'anime', label: 'Anime' },
-            { value: 'book', label: language === 'es' ? 'Libros' : 'Books' },
-            { value: 'comic', label: language === 'es' ? 'Cómics' : 'Comics' },
-            { value: 'manga', label: 'Mangas' },
-            { value: 'game', label: language === 'es' ? 'Juegos' : 'Games' },
-            { value: 'user', label: language === 'es' ? 'Usuarios' : 'Users' },
-            { value: 'guide', label: language === 'es' ? 'Guías' : 'Guides' }
-          ], user?.category_order).map(tab => {
-            const isSelected = activeTab === tab.value;
-            const tabColor = tab.value === 'all' 
-              ? 'var(--accent-primary)' 
-              : tab.value === 'user' 
-              ? 'var(--color-user, #ec4899)' 
-              : `var(--color-${tab.value})`;
-            const tabTextColor = tab.value === 'all' 
-              ? '#ffffff' 
-              : `var(--color-text-${tab.value})`;
-
-            return (
-              <button
-                key={tab.value}
-                type="button"
-                onClick={() => handleTabClick(tab.value as any)}
-                className={`profile-category-tab search-filter-btn ${isSelected ? 'selected' : ''}`}
-                title={tab.label}
-                style={{
-                  padding: '0.35rem 0.85rem',
-                  fontSize: '0.85rem',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.4rem',
-                  '--tab-color': tabColor,
-                  '--tab-text': tabTextColor
-                } as React.CSSProperties}
-              >
-                <span className="search-filter-icon" style={{ display: 'inline-flex', alignItems: 'center' }}>
-                  {getCategoryIcon(tab.value, { size: 14, color: isSelected ? tabTextColor : tabColor })}
-                </span>
-                <span className="search-filter-label">{tab.label}</span>
-              </button>
-            );
-          })}
+            <button type="submit" disabled={isSearching} className="btn-primary" style={{ padding: '0 2.5rem' }}>
+              {isSearching ? '...' : t('searchButton')}
+            </button>
+          </form>
         </div>
-      </section>
 
-      {/* Explore Subtabs (Novedades, Tendencias, Guías) - Sticks just like Home & Social tabs */}
-      {submittedQuery === '' && (
-        <div 
-          className="explore-subtabs-container"
-          style={{ 
-            display: "flex", 
-            alignItems: "center", 
-            gap: "1.75rem", 
-            borderBottom: "1px solid var(--border-color)",
-            paddingBottom: "0.75rem",
-            paddingTop: "0.25rem"
-          }}
-        >
-            <button 
-              type="button"
-              className={`explore-subtab-item ${exploreSubTab === 'new' ? 'active' : ''}`}
-              onClick={() => handleExploreSubTabChange('new')}
-              title={t('exploreNew')}
-              style={{
-                fontSize: "1.05rem", fontWeight: exploreSubTab === 'new' ? 600 : 500,
-                color: exploreSubTab === 'new' ? "var(--text-primary)" : "var(--text-secondary)",
-                background: "transparent",
-                border: "none",
-                cursor: "pointer",
-                padding: "0.25rem 0",
-                position: "relative",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "0.5rem",
-                transition: "color 0.15s ease"
-              }}
-            >
-              <span className="explore-subtab-icon">
-                <Rocket size={17} color={exploreSubTab === 'new' ? "var(--accent-primary)" : "currentColor"} />
-              </span>
-              <span className="explore-subtab-label">{t('exploreNew')}</span>
-              {exploreSubTab === 'new' && (
-                <div className="explore-subtab-indicator" style={{ position: "absolute", bottom: "-0.75rem", left: 0, right: 0, height: "2px", background: "var(--accent-primary)" }} />
-              )}
-            </button>
+        {/* Category Filters (Always visible on desktop, smooth collapsible on mobile) */}
+        <section className={`search-panel-section explore-filters-section ${showFiltersOnScroll ? 'show' : 'hide'}`}>
+          <div className="search-category-filters-inner">
+            <div className="search-category-filters">
+              {sortFilterTabs([
+                { value: 'all', label: language === 'es' ? 'Todo' : 'All' },
+                { value: 'movie', label: language === 'es' ? 'Películas' : 'Movies' },
+                { value: 'series', label: language === 'es' ? 'Series' : 'Shows' },
+                { value: 'anime', label: 'Anime' },
+                { value: 'book', label: language === 'es' ? 'Libros' : 'Books' },
+                { value: 'comic', label: language === 'es' ? 'Cómics' : 'Comics' },
+                { value: 'manga', label: 'Mangas' },
+                { value: 'game', label: language === 'es' ? 'Juegos' : 'Games' },
+                { value: 'user', label: language === 'es' ? 'Usuarios' : 'Users' },
+                { value: 'guide', label: language === 'es' ? 'Guías' : 'Guides' }
+              ], user?.category_order).map(tab => {
+                const isSelected = activeTab === tab.value;
+                const tabColor = tab.value === 'all' 
+                  ? 'var(--accent-primary)' 
+                  : tab.value === 'user' 
+                  ? 'var(--color-user, #ec4899)' 
+                  : `var(--color-${tab.value})`;
+                const tabTextColor = tab.value === 'all' 
+                  ? '#ffffff' 
+                  : `var(--color-text-${tab.value})`;
 
-            <button 
-              type="button"
-              className={`explore-subtab-item ${exploreSubTab === 'trending' ? 'active' : ''}`}
-              onClick={() => handleExploreSubTabChange('trending')}
-              title={t('exploreTrending')}
-              style={{
-                fontSize: "1.05rem", fontWeight: exploreSubTab === 'trending' ? 600 : 500,
-                color: exploreSubTab === 'trending' ? "var(--text-primary)" : "var(--text-secondary)",
-                background: "transparent",
-                border: "none",
-                cursor: "pointer",
-                padding: "0.25rem 0",
-                position: "relative",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "0.5rem",
-                transition: "color 0.15s ease"
-              }}
-            >
-              <span className="explore-subtab-icon">
-                <Flame size={17} color={exploreSubTab === 'trending' ? "#f97316" : "currentColor"} />
-              </span>
-              <span className="explore-subtab-label">{t('exploreTrending')}</span>
-              {exploreSubTab === 'trending' && (
-                <div className="explore-subtab-indicator" style={{ position: "absolute", bottom: "-0.75rem", left: 0, right: 0, height: "2px", background: "#f97316" }} />
-              )}
-            </button>
-
-            <button 
-              type="button"
-              className={`explore-subtab-item ${exploreSubTab === 'guides' ? 'active' : ''}`}
-              onClick={() => handleExploreSubTabChange('guides')}
-              title={t('exploreGuides')}
-              style={{
-                fontSize: "1.05rem", fontWeight: exploreSubTab === 'guides' ? 600 : 500,
-                color: exploreSubTab === 'guides' ? "var(--text-primary)" : "var(--text-secondary)",
-                background: "transparent",
-                border: "none",
-                cursor: "pointer",
-                padding: "0.25rem 0",
-                position: "relative",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "0.5rem",
-                transition: "color 0.15s ease"
-              }}
-            >
-              <span className="explore-subtab-icon">
-                <BookOpen size={17} color={exploreSubTab === 'guides' ? "var(--color-guide)" : "currentColor"} />
-              </span>
-              <span className="explore-subtab-label">{t('exploreGuides')}</span>
-              {exploreSubTab === 'guides' && (
-                <div className="explore-subtab-indicator" style={{ position: "absolute", bottom: "-0.75rem", left: 0, right: 0, height: "2px", background: "var(--color-guide)" }} />
-              )}
-            </button>
+                return (
+                  <button
+                    key={tab.value}
+                    type="button"
+                    onClick={() => handleTabClick(tab.value as any)}
+                    className={`profile-category-tab search-filter-btn ${isSelected ? 'selected' : ''}`}
+                    title={tab.label}
+                    style={{
+                      padding: '0.35rem 0.85rem',
+                      fontSize: '0.85rem',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.4rem',
+                      '--tab-color': tabColor,
+                      '--tab-text': tabTextColor
+                    } as React.CSSProperties}
+                  >
+                    <span className="search-filter-icon" style={{ display: 'inline-flex', alignItems: 'center' }}>
+                      {getCategoryIcon(tab.value, { size: 14, color: isSelected ? tabTextColor : tabColor })}
+                    </span>
+                    <span className="search-filter-label">{tab.label}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        )}
+        </section>
+
+        {/* Explore Subtabs (Novedades, Tendencias, Guías) - Sticks permanently below search/filters */}
+        {submittedQuery === '' && (
+          <div 
+            className="explore-subtabs-container"
+            style={{ 
+              display: "flex", 
+              alignItems: "center", 
+              gap: "1.75rem", 
+              borderBottom: "1px solid var(--border-color)",
+              paddingBottom: "0.75rem",
+              paddingTop: "0.25rem"
+            }}
+          >
+              <button 
+                type="button"
+                className={`explore-subtab-item ${exploreSubTab === 'new' ? 'active' : ''}`}
+                onClick={() => handleExploreSubTabChange('new')}
+                title={t('exploreNew')}
+                style={{
+                  fontSize: "1.05rem", fontWeight: exploreSubTab === 'new' ? 600 : 500,
+                  color: exploreSubTab === 'new' ? "var(--text-primary)" : "var(--text-secondary)",
+                  background: "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                  padding: "0.25rem 0",
+                  position: "relative",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "0.5rem",
+                  transition: "color 0.15s ease"
+                }}
+              >
+                <span className="explore-subtab-icon">
+                  <Rocket size={17} color={exploreSubTab === 'new' ? "var(--accent-primary)" : "currentColor"} />
+                </span>
+                <span className="explore-subtab-label">{t('exploreNew')}</span>
+                {exploreSubTab === 'new' && (
+                  <div className="explore-subtab-indicator" style={{ position: "absolute", bottom: "-0.75rem", left: 0, right: 0, height: "2px", background: "var(--accent-primary)" }} />
+                )}
+              </button>
+
+              <button 
+                type="button"
+                className={`explore-subtab-item ${exploreSubTab === 'trending' ? 'active' : ''}`}
+                onClick={() => handleExploreSubTabChange('trending')}
+                title={t('exploreTrending')}
+                style={{
+                  fontSize: "1.05rem", fontWeight: exploreSubTab === 'trending' ? 600 : 500,
+                  color: exploreSubTab === 'trending' ? "var(--text-primary)" : "var(--text-secondary)",
+                  background: "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                  padding: "0.25rem 0",
+                  position: "relative",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "0.5rem",
+                  transition: "color 0.15s ease"
+                }}
+              >
+                <span className="explore-subtab-icon">
+                  <Flame size={17} color={exploreSubTab === 'trending' ? "#f97316" : "currentColor"} />
+                </span>
+                <span className="explore-subtab-label">{t('exploreTrending')}</span>
+                {exploreSubTab === 'trending' && (
+                  <div className="explore-subtab-indicator" style={{ position: "absolute", bottom: "-0.75rem", left: 0, right: 0, height: "2px", background: "#f97316" }} />
+                )}
+              </button>
+
+              <button 
+                type="button"
+                className={`explore-subtab-item ${exploreSubTab === 'guides' ? 'active' : ''}`}
+                onClick={() => handleExploreSubTabChange('guides')}
+                title={t('exploreGuides')}
+                style={{
+                  fontSize: "1.05rem", fontWeight: exploreSubTab === 'guides' ? 600 : 500,
+                  color: exploreSubTab === 'guides' ? "var(--text-primary)" : "var(--text-secondary)",
+                  background: "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                  padding: "0.25rem 0",
+                  position: "relative",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "0.5rem",
+                  transition: "color 0.15s ease"
+                }}
+              >
+                <span className="explore-subtab-icon">
+                  <BookOpen size={17} color={exploreSubTab === 'guides' ? "var(--color-guide)" : "currentColor"} />
+                </span>
+                <span className="explore-subtab-label">{t('exploreGuides')}</span>
+                {exploreSubTab === 'guides' && (
+                  <div className="explore-subtab-indicator" style={{ position: "absolute", bottom: "-0.75rem", left: 0, right: 0, height: "2px", background: "var(--color-guide)" }} />
+                )}
+              </button>
+            </div>
+          )}
+      </div>
 
       {submittedQuery === '' ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem', marginTop: '1rem' }}>

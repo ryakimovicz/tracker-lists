@@ -960,17 +960,38 @@ h1, h2, h3, h4, h5, h6 {
   box-sizing: border-box;
 }
 
-/* Explore Category Filters Bar on Desktop (Loose buttons like Home, close to search bar and subtabs) */
+/* Explore Sticky Header on Desktop (Search bar, loose category filters, and subtabs together) */
+.explore-sticky-header-wrapper {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: var(--bg-primary);
+  margin-top: -2rem;
+  padding-top: 0.85rem;
+  width: 100%;
+}
+
+.explore-sticky-search-bar {
+  width: 100%;
+  padding-bottom: 0.75rem;
+  background: transparent;
+}
+
+/* Explore Category Filters Bar on Desktop (Loose buttons like Home, always visible on desktop) */
 .explore-filters-section {
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
   padding: 0 !important;
-  margin-top: -1.25rem !important;
-  margin-bottom: -1rem !important;
+  margin-top: 0 !important;
+  margin-bottom: 0.75rem !important;
   display: flex !important;
   flex-direction: column !important;
   width: 100% !important;
+}
+
+.search-category-filters-inner {
+  width: 100%;
 }
 
 .search-category-filters {
@@ -979,6 +1000,11 @@ h1, h2, h3, h4, h5, h6 {
   align-items: center;
   gap: 0.5rem;
   width: 100%;
+}
+
+.explore-subtabs-container {
+  width: 100%;
+  background: transparent;
 }
 
 /* Desktop Grid when a single category is filtered in Home */
@@ -1343,7 +1369,7 @@ h1, h2, h3, h4, h5, h6 {
     height: auto !important;
     max-height: 120px !important;
     margin-top: 0.5rem !important;
-    margin-bottom: 0.15rem !important;
+    margin-bottom: 0.85rem !important;
     padding-left: 0.5rem !important;
     padding-right: 0.5rem !important;
     padding-top: 0 !important;
@@ -1373,6 +1399,7 @@ h1, h2, h3, h4, h5, h6 {
     max-height: 120px !important;
     opacity: 1 !important;
     transform: translateY(0) !important;
+    margin-bottom: 0.85rem !important;
     pointer-events: auto !important;
   }
 
@@ -1442,29 +1469,78 @@ h1, h2, h3, h4, h5, h6 {
   }
 
   /* -------------------------------------------------------------------------
-     Mobile Explore: Permanent Sticky Search Bar & Subtabs
+     Mobile Explore: Sticky Header Wrapper with extra top space from navbar
      ------------------------------------------------------------------------- */
   .explore-page-container {
     gap: 0.65rem !important;
   }
 
-  .explore-sticky-search-bar {
+  .explore-sticky-header-wrapper {
     position: sticky !important;
     top: calc(56px + env(safe-area-inset-top, 0px)) !important;
-    margin-top: -1rem !important;
-    padding-top: 0.35rem !important;
-    padding-bottom: 0.15rem !important;
-    background: var(--bg-primary) !important;
     z-index: 50 !important;
+    background: var(--bg-primary) !important;
+    margin-top: -1rem !important;
+    padding-top: 0.85rem !important; /* Extra breathing space between header/navbar and search bar */
+    padding-bottom: 0.25rem !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
   }
 
+  .explore-sticky-search-bar {
+    position: relative !important;
+    top: auto !important;
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+    padding-bottom: 0.4rem !important;
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+    background: transparent !important;
+    box-sizing: border-box !important;
+    z-index: 2 !important;
+  }
+
+  /* Explore Category Filter Buttons on mobile: Clean, loose button appearance below search bar that smoothly slides away on scroll down and returns on scroll up */
   .explore-filters-section,
   .search-panel-section {
-    padding: 0.6rem 0.75rem !important;
-    border-radius: 12px !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
+    position: relative !important;
+    overflow: hidden !important;
+    height: auto !important;
+    max-height: 120px !important;
+    margin-top: 0.35rem !important;
+    margin-bottom: 0.25rem !important;
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+    transition: opacity 0.28s cubic-bezier(0.2, 0, 0, 1), transform 0.28s cubic-bezier(0.2, 0, 0, 1), max-height 0.3s cubic-bezier(0.2, 0, 0, 1), margin 0.3s cubic-bezier(0.2, 0, 0, 1) !important;
+    transform: translateY(0);
+    opacity: 1;
+  }
+
+  .explore-filters-section.hide {
+    max-height: 0 !important;
+    opacity: 0 !important;
+    transform: translateY(-16px) !important;
     margin-top: 0 !important;
-    margin-bottom: 0.15rem !important;
-    gap: 0 !important;
+    margin-bottom: 0 !important;
+    pointer-events: none !important;
+  }
+
+  .explore-filters-section.show {
+    max-height: 120px !important;
+    opacity: 1 !important;
+    transform: translateY(0) !important;
+    pointer-events: auto !important;
+  }
+
+  .search-category-filters-inner {
+    width: 100% !important;
   }
 
   .search-category-filters {
@@ -1477,19 +1553,20 @@ h1, h2, h3, h4, h5, h6 {
   }
 
   .explore-subtabs-container {
-    position: sticky !important;
-    top: calc(56px + env(safe-area-inset-top, 0px) + 48px) !important;
+    position: relative !important;
+    top: auto !important;
     background: var(--bg-primary) !important;
-    z-index: 48 !important;
+    z-index: 2 !important;
     display: flex !important;
     justify-content: space-around !important;
     gap: 0 !important;
     padding-left: 0.5rem !important;
     padding-right: 0.5rem !important;
-    padding-top: 0.15rem !important;
-    padding-bottom: 0.25rem !important;
+    padding-top: 0.25rem !important;
+    padding-bottom: 0.45rem !important;
     margin-top: 0 !important;
-    margin-bottom: 0.35rem !important;
+    margin-bottom: 0 !important;
+    border-bottom: 1px solid var(--border-color) !important;
   }
 
   .search-filter-btn {
