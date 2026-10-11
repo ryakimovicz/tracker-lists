@@ -3617,7 +3617,7 @@ export const Profile: React.FC = () => {
           <span className="profile-tab-label">{language === 'es' ? 'Guías' : 'Guides'}</span>
         </button>
 
-        {Boolean(profile?.lastfm_username) && (
+        {(Boolean(profile?.lastfm_username) || isOwnProfile) && (
           <button
             onClick={() => handleTabChange('music')}
             className={`profile-tab-btn ${activeTab === 'music' ? 'active' : ''}`}
@@ -6215,6 +6215,80 @@ export const Profile: React.FC = () => {
 
 
       {activeTab === 'music' && (
+        !profile?.lastfm_username ? (
+          /* Panel de conexión con Last.fm (idéntico al de /customize) */
+          <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px', textAlign: 'left' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                <h2 style={{ fontSize: '1.2rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0, color: 'var(--text-primary)' }}>
+                  <Music size={20} color="#ef4444" />
+                  {language === 'es' ? 'Mostrar música escuchada (Last.fm)' : 'Show Currently Playing Music (Last.fm)'}
+                </h2>
+                <span
+                  style={{
+                    fontSize: '0.75rem',
+                    padding: '0.2rem 0.55rem',
+                    borderRadius: '6px',
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    color: 'var(--text-muted)',
+                    border: '1px solid var(--border-color)',
+                    fontWeight: 600
+                  }}
+                >
+                  {language === 'es' ? 'No conectado' : 'Not connected'}
+                </span>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowMusicGuideModal(true)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'var(--accent-primary)',
+                  fontSize: '0.85rem',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  padding: '0.2rem 0.4rem',
+                  borderRadius: '6px'
+                }}
+              >
+                <HelpCircle size={15} />
+                {language === 'es' ? '¿Cómo conectar tu servicio de música?' : 'How to connect your music service?'}
+              </button>
+            </div>
+
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', margin: '0 0 1.25rem 0', lineHeight: 1.5 }}>
+              {language === 'es'
+                ? 'Conecta tu cuenta de Last.fm para mostrar en tiempo real la música que estás escuchando en Spotify, YouTube Music, Apple Music, Tidal o archivos locales en tu perfil.'
+                : 'Connect your Last.fm account to display in real-time what music you are listening to on Spotify, YouTube Music, Apple Music, Tidal, or local players on your profile.'}
+            </p>
+
+            <div>
+              <button
+                type="button"
+                onClick={handleLastFmLogin}
+                className="btn-primary"
+                style={{
+                  background: '#d51007',
+                  border: 'none',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  padding: '0.65rem 1.25rem',
+                  fontSize: '0.9rem',
+                  fontWeight: 600,
+                  boxShadow: '0 4px 14px rgba(213, 16, 7, 0.3)'
+                }}
+              >
+                <Music size={16} />
+                {language === 'es' ? 'Conectar con Last.fm' : 'Connect with Last.fm'}
+              </button>
+            </div>
+          </div>
+        ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', textAlign: 'left' }}>
           {/* Top Row: Content Type Selector (Left) and Period Selector (Right) */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.85rem' }}>
@@ -6508,6 +6582,7 @@ export const Profile: React.FC = () => {
             </div>
           )}
         </div>
+        )
       )}
 
       {/* AdBanner placed directly above Activity History */}
