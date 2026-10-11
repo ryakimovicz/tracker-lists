@@ -710,6 +710,11 @@ export const Profile: React.FC = () => {
   const [shelfStatusFilter, setShelfStatusFilter] = useState<string>('all');
   const [favoritesMediaFilter, setFavoritesMediaFilter] = useState<'all' | 'movie' | 'series' | 'anime' | 'book' | 'comic' | 'manga' | 'game'>('all');
   const [showReorderTooltip, setShowReorderTooltip] = useState(false);
+  const [showMobileReorderToast, setShowMobileReorderToast] = useState(false);
+  const mobileToastTimerRef = useRef<any>(null);
+  const [mobileToastDragX, setMobileToastDragX] = useState(0);
+  const [isMobileToastDragging, setIsMobileToastDragging] = useState(false);
+  const mobileToastTouchStartRef = useRef<{ x: number; y: number } | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [loading, setLoading] = useState(() => {
@@ -921,6 +926,8 @@ export const Profile: React.FC = () => {
   const favoritesListScrollRef = useRef<HTMLDivElement>(null);
   const [canFavoritesScrollLeft, setCanFavoritesScrollLeft] = useState(false);
   const [canFavoritesScrollRight, setCanFavoritesScrollRight] = useState(false);
+  const [canFavoritesListScrollTop, setCanFavoritesListScrollTop] = useState(false);
+  const [canFavoritesListScrollBottom, setCanFavoritesListScrollBottom] = useState(false);
   const [favoritesContainerWidth, setFavoritesContainerWidth] = useState(0);
 
   const updateShelfScrollState = useCallback(() => {
@@ -956,6 +963,28 @@ export const Profile: React.FC = () => {
 
     setCanShelfListScrollTop(prev => (prev !== canTop ? canTop : prev));
     setCanShelfListScrollBottom(prev => (prev !== canBottom ? canBottom : prev));
+  }, []);
+
+  const updateFavoritesListScrollState = useCallback(() => {
+    const el = favoritesListScrollRef.current;
+    if (!el) return;
+    const { scrollTop, scrollHeight, clientHeight } = el;
+    const canTop = scrollTop > 1;
+    const canBottom = scrollTop < scrollHeight - clientHeight - 1;
+
+    const mask = (canTop && canBottom)
+      ? 'linear-gradient(to bottom, transparent 0px, black 32px, black calc(100% - 38px), transparent 100%)'
+      : canTop
+      ? 'linear-gradient(to bottom, transparent 0px, black 32px, black 100%)'
+      : canBottom
+      ? 'linear-gradient(to bottom, black 0px, black calc(100% - 38px), transparent 100%)'
+      : 'none';
+
+    (el.style as any).webkitMaskImage = mask;
+    el.style.maskImage = mask;
+
+    setCanFavoritesListScrollTop(prev => (prev !== canTop ? canTop : prev));
+    setCanFavoritesListScrollBottom(prev => (prev !== canBottom ? canBottom : prev));
   }, []);
 
   const updateCreatedGuidesScrollState = useCallback(() => {
@@ -1415,6 +1444,7 @@ export const Profile: React.FC = () => {
     currentX: number;
     currentY: number;
     isDragging: boolean;
+    pointerType?: string;
   }
 
   const [favPointerDrag, setFavPointerDrag] = useState<FavPointerDrag | null>(null);
@@ -1427,6 +1457,37 @@ export const Profile: React.FC = () => {
 
   const favJustDraggedRef = useRef<boolean>(false);
   const favEdgeScrollIntervalRef = useRef<any>(null);
+  const favLongPressTimerRef = useRef<any>(null);
+  const [favActiveTouchCardId, setFavActiveTouchCardId] = useState<number | null>(null);
+
+  const clearFavLongPressTimer = useCallback(() => {
+    if (favLongPressTimerRef.current) {
+      clearTimeout(favLongPressTimerRef.current);
+      favLongPressTimerRef.current = null;
+    }
+  }, []);
+
+  const closeMobileReorderToast = useCallback(() => {
+    if (mobileToastTimerRef.current) {
+      clearTimeout(mobileToastTimerRef.current);
+      mobileToastTimerRef.current = null;
+    }
+    setShowMobileReorderToast(false);
+    setMobileToastDragX(0);
+    setIsMobileToastDragging(false);
+  }, []);
+
+  const triggerMobileReorderToast = useCallback(() => {
+    if (mobileToastTimerRef.current) {
+      clearTimeout(mobileToastTimerRef.current);
+    }
+    setMobileToastDragX(0);
+    setIsMobileToastDragging(false);
+    setShowMobileReorderToast(true);
+    mobileToastTimerRef.current = setTimeout(() => {
+      closeMobileReorderToast();
+    }, 4500);
+  }, [closeMobileReorderToast]);
 
   const stopFavEdgeScroll = useCallback(() => {
     if (favEdgeScrollIntervalRef.current) {
@@ -1492,17 +1553,37 @@ export const Profile: React.FC = () => {
   useEffect(() => {
     if (!favPointerDrag) return;
 
+    const handleTouchMove = (e: TouchEvent) => {
+      if (favPointerDragRef.current?.isDragging) {
+        if (e.cancelable) {
+          e.preventDefault();
+        }
+      }
+    };
+
     const handlePointerMove = (e: PointerEvent) => {
       const currentDrag = favPointerDragRef.current;
       if (!currentDrag) return;
 
       const dist = Math.hypot(e.clientX - currentDrag.startX, e.clientY - currentDrag.startY);
+
+      // For touch pointers, if movement exceeds 10px before long press completes, cancel the drag
+      if (currentDrag.pointerType === 'touch' && !currentDrag.isDragging) {
+        if (dist > 10) {
+          clearFavLongPressTimer();
+          setFavActiveTouchCardId(null);
+          setFavPointerDrag(null);
+        }
+        return;
+      }
+
       const isDraggingNow = currentDrag.isDragging || dist > 6;
 
       if (isDraggingNow) {
         favJustDraggedRef.current = true;
         document.body.style.userSelect = 'none';
         document.body.style.cursor = 'grabbing';
+        document.body.style.overflow = 'hidden';
         handleFavEdgeScrollCheck(e.clientX, e.clientY);
 
         // Find drop index across rendered cards / list rows
@@ -1556,7 +1637,10 @@ export const Profile: React.FC = () => {
     };
 
     const handlePointerUp = () => {
+      clearFavLongPressTimer();
+      setFavActiveTouchCardId(null);
       stopFavEdgeScroll();
+      document.body.style.overflow = '';
       const currentDrag = favPointerDragRef.current;
       const targetOverIdx = favDragOverIndexRef.current;
 
@@ -1610,17 +1694,22 @@ export const Profile: React.FC = () => {
       document.body.style.cursor = '';
     };
 
+    window.addEventListener('touchmove', handleTouchMove, { passive: false });
     window.addEventListener('pointermove', handlePointerMove);
     window.addEventListener('pointerup', handlePointerUp);
     window.addEventListener('pointercancel', handlePointerUp);
 
     return () => {
+      clearFavLongPressTimer();
+      setFavActiveTouchCardId(null);
+      document.body.style.overflow = '';
+      window.removeEventListener('touchmove', handleTouchMove);
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerUp);
       window.removeEventListener('pointercancel', handlePointerUp);
       stopFavEdgeScroll();
     };
-  }, [favPointerDrag !== null, displayedFavorites, libraryItems, targetUserIdentifier, stopFavEdgeScroll, handleFavEdgeScrollCheck]);
+  }, [favPointerDrag !== null, displayedFavorites, libraryItems, targetUserIdentifier, stopFavEdgeScroll, handleFavEdgeScrollCheck, clearFavLongPressTimer]);
 
   useEffect(() => {
     if (activeTab !== 'favorites') return;
@@ -1653,6 +1742,25 @@ export const Profile: React.FC = () => {
       if (resizeObserver) resizeObserver.disconnect();
     };
   }, [updateFavoritesScrollState, activeTab, isFavoritesExpanded, favoritesViewMode, displayedFavorites, favoritesMediaFilter]);
+
+  useEffect(() => {
+    if (activeTab !== 'favorites') return;
+    const listEl = favoritesListScrollRef.current;
+    if (!listEl) return;
+    updateFavoritesListScrollState();
+    const raf = requestAnimationFrame(updateFavoritesListScrollState);
+    const timer1 = setTimeout(updateFavoritesListScrollState, 50);
+    const timer2 = setTimeout(updateFavoritesListScrollState, 150);
+    listEl.addEventListener('scroll', updateFavoritesListScrollState, { passive: true });
+    window.addEventListener('resize', updateFavoritesListScrollState);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+      listEl.removeEventListener('scroll', updateFavoritesListScrollState);
+      window.removeEventListener('resize', updateFavoritesListScrollState);
+    };
+  }, [updateFavoritesListScrollState, activeTab, favoritesViewMode, displayedFavorites, favoritesMediaFilter]);
 
   // Last.fm states
   const [nowPlaying, setNowPlaying] = useState<any>(null);
@@ -4650,10 +4758,10 @@ export const Profile: React.FC = () => {
                     }, 60);
                   }}
                   onScroll={handleGuidesSwipeScroll}
-                  className="upcoming-mobile-swipe-wrapper home-mobile-only"
+                  className="profile-guides-mobile-swipe-wrapper home-mobile-only"
                 >
                   {/* Slide 1: Guías creadas */}
-                  <div className="upcoming-mobile-swipe-slide">
+                  <div className="profile-guides-mobile-swipe-slide">
                     {profile.created_lists.length === 0 ? (
                       <div className="glass-card" style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
                         {language === 'es' ? 'Aún no has creado ninguna guía.' : 'You have not created any guides yet.'}
@@ -4670,7 +4778,7 @@ export const Profile: React.FC = () => {
                   </div>
 
                   {/* Slide 2: Guías guardadas */}
-                  <div className="upcoming-mobile-swipe-slide">
+                  <div className="profile-guides-mobile-swipe-slide">
                     {profile.saved_lists.length === 0 ? (
                       <div className="glass-card" style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
                         {language === 'es' ? 'Aún no tienes guías guardadas.' : 'You have no saved guides yet.'}
@@ -5198,7 +5306,8 @@ export const Profile: React.FC = () => {
               );
             }
 
-            const isGrid = favoritesViewMode === 'grid';
+            const isMobileScreen = typeof window !== 'undefined' && window.innerWidth <= 768;
+            const isGrid = !isMobileScreen && favoritesViewMode === 'grid';
             const availableWidth = Math.max(0, (favoritesContainerWidth || shelfContainerWidth) - 90);
             const maxVisibleInOneRow = Math.max(1, Math.floor((availableWidth + 16) / 201));
             const canExpandMore = isGrid ? (filteredFavorites.length > maxVisibleInOneRow) : (filteredFavorites.length > 4);
@@ -5221,6 +5330,18 @@ export const Profile: React.FC = () => {
                 return 'linear-gradient(to right, black 0px, black calc(100% - 95px), transparent calc(100% - 45px), transparent 100%)';
               }
               return 'none';
+            };
+
+            const getFavoritesListMaskImage = () => {
+              if (!isMobileScreen) return undefined;
+              if (canFavoritesListScrollTop && canFavoritesListScrollBottom) {
+                return 'linear-gradient(to bottom, transparent 0px, black 32px, black calc(100% - 38px), transparent 100%)';
+              } else if (canFavoritesListScrollTop) {
+                return 'linear-gradient(to bottom, transparent 0px, black 32px, black 100%)';
+              } else if (canFavoritesListScrollBottom) {
+                return 'linear-gradient(to bottom, black 0px, black calc(100% - 38px), transparent 100%)';
+              }
+              return undefined;
             };
 
             const favBtnBaseStyle: React.CSSProperties = {
@@ -5383,6 +5504,11 @@ export const Profile: React.FC = () => {
                       >
                         <div
                           tabIndex={0}
+                          onClick={() => {
+                            if (typeof window !== 'undefined' && window.innerWidth <= 768) {
+                              triggerMobileReorderToast();
+                            }
+                          }}
                           style={{
                             display: 'inline-flex',
                             alignItems: 'center',
@@ -5401,51 +5527,21 @@ export const Profile: React.FC = () => {
                           <HelpCircle size={14} />
                         </div>
 
+                        {/* Desktop Only Tooltip (remains exactly as before) */}
                         {showReorderTooltip && (
-                          <div
-                            style={{
-                              position: 'absolute',
-                              top: 'calc(100% + 10px)',
-                              left: '50%',
-                              transform: 'translateX(-50%)',
-                              background: 'rgba(15, 18, 28, 0.94)',
-                              backdropFilter: 'blur(16px)',
-                              WebkitBackdropFilter: 'blur(16px)',
-                              border: '1px solid rgba(255, 255, 255, 0.12)',
-                              color: 'var(--text-primary)',
-                              padding: '0.45rem 0.8rem',
-                              borderRadius: '8px',
-                              fontSize: '0.78rem',
-                              fontWeight: 500,
-                              whiteSpace: 'nowrap',
-                              pointerEvents: 'none',
-                              boxShadow: '0 8px 24px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.4)',
-                              zIndex: 40
-                            }}
-                          >
-                            {/* Upward pointer arrow */}
-                            <div
-                              style={{
-                                position: 'absolute',
-                                top: '-5px',
-                                left: '50%',
-                                transform: 'translateX(-50%) rotate(45deg)',
-                                width: '8px',
-                                height: '8px',
-                                background: 'rgba(15, 18, 28, 0.94)',
-                                borderLeft: '1px solid rgba(255, 255, 255, 0.12)',
-                                borderTop: '1px solid rgba(255, 255, 255, 0.12)'
-                              }}
-                            />
-                            {language === 'es' ? 'Arrastrá una obra para reordenar tus destacados' : 'Drag an item to reorder your featured favorites'}
+                          <div className="fav-reorder-tooltip home-desktop-only">
+                            <div className="fav-reorder-tooltip-arrow" />
+                            <span>
+                              {language === 'es' ? 'Arrastrá una obra para reordenar tus destacados' : 'Drag an item to reorder your featured favorites'}
+                            </span>
                           </div>
                         )}
                       </div>
                     )}
                   </div>
 
-                  {/* View Mode Toggle Buttons & Expand */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  {/* View Mode Toggle Buttons & Expand (Desktop Only) */}
+                  <div className="home-desktop-only" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                     <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', background: 'var(--bg-secondary)', padding: '0.2rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
                       <button
                         type="button"
@@ -5857,14 +5953,18 @@ export const Profile: React.FC = () => {
                   /* List Mode */
                   <div
                     ref={favoritesListScrollRef}
+                    onScroll={updateFavoritesListScrollState}
+                    className="profile-shelf-list-container"
                     style={{
                       display: 'flex',
                       flexDirection: 'column',
                       gap: '0.65rem',
-                      height: isFavoritesExpanded ? '774px' : '398px',
-                      maxHeight: isFavoritesExpanded ? '774px' : '398px',
+                      height: isMobileScreen ? 'auto' : (isFavoritesExpanded ? '774px' : '398px'),
+                      maxHeight: isMobileScreen ? undefined : (isFavoritesExpanded ? '774px' : '398px'),
                       overflowY: 'auto',
-                      paddingRight: '0.35rem'
+                      paddingRight: '0.35rem',
+                      WebkitMaskImage: getFavoritesListMaskImage(),
+                      maskImage: getFavoritesListMaskImage()
                     }}
                   >
                     {filteredFavorites.map((item, idx) => {
@@ -5926,17 +6026,47 @@ export const Profile: React.FC = () => {
                               if (e.button !== 0 || !canReorderFavorites) return;
                               const target = e.target as HTMLElement;
                               if (target.closest('button') || target.closest('a')) return;
-                              setFavPointerDrag({
-                                item,
-                                sourceIndex: idx,
-                                startX: e.clientX,
-                                startY: e.clientY,
-                                currentX: e.clientX,
-                                currentY: e.clientY,
-                                isDragging: false
-                              });
+
+                              const isTouch = e.pointerType === 'touch';
+                              const clientX = e.clientX;
+                              const clientY = e.clientY;
+
+                              if (isTouch) {
+                                clearFavLongPressTimer();
+                                setFavPointerDrag({
+                                  item,
+                                  sourceIndex: idx,
+                                  startX: clientX,
+                                  startY: clientY,
+                                  currentX: clientX,
+                                  currentY: clientY,
+                                  isDragging: false,
+                                  pointerType: 'touch'
+                                });
+
+                                favLongPressTimerRef.current = setTimeout(() => {
+                                  favJustDraggedRef.current = true;
+                                  setFavActiveTouchCardId(item.id);
+                                  setFavPointerDrag(prev => prev ? { ...prev, isDragging: true } : null);
+                                  if (typeof window !== 'undefined' && 'vibrate' in navigator) {
+                                    try { navigator.vibrate(40); } catch {}
+                                  }
+                                }, 380);
+                              } else {
+                                setFavPointerDrag({
+                                  item,
+                                  sourceIndex: idx,
+                                  startX: clientX,
+                                  startY: clientY,
+                                  currentX: clientX,
+                                  currentY: clientY,
+                                  isDragging: false,
+                                  pointerType: e.pointerType || 'mouse'
+                                });
+                              }
                             }}
                             onClick={() => {
+                              clearFavLongPressTimer();
                               if (favJustDraggedRef.current || favPointerDragRef.current?.isDragging) return;
                               handleOpenItemDetails(item);
                             }}
@@ -5945,8 +6075,10 @@ export const Profile: React.FC = () => {
                               cursor: canReorderFavorites ? (favPointerDrag?.isDragging ? 'grabbing' : 'grab') : 'pointer',
                               userSelect: 'none',
                               WebkitUserDrag: 'none',
-                              touchAction: canReorderFavorites ? 'none' : 'auto',
-                              transition: 'opacity 0.2s ease, transform 0.2s ease'
+                              touchAction: canReorderFavorites ? (favPointerDrag?.isDragging ? 'none' : 'pan-y') : 'auto',
+                              transform: (favActiveTouchCardId === item.id && !isBeingDragged) ? 'scale(1.02)' : undefined,
+                              transition: 'opacity 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease',
+                              boxShadow: (favActiveTouchCardId === item.id) ? '0 0 14px rgba(244, 114, 182, 0.45)' : undefined
                             } as React.CSSProperties}
                           >
                             {/* Left: Poster thumbnail */}
@@ -6808,6 +6940,67 @@ export const Profile: React.FC = () => {
         name={musicDetailsModal.name}
         initialImage={musicDetailsModal.image}
       />
+
+      {/* Mobile Top Swipeable Reorder Toast */}
+      {showMobileReorderToast && (
+        <div
+          className="fav-reorder-mobile-banner home-mobile-only"
+          style={{
+            transform: `translateX(${mobileToastDragX}px)`,
+            opacity: Math.max(0.2, 1 - Math.abs(mobileToastDragX) / 220),
+            transition: isMobileToastDragging ? 'none' : 'transform 0.25s ease, opacity 0.25s ease'
+          }}
+          onTouchStart={(e) => {
+            const touch = e.touches[0];
+            mobileToastTouchStartRef.current = { x: touch.clientX, y: touch.clientY };
+            setIsMobileToastDragging(true);
+          }}
+          onTouchMove={(e) => {
+            if (!mobileToastTouchStartRef.current) return;
+            const touch = e.touches[0];
+            const diffX = touch.clientX - mobileToastTouchStartRef.current.x;
+            setMobileToastDragX(diffX);
+          }}
+          onTouchEnd={() => {
+            setIsMobileToastDragging(false);
+            if (Math.abs(mobileToastDragX) > 65) {
+              closeMobileReorderToast();
+            } else {
+              setMobileToastDragX(0);
+            }
+            mobileToastTouchStartRef.current = null;
+          }}
+          onPointerDown={(e) => {
+            if (e.pointerType !== 'touch') {
+              mobileToastTouchStartRef.current = { x: e.clientX, y: e.clientY };
+              setIsMobileToastDragging(true);
+            }
+          }}
+          onPointerMove={(e) => {
+            if (isMobileToastDragging && mobileToastTouchStartRef.current) {
+              const diffX = e.clientX - mobileToastTouchStartRef.current.x;
+              setMobileToastDragX(diffX);
+            }
+          }}
+          onPointerUp={() => {
+            if (isMobileToastDragging) {
+              setIsMobileToastDragging(false);
+              if (Math.abs(mobileToastDragX) > 65) {
+                closeMobileReorderToast();
+              } else {
+                setMobileToastDragX(0);
+              }
+              mobileToastTouchStartRef.current = null;
+            }
+          }}
+        >
+          <span>
+            {language === 'es'
+              ? 'Mantené presionada una obra para reordenar tus destacados'
+              : 'Hold down an item to reorder your featured favorites'}
+          </span>
+        </div>
+      )}
     </div>
   );
 };
