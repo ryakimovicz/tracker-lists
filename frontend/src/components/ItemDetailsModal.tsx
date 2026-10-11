@@ -5813,31 +5813,33 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                       </button>
                     </div>
                   )}
-
-                  <button
-                    type="button"
-                    onClick={() => onClose()}
-                    className="item-details-close-btn"
-                    title={language === 'es' ? 'Cerrar' : 'Close'}
-                    style={{
-                      position: 'absolute',
-                      top: '1.25rem',
-                      right: '1.25rem',
-                      background: 'transparent',
-                      border: 'none',
-                      color: 'var(--text-secondary)',
-                      cursor: 'pointer',
-                      padding: '0.25rem',
-                      borderRadius: '50%',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}
-                  >
-                    <X size={20} />
-                  </button>
                 </div>
               </div>
+
+              {/* Modal Close button */}
+              <button
+                type="button"
+                onClick={() => onClose()}
+                className="item-details-close-btn"
+                title={language === 'es' ? 'Cerrar' : 'Close'}
+                style={{
+                  position: 'absolute',
+                  top: '1.25rem',
+                  right: '1.25rem',
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'var(--text-secondary)',
+                  cursor: 'pointer',
+                  padding: '0.25rem',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  zIndex: 10
+                }}
+              >
+                <X size={20} />
+              </button>
 
               {/* Modal Body Info */}
               <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
