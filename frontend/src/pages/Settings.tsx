@@ -1130,7 +1130,7 @@ export const SettingsPage: React.FC = () => {
           Pathd v0.9.9 Beta
         </div>
         <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-          {isEs ? 'Seguimiento Multimedia Todo en Uno y Guías' : 'All-in-One Media Tracker & Guides'}
+          {isEs ? 'Seguimiento Multimedia y Guías' : 'Media Tracker & Guides'}
         </p>
       </div>
 
