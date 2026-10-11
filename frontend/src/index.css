@@ -1300,6 +1300,17 @@ h1, h2, h3, h4, h5, h6 {
     padding: 0.5rem 0.75rem !important;
   }
 
+  /* Profile shelf list container on mobile:
+     Scrollable bounded container whose height shows available items with the last item sliced higher up
+     and leaves the divider line visible below. */
+  .profile-shelf-list-container {
+    height: auto !important;
+    max-height: clamp(190px, calc(100dvh - 375px), 395px) !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+
   /* Modals sizing on mobile screens */
   .modal-content,
   .modal-overlay > div {

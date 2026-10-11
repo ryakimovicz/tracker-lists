@@ -800,6 +800,8 @@ export const Profile: React.FC = () => {
   const shelfListScrollRef = useRef<HTMLDivElement>(null);
   const [canShelfScrollLeft, setCanShelfScrollLeft] = useState(false);
   const [canShelfScrollRight, setCanShelfScrollRight] = useState(false);
+  const [canShelfListScrollTop, setCanShelfListScrollTop] = useState(false);
+  const [canShelfListScrollBottom, setCanShelfListScrollBottom] = useState(false);
   const shelfRightScrollGraceRef = useRef<number>(0);
   const [shelfContainerWidth, setShelfContainerWidth] = useState(0);
 
@@ -839,6 +841,30 @@ export const Profile: React.FC = () => {
     const canRight = scrollLeft < scrollWidth - clientWidth - 4;
     setCanShelfScrollLeft(prev => (prev !== canLeft ? canLeft : prev));
     setCanShelfScrollRight(prev => (prev !== canRight ? canRight : prev));
+  }, []);
+
+  const updateShelfListScrollState = useCallback(() => {
+    const el = shelfListScrollRef.current;
+    if (!el) return;
+    const { scrollTop, scrollHeight, clientHeight } = el;
+    // Immediate threshold: exactly 1px from edge
+    const canTop = scrollTop > 1;
+    const canBottom = scrollTop < scrollHeight - clientHeight - 1;
+
+    // Direct synchronous DOM update for zero delay during touch scrolling
+    const mask = (canTop && canBottom)
+      ? 'linear-gradient(to bottom, transparent 0px, black 32px, black calc(100% - 38px), transparent 100%)'
+      : canTop
+      ? 'linear-gradient(to bottom, transparent 0px, black 32px, black 100%)'
+      : canBottom
+      ? 'linear-gradient(to bottom, black 0px, black calc(100% - 38px), transparent 100%)'
+      : 'none';
+
+    (el.style as any).webkitMaskImage = mask;
+    el.style.maskImage = mask;
+
+    setCanShelfListScrollTop(prev => (prev !== canTop ? canTop : prev));
+    setCanShelfListScrollBottom(prev => (prev !== canBottom ? canBottom : prev));
   }, []);
 
   const updateCreatedGuidesScrollState = useCallback(() => {
@@ -1141,6 +1167,25 @@ export const Profile: React.FC = () => {
       window.removeEventListener('resize', updateShelfScrollState);
     };
   }, [updateShelfScrollState, activeTab, isShelfExpanded, shelfViewMode, libraryItems, shelfSearchQuery, mediaFilter, shelfStatusFilter]);
+
+  useEffect(() => {
+    if (activeTab !== 'shelf') return;
+    const listEl = shelfListScrollRef.current;
+    if (!listEl) return;
+    updateShelfListScrollState();
+    const raf = requestAnimationFrame(updateShelfListScrollState);
+    const timer1 = setTimeout(updateShelfListScrollState, 50);
+    const timer2 = setTimeout(updateShelfListScrollState, 150);
+    listEl.addEventListener('scroll', updateShelfListScrollState, { passive: true });
+    window.addEventListener('resize', updateShelfListScrollState);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+      listEl.removeEventListener('scroll', updateShelfListScrollState);
+      window.removeEventListener('resize', updateShelfListScrollState);
+    };
+  }, [updateShelfListScrollState, activeTab, shelfViewMode, libraryItems, shelfSearchQuery, mediaFilter, shelfStatusFilter]);
 
   useEffect(() => {
     if (activeTab !== 'guides') return;
@@ -3560,7 +3605,8 @@ export const Profile: React.FC = () => {
             <div ref={shelfContainerRef} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
               {/* Shelf Header Controls: Mode Toggler (Grid/List) & Expand/Collapse */}
               {(() => {
-                const isGrid = shelfViewMode === 'grid';
+                const isMobileScreen = typeof window !== 'undefined' && window.innerWidth <= 768;
+                const isGrid = !isMobileScreen && shelfViewMode === 'grid';
                 // Available width accounting for 45px padding on each side (90px total)
                 // Each shelf card is ~180px wide with a 16px (1rem) gap
                 const availableWidth = Math.max(0, shelfContainerWidth - 90);
@@ -3582,10 +3628,22 @@ export const Profile: React.FC = () => {
                   return 'none';
                 };
 
+                const getShelfListMaskImage = () => {
+                  if (!isMobileScreen) return undefined;
+                  if (canShelfListScrollTop && canShelfListScrollBottom) {
+                    return 'linear-gradient(to bottom, transparent 0px, black 32px, black calc(100% - 38px), transparent 100%)';
+                  } else if (canShelfListScrollTop) {
+                    return 'linear-gradient(to bottom, transparent 0px, black 32px, black 100%)';
+                  } else if (canShelfListScrollBottom) {
+                    return 'linear-gradient(to bottom, black 0px, black calc(100% - 38px), transparent 100%)';
+                  }
+                  return undefined;
+                };
+
                 return (
                   <>
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '0.6rem' }}>
-                      {/* View Mode Toggle Buttons */}
+                    <div className="home-desktop-only" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '0.6rem' }}>
+                      {/* View Mode Toggle Buttons (Desktop only) */}
                       <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', background: 'var(--bg-secondary)', padding: '0.2rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
                         <button
                           type="button"
@@ -3609,7 +3667,7 @@ export const Profile: React.FC = () => {
                         </button>
                       </div>
 
-                      {/* Expand / Collapse Control - Shown if items exceed compact view limit */}
+                      {/* Expand / Collapse Control - Shown if items exceed compact view limit (Desktop only) */}
                       {canExpandMore && (
                         <button
                           type="button"
@@ -4022,6 +4080,8 @@ export const Profile: React.FC = () => {
                       /* List Mode: Scrollable container without horizontal side arrow buttons */
                       <div
                         ref={shelfListScrollRef}
+                        onScroll={updateShelfListScrollState}
+                        className="profile-shelf-list-container"
                         style={{
                           display: 'flex',
                           flexDirection: 'column',
@@ -4029,7 +4089,9 @@ export const Profile: React.FC = () => {
                           height: isShelfExpanded ? '774px' : '398px',
                           maxHeight: isShelfExpanded ? '774px' : '398px',
                           overflowY: 'auto',
-                          paddingRight: '0.35rem'
+                          paddingRight: '0.35rem',
+                          WebkitMaskImage: getShelfListMaskImage(),
+                          maskImage: getShelfListMaskImage()
                         }}
                       >
                         {filteredItems.map(item => {
