@@ -2120,6 +2120,25 @@ h1, h2, h3, h4, h5, h6 {
     object-fit: cover !important;
   }
 
+  .search-results-grid .search-item-card .search-media-cover .media-poster-placeholder {
+    padding: 0.25rem !important;
+    justify-content: center !important;
+    align-items: center !important;
+  }
+
+  .search-results-grid .search-item-card .search-media-cover .media-poster-title-wrap {
+    display: none !important;
+  }
+
+  .search-results-grid .search-item-card .search-media-cover .media-poster-placeholder > div:last-child {
+    padding: 0.4rem !important;
+  }
+
+  .search-results-grid .search-item-card .search-media-cover .media-poster-placeholder > div:last-child svg {
+    width: 20px !important;
+    height: 20px !important;
+  }
+
   .search-results-grid .search-item-card > div:nth-child(2) {
     grid-column: 2 !important;
     grid-row: 1 / span 2 !important;
