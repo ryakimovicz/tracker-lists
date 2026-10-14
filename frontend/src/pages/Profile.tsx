@@ -6469,7 +6469,7 @@ export const Profile: React.FC = () => {
               )}
             </div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(195px, 1fr))', gap: '1.5rem' }}>
+            <div className="profile-music-grid">
               {musicItems.map((item, i) => {
                 const itemArtist = musicType === 'artists' ? item.name : item.artist;
                 const itemName = musicType === 'artists' ? undefined : item.name;
@@ -6478,7 +6478,7 @@ export const Profile: React.FC = () => {
                 return (
                   <div
                     key={`${item.name}-${i}`}
-                    className="glass-card"
+                    className={`glass-card profile-music-card ${musicType === 'artists' ? 'profile-music-card-artist' : ''}`}
                     onClick={() => {
                       const targetRoute = modalItemType === 'artist'
                         ? `/music/artist/${encodeURIComponent(itemArtist)}`
@@ -6490,42 +6490,24 @@ export const Profile: React.FC = () => {
                         }
                       });
                     }}
-                    style={{
-                      padding: '1rem',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '0.75rem',
-                      position: 'relative',
-                      overflow: 'hidden',
-                      cursor: 'pointer',
-                      transition: 'transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease'
-                    }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = 'translateY(-4px)';
-                      e.currentTarget.style.borderColor = 'rgba(29, 185, 84, 0.5)';
-                      e.currentTarget.style.boxShadow = '0 8px 24px rgba(29, 185, 84, 0.15)';
+                      if (window.innerWidth > 768) {
+                        e.currentTarget.style.transform = 'translateY(-4px)';
+                        e.currentTarget.style.borderColor = 'rgba(29, 185, 84, 0.5)';
+                        e.currentTarget.style.boxShadow = '0 8px 24px rgba(29, 185, 84, 0.15)';
+                      }
                       prefetchMusicDetails(modalItemType, itemArtist, itemName);
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.borderColor = 'var(--border-color)';
-                      e.currentTarget.style.boxShadow = 'none';
+                      if (window.innerWidth > 768) {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.borderColor = 'var(--border-color)';
+                        e.currentTarget.style.boxShadow = 'none';
+                      }
                     }}
                   >
                     {/* Position badge */}
-                    <span style={{
-                      position: 'absolute',
-                      top: '0.6rem',
-                      left: '0.6rem',
-                      zIndex: 2,
-                      background: 'rgba(0, 0, 0, 0.75)',
-                      color: '#ffffff',
-                      fontSize: '0.72rem',
-                      fontWeight: 700,
-                      padding: '0.15rem 0.45rem',
-                      borderRadius: '6px',
-                      backdropFilter: 'blur(4px)'
-                    }}>
+                    <span className="profile-music-rank-badge">
                       #{i + 1}
                     </span>
 
@@ -6542,17 +6524,7 @@ export const Profile: React.FC = () => {
                             e.stopPropagation();
                             handleToggleArtistFavorite(item.name, item.image);
                           }}
-                          className={`btn-favorite-heart ${isArtistFav ? 'is-favorite' : ''}`}
-                          style={{
-                            position: 'absolute',
-                            top: '0.5rem',
-                            right: '0.5rem',
-                            width: '32px',
-                            height: '32px',
-                            cursor: 'pointer',
-                            zIndex: 3,
-                            color: isArtistFav ? 'var(--color-user, #F472B6)' : 'var(--text-secondary)'
-                          }}
+                          className={`btn-favorite-heart profile-music-fav-btn ${isArtistFav ? 'is-favorite' : ''}`}
                           title={isArtistFav
                             ? (language === 'es' ? 'Quitar Destacado' : 'Remove Featured')
                             : (language === 'es' ? 'Destacar Artista' : 'Feature Artist')
@@ -6564,25 +6536,12 @@ export const Profile: React.FC = () => {
                     })()}
 
                     {/* Artwork / Poster / Avatar */}
-                    <div style={{
-                      width: '100%',
-                      aspectRatio: '1/1',
-                      borderRadius: musicType === 'artists' ? '50%' : '8px',
-                      overflow: 'hidden',
-                      background: 'var(--bg-tertiary)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      margin: musicType === 'artists' ? '0.5rem auto 0 auto' : '0',
-                      maxWidth: musicType === 'artists' ? '140px' : '100%',
-                      boxShadow: musicType === 'artists' ? '0 4px 12px rgba(0,0,0,0.3)' : undefined
-                    }}>
+                    <div className="profile-music-artwork-wrap">
                       {item.image && !item.image.includes('2a96cbd8b46e442fc41c2b86b821562f') && !item.image.includes('d41d8cd98f00b204e9800998ecf8427e') ? (
                         <img
                           src={item.image}
                           alt={item.name}
                           referrerPolicy="no-referrer"
-                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                           onError={(e) => {
                             e.currentTarget.style.display = 'none';
                             const fallback = e.currentTarget.nextElementSibling as HTMLElement;
@@ -6590,56 +6549,31 @@ export const Profile: React.FC = () => {
                           }}
                         />
                       ) : null}
-                      <div style={{
-                        display: (item.image && !item.image.includes('2a96cbd8b46e442fc41c2b86b821562f') && !item.image.includes('d41d8cd98f00b204e9800998ecf8427e')) ? 'none' : 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        width: '100%',
-                        height: '100%',
-                        color: 'var(--color-music, #1DB954)',
-                        opacity: 0.6
-                      }}>
-                        {musicType === 'artists' ? <Mic size={36} /> : musicType === 'tracks' ? <Headphones size={36} /> : <Disc size={36} />}
+                      <div
+                        className="profile-music-artwork-fallback"
+                        style={{
+                          display: (item.image && !item.image.includes('2a96cbd8b46e442fc41c2b86b821562f') && !item.image.includes('d41d8cd98f00b204e9800998ecf8427e')) ? 'none' : 'flex'
+                        }}
+                      >
+                        {musicType === 'artists' ? <Mic size={24} /> : musicType === 'tracks' ? <Headphones size={24} /> : <Disc size={24} />}
                       </div>
                     </div>
 
                     {/* Text details */}
-                    <div style={{ flex: 1, minWidth: 0, textAlign: musicType === 'artists' ? 'center' : 'left' }}>
-                      <h4 style={{
-                        margin: '0 0 0.2rem 0',
-                        color: 'var(--text-primary)',
-                        fontSize: '0.95rem',
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis'
-                      }} title={item.name}>
+                    <div className="profile-music-info">
+                      <h4 title={item.name}>
                         {item.name}
                       </h4>
                       {item.artist && (
-                        <span style={{
-                          fontSize: '0.82rem',
-                          color: 'var(--text-secondary)',
-                          display: 'block',
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis'
-                        }} title={item.artist}>
+                        <span className="profile-music-artist" title={item.artist}>
                           {item.artist}
                         </span>
                       )}
                     </div>
 
                     {/* Playcount Badge */}
-                    <div style={{ display: 'flex', justifyContent: musicType === 'artists' ? 'center' : 'flex-start' }}>
-                      <span style={{
-                        fontSize: '0.72rem',
-                        fontWeight: 600,
-                        background: 'rgba(29, 185, 84, 0.12)',
-                        color: 'var(--color-music, #1DB954)',
-                        padding: '0.2rem 0.55rem',
-                        borderRadius: '4px',
-                        border: '1px solid rgba(29, 185, 84, 0.25)'
-                      }}>
+                    <div className="profile-music-plays-wrap">
+                      <span className="profile-music-plays-badge">
                         {item.playcount} {language === 'es' ? 'reproducciones' : 'plays'}
                       </span>
                     </div>

@@ -1127,6 +1127,128 @@ h1, h2, h3, h4, h5, h6 {
   grid-template-columns: repeat(auto-fill, minmax(220px, 220px));
 }
 
+/* Profile Music Grid & Cards */
+.profile-music-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(195px, 1fr));
+  gap: 1.5rem;
+}
+
+.profile-music-card {
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.profile-music-rank-badge {
+  position: absolute;
+  top: 0.6rem;
+  left: 0.6rem;
+  z-index: 2;
+  background: rgba(0, 0, 0, 0.75);
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.15rem 0.45rem;
+  borderRadius: 6px;
+  backdrop-filter: blur(4px);
+}
+
+.profile-music-fav-btn {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  z-index: 3;
+  color: var(--text-secondary);
+}
+
+.profile-music-artwork-wrap {
+  width: 100%;
+  aspect-ratio: 1/1;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--bg-tertiary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.profile-music-card-artist .profile-music-artwork-wrap {
+  border-radius: 50%;
+  margin: 0.5rem auto 0 auto;
+  max-width: 140px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+.profile-music-artwork-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.profile-music-artwork-fallback {
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: var(--color-music, #1DB954);
+  opacity: 0.6;
+}
+
+.profile-music-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.profile-music-card-artist .profile-music-info {
+  text-align: center;
+}
+
+.profile-music-info h4 {
+  margin: 0 0 0.2rem 0;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.profile-music-artist {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.profile-music-plays-wrap {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.profile-music-card-artist .profile-music-plays-wrap {
+  justify-content: center;
+}
+
+.profile-music-plays-badge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  background: rgba(29, 185, 84, 0.12);
+  color: var(--color-music, #1DB954);
+  padding: 0.2rem 0.55rem;
+  border-radius: 4px;
+  border: 1px solid rgba(29, 185, 84, 0.25);
+}
+
 /* Hide mobile-only home subbar on desktop */
 .home-mobile-only {
   display: none !important;
@@ -2205,6 +2327,140 @@ h1, h2, h3, h4, h5, h6 {
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
+  }
+
+  /* -------------------------------------------------------------------------
+     Mobile Music Cards: Horizontal compact cards matching work cards
+     (Left artwork, center title/artist, right rank/playcount)
+     ------------------------------------------------------------------------- */
+  .profile-music-grid {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 0.65rem !important;
+    width: 100% !important;
+    padding-left: 0.25rem !important;
+    padding-right: 0.25rem !important;
+    box-sizing: border-box !important;
+  }
+
+  .profile-music-card {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    height: 70px !important;
+    min-height: 70px !important;
+    max-height: 70px !important;
+    border-radius: 10px !important;
+    padding: 0.4rem 0.65rem !important;
+    gap: 0.75rem !important;
+    box-sizing: border-box !important;
+    position: relative !important;
+    background: var(--bg-secondary) !important;
+  }
+
+  .profile-music-artwork-wrap {
+    order: 1 !important;
+    width: 52px !important;
+    min-width: 52px !important;
+    max-width: 52px !important;
+    height: 52px !important;
+    min-height: 52px !important;
+    max-height: 52px !important;
+    border-radius: 8px !important;
+    flex-shrink: 0 !important;
+    margin: 0 !important;
+  }
+
+  .profile-music-card-artist .profile-music-artwork-wrap {
+    border-radius: 50% !important;
+    margin: 0 !important;
+    max-width: 52px !important;
+  }
+
+  .profile-music-info {
+    order: 2 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    min-width: 0 !important;
+    flex: 1 !important;
+    text-align: left !important;
+    gap: 0.15rem !important;
+  }
+
+  .profile-music-card-artist .profile-music-info {
+    text-align: left !important;
+  }
+
+  .profile-music-info h4 {
+    margin: 0 !important;
+    font-size: 0.92rem !important;
+    font-weight: 700 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    color: var(--text-primary) !important;
+    line-height: 1.25 !important;
+  }
+
+  .profile-music-artist {
+    font-size: 0.78rem !important;
+    color: var(--text-secondary) !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    line-height: 1.2 !important;
+  }
+
+  .profile-music-plays-wrap {
+    order: 3 !important;
+    flex-shrink: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: flex-end !important;
+    justify-content: center !important;
+    gap: 0.25rem !important;
+  }
+
+  .profile-music-card-artist .profile-music-plays-wrap {
+    justify-content: center !important;
+  }
+
+  .profile-music-plays-badge {
+    font-size: 0.68rem !important;
+    font-weight: 600 !important;
+    padding: 0.15rem 0.45rem !important;
+    border-radius: 4px !important;
+    line-height: 1.2 !important;
+    white-space: nowrap !important;
+  }
+
+  .profile-music-rank-badge {
+    position: static !important;
+    order: 0 !important;
+    font-size: 0.75rem !important;
+    font-weight: 800 !important;
+    color: var(--text-secondary) !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    padding: 0 !important;
+    min-width: 20px !important;
+    text-align: center !important;
+    flex-shrink: 0 !important;
+  }
+
+  .profile-music-fav-btn {
+    position: static !important;
+    order: 4 !important;
+    width: 28px !important;
+    height: 28px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex-shrink: 0 !important;
   }
 
   /* Header count badge in category rows */
