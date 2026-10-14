@@ -703,6 +703,13 @@ export const Profile: React.FC = () => {
     } else {
       newParams.set('tab', tab);
     }
+    if (tab !== 'guides') {
+      newParams.delete('subtab');
+    }
+    if (tab !== 'music') {
+      newParams.delete('type');
+      newParams.delete('period');
+    }
     setSearchParams(newParams);
   };
 
@@ -1765,8 +1772,62 @@ export const Profile: React.FC = () => {
   // Last.fm states
   const [nowPlaying, setNowPlaying] = useState<any>(null);
   const [topAlbums, setTopAlbums] = useState<any[]>([]);
-  const [musicType, setMusicType] = useState<'artists' | 'albums' | 'tracks'>('artists');
-  const [musicPeriod, setMusicPeriod] = useState<'7day' | '1month' | 'overall'>('7day');
+
+  const musicTypeParam = searchParams.get('type');
+  const validMusicTypes = ['artists', 'albums', 'tracks'] as const;
+  const initialMusicType: 'artists' | 'albums' | 'tracks' = (musicTypeParam && validMusicTypes.includes(musicTypeParam as any))
+    ? (musicTypeParam as 'artists' | 'albums' | 'tracks')
+    : 'artists';
+
+  const musicPeriodParam = searchParams.get('period');
+  const validMusicPeriods = ['7day', '1month', 'overall'] as const;
+  const initialMusicPeriod: '7day' | '1month' | 'overall' = (musicPeriodParam && validMusicPeriods.includes(musicPeriodParam as any))
+    ? (musicPeriodParam as '7day' | '1month' | 'overall')
+    : '7day';
+
+  const [musicType, setMusicType] = useState<'artists' | 'albums' | 'tracks'>(initialMusicType);
+  const [musicPeriod, setMusicPeriod] = useState<'7day' | '1month' | 'overall'>(initialMusicPeriod);
+
+  // Sync state if URL searchParams change externally (e.g. back/forward navigation)
+  useEffect(() => {
+    if (activeTab === 'music') {
+      const typeInUrl = searchParams.get('type');
+      if (typeInUrl && validMusicTypes.includes(typeInUrl as any)) {
+        setMusicType(typeInUrl as 'artists' | 'albums' | 'tracks');
+      } else if (!typeInUrl) {
+        setMusicType('artists');
+      }
+
+      const periodInUrl = searchParams.get('period');
+      if (periodInUrl && validMusicPeriods.includes(periodInUrl as any)) {
+        setMusicPeriod(periodInUrl as '7day' | '1month' | 'overall');
+      } else if (!periodInUrl) {
+        setMusicPeriod('7day');
+      }
+    }
+  }, [searchParams, activeTab]);
+
+  const handleMusicTypeChange = (newType: 'artists' | 'albums' | 'tracks') => {
+    setMusicType(newType);
+    const newParams = new URLSearchParams(searchParams);
+    if (newType === 'artists') {
+      newParams.delete('type');
+    } else {
+      newParams.set('type', newType);
+    }
+    setSearchParams(newParams);
+  };
+
+  const handleMusicPeriodChange = (newPeriod: '7day' | '1month' | 'overall') => {
+    setMusicPeriod(newPeriod);
+    const newParams = new URLSearchParams(searchParams);
+    if (newPeriod === '7day') {
+      newParams.delete('period');
+    } else {
+      newParams.set('period', newPeriod);
+    }
+    setSearchParams(newParams);
+  };
   const [musicItems, setMusicItems] = useState<any[]>([]);
   const [isMusicDataLoading, setIsMusicDataLoading] = useState<boolean>(false);
   const [isConnectingLastFm, setIsConnectingLastFm] = useState(false);
@@ -6311,7 +6372,7 @@ export const Profile: React.FC = () => {
                   <button
                     key={tab.id}
                     type="button"
-                    onClick={() => setMusicType(tab.id as any)}
+                    onClick={() => handleMusicTypeChange(tab.id as any)}
                     className={`profile-category-tab ${isSelected ? 'selected' : ''}`}
                     style={{
                       padding: '0.35rem 0.85rem',
@@ -6343,7 +6404,7 @@ export const Profile: React.FC = () => {
                   <button
                     key={p.id}
                     type="button"
-                    onClick={() => setMusicPeriod(p.id as any)}
+                    onClick={() => handleMusicPeriodChange(p.id as any)}
                     className={`shelf-view-toggle-btn ${isSelected ? 'active' : ''}`}
                     style={{
                       padding: '0.3rem 0.65rem',
