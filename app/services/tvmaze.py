@@ -423,7 +423,7 @@ class TVMazeService:
         import json, urllib.request, datetime, time
         import concurrent.futures
 
-        cache_key = "tvmaze_new_anime_v1"
+        cache_key = "tvmaze_new_anime_v2"
         now_ts = time.time()
         if cache_key in TVMazeService._schedule_cache:
             ts, data = TVMazeService._schedule_cache[cache_key]
@@ -494,7 +494,7 @@ class TVMazeService:
             anime_map.values(),
             key=lambda x: (x["latest_ep"]["airdate"], x["show"].get("weight", 0)),
             reverse=True
-        )[:60]
+        )
 
         results = []
         for item in sorted_anime:

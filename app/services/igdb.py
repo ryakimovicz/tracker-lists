@@ -430,7 +430,7 @@ class IGDBService:
     def get_new_games(cls) -> List[SearchResultItem]:
         import time
         now = int(time.time())
-        body = f'fields id, name, category, game_type, parent_game, cover.image_id, first_release_date, summary; where first_release_date < {now} & cover != null & (game_type = (0, 2, 3, 4, 8, 9, 10) | category = (0, 2, 3, 4, 8, 9, 10)); sort first_release_date desc; limit 40;'
+        body = f'fields id, name, category, game_type, parent_game, cover.image_id, first_release_date, summary; where first_release_date < {now} & cover != null & (game_type = (0, 2, 3, 4, 8, 9, 10) | category = (0, 2, 3, 4, 8, 9, 10)); sort first_release_date desc; limit 100;'
         return cls._execute_query(body)
 
     @classmethod

@@ -175,7 +175,7 @@ class AnilistService:
         
         graphql_query = """
         query ($end: FuzzyDateInt) {
-          Page(page: 1, perPage: 40) {
+          Page(page: 1, perPage: 50) {
             media(type: MANGA, sort: [START_DATE_DESC], startDate_greater: 20260101, startDate_lesser: $end, isAdult: false) {
               id
               title { romaji english }
