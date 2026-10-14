@@ -5842,9 +5842,9 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
               </button>
 
               {/* Modal Body Info */}
-              <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
+              <div className="item-details-body-layout" style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
                 {selectedItem.image_url && (
-                    <div style={{ position: 'relative', width: '130px', height: '190px', borderRadius: '8px', overflow: 'hidden' }}>
+                    <div className="item-details-cover-container" style={{ position: 'relative', width: '130px', height: '190px', borderRadius: '8px', overflow: 'hidden' }}>
                       <img
                         src={selectedItem.image_url}
                         alt={selectedItem.title}
@@ -5934,7 +5934,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                     </div>
                   )}
                 
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem', minWidth: '250px' }}>
+                <div className="item-details-info-column" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem', minWidth: '250px' }}>
                   {/* Description info */}
                   {(() => {
                     const parseNotes = (notes: string) => {

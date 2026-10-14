@@ -2422,5 +2422,25 @@ h1, h2, h3, h4, h5, h6 {
   .episode-item-row:active {
     transform: scale(0.995);
   }
+
+  /* Modal body info layout on mobile: place info to the right of the cover image */
+  .item-details-body-layout {
+    gap: 1rem !important;
+    flex-wrap: nowrap !important;
+    align-items: flex-start !important;
+  }
+
+  .item-details-cover-container {
+    width: 110px !important;
+    min-width: 110px !important;
+    height: 160px !important;
+    flex-shrink: 0 !important;
+  }
+
+  .item-details-info-column {
+    min-width: 0 !important;
+    width: 100% !important;
+    gap: 0.75rem !important;
+  }
 }
 
