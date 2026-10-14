@@ -270,33 +270,27 @@ class OMDbService:
 
     @classmethod
     def get_new_movies(cls) -> List[SearchResultItem]:
-        cache_key = "_explore_new_movies_v10"
+        cache_key = "_explore_new_movies_v11"
         if cache_key in cls._search_cache:
             timestamp, cached_results = cls._search_cache[cache_key]
             if time.time() - timestamp < 3600 * 6: # 6 hours shared cache for all users
                 return cached_results
 
         from app.services.wikireleases import WikiReleasesService
-        from datetime import datetime
+        from datetime import datetime, timedelta
         all_films = WikiReleasesService.get_upcoming_and_recent_films(days_back=90, days_forward=30)
-        today_str = datetime.now().strftime("%Y-%m-%d")
+        today = datetime.now().date()
+        today_str = today.strftime("%Y-%m-%d")
+        two_weeks_ago = (today - timedelta(days=14)).strftime("%Y-%m-%d")
         
         future_films = sorted([f for f in all_films if f[1] >= today_str], key=lambda x: x[1])
-        past_films = sorted([f for f in all_films if f[1] < today_str], key=lambda x: x[1], reverse=True)
+        past_2weeks = sorted([f for f in all_films if two_weeks_ago <= f[1] < today_str], key=lambda x: x[1], reverse=True)
+        older_past = sorted([f for f in all_films if f[1] < two_weeks_ago], key=lambda x: x[1], reverse=True)
         
-        scheduled_films = []
+        scheduled_films = list(future_films) + list(past_2weeks)
         target_count = 45
-        if len(future_films) >= target_count:
-            for i, f in enumerate(future_films):
-                if i < target_count:
-                    scheduled_films.append(f)
-                elif f[1] == scheduled_films[-1][1]:
-                    scheduled_films.append(f)
-                else:
-                    break
-        else:
-            scheduled_films.extend(future_films)
-            for f in past_films:
+        if len(scheduled_films) < target_count:
+            for f in older_past:
                 if len(scheduled_films) < target_count:
                     scheduled_films.append(f)
                 elif f[1] == scheduled_films[-1][1]:
