@@ -7332,6 +7332,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                   return (
                                     <div
                                       key={ep.id || ep.external_id || `cv_${cleanEpId}`}
+                                      className="episode-item-row"
                                       ref={(el) => {
                                         if (el && isCandidateNext && !hasUserScrolledComicContainerRef.current) {
                                           const container = el.parentElement;
@@ -7345,96 +7346,95 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                           }
                                         }
                                       }}
+                                      onClick={() => {
+                                        setHistoryStack(prev => [...prev, selectedItem]);
+                                        onOpenItem && onOpenItem({
+                                          id: dbEp ? dbEp.id : ep.id,
+                                          list_id: selectedItem.tracking_list_id,
+                                          item_type: 'comic',
+                                          external_id: extIdKey,
+                                          title: `${selectedItem.title} #${ep.issue_number || ep.episode_number || 1}${ep.name ? ` - ${ep.name}` : ''}`,
+                                          image_url: ep.image_url || ep.image?.original || ep.image?.medium || ep.still_path || selectedItem.image_url,
+                                          custom_notes: JSON.stringify({ description: ep.overview || '', release_date: ep.air_date || null }),
+                                          completed_at: dbEp?.completed_at,
+                                          is_completed: isCompleted,
+                                          season_number: ep.season_number,
+                                          episode_number: ep.episode_number,
+                                          issue_number: ep.issue_number ?? ep.episode_number,
+                                          rawEpisodeId: ep.id,
+                                          release_date: ep.air_date,
+                                          parent_series: selectedItem
+                                        });
+                                      }}
                                       style={{
                                         display: 'flex',
                                         alignItems: 'center',
                                         justifyContent: 'space-between',
-                                        padding: '0.45rem 0.65rem',
+                                        padding: '0.75rem 1rem',
                                         background: 'var(--bg-secondary)',
                                         border: '1px solid var(--border-color)',
                                         borderRadius: '6px',
-                                        gap: '1rem'
+                                        gap: '0.75rem',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.15s ease'
                                       }}
                                     >
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', minWidth: 0 }}>
-                                        <div style={{ position: 'relative', flexShrink: 0 }}>
-                                          <button
-                                            type="button"
-                                            disabled={!user}
-                                            onClick={() => {
-                                              const currentIsCompleted = isCompleted;
-                                              if (currentIsCompleted) {
-                                                setEpisodeActionItem({ ep, listId: selectedItem.tracking_list_id });
-                                              } else {
-                                                const missing = getMissingPreviousEpisodesForEp(ep, displayedIssues);
-                                                if (missing.length > 0) {
-                                                  setPendingPreviousPrompt({
-                                                    type: 'episode',
-                                                    targetEp: ep,
-                                                    missingEpisodes: missing
-                                                  });
-                                                  return;
-                                                }
-                                                setGlobalProgress(prev => ({ ...prev, [extIdKey]: true, [cleanEpId]: true }));
-                                                handleToggleEpisode(selectedItem.tracking_list_id, ep);
-                                              }
-                                            }}
-                                            style={{
-                                              background: isCompleted ? `var(--color-${selectedItem.item_type || 'movie'})` : 'transparent',
-                                              border: isCompleted ? 'none' : '1px solid var(--border-color)',
-                                              borderRadius: '50%',
-                                              width: '20px',
-                                              height: '20px',
-                                              display: 'inline-flex',
-                                              alignItems: 'center',
-                                              justifyContent: 'center',
-                                              cursor: user ? 'pointer' : 'default',
-                                              color: isCompleted ? `var(--color-text-${selectedItem.item_type || 'movie'})` : 'var(--text-muted)',
-                                              opacity: isCompleted ? 1 : 0.6,
-                                              transition: 'all 0.2s ease',
-                                              padding: 0
-                                            }}
-                                          >
-                                            <Check size={12} strokeWidth={3} />
-                                          </button>
-                                        </div>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', minWidth: 0, overflow: 'hidden' }}>
-                                          <span style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={ep.name || 'Untitled'}>
-                                            {ep.name || (ep.issue_number ? `#${ep.issue_number}` : 'Untitled')}
+                                      {/* Left side: Issue Title and Date */}
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0, overflow: 'hidden', flex: 1 }}>
+                                        <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={ep.name || 'Untitled'}>
+                                          {ep.name || (ep.issue_number ? `#${ep.issue_number}` : 'Untitled')}
+                                        </span>
+                                        {ep.air_date && (
+                                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', flexShrink: 0 }}>
+                                            ({formatReleaseDate(ep.air_date)})
                                           </span>
-                                          {ep.air_date && (
-                                            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', flexShrink: 0 }}>
-                                              ({formatReleaseDate(ep.air_date)})
-                                            </span>
-                                          )}
-                                        </div>
+                                        )}
                                       </div>
-                                      <button
-                                        onClick={() => {
-                                          setHistoryStack(prev => [...prev, selectedItem]);
-                                          onOpenItem && onOpenItem({
-                                            id: dbEp ? dbEp.id : ep.id,
-                                            list_id: selectedItem.tracking_list_id,
-                                            item_type: 'comic',
-                                            external_id: extIdKey,
-                                            title: `${selectedItem.title} #${ep.issue_number || ep.episode_number || 1}${ep.name ? ` - ${ep.name}` : ''}`,
-                                            image_url: ep.image_url || ep.image?.original || ep.image?.medium || ep.still_path || selectedItem.image_url,
-                                            custom_notes: JSON.stringify({ description: ep.overview || '', release_date: ep.air_date || null }),
-                                            completed_at: dbEp?.completed_at,
-                                            is_completed: isCompleted,
-                                            season_number: ep.season_number,
-                                            episode_number: ep.episode_number,
-                                            issue_number: ep.issue_number ?? ep.episode_number,
-                                            rawEpisodeId: ep.id,
-                                            release_date: ep.air_date,
-                                            parent_series: selectedItem
-                                          });
-                                        }}
-                                        className="btn-secondary"
-                                        style={{ padding: '0.2rem 0.4rem', fontSize: '0.74rem', flexShrink: 0 }}
-                                      >
-                                        {language === 'es' ? 'Ver Info' : 'View Info'}
-                                      </button>
+
+                                      {/* Right side: Read Completion Checkmark */}
+                                      <div style={{ position: 'relative', flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
+                                        <button
+                                          type="button"
+                                          disabled={!user}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            const currentIsCompleted = isCompleted;
+                                            if (currentIsCompleted) {
+                                              setEpisodeActionItem({ ep, listId: selectedItem.tracking_list_id });
+                                            } else {
+                                              const missing = getMissingPreviousEpisodesForEp(ep, displayedIssues);
+                                              if (missing.length > 0) {
+                                                setPendingPreviousPrompt({
+                                                  type: 'episode',
+                                                  targetEp: ep,
+                                                  missingEpisodes: missing
+                                                });
+                                                return;
+                                              }
+                                              setGlobalProgress(prev => ({ ...prev, [extIdKey]: true, [cleanEpId]: true }));
+                                              handleToggleEpisode(selectedItem.tracking_list_id, ep);
+                                            }
+                                          }}
+                                          style={{
+                                            background: isCompleted ? `var(--color-${selectedItem.item_type || 'movie'})` : 'transparent',
+                                            border: isCompleted ? 'none' : '1px solid var(--border-color)',
+                                            borderRadius: '50%',
+                                            width: '22px',
+                                            height: '22px',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            cursor: user ? 'pointer' : 'default',
+                                            color: isCompleted ? `var(--color-text-${selectedItem.item_type || 'movie'})` : 'var(--text-muted)',
+                                            opacity: isCompleted ? 1 : 0.6,
+                                            transition: 'all 0.2s ease',
+                                            padding: 0
+                                          }}
+                                          title={isCompleted ? (language === 'es' ? 'Número leído' : 'Read') : (language === 'es' ? 'Marcar como leído' : 'Mark as read')}
+                                        >
+                                          <Check size={12} strokeWidth={3} />
+                                        </button>
+                                      </div>
                                     </div>
                                   );
                                 })}
