@@ -7714,38 +7714,50 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
                               return (
                                 <div key={`season_${s.season_number}`} style={{ border: '1px solid var(--border-color)', borderRadius: '6px', overflow: 'hidden' }}>
-                                  <div
-                                    role="button"
-                                    tabIndex={0}
-                                    onClick={() => {
-                                      hasManuallyToggledSeasonRef.current = true;
-                                      if (isSeasonActive) {
-                                        setActiveSeason(null);
-                                      } else {
-                                        hasUserScrolledSeasonContainerRef.current = false;
-                                        setActiveSeason(s.season_number);
-                                        handleLoadSeasonEpisodes(selectedItem.external_id, s.season_number);
-                                      }
-                                    }}
-                                    style={{
-                                      width: '100%',
-                                      padding: '0.75rem 1rem',
-                                      background: 'var(--bg-secondary)',
-                                      border: 'none',
-                                      color: 'var(--text-primary)',
-                                      fontWeight: 600,
-                                      textAlign: 'left',
-                                      cursor: 'pointer',
-                                      display: 'flex',
-                                      justifyContent: 'space-between',
-                                      alignItems: 'center'
-                                    }}
-                                  >
-                                    <span>
-                                      <span style={{ position: 'relative', display: 'inline-flex', verticalAlign: 'middle' }}>
-                                        <span
-                                          role="button"
-                                          tabIndex={0}
+                                    <div
+                                      role="button"
+                                      tabIndex={0}
+                                      onClick={() => {
+                                        hasManuallyToggledSeasonRef.current = true;
+                                        if (isSeasonActive) {
+                                          setActiveSeason(null);
+                                        } else {
+                                          hasUserScrolledSeasonContainerRef.current = false;
+                                          setActiveSeason(s.season_number);
+                                          handleLoadSeasonEpisodes(selectedItem.external_id, s.season_number);
+                                        }
+                                      }}
+                                      style={{
+                                        width: '100%',
+                                        padding: '0.75rem 1rem',
+                                        background: 'var(--bg-secondary)',
+                                        border: 'none',
+                                        color: 'var(--text-primary)',
+                                        fontWeight: 600,
+                                        textAlign: 'left',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center'
+                                      }}
+                                    >
+                                      {/* Left side: Chevron icon and Season Title matching Home rows */}
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0, flex: 1 }}>
+                                        <span style={{ display: 'inline-flex', alignItems: 'center', color: 'var(--text-muted)', flexShrink: 0 }}>
+                                          {isSeasonActive ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+                                        </span>
+                                        <span style={{ minWidth: 0 }}>
+                                          {seasonLabel}
+                                          <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginLeft: '0.5rem', fontWeight: 400 }}>
+                                            ({displayedSeasonEps.length > 0 ? displayedSeasonEps.length : s.episode_count} {countUnitLabel})
+                                          </span>
+                                        </span>
+                                      </div>
+
+                                      {/* Right side: Season Completion Checkmark matching episode items */}
+                                      <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0, marginLeft: '0.5rem' }}>
+                                        <button
+                                          type="button"
                                           onClick={async (e) => {
                                             e.stopPropagation();
                                             if (isSeasonDone || isSeasonPartial) {
@@ -7838,7 +7850,6 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                               : isSeasonPartial 
                                                 ? `var(--color-${selectedItem.item_type || 'movie'})` 
                                                 : 'var(--text-muted)',
-                                            marginRight: '0.65rem',
                                             opacity: isSeasonDone || isSeasonPartial ? 1 : 0.6,
                                             padding: 0,
                                             transition: 'all 0.2s ease'
@@ -7846,14 +7857,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                           title={isSeasonDone ? (language === 'es' ? 'Temporada completa' : 'Completed') : isSeasonPartial ? (language === 'es' ? 'Regular completo (pendientes especiales)' : 'Regular completed') : ''}
                                         >
                                           <Check size={12} strokeWidth={3} />
-                                        </span>
-                                      </span>
-                                        {seasonLabel}
-                                        <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginLeft: '0.5rem', fontWeight: 400 }}>
-                                          ({displayedSeasonEps.length > 0 ? displayedSeasonEps.length : s.episode_count} {countUnitLabel})
-                                        </span>
-                                      </span>
-                                      <span>{isSeasonActive ? '▼' : '►'}</span>
+                                        </button>
+                                      </div>
                                     </div>
 
                                     {isSeasonActive && (
