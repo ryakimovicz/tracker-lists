@@ -1720,26 +1720,46 @@ export const Search: React.FC = () => {
                               {formatReleaseDate(item.release_date)}
                             </div>
                           )}
-                          {activeTab === 'all' && (
-                            <span
-                              className={`${getTagClass(item.item_type)} search-category-tag`}
-                              style={{ 
-                                alignSelf: 'flex-start', 
-                                padding: '0.15rem 0.5rem', 
-                                borderRadius: '5px',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '0.3rem',
-                                fontSize: '0.7rem',
-                                fontWeight: 600,
-                                textTransform: 'none',
-                                letterSpacing: 'normal'
-                              }}
-                            >
-                              {getCategoryIcon(item.item_type, { size: 13, color: 'currentColor' })}
-                              <span>{getSingleCategoryLabel(item.item_type)}</span>
-                            </span>
-                          )}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
+                            {activeTab === 'all' && (
+                              <span
+                                className={`${getTagClass(item.item_type)} search-category-tag`}
+                                style={{ 
+                                  alignSelf: 'flex-start', 
+                                  padding: '0.15rem 0.5rem', 
+                                  borderRadius: '5px',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.3rem',
+                                  fontSize: '0.7rem',
+                                  fontWeight: 600,
+                                  textTransform: 'none',
+                                  letterSpacing: 'normal'
+                                }}
+                              >
+                                {getCategoryIcon(item.item_type, { size: 13, color: 'currentColor' })}
+                                <span>{getSingleCategoryLabel(item.item_type)}</span>
+                              </span>
+                            )}
+                            {item.badge && (
+                              <span
+                                className="search-media-badge-inline"
+                                style={{
+                                  fontSize: '0.7rem',
+                                  fontWeight: 600,
+                                  color: 'var(--text-secondary)',
+                                  background: 'rgba(255, 255, 255, 0.06)',
+                                  padding: '0.1rem 0.45rem',
+                                  borderRadius: '4px',
+                                  border: '1px solid var(--border-color)',
+                                  display: 'inline-flex',
+                                  alignItems: 'center'
+                                }}
+                              >
+                                {item.badge}
+                              </span>
+                            )}
+                          </div>
                         </div>
 
                         {user && !isComicIssue && (

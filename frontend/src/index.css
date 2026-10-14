@@ -2158,6 +2158,24 @@ h1, h2, h3, h4, h5, h6 {
     height: 10px !important;
   }
 
+  /* Hide the overlaid badge on mobile thumbnail so it does not clutter the 48x60px cover */
+  .search-results-grid .search-item-card .search-media-cover > div:not(.media-poster-container) {
+    display: none !important;
+  }
+
+  /* Inline media badge inside the card body (e.g. 50 Números, DLC, Colección) */
+  .search-results-grid .search-item-card .search-media-badge-inline {
+    font-size: 0.65rem !important;
+    font-weight: 600 !important;
+    padding: 0.1rem 0.4rem !important;
+    border-radius: 4px !important;
+    background: rgba(255, 255, 255, 0.06) !important;
+    border: 1px solid var(--border-color) !important;
+    color: var(--text-secondary) !important;
+    line-height: 1.2 !important;
+    margin-top: 0.1rem !important;
+  }
+
   .search-results-grid .search-item-card .btn-card-add-shelf {
     position: static !important;
     grid-column: 3 !important;
