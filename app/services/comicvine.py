@@ -2,16 +2,35 @@ import json
 import urllib.request
 import urllib.parse
 import re
-from typing import List, Dict, Tuple
+import time
+from typing import List, Dict, Tuple, Optional, Any
 from app.core.config import settings
 from app.services.base import SearchResultItem
 from app.core.sfw_filter import is_safe_media_item
+
+# In-memory caches to protect ComicVine's 200 requests/hour limit
+_CV_CACHE_TTL = 3600 * 24  # 24 hours
+_CV_SEARCH_CACHE: Dict[str, Tuple[float, List[SearchResultItem]]] = {}
+_CV_VOLUME_DETAIL_CACHE: Dict[str, Tuple[float, Optional[dict]]] = {}
+_CV_VOLUME_ISSUES_CACHE: Dict[str, Tuple[float, List[dict]]] = {}
+_CV_ISSUE_DETAIL_CACHE: Dict[str, Tuple[float, Optional[dict]]] = {}
+_CV_NEW_COMICS_CACHE: Dict[str, Tuple[float, List[SearchResultItem]]] = {}
 
 class ComicVineService:
     @staticmethod
     def search_comics(query: str) -> List[SearchResultItem]:
         if not query:
             return []
+        
+        cleaned_query = query.replace('#', ' ')
+        cleaned_query = " ".join(cleaned_query.split())
+        cache_key = cleaned_query.lower()
+        now_ts = time.time()
+
+        if cache_key in _CV_SEARCH_CACHE:
+            ts, cached_res = _CV_SEARCH_CACHE[cache_key]
+            if now_ts - ts < _CV_CACHE_TTL:
+                return cached_res
         
         api_key = settings.COMIC_VINE_API_KEY
         if not api_key:
@@ -280,6 +299,8 @@ class ComicVineService:
                 return 0.0
 
             merged_results.sort(key=get_relevance_score, reverse=True)
+            if merged_results:
+                _CV_SEARCH_CACHE[cache_key] = (now_ts, merged_results)
             return merged_results
         except Exception as e:
             print(f"Comic Vine API Error: {e}")
@@ -294,6 +315,13 @@ class ComicVineService:
         raw_id = str(vol_id).replace("cv_vol_", "").replace("cv_volume_", "").replace("cv_", "")
         if not raw_id.isdigit():
             return None
+
+        cache_key = raw_id
+        now_ts = time.time()
+        if cache_key in _CV_VOLUME_DETAIL_CACHE:
+            ts, cached_vol = _CV_VOLUME_DETAIL_CACHE[cache_key]
+            if now_ts - ts < _CV_CACHE_TTL:
+                return cached_vol
 
         url = f"https://comicvine.gamespot.com/api/volume/4050-{raw_id}/?api_key={api_key}&format=json"
         req = urllib.request.Request(url, headers={"User-Agent": "Pathd/1.0 (contact@pathd.app)"})
@@ -331,7 +359,7 @@ class ComicVineService:
                     is_ended = True if (start_yr_int and start_yr_int < current_year - 1) else False
                     status_str = "Ended" if is_ended else "Running"
 
-                    return {
+                    vol_result = {
                         "id": f"cv_vol_{raw_id}",
                         "name": vol_name,
                         "volume_name": vol_name,
@@ -346,6 +374,8 @@ class ComicVineService:
                         "status": status_str,
                         "is_ended": is_ended
                     }
+                    _CV_VOLUME_DETAIL_CACHE[cache_key] = (now_ts, vol_result)
+                    return vol_result
         except Exception as e:
             print(f"Comic Vine get_comic_volume_detail error: {e}")
         return None
@@ -359,6 +389,13 @@ class ComicVineService:
         raw_id = str(vol_id).replace("cv_vol_", "").replace("cv_volume_", "").replace("cv_", "")
         if not raw_id.isdigit():
             return []
+
+        cache_key = raw_id
+        now_ts = time.time()
+        if cache_key in _CV_VOLUME_ISSUES_CACHE:
+            ts, cached_eps = _CV_VOLUME_ISSUES_CACHE[cache_key]
+            if now_ts - ts < _CV_CACHE_TTL:
+                return cached_eps
 
         # Query all issues for this volume with pagination, sorted by issue_number ascending
         try:
@@ -421,6 +458,8 @@ class ComicVineService:
                     "overview": desc,
                     "air_date": itm.get("cover_date") or itm.get("store_date")
                 })
+            if episodes:
+                _CV_VOLUME_ISSUES_CACHE[cache_key] = (now_ts, episodes)
             return episodes
         except Exception as e:
             print(f"Comic Vine get_comic_volume_issues error: {e}")
@@ -435,6 +474,13 @@ class ComicVineService:
         raw_id = str(issue_id).replace("cv_issue_", "").replace("cv_", "")
         if not raw_id.isdigit():
             return None
+
+        cache_key = raw_id
+        now_ts = time.time()
+        if cache_key in _CV_ISSUE_DETAIL_CACHE:
+            ts, cached_issue = _CV_ISSUE_DETAIL_CACHE[cache_key]
+            if now_ts - ts < _CV_CACHE_TTL:
+                return cached_issue
 
         url = f"https://comicvine.gamespot.com/api/issue/4000-{raw_id}/?api_key={api_key}&format=json"
         req = urllib.request.Request(url, headers={"User-Agent": "Pathd/1.0 (contact@pathd.app)"})
@@ -482,7 +528,7 @@ class ComicVineService:
                                 "item_type": "comic"
                             }
 
-                    return {
+                    issue_res = {
                         "id": f"cv_issue_{raw_id}",
                         "title": full_title,
                         "name": full_title,
@@ -495,12 +541,21 @@ class ComicVineService:
                         "release_date": itm.get("cover_date") or itm.get("store_date"),
                         "parent_series": parent_series
                     }
+                    _CV_ISSUE_DETAIL_CACHE[cache_key] = (now_ts, issue_res)
+                    return issue_res
         except Exception as e:
             print(f"Comic Vine get_comic_issue_detail error: {e}")
         return None
 
     @staticmethod
     def get_new_comics() -> List[SearchResultItem]:
+        cache_key = "cv_new_comics_v1"
+        now_ts = time.time()
+        if cache_key in _CV_NEW_COMICS_CACHE:
+            ts, cached_new = _CV_NEW_COMICS_CACHE[cache_key]
+            if now_ts - ts < 14400:  # 4 hours cache
+                return cached_new
+
         api_key = settings.COMIC_VINE_API_KEY
         if not api_key:
             return []
@@ -571,6 +626,7 @@ class ComicVineService:
                             release_date=pub_date
                         ))
                     if results:
+                        _CV_NEW_COMICS_CACHE[cache_key] = (now_ts, results[:25])
                         return results[:25]
         except Exception as e:
             print(f"Comic Vine New Comics error: {e}")
@@ -578,7 +634,10 @@ class ComicVineService:
         # Fallback to volumes query
         from datetime import datetime
         current_year = datetime.now().year
-        return ComicVineService.search_comics(f"Batman {current_year}")[:15]
+        fallback = ComicVineService.search_comics(f"Batman {current_year}")[:15]
+        if fallback:
+            _CV_NEW_COMICS_CACHE[cache_key] = (now_ts, fallback)
+        return fallback
 
     _trending_comics_cache: Dict[str, Tuple[float, List[SearchResultItem]]] = {}
 
