@@ -6358,7 +6358,7 @@ export const Profile: React.FC = () => {
         ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', textAlign: 'left' }}>
           {/* Mobile Music Sub-tabs (Artistas, Álbumes, Canciones) matching Guides mobile sub-tabs */}
-          <div className="upcoming-mobile-tabs-container home-mobile-only" style={{ marginBottom: '0.25rem' }}>
+          <div className="upcoming-mobile-tabs-container home-mobile-only" style={{ marginBottom: '0.4rem' }}>
             {[
               { id: 'artists', label: language === 'es' ? 'Artistas' : 'Artists' },
               { id: 'albums', label: language === 'es' ? 'Álbumes' : 'Albums' },
@@ -6379,8 +6379,8 @@ export const Profile: React.FC = () => {
             })}
           </div>
 
-          {/* Period selector for mobile (aligned to the right below the subtabs) */}
-          <div className="home-mobile-only" style={{ display: 'flex', justifyContent: 'flex-end', width: '100%', paddingRight: '0.25rem', paddingLeft: '0.25rem', boxSizing: 'border-box', marginBottom: '0.25rem' }}>
+          {/* Period selector for mobile (aligned closely to the right below the subtabs) */}
+          <div className="home-mobile-only" style={{ display: 'flex', justifyContent: 'flex-end', width: '100%', paddingRight: '0.25rem', paddingLeft: '0.25rem', boxSizing: 'border-box', marginTop: '-0.75rem', marginBottom: '0.1rem' }}>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', background: 'var(--bg-secondary)', padding: '0.2rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
               {[
                 { id: '7day', label: language === 'es' ? '7 días' : '7 days', icon: Clock },
