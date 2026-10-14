@@ -549,7 +549,7 @@ class ComicVineService:
 
     @staticmethod
     def get_new_comics() -> List[SearchResultItem]:
-        cache_key = "cv_new_comics_v1"
+        cache_key = "cv_new_comics_v2"
         now_ts = time.time()
         if cache_key in _CV_NEW_COMICS_CACHE:
             ts, cached_new = _CV_NEW_COMICS_CACHE[cache_key]
@@ -560,9 +560,9 @@ class ComicVineService:
         if not api_key:
             return []
         
-        # Fetch latest published comic issues from Comic Vine with full dates
+        # Fetch latest published comic issues from Comic Vine with full store dates
         try:
-            url = f"https://comicvine.gamespot.com/api/issues/?api_key={api_key}&format=json&sort=cover_date:desc&limit=80"
+            url = f"https://comicvine.gamespot.com/api/issues/?api_key={api_key}&format=json&sort=store_date:desc&limit=120"
             req = urllib.request.Request(url, headers={"User-Agent": "Pathd/1.0 (contact@pathd.app)"})
             with urllib.request.urlopen(req, timeout=8) as response:
                 if response.status == 200:
@@ -626,9 +626,8 @@ class ComicVineService:
                             release_date=pub_date
                         ))
                     if results:
-                        comic_res = results[:50]
-                        _CV_NEW_COMICS_CACHE[cache_key] = (now_ts, comic_res)
-                        return comic_res
+                        _CV_NEW_COMICS_CACHE[cache_key] = (now_ts, results)
+                        return results
         except Exception as e:
             print(f"Comic Vine New Comics error: {e}")
 

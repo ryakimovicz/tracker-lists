@@ -183,7 +183,7 @@ class GoogleBooksService:
         import concurrent.futures
         from app.core.config import settings
 
-        cache_key = "googlebooks_new_books_v1"
+        cache_key = "googlebooks_new_books_v2"
         now_ts = time.time()
         if cache_key in GoogleBooksService._new_books_cache:
             ts, data = GoogleBooksService._new_books_cache[cache_key]
@@ -290,9 +290,8 @@ class GoogleBooksService:
             reverse=True
         )
 
-        final_res = all_books[:50]
-        GoogleBooksService._new_books_cache[cache_key] = (now_ts, final_res)
-        return final_res
+        GoogleBooksService._new_books_cache[cache_key] = (now_ts, all_books)
+        return all_books
 
     @staticmethod
     def get_trending_books() -> List[SearchResultItem]:

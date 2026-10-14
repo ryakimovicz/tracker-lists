@@ -270,14 +270,39 @@ class OMDbService:
 
     @classmethod
     def get_new_movies(cls) -> List[SearchResultItem]:
-        cache_key = "_explore_new_movies_v9"
+        cache_key = "_explore_new_movies_v10"
         if cache_key in cls._search_cache:
             timestamp, cached_results = cls._search_cache[cache_key]
             if time.time() - timestamp < 3600 * 6: # 6 hours shared cache for all users
                 return cached_results
 
         from app.services.wikireleases import WikiReleasesService
-        scheduled_films = WikiReleasesService.get_upcoming_and_recent_films(days_back=75, days_forward=21)
+        from datetime import datetime
+        all_films = WikiReleasesService.get_upcoming_and_recent_films(days_back=90, days_forward=30)
+        today_str = datetime.now().strftime("%Y-%m-%d")
+        
+        future_films = sorted([f for f in all_films if f[1] >= today_str], key=lambda x: x[1])
+        past_films = sorted([f for f in all_films if f[1] < today_str], key=lambda x: x[1], reverse=True)
+        
+        scheduled_films = []
+        target_count = 45
+        if len(future_films) >= target_count:
+            for i, f in enumerate(future_films):
+                if i < target_count:
+                    scheduled_films.append(f)
+                elif f[1] == scheduled_films[-1][1]:
+                    scheduled_films.append(f)
+                else:
+                    break
+        else:
+            scheduled_films.extend(future_films)
+            for f in past_films:
+                if len(scheduled_films) < target_count:
+                    scheduled_films.append(f)
+                elif f[1] == scheduled_films[-1][1]:
+                    scheduled_films.append(f)
+                else:
+                    break
         
         results: List[SearchResultItem] = []
         seen_titles = set()
@@ -366,7 +391,7 @@ class OMDbService:
 
         import concurrent.futures
         with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
-            fetched_items = list(executor.map(fetch_movie_from_schedule, scheduled_films[:55]))
+            fetched_items = list(executor.map(fetch_movie_from_schedule, scheduled_films))
 
         for m in fetched_items:
             norm_title = m.title.lower().strip()
@@ -374,7 +399,7 @@ class OMDbService:
                 seen_titles.add(norm_title)
                 results.append(m)
 
-        sorted_results = sorted(results, key=lambda x: x.release_date or "", reverse=True)[:45]
+        sorted_results = sorted(results, key=lambda x: x.release_date or "", reverse=True)
 
         if sorted_results:
             cls._search_cache[cache_key] = (time.time(), sorted_results)

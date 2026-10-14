@@ -592,8 +592,8 @@ class TVMazeService:
                         pass
                     return None
 
-                with concurrent.futures.ThreadPoolExecutor(max_workers=6) as ex:
-                    matched_shows = list(ex.map(fetch_tvm_show, series_titles[:25]))
+                with concurrent.futures.ThreadPoolExecutor(max_workers=8) as ex:
+                    matched_shows = list(ex.map(fetch_tvm_show, series_titles[:35]))
 
                 for show in matched_shows:
                     if show and show.image_url and show.title:
@@ -602,13 +602,13 @@ class TVMazeService:
                             seen_ids.add(show.external_id)
                             seen_titles.add(norm)
                             results.append(show)
-                        if len(results) >= 24:
+                        if len(results) >= 25:
                             break
         except Exception as e:
             print(f"Error fetching trending series via Wikipedia/TVMaze: {e}")
 
-        # Fallback if Wikipedia yielded too few
-        if len(results) < 12:
+        # Fallback / completion if Wikipedia yielded fewer than 20
+        if len(results) < 20:
             try:
                 url = "https://api.tvmaze.com/shows"
                 req = urllib.request.Request(url, headers={"User-Agent": "TrackerLists/1.0"})
@@ -645,7 +645,7 @@ class TVMazeService:
                                     release_date=show.get("premiered"),
                                     popularity=show.get("weight", 0)
                                 ))
-                            if len(results) >= 24:
+                            if len(results) >= 25:
                                 break
             except Exception as e:
                 print(f"Error in TVMaze fallback trending series: {e}")

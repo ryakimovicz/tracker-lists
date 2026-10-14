@@ -646,13 +646,32 @@ export const Search: React.FC = () => {
         if (!b.release_date) return -1;
         return new Date(b.release_date).getTime() - new Date(a.release_date).getTime();
       });
+
+      // At least 40 items floor, but if there are more items sharing the date of the 40th item, include all of them
+      const floorCount = 40;
+      if (c.items.length > floorCount) {
+        const thresholdDate = c.items[floorCount - 1]?.release_date;
+        if (thresholdDate) {
+          let cutoff = floorCount;
+          while (cutoff < c.items.length && c.items[cutoff]?.release_date === thresholdDate) {
+            cutoff++;
+          }
+          c.items = c.items.slice(0, cutoff);
+        } else {
+          c.items = c.items.slice(0, floorCount);
+        }
+      }
     });
     return cats;
   }, [exploreData, language, user?.category_order]);
 
   const exploreTrendingCategories = React.useMemo(() => {
     const items = exploreData?.tendencias || [];
-    return buildCategorizedList(items);
+    const cats = buildCategorizedList(items);
+    cats.forEach(c => {
+      c.items = c.items.slice(0, 20);
+    });
+    return cats;
   }, [exploreData, language, user?.category_order]);
 
   const filteredExploreCategories = React.useMemo(() => {
