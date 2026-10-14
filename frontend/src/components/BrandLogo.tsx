@@ -98,6 +98,7 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({ fontSize = '2.15rem', disa
 
   const triggerForwardCascade = (fromIndex: number) => {
     isHoveredRef.current = false;
+    lastHoveredIndexRef.current = 4;
     clearAllTimeouts();
 
     // Immediately highlight the tapped letter
@@ -143,6 +144,7 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({ fontSize = '2.15rem', disa
   };
 
   const handleMouseLeaveLogo = () => {
+    if (disableLink) return;
     isHoveredRef.current = false;
     clearAllTimeouts();
 
@@ -207,7 +209,11 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({ fontSize = '2.15rem', disa
     return (
       <span
         key={letter.char}
-        onMouseEnter={() => handleMouseEnterLetter(idx)}
+        onMouseEnter={() => {
+          if (!disableLink) {
+            handleMouseEnterLetter(idx);
+          }
+        }}
         onClick={(e) => handleClickLetter(e, idx)}
         style={{
           display: 'inline-block',
@@ -248,7 +254,6 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({ fontSize = '2.15rem', disa
         title="Pathd"
         aria-label="Pathd"
         onClick={handleClickLogo}
-        onMouseLeave={handleMouseLeaveLogo}
         style={commonStyle}
       >
         {lettersContent}
