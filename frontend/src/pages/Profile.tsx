@@ -6379,8 +6379,8 @@ export const Profile: React.FC = () => {
             })}
           </div>
 
-          {/* Period selector for mobile (aligned center / right below the subtabs) */}
-          <div className="home-mobile-only" style={{ display: 'flex', justifyContent: 'center', width: '100%', marginBottom: '0.25rem' }}>
+          {/* Period selector for mobile (aligned to the right below the subtabs) */}
+          <div className="home-mobile-only" style={{ display: 'flex', justifyContent: 'flex-end', width: '100%', paddingRight: '0.25rem', paddingLeft: '0.25rem', boxSizing: 'border-box', marginBottom: '0.25rem' }}>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', background: 'var(--bg-secondary)', padding: '0.2rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
               {[
                 { id: '7day', label: language === 'es' ? '7 días' : '7 days', icon: Clock },
