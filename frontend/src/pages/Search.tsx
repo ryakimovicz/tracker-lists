@@ -967,6 +967,9 @@ export const Search: React.FC = () => {
 
   const handleSearch = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+    if (searchInputRef.current) {
+      searchInputRef.current.blur();
+    }
     executeSearch(query, activeTab);
   };
 
