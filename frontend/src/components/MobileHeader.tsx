@@ -73,7 +73,7 @@ export const MobileHeader: React.FC = () => {
 
         {/* Center Slot: Brand Logo */}
         <div className="mobile-header-center">
-          <BrandLogo fontSize="1.75rem" />
+          <BrandLogo fontSize="1.75rem" disableLink={true} />
         </div>
 
         {/* Right Slot: Notifications & Settings */}

@@ -17,9 +17,10 @@ const LETTERS: LetterConfig[] = [
 
 interface BrandLogoProps {
   fontSize?: string;
+  disableLink?: boolean;
 }
 
-export const BrandLogo: React.FC<BrandLogoProps> = ({ fontSize = '2.15rem' }) => {
+export const BrandLogo: React.FC<BrandLogoProps> = ({ fontSize = '2.15rem', disableLink = false }) => {
   // activeLetter is the letter currently highlighted by wave or hover (-1 when in idle state)
   const [activeLetter, setActiveLetter] = useState<number>(-1);
   const isHoveredRef = useRef(false);
@@ -132,49 +133,85 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({ fontSize = '2.15rem' }) =>
     timeoutsRef.current.push(settleTimeout);
   };
 
+  const handleClickLogo = (e: React.MouseEvent) => {
+    if (disableLink) {
+      e.preventDefault();
+      e.stopPropagation();
+      isHoveredRef.current = false;
+      runWave();
+    }
+  };
+
+  const lettersContent = LETTERS.map((letter, idx) => {
+    // Is actively being animated or hovered right now
+    const isDynamicActive = activeLetter === idx;
+    // In idle state (activeLetter === -1), 'd' is always painted orange
+    const isIdleD = activeLetter === -1 && idx === 4;
+
+    const isColored = isDynamicActive || isIdleD;
+    const isLifted = isDynamicActive; // Only lifted while animating or hovered
+
+    return (
+      <span
+        key={letter.char}
+        onMouseEnter={() => handleMouseEnterLetter(idx)}
+        style={{
+          display: 'inline-block',
+          cursor: 'pointer',
+          color: isColored ? letter.colorVar : 'var(--text-primary)',
+          textShadow: isDynamicActive ? `0 0 16px ${letter.glow}` : 'none',
+          transform: isLifted ? 'translateY(-2.5px)' : 'translateY(0)',
+          transition: 'color 0.18s cubic-bezier(0.4, 0, 0.2, 1), transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), text-shadow 0.18s cubic-bezier(0.4, 0, 0.2, 1)',
+        }}
+      >
+        {letter.char}
+      </span>
+    );
+  });
+
+  const commonStyle: React.CSSProperties = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    textDecoration: 'none',
+    userSelect: 'none',
+    WebkitUserSelect: 'none',
+    WebkitTapHighlightColor: 'transparent',
+    fontSize,
+    fontWeight: 800,
+    letterSpacing: '-0.5px',
+    lineHeight: 1,
+    background: 'none',
+    border: 'none',
+    padding: 0,
+    cursor: 'pointer'
+  };
+
+  if (disableLink) {
+    return (
+      <button
+        type="button"
+        className="brand-logo-text"
+        title="Pathd"
+        aria-label="Pathd"
+        onClick={handleClickLogo}
+        onMouseLeave={handleMouseLeaveLogo}
+        style={commonStyle}
+      >
+        {lettersContent}
+      </button>
+    );
+  }
+
   return (
     <Link
       to="/"
       className="brand-logo-text"
       title="Pathd"
       onMouseLeave={handleMouseLeaveLogo}
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        textDecoration: 'none',
-        userSelect: 'none',
-        fontSize,
-        fontWeight: 800,
-        letterSpacing: '-0.5px',
-        lineHeight: 1,
-      }}
+      style={commonStyle}
     >
-      {LETTERS.map((letter, idx) => {
-        // Is actively being animated or hovered right now
-        const isDynamicActive = activeLetter === idx;
-        // In idle state (activeLetter === -1), 'd' is always painted orange
-        const isIdleD = activeLetter === -1 && idx === 4;
-
-        const isColored = isDynamicActive || isIdleD;
-        const isLifted = isDynamicActive; // Only lifted while animating or hovered
-
-        return (
-          <span
-            key={letter.char}
-            onMouseEnter={() => handleMouseEnterLetter(idx)}
-            style={{
-              display: 'inline-block',
-              cursor: 'pointer',
-              color: isColored ? letter.colorVar : 'var(--text-primary)',
-              textShadow: isDynamicActive ? `0 0 16px ${letter.glow}` : 'none',
-              transform: isLifted ? 'translateY(-2.5px)' : 'translateY(0)',
-              transition: 'color 0.18s cubic-bezier(0.4, 0, 0.2, 1), transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), text-shadow 0.18s cubic-bezier(0.4, 0, 0.2, 1)',
-            }}
-          >
-            {letter.char}
-          </span>
-        );
-      })}
+      {lettersContent}
     </Link>
   );
 };
+
