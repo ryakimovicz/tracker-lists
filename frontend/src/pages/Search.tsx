@@ -583,6 +583,22 @@ export const Search: React.FC = () => {
     setVisibleCount(24);
   }, [activeTab, submittedQuery]);
 
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const handleFocusSearch = () => {
+      if (searchInputRef.current) {
+        searchInputRef.current.focus();
+        searchInputRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    };
+
+    window.addEventListener('focus-search-input', handleFocusSearch);
+    return () => {
+      window.removeEventListener('focus-search-input', handleFocusSearch);
+    };
+  }, []);
+
   const [searchParams, setSearchParams] = useSearchParams();
 
   const validExploreTabs = ['new', 'trending', 'guides'] as const;
@@ -1329,6 +1345,7 @@ export const Search: React.FC = () => {
           <form onSubmit={handleSearch} style={{ display: 'flex', gap: '1rem' }}>
             <div style={{ flex: 1, position: 'relative' }}>
               <input
+                ref={searchInputRef}
                 type="text"
                 required
                 className="input-field"

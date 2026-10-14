@@ -63,6 +63,11 @@ export const MobileBottomNav: React.FC = () => {
             key={item.to}
             to={item.to}
             className={`mobile-bottom-nav-item ${activeClass}`}
+            onClick={(e) => {
+              if (item.to === '/search' && currentPath.startsWith('/search')) {
+                window.dispatchEvent(new Event('focus-search-input'));
+              }
+            }}
             onMouseEnter={() => prefetchRoute(item.to)}
             onTouchStart={() => prefetchRoute(item.to)}
             aria-label={item.label}
