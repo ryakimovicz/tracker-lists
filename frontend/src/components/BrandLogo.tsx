@@ -96,6 +96,52 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({ fontSize = '2.15rem', disa
     setActiveLetter(index);
   };
 
+  const triggerForwardCascade = (fromIndex: number) => {
+    isHoveredRef.current = false;
+    clearAllTimeouts();
+
+    // Immediately highlight the tapped letter
+    setActiveLetter(fromIndex);
+
+    // If 'd' was tapped directly, hold briefly and settle
+    if (fromIndex >= 4) {
+      const settleTimeout = setTimeout(() => {
+        if (!isHoveredRef.current) {
+          setActiveLetter(-1);
+          startPeriodicWave();
+        }
+      }, 350);
+      timeoutsRef.current.push(settleTimeout);
+      return;
+    }
+
+    // Smooth cascade from tapped index forward to 'd' (index 4)
+    const forwardSteps: number[] = [];
+    for (let i = fromIndex + 1; i <= 4; i++) {
+      forwardSteps.push(i);
+    }
+
+    const initialHold = 180;
+    const stepDelay = 115;
+    forwardSteps.forEach((letterIndex, step) => {
+      const t = setTimeout(() => {
+        if (!isHoveredRef.current) {
+          setActiveLetter(letterIndex);
+        }
+      }, initialHold + step * stepDelay);
+      timeoutsRef.current.push(t);
+    });
+
+    // Return to resting position once cascade completes
+    const settleTimeout = setTimeout(() => {
+      if (!isHoveredRef.current) {
+        setActiveLetter(-1);
+        startPeriodicWave();
+      }
+    }, initialHold + (forwardSteps.length - 1) * stepDelay + 250);
+    timeoutsRef.current.push(settleTimeout);
+  };
+
   const handleMouseLeaveLogo = () => {
     isHoveredRef.current = false;
     clearAllTimeouts();
@@ -137,8 +183,15 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({ fontSize = '2.15rem', disa
     if (disableLink) {
       e.preventDefault();
       e.stopPropagation();
-      isHoveredRef.current = false;
-      runWave();
+      triggerForwardCascade(0);
+    }
+  };
+
+  const handleClickLetter = (e: React.MouseEvent, idx: number) => {
+    if (disableLink) {
+      e.preventDefault();
+      e.stopPropagation();
+      triggerForwardCascade(idx);
     }
   };
 
@@ -155,6 +208,7 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({ fontSize = '2.15rem', disa
       <span
         key={letter.char}
         onMouseEnter={() => handleMouseEnterLetter(idx)}
+        onClick={(e) => handleClickLetter(e, idx)}
         style={{
           display: 'inline-block',
           cursor: 'pointer',
