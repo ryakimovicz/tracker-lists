@@ -2133,13 +2133,29 @@ h1, h2, h3, h4, h5, h6 {
 
   .search-results-grid .search-item-card h4 {
     margin: 0 !important;
-    font-size: 0.85rem !important;
+    font-size: 0.92rem !important;
     font-weight: 700 !important;
     white-space: nowrap !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
     color: var(--text-primary) !important;
     line-height: 1.25 !important;
+  }
+
+  /* Compact, discreet category tag below the title */
+  .search-results-grid .search-item-card .search-category-tag {
+    font-size: 0.65rem !important;
+    font-weight: 600 !important;
+    padding: 0.1rem 0.4rem !important;
+    border-radius: 4px !important;
+    gap: 0.25rem !important;
+    line-height: 1.2 !important;
+    margin-top: 0.1rem !important;
+  }
+
+  .search-results-grid .search-item-card .search-category-tag svg {
+    width: 10px !important;
+    height: 10px !important;
   }
 
   .search-results-grid .search-item-card .btn-card-add-shelf {

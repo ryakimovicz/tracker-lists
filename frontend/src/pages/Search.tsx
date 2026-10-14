@@ -1722,16 +1722,16 @@ export const Search: React.FC = () => {
                           )}
                           {activeTab === 'all' && (
                             <span
-                              className={getTagClass(item.item_type)}
+                              className={`${getTagClass(item.item_type)} search-category-tag`}
                               style={{ 
                                 alignSelf: 'flex-start', 
-                                padding: '0.2rem 0.55rem', 
-                                borderRadius: '6px',
+                                padding: '0.15rem 0.5rem', 
+                                borderRadius: '5px',
                                 display: 'inline-flex',
                                 alignItems: 'center',
-                                gap: '0.35rem',
-                                fontSize: '0.72rem',
-                                fontWeight: 700,
+                                gap: '0.3rem',
+                                fontSize: '0.7rem',
+                                fontWeight: 600,
                                 textTransform: 'none',
                                 letterSpacing: 'normal'
                               }}
