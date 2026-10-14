@@ -6357,8 +6357,67 @@ export const Profile: React.FC = () => {
           </div>
         ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', textAlign: 'left' }}>
-          {/* Top Row: Content Type Selector (Left) and Period Selector (Right) */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.85rem' }}>
+          {/* Mobile Music Sub-tabs (Artistas, Álbumes, Canciones) matching Guides mobile sub-tabs */}
+          <div className="upcoming-mobile-tabs-container home-mobile-only" style={{ marginBottom: '0.25rem' }}>
+            {[
+              { id: 'artists', label: language === 'es' ? 'Artistas' : 'Artists' },
+              { id: 'albums', label: language === 'es' ? 'Álbumes' : 'Albums' },
+              { id: 'tracks', label: language === 'es' ? 'Canciones' : 'Tracks' }
+            ].map(tab => {
+              const isSelected = musicType === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  className={`profile-music-mobile-tab-btn ${isSelected ? 'active' : ''}`}
+                  onClick={() => handleMusicTypeChange(tab.id as any)}
+                >
+                  <span>{tab.label}</span>
+                  {isSelected && <div className="profile-music-tab-indicator" />}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Period selector for mobile (aligned center / right below the subtabs) */}
+          <div className="home-mobile-only" style={{ display: 'flex', justifyContent: 'center', width: '100%', marginBottom: '0.25rem' }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', background: 'var(--bg-secondary)', padding: '0.2rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+              {[
+                { id: '7day', label: language === 'es' ? '7 días' : '7 days', icon: Clock },
+                { id: '1month', label: language === 'es' ? '1 mes' : '1 month', icon: CalendarDays },
+                { id: 'overall', label: language === 'es' ? 'Siempre' : 'All time', icon: InfinityIcon }
+              ].map(p => {
+                const isSelected = musicPeriod === p.id;
+                const PeriodIcon = p.icon;
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => handleMusicPeriodChange(p.id as any)}
+                    className={`shelf-view-toggle-btn ${isSelected ? 'active' : ''}`}
+                    style={{
+                      padding: '0.3rem 0.65rem',
+                      borderRadius: '6px',
+                      fontSize: '0.78rem',
+                      fontWeight: isSelected ? 600 : 500,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.35rem',
+                      border: 'none',
+                      background: isSelected ? 'var(--color-music, #1DB954)' : 'transparent',
+                      color: isSelected ? '#ffffff' : 'var(--text-secondary)'
+                    }}
+                  >
+                    <PeriodIcon size={13} />
+                    <span>{p.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Desktop Top Row: Content Type Selector (Left) and Period Selector (Right) */}
+          <div className="home-desktop-only" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.85rem' }}>
             {/* Type selector: Artistas, Álbumes, Canciones */}
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
               {[
