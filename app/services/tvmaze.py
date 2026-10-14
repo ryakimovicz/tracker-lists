@@ -431,7 +431,8 @@ class TVMazeService:
                 return data
 
         today = datetime.date.today()
-        dates = [(today - datetime.timedelta(days=i)).strftime("%Y-%m-%d") for i in range(5)]
+        # Look back up to 14 days to capture ongoing anime across 2 full broadcast weeks
+        dates = [(today - datetime.timedelta(days=i)).strftime("%Y-%m-%d") for i in range(14)]
         
         urls = []
         for d in dates:
@@ -449,7 +450,7 @@ class TVMazeService:
             return []
 
         all_episodes = []
-        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=14) as executor:
             for items in executor.map(fetch_url, urls):
                 all_episodes.extend(items)
 
@@ -513,6 +514,22 @@ class TVMazeService:
                 latest_episode=lep.get("number"),
                 popularity=show.get("weight", 0)
             ))
+
+        # Guarantee at least 40 anime by completing with recent broadcasts from AniList
+        if len(results) < 40:
+            try:
+                from app.services.anilist import AnilistService
+                anilist_anime = AnilistService.get_new_anime()
+                existing_titles = {r.title.lower().strip() for r in results}
+                for a in anilist_anime:
+                    norm = a.title.lower().strip()
+                    if norm not in existing_titles:
+                        existing_titles.add(norm)
+                        results.append(a)
+                    if len(results) >= 40:
+                        break
+            except Exception as e:
+                print(f"Notice completing anime with AniList: {e}")
 
         TVMazeService._schedule_cache[cache_key] = (now_ts, results)
         return results

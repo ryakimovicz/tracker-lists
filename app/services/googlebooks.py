@@ -197,7 +197,9 @@ class GoogleBooksService:
             f"{current_year}",
             f"novel {current_year}",
             f"books {current_year}",
-            f"bestseller {current_year}"
+            f"bestseller {current_year}",
+            f"fiction {current_year}",
+            f"literature {current_year}"
         ]
         
         def fetch_term(term):
@@ -217,7 +219,7 @@ class GoogleBooksService:
             return []
 
         all_raw_items = []
-        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
             for items in executor.map(fetch_term, search_terms):
                 all_raw_items.extend(items)
 
@@ -288,7 +290,7 @@ class GoogleBooksService:
             reverse=True
         )
 
-        final_res = all_books[:40]
+        final_res = all_books[:50]
         GoogleBooksService._new_books_cache[cache_key] = (now_ts, final_res)
         return final_res
 

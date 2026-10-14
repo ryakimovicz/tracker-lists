@@ -562,9 +562,9 @@ class ComicVineService:
         
         # Fetch latest published comic issues from Comic Vine with full dates
         try:
-            url = f"https://comicvine.gamespot.com/api/issues/?api_key={api_key}&format=json&sort=cover_date:desc&limit=50"
+            url = f"https://comicvine.gamespot.com/api/issues/?api_key={api_key}&format=json&sort=cover_date:desc&limit=80"
             req = urllib.request.Request(url, headers={"User-Agent": "Pathd/1.0 (contact@pathd.app)"})
-            with urllib.request.urlopen(req, timeout=6) as response:
+            with urllib.request.urlopen(req, timeout=8) as response:
                 if response.status == 200:
                     data = json.loads(response.read().decode())
                     results = []
@@ -626,8 +626,9 @@ class ComicVineService:
                             release_date=pub_date
                         ))
                     if results:
-                        _CV_NEW_COMICS_CACHE[cache_key] = (now_ts, results[:25])
-                        return results[:25]
+                        comic_res = results[:50]
+                        _CV_NEW_COMICS_CACHE[cache_key] = (now_ts, comic_res)
+                        return comic_res
         except Exception as e:
             print(f"Comic Vine New Comics error: {e}")
 

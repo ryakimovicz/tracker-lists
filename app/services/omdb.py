@@ -277,7 +277,7 @@ class OMDbService:
                 return cached_results
 
         from app.services.wikireleases import WikiReleasesService
-        scheduled_films = WikiReleasesService.get_upcoming_and_recent_films(days_back=45, days_forward=21)
+        scheduled_films = WikiReleasesService.get_upcoming_and_recent_films(days_back=75, days_forward=21)
         
         results: List[SearchResultItem] = []
         seen_titles = set()
@@ -366,7 +366,7 @@ class OMDbService:
 
         import concurrent.futures
         with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
-            fetched_items = list(executor.map(fetch_movie_from_schedule, scheduled_films[:35]))
+            fetched_items = list(executor.map(fetch_movie_from_schedule, scheduled_films[:55]))
 
         for m in fetched_items:
             norm_title = m.title.lower().strip()
@@ -374,7 +374,7 @@ class OMDbService:
                 seen_titles.add(norm_title)
                 results.append(m)
 
-        sorted_results = sorted(results, key=lambda x: x.release_date or "", reverse=True)[:25]
+        sorted_results = sorted(results, key=lambda x: x.release_date or "", reverse=True)[:45]
 
         if sorted_results:
             cls._search_cache[cache_key] = (time.time(), sorted_results)
