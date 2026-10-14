@@ -1446,7 +1446,7 @@ export const Search: React.FC = () => {
           >
               <button 
                 type="button"
-                className={`explore-subtab-item ${exploreSubTab === 'new' ? 'active' : ''}`}
+                className={`explore-subtab-item explore-tab-new ${exploreSubTab === 'new' ? 'active' : ''}`}
                 onClick={() => handleExploreSubTabChange('new')}
                 title={t('exploreNew')}
                 style={{
@@ -1474,7 +1474,7 @@ export const Search: React.FC = () => {
 
               <button 
                 type="button"
-                className={`explore-subtab-item ${exploreSubTab === 'trending' ? 'active' : ''}`}
+                className={`explore-subtab-item explore-tab-trending ${exploreSubTab === 'trending' ? 'active' : ''}`}
                 onClick={() => handleExploreSubTabChange('trending')}
                 title={t('exploreTrending')}
                 style={{
@@ -1502,7 +1502,7 @@ export const Search: React.FC = () => {
 
               <button 
                 type="button"
-                className={`explore-subtab-item ${exploreSubTab === 'guides' ? 'active' : ''}`}
+                className={`explore-subtab-item explore-tab-guides ${exploreSubTab === 'guides' ? 'active' : ''}`}
                 onClick={() => handleExploreSubTabChange('guides')}
                 title={t('exploreGuides')}
                 style={{

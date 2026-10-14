@@ -471,29 +471,59 @@ h1, h2, h3, h4, h5, h6 {
   }
 
   /* -------------------------------------------------------------------------
-     Mobile Profile Tabs & Shelf Filters (Icons only)
+     Mobile Profile Tabs & Shelf Filters
      ------------------------------------------------------------------------- */
   .profile-tabs-nav {
     justify-content: space-around !important;
     gap: 0 !important;
     width: 100% !important;
+    padding-bottom: 0.35rem !important;
   }
 
   .profile-tab-btn {
     flex: 1 !important;
-    padding: 0.65rem 0.25rem !important;
-    gap: 0 !important;
-    justify-content: center !important;
+    display: flex !important;
+    flex-direction: column !important;
     align-items: center !important;
+    justify-content: center !important;
+    padding: 0.25rem 0 0.35rem 0 !important;
+    gap: 0 !important;
+    position: relative !important;
+    min-height: 44px !important;
   }
 
   .profile-tab-btn .profile-tab-label {
-    display: none !important;
+    display: block !important;
+    font-size: 0.65rem !important;
+    font-weight: 700 !important;
+    line-height: 1 !important;
+    color: var(--tab-color, var(--accent-primary)) !important;
+    text-align: center !important;
+    white-space: nowrap !important;
+    position: absolute !important;
+    bottom: 0.05rem !important;
+    left: 50% !important;
+    transform: translateX(-50%) translateY(4px) scale(0.9) !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+    transition: opacity 0.22s cubic-bezier(0.4, 0, 0.2, 1), transform 0.22s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.22s !important;
+  }
+
+  .profile-tab-btn.active .profile-tab-label {
+    opacity: 1 !important;
+    visibility: visible !important;
+    transform: translateX(-50%) translateY(0) scale(1) !important;
   }
 
   .profile-tab-btn svg {
     width: 20px !important;
     height: 20px !important;
+    transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  }
+
+  .profile-tab-btn.active svg {
+    transform: translateY(-5px) !important;
   }
 
   /* Shelf Media Category Filters on Mobile */
@@ -1495,18 +1525,43 @@ h1, h2, h3, h4, h5, h6 {
   .explore-subtab-item {
     flex: 1 !important;
     display: flex !important;
+    flex-direction: column !important;
     align-items: center !important;
     justify-content: center !important;
-    padding: 0.45rem 0 !important;
+    padding: 0.25rem 0 0.35rem 0 !important;
     border-radius: 8px !important;
     transition: all 0.15s ease !important;
     position: relative !important;
+    min-height: 44px !important;
   }
 
   .home-tab-item .home-tab-label,
   .social-tab-item .social-tab-label,
   .explore-subtab-item .explore-subtab-label {
-    display: none !important;
+    display: block !important;
+    font-size: 0.65rem !important;
+    font-weight: 700 !important;
+    line-height: 1 !important;
+    color: inherit !important;
+    text-align: center !important;
+    white-space: nowrap !important;
+    position: absolute !important;
+    bottom: 0.05rem !important;
+    left: 50% !important;
+    transform: translateX(-50%) translateY(4px) scale(0.9) !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+    transition: opacity 0.22s cubic-bezier(0.4, 0, 0.2, 1), transform 0.22s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.22s !important;
+  }
+
+  /* Only active tab displays its label underneath its icon */
+  .home-tab-item.active .home-tab-label,
+  .social-tab-item.active .social-tab-label,
+  .explore-subtab-item.active .explore-subtab-label {
+    opacity: 1 !important;
+    visibility: visible !important;
+    transform: translateX(-50%) translateY(0) scale(1) !important;
   }
 
   .home-tab-item .home-tab-icon,
@@ -1515,6 +1570,7 @@ h1, h2, h3, h4, h5, h6 {
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
+    transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1) !important;
   }
 
   .home-tab-item .home-tab-icon svg,
@@ -1524,22 +1580,36 @@ h1, h2, h3, h4, h5, h6 {
     height: 20px !important;
   }
 
+  .home-tab-item.active .home-tab-icon,
+  .social-tab-item.active .social-tab-icon,
+  .explore-subtab-item.active .explore-subtab-icon {
+    transform: translateY(-5px) !important;
+  }
+
   .home-tab-item.active,
-  .social-tab-item.active {
+  .social-tab-item.active,
+  .explore-subtab-item.active {
     color: var(--accent-primary) !important;
   }
 
-  .home-tab-item.active .home-tab-indicator,
-  .social-tab-item.active .social-tab-indicator {
-    bottom: -0.75rem !important;
-    left: 20% !important;
-    right: 20% !important;
+  .explore-subtab-item.active.explore-tab-new {
+    color: var(--accent-primary) !important;
   }
 
+  .explore-subtab-item.active.explore-tab-trending {
+    color: #f97316 !important;
+  }
+
+  .explore-subtab-item.active.explore-tab-guides {
+    color: var(--color-guide, #2DD4BF) !important;
+  }
+
+  .home-tab-item.active .home-tab-indicator,
+  .social-tab-item.active .social-tab-indicator,
   .explore-subtab-item.active .explore-subtab-indicator {
-    bottom: -0.35rem !important;
-    left: 20% !important;
-    right: 20% !important;
+    bottom: -0.4rem !important;
+    left: 15% !important;
+    right: 15% !important;
   }
 
   /* -------------------------------------------------------------------------

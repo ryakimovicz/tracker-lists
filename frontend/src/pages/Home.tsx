@@ -2730,7 +2730,7 @@ export const Home: React.FC = () => {
             paddingTop: "0.5rem" 
           }}
         >
-          {["watching", "guides", "plan_to_watch", "completed", "dropped", "upcoming"].map((tab) => {
+          {["watching", "guides", "plan_to_watch", "completed", "dropped", "upcoming"].map((tab, idx) => {
             const labels: any = language === 'es'
               ? { "watching": "Continuar", "guides": "Guías", "plan_to_watch": "No comenzado", "completed": "Terminado", "dropped": "Abandonado", "upcoming": "Próximos" }
               : { "watching": "Continue", "guides": "Guides", "plan_to_watch": "Not started", "completed": "Completed", "dropped": "Dropped", "upcoming": "Upcoming" };
@@ -2748,6 +2748,7 @@ export const Home: React.FC = () => {
                 key={tab}
                 onClick={() => handleTabChange(tab as any)}
                 className={`home-tab-item ${isActive ? 'active' : ''}`}
+                data-tab={tab}
                 title={labels[tab]}
                 style={{
                   fontSize: "1.05rem", fontWeight: isActive ? 600 : 500,
