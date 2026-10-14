@@ -1601,7 +1601,7 @@ export const Search: React.FC = () => {
       {/* Search Results Display */}
       {!isSearching && filteredResults.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1.5rem' }}>
+          <div className="search-results-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1.5rem' }}>
             {filteredResults.slice(0, visibleCount).map((item) => {
               return (
                 <React.Fragment key={`${item.external_id}-${item.item_type}`}>
@@ -1693,9 +1693,9 @@ export const Search: React.FC = () => {
               const itemTypeTextColor = `var(--color-text-${item.item_type || 'movie'})`;
 
               return (
-                <div key={`${item.external_id}-${item.item_type}`} className="glass-card" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', cursor: 'pointer', position: 'relative' }} onClick={() => handleOpenItemDetails(item)} onMouseEnter={() => prefetchMediaDetails(item)}>
+                <div key={`${item.external_id}-${item.item_type}`} className="glass-card search-item-card" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', cursor: 'pointer', position: 'relative' }} onClick={() => handleOpenItemDetails(item)} onMouseEnter={() => prefetchMediaDetails(item)}>
 
-                  <div style={{ position: 'relative', width: '100%', height: '260px', borderRadius: '8px', overflow: 'hidden' }}>
+                  <div className="card-media-cover search-media-cover" style={{ position: 'relative', width: '100%', height: '260px', borderRadius: '8px', overflow: 'hidden' }}>
                     <MediaPoster
                       src={item.image_url}
                       title={item.title}
