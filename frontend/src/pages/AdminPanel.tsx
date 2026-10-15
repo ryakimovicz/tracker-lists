@@ -117,6 +117,51 @@ export const AdminPanel: React.FC = () => {
     confirmText?: string;
     onConfirm: () => void;
   } | null>(null);
+
+  const openConfirmDialog = (dialog: {
+    title: string;
+    message: string;
+    type?: 'danger' | 'warning';
+    confirmText?: string;
+    onConfirm: () => void;
+  }, actionName: string = 'confirm') => {
+    setConfirmDialog({ ...dialog, isOpen: true });
+    if (typeof window !== 'undefined') {
+      const currentUrl = new URL(window.location.href);
+      currentUrl.searchParams.set('admin_action', actionName);
+      const newRelative = currentUrl.pathname + (currentUrl.search || '') + (currentUrl.hash || '');
+      window.history.pushState(window.history.state, '', newRelative);
+    }
+  };
+
+  const closeConfirmDialog = (useBack: boolean = true) => {
+    setConfirmDialog(null);
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('admin_action')) {
+        if (useBack) {
+          window.history.back();
+        } else {
+          const currentUrl = new URL(window.location.href);
+          currentUrl.searchParams.delete('admin_action');
+          const newRelative = currentUrl.pathname + (currentUrl.search || '') + (currentUrl.hash || '');
+          window.history.replaceState(window.history.state, '', newRelative);
+        }
+      }
+    }
+  };
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const p = new URLSearchParams(window.location.search);
+      if (!p.get('admin_action')) {
+        setConfirmDialog(null);
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   const { user: currentUser, logout } = useAuth();
   const navigate = useNavigate();
 
@@ -133,8 +178,7 @@ export const AdminPanel: React.FC = () => {
     }
 
     const isChangingSelf = (currentUser?.id === selectedUser.id);
-    setConfirmDialog({
-      isOpen: true,
+    openConfirmDialog({
       title: isEs ? '¿Reasignar ID de Usuario?' : 'Reassign User ID?',
       message: isEs
         ? `¿Confirmas reasignar al usuario "${selectedUser.username}" del ID #${selectedUser.id} al nuevo ID #${targetId}? ${isChangingSelf ? 'Al cambiar tu propio ID se cerrará tu sesión para que inicies con tus nuevos datos.' : 'Todas sus guías, biblioteca, favoritos y progreso se reasignarán en cascada de forma segura.'}`
@@ -142,7 +186,7 @@ export const AdminPanel: React.FC = () => {
       type: 'warning',
       confirmText: isEs ? 'Reasignar ID' : 'Reassign ID',
       onConfirm: async () => {
-        setConfirmDialog(null);
+        closeConfirmDialog(false);
         setActionLoading(true);
         try {
           const res = await apiClient.post(`/admin/users/${selectedUser.id}/change-id`, { new_id: targetId });
@@ -164,7 +208,7 @@ export const AdminPanel: React.FC = () => {
           setActionLoading(false);
         }
       }
-    });
+    }, 'change_user_id');
   };
 
   const handleChangeUsername = () => {
@@ -186,8 +230,7 @@ export const AdminPanel: React.FC = () => {
     }
 
     const isChangingSelf = (currentUser?.id === selectedUser.id);
-    setConfirmDialog({
-      isOpen: true,
+    openConfirmDialog({
       title: isEs ? '¿Cambiar Nombre de Usuario?' : 'Change Username?',
       message: isEs
         ? `¿Confirmas cambiar el nombre de usuario de "${selectedUser.username}" a "${trimmed}"? ${isChangingSelf ? 'Al cambiar tu propio nombre de usuario, se actualizará tu perfil.' : 'Se actualizará su perfil y menciones públicas.'}`
@@ -195,7 +238,7 @@ export const AdminPanel: React.FC = () => {
       type: 'warning',
       confirmText: isEs ? 'Cambiar Nombre' : 'Change Username',
       onConfirm: async () => {
-        setConfirmDialog(null);
+        closeConfirmDialog(false);
         setActionLoading(true);
         try {
           const res = await apiClient.put(`/admin/users/${selectedUser.id}/username`, { username: trimmed });
@@ -368,8 +411,7 @@ export const AdminPanel: React.FC = () => {
 
   const handleCancelUserSubscription = () => {
     if (!selectedUser || selectedUser.is_admin || selectedUser.is_vip) return;
-    setConfirmDialog({
-      isOpen: true,
+    openConfirmDialog({
       title: isEs ? '¿Cancelar Suscripción?' : 'Cancel Subscription?',
       message: isEs
         ? `¿Estás seguro de que deseas cancelar la suscripción Premium de "${selectedUser.username}"? Se detendrán los cobros automáticos en Dodo Payments.`
@@ -377,7 +419,7 @@ export const AdminPanel: React.FC = () => {
       type: 'warning',
       confirmText: isEs ? 'Cancelar Suscripción' : 'Cancel Subscription',
       onConfirm: async () => {
-        setConfirmDialog(null);
+        closeConfirmDialog(false);
         setActionLoading(true);
         try {
           const res = await apiClient.post(`/admin/users/${selectedUser.id}/cancel-subscription`);
@@ -398,7 +440,7 @@ export const AdminPanel: React.FC = () => {
           setActionLoading(false);
         }
       }
-    });
+    }, 'cancel_user_sub');
   };
 
   const handleSendWarning = async () => {
@@ -478,8 +520,7 @@ export const AdminPanel: React.FC = () => {
 
   const handleDeleteUser = () => {
     if (!selectedUser) return;
-    setConfirmDialog({
-      isOpen: true,
+    openConfirmDialog({
       title: isEs ? '¿Eliminar Usuario Permanentemente?' : 'Permanently Delete User?',
       message: isEs
         ? `¿Estás seguro de que deseas eliminar permanentemente al usuario "${selectedUser.username}"? Esta acción no se puede deshacer.`
@@ -487,7 +528,7 @@ export const AdminPanel: React.FC = () => {
       type: 'danger',
       confirmText: isEs ? 'Eliminar Usuario' : 'Delete User',
       onConfirm: async () => {
-        setConfirmDialog(null);
+        closeConfirmDialog(false);
         setActionLoading(true);
         try {
           await apiClient.delete(`/admin/users/${selectedUser.id}`);
@@ -499,7 +540,7 @@ export const AdminPanel: React.FC = () => {
           setActionLoading(false);
         }
       }
-    });
+    }, 'delete_user');
   };
 
   const handleDeleteReportItem = async (type: 'list' | 'comment' | 'activity_comment' | 'review', id: number) => {
@@ -1764,7 +1805,7 @@ export const AdminPanel: React.FC = () => {
           type={confirmDialog.type || 'warning'}
           isLoading={actionLoading}
           onConfirm={confirmDialog.onConfirm}
-          onClose={() => setConfirmDialog(null)}
+          onClose={() => closeConfirmDialog(true)}
         />
       )}
     </div>

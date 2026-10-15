@@ -53,10 +53,10 @@ export const CustomizePage: React.FC = () => {
   const isEs = language === 'es';
   const isLight = theme === 'light';
 
-  // Modal parameter handling: 'avatar' | 'banner' | 'background' | 'music-guide'
+  // Modal parameter handling: 'avatar' | 'banner' | 'background' | 'music-guide' | 'disconnect-lastfm'
   const modalParam = searchParams.get('modal');
 
-  const openModal = (modalName: 'avatar' | 'banner' | 'background' | 'music-guide') => {
+  const openModal = (modalName: 'avatar' | 'banner' | 'background' | 'music-guide' | 'disconnect-lastfm') => {
     const newParams = new URLSearchParams(searchParams);
     newParams.set('modal', modalName);
     setSearchParams(newParams);
@@ -74,8 +74,8 @@ export const CustomizePage: React.FC = () => {
   const showBannerModal = modalParam === 'banner';
   const showBackgroundModal = modalParam === 'background';
   const showMusicGuideModal = modalParam === 'music-guide' || modalParam === 'music_guide';
+  const showDisconnectLastFmModal = modalParam === 'disconnect-lastfm' || modalParam === 'disconnect_lastfm';
   const [showProModal, setShowProModal] = useState(false);
-  const [showDisconnectLastFmModal, setShowDisconnectLastFmModal] = useState(false);
   const [musicDetailsModal, setMusicDetailsModal] = useState<{
     isOpen: boolean;
     type: 'artist' | 'album' | 'track';
@@ -408,14 +408,14 @@ export const CustomizePage: React.FC = () => {
         type: 'success',
         text: isEs ? 'Cuenta de Last.fm desconectada.' : 'Last.fm account disconnected.',
       });
-      setShowDisconnectLastFmModal(false);
+      closeModal();
       setTimeout(() => setLastfmMsg(null), 3000);
     } catch (err: any) {
       setLastfmMsg({
         type: 'error',
         text: isEs ? 'Error al desconectar la cuenta.' : 'Error disconnecting account.',
       });
-      setShowDisconnectLastFmModal(false);
+      closeModal();
     } finally {
       setIsDisconnectingLastFm(false);
     }
@@ -1549,7 +1549,7 @@ export const CustomizePage: React.FC = () => {
 
               <button
                 type="button"
-                onClick={() => setShowDisconnectLastFmModal(true)}
+                onClick={() => openModal('disconnect-lastfm')}
                 disabled={isDisconnectingLastFm}
                 className="btn-secondary"
                 style={{ color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.4)', padding: '0.45rem 0.9rem', fontSize: '0.85rem' }}
@@ -1639,7 +1639,7 @@ export const CustomizePage: React.FC = () => {
         cancelText={isEs ? 'Cancelar' : 'Cancel'}
         type="danger"
         onConfirm={executeDisconnectLastFm}
-        onClose={() => setShowDisconnectLastFmModal(false)}
+        onClose={closeModal}
       />
 
       {/* Music Item Details Modal */}

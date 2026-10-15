@@ -744,6 +744,50 @@ export const Profile: React.FC = () => {
     onConfirm: () => void;
   } | null>(null);
 
+  const openConfirmDialog = (dialog: {
+    title: string;
+    message: string;
+    type?: 'danger' | 'warning';
+    confirmText?: string;
+    onConfirm: () => void;
+  }, actionParam: string = 'confirm') => {
+    setConfirmDialog({ ...dialog, isOpen: true });
+    if (typeof window !== 'undefined') {
+      const currentUrl = new URL(window.location.href);
+      currentUrl.searchParams.set('action', actionParam);
+      const newRelative = currentUrl.pathname + (currentUrl.search || '') + (currentUrl.hash || '');
+      window.history.pushState(window.history.state, '', newRelative);
+    }
+  };
+
+  const closeConfirmDialog = (useBack: boolean = true) => {
+    setConfirmDialog(null);
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('action')) {
+        if (useBack) {
+          window.history.back();
+        } else {
+          const currentUrl = new URL(window.location.href);
+          currentUrl.searchParams.delete('action');
+          const newRelative = currentUrl.pathname + (currentUrl.search || '') + (currentUrl.hash || '');
+          window.history.replaceState(window.history.state, '', newRelative);
+        }
+      }
+    }
+  };
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const p = new URLSearchParams(window.location.search);
+      if (!p.get('action')) {
+        setConfirmDialog(null);
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   const isOwnProfile = Boolean(!targetUserIdentifier || String(profile?.id) === String(currentUser?.id) || (currentUser?.username && usernameParam?.toLowerCase() === currentUser.username.toLowerCase()));
 
   useEffect(() => {
@@ -2414,14 +2458,13 @@ export const Profile: React.FC = () => {
   };
 
   const handleLastFmDisconnect = () => {
-    setConfirmDialog({
-      isOpen: true,
+    openConfirmDialog({
       title: language === 'es' ? '¿Desconectar Last.fm?' : 'Disconnect Last.fm?',
       message: language === 'es' ? 'Tu cuenta de Last.fm se desvinculará de tu perfil.' : 'Your Last.fm account will be unlinked from your profile.',
       type: 'danger',
       confirmText: language === 'es' ? 'Desconectar' : 'Disconnect',
       onConfirm: async () => {
-        setConfirmDialog(null);
+        closeConfirmDialog(false);
         try {
           await apiClient.delete('/users/me/lastfm/disconnect');
           setProfile(prev => prev ? { ...prev, lastfm_username: undefined } : null);
@@ -2432,7 +2475,7 @@ export const Profile: React.FC = () => {
           setErrorMsg('Error disconnecting from Last.fm');
         }
       }
-    });
+    }, 'disconnect_lastfm');
   };
 
 
@@ -2703,14 +2746,13 @@ export const Profile: React.FC = () => {
   };
 
   const handleDeleteItem = (itemId: number) => {
-    setConfirmDialog({
-      isOpen: true,
+    openConfirmDialog({
       title: language === 'es' ? '¿Eliminar de la estantería?' : 'Remove from shelf?',
       message: language === 'es' ? 'Esta obra se eliminará de tu estantería y de tu historial.' : 'This title will be removed from your shelf and activity history.',
       type: 'danger',
       confirmText: language === 'es' ? 'Eliminar' : 'Delete',
       onConfirm: async () => {
-        setConfirmDialog(null);
+        closeConfirmDialog(false);
         setErrorMsg('');
         setSuccessMsg('');
         try {
@@ -2727,7 +2769,7 @@ export const Profile: React.FC = () => {
           setErrorMsg(err.response?.data?.detail || 'Failed to delete item.');
         }
       }
-    });
+    }, 'delete_item');
   };
 
   const handleOpenGuide = (guideId: number) => {
@@ -2736,14 +2778,13 @@ export const Profile: React.FC = () => {
 
 
   const handleDeleteGuide = (listId: number) => {
-    setConfirmDialog({
-      isOpen: true,
+    openConfirmDialog({
       title: language === 'es' ? '¿Eliminar esta guía?' : 'Delete this guide?',
       message: language === 'es' ? 'Esta acción eliminará la guía y sus elementos de forma permanente.' : 'This action will permanently delete this guide and its items.',
       type: 'danger',
       confirmText: language === 'es' ? 'Eliminar Guía' : 'Delete Guide',
       onConfirm: async () => {
-        setConfirmDialog(null);
+        closeConfirmDialog(false);
         setErrorMsg('');
         setSuccessMsg('');
         try {
@@ -2764,7 +2805,7 @@ export const Profile: React.FC = () => {
           setErrorMsg(err.response?.data?.detail || 'Failed to delete guide.');
         }
       }
-    });
+    }, 'delete_guide');
   };
   // Get allowed statuses based on item type
   const getAllowedStatuses = (type: string) => {
@@ -7056,7 +7097,7 @@ export const Profile: React.FC = () => {
           confirmText={confirmDialog.confirmText}
           type={confirmDialog.type || 'danger'}
           onConfirm={confirmDialog.onConfirm}
-          onClose={() => setConfirmDialog(null)}
+          onClose={() => closeConfirmDialog(true)}
         />
       )}
 

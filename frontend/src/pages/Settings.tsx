@@ -40,10 +40,10 @@ export const SettingsPage: React.FC = () => {
   const isEs = language === 'es';
   const isBackdropMouseDownRef = useRef(false);
 
-  // Modal parameter handling: 'privacy' | 'terms' | 'delete'
+  // Modal parameter handling: 'privacy' | 'terms' | 'delete' | 'cancel_subscription' | 'logout'
   const modalParam = searchParams.get('modal');
 
-  const openModal = (modalName: 'privacy' | 'terms' | 'delete') => {
+  const openModal = (modalName: 'privacy' | 'terms' | 'delete' | 'cancel_subscription' | 'logout') => {
     const newParams = new URLSearchParams(searchParams);
     newParams.set('modal', modalName);
     setSearchParams(newParams);
@@ -59,23 +59,24 @@ export const SettingsPage: React.FC = () => {
   const showPrivacyModal = modalParam === 'privacy';
   const showTermsModal = modalParam === 'terms';
   const showDeleteModal = modalParam === 'delete';
+  const showCancelSubModal = modalParam === 'cancel_subscription';
+  const showLogoutModal = modalParam === 'logout';
   const [showProModal, setShowProModal] = useState(false);
 
   useEffect(() => {
-    if (showPrivacyModal || showTermsModal || showDeleteModal) {
+    if (showPrivacyModal || showTermsModal || showDeleteModal || showCancelSubModal || showLogoutModal) {
       const originalStyle = window.getComputedStyle(document.body).overflow;
       document.body.style.overflow = 'hidden';
       return () => {
         document.body.style.overflow = originalStyle;
       };
     }
-  }, [showPrivacyModal, showTermsModal, showDeleteModal]);
+  }, [showPrivacyModal, showTermsModal, showDeleteModal, showCancelSubModal, showLogoutModal]);
 
   // Subscription management
   const [cancelSubLoading, setCancelSubLoading] = useState(false);
   const [cancelSubMsg, setCancelSubMsg] = useState<string | null>(null);
   const [cancelSubError, setCancelSubError] = useState<string | null>(null);
-  const [showCancelSubModal, setShowCancelSubModal] = useState(false);
 
   const executeCancelSubscription = async () => {
     setCancelSubLoading(true);
@@ -85,7 +86,7 @@ export const SettingsPage: React.FC = () => {
       const res = await apiClient.post('/payments/cancel-subscription');
       setCancelSubMsg(res.data.message || (isEs ? 'Suscripción cancelada con éxito.' : 'Subscription cancelled successfully.'));
       await refreshProfile();
-      setShowCancelSubModal(false);
+      closeModal();
     } catch (err: any) {
       setCancelSubError(err.response?.data?.detail || 'Error cancelling subscription');
     } finally {
@@ -94,7 +95,7 @@ export const SettingsPage: React.FC = () => {
   };
 
   const handleCancelSubscription = () => {
-    setShowCancelSubModal(true);
+    openModal('cancel_subscription');
   };
 
   // Username form state
@@ -276,7 +277,6 @@ export const SettingsPage: React.FC = () => {
     }
   };
 
-  const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const handleConfirmLogout = async () => {
@@ -288,7 +288,7 @@ export const SettingsPage: React.FC = () => {
       console.error('Failed to log out:', err);
     } finally {
       setIsLoggingOut(false);
-      setShowLogoutModal(false);
+      closeModal();
     }
   };
 
@@ -1103,7 +1103,7 @@ export const SettingsPage: React.FC = () => {
           </p>
           <button
             type="button"
-            onClick={() => setShowLogoutModal(true)}
+            onClick={() => openModal('logout')}
             className="btn-secondary"
             style={{
               display: 'inline-flex',
@@ -1353,7 +1353,7 @@ export const SettingsPage: React.FC = () => {
         type="warning"
         isLoading={cancelSubLoading}
         onConfirm={executeCancelSubscription}
-        onClose={() => setShowCancelSubModal(false)}
+        onClose={closeModal}
       />
 
       {/* Logout Confirmation Modal */}
@@ -1370,7 +1370,7 @@ export const SettingsPage: React.FC = () => {
         type="danger"
         isLoading={isLoggingOut}
         onConfirm={handleConfirmLogout}
-        onClose={() => setShowLogoutModal(false)}
+        onClose={closeModal}
       />
 
       {/* Privacy Policy Modal */}

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { ThumbsUp, MessageSquare, MoreVertical, Trash2, Star, Film, Tv, Sparkles, Book, Gamepad2, Compass, User, EyeOff, Mic, Headphones, Music } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { apiClient } from '../api/client';
@@ -56,12 +56,53 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
   const [isLiked, setIsLiked] = useState(activity.is_liked_by_me || false);
   const [commentsCount, setCommentsCount] = useState(activity.comments_count || 0);
   const [showComments, setShowComments] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  // Confirmation modal synced with URL ?delete_post=<id>
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    const p = new URLSearchParams(window.location.search);
+    return p.get('delete_post') === String(activity.id);
+  });
   const [isDeleting, setIsDeleting] = useState(false);
   const [likeAnimating, setLikeAnimating] = useState(false);
   const [showDoubleTapBurst, setShowDoubleTapBurst] = useState(false);
   const lastTapRef = useRef<number>(0);
   const singleTapTimeoutRef = useRef<any>(null);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const p = new URLSearchParams(window.location.search);
+      setShowDeleteConfirm(p.get('delete_post') === String(activity.id));
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [activity.id]);
+
+  const openDeleteConfirm = () => {
+    setShowDeleteConfirm(true);
+    if (typeof window !== 'undefined') {
+      const currentUrl = new URL(window.location.href);
+      currentUrl.searchParams.set('delete_post', String(activity.id));
+      const newRelative = currentUrl.pathname + (currentUrl.search || '') + (currentUrl.hash || '');
+      window.history.pushState(window.history.state, '', newRelative);
+    }
+  };
+
+  const closeDeleteConfirm = (useBack: boolean = true) => {
+    setShowDeleteConfirm(false);
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('delete_post') === String(activity.id)) {
+        if (useBack) {
+          window.history.back();
+        } else {
+          const currentUrl = new URL(window.location.href);
+          currentUrl.searchParams.delete('delete_post');
+          const newRelative = currentUrl.pathname + (currentUrl.search || '') + (currentUrl.hash || '');
+          window.history.replaceState(window.history.state, '', newRelative);
+        }
+      }
+    }
+  };
 
   const performLike = async () => {
     if (!user) return;
@@ -154,7 +195,7 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
     try {
       setIsDeleting(true);
       await apiClient.delete(`/social/feed/activity/${activity.id}`);
-      setShowDeleteConfirm(false);
+      closeDeleteConfirm(false);
       if (onDelete) {
         onDelete(activity.id);
       }
@@ -659,7 +700,7 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  setShowDeleteConfirm(true);
+                  openDeleteConfirm();
                 }}
                 title={isEs ? 'Eliminar publicación' : 'Delete post'}
                 style={{
@@ -1387,7 +1428,7 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
         type="danger"
         isLoading={isDeleting}
         onConfirm={handleDeleteActivity}
-        onClose={() => setShowDeleteConfirm(false)}
+        onClose={() => closeDeleteConfirm(true)}
       />
     </div>
   );

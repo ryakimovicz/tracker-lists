@@ -14,8 +14,58 @@ export const SuspendedAccountModal: React.FC = () => {
   const [isCancellingSub, setIsCancellingSub] = useState(false);
   const [cancelSubMessage, setCancelSubMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [confirmCancelModal, setConfirmCancelModal] = useState(false);
-  const [confirmDeleteModal, setConfirmDeleteModal] = useState(false);
+
+  // Sync confirmation dialogs with URL ?modal=cancel_sub | delete_account
+  const [confirmCancelModal, setConfirmCancelModal] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    const p = new URLSearchParams(window.location.search);
+    return p.get('modal') === 'cancel_sub';
+  });
+  const [confirmDeleteModal, setConfirmDeleteModal] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    const p = new URLSearchParams(window.location.search);
+    return p.get('modal') === 'delete_account';
+  });
+
+  const openSubModal = (modalName: 'cancel_sub' | 'delete_account') => {
+    if (modalName === 'cancel_sub') setConfirmCancelModal(true);
+    if (modalName === 'delete_account') setConfirmDeleteModal(true);
+    if (typeof window !== 'undefined') {
+      const currentUrl = new URL(window.location.href);
+      currentUrl.searchParams.set('modal', modalName);
+      const newRelative = currentUrl.pathname + (currentUrl.search || '') + (currentUrl.hash || '');
+      window.history.pushState(window.history.state, '', newRelative);
+    }
+  };
+
+  const closeSubModal = (useBack: boolean = true) => {
+    setConfirmCancelModal(false);
+    setConfirmDeleteModal(false);
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('modal')) {
+        if (useBack) {
+          window.history.back();
+        } else {
+          const currentUrl = new URL(window.location.href);
+          currentUrl.searchParams.delete('modal');
+          const newRelative = currentUrl.pathname + (currentUrl.search || '') + (currentUrl.hash || '');
+          window.history.replaceState(window.history.state, '', newRelative);
+        }
+      }
+    }
+  };
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const p = new URLSearchParams(window.location.search);
+      const m = p.get('modal');
+      setConfirmCancelModal(m === 'cancel_sub');
+      setConfirmDeleteModal(m === 'delete_account');
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   useEffect(() => {
     if (!user || !user.is_suspended) return;
@@ -40,10 +90,10 @@ export const SuspendedAccountModal: React.FC = () => {
       const res = await apiClient.post('/payments/cancel-subscription');
       setCancelSubMessage(res.data.message || (isEs ? 'Renovación de suscripción cancelada.' : 'Subscription renewal cancelled.'));
       await refreshProfile();
-      setConfirmCancelModal(false);
+      closeSubModal(false);
     } catch (err) {
       setErrorMessage(isEs ? 'Error al cancelar la suscripción. Contáctanos a support@pathd.net' : 'Error cancelling subscription. Please contact support@pathd.net');
-      setConfirmCancelModal(false);
+      closeSubModal(false);
     } finally {
       setIsCancellingSub(false);
     }
@@ -57,7 +107,7 @@ export const SuspendedAccountModal: React.FC = () => {
       await logout();
     } catch (err) {
       setErrorMessage(isEs ? 'Error al eliminar la cuenta. Por favor contáctanos a support@pathd.net' : 'Error deleting account. Please contact support@pathd.net');
-      setConfirmDeleteModal(false);
+      closeSubModal(false);
     } finally {
       setIsDeleting(false);
     }
@@ -167,7 +217,7 @@ export const SuspendedAccountModal: React.FC = () => {
               <button
                 type="button"
                 disabled={isCancellingSub}
-                onClick={() => setConfirmCancelModal(true)}
+                onClick={() => openSubModal('cancel_sub')}
                 className="btn-secondary"
                 style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', fontSize: '0.85rem', padding: '0.55rem', color: '#f59e0b', borderColor: 'rgba(245, 158, 11, 0.4)' }}
               >
@@ -219,7 +269,7 @@ export const SuspendedAccountModal: React.FC = () => {
           <button
             type="button"
             disabled={isDeleting}
-            onClick={() => setConfirmDeleteModal(true)}
+            onClick={() => openSubModal('delete_account')}
             style={{
               background: 'none',
               border: 'none',
@@ -255,7 +305,7 @@ export const SuspendedAccountModal: React.FC = () => {
           type="warning"
           isLoading={isCancellingSub}
           onConfirm={executeCancelSubscription}
-          onClose={() => setConfirmCancelModal(false)}
+          onClose={() => closeSubModal(true)}
         />
 
         <ConfirmModal
@@ -271,7 +321,7 @@ export const SuspendedAccountModal: React.FC = () => {
           type="danger"
           isLoading={isDeleting}
           onConfirm={executeDeleteMyAccount}
-          onClose={() => setConfirmDeleteModal(false)}
+          onClose={() => closeSubModal(true)}
         />
       </div>
     </div>
