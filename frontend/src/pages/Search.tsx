@@ -15,7 +15,7 @@ import { prefetchMediaDetails } from '../utils/prefetch';
 import { removeCachedSeries, clearCachedSeriesMatching } from '../utils/seriesCache';
 import { getCachedShelfItems, setCachedShelfItems, createShelfMap, findInShelfMap } from '../utils/shelfCache';
 
-import { Search as SearchIcon, AlertCircle, CheckCircle, Plus, X, Heart, Star, Users, BookOpen, Package, Puzzle, Sparkles, Gamepad2, Trash2, Flame, TrendingUp, Trophy, Bookmark, Film, Tv, Book, MessageSquare, MessageCircle, Rocket, Clock, Crown, RefreshCw, Zap } from 'lucide-react';
+import { Search as SearchIcon, AlertCircle, CheckCircle, Plus, X, Heart, Star, Users, BookOpen, Package, Puzzle, Sparkles, Gamepad2, Trash2, Flame, TrendingUp, Trophy, Bookmark, Film, Tv, Book, MessageSquare, MessageCircle, Rocket, Clock, Award, RefreshCw, Zap } from 'lucide-react';
 
 interface SearchResultItem {
   external_id: string;
@@ -61,7 +61,7 @@ export const renderMediaBadge = (
     borderColor = 'rgba(59, 130, 246, 0.5)';
   } else if (bLower === 'edition' || bLower === 'edición' || bLower === 'edicion') {
     label = isEs ? 'Edición' : 'Edition';
-    icon = <Crown size={11} color="#f59e0b" />;
+    icon = <Award size={11} color="#f59e0b" />;
     borderColor = 'rgba(245, 158, 11, 0.5)';
   } else if (bLower === 'remake') {
     label = 'Remake';
