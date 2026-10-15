@@ -295,7 +295,7 @@ export const ActivityCommentThread: React.FC<ActivityCommentThreadProps> = ({
 
         {/* Content body */}
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginBottom: '0.2rem' }}>
             <AuthorUsername
               username={item.username}
               isDeleted={item.is_deleted}
@@ -305,6 +305,26 @@ export const ActivityCommentThread: React.FC<ActivityCommentThreadProps> = ({
             <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
               {new Date(item.created_at).toLocaleDateString(isEs ? 'es-ES' : 'en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
             </span>
+            {!item.is_deleted && canDelete && (
+              <button
+                onClick={() => handleDeleteComment(item.id)}
+                title={isEs ? 'Eliminar' : 'Delete'}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer',
+                  padding: '0.15rem',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  marginLeft: '0.1rem'
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = '#ef4444')}
+                onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
+              >
+                <Trash2 size={12} />
+              </button>
+            )}
           </div>
 
           {item.is_deleted ? (
@@ -426,24 +446,6 @@ export const ActivityCommentThread: React.FC<ActivityCommentThreadProps> = ({
                 onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
               >
                 <Flag size={12} />
-              </button>
-            )}
-
-            {!item.is_deleted && canDelete && (
-              <button
-                onClick={() => handleDeleteComment(item.id)}
-                title={isEs ? 'Eliminar' : 'Delete'}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: 'var(--text-muted)',
-                  cursor: 'pointer',
-                  padding: '0.15rem'
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.color = '#ef4444')}
-                onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
-              >
-                <Trash2 size={12} />
               </button>
             )}
           </div>

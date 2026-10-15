@@ -8861,6 +8861,26 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                     )}
                                   </span>
                                 )}
+                                {!rootNode.is_deleted && user && (user.id === rootNode.user_id || user.is_admin) && (
+                                  <button
+                                    onClick={() => handleDeleteReviewItem(rootNode.id)}
+                                    title={language === 'es' ? 'Eliminar comentario' : 'Delete comment'}
+                                    style={{
+                                      background: 'transparent',
+                                      border: 'none',
+                                      color: 'var(--text-muted)',
+                                      cursor: 'pointer',
+                                      padding: '0.15rem',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      marginLeft: '0.1rem'
+                                    }}
+                                    onMouseEnter={(e) => (e.currentTarget.style.color = '#ef4444')}
+                                    onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
+                                  >
+                                    <Trash2 size={13} />
+                                  </button>
+                                )}
                               </div>
 
                               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -8946,25 +8966,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                     <Flag size={13} />
                                   </button>
                                 )}
-                                {!rootNode.is_deleted && user && (user.id === rootNode.user_id || user.is_admin) && (
-                                  <button
-                                    onClick={() => handleDeleteReviewItem(rootNode.id)}
-                                    title={language === 'es' ? 'Eliminar comentario' : 'Delete comment'}
-                                    style={{
-                                      background: 'transparent',
-                                      border: 'none',
-                                      color: 'var(--text-muted)',
-                                      cursor: 'pointer',
-                                      padding: '0.2rem',
-                                      display: 'flex',
-                                      alignItems: 'center'
-                                    }}
-                                    onMouseEnter={(e) => (e.currentTarget.style.color = '#ef4444')}
-                                    onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
-                                  >
-                                    <Trash2 size={14} />
-                                  </button>
-                                )}
+
                               </div>
                             </div>
 
@@ -9218,6 +9220,26 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                               )}
                                             </span>
                                           )}
+                                          {!reply.is_deleted && user && (user.id === reply.user_id || user.is_admin) && (
+                                            <button
+                                              onClick={() => handleDeleteReviewItem(reply.id)}
+                                              title={language === 'es' ? 'Eliminar respuesta' : 'Delete reply'}
+                                              style={{
+                                                background: 'transparent',
+                                                border: 'none',
+                                                color: 'var(--text-muted)',
+                                                cursor: 'pointer',
+                                                padding: '0.15rem',
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                marginLeft: '0.1rem'
+                                              }}
+                                              onMouseEnter={(e) => (e.currentTarget.style.color = '#ef4444')}
+                                              onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
+                                            >
+                                              <Trash2 size={12} />
+                                            </button>
+                                          )}
                                         </div>
 
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
@@ -9278,25 +9300,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                               <Flag size={12} />
                                             </button>
                                           )}
-                                          {!reply.is_deleted && user && (user.id === reply.user_id || user.is_admin) && (
-                                            <button
-                                              onClick={() => handleDeleteReviewItem(reply.id)}
-                                              title={language === 'es' ? 'Eliminar respuesta' : 'Delete reply'}
-                                              style={{
-                                                background: 'transparent',
-                                                border: 'none',
-                                                color: 'var(--text-muted)',
-                                                cursor: 'pointer',
-                                                padding: '0.2rem',
-                                                display: 'flex',
-                                                alignItems: 'center'
-                                              }}
-                                              onMouseEnter={(e) => (e.currentTarget.style.color = '#ef4444')}
-                                              onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
-                                            >
-                                              <Trash2 size={13} />
-                                            </button>
-                                          )}
+
                                         </div>
                                       </div>
 
