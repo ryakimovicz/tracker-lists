@@ -15,7 +15,7 @@ import { prefetchMediaDetails } from '../utils/prefetch';
 import { removeCachedSeries, clearCachedSeriesMatching } from '../utils/seriesCache';
 import { getCachedShelfItems, setCachedShelfItems, createShelfMap, findInShelfMap } from '../utils/shelfCache';
 
-import { Search as SearchIcon, AlertCircle, CheckCircle, Plus, X, Heart, Star, Users, BookOpen, Package, Puzzle, Sparkles, Gamepad2, Trash2, Flame, TrendingUp, Trophy, Bookmark, Film, Tv, Book, MessageSquare, MessageCircle, Rocket, Clock } from 'lucide-react';
+import { Search as SearchIcon, AlertCircle, CheckCircle, Plus, X, Heart, Star, Users, BookOpen, Package, Puzzle, Sparkles, Gamepad2, Trash2, Flame, TrendingUp, Trophy, Bookmark, Film, Tv, Book, MessageSquare, MessageCircle, Rocket, Clock, Crown, RefreshCw, Zap } from 'lucide-react';
 
 interface SearchResultItem {
   external_id: string;
@@ -57,11 +57,11 @@ export const renderMediaBadge = (
     borderColor = 'rgba(139, 92, 246, 0.5)';
   } else if (bLower === 'expansion' || bLower === 'expansión' || bLower === 'expansion') {
     label = isEs ? 'Expansión' : 'Expansion';
-    icon = <Sparkles size={11} color="#3b82f6" />;
+    icon = <Zap size={11} color="#3b82f6" />;
     borderColor = 'rgba(59, 130, 246, 0.5)';
   } else if (bLower === 'edition' || bLower === 'edición' || bLower === 'edicion') {
     label = isEs ? 'Edición' : 'Edition';
-    icon = <Sparkles size={11} color="#f59e0b" />;
+    icon = <Crown size={11} color="#f59e0b" />;
     borderColor = 'rgba(245, 158, 11, 0.5)';
   } else if (bLower === 'remake') {
     label = 'Remake';
@@ -69,7 +69,7 @@ export const renderMediaBadge = (
     borderColor = 'rgba(236, 72, 153, 0.5)';
   } else if (bLower === 'remaster') {
     label = 'Remaster';
-    icon = <Sparkles size={11} color="#06b6d4" />;
+    icon = <RefreshCw size={11} color="#06b6d4" />;
     borderColor = 'rgba(6, 182, 212, 0.5)';
   } else if (bLower === 'mod') {
     label = 'Mod';
