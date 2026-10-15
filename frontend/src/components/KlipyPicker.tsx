@@ -399,7 +399,15 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
   initialTab = 'gifs'
 }) => {
   const { language } = useTranslation();
-  const [activeTab, setActiveTab] = useState<'gifs' | 'stickers' | 'memes' | 'clips'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'gifs' | 'stickers' | 'memes' | 'clips'>(() => {
+    try {
+      const saved = localStorage.getItem('klipy_last_active_tab');
+      if (saved && ['gifs', 'stickers', 'memes', 'clips'].includes(saved)) {
+        return saved as any;
+      }
+    } catch (e) {}
+    return initialTab;
+  });
   const [searchQuery, setSearchQuery] = useState('');
   const [items, setItems] = useState<KlipyMediaItem[]>([]);
   const [categories, setCategories] = useState<{ category: string; query: string; preview_url?: string }[]>([]);
@@ -451,7 +459,6 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
   onCloseRef.current = onClose;
 
   const sessionPushedCountRef = useRef(0);
-  const isNavigatingInternalRef = useRef(false);
 
   // Sync with URL query parameters: ?modal=media&media_tab=gifs|stickers|memes|clips&folder=favorites
   const updateKlipyUrlParams = useCallback((isOpenState: boolean, tab: 'gifs' | 'stickers' | 'memes' | 'clips', isFavs: boolean, usePush: boolean = false) => {
@@ -493,15 +500,24 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
       return;
     }
 
-    // When modal is opened fresh, start from initial tab or URL tab
+    // Determine the tab to use when opening fresh:
+    // Priority: URL param (if already in URL) -> saved last active tab -> initialTab
     const params = new URLSearchParams(window.location.search);
     const mediaTabParam = params.get('media_tab');
     const folderParam = params.get('folder');
 
     let effectiveTab: 'gifs' | 'stickers' | 'memes' | 'clips' = initialTab;
+    let savedTab: string | null = null;
+    try {
+      savedTab = localStorage.getItem('klipy_last_active_tab');
+    } catch (e) {}
+
     if (mediaTabParam && ['gifs', 'stickers', 'memes', 'clips'].includes(mediaTabParam)) {
       effectiveTab = mediaTabParam as any;
+    } else if (savedTab && ['gifs', 'stickers', 'memes', 'clips'].includes(savedTab)) {
+      effectiveTab = savedTab as any;
     }
+
     const effectiveFavs = folderParam === 'favorites';
 
     setActiveTab(effectiveTab);
@@ -521,15 +537,18 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
         sessionPushedCountRef.current -= 1;
         const p = new URLSearchParams(window.location.search);
         const mt = p.get('media_tab');
+        let newTab: 'gifs' | 'stickers' | 'memes' | 'clips' = 'gifs';
         if (mt && ['gifs', 'stickers', 'memes', 'clips'].includes(mt)) {
-          setActiveTab(mt as any);
-        } else {
-          setActiveTab('gifs');
+          newTab = mt as any;
         }
+        setActiveTab(newTab);
+        try { localStorage.setItem('klipy_last_active_tab', newTab); } catch (e) {}
         setViewFavorites(p.get('folder') === 'favorites');
       } else {
-        // We reached the initial route of this session! Close the modal.
+        // We reached the initial route of THIS session! Close the modal immediately.
         isClosingViaBackRef.current = true;
+        // Clean URL params via replaceState so no media_tab is left behind on the host route
+        updateKlipyUrlParams(false, 'gifs', false, false);
         onCloseRef.current();
       }
     };
@@ -544,8 +563,9 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
   useEffect(() => {
     if (!isOpen) {
       if (isClosingViaBackRef.current) {
-        // Popped by the back button that triggered closing, just reset
+        // Popped by the back button that triggered closing, clean params and reset ref
         isClosingViaBackRef.current = false;
+        updateKlipyUrlParams(false, 'gifs', false, false);
       } else {
         // Closed via X, click outside, or item selection:
         // Pop all history entries created during THIS session so we don't leave previous tabs in browser history!
@@ -606,6 +626,7 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
   const handleTabSelect = (tab: 'gifs' | 'stickers' | 'memes' | 'clips') => {
     if (tab === activeTab && !viewFavorites) return;
     setActiveTab(tab);
+    try { localStorage.setItem('klipy_last_active_tab', tab); } catch (e) {}
     setViewFavorites(false);
     sessionPushedCountRef.current += 1;
     updateKlipyUrlParams(true, tab, false, true);
