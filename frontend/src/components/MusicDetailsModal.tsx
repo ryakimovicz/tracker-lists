@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { X, Trophy, Disc, Mic, Headphones, Clock, Music, User as UserIcon, Calendar, ArrowRight, Star, ChevronDown, ChevronUp, Globe, Heart } from 'lucide-react';
 import { useTranslation } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
@@ -107,9 +107,75 @@ const MusicDetailsModalInner: React.FC<MusicDetailsModalProps> = ({
     });
   }, [propType, propArtist, propName, initialImage]);
 
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlFilterParam = searchParams.get('discography');
+  const validFilters = ['all', 'album', 'single', 'ep'] as const;
+  const initialFilter: 'all' | 'album' | 'single' | 'ep' = validFilters.includes(urlFilterParam as any) ? (urlFilterParam as any) : 'all';
+
   const initialCached = getCachedMusicDetails(propType, propArtist, propName);
   const [rankingPeriod, setRankingPeriod] = useState<'7day' | '1month' | 'overall'>('7day');
-  const [discographyFilter, setDiscographyFilter] = useState<'all' | 'album' | 'single' | 'ep'>('all');
+  const [discographyFilter, setDiscographyFilterState] = useState<'all' | 'album' | 'single' | 'ep'>(initialFilter);
+
+  // Sync state if URL changes externally
+  useEffect(() => {
+    const currentParam = searchParams.get('discography');
+    if (validFilters.includes(currentParam as any)) {
+      setDiscographyFilterState(currentParam as any);
+    } else if (!currentParam) {
+      setDiscographyFilterState('all');
+    }
+  }, [searchParams]);
+
+  const setDiscographyFilter = (newFilter: 'all' | 'album' | 'single' | 'ep') => {
+    setDiscographyFilterState(newFilter);
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev);
+      if (newFilter === 'all') {
+        next.delete('discography');
+      } else {
+        next.set('discography', newFilter);
+      }
+      return next;
+    }, { replace: true });
+  };
+
+  // Touch swipe support for mobile discography category cycling
+  const touchStartXRef = useRef<number | null>(null);
+  const touchStartYRef = useRef<number | null>(null);
+
+  const handleDiscographyTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      touchStartXRef.current = e.touches[0].clientX;
+      touchStartYRef.current = e.touches[0].clientY;
+    }
+  };
+
+  const handleDiscographyTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartXRef.current === null || touchStartYRef.current === null) return;
+    const endX = e.changedTouches[0].clientX;
+    const endY = e.changedTouches[0].clientY;
+    const diffX = endX - touchStartXRef.current;
+    const diffY = endY - touchStartYRef.current;
+    touchStartXRef.current = null;
+    touchStartYRef.current = null;
+
+    // Must be predominantly horizontal swipe and at least 45px
+    if (Math.abs(diffX) > 45 && Math.abs(diffX) > Math.abs(diffY) * 1.4) {
+      const order: ('all' | 'album' | 'single' | 'ep')[] = ['all', 'album', 'single', 'ep'];
+      const currentIndex = order.indexOf(discographyFilter);
+      if (diffX < 0) {
+        // Swiped left -> Next category
+        if (currentIndex < order.length - 1) {
+          setDiscographyFilter(order[currentIndex + 1]);
+        }
+      } else {
+        // Swiped right -> Previous category
+        if (currentIndex > 0) {
+          setDiscographyFilter(order[currentIndex - 1]);
+        }
+      }
+    }
+  };
   const [isBioExpanded, setIsBioExpanded] = useState<boolean>(false);
   const [translatedBio, setTranslatedBio] = useState<string>('');
   const [translatedBioTarget, setTranslatedBioTarget] = useState<string>('');
@@ -1021,7 +1087,11 @@ const MusicDetailsModalInner: React.FC<MusicDetailsModalProps> = ({
 
               {/* Artist Discography Section (Albums, Singles, EPs, Compilations) */}
               {currentType === 'artist' && details?.discography && details.discography.length > 0 && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div 
+                  onTouchStart={handleDiscographyTouchStart}
+                  onTouchEnd={handleDiscographyTouchEnd}
+                  style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', touchAction: 'pan-y' }}
+                >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
                     <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                       {isEs ? 'Discografía' : 'Discography'} ({filteredDiscography.length})
@@ -1066,93 +1136,102 @@ const MusicDetailsModalInner: React.FC<MusicDetailsModalProps> = ({
                     overflowY: 'auto',
                     padding: '0.25rem'
                   }}>
-                    {filteredDiscography.map((albumItem: any, idx: number) => (
-                      <div
-                        key={`${albumItem.title}-${idx}`}
-                        onClick={() => navigateToItem('album', displayTitle, albumItem.title, albumItem.cover)}
-                        style={{
-                          padding: '0.6rem',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          borderRadius: '10px',
-                          cursor: 'pointer',
-                          background: 'var(--bg-tertiary)',
-                          border: '1px solid var(--border-color)',
-                          boxSizing: 'border-box',
-                          minHeight: '190px',
-                          flexShrink: 0,
-                          transition: 'transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease'
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.transform = 'translateY(-3px)';
-                          e.currentTarget.style.borderColor = 'rgba(29, 185, 84, 0.5)';
-                          e.currentTarget.style.boxShadow = '0 6px 16px rgba(29, 185, 84, 0.15)';
-                          prefetchMusicDetails('album', displayTitle, albumItem.title);
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.transform = 'translateY(0)';
-                          e.currentTarget.style.borderColor = 'var(--border-color)';
-                          e.currentTarget.style.boxShadow = 'none';
-                        }}
-                        title={`${albumItem.title} (${albumItem.year || ''})`}
-                      >
-                        <div style={{ width: '100%', height: '120px', minHeight: '120px', maxHeight: '120px', borderRadius: '6px', overflow: 'hidden', background: '#222', flexShrink: 0 }}>
-                          {albumItem.cover && !albumItem.cover.includes('2a96cbd8b46e442fc41c2b86b821562f') && !albumItem.cover.includes('d41d8cd98f00b204e9800998ecf8427e') ? (
-                            <img
-                              src={albumItem.cover}
-                              alt={albumItem.title}
-                              referrerPolicy="no-referrer"
-                              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                              onError={(e) => {
-                                e.currentTarget.style.display = 'none';
-                                const fallback = e.currentTarget.nextElementSibling as HTMLElement;
-                                if (fallback) fallback.style.display = 'flex';
-                              }}
-                            />
-                          ) : null}
-                          <div style={{
-                            width: '100%',
-                            height: '100%',
-                            display: (albumItem.cover && !albumItem.cover.includes('2a96cbd8b46e442fc41c2b86b821562f') && !albumItem.cover.includes('d41d8cd98f00b204e9800998ecf8427e')) ? 'none' : 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: 'var(--text-muted)'
-                          }}>
-                            <Disc size={24} />
-                          </div>
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', flex: 1, marginTop: '0.45rem', minWidth: 0, gap: '0.25rem' }}>
-                          <span style={{
-                            fontSize: '0.76rem',
-                            fontWeight: 600,
-                            color: 'var(--text-primary)',
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            lineHeight: 1.25
-                          }}>
-                            {albumItem.title}
-                          </span>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', minWidth: 0, marginTop: 'auto' }}>
-                            <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 500 }}>
-                              {albumItem.year || ''}
-                            </span>
-                            <span style={{
-                              fontSize: '0.6rem',
-                              fontWeight: 700,
-                              textTransform: 'uppercase',
-                              color: 'var(--color-music, #1DB954)',
-                              background: 'rgba(29, 185, 84, 0.12)',
-                              padding: '0.05rem 0.3rem',
-                              borderRadius: '3px',
-                              lineHeight: 1.2
+                    {filteredDiscography.map((albumItem: any, idx: number) => {
+                      const itemRecordType = (albumItem.record_type || '').toLowerCase();
+                      const itemTypeLabel = itemRecordType === 'ep'
+                        ? 'EP'
+                        : itemRecordType === 'single'
+                        ? (isEs ? 'Sencillo' : 'Single')
+                        : (isEs ? 'Álbum' : 'Album');
+
+                      return (
+                        <div
+                          key={`${albumItem.title}-${idx}`}
+                          onClick={() => navigateToItem('album', displayTitle, albumItem.title, albumItem.cover)}
+                          style={{
+                            padding: '0.6rem',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            borderRadius: '10px',
+                            cursor: 'pointer',
+                            background: 'var(--bg-tertiary)',
+                            border: '1px solid var(--border-color)',
+                            boxSizing: 'border-box',
+                            minHeight: '190px',
+                            flexShrink: 0,
+                            transition: 'transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.transform = 'translateY(-3px)';
+                            e.currentTarget.style.borderColor = 'rgba(29, 185, 84, 0.5)';
+                            e.currentTarget.style.boxShadow = '0 6px 16px rgba(29, 185, 84, 0.15)';
+                            prefetchMusicDetails('album', displayTitle, albumItem.title);
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = 'translateY(0)';
+                            e.currentTarget.style.borderColor = 'var(--border-color)';
+                            e.currentTarget.style.boxShadow = 'none';
+                          }}
+                          title={`${albumItem.title} (${albumItem.year || ''})`}
+                        >
+                          <div style={{ width: '100%', height: '120px', minHeight: '120px', maxHeight: '120px', borderRadius: '6px', overflow: 'hidden', background: '#222', flexShrink: 0 }}>
+                            {albumItem.cover && !albumItem.cover.includes('2a96cbd8b46e442fc41c2b86b821562f') && !albumItem.cover.includes('d41d8cd98f00b204e9800998ecf8427e') ? (
+                              <img
+                                src={albumItem.cover}
+                                alt={albumItem.title}
+                                referrerPolicy="no-referrer"
+                                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                                onError={(e) => {
+                                  e.currentTarget.style.display = 'none';
+                                  const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                                  if (fallback) fallback.style.display = 'flex';
+                                }}
+                              />
+                            ) : null}
+                            <div style={{
+                              width: '100%',
+                              height: '100%',
+                              display: (albumItem.cover && !albumItem.cover.includes('2a96cbd8b46e442fc41c2b86b821562f') && !albumItem.cover.includes('d41d8cd98f00b204e9800998ecf8427e')) ? 'none' : 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: 'var(--text-muted)'
                             }}>
-                              {albumItem.record_type}
+                              <Disc size={24} />
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', flex: 1, marginTop: '0.45rem', minWidth: 0, gap: '0.25rem' }}>
+                            <span style={{
+                              fontSize: '0.76rem',
+                              fontWeight: 600,
+                              color: 'var(--text-primary)',
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              lineHeight: 1.25
+                            }}>
+                              {albumItem.title}
                             </span>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', minWidth: 0, marginTop: 'auto' }}>
+                              <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 500 }}>
+                                {albumItem.year || ''}
+                              </span>
+                              <span style={{
+                                fontSize: '0.6rem',
+                                fontWeight: 700,
+                                textTransform: 'uppercase',
+                                color: 'var(--color-music, #1DB954)',
+                                background: 'rgba(29, 185, 84, 0.12)',
+                                padding: '0.05rem 0.3rem',
+                                borderRadius: '3px',
+                                lineHeight: 1.2
+                              }}>
+                                {itemTypeLabel}
+                              </span>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}
