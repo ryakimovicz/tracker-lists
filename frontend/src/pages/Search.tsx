@@ -36,38 +36,49 @@ export const renderMediaBadge = (
   inline: boolean = false
 ) => {
   if (!badge) return null;
-  let label = badge;
+  const isEs = language === 'es';
+  const bLower = badge.toLowerCase().trim();
+
+  let label = bLower.charAt(0).toUpperCase() + bLower.slice(1);
   let icon = null;
   let borderColor = 'rgba(255, 255, 255, 0.25)';
 
-  if (badge === 'pack') {
-    label = language === 'es' ? 'Pack' : 'Pack';
+  if (bLower === 'pack') {
+    label = 'Pack';
     icon = <Package size={11} color="#38bdf8" />;
     borderColor = 'rgba(56, 189, 248, 0.5)';
-  } else if (badge === 'collection') {
-    label = language === 'es' ? 'Colección' : 'Collection';
+  } else if (bLower === 'collection' || bLower === 'colección' || bLower === 'coleccion') {
+    label = isEs ? 'Colección' : 'Collection';
     icon = <Package size={11} color="#10b981" />;
     borderColor = 'rgba(16, 185, 129, 0.5)';
-  } else if (badge === 'dlc') {
+  } else if (bLower === 'dlc') {
     label = 'DLC';
     icon = <Puzzle size={11} color="#8b5cf6" />;
     borderColor = 'rgba(139, 92, 246, 0.5)';
-  } else if (badge === 'expansion') {
-    label = language === 'es' ? 'Expansión' : 'Expansion';
+  } else if (bLower === 'expansion' || bLower === 'expansión' || bLower === 'expansion') {
+    label = isEs ? 'Expansión' : 'Expansion';
     icon = <Sparkles size={11} color="#3b82f6" />;
     borderColor = 'rgba(59, 130, 246, 0.5)';
-  } else if (badge === 'edition') {
-    label = language === 'es' ? 'Edición' : 'Edition';
+  } else if (bLower === 'edition' || bLower === 'edición' || bLower === 'edicion') {
+    label = isEs ? 'Edición' : 'Edition';
     icon = <Sparkles size={11} color="#f59e0b" />;
     borderColor = 'rgba(245, 158, 11, 0.5)';
-  } else if (badge === 'remake') {
+  } else if (bLower === 'remake') {
     label = 'Remake';
     icon = <Gamepad2 size={11} color="#ec4899" />;
     borderColor = 'rgba(236, 72, 153, 0.5)';
-  } else if (badge === 'remaster') {
+  } else if (bLower === 'remaster') {
     label = 'Remaster';
     icon = <Sparkles size={11} color="#06b6d4" />;
     borderColor = 'rgba(6, 182, 212, 0.5)';
+  } else if (bLower === 'mod') {
+    label = 'Mod';
+    icon = <Puzzle size={11} color="#a855f7" />;
+    borderColor = 'rgba(168, 85, 247, 0.5)';
+  } else if (bLower === 'upcoming' || bLower === 'próximamente' || bLower === 'proximamente') {
+    label = isEs ? 'Próximamente' : 'Upcoming';
+    icon = <Clock size={11} color="#f97316" />;
+    borderColor = 'rgba(249, 115, 22, 0.5)';
   }
 
   if (inline) {
@@ -1822,24 +1833,7 @@ export const Search: React.FC = () => {
                                 <span>{getSingleCategoryLabel(item.item_type)}</span>
                               </span>
                             )}
-                            {item.badge && (
-                              <span
-                                className="search-media-badge-inline"
-                                style={{
-                                  fontSize: '0.7rem',
-                                  fontWeight: 600,
-                                  color: 'var(--text-secondary)',
-                                  background: 'rgba(255, 255, 255, 0.06)',
-                                  padding: '0.1rem 0.45rem',
-                                  borderRadius: '4px',
-                                  border: '1px solid var(--border-color)',
-                                  display: 'inline-flex',
-                                  alignItems: 'center'
-                                }}
-                              >
-                                {item.badge}
-                              </span>
-                            )}
+                            {item.badge && renderMediaBadge(item.badge, language, 'search-media-badge-inline', true)}
                           </div>
                         </div>
 

@@ -689,7 +689,7 @@ def get_explore_tabs(
         return True
 
     # 2. Nuevo (APIs with 4-hour in-memory cache)
-    cache_key_nuevo = "explore_nuevo_global_v8"
+    cache_key_nuevo = "explore_nuevo_global_v9"
     nuevo = []
     if cache_key_nuevo in _EXPLORE_NUEVO_CACHE:
         cache_time, cached_items = _EXPLORE_NUEVO_CACHE[cache_key_nuevo]
@@ -697,7 +697,7 @@ def get_explore_tabs(
             nuevo = [x for x in cached_items if is_item_allowed(x)]
 
     # 3. Tendencias (APIs with 4-hour in-memory cache)
-    cache_key_trend = "explore_tendencias_global_v5"
+    cache_key_trend = "explore_tendencias_global_v6"
     tendencias = []
     if cache_key_trend in _EXPLORE_TENDENCIAS_CACHE:
         cache_time, cached_items = _EXPLORE_TENDENCIAS_CACHE[cache_key_trend]

@@ -396,6 +396,7 @@ class IGDBService:
 
                         cat = item.get("game_type") if item.get("game_type") is not None else item.get("category", 0)
                         has_version_parent = bool(item.get("version_parent"))
+                        name_lower = (item.get("name") or "").lower()
                         badge = None
                         if cat in (2, 4, 6):
                             badge = "expansion"
@@ -411,6 +412,14 @@ class IGDBService:
                             badge = "remake"
                         elif cat == 9:
                             badge = "remaster"
+                        elif any(w in name_lower for w in ["edition", "edición", "deluxe", "goty", "director's cut", "definitive"]):
+                            badge = "edition"
+                        elif any(w in name_lower for w in ["collection", "colección", "bundle", "trilogy", "anthology"]):
+                            badge = "collection"
+                        elif "remaster" in name_lower:
+                            badge = "remaster"
+                        elif "remake" in name_lower:
+                            badge = "remake"
 
                         results.append(SearchResultItem(
                             external_id=str(item.get("id")),
@@ -430,7 +439,7 @@ class IGDBService:
     def get_new_games(cls) -> List[SearchResultItem]:
         import time
         now = int(time.time())
-        body = f'fields id, name, category, game_type, parent_game, cover.image_id, first_release_date, summary; where first_release_date < {now} & cover != null & (game_type = (0, 2, 3, 4, 8, 9, 10) | category = (0, 2, 3, 4, 8, 9, 10)); sort first_release_date desc; limit 100;'
+        body = f'fields id, name, category, game_type, parent_game, version_parent, cover.image_id, first_release_date, summary; where first_release_date < {now} & cover != null & (game_type = (0, 2, 3, 4, 8, 9, 10) | category = (0, 2, 3, 4, 8, 9, 10)); sort first_release_date desc; limit 100;'
         return cls._execute_query(body)
 
     @classmethod
@@ -453,7 +462,7 @@ class IGDBService:
                     pop_data = json.loads(res.read().decode())
                     gids = [str(p["game_id"]) for p in pop_data if "game_id" in p]
                     if gids:
-                        body_games = f"fields id, name, category, game_type, parent_game, cover.image_id, first_release_date, summary, total_rating; where id = ({','.join(gids)}) & cover != null; limit 35;"
+                        body_games = f"fields id, name, category, game_type, parent_game, version_parent, cover.image_id, first_release_date, summary, total_rating; where id = ({','.join(gids)}) & cover != null; limit 35;"
                         items = cls._execute_query(body_games)
                         # Maintain rank order of popularity
                         id_to_item = {str(item.external_id): item for item in items}
@@ -464,7 +473,7 @@ class IGDBService:
             print(f"IGDB popularity_primitives error: {e}")
 
         # Fallback query without date restrictions
-        body_fallback = "fields id, name, category, game_type, parent_game, cover.image_id, first_release_date, summary, total_rating; where cover != null & total_rating != null; sort total_rating desc; limit 24;"
+        body_fallback = "fields id, name, category, game_type, parent_game, version_parent, cover.image_id, first_release_date, summary, total_rating; where cover != null & total_rating != null; sort total_rating desc; limit 24;"
         return cls._execute_query(body_fallback)
 
 
