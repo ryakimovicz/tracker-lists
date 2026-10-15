@@ -677,13 +677,28 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
     fetchMedia(activeTab, searchQuery, 1, false);
   }, [activeTab, isOpen]);
 
+  const categoriesCacheRef = useRef<{ [key: string]: any[] }>({});
+  const [rateLimited, setRateLimited] = useState(false);
+
   // Fetch Categories for current tab
   const loadCategories = async (tab: string) => {
     if (!KLIPY_API_KEY) return;
+    const segment = tab === 'memes' ? 'static-memes' : tab;
+    const localeParam = language === 'es' ? 'es' : 'en';
+    const cacheKey = `${segment}-${localeParam}`;
+
+    if (categoriesCacheRef.current[cacheKey]) {
+      setCategories(categoriesCacheRef.current[cacheKey]);
+      return;
+    }
+
     try {
-      const segment = tab === 'memes' ? 'static-memes' : tab;
-      const localeParam = language === 'es' ? 'es' : 'en';
       const res = await fetch(`${BASE_URL}/${KLIPY_API_KEY}/${segment}/categories?locale=${localeParam}`);
+      if (res.status === 429) {
+        setRateLimited(true);
+        setCategories([]);
+        return;
+      }
       if (res.ok) {
         const data = await res.json();
         let cats: any[] = [];
@@ -694,6 +709,7 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
         } else if (Array.isArray(data.data)) {
           cats = data.data;
         }
+        categoriesCacheRef.current[cacheKey] = cats;
         setCategories(cats);
       }
     } catch (err) {
@@ -716,7 +732,13 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
       }
 
       const res = await fetch(url);
+      if (res.status === 429) {
+        setRateLimited(true);
+        if (!append) setItems([]);
+        return;
+      }
       if (res.ok) {
+        setRateLimited(false);
         const json = await res.json();
         let newItems: KlipyMediaItem[] = [];
         let hasNext = false;
@@ -1053,7 +1075,7 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
               type="text"
               value={searchQuery}
               onChange={handleSearchChange}
-              placeholder={language === 'es' ? 'Buscar...' : 'Search...'}
+              placeholder={language === 'es' ? 'Buscar en KLIPY' : 'Search KLIPY'}
               autoFocus
               style={{
                 background: 'transparent',
@@ -1352,9 +1374,22 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
 
           {!viewFavorites && (!Array.isArray(items) || items.length === 0) && !loading && (
             <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '3rem 1rem', color: 'var(--text-muted)' }}>
-              <p style={{ margin: 0, fontSize: '0.9rem' }}>
-                {language === 'es' ? 'No se encontraron resultados en KLIPY' : 'No results found on KLIPY'}
-              </p>
+              {rateLimited ? (
+                <div>
+                  <p style={{ margin: '0 0 0.4rem', fontSize: '0.92rem', color: 'var(--text-primary)', fontWeight: 600 }}>
+                    {language === 'es' ? 'Límite de peticiones por hora alcanzado en KLIPY' : 'KLIPY hourly request limit reached'}
+                  </p>
+                  <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                    {language === 'es'
+                      ? 'La API key de prueba de KLIPY se renueva cada hora. Puedes solicitar la Production Key en tu panel de desarrollador para límites ilimitados.'
+                      : 'KLIPY test API key resets every hour. You can request a Production Key in your partner panel for higher limits.'}
+                  </p>
+                </div>
+              ) : (
+                <p style={{ margin: 0, fontSize: '0.9rem' }}>
+                  {language === 'es' ? 'No se encontraron resultados en KLIPY' : 'No results found on KLIPY'}
+                </p>
+              )}
             </div>
           )}
 
