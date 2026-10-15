@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Shield, Bell, Settings } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { BrandLogo } from './BrandLogo';
@@ -9,7 +9,8 @@ import { apiClient } from '../api/client';
 export const MobileHeader: React.FC = () => {
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
-  const [showNotifFlyout, setShowNotifFlyout] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const showNotifFlyout = searchParams.get('notifications') === 'true' || searchParams.has('notifications');
   const [unreadCount, setUnreadCount] = useState(0);
   const notifBtnRef = useRef<HTMLButtonElement>(null);
   const isUserLoggedIn = Boolean(user && isAuthenticated);
@@ -82,7 +83,17 @@ export const MobileHeader: React.FC = () => {
             <button
               ref={notifBtnRef}
               type="button"
-              onClick={() => setShowNotifFlyout(prev => !prev)}
+              onClick={() => {
+                const newParams = new URLSearchParams(searchParams);
+                if (showNotifFlyout) {
+                  newParams.delete('notifications');
+                  newParams.delete('notif_tab');
+                  setSearchParams(newParams);
+                } else {
+                  newParams.set('notifications', 'true');
+                  setSearchParams(newParams);
+                }
+              }}
               className="mobile-header-icon-btn"
               title="Notificaciones"
               aria-label="Notificaciones"
@@ -110,7 +121,11 @@ export const MobileHeader: React.FC = () => {
       {/* Notifications Flyout Modal for Mobile */}
       <NotificationFlyout
         isOpen={showNotifFlyout}
-        onClose={() => setShowNotifFlyout(false)}
+        onClose={() => {
+          if (showNotifFlyout) {
+            window.history.back();
+          }
+        }}
         onUnreadCountChange={(cnt) => setUnreadCount(cnt)}
         ignoreRef={notifBtnRef}
       />

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Bell, CheckCheck, Trash2, UserPlus, ThumbsUp, MessageSquare, Reply, UserCheck, X, ExternalLink, AtSign, AlertTriangle } from 'lucide-react';
 import { apiClient } from '../api/client';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useTranslation } from '../context/LanguageContext';
 
 export interface NotificationItem {
@@ -32,21 +32,110 @@ export const NotificationFlyout: React.FC<NotificationFlyoutProps> = ({
   ignoreRef
 }) => {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
-  const [filter, setFilter] = useState<'all' | 'unread'>('all');
   const [loading, setLoading] = useState(false);
   const [processingId, setProcessingId] = useState<number | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const swipeWrapperRef = useRef<HTMLDivElement>(null);
+  const isProgrammaticScrollRef = useRef(false);
+  const isUserTouchingRef = useRef(false);
+  const swipeTimeoutRef = useRef<any>(null);
+  const debounceRef = useRef<any>(null);
+
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { language } = useTranslation();
   const isEs = language === 'es';
 
-  // Fetch notifications
+  // Read active tab from URL: ?notif_tab=unread vs all (default)
+  const filter: 'all' | 'unread' = searchParams.get('notif_tab') === 'unread' ? 'unread' : 'all';
+
+  const handleSelectTab = (tab: 'all' | 'unread') => {
+    const newParams = new URLSearchParams(searchParams);
+    if (tab === 'unread') {
+      newParams.set('notif_tab', 'unread');
+    } else {
+      newParams.delete('notif_tab');
+    }
+    setSearchParams(newParams);
+
+    // Scroll swipe container smoothly on mobile
+    if (swipeWrapperRef.current) {
+      const el = swipeWrapperRef.current;
+      isProgrammaticScrollRef.current = true;
+      if (swipeTimeoutRef.current) clearTimeout(swipeTimeoutRef.current);
+
+      const maxScroll = el.scrollWidth - el.clientWidth;
+      const targetScroll = tab === 'all' ? 0 : (maxScroll > 0 ? maxScroll : el.clientWidth);
+      el.scrollTo({ left: targetScroll, behavior: 'smooth' });
+
+      swipeTimeoutRef.current = setTimeout(() => {
+        isProgrammaticScrollRef.current = false;
+      }, 500);
+    }
+  };
+
+  // Sync scroll position if tab changes via browser forward/back
+  useEffect(() => {
+    if (swipeWrapperRef.current && !isUserTouchingRef.current) {
+      const el = swipeWrapperRef.current;
+      const maxScroll = el.scrollWidth - el.clientWidth;
+      const targetScroll = filter === 'all' ? 0 : (maxScroll > 0 ? maxScroll : el.clientWidth);
+      if (Math.abs(el.scrollLeft - targetScroll) > 10) {
+        isProgrammaticScrollRef.current = true;
+        el.scrollTo({ left: targetScroll, behavior: 'smooth' });
+        setTimeout(() => {
+          isProgrammaticScrollRef.current = false;
+        }, 500);
+      }
+    }
+  }, [filter]);
+
+  // Check swipe settling on mobile
+  const checkSwipeSettled = () => {
+    if (!swipeWrapperRef.current) return;
+    if (isProgrammaticScrollRef.current) return;
+    if (isUserTouchingRef.current) return;
+    const el = swipeWrapperRef.current;
+    const scrollPos = el.scrollLeft;
+    const maxScroll = el.scrollWidth - el.clientWidth;
+    if (maxScroll <= 0) return;
+
+    const scrollFraction = scrollPos / maxScroll;
+    if (scrollFraction > 0.25 && scrollFraction < 0.75) {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => {
+        checkSwipeSettled();
+      }, 100);
+      return;
+    }
+
+    const newTab: 'all' | 'unread' = scrollFraction >= 0.5 ? 'unread' : 'all';
+    if (newTab !== filter) {
+      const newParams = new URLSearchParams(searchParams);
+      if (newTab === 'unread') {
+        newParams.set('notif_tab', 'unread');
+      } else {
+        newParams.delete('notif_tab');
+      }
+      setSearchParams(newParams);
+    }
+  };
+
+  const handleSwipeScroll = () => {
+    if (isProgrammaticScrollRef.current) return;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      checkSwipeSettled();
+    }, 80);
+  };
+
+  // Fetch all notifications (or unread)
   const fetchNotifications = async () => {
     try {
       setLoading(true);
       const res = await apiClient.get('/notifications/', {
-        params: { unread_only: filter === 'unread', limit: 40 }
+        params: { limit: 60 }
       });
       if (Array.isArray(res.data)) {
         setNotifications(res.data);
@@ -62,9 +151,9 @@ export const NotificationFlyout: React.FC<NotificationFlyoutProps> = ({
     if (isOpen) {
       fetchNotifications();
     }
-  }, [isOpen, filter]);
+  }, [isOpen]);
 
-  // Click outside to close
+  // Click outside to close (desktop flyout)
   useEffect(() => {
     const handleOutsideClick = (e: MouseEvent) => {
       const target = e.target as Node;
@@ -127,14 +216,12 @@ export const NotificationFlyout: React.FC<NotificationFlyoutProps> = ({
     e.stopPropagation();
     try {
       setProcessingId(notif.id);
-      // Find the request by requester
       const reqRes = await apiClient.get('/social/follow-requests');
       const reqItem = reqRes.data?.find((r: any) => r.requester_id === notif.actor_id);
       if (reqItem) {
         await apiClient.post(`/social/follow-requests/${reqItem.id}/accept`);
       }
       await handleMarkAsRead(notif.id);
-      // Remove from list or update
       setNotifications(prev => prev.filter(n => n.id !== notif.id));
     } catch (err) {
       console.error('Error accepting follow request:', err);
@@ -290,6 +377,197 @@ export const NotificationFlyout: React.FC<NotificationFlyoutProps> = ({
     }
   };
 
+  const allItems = notifications;
+  const unreadItems = notifications.filter(n => !n.is_read);
+
+  const renderNotificationList = (items: NotificationItem[], isUnreadTab: boolean) => {
+    if (loading) {
+      return (
+        <div style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+          {isEs ? 'Cargando notificaciones...' : 'Loading notifications...'}
+        </div>
+      );
+    }
+    if (items.length === 0) {
+      return (
+        <div style={{ padding: '3rem 1.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+          <Bell size={32} style={{ opacity: 0.3, marginBottom: '0.75rem' }} />
+          <p style={{ margin: 0, fontSize: '0.92rem' }}>
+            {isUnreadTab
+              ? (isEs ? 'No tienes notificaciones sin leer' : 'No unread notifications')
+              : (isEs ? 'No tienes notificaciones aún' : 'No notifications yet')}
+          </p>
+        </div>
+      );
+    }
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column' }}>
+        {items.map(notif => {
+          const isUnread = !notif.is_read;
+          const isFollowReq = notif.notification_type === 'follow_request';
+
+          return (
+            <div
+              key={notif.id}
+              onClick={() => handleClickItem(notif)}
+              style={{
+                padding: '0.85rem 1.15rem',
+                display: 'flex',
+                gap: '0.75rem',
+                alignItems: 'flex-start',
+                borderBottom: '1px solid var(--border-color)',
+                background: isUnread ? 'rgba(245, 158, 11, 0.08)' : 'transparent',
+                cursor: 'pointer',
+                transition: 'background 0.15s ease',
+                position: 'relative'
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.background = isUnread ? 'rgba(245, 158, 11, 0.14)' : 'rgba(125, 125, 125, 0.08)';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background = isUnread ? 'rgba(245, 158, 11, 0.08)' : 'transparent';
+              }}
+            >
+              {/* Avatar with type badge */}
+              <div style={{ position: 'relative', flexShrink: 0 }}>
+                {notif.actor_photo_url ? (
+                  <img
+                    src={notif.actor_photo_url}
+                    alt={notif.actor_username}
+                    style={{ width: '38px', height: '38px', borderRadius: '50%', objectFit: 'cover' }}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      width: '38px',
+                      height: '38px',
+                      borderRadius: '50%',
+                      background: 'linear-gradient(135deg, var(--accent-primary), #6366f1)',
+                      color: '#fff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontWeight: 700,
+                      fontSize: '0.9rem'
+                    }}
+                  >
+                    {(notif.actor_username || 'U')[0].toUpperCase()}
+                  </div>
+                )}
+
+                <div
+                  style={{
+                    position: 'absolute',
+                    bottom: '-2px',
+                    right: '-3px',
+                    width: '18px',
+                    height: '18px',
+                    borderRadius: '50%',
+                    background: 'var(--bg-secondary, #1e1e24)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.3)'
+                  }}
+                >
+                  {renderIcon(notif.notification_type)}
+                </div>
+              </div>
+
+              {/* Content */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p
+                  style={{
+                    margin: '0 0 0.25rem 0',
+                    fontSize: '0.86rem',
+                    lineHeight: 1.35,
+                    color: 'var(--text-primary)'
+                  }}
+                >
+                  <span style={{ fontWeight: 700, color: 'var(--accent-primary)' }}>
+                    {notif.actor_username}
+                  </span>{' '}
+                  {renderDescription(notif)}
+                </p>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                    {formatTime(notif.created_at)}
+                  </span>
+                  {isUnread && (
+                    <span
+                      style={{
+                        width: '6px',
+                        height: '6px',
+                        borderRadius: '50%',
+                        background: 'var(--accent-primary)'
+                      }}
+                    />
+                  )}
+                </div>
+
+                {/* Actions for follow request */}
+                {isFollowReq && (
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: '0.5rem',
+                      marginTop: '0.6rem'
+                    }}
+                  >
+                    <button
+                      onClick={e => handleAcceptFollowRequest(e, notif)}
+                      disabled={processingId === notif.id}
+                      className="btn-primary"
+                      style={{
+                        padding: '0.3rem 0.75rem',
+                        fontSize: '0.78rem',
+                        borderRadius: '16px'
+                      }}
+                    >
+                      {isEs ? 'Aceptar' : 'Accept'}
+                    </button>
+                    <button
+                      onClick={e => handleRejectFollowRequest(e, notif)}
+                      disabled={processingId === notif.id}
+                      className="btn-secondary"
+                      style={{
+                        padding: '0.3rem 0.75rem',
+                        fontSize: '0.78rem',
+                        borderRadius: '16px'
+                      }}
+                    >
+                      {isEs ? 'Rechazar' : 'Reject'}
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Delete button */}
+              <button
+                onClick={e => handleDelete(e, notif.id)}
+                title={isEs ? 'Eliminar' : 'Delete'}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer',
+                  padding: '0.2rem',
+                  opacity: 0.6,
+                  flexShrink: 0
+                }}
+                onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
+                onMouseLeave={e => (e.currentTarget.style.opacity = '0.6')}
+              >
+                <Trash2 size={13} />
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
   return (
     <div
       ref={panelRef}
@@ -319,7 +597,8 @@ export const NotificationFlyout: React.FC<NotificationFlyoutProps> = ({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          background: 'var(--bg-secondary)'
+          background: 'var(--bg-secondary)',
+          flexShrink: 0
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
@@ -364,18 +643,20 @@ export const NotificationFlyout: React.FC<NotificationFlyoutProps> = ({
         </div>
       </div>
 
-      {/* Filter Tabs */}
+      {/* Desktop Filter Pills */}
       <div
+        className="notification-desktop-tabs"
         style={{
           display: 'flex',
           padding: '0.5rem 1rem',
           gap: '0.5rem',
           borderBottom: '1px solid var(--border-color)',
-          background: 'var(--bg-tertiary)'
+          background: 'var(--bg-tertiary)',
+          flexShrink: 0
         }}
       >
         <button
-          onClick={() => setFilter('all')}
+          onClick={() => handleSelectTab('all')}
           style={{
             flex: 1,
             padding: '0.35rem 0.6rem',
@@ -392,7 +673,7 @@ export const NotificationFlyout: React.FC<NotificationFlyoutProps> = ({
           {isEs ? 'Todas' : 'All'}
         </button>
         <button
-          onClick={() => setFilter('unread')}
+          onClick={() => handleSelectTab('unread')}
           style={{
             flex: 1,
             padding: '0.35rem 0.6rem',
@@ -410,8 +691,29 @@ export const NotificationFlyout: React.FC<NotificationFlyoutProps> = ({
         </button>
       </div>
 
-      {/* List */}
+      {/* Mobile Top Tabs (Full Width Tab Bar style like Calendario / Por confirmar) */}
+      <div className="notification-mobile-tabs-container">
+        <button
+          type="button"
+          className={`notification-mobile-tab-btn ${filter === 'all' ? 'active' : ''}`}
+          onClick={() => handleSelectTab('all')}
+        >
+          <span>{isEs ? 'Todas' : 'All'}</span>
+          {filter === 'all' && <div className="notification-tab-indicator" />}
+        </button>
+        <button
+          type="button"
+          className={`notification-mobile-tab-btn ${filter === 'unread' ? 'active' : ''}`}
+          onClick={() => handleSelectTab('unread')}
+        >
+          <span>{isEs ? 'No leídas' : 'Unread'}</span>
+          {filter === 'unread' && <div className="notification-tab-indicator" />}
+        </button>
+      </div>
+
+      {/* Desktop List (vertical scrollable) */}
       <div
+        className="notification-desktop-list"
         style={{
           flex: 1,
           overflowY: 'auto',
@@ -420,183 +722,33 @@ export const NotificationFlyout: React.FC<NotificationFlyoutProps> = ({
           flexDirection: 'column'
         }}
       >
-        {loading ? (
-          <div style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-            {isEs ? 'Cargando notificaciones...' : 'Loading notifications...'}
-          </div>
-        ) : notifications.length === 0 ? (
-          <div style={{ padding: '3rem 1.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-            <Bell size={32} style={{ opacity: 0.3, marginBottom: '0.75rem' }} />
-            <p style={{ margin: 0, fontSize: '0.92rem' }}>
-              {filter === 'unread'
-                ? (isEs ? 'No tienes notificaciones sin leer' : 'No unread notifications')
-                : (isEs ? 'No tienes notificaciones aún' : 'No notifications yet')}
-            </p>
-          </div>
-        ) : (
-          notifications.map(notif => {
-            const isUnread = !notif.is_read;
-            const isFollowReq = notif.notification_type === 'follow_request';
+        {renderNotificationList(filter === 'unread' ? unreadItems : allItems, filter === 'unread')}
+      </div>
 
-            return (
-              <div
-                key={notif.id}
-                onClick={() => handleClickItem(notif)}
-                style={{
-                  padding: '0.85rem 1.15rem',
-                  display: 'flex',
-                  gap: '0.75rem',
-                  alignItems: 'flex-start',
-                  borderBottom: '1px solid var(--border-color)',
-                  background: isUnread ? 'rgba(245, 158, 11, 0.08)' : 'transparent',
-                  cursor: 'pointer',
-                  transition: 'background 0.15s ease',
-                  position: 'relative'
-                }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.background = isUnread ? 'rgba(245, 158, 11, 0.14)' : 'rgba(125, 125, 125, 0.08)';
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.background = isUnread ? 'rgba(245, 158, 11, 0.08)' : 'transparent';
-                }}
-              >
-                {/* Avatar with type badge */}
-                <div style={{ position: 'relative', flexShrink: 0 }}>
-                  {notif.actor_photo_url ? (
-                    <img
-                      src={notif.actor_photo_url}
-                      alt={notif.actor_username}
-                      style={{ width: '38px', height: '38px', borderRadius: '50%', objectFit: 'cover' }}
-                    />
-                  ) : (
-                    <div
-                      style={{
-                        width: '38px',
-                        height: '38px',
-                        borderRadius: '50%',
-                        background: 'linear-gradient(135deg, var(--accent-primary), #6366f1)',
-                        color: '#fff',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontWeight: 700,
-                        fontSize: '0.9rem'
-                      }}
-                    >
-                      {(notif.actor_username || 'U')[0].toUpperCase()}
-                    </div>
-                  )}
+      {/* Mobile Swipe Container between Todas & No leídas */}
+      <div
+        ref={swipeWrapperRef}
+        onTouchStart={() => {
+          isUserTouchingRef.current = true;
+        }}
+        onTouchEnd={() => {
+          isUserTouchingRef.current = false;
+          setTimeout(() => {
+            checkSwipeSettled();
+          }, 60);
+        }}
+        onScroll={handleSwipeScroll}
+        className="notification-mobile-swipe-wrapper"
+      >
+        {/* Slide 1: Todas */}
+        <div className="notification-mobile-swipe-slide">
+          {renderNotificationList(allItems, false)}
+        </div>
 
-                  <div
-                    style={{
-                      position: 'absolute',
-                      bottom: '-2px',
-                      right: '-3px',
-                      width: '18px',
-                      height: '18px',
-                      borderRadius: '50%',
-                      background: 'var(--bg-secondary, #1e1e24)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.3)'
-                    }}
-                  >
-                    {renderIcon(notif.notification_type)}
-                  </div>
-                </div>
-
-                {/* Content */}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p
-                    style={{
-                      margin: '0 0 0.25rem 0',
-                      fontSize: '0.86rem',
-                      lineHeight: 1.35,
-                      color: 'var(--text-primary)'
-                    }}
-                  >
-                    <span style={{ fontWeight: 700, color: 'var(--accent-primary)' }}>
-                      {notif.actor_username}
-                    </span>{' '}
-                    {renderDescription(notif)}
-                  </p>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                    <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
-                      {formatTime(notif.created_at)}
-                    </span>
-                    {isUnread && (
-                      <span
-                        style={{
-                          width: '6px',
-                          height: '6px',
-                          borderRadius: '50%',
-                          background: 'var(--accent-primary)'
-                        }}
-                      />
-                    )}
-                  </div>
-
-                  {/* Actions for follow request */}
-                  {isFollowReq && (
-                    <div
-                      style={{
-                        display: 'flex',
-                        gap: '0.5rem',
-                        marginTop: '0.6rem'
-                      }}
-                    >
-                      <button
-                        onClick={e => handleAcceptFollowRequest(e, notif)}
-                        disabled={processingId === notif.id}
-                        className="btn-primary"
-                        style={{
-                          padding: '0.3rem 0.75rem',
-                          fontSize: '0.78rem',
-                          borderRadius: '16px'
-                        }}
-                      >
-                        {isEs ? 'Aceptar' : 'Accept'}
-                      </button>
-                      <button
-                        onClick={e => handleRejectFollowRequest(e, notif)}
-                        disabled={processingId === notif.id}
-                        className="btn-secondary"
-                        style={{
-                          padding: '0.3rem 0.75rem',
-                          fontSize: '0.78rem',
-                          borderRadius: '16px'
-                        }}
-                      >
-                        {isEs ? 'Rechazar' : 'Reject'}
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                {/* Delete button */}
-                <button
-                  onClick={e => handleDelete(e, notif.id)}
-                  title={isEs ? 'Eliminar' : 'Delete'}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    color: 'var(--text-muted)',
-                    cursor: 'pointer',
-                    padding: '0.2rem',
-                    opacity: 0.6,
-                    flexShrink: 0
-                  }}
-                  onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
-                  onMouseLeave={e => (e.currentTarget.style.opacity = '0.6')}
-                >
-                  <Trash2 size={13} />
-                </button>
-              </div>
-            );
-          })
-        )}
+        {/* Slide 2: No leídas */}
+        <div className="notification-mobile-swipe-slide">
+          {renderNotificationList(unreadItems, true)}
+        </div>
       </div>
     </div>
   );
