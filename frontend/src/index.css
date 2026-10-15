@@ -3151,3 +3151,41 @@ h1, h2, h3, h4, h5, h6 {
   }
 }
 
+/* Klipy Media Card Styles & Hover isolation for touch devices */
+.klipy-card-item {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+  outline: none;
+}
+
+.klipy-card-item:focus,
+.klipy-card-item:active {
+  outline: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .klipy-card-item:hover {
+    transform: scale(1.03);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+    border-color: var(--accent-primary, #6366f1) !important;
+  }
+
+  .klipy-folder-card:hover {
+    transform: scale(1.03) !important;
+    box-shadow: 0 6px 16px rgba(236, 72, 153, 0.25) !important;
+    border-color: #ec4899 !important;
+  }
+}
+
+

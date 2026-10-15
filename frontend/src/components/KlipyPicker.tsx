@@ -171,29 +171,9 @@ const KlipyClipCard: React.FC<{
     <div
       ref={containerRef}
       onClick={onSelect}
+      className="klipy-card-item"
       style={{
-        position: 'relative',
-        width: '100%',
-        height: '100%',
-        borderRadius: '8px',
-        overflow: 'hidden',
-        background: 'rgba(255, 255, 255, 0.03)',
-        border: isUnmuted ? '1px solid #ec4899' : '1px solid rgba(255, 255, 255, 0.06)',
-        cursor: 'pointer',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        transition: 'transform 0.15s ease, box-shadow 0.15s ease'
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.transform = 'scale(1.03)';
-        e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.4)';
-        if (!isUnmuted) e.currentTarget.style.borderColor = 'var(--accent-primary, #6366f1)';
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.transform = 'scale(1)';
-        e.currentTarget.style.boxShadow = 'none';
-        if (!isUnmuted) e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.06)';
+        border: isUnmuted ? '1px solid #ec4899' : undefined
       }}
     >
       {/* Top-Left Favorite Button */}
@@ -348,30 +328,7 @@ const KlipyMediaCard: React.FC<{
   return (
     <div
       onClick={onSelect}
-      style={{
-        position: 'relative',
-        width: '100%',
-        height: '100%',
-        borderRadius: '8px',
-        overflow: 'hidden',
-        background: 'rgba(255, 255, 255, 0.03)',
-        border: '1px solid rgba(255, 255, 255, 0.06)',
-        cursor: 'pointer',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        transition: 'transform 0.15s ease, box-shadow 0.15s ease'
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.transform = 'scale(1.03)';
-        e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.4)';
-        e.currentTarget.style.borderColor = 'var(--accent-primary, #6366f1)';
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.transform = 'scale(1)';
-        e.currentTarget.style.boxShadow = 'none';
-        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.06)';
-      }}
+      className="klipy-card-item"
     >
       {/* Top-Left Favorite Button */}
       <button
@@ -1174,6 +1131,7 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
           {!searchQuery && !viewFavorites && (
             <div
               onClick={() => handleToggleFavoritesView(true)}
+              className="klipy-folder-card"
               style={{
                 position: 'relative',
                 width: '100%',
@@ -1189,17 +1147,9 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
                 justifyContent: 'center',
                 gap: '0.4rem',
                 transition: 'transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease',
-                userSelect: 'none'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'scale(1.03)';
-                e.currentTarget.style.boxShadow = '0 6px 16px rgba(236, 72, 153, 0.25)';
-                e.currentTarget.style.borderColor = '#ec4899';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'scale(1)';
-                e.currentTarget.style.boxShadow = 'none';
-                e.currentTarget.style.borderColor = 'rgba(236, 72, 153, 0.5)';
+                userSelect: 'none',
+                WebkitTapHighlightColor: 'transparent',
+                outline: 'none'
               }}
             >
               <div style={{
