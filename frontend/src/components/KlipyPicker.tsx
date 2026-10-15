@@ -450,6 +450,9 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
 
+  const sessionPushedCountRef = useRef(0);
+  const isNavigatingInternalRef = useRef(false);
+
   // Sync with URL query parameters: ?modal=media&media_tab=gifs|stickers|memes|clips&folder=favorites
   const updateKlipyUrlParams = useCallback((isOpenState: boolean, tab: 'gifs' | 'stickers' | 'memes' | 'clips', isFavs: boolean, usePush: boolean = false) => {
     if (typeof window === 'undefined') return;
@@ -486,10 +489,11 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
   useEffect(() => {
     if (!isOpen) {
       hasPushedModalHistoryRef.current = false;
+      sessionPushedCountRef.current = 0;
       return;
     }
 
-    // Check if initial URL already had parameters
+    // When modal is opened fresh, start from initial tab or URL tab
     const params = new URLSearchParams(window.location.search);
     const mediaTabParam = params.get('media_tab');
     const folderParam = params.get('folder');
@@ -502,8 +506,9 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
 
     setActiveTab(effectiveTab);
     setViewFavorites(effectiveFavs);
+    sessionPushedCountRef.current = 0;
 
-    // Only push history once when the modal is opened if not already having modal=media in URL
+    // Push the initial history entry for opening the modal (if not already opened with modal=media)
     const alreadyHadModal = params.get('modal') === 'media';
     if (!hasPushedModalHistoryRef.current) {
       hasPushedModalHistoryRef.current = true;
@@ -511,11 +516,10 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
     }
 
     const handlePopState = () => {
-      const p = new URLSearchParams(window.location.search);
-      if (p.get('modal') !== 'media') {
-        isClosingViaBackRef.current = true;
-        onCloseRef.current();
-      } else {
+      // If user was navigating internally back within session
+      if (sessionPushedCountRef.current > 0) {
+        sessionPushedCountRef.current -= 1;
+        const p = new URLSearchParams(window.location.search);
         const mt = p.get('media_tab');
         if (mt && ['gifs', 'stickers', 'memes', 'clips'].includes(mt)) {
           setActiveTab(mt as any);
@@ -523,6 +527,10 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
           setActiveTab('gifs');
         }
         setViewFavorites(p.get('folder') === 'favorites');
+      } else {
+        // We reached the initial route of this session! Close the modal.
+        isClosingViaBackRef.current = true;
+        onCloseRef.current();
       }
     };
 
@@ -536,14 +544,18 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
   useEffect(() => {
     if (!isOpen) {
       if (isClosingViaBackRef.current) {
-        // Already popped history entry via back button, just reset ref
+        // Popped by the back button that triggered closing, just reset
         isClosingViaBackRef.current = false;
       } else {
-        // Closed via X, click outside, or item selection: if ?modal=media is in URL, pop the entry
+        // Closed via X, click outside, or item selection:
+        // Pop all history entries created during THIS session so we don't leave previous tabs in browser history!
+        const entriesToPop = sessionPushedCountRef.current + 1; // +1 for the modal opening entry
+        sessionPushedCountRef.current = 0;
+
         if (typeof window !== 'undefined') {
           const p = new URLSearchParams(window.location.search);
           if (p.get('modal') === 'media') {
-            window.history.back();
+            window.history.go(-entriesToPop);
           } else {
             updateKlipyUrlParams(false, 'gifs', false, false);
           }
@@ -592,14 +604,18 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
   };
 
   const handleTabSelect = (tab: 'gifs' | 'stickers' | 'memes' | 'clips') => {
+    if (tab === activeTab && !viewFavorites) return;
     setActiveTab(tab);
     setViewFavorites(false);
-    updateKlipyUrlParams(true, tab, false, false);
+    sessionPushedCountRef.current += 1;
+    updateKlipyUrlParams(true, tab, false, true);
   };
 
   const handleToggleFavoritesView = (showFavs: boolean) => {
+    if (showFavs === viewFavorites) return;
     setViewFavorites(showFavs);
-    updateKlipyUrlParams(true, activeTab, showFavs, false);
+    sessionPushedCountRef.current += 1;
+    updateKlipyUrlParams(true, activeTab, showFavs, true);
   };
 
   // Close on Escape or click outside
