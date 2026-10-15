@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom';
 import { X, ThumbsUp, MessageSquare } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../context/LanguageContext';
+import { useTheme } from '../context/ThemeContext';
+import { getProfileTheme } from '../utils/profileThemes';
 import { ActivityCommentThread } from './ActivityCommentThread';
 import type { ActivityCardData } from './SocialActivityCard';
 
@@ -32,6 +34,16 @@ export const ActivityModal: React.FC<ActivityModalProps> = ({
   const { user } = useAuth();
   const { language } = useTranslation();
   const isEs = language === 'es';
+
+  const { resolvedTheme } = useTheme();
+  const isLight = resolvedTheme === 'light';
+
+  const profileTheme = React.useMemo(() => {
+    if (user?.is_pro && user?.profile_color) {
+      return getProfileTheme(user.profile_color, isLight);
+    }
+    return null;
+  }, [user?.is_pro, user?.profile_color, isLight]);
 
   const mouseDownOnBackdropRef = React.useRef(false);
 
@@ -110,7 +122,8 @@ export const ActivityModal: React.FC<ActivityModalProps> = ({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '1.25rem'
+        padding: '1.25rem',
+        ...profileTheme?.cssVariables
       }}
     >
       <div
@@ -127,7 +140,8 @@ export const ActivityModal: React.FC<ActivityModalProps> = ({
           flexDirection: 'column',
           boxShadow: 'var(--card-shadow, 0 25px 50px -12px rgba(0, 0, 0, 0.85))',
           overflow: 'hidden',
-          animation: 'fadeInScale 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+          animation: 'fadeInScale 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+          ...profileTheme?.cssVariables
         }}
       >
         {/* Scrollable Container for Card Preview + Comments Thread */}

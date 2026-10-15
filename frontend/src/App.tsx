@@ -92,6 +92,37 @@ function AppContent() {
     return null;
   }, [user?.is_pro, user?.profile_color, isLight]);
 
+  // Synchronize custom accent / theme variables to document.documentElement
+  // so portals, modals (e.g. ActivityModal, KlipyPicker), tooltips and roots inherit the custom accent
+  useEffect(() => {
+    const root = document.documentElement;
+    const vars = appProfileTheme?.cssVariables as Record<string, string> | undefined;
+
+    const themeVarKeys = [
+      '--accent-primary',
+      '--accent-secondary',
+      '--accent-hover',
+      '--border-color',
+      '--border-glow',
+      '--btn-glow',
+      '--btn-glow-hover',
+      '--accent-text',
+      '--accent-text-hover'
+    ];
+
+    if (vars) {
+      Object.entries(vars).forEach(([key, value]) => {
+        if (value) root.style.setProperty(key, String(value));
+      });
+    } else {
+      themeVarKeys.forEach((key) => root.style.removeProperty(key));
+    }
+
+    return () => {
+      themeVarKeys.forEach((key) => root.style.removeProperty(key));
+    };
+  }, [appProfileTheme]);
+
   return (
     <div 
       className="app-container"

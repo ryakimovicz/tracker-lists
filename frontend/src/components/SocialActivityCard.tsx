@@ -1241,8 +1241,8 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
         {canHaveComments && (
           <div
             style={{
-              background: (isFooterHovered && !isLikeHovered) ? 'rgba(245, 158, 11, 0.12)' : 'transparent',
-              border: (isFooterHovered && !isLikeHovered) ? '1px solid rgba(245, 158, 11, 0.35)' : '1px solid transparent',
+              background: (isFooterHovered && !isLikeHovered) ? 'color-mix(in srgb, var(--accent-primary) 12%, transparent)' : 'transparent',
+              border: (isFooterHovered && !isLikeHovered) ? '1px solid color-mix(in srgb, var(--accent-primary) 35%, transparent)' : '1px solid transparent',
               color: (isFooterHovered && !isLikeHovered) ? 'var(--accent-primary)' : 'var(--text-secondary)',
               borderRadius: '20px',
               padding: '0.35rem 0.75rem',
