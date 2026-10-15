@@ -257,11 +257,17 @@ const MusicDetailsModalInner: React.FC<MusicDetailsModalProps> = ({
   const currentUserRank = currentPeriodData?.current_user_rank;
   const isEs = language === 'es';
 
+  const recordType = (details?.record_type || '').toLowerCase();
+
   const typeLabel = currentType === 'artist' 
     ? (isEs ? 'Artista' : 'Artist')
-    : currentType === 'album' 
-    ? (isEs ? 'Álbum' : 'Album')
-    : (isEs ? 'Canción' : 'Track');
+    : currentType === 'track'
+    ? (isEs ? 'Canción' : 'Track')
+    : recordType === 'ep'
+    ? 'EP'
+    : recordType === 'single'
+    ? (isEs ? 'Sencillo' : 'Single')
+    : (isEs ? 'Álbum' : 'Album');
 
   const displayTitle = (currentType === 'artist' ? (details?.name || activeItem.artist) : (details?.name || activeItem.name || activeItem.artist));
   const displayArtist = (currentType === 'artist' ? null : (details?.artist || activeItem.artist));
@@ -550,76 +556,42 @@ const MusicDetailsModalInner: React.FC<MusicDetailsModalProps> = ({
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
+          position: 'relative',
           boxShadow: 'var(--card-shadow, 0 20px 50px rgba(0,0,0,0.5))'
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div
-          className="music-details-modal-header"
+        {/* Close Button X (top right) */}
+        <button
+          type="button"
+          onClick={onClose}
+          className="item-details-close-btn music-details-close-btn"
           style={{
-            padding: '1.25rem 1.5rem',
-            borderBottom: '1px solid var(--border-color)',
+            position: 'absolute',
+            top: '1.25rem',
+            right: '1.25rem',
+            background: 'transparent',
+            border: 'none',
+            color: 'var(--text-secondary)',
+            cursor: 'pointer',
+            padding: '0.25rem',
+            borderRadius: '50%',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'space-between',
-            background: 'rgba(255, 255, 255, 0.02)'
+            justifyContent: 'center',
+            zIndex: 30,
+            transition: 'color 0.2s, background 0.2s'
           }}
+          title={isEs ? 'Cerrar' : 'Close'}
+          aria-label={isEs ? 'Cerrar' : 'Close'}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', minWidth: 0, flex: 1, paddingRight: '0.5rem' }}>
-            <div
-              style={{
-                width: '32px',
-                height: '32px',
-                borderRadius: '8px',
-                background: 'rgba(29, 185, 84, 0.15)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'var(--color-music, #1DB954)',
-                flexShrink: 0
-              }}
-            >
-              {currentType === 'artist' ? <Mic size={18} /> : currentType === 'album' ? <Disc size={18} /> : <Headphones size={18} />}
-            </div>
-            <div style={{ minWidth: 0, flex: 1 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-music, #1DB954)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  {typeLabel}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0 }}>
-            <button
-              type="button"
-              onClick={onClose}
-              className="btn-close-modal music-details-close-btn"
-              style={{
-                background: 'transparent',
-                border: 'none',
-                color: 'var(--text-secondary)',
-                cursor: 'pointer',
-                padding: '0.4rem',
-                borderRadius: '8px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'color 0.2s, background 0.2s'
-              }}
-              title={isEs ? 'Cerrar' : 'Close'}
-              aria-label={isEs ? 'Cerrar' : 'Close'}
-            >
-              <X size={20} />
-            </button>
-          </div>
-        </div>
+          <X size={20} />
+        </button>
 
         {/* Scrollable Content */}
         <div className="music-details-modal-body" style={{ padding: '1.5rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1.5rem', flex: 1 }}>
-          {/* Media Overview Banner (Always rendered immediately) */}
-          <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center' }}>
+          {/* Media Overview Banner */}
+          <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'flex-start', paddingRight: '2rem' }}>
             <div
               style={{
                 width: '120px',
@@ -661,13 +633,26 @@ const MusicDetailsModalInner: React.FC<MusicDetailsModalProps> = ({
               </div>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', minWidth: 0, flex: 1 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
-                <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.2 }}>
-                  {displayTitle}
-                </h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', minWidth: 0, flex: 1 }}>
+              {/* Row 1: Tag badge + favorite heart button (for artist) aligned to the right */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', width: '100%' }}>
+                <span style={{
+                  fontSize: '0.72rem',
+                  fontWeight: 800,
+                  color: 'var(--color-music, #1DB954)',
+                  background: 'rgba(29, 185, 84, 0.12)',
+                  border: '1px solid rgba(29, 185, 84, 0.25)',
+                  padding: '0.2rem 0.55rem',
+                  borderRadius: '6px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  lineHeight: 1.2
+                }}>
+                  {typeLabel}
+                </span>
 
-                {/* Feature Artist Heart button */}
                 {user && currentType === 'artist' && (
                   <button
                     type="button"
@@ -678,6 +663,7 @@ const MusicDetailsModalInner: React.FC<MusicDetailsModalProps> = ({
                       height: '32px',
                       minWidth: '32px',
                       minHeight: '32px',
+                      marginLeft: 'auto',
                       flexShrink: 0,
                       cursor: 'pointer',
                       borderRadius: '50%',
@@ -699,7 +685,12 @@ const MusicDetailsModalInner: React.FC<MusicDetailsModalProps> = ({
                 )}
               </div>
 
-              {/* Clickable Artist link (when in album or track view) */}
+              {/* Row 2: Title */}
+              <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.2 }}>
+                {displayTitle}
+              </h2>
+
+              {/* Row 3: Artist name with arrow (for non-artists: albums, EPs, singles, tracks) */}
               {displayArtist && (
                 <button
                   type="button"
@@ -716,17 +707,17 @@ const MusicDetailsModalInner: React.FC<MusicDetailsModalProps> = ({
                     cursor: 'pointer',
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: '0.3rem',
+                    gap: '0.35rem',
                     width: 'fit-content'
                   }}
                   title={isEs ? `Ver artista ${displayArtist}` : `View artist ${displayArtist}`}
                 >
                   <span>{displayArtist}</span>
-                  <ArrowRight size={13} style={{ opacity: 0.7 }} />
+                  <ArrowRight size={13} style={{ opacity: 0.8 }} />
                 </button>
               )}
 
-              {/* Clickable Album link (when in track view) */}
+              {/* Row 4: Parent Album / EP / Single link (for tracks) */}
               {details?.album && currentType === 'track' && (
                 <button
                   type="button"
@@ -757,15 +748,16 @@ const MusicDetailsModalInner: React.FC<MusicDetailsModalProps> = ({
                 </button>
               )}
 
-              {details?.duration && (
+              {/* Duration (if track) */}
+              {details?.duration && currentType === 'track' && (
                 <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                   <Clock size={13} />
                   <span>{formatDuration(details.duration)}</span>
                 </div>
               )}
 
-              {/* Release Year / Date for Album */}
-              {currentType === 'album' && (details?.year || details?.release_date) && (
+              {/* Release Year: Albums, EPs, Singles, Tracks */}
+              {(details?.year || details?.release_date) && currentType !== 'artist' && (
                 <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                   <Calendar size={13} />
                   <span>
@@ -775,9 +767,9 @@ const MusicDetailsModalInner: React.FC<MusicDetailsModalProps> = ({
                 </div>
               )}
 
-              {/* Tags / Genres */}
-              {details?.tags && details.tags.length > 0 ? (
-                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.4rem' }}>
+              {/* Genre tags: For artists below the name */}
+              {currentType === 'artist' && details?.tags && details.tags.length > 0 ? (
+                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.2rem' }}>
                   {details.tags.slice(0, 4).map((tag: string, idx: number) => (
                     <span
                       key={idx}
@@ -796,8 +788,8 @@ const MusicDetailsModalInner: React.FC<MusicDetailsModalProps> = ({
                     </span>
                   ))}
                 </div>
-              ) : loading && !details ? (
-                <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.4rem' }}>
+              ) : currentType === 'artist' && loading && !details ? (
+                <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.2rem' }}>
                   <div className="skeleton" style={{ height: '1.2rem', width: '60px', borderRadius: '9999px' }} />
                   <div className="skeleton" style={{ height: '1.2rem', width: '70px', borderRadius: '9999px' }} />
                 </div>
@@ -857,6 +849,53 @@ const MusicDetailsModalInner: React.FC<MusicDetailsModalProps> = ({
             </div>
           ) : (
             <>
+              {/* Album / EP / Single Tracklist (Clickable tracks) - Positioned directly under overview */}
+              {currentType === 'album' && details?.tracks && details.tracks.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    {isEs ? 'Lista de Canciones' : 'Tracklist'} ({details.tracks.length})
+                  </h4>
+                  <div style={{ background: 'var(--bg-tertiary)', borderRadius: '12px', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
+                    {details.tracks.map((trk: any, idx: number) => (
+                      <div
+                        key={idx}
+                        onClick={() => navigateToItem('track', displayArtist || activeItem.artist, trk.name, displayImage)}
+                        style={{
+                          padding: '0.6rem 1rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          borderBottom: idx < details.tracks.length - 1 ? '1px solid rgba(255, 255, 255, 0.05)' : 'none',
+                          fontSize: '0.85rem',
+                          cursor: 'pointer',
+                          transition: 'background 0.15s ease'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)';
+                          prefetchMusicDetails('track', displayArtist || activeItem.artist, trk.name);
+                        }}
+                        onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                        title={isEs ? `Ver info de ${trk.name}` : `View info for ${trk.name}`}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: 0, flex: 1 }}>
+                          <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem', width: '20px', textAlign: 'right' }}>
+                            {idx + 1}
+                          </span>
+                          <span style={{ color: 'var(--text-primary)', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {trk.name}
+                          </span>
+                        </div>
+                        {trk.duration && (
+                          <span style={{ color: 'var(--text-secondary)', fontSize: '0.78rem', marginLeft: '1rem' }}>
+                            {formatDuration(trk.duration)}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Biography / Description */}
               {details?.bio && (
                 <div style={{ background: 'var(--bg-tertiary)', padding: '1rem 1.25rem', borderRadius: '12px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
@@ -1099,53 +1138,6 @@ const MusicDetailsModalInner: React.FC<MusicDetailsModalProps> = ({
                             </span>
                           </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Album Tracklist (Clickable tracks) */}
-              {currentType === 'album' && details?.tracks && details.tracks.length > 0 && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                    {isEs ? 'Lista de Canciones' : 'Tracklist'} ({details.tracks.length})
-                  </h4>
-                  <div style={{ background: 'var(--bg-tertiary)', borderRadius: '12px', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
-                    {details.tracks.map((trk: any, idx: number) => (
-                      <div
-                        key={idx}
-                        onClick={() => navigateToItem('track', displayArtist || activeItem.artist, trk.name, displayImage)}
-                        style={{
-                          padding: '0.6rem 1rem',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          borderBottom: idx < details.tracks.length - 1 ? '1px solid rgba(255, 255, 255, 0.05)' : 'none',
-                          fontSize: '0.85rem',
-                          cursor: 'pointer',
-                          transition: 'background 0.15s ease'
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)';
-                          prefetchMusicDetails('track', displayArtist || activeItem.artist, trk.name);
-                        }}
-                        onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                        title={isEs ? `Ver info de ${trk.name}` : `View info for ${trk.name}`}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: 0, flex: 1 }}>
-                          <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem', width: '20px', textAlign: 'right' }}>
-                            {idx + 1}
-                          </span>
-                          <span style={{ color: 'var(--text-primary)', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            {trk.name}
-                          </span>
-                        </div>
-                        {trk.duration && (
-                          <span style={{ color: 'var(--text-secondary)', fontSize: '0.78rem', marginLeft: '1rem' }}>
-                            {formatDuration(trk.duration)}
-                          </span>
-                        )}
                       </div>
                     ))}
                   </div>

@@ -1246,8 +1246,25 @@ class LastFMService(metaclass=LastFMMeta):
                             if m:
                                 year = m.group(1)
 
+                        # Determine record_type (single, ep, album)
+                        rec_type = "album"
+                        try:
+                            # 1. Check if album title contains EP or Single explicitly
+                            norm_alb_low = name.lower()
+                            if " - ep" in norm_alb_low or " ep" in norm_alb_low or "(ep)" in norm_alb_low or "[ep]" in norm_alb_low:
+                                rec_type = "ep"
+                            elif " - single" in norm_alb_low or " single" in norm_alb_low or "(single)" in norm_alb_low or "[single]" in norm_alb_low:
+                                rec_type = "single"
+                            elif len(tracks) == 1:
+                                rec_type = "single"
+                            elif 2 <= len(tracks) <= 6:
+                                rec_type = "ep"
+                        except Exception:
+                            pass
+
                         result = {
                             "type": "album",
+                            "record_type": rec_type,
                             "name": name,
                             "artist": artist,
                             "image": image,
@@ -1307,6 +1324,19 @@ class LastFMService(metaclass=LastFMMeta):
                         wiki = cls._clean_wiki(track.get("wiki", {}).get("summary"))
                         tags = [t.get("name") for t in track.get("toptags", {}).get("tag", []) if t.get("name")]
 
+                        # Resolve track year/release_date from parent album or wiki
+                        year = ""
+                        release_date = ""
+                        if album_title:
+                            rel_info = cls.get_album_release_info(artist, album_title)
+                            year = rel_info.get("year", "")
+                            release_date = rel_info.get("release_date", "")
+                        if not year and track.get("wiki", {}).get("published"):
+                            import re
+                            m = re.search(r'\b(19\d\d|20\d\d)\b', track.get("wiki", {}).get("published", ""))
+                            if m:
+                                year = m.group(1)
+
                         result = {
                             "type": "track",
                             "name": name,
@@ -1316,6 +1346,8 @@ class LastFMService(metaclass=LastFMMeta):
                             "bio": wiki,
                             "tags": tags,
                             "duration": track.get("duration"),
+                            "release_date": release_date,
+                            "year": year,
                             "listeners": track.get("listeners"),
                             "playcount": track.get("playcount")
                         }
