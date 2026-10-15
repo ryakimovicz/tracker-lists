@@ -92,11 +92,10 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
     await performLike();
   };
 
-  const isTouchDeviceRef = useRef(false);
+  const lastDoubleTapTimeRef = useRef(0);
 
   // Double tap handler for mobile screens on the activity card
   const handleCardTouchEnd = (e: React.TouchEvent) => {
-    isTouchDeviceRef.current = true;
     // If the touch originated from an interactive button, skip double tap
     const target = e.target as HTMLElement | null;
     if (target?.closest('button') || target?.closest('a')) {
@@ -106,19 +105,22 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
     const now = Date.now();
     const timeSinceLastTap = now - lastTapRef.current;
 
-    if (timeSinceLastTap > 0 && timeSinceLastTap < 300) {
-      // Double tap confirmed! Cancel any pending single-tap navigation
+    if (timeSinceLastTap > 0 && timeSinceLastTap < 320) {
+      // Double tap confirmed!
+      lastDoubleTapTimeRef.current = now;
+      lastTapRef.current = 0;
+
+      // Immediately cancel any queued single-tap action
       if (singleTapTimeoutRef.current) {
         clearTimeout(singleTapTimeoutRef.current);
         singleTapTimeoutRef.current = null;
       }
-      lastTapRef.current = 0;
 
       // Show animated visual like burst
       setShowDoubleTapBurst(true);
       setTimeout(() => setShowDoubleTapBurst(false), 700);
 
-      // If not liked yet, like it. If already liked, re-trigger animation and keep like
+      // Perform like
       if (!isLiked) {
         performLike();
       } else {
@@ -131,18 +133,21 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
   };
 
   const executeDelayedCardAction = (action: () => void) => {
-    // On touch devices, delay execution slightly (~280ms) to ensure it isn't part of a double-tap
-    if (isTouchDeviceRef.current || (typeof window !== 'undefined' && 'ontouchstart' in window)) {
-      if (singleTapTimeoutRef.current) {
-        clearTimeout(singleTapTimeoutRef.current);
-      }
-      singleTapTimeoutRef.current = setTimeout(() => {
-        action();
-        singleTapTimeoutRef.current = null;
-      }, 280);
-    } else {
-      action();
+    // If a double-tap just occurred, discard this click completely!
+    if (Date.now() - lastDoubleTapTimeRef.current < 650) {
+      return;
     }
+
+    // Delay single tap navigation slightly to allow double-tap detection
+    if (singleTapTimeoutRef.current) {
+      clearTimeout(singleTapTimeoutRef.current);
+    }
+    singleTapTimeoutRef.current = setTimeout(() => {
+      if (Date.now() - lastDoubleTapTimeRef.current >= 650) {
+        action();
+      }
+      singleTapTimeoutRef.current = null;
+    }, 320);
   };
 
   const handleDeleteActivity = async () => {
