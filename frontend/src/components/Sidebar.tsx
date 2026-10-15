@@ -62,7 +62,6 @@ export const Sidebar: React.FC = () => {
   const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
-  const [showProModal, setShowProModal] = useState(false);
   const [showNotifFlyout, setShowNotifFlyout] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const notifBtnRef = useRef<HTMLButtonElement>(null);
@@ -130,13 +129,13 @@ export const Sidebar: React.FC = () => {
   return (
     <div className="sidebar">
       {/* Title */}
-      <div style={{ padding: '0.5rem 0 2rem 0' }}>
+      <div style={{ padding: '0.5rem 0 1.5rem 0', flexShrink: 0 }}>
         <BrandLogo />
       </div>
 
 
       {/* Main Navigation */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flexShrink: 0 }}>
         <NavItem to="/" icon={Home} label={t('navHome') || 'Inicio'} currentPath={location.pathname} currentSearch={location.search} currentUserId={user?.id} />
         {isUserLoggedIn && (
           <>
@@ -158,7 +157,7 @@ export const Sidebar: React.FC = () => {
       </div>
 
       {/* Bottom Area */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: 'auto', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: 'auto', paddingTop: '1rem', borderTop: '1px solid var(--border-color)', flexShrink: 0 }}>
         
         {/* Toggles (hidden when on /settings) - below separator, above Admin / Settings */}
         {location.pathname !== '/settings' && (
@@ -227,14 +226,22 @@ export const Sidebar: React.FC = () => {
           <>
             {user && !user.is_pro && (
               <button
-                onClick={() => navigate('/premium', { state: { backgroundLocation: location } })}
+                onClick={() => {
+                  const currentParams = new URLSearchParams(location.search);
+                  currentParams.set('modal', 'premium');
+                  const targetSearch = currentParams.toString();
+                  navigate({
+                    pathname: location.pathname,
+                    search: targetSearch ? `?${targetSearch}` : ''
+                  });
+                }}
                 className="btn-primary"
                 style={{
                   padding: '0.5rem 1rem',
                   fontSize: '0.9rem',
-                  background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                  background: 'var(--accent-primary)',
                   border: 'none',
-                  color: '#fff',
+                  color: 'var(--accent-text, #0f172a)',
                   width: '100%',
                   margin: '0.5rem 0',
                   display: 'flex',
@@ -244,7 +251,7 @@ export const Sidebar: React.FC = () => {
                   fontWeight: 600
                 }}
               >
-                <Star size={16} fill="#fff" /> {t('navUpgradePro') || (language === 'es' ? 'Hacerse Premium' : 'Get Premium')}
+                <Star size={16} fill="currentColor" /> {t('navUpgradePro') || (language === 'es' ? 'Hacerse Premium' : 'Get Premium')}
               </button>
             )}
 

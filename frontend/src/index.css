@@ -260,10 +260,14 @@ body {
   position: sticky;
   top: 0;
   height: 100vh;
+  max-height: 100vh;
   display: flex;
   flex-direction: column;
   padding: 1.5rem;
   z-index: 100;
+  overflow-y: auto;
+  overflow-x: hidden;
+  box-sizing: border-box;
 }
 
 .main-content {
@@ -2988,12 +2992,12 @@ h1, h2, h3, h4, h5, h6 {
 
   /* Fullscreen mobile modals for other overlay types without side margins or rounded corners */
   .content-modal-overlay,
-  div[style*="zIndex: 2000"]:not(.item-details-modal-overlay):not(.music-details-modal-overlay):not(.activity-modal-overlay):not(.klipy-modal-overlay):not(.notification-flyout-panel),
-  div[style*="z-index: 2000"]:not(.item-details-modal-overlay):not(.music-details-modal-overlay):not(.activity-modal-overlay):not(.klipy-modal-overlay):not(.notification-flyout-panel),
-  div[style*="zIndex: 9999"]:not(.item-details-modal-overlay):not(.music-details-modal-overlay):not(.activity-modal-overlay):not(.klipy-modal-overlay):not(.notification-flyout-panel),
-  div[style*="z-index: 9999"]:not(.item-details-modal-overlay):not(.music-details-modal-overlay):not(.activity-modal-overlay):not(.klipy-modal-overlay):not(.notification-flyout-panel),
-  div[style*="zIndex: 10000"]:not(.activity-modal-overlay):not(.klipy-modal-overlay):not(.notification-flyout-panel),
-  div[style*="z-index: 10000"]:not(.activity-modal-overlay):not(.klipy-modal-overlay):not(.notification-flyout-panel) {
+  div[style*="zIndex: 2000"]:not(.item-details-modal-overlay):not(.music-details-modal-overlay):not(.activity-modal-overlay):not(.klipy-modal-overlay):not(.notification-flyout-panel):not(.pro-modal-overlay),
+  div[style*="z-index: 2000"]:not(.item-details-modal-overlay):not(.music-details-modal-overlay):not(.activity-modal-overlay):not(.klipy-modal-overlay):not(.notification-flyout-panel):not(.pro-modal-overlay),
+  div[style*="zIndex: 9999"]:not(.item-details-modal-overlay):not(.music-details-modal-overlay):not(.activity-modal-overlay):not(.klipy-modal-overlay):not(.notification-flyout-panel):not(.pro-modal-overlay),
+  div[style*="z-index: 9999"]:not(.item-details-modal-overlay):not(.music-details-modal-overlay):not(.activity-modal-overlay):not(.klipy-modal-overlay):not(.notification-flyout-panel):not(.pro-modal-overlay),
+  div[style*="zIndex: 10000"]:not(.activity-modal-overlay):not(.klipy-modal-overlay):not(.notification-flyout-panel):not(.pro-modal-overlay),
+  div[style*="z-index: 10000"]:not(.activity-modal-overlay):not(.klipy-modal-overlay):not(.notification-flyout-panel):not(.pro-modal-overlay) {
     position: fixed !important;
     top: 0 !important;
     left: 0 !important;
@@ -3132,6 +3136,49 @@ h1, h2, h3, h4, h5, h6 {
     overflow-y: auto !important;
     flex: 1 !important;
     -webkit-overflow-scrolling: touch;
+  }
+
+  /* Pathd Premium Modal on mobile: stays between top header (56px) and bottom nav (60px) and never touches screen sides */
+  .pro-modal-overlay {
+    position: fixed !important;
+    top: calc(56px + env(safe-area-inset-top, 0px)) !important;
+    bottom: calc(60px + env(safe-area-inset-bottom, 0px)) !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100vw !important;
+    height: calc(100dvh - 56px - env(safe-area-inset-top, 0px) - 60px - env(safe-area-inset-bottom, 0px)) !important;
+    max-height: calc(100dvh - 56px - env(safe-area-inset-top, 0px) - 60px - env(safe-area-inset-bottom, 0px)) !important;
+    padding: 0.75rem 1rem !important;
+    margin: 0 !important;
+    box-sizing: border-box !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    z-index: 1200 !important;
+  }
+
+  .pro-modal-card {
+    position: relative !important;
+    width: 100% !important;
+    max-width: 440px !important;
+    height: auto !important;
+    max-height: calc(100dvh - 56px - env(safe-area-inset-top, 0px) - 60px - env(safe-area-inset-bottom, 0px) - 1.5rem) !important;
+    border-radius: 16px !important;
+    border: 1px solid var(--border-color) !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5) !important;
+    margin: 0 auto !important;
+    padding: 1.25rem 1rem !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
+  }
+
+  .pro-modal-benefits-list {
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    flex: 1 !important;
+    min-height: 0 !important;
   }
 }
 

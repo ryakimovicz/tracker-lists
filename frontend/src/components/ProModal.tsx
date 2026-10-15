@@ -16,6 +16,43 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
+  // Synchronize URL query parameter with modal visibility: ?modal=premium or ?premium=true
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const currentUrl = new URL(window.location.href);
+    const hasQuery = currentUrl.searchParams.get('modal') === 'premium' ||
+                     currentUrl.searchParams.get('modal') === 'pro' ||
+                     currentUrl.searchParams.get('premium') === 'true' ||
+                     currentUrl.searchParams.get('pro') === 'true' ||
+                     currentUrl.pathname === '/premium' ||
+                     currentUrl.pathname === '/pro';
+
+    if (!hasQuery) {
+      // Append ?modal=premium to the URL via history.pushState so browser back closes the modal
+      currentUrl.searchParams.set('modal', 'premium');
+      const newRelative = currentUrl.pathname + (currentUrl.search || '') + (currentUrl.hash || '');
+      window.history.pushState(window.history.state, '', newRelative);
+    }
+
+    const handlePopState = () => {
+      const p = new URLSearchParams(window.location.search);
+      const isStillOpen = p.get('modal') === 'premium' ||
+                          p.get('modal') === 'pro' ||
+                          p.get('premium') === 'true' ||
+                          p.get('pro') === 'true' ||
+                          window.location.pathname === '/premium' ||
+                          window.location.pathname === '/pro';
+      if (!isStillOpen) {
+        onClose();
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [onClose]);
+
   useEffect(() => {
     const originalStyle = window.getComputedStyle(document.body).overflow;
     document.body.style.overflow = 'hidden';
@@ -23,6 +60,25 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
       document.body.style.overflow = originalStyle;
     };
   }, []);
+
+  const handleModalClose = () => {
+    if (typeof window !== 'undefined') {
+      const currentUrl = new URL(window.location.href);
+      const isParamModal = currentUrl.searchParams.get('modal') === 'premium' ||
+                           currentUrl.searchParams.get('modal') === 'pro' ||
+                           currentUrl.searchParams.get('premium') === 'true' ||
+                           currentUrl.searchParams.get('pro') === 'true';
+
+      if (isParamModal && (window.location.pathname !== '/premium' && window.location.pathname !== '/pro')) {
+        currentUrl.searchParams.delete('modal');
+        currentUrl.searchParams.delete('premium');
+        currentUrl.searchParams.delete('pro');
+        const newRelative = currentUrl.pathname + (currentUrl.search || '') + (currentUrl.hash || '');
+        window.history.replaceState(window.history.state, '', newRelative);
+      }
+    }
+    onClose();
+  };
 
 
   const handleSubscribe = async () => {
@@ -49,6 +105,7 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
 
   const modalContent = (
     <div 
+      className="pro-modal-overlay"
       style={{
         position: 'fixed',
         top: 0,
@@ -63,10 +120,10 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
         zIndex: 99999,
         padding: '1rem'
       }} 
-      onClick={onClose}
+      onClick={handleModalClose}
     >
       <div 
-        className="glass-card" 
+        className="glass-card pro-modal-card" 
         style={{
           width: '100%',
           maxWidth: '520px',
@@ -83,7 +140,7 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
         onClick={e => e.stopPropagation()}
       >
         <button 
-          onClick={onClose}
+          onClick={handleModalClose}
           style={{
             position: 'absolute',
             top: '1.25rem',
@@ -132,14 +189,17 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
         )}
 
         {/* Scrollable Benefits List */}
-        <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '1rem',
-          overflowY: 'auto',
-          paddingRight: '0.4rem',
-          marginBottom: '1.25rem'
-        }}>
+        <div 
+          className="pro-modal-benefits-list"
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '1rem',
+            overflowY: 'auto',
+            paddingRight: '0.4rem',
+            marginBottom: '1.25rem'
+          }}
+        >
           {/* Benefit 0: Profile Banners & Ambient Backgrounds */}
           <div style={{ display: 'flex', gap: '0.85rem', alignItems: 'flex-start' }}>
             <div style={{ background: 'rgba(245, 158, 11, 0.15)', padding: '0.45rem', borderRadius: '8px', color: '#f59e0b', flexShrink: 0 }}>
@@ -280,9 +340,9 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
                   padding: '0.85rem',
                   fontSize: '1rem',
                   fontWeight: 700,
-                  background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                  background: 'var(--accent-primary)',
                   border: 'none',
-                  color: '#fff',
+                  color: 'var(--accent-text, #0f172a)',
                   borderRadius: '10px',
                   boxShadow: '0 4px 15px rgba(245, 158, 11, 0.4)',
                   display: 'flex',
@@ -298,8 +358,8 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
                 {loading
                   ? (isEs ? 'Preparando pago...' : 'Preparing checkout...')
                   : user?.is_pro
-                  ? (isEs ? 'Mantener Premium al finalizar regalo ($2.99/mes)' : 'Keep Premium after gift ends ($2.99/mo)')
-                  : (isEs ? 'Suscribirse a Premium ($2.99/mes)' : 'Subscribe to Premium ($2.99/mo)')}
+                  ? (isEs ? 'Mantener Premium al finalizar regalo ($4,99/mes)' : 'Keep Premium after gift ends ($4.99/mo)')
+                  : (isEs ? 'Suscribirse a Premium ($4,99/mes)' : 'Subscribe to Premium ($4.99/mo)')}
               </button>
             </div>
           ) : (

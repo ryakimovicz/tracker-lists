@@ -8,7 +8,11 @@ export const PremiumRouteModal: React.FC = () => {
   const [searchParams] = useSearchParams();
 
   const isPremiumPath = location.pathname === '/premium' || location.pathname === '/pro';
-  const hasPremiumQuery = searchParams.get('premium') === 'true' || searchParams.get('pro') === 'true';
+  const modalParam = searchParams.get('modal');
+  const hasPremiumQuery = searchParams.get('premium') === 'true' || 
+                          searchParams.get('pro') === 'true' ||
+                          modalParam === 'premium' ||
+                          modalParam === 'pro';
 
   const shouldOpen = isPremiumPath || hasPremiumQuery;
 
@@ -27,6 +31,9 @@ export const PremiumRouteModal: React.FC = () => {
       const newParams = new URLSearchParams(searchParams);
       newParams.delete('premium');
       newParams.delete('pro');
+      if (newParams.get('modal') === 'premium' || newParams.get('modal') === 'pro') {
+        newParams.delete('modal');
+      }
       const newSearch = newParams.toString();
       navigate(
         {

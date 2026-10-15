@@ -822,9 +822,9 @@ export const SettingsPage: React.FC = () => {
                   onClick={() => setShowProModal(true)}
                   className="btn-primary"
                   style={{
-                    background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                    background: 'var(--accent-primary)',
                     border: 'none',
-                    color: '#fff',
+                    color: 'var(--accent-text, #0f172a)',
                     fontSize: '0.85rem',
                     padding: '0.55rem 1.1rem',
                     display: 'inline-flex',
@@ -836,8 +836,8 @@ export const SettingsPage: React.FC = () => {
                 >
                   <Crown size={15} />
                   {user?.is_pro
-                    ? (isEs ? 'Mantener suscripción ($2.99/mes)' : 'Keep subscription ($2.99/mo)')
-                    : (isEs ? 'Mejorar a Premium ($2.99/mes)' : 'Upgrade to Premium ($2.99/mo)')}
+                    ? (isEs ? 'Mantener suscripción ($4,99/mes)' : 'Keep subscription ($4.99/mo)')
+                    : (isEs ? 'Mejorar a Premium ($4,99/mes)' : 'Upgrade to Premium ($4.99/mo)')}
                 </button>
               )}
             </div>
