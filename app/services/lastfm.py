@@ -1220,18 +1220,34 @@ class LastFMService(metaclass=LastFMMeta):
                         if cls._is_placeholder_or_empty(image):
                             image = cls._fetch_album_image(name, artist)
 
-                        wiki = cls._clean_wiki(album.get("wiki", {}).get("summary"))
-                        tags = [t.get("name") for t in album.get("tags", {}).get("tag", []) if t.get("name")]
-                        raw_tracks = album.get("tracks", {}).get("track", [])
-                        if isinstance(raw_tracks, dict):
-                            raw_tracks = [raw_tracks]
+                        wiki = cls._clean_wiki(album.get("wiki", {}).get("summary") if isinstance(album.get("wiki"), dict) else None)
+                        
+                        raw_tags_obj = album.get("tags")
+                        tags = []
+                        if isinstance(raw_tags_obj, dict):
+                            raw_tag_list = raw_tags_obj.get("tag", [])
+                            if isinstance(raw_tag_list, dict):
+                                raw_tag_list = [raw_tag_list]
+                            if isinstance(raw_tag_list, list):
+                                tags = [t.get("name") for t in raw_tag_list if isinstance(t, dict) and t.get("name")]
+
+                        raw_tracks_obj = album.get("tracks")
+                        raw_tracks = []
+                        if isinstance(raw_tracks_obj, dict):
+                            raw_tracks = raw_tracks_obj.get("track", [])
+                            if isinstance(raw_tracks, dict):
+                                raw_tracks = [raw_tracks]
+                        elif isinstance(raw_tracks_obj, list):
+                            raw_tracks = raw_tracks_obj
+
                         tracks = []
                         for trk in raw_tracks:
-                            tracks.append({
-                                "name": trk.get("name"),
-                                "duration": trk.get("duration"),
-                                "rank": trk.get("@attr", {}).get("rank")
-                            })
+                            if isinstance(trk, dict):
+                                tracks.append({
+                                    "name": trk.get("name"),
+                                    "duration": trk.get("duration"),
+                                    "rank": trk.get("@attr", {}).get("rank") if isinstance(trk.get("@attr"), dict) else None
+                                })
 
                         # Release year and release date resolution
                         rel_info = cls.get_album_release_info(artist, name)
