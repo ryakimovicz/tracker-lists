@@ -75,16 +75,20 @@ export const MobileHeader: React.FC = () => {
               ref={notifBtnRef}
               type="button"
               onClick={() => {
-                const newParams = new URLSearchParams(searchParams);
                 if (showNotifFlyout) {
+                  // If notifications are open, closing them returns to the underlying screen (or removes params)
+                  const newParams = new URLSearchParams(searchParams);
                   newParams.delete('notifications');
                   newParams.delete('notif_tab');
+                  setSearchParams(newParams, { replace: true, state: location.state });
                 } else {
+                  // Opening notifications:
+                  const newParams = new URLSearchParams(searchParams);
                   newParams.set('notifications', 'true');
+                  setSearchParams(newParams, { replace: true, state: location.state });
                 }
-                setSearchParams(newParams, { replace: true, state: location.state });
               }}
-              className="mobile-header-icon-btn"
+              className={`mobile-header-icon-btn ${showNotifFlyout ? 'active' : ''}`}
               title="Notificaciones"
               aria-label="Notificaciones"
             >
@@ -100,8 +104,30 @@ export const MobileHeader: React.FC = () => {
           <button
             type="button"
             onClick={() => {
-              if (isSettingsActive) {
-                // Return to exact previous screen
+              if (showNotifFlyout) {
+                // Notifications are open!
+                if (isSettingsActive) {
+                  // We are already on /settings, so just close notifications to reveal settings!
+                  const newParams = new URLSearchParams(searchParams);
+                  newParams.delete('notifications');
+                  newParams.delete('notif_tab');
+                  setSearchParams(newParams, { replace: true, state: location.state });
+                } else {
+                  // We were somewhere else, close notifications and navigate to settings!
+                  const newParams = new URLSearchParams(searchParams);
+                  newParams.delete('notifications');
+                  newParams.delete('notif_tab');
+                  const cleanSearch = newParams.toString();
+                  const cleanCurrentLoc = {
+                    ...location,
+                    search: cleanSearch ? `?${cleanSearch}` : ''
+                  };
+                  navigate('/settings', {
+                    state: { from: cleanCurrentLoc }
+                  });
+                }
+              } else if (isSettingsActive) {
+                // Settings is open and notifications are NOT open: return to previous screen
                 const fromLocation = (location.state as any)?.from;
                 if (fromLocation) {
                   navigate(fromLocation);
