@@ -1332,32 +1332,17 @@ h1, h2, h3, h4, h5, h6 {
     background: #090d16;
   }
 
-  .mobile-header-left,
+  .mobile-header-left {
+    display: flex;
+    align-items: center;
+    flex: 1;
+  }
+
   .mobile-header-right {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    min-width: 72px;
-  }
-
-  .mobile-header-left {
-    justify-content: flex-start;
-  }
-
-  .mobile-header-right {
     justify-content: flex-end;
-  }
-
-  .mobile-header-center {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex: 1;
-  }
-
-  .mobile-header-placeholder {
-    width: 36px;
-    height: 36px;
   }
 
   .mobile-header-icon-btn {

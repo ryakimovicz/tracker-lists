@@ -58,14 +58,9 @@ export const MobileHeader: React.FC = () => {
   return (
     <>
       <header className="mobile-header">
-        {/* Left Slot: Balanced spacer to keep center logo perfectly centered */}
+        {/* Left Slot: Brand Logo */}
         <div className="mobile-header-left">
-          <div className="mobile-header-placeholder" />
-        </div>
-
-        {/* Center Slot: Brand Logo */}
-        <div className="mobile-header-center">
-          <BrandLogo fontSize="1.75rem" disableLink={true} />
+          <BrandLogo fontSize="1.65rem" disableLink={true} />
         </div>
 
         {/* Right Slot: Notifications & Settings */}
