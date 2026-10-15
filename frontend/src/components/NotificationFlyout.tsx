@@ -57,7 +57,7 @@ export const NotificationFlyout: React.FC<NotificationFlyoutProps> = ({
     } else {
       newParams.delete('notif_tab');
     }
-    setSearchParams(newParams, { replace: true });
+    setSearchParams(newParams, { replace: true, state: location.state });
 
     // Scroll swipe container smoothly on mobile
     if (swipeWrapperRef.current) {
@@ -118,7 +118,7 @@ export const NotificationFlyout: React.FC<NotificationFlyoutProps> = ({
       } else {
         newParams.delete('notif_tab');
       }
-      setSearchParams(newParams, { replace: true });
+      setSearchParams(newParams, { replace: true, state: location.state });
     }
   };
 
@@ -263,15 +263,20 @@ export const NotificationFlyout: React.FC<NotificationFlyoutProps> = ({
       handleMarkAsRead(notif.id);
     }
 
-    // Prepare a clean backgroundLocation without notifications flyout search params
-    const cleanParams = new URLSearchParams(location.search);
+    // Determine the base background location:
+    // If we are already on a modal (e.g. location.state?.backgroundLocation exists), preserve that original background!
+    // Otherwise, base it on the current location.
+    const baseLocation = (location.state as any)?.backgroundLocation || location;
+    const cleanParams = new URLSearchParams(typeof baseLocation === 'object' ? baseLocation.search : '');
     cleanParams.delete('notifications');
     cleanParams.delete('notif_tab');
     const cleanSearch = cleanParams.toString();
-    const cleanBgLocation = {
-      ...location,
-      search: cleanSearch ? `?${cleanSearch}` : ''
-    };
+    const cleanBgLocation = typeof baseLocation === 'string'
+      ? baseLocation.replace(/[?&]notifications(=[^&]*)?/g, '').replace(/[?&]notif_tab(=[^&]*)?/g, '').replace(/[?&]$/, '')
+      : {
+          ...baseLocation,
+          search: cleanSearch ? `?${cleanSearch}` : ''
+        };
 
     onClose();
 

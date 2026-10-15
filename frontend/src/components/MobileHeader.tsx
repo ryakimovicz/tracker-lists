@@ -79,11 +79,10 @@ export const MobileHeader: React.FC = () => {
                 if (showNotifFlyout) {
                   newParams.delete('notifications');
                   newParams.delete('notif_tab');
-                  setSearchParams(newParams);
                 } else {
                   newParams.set('notifications', 'true');
-                  setSearchParams(newParams);
                 }
+                setSearchParams(newParams, { replace: true, state: location.state });
               }}
               className="mobile-header-icon-btn"
               title="Notificaciones"
@@ -134,7 +133,7 @@ export const MobileHeader: React.FC = () => {
           const newParams = new URLSearchParams(searchParams);
           newParams.delete('notifications');
           newParams.delete('notif_tab');
-          setSearchParams(newParams);
+          setSearchParams(newParams, { replace: true, state: location.state });
         }}
         onUnreadCountChange={(cnt) => setUnreadCount(cnt)}
         ignoreRef={notifBtnRef}

@@ -66,7 +66,9 @@ export const PostRouteModal: React.FC = () => {
   const handleClose = () => {
     const bg = (location.state as any)?.backgroundLocation;
     if (bg) {
-      const targetUrl = typeof bg === 'string' ? bg : `${bg.pathname || '/'}${bg.search || ''}${bg.hash || ''}`;
+      let targetUrl = typeof bg === 'string' ? bg : `${bg.pathname || '/'}${bg.search || ''}${bg.hash || ''}`;
+      // Clean notifications query params if any were attached
+      targetUrl = targetUrl.replace(/[?&]notifications(=[^&]*)?/g, '').replace(/[?&]notif_tab(=[^&]*)?/g, '').replace(/\?&/, '?').replace(/[?&]$/, '');
       navigate(targetUrl, { replace: true });
     } else if (window.history.length > 1) {
       navigate(-1);
