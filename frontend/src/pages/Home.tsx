@@ -739,9 +739,24 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
           return { nextEp: null, isCaughtUp: true, initialLoad: false };
         }
         
-        // Pick the first episode in chronological order that is still pending in the current cycle
+        // Pick the next episode in chronological order starting right after the latest completed one
         const targetCycle = minSeen + 1;
-        let candidate = aired.find((_, idx) => airedCounts[idx] < targetCycle) || null;
+        let lastWatchedIndex = -1;
+        for (let i = aired.length - 1; i >= 0; i--) {
+          if (airedCounts[i] >= targetCycle) {
+            lastWatchedIndex = i;
+            break;
+          }
+        }
+
+        let candidate = null;
+        if (lastWatchedIndex !== -1 && lastWatchedIndex + 1 < aired.length) {
+          candidate = aired.slice(lastWatchedIndex + 1).find((_, idx) => airedCounts[lastWatchedIndex + 1 + idx] < targetCycle) || null;
+        }
+        if (!candidate) {
+          candidate = aired.find((_, idx) => airedCounts[idx] < targetCycle) || null;
+        }
+
         if (candidate) {
           return { nextEp: candidate, isCaughtUp: false, initialLoad: false };
         }
