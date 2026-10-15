@@ -602,14 +602,20 @@ const MusicDetailsModalInner: React.FC<MusicDetailsModalProps> = ({
                 onClick={handleToggleArtistFavorite}
                 className={`btn-favorite-heart ${isCurrentArtistFavorite ? 'is-favorite' : ''}`}
                 style={{
-                  width: '36px',
-                  height: '36px',
+                  width: '34px',
+                  height: '34px',
+                  minWidth: '34px',
+                  minHeight: '34px',
+                  flexShrink: 0,
                   cursor: 'pointer',
-                  borderRadius: '8px',
-                  display: 'flex',
+                  borderRadius: '50%',
+                  display: 'inline-flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: isCurrentArtistFavorite ? 'var(--color-user, #F472B6)' : 'var(--text-secondary)'
+                  color: isCurrentArtistFavorite ? 'var(--color-user, #F472B6)' : 'var(--text-secondary)',
+                  border: isCurrentArtistFavorite ? '1px solid var(--color-user, #F472B6)' : '1px solid var(--border-color)',
+                  background: isCurrentArtistFavorite ? 'rgba(244, 114, 182, 0.12)' : 'rgba(255, 255, 255, 0.05)',
+                  transition: 'all 0.2s ease'
                 }}
                 title={isCurrentArtistFavorite
                   ? (isEs ? 'Quitar Destacado' : 'Remove Featured')
