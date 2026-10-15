@@ -1391,7 +1391,7 @@ export const CreateGuide: React.FC = () => {
             justifyContent: 'center',
             color: '#f59e0b'
           }}>
-            <Sparkles size={36} />
+            <BookOpen size={36} />
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
