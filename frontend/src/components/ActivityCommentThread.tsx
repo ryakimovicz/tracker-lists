@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Reply, Trash2, ThumbsUp, Image as ImageIcon, Flag } from 'lucide-react';
+import { Send, Reply, Trash2, ThumbsUp, Image as ImageIcon, Flag, ChevronDown, ChevronRight } from 'lucide-react';
 import { apiClient } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../context/LanguageContext';
@@ -40,6 +40,7 @@ export const ActivityCommentThread: React.FC<ActivityCommentThreadProps> = ({
   const isEs = language === 'es';
 
   const [comments, setComments] = useState<ActivityCommentItem[]>([]);
+  const [collapsedReplies, setCollapsedReplies] = useState<Record<number, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [text, setText] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -51,6 +52,13 @@ export const ActivityCommentThread: React.FC<ActivityCommentThreadProps> = ({
   const [replyText, setReplyText] = useState('');
   const [replyMedia, setReplyMedia] = useState<SelectedKlipyMedia | null>(null);
   const [showReplyKlipy, setShowReplyKlipy] = useState(false);
+
+  const toggleCollapseReplies = (commentId: number) => {
+    setCollapsedReplies(prev => ({
+      ...prev,
+      [commentId]: !prev[commentId]
+    }));
+  };
 
   const countTotal = (items: ActivityCommentItem[]): number => {
     let count = 0;
@@ -123,6 +131,19 @@ export const ActivityCommentThread: React.FC<ActivityCommentThreadProps> = ({
       setReplyText('');
       setReplyMedia(null);
       setReplyTarget(null);
+      // Auto-expand replies on the parent comment so the user immediately sees their new reply
+      const findRootCommentId = (items: ActivityCommentItem[], targetId: number): number | null => {
+        for (const root of items) {
+          if (root.id === targetId) return root.id;
+          const desc = getAllDescendantReplies(root);
+          if (desc.some(d => d.id === targetId)) return root.id;
+        }
+        return null;
+      };
+      const rootId = findRootCommentId(comments, parentId);
+      if (rootId) {
+        setCollapsedReplies(prev => ({ ...prev, [rootId]: false }));
+      }
       await fetchComments();
     } catch (err) {
       console.error('Error replying:', err);
@@ -205,7 +226,16 @@ export const ActivityCommentThread: React.FC<ActivityCommentThreadProps> = ({
     return list.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
   };
 
-  const renderSingleComment = (item: ActivityCommentItem, isChild = false) => {
+  const renderSingleComment = (
+    item: ActivityCommentItem, 
+    isChild = false,
+    collapseOptions?: {
+      hasReplies: boolean;
+      isCollapsed: boolean;
+      repliesCount: number;
+      onToggle: () => void;
+    }
+  ) => {
     const isReplyingThis = replyTarget?.id === item.id;
     const canDelete = user && (user.id === item.user_id || user.is_admin);
 
@@ -352,6 +382,32 @@ export const ActivityCommentThread: React.FC<ActivityCommentThreadProps> = ({
               >
                 <Reply size={12} />
                 <span>{isReplyingThis ? (isEs ? 'Cancelar' : 'Cancel') : (isEs ? 'Responder' : 'Reply')}</span>
+              </button>
+            )}
+
+            {collapseOptions?.hasReplies && (
+              <button
+                onClick={collapseOptions.onToggle}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'var(--text-muted)',
+                  fontSize: '0.76rem',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.25rem',
+                  padding: '0.15rem 0.35rem'
+                }}
+              >
+                {collapseOptions.isCollapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
+                <span>
+                  {collapseOptions.isCollapsed
+                    ? (isEs ? `Mostrar ${collapseOptions.repliesCount} ${collapseOptions.repliesCount === 1 ? 'respuesta' : 'respuestas'}` : `Show ${collapseOptions.repliesCount} ${collapseOptions.repliesCount === 1 ? 'reply' : 'replies'}`)
+                    : (isEs ? `Ocultar ${collapseOptions.repliesCount} ${collapseOptions.repliesCount === 1 ? 'respuesta' : 'respuestas'}` : `Hide ${collapseOptions.repliesCount} ${collapseOptions.repliesCount === 1 ? 'reply' : 'replies'}`)
+                  }
+                </span>
               </button>
             )}
 
@@ -538,13 +594,21 @@ export const ActivityCommentThread: React.FC<ActivityCommentThreadProps> = ({
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           {comments.map(rootComment => {
             const descendantReplies = getAllDescendantReplies(rootComment);
+            const hasReplies = descendantReplies.length > 0;
+            const isCollapsed = !!collapsedReplies[rootComment.id];
+
             return (
               <div key={rootComment.id} style={{ display: 'flex', flexDirection: 'column' }}>
                 {/* Root Comment */}
-                {renderSingleComment(rootComment, false)}
+                {renderSingleComment(rootComment, false, hasReplies ? {
+                  hasReplies,
+                  isCollapsed,
+                  repliesCount: descendantReplies.length,
+                  onToggle: () => toggleCollapseReplies(rootComment.id)
+                } : undefined)}
 
                 {/* All descendant replies flattened at a single indentation level */}
-                {descendantReplies.length > 0 && (
+                {hasReplies && !isCollapsed && (
                   <div
                     style={{
                       display: 'flex',
