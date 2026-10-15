@@ -57,7 +57,7 @@ export const NotificationFlyout: React.FC<NotificationFlyoutProps> = ({
     } else {
       newParams.delete('notif_tab');
     }
-    setSearchParams(newParams);
+    setSearchParams(newParams, { replace: true });
 
     // Scroll swipe container smoothly on mobile
     if (swipeWrapperRef.current) {
@@ -118,7 +118,7 @@ export const NotificationFlyout: React.FC<NotificationFlyoutProps> = ({
       } else {
         newParams.delete('notif_tab');
       }
-      setSearchParams(newParams);
+      setSearchParams(newParams, { replace: true });
     }
   };
 
@@ -151,6 +151,17 @@ export const NotificationFlyout: React.FC<NotificationFlyoutProps> = ({
     if (isOpen) {
       fetchNotifications();
     }
+  }, [isOpen]);
+
+  // Lock body scroll while notification modal is open on mobile
+  useEffect(() => {
+    if (!isOpen) return;
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
   }, [isOpen]);
 
   // Click outside to close (desktop flyout)
@@ -602,7 +613,7 @@ export const NotificationFlyout: React.FC<NotificationFlyoutProps> = ({
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-          <Bell size={18} color="var(--accent-primary)" />
+          <Bell size={18} color="var(--accent-primary)" className="notification-header-bell" />
           <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700 }}>
             {isEs ? 'Notificaciones' : 'Notifications'}
           </h3>

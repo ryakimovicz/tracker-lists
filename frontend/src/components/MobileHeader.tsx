@@ -122,9 +122,10 @@ export const MobileHeader: React.FC = () => {
       <NotificationFlyout
         isOpen={showNotifFlyout}
         onClose={() => {
-          if (showNotifFlyout) {
-            window.history.back();
-          }
+          const newParams = new URLSearchParams(searchParams);
+          newParams.delete('notifications');
+          newParams.delete('notif_tab');
+          setSearchParams(newParams);
         }}
         onUnreadCountChange={(cnt) => setUnreadCount(cnt)}
         ignoreRef={notifBtnRef}

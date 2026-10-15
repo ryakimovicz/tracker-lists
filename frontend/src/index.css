@@ -1489,6 +1489,10 @@ h1, h2, h3, h4, h5, h6 {
     display: none !important;
   }
 
+  .notification-header-bell {
+    display: none !important;
+  }
+
   /* -------------------------------------------------------------------------
      Mobile Global Proportional Content Scaling
      ------------------------------------------------------------------------- */
