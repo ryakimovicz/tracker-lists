@@ -594,12 +594,12 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
   const handleTabSelect = (tab: 'gifs' | 'stickers' | 'memes' | 'clips') => {
     setActiveTab(tab);
     setViewFavorites(false);
-    updateKlipyUrlParams(true, tab, false, true);
+    updateKlipyUrlParams(true, tab, false, false);
   };
 
   const handleToggleFavoritesView = (showFavs: boolean) => {
     setViewFavorites(showFavs);
-    updateKlipyUrlParams(true, activeTab, showFavs, true);
+    updateKlipyUrlParams(true, activeTab, showFavs, false);
   };
 
   // Close on Escape or click outside
