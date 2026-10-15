@@ -1020,7 +1020,7 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
               type="text"
               value={searchQuery}
               onChange={handleSearchChange}
-              placeholder="Search KLIPY"
+              placeholder={language === 'es' ? 'Buscar...' : 'Search...'}
               autoFocus
               style={{
                 background: 'transparent',
