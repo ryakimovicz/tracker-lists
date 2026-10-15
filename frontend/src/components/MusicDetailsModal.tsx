@@ -562,38 +562,7 @@ const MusicDetailsModalInner: React.FC<MusicDetailsModalProps> = ({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Scrollable Content */}
-        <div className="music-details-modal-body" style={{ padding: '1.25rem 1.25rem 1.5rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1.25rem', flex: 1, position: 'relative' }}>
-          {/* Close Button X (top right inside scrollable content, scrolls away with modal) */}
-          <button
-            type="button"
-            onClick={onClose}
-            className="btn-close-modal music-details-close-btn"
-            style={{
-              position: 'absolute',
-              top: '1.25rem',
-              right: '1.25rem',
-              width: '34px',
-              height: '34px',
-              minWidth: '34px',
-              minHeight: '34px',
-              background: 'transparent',
-              border: 'none',
-              color: 'var(--text-secondary)',
-              cursor: 'pointer',
-              padding: 0,
-              borderRadius: '50%',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 10,
-              transition: 'color 0.2s, background 0.2s'
-            }}
-            title={isEs ? 'Cerrar' : 'Close'}
-            aria-label={isEs ? 'Cerrar' : 'Close'}
-          >
-            <X size={20} />
-          </button>
-
+        <div className="music-details-modal-body" style={{ padding: '1.25rem 1.25rem 1.5rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1.25rem', flex: 1 }}>
           {/* Media Overview Banner (Starts at the top of modal) */}
           <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'flex-start' }}>
             {/* Image on the left */}
@@ -639,9 +608,9 @@ const MusicDetailsModalInner: React.FC<MusicDetailsModalProps> = ({
             </div>
 
             {/* Right column next to the image */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', minWidth: 0, flex: 1, paddingRight: '2.5rem' }}>
-              {/* Row 1: Tag badge to the right of image */}
-              <div style={{ display: 'flex', alignItems: 'center' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', minWidth: 0, flex: 1 }}>
+              {/* Row 1: Tag badge to the right of image horizontally aligned with X close button on far right */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', width: '100%', minHeight: '34px' }}>
                 <span style={{
                   fontSize: '0.72rem',
                   fontWeight: 800,
@@ -658,10 +627,38 @@ const MusicDetailsModalInner: React.FC<MusicDetailsModalProps> = ({
                 }}>
                   {typeLabel}
                 </span>
+
+                {/* Close Button X (aligned horizontally with badge, scrolls away with modal) */}
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="btn-close-modal music-details-close-btn"
+                  style={{
+                    width: '34px',
+                    height: '34px',
+                    minWidth: '34px',
+                    minHeight: '34px',
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'var(--text-secondary)',
+                    cursor: 'pointer',
+                    padding: 0,
+                    borderRadius: '50%',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                    transition: 'color 0.2s, background 0.2s'
+                  }}
+                  title={isEs ? 'Cerrar' : 'Close'}
+                  aria-label={isEs ? 'Cerrar' : 'Close'}
+                >
+                  <X size={20} />
+                </button>
               </div>
 
-              {/* Row 2: Title horizontally aligned with heart button (heart button aligned with X column) */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', width: '100%' }}>
+              {/* Row 2: Title horizontally aligned with heart button (heart button directly beneath X in the same column) */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', width: '100%', minHeight: '34px' }}>
                 <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.2, minWidth: 0, wordBreak: 'break-word' }}>
                   {displayTitle}
                 </h2>
