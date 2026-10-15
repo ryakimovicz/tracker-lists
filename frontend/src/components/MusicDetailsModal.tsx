@@ -856,42 +856,50 @@ const MusicDetailsModalInner: React.FC<MusicDetailsModalProps> = ({
             <>
               {/* Album / EP / Single Tracklist (Clickable tracks) - Positioned directly under overview */}
               {currentType === 'album' && details?.tracks && details.tracks.length > 0 && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
                   <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                     {isEs ? 'Lista de Canciones' : 'Tracklist'} ({details.tracks.length})
                   </h4>
-                  <div style={{ background: 'var(--bg-tertiary)', borderRadius: '12px', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
+                  <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '380px', overflowY: 'auto', paddingRight: '0.25rem' }}>
                     {details.tracks.map((trk: any, idx: number) => (
                       <div
                         key={idx}
+                        className="episode-item-row"
                         onClick={() => navigateToItem('track', displayArtist || activeItem.artist, trk.name, displayImage)}
                         style={{
-                          padding: '0.6rem 1rem',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'space-between',
-                          borderBottom: idx < details.tracks.length - 1 ? '1px solid rgba(255, 255, 255, 0.05)' : 'none',
-                          fontSize: '0.85rem',
+                          padding: '0.75rem 1rem',
+                          background: 'var(--bg-secondary)',
+                          border: '1px solid var(--border-color)',
+                          borderRadius: '6px',
+                          gap: '0.75rem',
                           cursor: 'pointer',
-                          transition: 'background 0.15s ease'
+                          transition: 'all 0.15s ease'
                         }}
                         onMouseEnter={(e) => {
-                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)';
+                          e.currentTarget.style.borderColor = 'var(--color-music, #1DB954)';
                           prefetchMusicDetails('track', displayArtist || activeItem.artist, trk.name);
                         }}
-                        onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.borderColor = 'var(--border-color)';
+                        }}
                         title={isEs ? `Ver info de ${trk.name}` : `View info for ${trk.name}`}
                       >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: 0, flex: 1 }}>
-                          <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem', width: '20px', textAlign: 'right' }}>
-                            {idx + 1}
+                        {/* Left side: Track number and Title */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', minWidth: 0, overflow: 'hidden', flex: 1 }}>
+                          <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-muted)', flexShrink: 0, minWidth: '22px' }}>
+                            {idx + 1}.
                           </span>
-                          <span style={{ color: 'var(--text-primary)', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {trk.name}
                           </span>
                         </div>
+
+                        {/* Right side: Duration */}
                         {trk.duration && (
-                          <span style={{ color: 'var(--text-secondary)', fontSize: '0.78rem', marginLeft: '1rem' }}>
+                          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', flexShrink: 0, fontWeight: 500 }}>
                             {formatDuration(trk.duration)}
                           </span>
                         )}
