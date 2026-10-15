@@ -2029,13 +2029,44 @@ h1, h2, h3, h4, h5, h6 {
     text-overflow: ellipsis !important;
   }
 
-  .activity-card .card-body-content > div:nth-child(2) {
+  .activity-card .card-body-content > div:nth-child(2):not(.explore-card-badges-inline) {
     font-size: 0.72rem !important;
     font-weight: 500 !important;
     color: var(--text-secondary) !important;
     white-space: nowrap !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
+  }
+
+  /* Explore & Activity Cards: Hide overlaid badges from cover on mobile */
+  .activity-card .card-media-cover > div:not(.media-poster-container):not(.media-poster-placeholder) {
+    display: none !important;
+  }
+
+  /* Inline badges on mobile inside card-body-content */
+  .activity-card .explore-card-badges-inline {
+    display: flex !important;
+    align-items: center !important;
+    gap: 0.35rem !important;
+    flex-wrap: wrap !important;
+    margin-top: 0.15rem !important;
+    width: 100% !important;
+  }
+
+  .activity-card .explore-card-badge-inline {
+    font-size: 0.65rem !important;
+    font-weight: 600 !important;
+    padding: 0.08rem 0.35rem !important;
+    border-radius: 4px !important;
+    line-height: 1.2 !important;
+  }
+
+  .activity-card .explore-card-status-badge-inline {
+    font-size: 0.65rem !important;
+    font-weight: 600 !important;
+    padding: 0.08rem 0.35rem !important;
+    border-radius: 4px !important;
+    line-height: 1.2 !important;
   }
 
   /* Right Action Button (Check / Play) */

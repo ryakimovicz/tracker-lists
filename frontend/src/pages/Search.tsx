@@ -29,7 +29,12 @@ interface SearchResultItem {
   badge?: string;
 }
 
-export const renderMediaBadge = (badge?: string | null, language: string = 'es') => {
+export const renderMediaBadge = (
+  badge?: string | null, 
+  language: string = 'es', 
+  className: string = 'explore-cover-badge',
+  inline: boolean = false
+) => {
   if (!badge) return null;
   let label = badge;
   let icon = null;
@@ -65,8 +70,35 @@ export const renderMediaBadge = (badge?: string | null, language: string = 'es')
     borderColor = 'rgba(6, 182, 212, 0.5)';
   }
 
+  if (inline) {
+    return (
+      <span
+        className={className}
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '0.25rem',
+          fontSize: '0.68rem',
+          fontWeight: 700,
+          background: 'rgba(255, 255, 255, 0.08)',
+          color: 'var(--text-primary)',
+          border: `1px solid ${borderColor}`,
+          padding: '0.1rem 0.4rem',
+          borderRadius: '4px',
+          lineHeight: 1.2,
+          letterSpacing: '0.01em',
+          width: 'fit-content'
+        }}
+      >
+        {icon}
+        <span>{label}</span>
+      </span>
+    );
+  }
+
   return (
     <div
+      className={className}
       style={{
         position: 'absolute',
         top: '0.5rem',
@@ -191,17 +223,20 @@ const ExploreSection = React.memo<ExploreSectionProps>(({
           />
 
           {/* Game/Media Badge (Colección, DLC, etc.) - exclude comic issue numbers */}
-          {item.item_type !== 'comic' && renderMediaBadge(item.badge, language)}
+          {item.item_type !== 'comic' && renderMediaBadge(item.badge, language, 'explore-cover-badge home-desktop-only')}
 
           {/* Status Badge */}
           {statusLabel && (
-            <div style={{ 
-              position: 'absolute', top: '0.5rem', right: '0.5rem', 
-              padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 600,
-              background: (item.status === 'completed' || item.status === 'read') ? 'var(--color-movie)' : (item.status === 'watching' || item.status === 'reading') ? '#3b82f6' : '#ef4444',
-              color: (item.status === 'completed' || item.status === 'read') ? 'var(--color-text-movie)' : '#ffffff',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.5)'
-            }}>
+            <div 
+              className="explore-cover-badge home-desktop-only"
+              style={{ 
+                position: 'absolute', top: '0.5rem', right: '0.5rem', 
+                padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 600,
+                background: (item.status === 'completed' || item.status === 'read') ? 'var(--color-movie)' : (item.status === 'watching' || item.status === 'reading') ? '#3b82f6' : '#ef4444',
+                color: (item.status === 'completed' || item.status === 'read') ? 'var(--color-text-movie)' : '#ffffff',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.5)'
+              }}
+            >
               {statusLabel}
             </div>
           )}
@@ -237,6 +272,32 @@ const ExploreSection = React.memo<ExploreSectionProps>(({
                 </div>
               ) : null}
             </>
+          )}
+
+          {/* Mobile badges: Move media & status badges from cover to card body */}
+          {((item.item_type !== 'comic' && item.badge) || statusLabel) && (
+            <div className="explore-card-badges-inline home-mobile-only" style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap', marginTop: '0.2rem' }}>
+              {item.item_type !== 'comic' && renderMediaBadge(item.badge, language, 'explore-card-badge-inline', true)}
+              {statusLabel && (
+                <span
+                  className="explore-card-status-badge-inline"
+                  style={{
+                    fontSize: '0.68rem',
+                    fontWeight: 700,
+                    padding: '0.1rem 0.4rem',
+                    borderRadius: '4px',
+                    background: (item.status === 'completed' || item.status === 'read') ? 'var(--color-movie)' : (item.status === 'watching' || item.status === 'reading') ? '#3b82f6' : '#ef4444',
+                    color: (item.status === 'completed' || item.status === 'read') ? 'var(--color-text-movie)' : '#ffffff',
+                    lineHeight: 1.2,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    width: 'fit-content'
+                  }}
+                >
+                  {statusLabel}
+                </span>
+              )}
+            </div>
           )}
         </div>
       </div>
