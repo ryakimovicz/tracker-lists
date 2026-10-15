@@ -368,7 +368,7 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
                   switch (cat) {
                     case 'all': return isEs ? 'Todo' : 'All';
                     case 'movie': return isEs ? 'Películas' : 'Movies';
-                    case 'series': return isEs ? 'Series' : 'Shows';
+                    case 'series': return isEs ? 'Series' : 'TV Shows';
                     case 'anime': return 'Anime';
                     case 'book': return isEs ? 'Libros' : 'Books';
                     case 'comic': return isEs ? 'Cómics' : 'Comics';
@@ -467,7 +467,7 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
                       : 'No results found for your search.'
                     : isEs
                     ? 'Escribe para buscar personajes y portadas de Películas, Series, Anime, Libros, Cómics, Manga y Juegos.'
-                    : 'Type to search characters and covers across Movies, Shows, Anime, Books, Comics, Manga, and Games.'}
+                    : 'Type to search characters and covers across Movies, TV Shows, Anime, Books, Comics, Manga, and Games.'}
                 </div>
               );
             }
@@ -565,7 +565,7 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
                 {selectedCategory === 'all' && (() => {
                   const getCategoryLabel = () => {
                     switch (ch.category) {
-                      case 'series': return isEs ? 'Serie' : 'Show';
+                      case 'series': return isEs ? 'Serie' : 'TV Show';
                       case 'movie': return isEs ? 'Película' : 'Movie';
                       case 'anime': return 'Anime';
                       case 'comic': return isEs ? 'Cómic' : 'Comic';
@@ -573,7 +573,7 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
                       case 'book': return isEs ? 'Libro' : 'Book';
                       case 'game': return isEs ? 'Juego' : 'Game';
                       case 'music': return isEs ? 'Música' : 'Music';
-                      default: return isEs ? 'Serie' : 'Show';
+                      default: return isEs ? 'Serie' : 'TV Show';
                     }
                   };
                   return (

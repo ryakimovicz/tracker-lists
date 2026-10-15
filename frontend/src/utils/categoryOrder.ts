@@ -145,7 +145,7 @@ export function getCategoryLabel(type: string, isEs: boolean, plural: boolean = 
   // English (Default)
   switch (clean) {
     case 'movie': return plural ? 'Movies' : 'Movie';
-    case 'series': return plural ? 'Shows' : 'Show';
+    case 'series': return plural ? 'TV Shows' : 'TV Show';
     case 'anime': return 'Anime';
     case 'book': return plural ? 'Books' : 'Book';
     case 'comic': return plural ? 'Comics' : 'Comic';

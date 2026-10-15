@@ -488,7 +488,7 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
                   switch (cat) {
                     case 'all': return isEs ? 'Todo' : 'All';
                     case 'movie': return isEs ? 'Películas' : 'Movies';
-                    case 'series': return isEs ? 'Series' : 'Shows';
+                    case 'series': return isEs ? 'Series' : 'TV Shows';
                     case 'anime': return 'Anime';
                     case 'book': return isEs ? 'Libros' : 'Books';
                     case 'comic': return isEs ? 'Cómics' : 'Comics';
@@ -587,7 +587,7 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
                       : 'No results found for your search.'
                     : isEs
                     ? 'Escribe para buscar portadas de Películas, Series, Anime, Libros, Cómics, Manga y Juegos.'
-                    : 'Type to search banners from Movies, Shows, Anime, Books, Comics, Manga, and Games.'}
+                    : 'Type to search banners from Movies, TV Shows, Anime, Books, Comics, Manga, and Games.'}
                 </div>
               );
             }
@@ -662,7 +662,7 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
                        b.category === 'comic' ? (isEs ? 'Cómic' : 'Comic') :
                        b.category === 'book' ? (isEs ? 'Libro' : 'Book') :
                        b.category === 'movie' ? (isEs ? 'Película' : 'Movie') :
-                       b.category === 'music' ? (isEs ? 'Música' : 'Music') : (isEs ? 'Serie' : 'Show')}
+                       b.category === 'music' ? (isEs ? 'Música' : 'Music') : (isEs ? 'Serie' : 'TV Show')}
                     </span>
                   )}
                 </div>

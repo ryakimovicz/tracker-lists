@@ -498,7 +498,7 @@ export const BackgroundSelectorModal: React.FC<BackgroundSelectorModalProps> = (
                   switch (cat) {
                     case 'all': return isEs ? 'Todo' : 'All';
                     case 'movie': return isEs ? 'Películas' : 'Movies';
-                    case 'series': return isEs ? 'Series' : 'Shows';
+                    case 'series': return isEs ? 'Series' : 'TV Shows';
                     case 'anime': return 'Anime';
                     case 'book': return isEs ? 'Libros' : 'Books';
                     case 'comic': return isEs ? 'Cómics' : 'Comics';
@@ -597,7 +597,7 @@ export const BackgroundSelectorModal: React.FC<BackgroundSelectorModalProps> = (
                       : 'No results found for your search.'
                     : isEs
                     ? 'Escribe para buscar fondos 1080p de Películas, Series, Anime, Libros, Cómics, Manga y Juegos.'
-                    : 'Type to search 1080p backgrounds from Movies, Shows, Anime, Books, Comics, Manga, and Games.'}
+                    : 'Type to search 1080p backgrounds from Movies, TV Shows, Anime, Books, Comics, Manga, and Games.'}
                 </div>
               );
             }
@@ -671,7 +671,7 @@ export const BackgroundSelectorModal: React.FC<BackgroundSelectorModalProps> = (
                          b.category === 'comic' ? (isEs ? 'Cómic' : 'Comic') :
                          b.category === 'book' ? (isEs ? 'Libro' : 'Book') :
                          b.category === 'movie' ? (isEs ? 'Película' : 'Movie') :
-                         b.category === 'music' ? (isEs ? 'Música' : 'Music') : (isEs ? 'Serie' : 'Show')}
+                         b.category === 'music' ? (isEs ? 'Música' : 'Music') : (isEs ? 'Serie' : 'TV Show')}
                       </span>
                     )}
                   </div>

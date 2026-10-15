@@ -441,7 +441,7 @@ const ExploreGuidesSection = React.memo<ExploreGuidesSectionProps>(({
       case 'movie':
         return <span key={mt} style={{ display: 'inline-flex', alignItems: 'center' }} title={language === 'es' ? 'Películas' : 'Movies'}><Film size={13} color="var(--color-movie)" /></span>;
       case 'series':
-        return <span key={mt} style={{ display: 'inline-flex', alignItems: 'center' }} title={language === 'es' ? 'Series' : 'Shows'}><Tv size={13} color="var(--color-series)" /></span>;
+        return <span key={mt} style={{ display: 'inline-flex', alignItems: 'center' }} title={language === 'es' ? 'Series' : 'TV Shows'}><Tv size={13} color="var(--color-series)" /></span>;
       case 'anime':
         return <span key={mt} style={{ display: 'inline-flex', alignItems: 'center' }} title="Anime"><Sparkles size={13} color="var(--color-anime)" /></span>;
       case 'manga':
@@ -715,7 +715,7 @@ export const Search: React.FC = () => {
     return categoryOrder.map(type => ({
       type,
       title: type === 'movie' ? (language === 'es' ? 'Películas' : 'Movies') :
-             type === 'series' ? (language === 'es' ? 'Series' : 'Shows') :
+             type === 'series' ? (language === 'es' ? 'Series' : 'TV Shows') :
              type === 'anime' ? 'Anime' :
              type === 'book' ? (language === 'es' ? 'Libros' : 'Books') :
              type === 'comic' ? (language === 'es' ? 'Cómics' : 'Comics') : 
@@ -771,7 +771,7 @@ export const Search: React.FC = () => {
   const getCategoryLabel = (cat: string) => {
     switch (cat) {
       case 'movie': return language === 'es' ? 'Películas' : 'Movies';
-      case 'series': return language === 'es' ? 'Series' : 'Shows';
+      case 'series': return language === 'es' ? 'Series' : 'TV Shows';
       case 'anime': return 'Anime';
       case 'book': return language === 'es' ? 'Libros' : 'Books';
       case 'comic': return language === 'es' ? 'Cómics' : 'Comics';
@@ -786,7 +786,7 @@ export const Search: React.FC = () => {
   const getSingleCategoryLabel = (cat: string) => {
     switch (cat) {
       case 'movie': return language === 'es' ? 'Película' : 'Movie';
-      case 'series': return language === 'es' ? 'Serie' : 'Show';
+      case 'series': return language === 'es' ? 'Serie' : 'TV Show';
       case 'anime': return 'Anime';
       case 'book': return language === 'es' ? 'Libro' : 'Book';
       case 'comic': return language === 'es' ? 'Cómic' : 'Comic';
@@ -1495,7 +1495,7 @@ export const Search: React.FC = () => {
               {sortFilterTabs([
                 { value: 'all', label: language === 'es' ? 'Todo' : 'All' },
                 { value: 'movie', label: language === 'es' ? 'Películas' : 'Movies' },
-                { value: 'series', label: language === 'es' ? 'Series' : 'Shows' },
+                { value: 'series', label: language === 'es' ? 'Series' : 'TV Shows' },
                 { value: 'anime', label: 'Anime' },
                 { value: 'book', label: language === 'es' ? 'Libros' : 'Books' },
                 { value: 'comic', label: language === 'es' ? 'Cómics' : 'Comics' },

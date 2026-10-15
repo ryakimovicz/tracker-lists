@@ -230,7 +230,7 @@ const ShelfCardItem = React.memo<ShelfCardItemProps>(({
             const label = isGame 
               ? (specialGameLabel || (language === 'es' ? 'Juego' : 'Game'))
               : (item.item_type === 'episode' || item.external_id?.startsWith('tvm-ep-'))
-              ? (language === 'es' ? 'Serie' : 'Show')
+              ? (language === 'es' ? 'Serie' : 'TV Show')
               : item.item_type === 'season'
               ? (language === 'es' ? 'Temporada' : 'Season')
               : item.item_type === 'comic' ? (language === 'es' ? 'Cómic' : 'Comic') : item.item_type === 'manga' ? 'Manga' : t('media' + item.item_type.charAt(0).toUpperCase() + item.item_type.slice(1));
@@ -3799,7 +3799,7 @@ export const Profile: React.FC = () => {
                       className={`profile-category-tab ${isSelected ? 'selected' : ''}`}
                       title={type === 'all' ? (language === 'es' ? 'Todo' : 'All') :
                              type === 'movie' ? (language === 'es' ? 'Películas' : 'Movies') :
-                             type === 'series' ? (language === 'es' ? 'Series' : 'Shows') :
+                             type === 'series' ? (language === 'es' ? 'Series' : 'TV Shows') :
                              type === 'anime' ? 'Anime' :
                              type === 'book' ? (language === 'es' ? 'Libros' : 'Books') :
                              type === 'comic' ? (language === 'es' ? 'Cómics' : 'Comics') :
@@ -3822,7 +3822,7 @@ export const Profile: React.FC = () => {
                       <span className="profile-category-label">
                         {type === 'all' ? (language === 'es' ? 'Todo' : 'All') :
                          type === 'movie' ? (language === 'es' ? 'Películas' : 'Movies') :
-                         type === 'series' ? (language === 'es' ? 'Series' : 'Shows') :
+                         type === 'series' ? (language === 'es' ? 'Series' : 'TV Shows') :
                          type === 'anime' ? 'Anime' :
                          type === 'book' ? (language === 'es' ? 'Libros' : 'Books') :
                          type === 'comic' ? (language === 'es' ? 'Cómics' : 'Comics') :
@@ -4459,7 +4459,7 @@ export const Profile: React.FC = () => {
                 case 'movie':
                   return <span key={mt} style={{ display: 'inline-flex', alignItems: 'center' }} title={language === 'es' ? 'Películas' : 'Movies'}><Film size={13} color="var(--color-movie)" /></span>;
                 case 'series':
-                  return <span key={mt} style={{ display: 'inline-flex', alignItems: 'center' }} title={language === 'es' ? 'Series' : 'Shows'}><Tv size={13} color="var(--color-series)" /></span>;
+                  return <span key={mt} style={{ display: 'inline-flex', alignItems: 'center' }} title={language === 'es' ? 'Series' : 'TV Shows'}><Tv size={13} color="var(--color-series)" /></span>;
                 case 'anime':
                   return <span key={mt} style={{ display: 'inline-flex', alignItems: 'center' }} title="Anime"><Sparkles size={13} color="var(--color-anime)" /></span>;
                 case 'manga':
@@ -5371,7 +5371,7 @@ export const Profile: React.FC = () => {
                       <span>
                         {type === 'all' ? (language === 'es' ? 'Todo' : 'All') :
                          type === 'movie' ? (language === 'es' ? 'Películas' : 'Movies') :
-                         type === 'series' ? (language === 'es' ? 'Series' : 'Shows') :
+                         type === 'series' ? (language === 'es' ? 'Series' : 'TV Shows') :
                          type === 'anime' ? 'Anime' :
                          type === 'book' ? (language === 'es' ? 'Libros' : 'Books') :
                          type === 'comic' ? (language === 'es' ? 'Cómics' : 'Comics') :
@@ -5889,7 +5889,7 @@ export const Profile: React.FC = () => {
                                     const label = isGame
                                       ? (specialGameLabel || (language === 'es' ? 'Juego' : 'Game'))
                                       : (item.item_type === 'episode' || item.external_id?.startsWith('tvm-ep-'))
-                                      ? (language === 'es' ? 'Serie' : 'Show')
+                                      ? (language === 'es' ? 'Serie' : 'TV Show')
                                       : item.item_type === 'season'
                                       ? (language === 'es' ? 'Temporada' : 'Season')
                                       : item.item_type === 'comic' ? (language === 'es' ? 'Cómic' : 'Comic') : item.item_type === 'manga' ? 'Manga' : t('media' + item.item_type.charAt(0).toUpperCase() + item.item_type.slice(1));

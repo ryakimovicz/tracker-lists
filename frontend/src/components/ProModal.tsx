@@ -186,7 +186,7 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
               <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.35 }}>
                 {isEs
                   ? 'Arma tu Top 10 en Películas, Series, Anime, Libros, Cómics, Manga y Juegos (hasta 70 obras en total).'
-                  : 'Build your ultimate Top 10 in Movies, Shows, Anime, Books, Comics, Manga, and Games (up to 70 total).'}
+                  : 'Build your ultimate Top 10 in Movies, TV Shows, Anime, Books, Comics, Manga, and Games (up to 70 total).'}
               </p>
             </div>
           </div>

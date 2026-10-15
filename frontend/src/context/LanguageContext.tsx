@@ -96,7 +96,7 @@ const translations: Translations = {
   mediaAll: { en: 'All', es: 'Todos' },
   mediaGame: { en: 'Game', es: 'Juego' },
   mediaMovie: { en: 'Movie', es: 'Película' },
-  mediaSeries: { en: 'Show', es: 'Serie' },
+  mediaSeries: { en: 'TV Show', es: 'Serie' },
   mediaBook: { en: 'Book', es: 'Libro' },
   mediaAnime: { en: 'Anime', es: 'Anime' },
   mediaEpisode: { en: 'Episode', es: 'Episodio' },
