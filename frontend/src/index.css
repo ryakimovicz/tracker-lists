@@ -1472,6 +1472,7 @@ h1, h2, h3, h4, h5, h6 {
     border-right: none !important;
     border-top: none !important;
     border-bottom: 1px solid var(--border-color) !important;
+    z-index: 999 !important;
     animation: fadeIn 0.15s ease-out !important;
   }
 
