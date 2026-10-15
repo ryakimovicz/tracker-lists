@@ -359,8 +359,21 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
                   ? (isEs ? 'Preparando pago...' : 'Preparing checkout...')
                   : user?.is_pro
                   ? (isEs ? 'Mantener Premium al finalizar regalo ($4,99/mes)' : 'Keep Premium after gift ends ($4.99/mo)')
-                  : (isEs ? 'Suscribirse a Premium ($4,99/mes)' : 'Subscribe to Premium ($4.99/mo)')}
+                  : (isEs ? 'Comenzar prueba gratis de 7 días' : 'Start 7-day free trial')}
               </button>
+
+              {!user?.is_pro && (
+                <p style={{
+                  fontSize: '0.78rem',
+                  color: 'var(--text-muted)',
+                  textAlign: 'center',
+                  margin: '0.55rem 0 0 0'
+                }}>
+                  {isEs 
+                    ? 'Luego $4,99/mes (impuestos incluidos). Cancela cuando quieras.'
+                    : 'Then $4.99/mo (taxes included). Cancel anytime.'}
+                </p>
+              )}
             </div>
           ) : (
             <div style={{ textAlign: 'center', padding: '0.5rem 0' }}>

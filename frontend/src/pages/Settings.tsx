@@ -837,7 +837,7 @@ export const SettingsPage: React.FC = () => {
                   <Crown size={15} />
                   {user?.is_pro
                     ? (isEs ? 'Mantener suscripción ($4,99/mes)' : 'Keep subscription ($4.99/mo)')
-                    : (isEs ? 'Mejorar a Premium ($4,99/mes)' : 'Upgrade to Premium ($4.99/mo)')}
+                    : (isEs ? 'Prueba gratis de 7 días (luego $4,99/mes)' : '7-day free trial (then $4.99/mo)')}
                 </button>
               )}
             </div>
