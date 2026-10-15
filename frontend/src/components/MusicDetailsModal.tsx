@@ -592,37 +592,6 @@ const MusicDetailsModalInner: React.FC<MusicDetailsModalProps> = ({
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0 }}>
-            {/* Feature Artist Heart button */}
-            {user && currentType === 'artist' && (
-              <button
-                type="button"
-                onClick={handleToggleArtistFavorite}
-                className={`btn-favorite-heart ${isCurrentArtistFavorite ? 'is-favorite' : ''}`}
-                style={{
-                  width: '34px',
-                  height: '34px',
-                  minWidth: '34px',
-                  minHeight: '34px',
-                  flexShrink: 0,
-                  cursor: 'pointer',
-                  borderRadius: '50%',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: isCurrentArtistFavorite ? 'var(--color-user, #F472B6)' : 'var(--text-secondary)',
-                  border: isCurrentArtistFavorite ? '1px solid var(--color-user, #F472B6)' : '1px solid var(--border-color)',
-                  background: isCurrentArtistFavorite ? 'rgba(244, 114, 182, 0.12)' : 'rgba(255, 255, 255, 0.05)',
-                  transition: 'all 0.2s ease'
-                }}
-                title={isCurrentArtistFavorite
-                  ? (isEs ? 'Quitar Destacado' : 'Remove Featured')
-                  : (isEs ? 'Destacar Artista' : 'Feature Artist')
-                }
-              >
-                <Heart size={18} fill={isCurrentArtistFavorite ? 'var(--color-user, #F472B6)' : 'none'} />
-              </button>
-            )}
-
             <button
               type="button"
               onClick={onClose}
@@ -693,9 +662,42 @@ const MusicDetailsModalInner: React.FC<MusicDetailsModalProps> = ({
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', minWidth: 0, flex: 1 }}>
-              <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.2 }}>
-                {displayTitle}
-              </h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.2 }}>
+                  {displayTitle}
+                </h2>
+
+                {/* Feature Artist Heart button */}
+                {user && currentType === 'artist' && (
+                  <button
+                    type="button"
+                    onClick={handleToggleArtistFavorite}
+                    className={`btn-favorite-heart ${isCurrentArtistFavorite ? 'is-favorite' : ''}`}
+                    style={{
+                      width: '32px',
+                      height: '32px',
+                      minWidth: '32px',
+                      minHeight: '32px',
+                      flexShrink: 0,
+                      cursor: 'pointer',
+                      borderRadius: '50%',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: isCurrentArtistFavorite ? 'var(--color-user, #F472B6)' : 'var(--text-secondary)',
+                      border: isCurrentArtistFavorite ? '1px solid var(--color-user, #F472B6)' : '1px solid var(--border-color)',
+                      background: isCurrentArtistFavorite ? 'rgba(244, 114, 182, 0.12)' : 'rgba(255, 255, 255, 0.05)',
+                      transition: 'all 0.2s ease'
+                    }}
+                    title={isCurrentArtistFavorite
+                      ? (isEs ? 'Quitar Destacado' : 'Remove Featured')
+                      : (isEs ? 'Destacar Artista' : 'Feature Artist')
+                    }
+                  >
+                    <Heart size={16} fill={isCurrentArtistFavorite ? 'var(--color-user, #F472B6)' : 'none'} />
+                  </button>
+                )}
+              </div>
 
               {/* Clickable Artist link (when in album or track view) */}
               {displayArtist && (
