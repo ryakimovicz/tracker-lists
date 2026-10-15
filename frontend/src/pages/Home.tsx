@@ -2527,8 +2527,9 @@ export const Home: React.FC = () => {
                 return (t?.consumption_count !== undefined) ? t.consumption_count : (t?.is_completed ? 1 : 0);
               });
               const minAired = Math.min(...airedCounts);
-              const hasUnwatchedAiredInCycle = airedCounts.some(c => c === minAired && c < (i.times_completed ? i.times_completed + 1 : 1));
-              if (!hasUnwatchedAiredInCycle && airedCounts.every(c => c > 0 && c === airedCounts[0])) {
+              const maxAired = Math.max(...airedCounts);
+              // If all aired are completed at the exact same count (> 0), then it's fully caught up with no pending items
+              if (minAired === maxAired && minAired > 0) {
                 return false;
               }
             }
