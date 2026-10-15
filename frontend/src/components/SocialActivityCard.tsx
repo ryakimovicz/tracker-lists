@@ -92,8 +92,11 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
     await performLike();
   };
 
+  const isTouchDeviceRef = useRef(false);
+
   // Double tap handler for mobile screens on the activity card
   const handleCardTouchEnd = (e: React.TouchEvent) => {
+    isTouchDeviceRef.current = true;
     // If the touch originated from an interactive button, skip double tap
     const target = e.target as HTMLElement | null;
     if (target?.closest('button') || target?.closest('a')) {
@@ -104,7 +107,7 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
     const timeSinceLastTap = now - lastTapRef.current;
 
     if (timeSinceLastTap > 0 && timeSinceLastTap < 300) {
-      // Double tap detected!
+      // Double tap confirmed! Cancel any pending single-tap navigation
       if (singleTapTimeoutRef.current) {
         clearTimeout(singleTapTimeoutRef.current);
         singleTapTimeoutRef.current = null;
@@ -127,6 +130,21 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
     }
   };
 
+  const executeDelayedCardAction = (action: () => void) => {
+    // On touch devices, delay execution slightly (~280ms) to ensure it isn't part of a double-tap
+    if (isTouchDeviceRef.current || (typeof window !== 'undefined' && 'ontouchstart' in window)) {
+      if (singleTapTimeoutRef.current) {
+        clearTimeout(singleTapTimeoutRef.current);
+      }
+      singleTapTimeoutRef.current = setTimeout(() => {
+        action();
+        singleTapTimeoutRef.current = null;
+      }, 280);
+    } else {
+      action();
+    }
+  };
+
   const handleDeleteActivity = async () => {
     try {
       setIsDeleting(true);
@@ -146,56 +164,58 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
 
   const handleClickCard = async (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    if (isGuideActivity && activity.list_id) {
-      navigate(`/guide/${activity.list_id}`);
-      return;
-    }
-
-    if (onOpenItem) {
-      let effectiveItemType = (meta.series_item_type || activity.item_type || meta.item_type || 'series').toLowerCase();
-      if (effectiveItemType === 'episode') effectiveItemType = 'series';
-      if (meta.series_external_id && String(meta.series_external_id).startsWith('anime_')) effectiveItemType = 'anime';
-
-      let effectiveExternalId = meta.series_external_id || meta.parent_external_id || meta.work_ext_id || activity.external_id || undefined;
-      const cleanTitle = meta.series_title || meta.work_title || (parsedEpisode ? parsedEpisode.seriesName : (parsedComicIssue ? parsedComicIssue.seriesName : activity.item_title));
-      
-      // If the activity is an episode (e.g. tvm-ep-12345), resolve parent show ID so it opens the series modal
-      if (effectiveExternalId && typeof effectiveExternalId === 'string' && effectiveExternalId.startsWith('tvm-ep-')) {
-        const epNumId = effectiveExternalId.replace('tvm-ep-', '');
-        try {
-          const epRes = await fetch(`https://api.tvmaze.com/episodes/${epNumId}`);
-          if (epRes.ok) {
-            const epData = await epRes.json();
-            const showId = epData?._links?.show?.href ? epData._links.show.href.split('/').pop() : null;
-            if (showId) {
-              effectiveExternalId = `tvm_${showId}`;
-            }
-          }
-        } catch (_) {}
-      } else if (effectiveExternalId && typeof effectiveExternalId === 'string' && effectiveExternalId.startsWith('cv_issue_')) {
-        effectiveItemType = 'comic';
-        if (meta.volume_id || meta.series_external_id) {
-          effectiveExternalId = meta.volume_id || meta.series_external_id;
-        } else {
-          try {
-            const issueRes = await apiClient.get(`/search/comic/issue/${effectiveExternalId}`);
-            if (issueRes.data?.parent_series?.external_id) {
-              effectiveExternalId = issueRes.data.parent_series.external_id;
-            }
-          } catch (_) {}
-        }
+    executeDelayedCardAction(async () => {
+      if (isGuideActivity && activity.list_id) {
+        navigate(`/guide/${activity.list_id}`);
+        return;
       }
 
-      const itemToOpen = {
-        external_id: effectiveExternalId,
-        id: (!effectiveExternalId && activity.list_id) ? activity.list_id : undefined,
-        title: cleanTitle || activity.item_title || 'Media',
-        image_url: activity.image_url || undefined,
-        item_type: effectiveItemType,
-        tracking_list_id: activity.list_id || undefined
-      };
-      onOpenItem(itemToOpen);
-    }
+      if (onOpenItem) {
+        let effectiveItemType = (meta.series_item_type || activity.item_type || meta.item_type || 'series').toLowerCase();
+        if (effectiveItemType === 'episode') effectiveItemType = 'series';
+        if (meta.series_external_id && String(meta.series_external_id).startsWith('anime_')) effectiveItemType = 'anime';
+
+        let effectiveExternalId = meta.series_external_id || meta.parent_external_id || meta.work_ext_id || activity.external_id || undefined;
+        const cleanTitle = meta.series_title || meta.work_title || (parsedEpisode ? parsedEpisode.seriesName : (parsedComicIssue ? parsedComicIssue.seriesName : activity.item_title));
+        
+        // If the activity is an episode (e.g. tvm-ep-12345), resolve parent show ID so it opens the series modal
+        if (effectiveExternalId && typeof effectiveExternalId === 'string' && effectiveExternalId.startsWith('tvm-ep-')) {
+          const epNumId = effectiveExternalId.replace('tvm-ep-', '');
+          try {
+            const epRes = await fetch(`https://api.tvmaze.com/episodes/${epNumId}`);
+            if (epRes.ok) {
+              const epData = await epRes.json();
+              const showId = epData?._links?.show?.href ? epData._links.show.href.split('/').pop() : null;
+              if (showId) {
+                effectiveExternalId = `tvm_${showId}`;
+              }
+            }
+          } catch (_) {}
+        } else if (effectiveExternalId && typeof effectiveExternalId === 'string' && effectiveExternalId.startsWith('cv_issue_')) {
+          effectiveItemType = 'comic';
+          if (meta.volume_id || meta.series_external_id) {
+            effectiveExternalId = meta.volume_id || meta.series_external_id;
+          } else {
+            try {
+              const issueRes = await apiClient.get(`/search/comic/issue/${effectiveExternalId}`);
+              if (issueRes.data?.parent_series?.external_id) {
+                effectiveExternalId = issueRes.data.parent_series.external_id;
+              }
+            } catch (_) {}
+          }
+        }
+
+        const itemToOpen = {
+          external_id: effectiveExternalId,
+          id: (!effectiveExternalId && activity.list_id) ? activity.list_id : undefined,
+          title: cleanTitle || activity.item_title || 'Media',
+          image_url: activity.image_url || undefined,
+          item_type: effectiveItemType,
+          tracking_list_id: activity.list_id || undefined
+        };
+        onOpenItem(itemToOpen);
+      }
+    });
   };
 
   // Human readable action text (capitalized and media-aware)
@@ -580,7 +600,9 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
         <div
           onClick={(e) => {
             e.stopPropagation();
-            navigate(`/user/${encodeURIComponent(activity.username)}`);
+            executeDelayedCardAction(() => {
+              navigate(`/user/${encodeURIComponent(activity.username)}`);
+            });
           }}
           style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', cursor: 'pointer', minWidth: 0, flex: 1 }}
         >
@@ -1187,8 +1209,10 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
 
     const handleOpenComments = () => {
       if (!canHaveComments) return;
-      navigate(`/post/${activity.id}`, {
-        state: { backgroundLocation: location, activity }
+      executeDelayedCardAction(() => {
+        navigate(`/post/${activity.id}`, {
+          state: { backgroundLocation: location, activity }
+        });
       });
     };
 
