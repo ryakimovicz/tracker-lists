@@ -677,18 +677,20 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
     fetchMedia(activeTab, searchQuery, 1, false);
   }, [activeTab, isOpen]);
 
-  const categoriesCacheRef = useRef<{ [key: string]: any[] }>({});
+  const categoriesCacheRef = useRef<{ [key: string]: { data: any[]; timestamp: number } }>({});
   const [rateLimited, setRateLimited] = useState(false);
 
-  // Fetch Categories for current tab
+  // Fetch Categories for current tab (cached in memory for 10 minutes to avoid redundant API hits)
   const loadCategories = async (tab: string) => {
     if (!KLIPY_API_KEY) return;
     const segment = tab === 'memes' ? 'static-memes' : tab;
     const localeParam = language === 'es' ? 'es' : 'en';
     const cacheKey = `${segment}-${localeParam}`;
 
-    if (categoriesCacheRef.current[cacheKey]) {
-      setCategories(categoriesCacheRef.current[cacheKey]);
+    const cached = categoriesCacheRef.current[cacheKey];
+    const TEN_MINUTES = 10 * 60 * 1000;
+    if (cached && Date.now() - cached.timestamp < TEN_MINUTES) {
+      setCategories(cached.data);
       return;
     }
 
@@ -709,7 +711,7 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
         } else if (Array.isArray(data.data)) {
           cats = data.data;
         }
-        categoriesCacheRef.current[cacheKey] = cats;
+        categoriesCacheRef.current[cacheKey] = { data: cats, timestamp: Date.now() };
         setCategories(cats);
       }
     } catch (err) {
@@ -1376,13 +1378,13 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
             <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '3rem 1rem', color: 'var(--text-muted)' }}>
               {rateLimited ? (
                 <div>
-                  <p style={{ margin: '0 0 0.4rem', fontSize: '0.92rem', color: 'var(--text-primary)', fontWeight: 600 }}>
-                    {language === 'es' ? 'Límite de peticiones por hora alcanzado en KLIPY' : 'KLIPY hourly request limit reached'}
+                  <p style={{ margin: '0 0 0.35rem', fontSize: '0.92rem', color: 'var(--text-primary)', fontWeight: 600 }}>
+                    {language === 'es' ? 'Servicio no disponible temporalmente' : 'Service temporarily unavailable'}
                   </p>
                   <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                     {language === 'es'
-                      ? 'La API key de prueba de KLIPY se renueva cada hora. Puedes solicitar la Production Key en tu panel de desarrollador para límites ilimitados.'
-                      : 'KLIPY test API key resets every hour. You can request a Production Key in your partner panel for higher limits.'}
+                      ? 'Por favor intenta de nuevo en unos minutos.'
+                      : 'Please try again in a few minutes.'}
                   </p>
                 </div>
               ) : (
