@@ -513,6 +513,7 @@ const MusicDetailsModalInner: React.FC<MusicDetailsModalProps> = ({
 
   return (
     <div
+      className="item-details-modal-overlay music-details-modal-overlay"
       style={{
         position: 'fixed',
         inset: 0,
@@ -538,7 +539,7 @@ const MusicDetailsModalInner: React.FC<MusicDetailsModalProps> = ({
       }}
     >
       <div
-        className="glass-card"
+        className="glass-card item-details-modal-card music-details-modal-card"
         style={{
           width: '100%',
           maxWidth: '680px',
@@ -555,6 +556,7 @@ const MusicDetailsModalInner: React.FC<MusicDetailsModalProps> = ({
       >
         {/* Header */}
         <div
+          className="music-details-modal-header"
           style={{
             padding: '1.25rem 1.5rem',
             borderBottom: '1px solid var(--border-color)',
@@ -564,7 +566,7 @@ const MusicDetailsModalInner: React.FC<MusicDetailsModalProps> = ({
             background: 'rgba(255, 255, 255, 0.02)'
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', minWidth: 0, flex: 1, paddingRight: '0.5rem' }}>
             <div
               style={{
                 width: '32px',
@@ -574,12 +576,13 @@ const MusicDetailsModalInner: React.FC<MusicDetailsModalProps> = ({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: 'var(--color-music, #1DB954)'
+                color: 'var(--color-music, #1DB954)',
+                flexShrink: 0
               }}
             >
               {currentType === 'artist' ? <Mic size={18} /> : currentType === 'album' ? <Disc size={18} /> : <Headphones size={18} />}
             </div>
-            <div>
+            <div style={{ minWidth: 0, flex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-music, #1DB954)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   {typeLabel}
@@ -591,7 +594,7 @@ const MusicDetailsModalInner: React.FC<MusicDetailsModalProps> = ({
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0 }}>
             {/* Feature Artist Heart button */}
             {user && currentType === 'artist' && (
               <button
@@ -620,7 +623,7 @@ const MusicDetailsModalInner: React.FC<MusicDetailsModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="btn-close-modal"
+              className="btn-close-modal music-details-close-btn"
               style={{
                 background: 'transparent',
                 border: 'none',
@@ -642,7 +645,7 @@ const MusicDetailsModalInner: React.FC<MusicDetailsModalProps> = ({
         </div>
 
         {/* Scrollable Content */}
-        <div style={{ padding: '1.5rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        <div className="music-details-modal-body" style={{ padding: '1.5rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1.5rem', flex: 1 }}>
           {/* Media Overview Banner (Always rendered immediately) */}
           <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center' }}>
             <div
