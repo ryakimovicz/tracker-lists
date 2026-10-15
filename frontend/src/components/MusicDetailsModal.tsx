@@ -584,13 +584,10 @@ const MusicDetailsModalInner: React.FC<MusicDetailsModalProps> = ({
             </div>
             <div style={{ minWidth: 0, flex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-music, #1DB954)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-music, #1DB954)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   {typeLabel}
                 </span>
               </div>
-              <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', maxWidth: '480px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {displayTitle}
-              </h3>
             </div>
           </div>
 
