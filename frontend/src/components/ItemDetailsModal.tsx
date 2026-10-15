@@ -1351,6 +1351,12 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   const [editingReplyMedia, setEditingReplyMedia] = useState<SelectedKlipyMedia | null>(null);
   const [activeBottomTab, setActiveBottomTab] = useState<'reviews' | 'comments'>('reviews');
   const [showCommentsSpoilerModal, setShowCommentsSpoilerModal] = useState<boolean>(false);
+  const [deleteCommentId, setDeleteCommentId] = useState<number | null>(() => {
+    if (typeof window === 'undefined') return null;
+    const p = new URLSearchParams(window.location.search);
+    const id = p.get('delete_comment');
+    return id ? Number(id) : null;
+  });
 
   // Klipy Picker Modal state
   const [klipyPickerTarget, setKlipyPickerTarget] = useState<'comment' | 'reply' | 'edit_reply' | 'edit_comment' | null>(null);
@@ -2277,7 +2283,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     await handleMarkConsumedAgain(true);
   };
 
-  const isAnySubModalOpen = showCommentsSpoilerModal || showReconsumedModal || showSeriesScopeModal || showHundredPercentDecisionModal || showStatusChangeModal || showRemoveShelfModal || showReportMediaModal || !!episodeActionItem || !!seasonActionItem || !!pendingPreviousPrompt || !!comicIssuePrompt;
+  const isAnySubModalOpen = (deleteCommentId !== null) || showCommentsSpoilerModal || showReconsumedModal || showSeriesScopeModal || showHundredPercentDecisionModal || showStatusChangeModal || showRemoveShelfModal || showReportMediaModal || !!episodeActionItem || !!seasonActionItem || !!pendingPreviousPrompt || !!comicIssuePrompt;
 
   const handleRemoveLatestConsumption = async () => {
     if (!selectedItem || !selectedItem.id) return;
@@ -3777,13 +3783,42 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     initialUrlCheckDone.current = true;
   }, [isItemConsumed, updateModalUrlParams]);
 
-  // Listen for browser Back/Forward (popstate) to handle spoiler warning modal and tab changes
+  const openDeleteReviewConfirm = (reviewId: number) => {
+    if (typeof window === 'undefined') return;
+    setDeleteCommentId(reviewId);
+    const currentUrl = new URL(window.location.href);
+    currentUrl.searchParams.set('delete_comment', String(reviewId));
+    const newRelative = currentUrl.pathname + (currentUrl.search || '') + (currentUrl.hash || '');
+    window.history.pushState(window.history.state, '', newRelative);
+  };
+
+  const closeDeleteReviewConfirm = (useBack: boolean = true) => {
+    setDeleteCommentId(null);
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('delete_comment')) {
+      if (useBack) {
+        window.history.back();
+      } else {
+        const currentUrl = new URL(window.location.href);
+        currentUrl.searchParams.delete('delete_comment');
+        const newRelative = currentUrl.pathname + (currentUrl.search || '') + (currentUrl.hash || '');
+        window.history.replaceState(window.history.state, '', newRelative);
+      }
+    }
+  };
+
+  // Listen for browser Back/Forward (popstate) to handle spoiler warning modal, delete confirmation, and tab changes
   useEffect(() => {
     const handlePopState = () => {
       const params = new URLSearchParams(window.location.search);
       const warningParam = params.get('warning');
       const tabParam = params.get('tab');
       const modalParam = params.get('modal');
+      const deleteCommentParam = params.get('delete_comment');
+
+      // Sync delete comment confirmation
+      setDeleteCommentId(deleteCommentParam ? Number(deleteCommentParam) : null);
 
       // If Klipy modal is active, let KlipyPicker handle its own popstate
       if (modalParam === 'media') return;
@@ -3823,6 +3858,10 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
         }
         if (params.get('tab') === 'comments') {
           params.delete('tab');
+          changed = true;
+        }
+        if (params.get('delete_comment')) {
+          params.delete('delete_comment');
           changed = true;
         }
         if (changed) {
@@ -4083,6 +4122,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       }
     } catch (err) {
       console.error("Failed to delete review", err);
+    } finally {
+      closeDeleteReviewConfirm(true);
     }
   };  const handleReportReviewItem = async (reviewId: number) => {
     if (!user) return;
@@ -8863,7 +8904,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                 )}
                                 {!rootNode.is_deleted && user && (user.id === rootNode.user_id || user.is_admin) && (
                                   <button
-                                    onClick={() => handleDeleteReviewItem(rootNode.id)}
+                                    onClick={() => openDeleteReviewConfirm(rootNode.id)}
                                     title={language === 'es' ? 'Eliminar comentario' : 'Delete comment'}
                                     style={{
                                       background: 'transparent',
@@ -9222,7 +9263,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                           )}
                                           {!reply.is_deleted && user && (user.id === reply.user_id || user.is_admin) && (
                                             <button
-                                              onClick={() => handleDeleteReviewItem(reply.id)}
+                                              onClick={() => openDeleteReviewConfirm(reply.id)}
                                               title={language === 'es' ? 'Eliminar respuesta' : 'Delete reply'}
                                               style={{
                                                 background: 'transparent',
@@ -11530,6 +11571,25 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                     updateModalUrlParams('reviews', false, false);
                   }
                 }}
+              />
+
+              <ConfirmModal
+                isOpen={deleteCommentId !== null}
+                title={language === 'es' ? 'Eliminar comentario' : 'Delete comment'}
+                message={
+                  language === 'es'
+                    ? '¿Estás seguro de que deseas eliminar este comentario? Esta acción no se puede deshacer.'
+                    : 'Are you sure you want to delete this comment? This action cannot be undone.'
+                }
+                type="danger"
+                confirmText={language === 'es' ? 'Eliminar' : 'Delete'}
+                cancelText={language === 'es' ? 'Cancelar' : 'Cancel'}
+                onConfirm={() => {
+                  if (deleteCommentId) {
+                    handleDeleteReviewItem(deleteCommentId);
+                  }
+                }}
+                onClose={() => closeDeleteReviewConfirm(true)}
               />
     </div>
   );

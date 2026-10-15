@@ -7,6 +7,7 @@ import { KlipyPicker } from './KlipyPicker';
 import type { SelectedKlipyMedia } from './KlipyPicker';
 import { MediaAttachmentView } from './ItemDetailsModal';
 import { renderFormattedContentWithMentions, AuthorUsername } from './MentionTag';
+import { ConfirmModal } from './ConfirmModal';
 
 export interface ActivityCommentItem {
   id: number;
@@ -176,12 +177,57 @@ export const ActivityCommentThread: React.FC<ActivityCommentThreadProps> = ({
     }
   };
 
+  // Confirmation Modal state synced with URL ?delete_comment=<id>
+  const [deleteCommentId, setDeleteCommentId] = useState<number | null>(() => {
+    if (typeof window === 'undefined') return null;
+    const p = new URLSearchParams(window.location.search);
+    const id = p.get('delete_comment');
+    return id ? Number(id) : null;
+  });
+
+  const openDeleteConfirm = (commentId: number) => {
+    if (typeof window === 'undefined') return;
+    setDeleteCommentId(commentId);
+    const currentUrl = new URL(window.location.href);
+    currentUrl.searchParams.set('delete_comment', String(commentId));
+    const newRelative = currentUrl.pathname + (currentUrl.search || '') + (currentUrl.hash || '');
+    window.history.pushState(window.history.state, '', newRelative);
+  };
+
+  const closeDeleteConfirm = (useBack: boolean = true) => {
+    setDeleteCommentId(null);
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('delete_comment')) {
+      if (useBack) {
+        window.history.back();
+      } else {
+        const currentUrl = new URL(window.location.href);
+        currentUrl.searchParams.delete('delete_comment');
+        const newRelative = currentUrl.pathname + (currentUrl.search || '') + (currentUrl.hash || '');
+        window.history.replaceState(window.history.state, '', newRelative);
+      }
+    }
+  };
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const p = new URLSearchParams(window.location.search);
+      const id = p.get('delete_comment');
+      setDeleteCommentId(id ? Number(id) : null);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   const handleDeleteComment = async (commentId: number) => {
     try {
       await apiClient.delete(`/social/comments/${commentId}`);
       await fetchComments();
     } catch (err) {
       console.error('Error deleting comment:', err);
+    } finally {
+      closeDeleteConfirm(true);
     }
   };
 
@@ -307,7 +353,7 @@ export const ActivityCommentThread: React.FC<ActivityCommentThreadProps> = ({
             </span>
             {!item.is_deleted && canDelete && (
               <button
-                onClick={() => handleDeleteComment(item.id)}
+                onClick={() => openDeleteConfirm(item.id)}
                 title={isEs ? 'Eliminar' : 'Delete'}
                 style={{
                   background: 'transparent',
@@ -653,6 +699,26 @@ export const ActivityCommentThread: React.FC<ActivityCommentThreadProps> = ({
           }}
         />
       )}
+
+      {/* Delete Comment Confirmation Modal */}
+      <ConfirmModal
+        isOpen={deleteCommentId !== null}
+        title={isEs ? 'Eliminar comentario' : 'Delete comment'}
+        message={
+          isEs
+            ? '¿Estás seguro de que deseas eliminar este comentario? Esta acción no se puede deshacer.'
+            : 'Are you sure you want to delete this comment? This action cannot be undone.'
+        }
+        type="danger"
+        confirmText={isEs ? 'Eliminar' : 'Delete'}
+        cancelText={isEs ? 'Cancelar' : 'Cancel'}
+        onConfirm={() => {
+          if (deleteCommentId) {
+            handleDeleteComment(deleteCommentId);
+          }
+        }}
+        onClose={() => closeDeleteConfirm(true)}
+      />
     </div>
   );
 };
