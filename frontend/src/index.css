@@ -2939,9 +2939,10 @@ h1, h2, h3, h4, h5, h6 {
     -webkit-user-select: none !important;
   }
 
-  /* Item details & Activity post modals on mobile: stay between top header (56px) and bottom nav (60px) */
+  /* Item details, Activity post & Media picker (?modal=media) modals on mobile: stay between top header (56px) and bottom nav (60px) */
   .item-details-modal-overlay,
-  .activity-modal-overlay {
+  .activity-modal-overlay,
+  .klipy-modal-overlay {
     position: fixed !important;
     top: calc(56px + env(safe-area-inset-top, 0px)) !important;
     bottom: calc(60px + env(safe-area-inset-bottom, 0px)) !important;
@@ -2958,7 +2959,8 @@ h1, h2, h3, h4, h5, h6 {
 
   .item-details-modal-card,
   .item-details-modal-overlay > .glass-card,
-  .activity-modal-card {
+  .activity-modal-card,
+  .klipy-modal-card {
     position: absolute !important;
     top: 0 !important;
     left: 0 !important;
@@ -2973,22 +2975,29 @@ h1, h2, h3, h4, h5, h6 {
     border: none !important;
     box-shadow: none !important;
     margin: 0 !important;
+    padding: 0 !important;
+    overflow-y: hidden !important;
+    box-sizing: border-box !important;
+  }
+
+  .item-details-modal-card,
+  .item-details-modal-overlay > .glass-card,
+  .activity-modal-card {
     padding-left: 1rem !important;
     padding-right: 1rem !important;
     padding-top: 1rem !important;
     padding-bottom: 1.5rem !important;
     overflow-y: auto !important;
-    box-sizing: border-box !important;
   }
 
   /* Fullscreen mobile modals for other overlay types without side margins or rounded corners */
   .content-modal-overlay,
-  div[style*="zIndex: 2000"]:not(.item-details-modal-overlay):not(.music-details-modal-overlay):not(.activity-modal-overlay):not(.notification-flyout-panel),
-  div[style*="z-index: 2000"]:not(.item-details-modal-overlay):not(.music-details-modal-overlay):not(.activity-modal-overlay):not(.notification-flyout-panel),
-  div[style*="zIndex: 9999"]:not(.item-details-modal-overlay):not(.music-details-modal-overlay):not(.activity-modal-overlay):not(.notification-flyout-panel),
-  div[style*="z-index: 9999"]:not(.item-details-modal-overlay):not(.music-details-modal-overlay):not(.activity-modal-overlay):not(.notification-flyout-panel),
-  div[style*="zIndex: 10000"]:not(.activity-modal-overlay):not(.notification-flyout-panel),
-  div[style*="z-index: 10000"]:not(.activity-modal-overlay):not(.notification-flyout-panel) {
+  div[style*="zIndex: 2000"]:not(.item-details-modal-overlay):not(.music-details-modal-overlay):not(.activity-modal-overlay):not(.klipy-modal-overlay):not(.notification-flyout-panel),
+  div[style*="z-index: 2000"]:not(.item-details-modal-overlay):not(.music-details-modal-overlay):not(.activity-modal-overlay):not(.klipy-modal-overlay):not(.notification-flyout-panel),
+  div[style*="zIndex: 9999"]:not(.item-details-modal-overlay):not(.music-details-modal-overlay):not(.activity-modal-overlay):not(.klipy-modal-overlay):not(.notification-flyout-panel),
+  div[style*="z-index: 9999"]:not(.item-details-modal-overlay):not(.music-details-modal-overlay):not(.activity-modal-overlay):not(.klipy-modal-overlay):not(.notification-flyout-panel),
+  div[style*="zIndex: 10000"]:not(.activity-modal-overlay):not(.klipy-modal-overlay):not(.notification-flyout-panel),
+  div[style*="z-index: 10000"]:not(.activity-modal-overlay):not(.klipy-modal-overlay):not(.notification-flyout-panel) {
     position: fixed !important;
     top: 0 !important;
     left: 0 !important;

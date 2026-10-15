@@ -838,6 +838,7 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
 
   return createPortal(
     <div
+      className="klipy-modal-overlay"
       style={{
         position: 'fixed',
         top: 0,
@@ -858,6 +859,7 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
     >
       <div
         ref={containerRef}
+        className="klipy-modal-card"
         style={{
           width: '100%',
           maxWidth: '540px',
