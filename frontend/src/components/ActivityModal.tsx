@@ -100,6 +100,7 @@ export const ActivityModal: React.FC<ActivityModalProps> = ({
 
   return createPortal(
     <div
+      className="activity-modal-overlay"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) {
           mouseDownOnBackdropRef.current = true;
@@ -127,6 +128,7 @@ export const ActivityModal: React.FC<ActivityModalProps> = ({
       }}
     >
       <div
+        className="activity-modal-card"
         onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
         style={{
