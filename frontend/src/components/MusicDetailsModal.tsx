@@ -591,7 +591,7 @@ const MusicDetailsModalInner: React.FC<MusicDetailsModalProps> = ({
         {/* Scrollable Content */}
         <div className="music-details-modal-body" style={{ padding: '1.5rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1.5rem', flex: 1 }}>
           {/* Media Overview Banner */}
-          <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'flex-start', paddingRight: '2rem' }}>
+          <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'flex-start' }}>
             <div
               style={{
                 width: '120px',
@@ -634,8 +634,8 @@ const MusicDetailsModalInner: React.FC<MusicDetailsModalProps> = ({
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', minWidth: 0, flex: 1 }}>
-              {/* Row 1: Tag badge + favorite heart button (for artist) aligned to the right */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', width: '100%' }}>
+              {/* Row 1: Tag badge */}
+              <div style={{ display: 'flex', alignItems: 'center' }}>
                 <span style={{
                   fontSize: '0.72rem',
                   fontWeight: 800,
@@ -652,6 +652,13 @@ const MusicDetailsModalInner: React.FC<MusicDetailsModalProps> = ({
                 }}>
                   {typeLabel}
                 </span>
+              </div>
+
+              {/* Row 2: Title horizontally aligned with heart button (heart button aligned vertically with X) */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', width: '100%' }}>
+                <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.2, minWidth: 0, wordBreak: 'break-word' }}>
+                  {displayTitle}
+                </h2>
 
                 {user && currentType === 'artist' && (
                   <button
@@ -659,10 +666,10 @@ const MusicDetailsModalInner: React.FC<MusicDetailsModalProps> = ({
                     onClick={handleToggleArtistFavorite}
                     className={`btn-favorite-heart ${isCurrentArtistFavorite ? 'is-favorite' : ''}`}
                     style={{
-                      width: '32px',
-                      height: '32px',
-                      minWidth: '32px',
-                      minHeight: '32px',
+                      width: '34px',
+                      height: '34px',
+                      minWidth: '34px',
+                      minHeight: '34px',
                       marginLeft: 'auto',
                       flexShrink: 0,
                       cursor: 'pointer',
@@ -684,11 +691,6 @@ const MusicDetailsModalInner: React.FC<MusicDetailsModalProps> = ({
                   </button>
                 )}
               </div>
-
-              {/* Row 2: Title */}
-              <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.2 }}>
-                {displayTitle}
-              </h2>
 
               {/* Row 3: Artist name with arrow (for non-artists: albums, EPs, singles, tracks) */}
               {displayArtist && (
