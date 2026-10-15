@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
-import { Shield, Bell, Settings } from 'lucide-react';
+import { Shield, Bell, Settings, Crown } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useTranslation } from '../context/LanguageContext';
 import { BrandLogo } from './BrandLogo';
 import { NotificationFlyout } from './NotificationFlyout';
 import { apiClient } from '../api/client';
 
 export const MobileHeader: React.FC = () => {
   const { user, isAuthenticated } = useAuth();
+  const { language, t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -63,8 +65,29 @@ export const MobileHeader: React.FC = () => {
           <BrandLogo fontSize="1.65rem" disableLink={true} />
         </div>
 
-        {/* Right Slot: Notifications & Settings */}
+        {/* Right Slot: Premium, Notifications & Settings */}
         <div className="mobile-header-right">
+          {isUserLoggedIn && !user?.is_pro && (
+            <button
+              type="button"
+              onClick={() => {
+                const currentParams = new URLSearchParams(location.search);
+                currentParams.set('modal', 'premium');
+                const targetSearch = currentParams.toString();
+                navigate({
+                  pathname: location.pathname,
+                  search: targetSearch ? `?${targetSearch}` : ''
+                });
+              }}
+              className="mobile-header-icon-btn"
+              title={t('navUpgradePro') || (language === 'es' ? 'Hacerse Premium' : 'Get Premium')}
+              aria-label={t('navUpgradePro') || (language === 'es' ? 'Hacerse Premium' : 'Get Premium')}
+              style={{ color: 'var(--accent-primary)' }}
+            >
+              <Crown size={22} color="var(--accent-primary)" />
+            </button>
+          )}
+
           {isUserLoggedIn && (
             <button
               ref={notifBtnRef}
