@@ -317,11 +317,97 @@ export const NotificationFlyout: React.FC<NotificationFlyoutProps> = ({
     }
   };
 
+  // Helper to format item titles like in social event cards (e.g. S02E15, specials, comics)
+  const formatNotificationItemTitle = (rawTitle?: string | null) => {
+    if (!rawTitle) return null;
+    const rawText = rawTitle.trim();
+
+    // 1. Episode pattern: "Series - S01E02 - Episode Name" or "S01E02 - Episode Name"
+    const epMatch = rawText.match(/^(?:(.*?)\s*-\s*)?[sS](\d+)[eE](\d+)(?:\s*-\s*(.*))?$/);
+    if (epMatch) {
+      const seriesName = (epMatch[1] || '').trim();
+      const seasonNum = parseInt(epMatch[2], 10);
+      const episodeNum = parseInt(epMatch[3], 10);
+      const sPadded = seasonNum < 10 ? `0${seasonNum}` : `${seasonNum}`;
+      const ePadded = episodeNum < 10 ? `0${episodeNum}` : `${episodeNum}`;
+      const epCode = isEs ? `T${sPadded} | E${ePadded}` : `S${sPadded} | E${ePadded}`;
+      const episodeName = (epMatch[4] || '').trim();
+
+      return (
+        <span>
+          <strong style={{ color: 'var(--text-primary)' }}>{epCode}</strong>
+          {episodeName && (
+            <span style={{ color: 'var(--text-secondary)', marginLeft: '0.3rem' }}>
+              ({episodeName})
+            </span>
+          )}
+          {seriesName && (
+            <span>
+              {' '}{isEs ? 'de' : 'of'}{' '}
+              <strong style={{ color: 'var(--text-primary)' }}>{seriesName}</strong>
+            </span>
+          )}
+        </span>
+      );
+    }
+
+    // 2. Special episode pattern: "Series - Especial / Special - Name"
+    const specialMatch = rawText.match(/^(.*?)\s*-\s*(?:Especial|Special)\s*-\s*(.*)$/i);
+    if (specialMatch) {
+      const seriesName = (specialMatch[1] || '').trim();
+      const episodeName = (specialMatch[2] || '').trim();
+      return (
+        <span>
+          <strong style={{ color: 'var(--text-primary)' }}>{isEs ? 'Especial' : 'Special'}</strong>
+          {episodeName && (
+            <span style={{ color: 'var(--text-secondary)', marginLeft: '0.3rem' }}>
+              ({episodeName})
+            </span>
+          )}
+          {seriesName && (
+            <span>
+              {' '}{isEs ? 'de' : 'of'}{' '}
+              <strong style={{ color: 'var(--text-primary)' }}>{seriesName}</strong>
+            </span>
+          )}
+        </span>
+      );
+    }
+
+    // 3. Comic issue pattern: "Series #12 - Title" or "Series #12"
+    const comicMatch = rawText.match(/^(.*?)\s*#(\d+(?:\.\d+)?)(?:\s*-\s*(.*))?$/);
+    if (comicMatch) {
+      const seriesName = (comicMatch[1] || '').trim();
+      const issueNum = comicMatch[2].trim();
+      const issueTitle = comicMatch[3]?.trim();
+      return (
+        <span>
+          <strong style={{ color: 'var(--text-primary)' }}>#{issueNum}</strong>
+          {issueTitle && (
+            <span style={{ color: 'var(--text-secondary)', marginLeft: '0.3rem' }}>
+              ({issueTitle})
+            </span>
+          )}
+          {seriesName && (
+            <span>
+              {' '}{isEs ? 'de' : 'of'}{' '}
+              <strong style={{ color: 'var(--text-primary)' }}>{seriesName}</strong>
+            </span>
+          )}
+        </span>
+      );
+    }
+
+    return <strong style={{ color: 'var(--text-primary)' }}>{rawText}</strong>;
+  };
+
   const renderDescription = (notif: NotificationItem) => {
     let extra: any = {};
     try {
       if (notif.extra_data_json) extra = JSON.parse(notif.extra_data_json);
     } catch (e) {}
+
+    const formattedTitle = formatNotificationItemTitle(extra.item_title);
 
     switch (notif.notification_type) {
       case 'admin_warning':
@@ -334,15 +420,31 @@ export const NotificationFlyout: React.FC<NotificationFlyoutProps> = ({
       case 'activity_like':
         return (
           <span>
-            {isEs ? 'le dio me gusta a tu actividad' : 'liked your activity'}{' '}
-            {extra.item_title ? <strong>{extra.item_title}</strong> : ''}
+            {formattedTitle ? (
+              <>
+                {isEs ? 'le dio me gusta a tu actividad de' : 'liked your activity on'}{' '}
+                {formattedTitle}
+              </>
+            ) : (
+              <span>{isEs ? 'le dio me gusta a tu actividad' : 'liked your activity'}</span>
+            )}
           </span>
         );
       case 'activity_comment':
         return (
           <span>
-            {isEs ? 'comentó en tu actividad' : 'commented on your activity'}
-            {extra.snippet ? `: "${extra.snippet}"` : ''}
+            {formattedTitle ? (
+              <>
+                {isEs ? 'comentó en tu actividad de' : 'commented on your activity on'}{' '}
+                {formattedTitle}
+                {extra.snippet ? `: "${extra.snippet}"` : ''}
+              </>
+            ) : (
+              <>
+                {isEs ? 'comentó en tu actividad' : 'commented on your activity'}
+                {extra.snippet ? `: "${extra.snippet}"` : ''}
+              </>
+            )}
           </span>
         );
       case 'comment_reply':
@@ -356,7 +458,7 @@ export const NotificationFlyout: React.FC<NotificationFlyoutProps> = ({
         return (
           <span>
             {isEs ? 'te mencionó en un comentario' : 'mentioned you in a comment'}
-            {extra.item_title ? ` (${extra.item_title})` : ''}
+            {formattedTitle ? <> ({formattedTitle})</> : ''}
             {extra.snippet ? `: "${extra.snippet}"` : ''}
           </span>
         );
