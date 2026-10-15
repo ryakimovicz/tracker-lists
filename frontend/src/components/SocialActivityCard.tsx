@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { ThumbsUp, MessageSquare, MoreVertical, Trash2, Star, Film, Tv, Sparkles, Book, Gamepad2, Compass, User, EyeOff, Mic, Headphones, Music } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { apiClient } from '../api/client';
@@ -59,9 +59,11 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [likeAnimating, setLikeAnimating] = useState(false);
+  const [showDoubleTapBurst, setShowDoubleTapBurst] = useState(false);
+  const lastTapRef = useRef<number>(0);
+  const singleTapTimeoutRef = useRef<any>(null);
 
-  const handleToggleLike = async (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const performLike = async () => {
     if (!user) return;
 
     setLikeAnimating(true);
@@ -70,7 +72,7 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
     const prevLiked = isLiked;
     const prevCount = likesCount;
 
-    // Optimistic
+    // Optimistic toggle
     setIsLiked(!prevLiked);
     setLikesCount(prevLiked ? Math.max(0, prevCount - 1) : prevCount + 1);
 
@@ -82,6 +84,46 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
       // Revert on error
       setIsLiked(prevLiked);
       setLikesCount(prevCount);
+    }
+  };
+
+  const handleToggleLike = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    await performLike();
+  };
+
+  // Double tap handler for mobile screens on the activity card
+  const handleCardTouchEnd = (e: React.TouchEvent) => {
+    // If the touch originated from an interactive button, skip double tap
+    const target = e.target as HTMLElement | null;
+    if (target?.closest('button') || target?.closest('a')) {
+      return;
+    }
+
+    const now = Date.now();
+    const timeSinceLastTap = now - lastTapRef.current;
+
+    if (timeSinceLastTap > 0 && timeSinceLastTap < 300) {
+      // Double tap detected!
+      if (singleTapTimeoutRef.current) {
+        clearTimeout(singleTapTimeoutRef.current);
+        singleTapTimeoutRef.current = null;
+      }
+      lastTapRef.current = 0;
+
+      // Show animated visual like burst
+      setShowDoubleTapBurst(true);
+      setTimeout(() => setShowDoubleTapBurst(false), 700);
+
+      // If not liked yet, like it. If already liked, re-trigger animation and keep like
+      if (!isLiked) {
+        performLike();
+      } else {
+        setLikeAnimating(true);
+        setTimeout(() => setLikeAnimating(false), 300);
+      }
+    } else {
+      lastTapRef.current = now;
     }
   };
 
@@ -1153,6 +1195,7 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
     return (
       <div
         className="glass-card social-feed-card"
+        onTouchEnd={handleCardTouchEnd}
         style={{
           padding: '1.25rem',
           borderRadius: '16px',
@@ -1164,9 +1207,35 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
           border: '1px solid var(--border-color)',
           transition: 'border-color 0.2s ease, background 0.2s ease, transform 0.2s ease',
           height: '100%',
-          justifyContent: 'space-between'
+          justifyContent: 'space-between',
+          overflow: 'hidden'
         }}
       >
+        {/* Double-tap animated like burst (mobile) */}
+        {showDoubleTapBurst && (
+          <div
+            className="social-double-tap-burst"
+            style={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              zIndex: 10,
+              background: 'rgba(59, 130, 246, 0.95)',
+              color: '#fff',
+              borderRadius: '50%',
+              width: '76px',
+              height: '76px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 8px 30px rgba(59, 130, 246, 0.6)',
+              backdropFilter: 'blur(8px)'
+            }}
+          >
+            <ThumbsUp size={40} fill="#fff" color="#fff" />
+          </div>
+        )}
+
         {/* Clickable Card Body (Header + Poster + Action Description + Review) */}
         <div
           onClick={handleClickCard}

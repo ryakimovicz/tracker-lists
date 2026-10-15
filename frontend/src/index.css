@@ -3188,4 +3188,30 @@ h1, h2, h3, h4, h5, h6 {
   }
 }
 
+/* Social Card Mobile Double-Tap Like Burst */
+@keyframes socialLikeBurst {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.3);
+  }
+  30% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.25);
+  }
+  60% {
+    opacity: 0.95;
+    transform: translate(-50%, -50%) scale(1.1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.4);
+  }
+}
+
+.social-double-tap-burst {
+  animation: socialLikeBurst 0.65s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+  pointer-events: none;
+}
+
+
 
