@@ -143,11 +143,11 @@ export const MobileHeader: React.FC = () => {
                 });
               }
             }}
-            className={`mobile-header-icon-btn ${isSettingsActive ? 'active' : ''}`}
+            className={`mobile-header-icon-btn ${isSettingsActive && !showNotifFlyout ? 'active' : ''}`}
             title="Ajustes"
             aria-label="Ajustes"
           >
-            <Settings size={22} color={isSettingsActive ? 'var(--accent-primary)' : 'var(--text-secondary)'} />
+            <Settings size={22} color={isSettingsActive && !showNotifFlyout ? 'var(--accent-primary)' : 'var(--text-secondary)'} />
           </button>
         </div>
       </header>
