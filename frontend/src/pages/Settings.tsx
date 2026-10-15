@@ -921,7 +921,7 @@ export const SettingsPage: React.FC = () => {
                 </button>
               </div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <div className="settings-password-grid">
               <div>
                 <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.35rem' }}>
                   {isEs ? 'Nueva contraseña' : 'New password'}

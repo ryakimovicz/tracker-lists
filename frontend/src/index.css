@@ -2999,3 +2999,15 @@ h1, h2, h3, h4, h5, h6 {
   }
 }
 
+.settings-password-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+@media (max-width: 768px) {
+  .settings-password-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
