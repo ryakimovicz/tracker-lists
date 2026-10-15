@@ -102,6 +102,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
 
   const modalContent = (
     <div
+      className="confirm-modal-overlay"
       style={{
         position: 'fixed',
         top: 0,
@@ -122,7 +123,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
       onClick={!isLoading ? onClose : undefined}
     >
       <div
-        className="glass-card"
+        className="glass-card confirm-modal-card"
         style={{
           width: '100%',
           maxWidth: '460px',

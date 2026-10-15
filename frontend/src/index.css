@@ -3223,5 +3223,45 @@ h1, h2, h3, h4, h5, h6 {
   pointer-events: none;
 }
 
+/* ---------------------------------------------------------------------------
+   Confirmation / Alert Modals Responsive Styling (?delete_comment, ?warning=spoilers, etc.)
+   Ensures modals stay nicely centered with balanced breathing room from screen edges on mobile
+   --------------------------------------------------------------------------- */
+.confirm-modal-overlay {
+  padding: 1.25rem !important;
+  box-sizing: border-box !important;
+}
+
+.confirm-modal-card {
+  width: 100% !important;
+  max-width: 440px !important;
+  box-sizing: border-box !important;
+}
+
+@media (max-width: 768px) {
+  .confirm-modal-overlay {
+    padding: 1.25rem 1.5rem !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  .confirm-modal-card {
+    position: relative !important;
+    width: min(calc(100vw - 2.5rem), 400px) !important;
+    max-width: min(calc(100vw - 2.5rem), 400px) !important;
+    min-width: unset !important;
+    height: auto !important;
+    min-height: unset !important;
+    max-height: calc(100dvh - 3rem) !important;
+    border-radius: 20px !important;
+    padding: 1.75rem 1.25rem !important;
+    margin: auto !important;
+    overflow-y: auto !important;
+    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12)) !important;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.65) !important;
+  }
+}
+
 
 
