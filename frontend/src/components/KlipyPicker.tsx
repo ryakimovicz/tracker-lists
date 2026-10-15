@@ -595,6 +595,45 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
     }
   }, [isOpen, updateKlipyUrlParams]);
 
+  const TABS: ('gifs' | 'stickers' | 'memes' | 'clips')[] = ['gifs', 'stickers', 'memes', 'clips'];
+
+  const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (viewFavorites) return;
+    const touch = e.touches[0];
+    touchStartRef.current = {
+      x: touch.clientX,
+      y: touch.clientY,
+      time: Date.now()
+    };
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (viewFavorites || !touchStartRef.current) return;
+    const touch = e.changedTouches[0];
+    const diffX = touch.clientX - touchStartRef.current.x;
+    const diffY = touch.clientY - touchStartRef.current.y;
+    const elapsedTime = Date.now() - touchStartRef.current.time;
+    touchStartRef.current = null;
+
+    // Minimum swipe distance: 50px, predominantly horizontal, within 800ms
+    if (elapsedTime <= 800 && Math.abs(diffX) >= 50 && Math.abs(diffX) > Math.abs(diffY) * 1.4) {
+      const currentIndex = TABS.indexOf(activeTab);
+      if (diffX < 0) {
+        // Swipe Left -> next tab
+        if (currentIndex < TABS.length - 1) {
+          handleTabSelect(TABS[currentIndex + 1]);
+        }
+      } else {
+        // Swipe Right -> previous tab
+        if (currentIndex > 0) {
+          handleTabSelect(TABS[currentIndex - 1]);
+        }
+      }
+    }
+  };
+
   const handleTabSelect = (tab: 'gifs' | 'stickers' | 'memes' | 'clips') => {
     setActiveTab(tab);
     setViewFavorites(false);
@@ -1118,6 +1157,8 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
         {/* Grid Content */}
         <div
           onScroll={handleScroll}
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
           style={{
             flex: 1,
             overflowY: 'auto',
@@ -1348,9 +1389,14 @@ export const KlipyPicker: React.FC<KlipyPickerProps> = ({
           color: 'var(--text-muted, #94a3b8)',
           background: 'var(--bg-secondary, rgba(0,0,0,0.2))'
         }}>
-          <span>
-            {language === 'es' ? 'Haz clic para insertar' : 'Click to insert'}
-          </span>
+          <div>
+            <span className="home-desktop-only">
+              {language === 'es' ? 'Haz clic para insertar' : 'Click to insert'}
+            </span>
+            <span className="home-mobile-only">
+              {language === 'es' ? 'Toca para insertar' : 'Tap to insert'}
+            </span>
+          </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
             <span>Powered by</span>
             <strong style={{ color: 'var(--text-primary)', letterSpacing: '0.04em' }}>KLIPY</strong>
