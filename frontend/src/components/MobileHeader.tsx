@@ -56,20 +56,9 @@ export const MobileHeader: React.FC = () => {
   return (
     <>
       <header className="mobile-header">
-        {/* Left Slot: Admin Button or balanced spacer */}
+        {/* Left Slot: Balanced spacer to keep center logo perfectly centered */}
         <div className="mobile-header-left">
-          {user?.is_admin ? (
-            <Link
-              to="/admin"
-              className="mobile-header-icon-btn"
-              title="Panel de Admin"
-              aria-label="Panel de Admin"
-            >
-              <Shield size={22} color="var(--accent-primary)" />
-            </Link>
-          ) : (
-            <div className="mobile-header-placeholder" />
-          )}
+          <div className="mobile-header-placeholder" />
         </div>
 
         {/* Center Slot: Brand Logo */}

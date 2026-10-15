@@ -1036,6 +1036,60 @@ export const SettingsPage: React.FC = () => {
           </div>
         </div>
 
+        {/* Section 8.5: Administration (Admins Only) */}
+        {user?.is_admin && (
+          <div
+            className="glass-card"
+            style={{
+              padding: '2rem',
+              borderRadius: '16px',
+              border: '1px solid var(--border-color)',
+              background: 'linear-gradient(135deg, var(--bg-secondary) 0%, rgba(59, 130, 246, 0.05) 100%)'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.75rem' }}>
+              <h2 style={{ fontSize: '1.2rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
+                <Shield size={20} color="var(--accent-primary)" />
+                {isEs ? 'Panel de Control' : 'Control Panel'}
+              </h2>
+              <span
+                style={{
+                  fontSize: '0.72rem',
+                  fontWeight: 700,
+                  padding: '0.2rem 0.55rem',
+                  borderRadius: '20px',
+                  background: 'color-mix(in srgb, var(--accent-primary) 14%, transparent)',
+                  color: 'var(--accent-primary)',
+                  border: '1px solid color-mix(in srgb, var(--accent-primary) 35%, transparent)'
+                }}
+              >
+                ADMIN
+              </span>
+            </div>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1.25rem', lineHeight: 1.5 }}>
+              {isEs
+                ? 'Acceso a la gestión global de usuarios, reportes de contenido, obras, reseñas y moderación de la comunidad.'
+                : 'Access global user management, content reports, media items, reviews, and community moderation.'}
+            </p>
+            <Link
+              to="/admin"
+              className="btn-primary"
+              style={{
+                textDecoration: 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                padding: '0.65rem 1.35rem',
+                fontSize: '0.9rem',
+                fontWeight: 600
+              }}
+            >
+              <Shield size={16} />
+              <span>{isEs ? 'Abrir Panel de Control' : 'Open Control Panel'}</span>
+            </Link>
+          </div>
+        )}
+
         {/* Section 9: Session (Log Out) */}
         <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px' }}>
           <h2 style={{ fontSize: '1.2rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: 0 }}>
