@@ -396,14 +396,17 @@ const MusicDetailsModalInner: React.FC<MusicDetailsModalProps> = ({
       image: newImage
     });
 
-    // If currently on a /music/ URL or opened via route, sync the browser URL seamlessly
+    // If currently on a /music/ URL or opened via route, push the new item to the history stack so the back button navigates to the previous item
     if (location.pathname.startsWith('/music/')) {
       const targetPath = newType === 'artist'
         ? `/music/artist/${encodeURIComponent(newArtist)}`
         : `/music/${newType}/${encodeURIComponent(newArtist)}/${encodeURIComponent(newName || '')}`;
       navigate(targetPath, {
-        replace: true,
-        state: location.state
+        replace: false,
+        state: {
+          backgroundLocation: (location.state as any)?.backgroundLocation || location,
+          image: newImage
+        }
       });
     }
   };
