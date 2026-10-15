@@ -263,34 +263,40 @@ export const NotificationFlyout: React.FC<NotificationFlyoutProps> = ({
       handleMarkAsRead(notif.id);
     }
 
+    // Prepare a clean backgroundLocation without notifications flyout search params
+    const cleanParams = new URLSearchParams(location.search);
+    cleanParams.delete('notifications');
+    cleanParams.delete('notif_tab');
+    const cleanSearch = cleanParams.toString();
+    const cleanBgLocation = {
+      ...location,
+      search: cleanSearch ? `?${cleanSearch}` : ''
+    };
+
+    onClose();
+
     if (notif.notification_type === 'admin_warning' || notif.entity_type === 'moderation') {
       navigate('/profile');
-      onClose();
     } else if (notif.notification_type === 'new_follower' || notif.notification_type === 'follow_request') {
       navigate(`/user/${encodeURIComponent(notif.actor_username)}`);
-      onClose();
     } else if (notif.entity_type === 'item') {
       if (notif.entity_id) {
         navigate(`/item/${notif.entity_id}`, {
-          state: { backgroundLocation: location }
+          state: { backgroundLocation: cleanBgLocation }
         });
       }
-      onClose();
     } else if (notif.entity_type === 'activity' || notif.notification_type.startsWith('activity_') || notif.notification_type === 'mention') {
       if (notif.entity_id) {
         navigate(`/post/${notif.entity_id}`, {
-          state: { backgroundLocation: location }
+          state: { backgroundLocation: cleanBgLocation }
         });
       } else {
         navigate('/social');
       }
-      onClose();
     } else if (notif.entity_type === 'guide') {
       navigate(`/guide/${notif.entity_id}`);
-      onClose();
     } else {
       navigate(`/user/${encodeURIComponent(notif.actor_username)}`);
-      onClose();
     }
   };
 
