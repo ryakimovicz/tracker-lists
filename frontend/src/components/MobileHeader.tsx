@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { Shield, Bell, Settings } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { BrandLogo } from './BrandLogo';
@@ -9,8 +9,10 @@ import { apiClient } from '../api/client';
 export const MobileHeader: React.FC = () => {
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const showNotifFlyout = searchParams.get('notifications') === 'true' || searchParams.has('notifications');
+  const isSettingsActive = location.pathname === '/settings';
   const [unreadCount, setUnreadCount] = useState(0);
   const notifBtnRef = useRef<HTMLButtonElement>(null);
   const isUserLoggedIn = Boolean(user && isAuthenticated);
@@ -96,14 +98,32 @@ export const MobileHeader: React.FC = () => {
             </button>
           )}
 
-          <Link
-            to="/settings"
-            className="mobile-header-icon-btn"
+          <button
+            type="button"
+            onClick={() => {
+              if (isSettingsActive) {
+                // Return to exact previous screen
+                const fromLocation = (location.state as any)?.from;
+                if (fromLocation) {
+                  navigate(fromLocation);
+                } else if (window.history.length > 1) {
+                  navigate(-1);
+                } else {
+                  navigate('/');
+                }
+              } else {
+                // Navigate to /settings remembering the current page
+                navigate('/settings', {
+                  state: { from: location }
+                });
+              }
+            }}
+            className={`mobile-header-icon-btn ${isSettingsActive ? 'active' : ''}`}
             title="Ajustes"
             aria-label="Ajustes"
           >
-            <Settings size={22} color="var(--text-secondary)" />
-          </Link>
+            <Settings size={22} color={isSettingsActive ? 'var(--accent-primary)' : 'var(--text-secondary)'} />
+          </button>
         </div>
       </header>
 

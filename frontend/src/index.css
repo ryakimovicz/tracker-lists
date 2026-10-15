@@ -1381,8 +1381,18 @@ h1, h2, h3, h4, h5, h6 {
     background: rgba(255, 255, 255, 0.08);
   }
 
+  .mobile-header-icon-btn.active {
+    color: var(--accent-primary) !important;
+    background: color-mix(in srgb, var(--accent-primary) 12%, transparent);
+  }
+
   [data-theme="light"] .mobile-header-icon-btn:active {
     background: rgba(0, 0, 0, 0.06);
+  }
+
+  [data-theme="light"] .mobile-header-icon-btn.active {
+    color: var(--accent-primary) !important;
+    background: color-mix(in srgb, var(--accent-primary) 10%, transparent);
   }
 
   .mobile-header-badge {
