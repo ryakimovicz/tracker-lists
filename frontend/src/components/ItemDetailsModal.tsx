@@ -3895,9 +3895,18 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
   const epHeaderInfo = isEpisode ? getEpisodeHeaderInfo() : null;
 
+  const isComicOrIssue = Boolean(
+    isComicIssue ||
+    selectedItem?.item_type === 'comic' ||
+    selectedItem?.parent_series?.item_type === 'comic' ||
+    String(selectedItem?.external_id || '').startsWith('cv_issue_') ||
+    String(selectedItem?.external_id || '').startsWith('cv_vol_')
+  );
+
   const shouldBlurEpisodeCover = Boolean(
     user?.blur_unwatched_episodes &&
     isEpisode &&
+    !isComicOrIssue &&
     !isEpisodeCompleted &&
     !isEpisodeCoverRevealed
   );

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ThumbsUp, MessageSquare, MoreVertical, Trash2, Star, Film, Tv, Sparkles, Book, Gamepad2, Compass, User, EyeOff, Mic, Headphones, Music } from 'lucide-react';
+import { ThumbsUp, MessageSquare, MoreVertical, Trash2, Star, Film, Tv, Sparkles, Book, Gamepad2, Compass, User, Eye, EyeOff, Mic, Headphones, Music } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import { useAuth } from '../context/AuthContext';
@@ -571,6 +571,35 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
 
   const isReviewSpoiler = Boolean(meta?.is_spoiler);
   const [isSpoilerRevealed, setIsSpoilerRevealed] = useState(false);
+  const [isCoverRevealed, setIsCoverRevealed] = useState(false);
+
+  // Anti-spoiler cover blur for series / anime episodes (NEVER for comics or manga)
+  const isComicOrManga = Boolean(
+    ['comic', 'manga'].includes((activity.item_type || meta.item_type || '').toLowerCase()) ||
+    (activity.external_id && String(activity.external_id).startsWith('cv_')) ||
+    parsedComicIssue
+  );
+
+  const isEpisodeActivity = Boolean(
+    !isComicOrManga && (
+      parsedEpisode ||
+      (activity.item_type || meta.item_type) === 'episode' ||
+      (activity.external_id && String(activity.external_id).startsWith('tvm-ep-')) ||
+      meta.is_single_episode ||
+      (meta.season_number && meta.episode_number)
+    )
+  );
+
+  const shouldBlurCardCover = Boolean(
+    user?.blur_unwatched_episodes &&
+    isEpisodeActivity &&
+    !isCoverRevealed &&
+    !(isOwnActivity && (
+      activity.activity_type === 'item_completed' ||
+      meta.status === 'completed' ||
+      meta.status === 'watched'
+    ))
+  );
 
   const [isCardHovered, setIsCardHovered] = useState(false);
   const [isFooterHovered, setIsFooterHovered] = useState(false);
@@ -794,10 +823,66 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
                   width: '100%',
                   height: '100%',
                   objectFit: 'cover',
-                  transform: isCardHovered ? 'scale(1.04)' : 'scale(1)',
-                  transition: 'transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+                  cursor: shouldBlurCardCover ? 'pointer' : undefined,
+                  filter: shouldBlurCardCover ? 'blur(16px)' : 'none',
+                  transform: shouldBlurCardCover
+                    ? (isCardHovered ? 'scale(1.12)' : 'scale(1.08)')
+                    : (isCardHovered ? 'scale(1.04)' : 'scale(1)'),
+                  transition: 'filter 0.3s ease, transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
                 }}
               />
+              {shouldBlurCardCover && (
+                <div
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsCoverRevealed(true);
+                  }}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.5rem',
+                    padding: '1rem',
+                    textAlign: 'center',
+                    cursor: 'pointer',
+                    background: 'rgba(0, 0, 0, 0.45)',
+                    backdropFilter: 'blur(3px)',
+                    WebkitBackdropFilter: 'blur(3px)',
+                    color: '#fff',
+                    zIndex: 2,
+                    userSelect: 'none'
+                  }}
+                  title={isEs ? 'Haz clic para revelar la portada' : 'Click to reveal cover'}
+                >
+                  <div style={{
+                    background: 'rgba(0, 0, 0, 0.65)',
+                    borderRadius: '50%',
+                    width: '42px',
+                    height: '42px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+                    border: '1px solid rgba(255,255,255,0.2)'
+                  }}>
+                    <Eye size={20} />
+                  </div>
+                  <span style={{
+                    fontSize: '0.82rem',
+                    fontWeight: 600,
+                    textShadow: '0 2px 4px rgba(0,0,0,0.9)',
+                    lineHeight: 1.2
+                  }}>
+                    {isEs ? 'Revelar portada' : 'Reveal cover'}
+                  </span>
+                </div>
+              )}
             </div>
           );
         })()}
