@@ -1290,20 +1290,21 @@ const MusicDetailsModalInner: React.FC<MusicDetailsModalProps> = ({
                                   </span>
                                 )}
                                 {listener.is_pro && (
-                                  <span style={{ 
-                                    fontSize: '0.65rem', 
-                                    fontWeight: 700, 
-                                    padding: '0.1rem 0.35rem', 
-                                    borderRadius: '4px', 
-                                    background: 'rgba(245, 158, 11, 0.12)', 
-                                    color: '#f59e0b',
-                                    border: '1px solid rgba(245, 158, 11, 0.25)',
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '0.2rem'
-                                  }}>
-                                    <Star size={9} fill="#f59e0b" color="#f59e0b" />
-                                    PREMIUM
+                                  <span
+                                    title="Premium"
+                                    style={{ 
+                                      padding: '0.15rem 0.25rem', 
+                                      borderRadius: '4px', 
+                                      background: 'rgba(245, 158, 11, 0.12)', 
+                                      color: '#f59e0b',
+                                      border: '1px solid rgba(245, 158, 11, 0.25)',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      lineHeight: 1
+                                    }}
+                                  >
+                                    <Star size={10} fill="#f59e0b" color="#f59e0b" />
                                   </span>
                                 )}
                               </div>
@@ -1396,20 +1397,21 @@ const MusicDetailsModalInner: React.FC<MusicDetailsModalProps> = ({
                                 {isEs ? 'Tú' : 'You'}
                               </span>
                               {currentUserRank.is_pro && (
-                                <span style={{ 
-                                  fontSize: '0.65rem', 
-                                  fontWeight: 700, 
-                                  padding: '0.1rem 0.35rem', 
-                                  borderRadius: '4px', 
-                                  background: 'rgba(245, 158, 11, 0.12)', 
-                                  color: '#f59e0b',
-                                  border: '1px solid rgba(245, 158, 11, 0.25)',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '0.2rem'
-                                }}>
-                                  <Star size={9} fill="#f59e0b" color="#f59e0b" />
-                                  PREMIUM
+                                <span
+                                  title="Premium"
+                                  style={{ 
+                                    padding: '0.15rem 0.25rem', 
+                                    borderRadius: '4px', 
+                                    background: 'rgba(245, 158, 11, 0.12)', 
+                                    color: '#f59e0b',
+                                    border: '1px solid rgba(245, 158, 11, 0.25)',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    lineHeight: 1
+                                  }}
+                                >
+                                  <Star size={10} fill="#f59e0b" color="#f59e0b" />
                                 </span>
                               )}
                             </div>
