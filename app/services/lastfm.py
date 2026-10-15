@@ -754,6 +754,52 @@ class LastFMService(metaclass=LastFMMeta):
             return ""
         return "".join(c for c in unicodedata.normalize('NFD', text) if unicodedata.category(c) != 'Mn').strip()
 
+    _SPECIAL_EDITION_KEYWORDS = {
+        'live', 'session', 'sessions', 'en vivo', 'directo', 'acoustic', 'acustico',
+        'deluxe', 'anniversary', 'aniversario', 'expanded', 'bonus', 'remix', 'remixes',
+        'instrumental', 'demo', 'demos'
+    }
+
+    @classmethod
+    def _extract_descriptors(cls, title: str) -> set:
+        if not title:
+            return set()
+        t = cls._strip_acc(title.lower())
+        found = set()
+        for multi in ['en vivo', 'live session', 'live sessions', 'deluxe edition', 'anniversary edition']:
+            if multi in t:
+                found.add(multi)
+        for word in re.findall(r'\b[a-z0-9\-]+\b', t):
+            if word in cls._SPECIAL_EDITION_KEYWORDS:
+                found.add(word)
+        return found
+
+    @classmethod
+    def _titles_match(cls, target: str, candidate: str) -> bool:
+        if not target or not candidate:
+            return False
+        norm_t = cls._strip_acc(target.lower()).strip()
+        norm_c = cls._strip_acc(candidate.lower()).strip()
+        if norm_t == norm_c:
+            return True
+
+        t_desc = cls._extract_descriptors(target)
+        c_desc = cls._extract_descriptors(candidate)
+
+        # If one has special descriptors (live, session, deluxe, etc.) and the other does not, do not conflate them
+        if bool(t_desc) != bool(c_desc):
+            return False
+        if t_desc and not (t_desc.issubset(c_desc) or c_desc.issubset(t_desc) or bool(t_desc & c_desc)):
+            return False
+
+        base_t = cls._strip_acc(cls._clean_album_title(target).lower()).strip()
+        base_c = cls._strip_acc(cls._clean_album_title(candidate).lower()).strip()
+
+        base_t = re.sub(r'[\(\[\{-]?\s*(ep|single|lp)\s*[\)\]\}]?', '', base_t).strip(' -')
+        base_c = re.sub(r'[\(\[\{-]?\s*(ep|single|lp)\s*[\)\]\}]?', '', base_c).strip(' -')
+
+        return base_t == base_c or (len(base_t) >= 4 and (base_t in base_c or base_c in base_t))
+
     @staticmethod
     def _clean_album_title(title: str) -> str:
         if not title:
@@ -929,8 +975,8 @@ class LastFMService(metaclass=LastFMMeta):
         if not results:
             results = cls._get_lastfm_top_albums_discography(artist_name)
 
-        # Cross-reference with iTunes catalog to correct re-issue/upload dates (e.g. 2016 Deezer re-upload -> 2006 true release)
-        itunes_date_map = {}
+        # Cross-reference with iTunes catalog to correct re-issue/upload dates
+        itunes_catalog_items: List[tuple] = []
         try:
             q = urllib.parse.quote(artist_name)
             req = urllib.request.Request(f"https://itunes.apple.com/search?term={q}&entity=album&limit=100", headers={"User-Agent": "PathdApp/1.0 (contact@pathd.net)"})
@@ -939,33 +985,25 @@ class LastFMService(metaclass=LastFMMeta):
                     d = json.loads(res.read().decode('utf-8'))
                     for item in d.get("results", []):
                         raw_col = (item.get("collectionName") or "").strip()
-                        clean_col = cls._clean_album_title(raw_col)
                         r_date = (item.get("releaseDate") or "")[:10]
-                        if r_date:
-                            if raw_col:
-                                itunes_date_map[cls._strip_acc(raw_col.lower())] = r_date
-                            if clean_col:
-                                itunes_date_map[cls._strip_acc(clean_col.lower())] = r_date
+                        if raw_col and r_date:
+                            itunes_catalog_items.append((raw_col, r_date))
         except Exception:
             pass
 
         for alb in results:
-            t_raw = cls._strip_acc(alb["title"].strip().lower())
-            t_clean = cls._strip_acc(cls._clean_album_title(alb["title"]).strip().lower())
-            
+            alb_title = alb.get("title", "")
             matched_date = ""
-            if t_raw in itunes_date_map:
-                matched_date = itunes_date_map[t_raw]
-            elif t_clean in itunes_date_map:
-                matched_date = itunes_date_map[t_clean]
-            else:
-                for k, v in itunes_date_map.items():
-                    if t_clean and (t_clean in k or k in t_clean):
-                        matched_date = v
-                        break
+            for raw_col, r_date in itunes_catalog_items:
+                if cls._titles_match(alb_title, raw_col):
+                    matched_date = r_date
+                    break
 
             if matched_date:
-                if not alb["release_date"] or matched_date < alb["release_date"]:
+                # If neither is special edition, pick the earlier original release date
+                # If it is a special edition, update with matched date
+                is_special = bool(cls._extract_descriptors(alb_title))
+                if not alb.get("release_date") or (not is_special and matched_date < alb["release_date"]) or is_special:
                     alb["release_date"] = matched_date
                     alb["year"] = matched_date.split("-")[0]
 
@@ -974,7 +1012,8 @@ class LastFMService(metaclass=LastFMMeta):
             try:
                 info = cls.get_album_release_info(artist_name, alb_dict["title"])
                 if info.get("year") and info.get("release_date"):
-                    if not alb_dict.get("release_date") or info["release_date"] < alb_dict["release_date"]:
+                    is_special = bool(cls._extract_descriptors(alb_dict["title"]))
+                    if not alb_dict.get("release_date") or is_special or info["release_date"] < alb_dict["release_date"]:
                         alb_dict["release_date"] = info["release_date"]
                         alb_dict["year"] = info["year"]
             except Exception:
@@ -1004,20 +1043,19 @@ class LastFMService(metaclass=LastFMMeta):
         if cache_key in cls._cache_album_release_info:
             return cls._cache_album_release_info[cache_key]
 
-        clean_alb = cls._clean_album_title(album_name)
-        norm_clean = cls._strip_acc(clean_alb.lower())
-        norm_orig = cls._strip_acc(album_name.lower())
+        is_special = bool(cls._extract_descriptors(album_name))
+        query_title = album_name if is_special else cls._clean_album_title(album_name)
 
         def _fetch_itunes() -> Optional[str]:
             try:
-                q = urllib.parse.quote(f"{artist_name} {clean_alb}".strip())
-                req = urllib.request.Request(f"https://itunes.apple.com/search?term={q}&entity=album&limit=10", headers={"User-Agent": "PathdApp/1.0 (contact@pathd.net)"})
+                q = urllib.parse.quote(f"{artist_name} {query_title}".strip())
+                req = urllib.request.Request(f"https://itunes.apple.com/search?term={q}&entity=album&limit=15", headers={"User-Agent": "PathdApp/1.0 (contact@pathd.net)"})
                 with urllib.request.urlopen(req, timeout=2.5) as res:
                     if res.status == 200:
                         d = json.loads(res.read().decode('utf-8'))
                         for item in d.get("results", []):
-                            col = cls._strip_acc(cls._clean_album_title(item.get("collectionName") or "").lower())
-                            if norm_clean == col or norm_clean in col or col in norm_clean:
+                            col_name = item.get("collectionName") or ""
+                            if cls._titles_match(album_name, col_name):
                                 r_date = (item.get("releaseDate") or "")[:10]
                                 if r_date:
                                     return r_date
@@ -1027,15 +1065,17 @@ class LastFMService(metaclass=LastFMMeta):
 
         def _fetch_musicbrainz() -> Optional[str]:
             try:
-                q = urllib.parse.quote(f'artist:"{artist_name}" AND (releasegroup:"{clean_alb}" OR release:"{clean_alb}")')
+                clean_mb = re.sub(r'[\"\[\]\(\)]', ' ', query_title).strip()
+                clean_mb = re.sub(r'\s+', ' ', clean_mb)
+                q = urllib.parse.quote(f'artist:"{artist_name}" AND (releasegroup:"{clean_mb}" OR release:"{clean_mb}")')
                 url = f'https://musicbrainz.org/ws/2/release-group?query={q}&fmt=json&limit=5'
                 req = urllib.request.Request(url, headers={'User-Agent': 'PathdApp/1.0 (contact@pathd.net)'})
                 with urllib.request.urlopen(req, timeout=2.5) as res:
                     if res.status == 200:
                         d = json.loads(res.read().decode('utf-8'))
                         for rg in d.get('release-groups', []):
-                            rg_t = cls._strip_acc(cls._clean_album_title(rg.get('title', '')).lower())
-                            if norm_clean == rg_t or norm_clean in rg_t or rg_t in norm_clean:
+                            rg_t = rg.get('title', '')
+                            if cls._titles_match(album_name, rg_t):
                                 d_str = rg.get('first-release-date')
                                 if d_str:
                                     return d_str
@@ -1045,14 +1085,14 @@ class LastFMService(metaclass=LastFMMeta):
 
         def _fetch_deezer() -> Optional[str]:
             try:
-                q = urllib.parse.quote(f"{artist_name} {album_name}".strip())
+                q = urllib.parse.quote(f"{artist_name} {query_title}".strip())
                 req = urllib.request.Request(f"https://api.deezer.com/search/album?q={q}&limit=5", headers={"User-Agent": "PathdApp/1.0 (contact@pathd.net)"})
                 with urllib.request.urlopen(req, timeout=2.5) as res:
                     if res.status == 200:
                         d = json.loads(res.read().decode('utf-8'))
                         for itm in d.get("data", []):
-                            t_norm = cls._strip_acc(cls._clean_album_title(itm.get("title", "")).lower())
-                            if norm_clean == t_norm or norm_clean in t_norm or t_norm in norm_clean or norm_orig in t_norm:
+                            cand_t = itm.get("title", "")
+                            if cls._titles_match(album_name, cand_t):
                                 alb_id = itm.get("id")
                                 if alb_id:
                                     req2 = urllib.request.Request(f"https://api.deezer.com/album/{alb_id}", headers={"User-Agent": "PathdApp/1.0 (contact@pathd.net)"})
@@ -1083,7 +1123,7 @@ class LastFMService(metaclass=LastFMMeta):
         except Exception:
             pass
 
-        # Parse valid dates and extract the earliest historical release
+        # Parse valid dates
         valid_dates = []
         for d in found_dates:
             m = re.match(r'^(19\d\d|20\d\d)(?:-(\d{2}))?(?:-(\d{2}))?', d)
@@ -1096,7 +1136,7 @@ class LastFMService(metaclass=LastFMMeta):
             cls._cache_album_release_info[cache_key] = {"year": "", "release_date": ""}
             return {"year": "", "release_date": ""}
 
-        # Sort chronologically to pick the earliest authentic master release date
+        # Sort chronologically to pick the earliest authentic release date for this version
         valid_dates.sort(key=lambda x: x[1])
         earliest = valid_dates[0]
         yr_str = str(earliest[0])
