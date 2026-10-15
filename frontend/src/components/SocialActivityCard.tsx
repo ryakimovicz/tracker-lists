@@ -1249,7 +1249,7 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
               top: '50%',
               left: '50%',
               zIndex: 10,
-              background: 'rgba(59, 130, 246, 0.95)',
+              background: 'var(--accent-primary)',
               color: '#fff',
               borderRadius: '50%',
               width: '76px',
@@ -1257,7 +1257,7 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 8px 30px rgba(59, 130, 246, 0.6)',
+              boxShadow: '0 8px 30px color-mix(in srgb, var(--accent-primary) 60%, transparent)',
               backdropFilter: 'blur(8px)'
             }}
           >
@@ -1302,9 +1302,9 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
           onClick={handleToggleLike}
           disabled={!user}
           style={{
-            background: isLiked ? 'rgba(59, 130, 246, 0.15)' : 'transparent',
-            border: isLiked ? '1px solid rgba(59, 130, 246, 0.4)' : '1px solid transparent',
-            color: isLiked ? '#3b82f6' : 'var(--text-secondary)',
+            background: isLiked ? 'color-mix(in srgb, var(--accent-primary) 15%, transparent)' : 'transparent',
+            border: isLiked ? '1px solid color-mix(in srgb, var(--accent-primary) 40%, transparent)' : '1px solid transparent',
+            color: isLiked ? 'var(--accent-primary)' : 'var(--text-secondary)',
             borderRadius: '20px',
             padding: '0.35rem 0.75rem',
             display: 'inline-flex',
@@ -1319,8 +1319,8 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
           onMouseEnter={(e) => {
             setIsLikeHovered(true);
             if (!isLiked) {
-              e.currentTarget.style.color = '#3b82f6';
-              e.currentTarget.style.background = 'rgba(59, 130, 246, 0.08)';
+              e.currentTarget.style.color = 'var(--accent-primary)';
+              e.currentTarget.style.background = 'color-mix(in srgb, var(--accent-primary) 8%, transparent)';
             }
           }}
           onMouseLeave={(e) => {
@@ -1331,7 +1331,7 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
             }
           }}
         >
-          <ThumbsUp size={17} fill={isLiked ? '#3b82f6' : 'none'} color={isLiked ? '#3b82f6' : 'currentColor'} />
+          <ThumbsUp size={17} fill={isLiked ? 'var(--accent-primary)' : 'none'} color={isLiked ? 'var(--accent-primary)' : 'currentColor'} />
           <span>{likesCount}</span>
         </button>
 

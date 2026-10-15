@@ -185,9 +185,9 @@ export const ActivityModal: React.FC<ActivityModalProps> = ({
                 onClick={onToggleLike}
                 disabled={!user}
                 style={{
-                  background: isLiked ? 'rgba(59, 130, 246, 0.15)' : 'transparent',
-                  border: isLiked ? '1px solid rgba(59, 130, 246, 0.4)' : '1px solid transparent',
-                  color: isLiked ? '#3b82f6' : 'var(--text-secondary)',
+                  background: isLiked ? 'color-mix(in srgb, var(--accent-primary) 15%, transparent)' : 'transparent',
+                  border: isLiked ? '1px solid color-mix(in srgb, var(--accent-primary) 40%, transparent)' : '1px solid transparent',
+                  color: isLiked ? 'var(--accent-primary)' : 'var(--text-secondary)',
                   borderRadius: '20px',
                   padding: '0.3rem 0.7rem',
                   display: 'inline-flex',
@@ -199,7 +199,7 @@ export const ActivityModal: React.FC<ActivityModalProps> = ({
                   transition: 'all 0.15s ease'
                 }}
               >
-                <ThumbsUp size={16} fill={isLiked ? '#3b82f6' : 'none'} color={isLiked ? '#3b82f6' : 'currentColor'} />
+                <ThumbsUp size={16} fill={isLiked ? 'var(--accent-primary)' : 'none'} color={isLiked ? 'var(--accent-primary)' : 'currentColor'} />
                 <span>{likesCount}</span>
               </button>
 
