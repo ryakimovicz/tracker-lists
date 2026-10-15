@@ -927,6 +927,19 @@ def get_activity_post(
     if not act:
         raise HTTPException(status_code=404, detail="Activity not found")
 
+    # Check privacy: if author is private, only the author, an admin, or approved followers can view
+    target_author = db.query(User).filter(User.id == act.user_id).first()
+    if target_author and getattr(target_author, "is_private", False):
+        is_own = bool(current_user and current_user.id == target_author.id)
+        is_admin = bool(current_user and getattr(current_user, "is_admin", False))
+        is_following = bool(current_user and db.query(Follow).filter(
+            Follow.follower_id == current_user.id,
+            Follow.followed_id == target_author.id
+        ).first() is not None)
+
+        if not (is_own or is_admin or is_following):
+            raise HTTPException(status_code=403, detail="This account is private")
+
     accept_lang = request.headers.get("Accept-Language", "es")
     parts = accept_lang.split("-")
     client_lang = parts[0].lower() if parts else "es"
@@ -983,6 +996,17 @@ def toggle_activity_like(
     act = db.query(UserActivityLog).filter(UserActivityLog.id == activity_id).first()
     if not act:
         raise HTTPException(status_code=404, detail="Activity not found")
+
+    target_author = db.query(User).filter(User.id == act.user_id).first()
+    if target_author and getattr(target_author, "is_private", False):
+        is_own = bool(current_user.id == target_author.id)
+        is_admin = bool(getattr(current_user, "is_admin", False))
+        is_following = bool(db.query(Follow).filter(
+            Follow.follower_id == current_user.id,
+            Follow.followed_id == target_author.id
+        ).first() is not None)
+        if not (is_own or is_admin or is_following):
+            raise HTTPException(status_code=403, detail="This account is private")
 
     existing_like = db.query(ActivityLike).filter(
         ActivityLike.activity_id == activity_id,
@@ -1060,6 +1084,21 @@ def get_activity_comments(
     current_user: Optional[User] = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
+    act = db.query(UserActivityLog).filter(UserActivityLog.id == activity_id).first()
+    if not act:
+        raise HTTPException(status_code=404, detail="Activity not found")
+
+    target_author = db.query(User).filter(User.id == act.user_id).first()
+    if target_author and getattr(target_author, "is_private", False):
+        is_own = bool(current_user and current_user.id == target_author.id)
+        is_admin = bool(current_user and getattr(current_user, "is_admin", False))
+        is_following = bool(current_user and db.query(Follow).filter(
+            Follow.follower_id == current_user.id,
+            Follow.followed_id == target_author.id
+        ).first() is not None)
+        if not (is_own or is_admin or is_following):
+            raise HTTPException(status_code=403, detail="This account is private")
+
     comments = db.query(ActivityComment).filter(
         ActivityComment.activity_id == activity_id
     ).order_by(ActivityComment.created_at.asc()).all()
@@ -1118,6 +1157,17 @@ def post_activity_comment(
     act = db.query(UserActivityLog).filter(UserActivityLog.id == activity_id).first()
     if not act:
         raise HTTPException(status_code=404, detail="Activity not found")
+
+    target_author = db.query(User).filter(User.id == act.user_id).first()
+    if target_author and getattr(target_author, "is_private", False):
+        is_own = bool(current_user.id == target_author.id)
+        is_admin = bool(getattr(current_user, "is_admin", False))
+        is_following = bool(db.query(Follow).filter(
+            Follow.follower_id == current_user.id,
+            Follow.followed_id == target_author.id
+        ).first() is not None)
+        if not (is_own or is_admin or is_following):
+            raise HTTPException(status_code=403, detail="This account is private")
 
     new_comment = ActivityComment(
         activity_id=activity_id,
