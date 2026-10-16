@@ -294,7 +294,7 @@ const ScrollRow = ({
           className="home-category-header-wrap"
           style={{ display: "flex", flexDirection: "column", gap: "0.5rem", paddingLeft: "45px", paddingRight: "45px", marginBottom: effectiveRowMode === 'collapsed' ? "0.5rem" : "1rem" }}
         >
-          <div style={{ display: "flex", alignItems: "center" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
             <button
               type="button"
               className="home-category-toggle-btn"
@@ -351,12 +351,12 @@ const ScrollRow = ({
                 )}
               </span>
             </button>
+            {headerExtra && effectiveRowMode !== 'collapsed' && (
+              <div style={{ display: "inline-flex", alignItems: "center" }}>
+                {headerExtra}
+              </div>
+            )}
           </div>
-          {headerExtra && effectiveRowMode !== 'collapsed' && (
-            <div style={{ display: "flex", alignItems: "center" }}>
-              {headerExtra}
-            </div>
-          )}
         </div>
       )}
       {effectiveRowMode !== 'collapsed' && (
@@ -2530,12 +2530,22 @@ export const Home: React.FC = () => {
 
   const startOfTodayMs = new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate()).getTime();
   const nowMs = Date.now();
+
+  // Auto-switch gameFilter if the current selection has 0 games in watching tab, but the other option has games
+  const playingGamesCount = libraryItems.filter(i => i.item_type === "game" && i.status === "playing").length;
+  const endlessGamesCount = libraryItems.filter(i => i.item_type === "game" && i.status === "endless").length;
+  const effectiveGameFilter: "playing" | "endless" = (gameFilter === "endless" && endlessGamesCount === 0 && playingGamesCount > 0)
+    ? "playing"
+    : (gameFilter === "playing" && playingGamesCount === 0 && endlessGamesCount > 0)
+    ? "endless"
+    : gameFilter;
+
   let filteredItems: any[] = [];
   if (activeTab === "watching") {
     filteredItems = libraryItems.filter(i => {
       if (i.item_type === "custom") return false;
       if (i.item_type === "game") {
-        if (gameFilter === "endless") {
+        if (effectiveGameFilter === "endless") {
           return i.status === "endless";
         }
         return i.status === "playing";
@@ -3835,7 +3845,7 @@ export const Home: React.FC = () => {
                 return (
                   <>
                     {/* Unified category header title and count badge for both Mobile and Desktop */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', paddingLeft: '0.5rem', paddingRight: '0.5rem', marginBottom: '0.25rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', paddingLeft: '0.5rem', paddingRight: '0.5rem', marginBottom: '0.25rem', flexWrap: 'wrap' }}>
                       {getCategoryIcon(homeCategoryFilter, { size: 20, color: `var(--color-${homeCategoryFilter})` })}
                       <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)' }}>
                         {getTypeCat(homeCategoryFilter, true)}
@@ -3851,6 +3861,44 @@ export const Home: React.FC = () => {
                       }}>
                         {specificItems.length}
                       </span>
+                      {homeCategoryFilter === 'game' && activeTab === 'watching' && playingGamesCount > 0 && endlessGamesCount > 0 && (
+                        <div style={{ display: "inline-flex", background: "var(--bg-tertiary)", padding: "3px", borderRadius: "8px", gap: "4px", border: "1px solid var(--border-color)", marginLeft: "0.25rem" }}>
+                          <button
+                            type="button"
+                            onClick={() => setGameFilter("playing")}
+                            style={{
+                              border: "none",
+                              background: effectiveGameFilter === "playing" ? "var(--color-game, #10b981)" : "transparent",
+                              color: effectiveGameFilter === "playing" ? "var(--color-text-game, #ffffff)" : "var(--text-secondary)",
+                              padding: "3px 8px",
+                              borderRadius: "6px",
+                              fontSize: "0.78rem",
+                              fontWeight: 600,
+                              cursor: "pointer",
+                              transition: "all 0.2s ease"
+                            }}
+                          >
+                            {language === "es" ? "Jugando" : "Playing"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setGameFilter("endless")}
+                            style={{
+                              border: "none",
+                              background: effectiveGameFilter === "endless" ? "var(--color-game, #10b981)" : "transparent",
+                              color: effectiveGameFilter === "endless" ? "var(--color-text-game, #ffffff)" : "var(--text-secondary)",
+                              padding: "3px 8px",
+                              borderRadius: "6px",
+                              fontSize: "0.78rem",
+                              fontWeight: 600,
+                              cursor: "pointer",
+                              transition: "all 0.2s ease"
+                            }}
+                          >
+                            {language === "es" ? "Infinito" : "Endless"}
+                          </button>
+                        </div>
+                      )}
                     </div>
 
                     {/* Mobile vertical stack (edge to edge full width) */}
@@ -3873,17 +3921,24 @@ export const Home: React.FC = () => {
                 <>
                   {getOrderedCategories(currentUser?.category_order).map(category => {
                     let catItems = filteredItems.filter(i => i.item_type === category);
-                    if (catItems.length === 0 && (category !== "game" || activeTab !== "watching")) return null;
+                    
+                    // In watching tab, only show game category if user actually has games in 'playing' or 'endless'
+                    if (category === "game" && activeTab === "watching") {
+                      const totalActiveGames = libraryItems.filter(i => i.item_type === "game" && (i.status === "playing" || i.status === "endless")).length;
+                      if (totalActiveGames === 0) return null;
+                    } else if (catItems.length === 0) {
+                      return null;
+                    }
 
-                    const headerExtra = (category === "game" && activeTab === "watching") ? (
+                    const headerExtra = (category === "game" && activeTab === "watching" && playingGamesCount > 0 && endlessGamesCount > 0) ? (
                       <div style={{ display: "flex", background: "var(--bg-tertiary)", padding: "3px", borderRadius: "8px", gap: "4px", border: "1px solid var(--border-color)" }}>
                         <button
                           type="button"
                           onClick={() => setGameFilter("playing")}
                           style={{
                             border: "none",
-                            background: gameFilter === "playing" ? "var(--color-game, #10b981)" : "transparent",
-                            color: gameFilter === "playing" ? "var(--color-text-game, #ffffff)" : "var(--text-secondary)",
+                            background: effectiveGameFilter === "playing" ? "var(--color-game, #10b981)" : "transparent",
+                            color: effectiveGameFilter === "playing" ? "var(--color-text-game, #ffffff)" : "var(--text-secondary)",
                             padding: "4px 10px",
                             borderRadius: "6px",
                             fontSize: "0.8rem",
@@ -3899,8 +3954,8 @@ export const Home: React.FC = () => {
                           onClick={() => setGameFilter("endless")}
                           style={{
                             border: "none",
-                            background: gameFilter === "endless" ? "var(--color-game, #10b981)" : "transparent",
-                            color: gameFilter === "endless" ? "var(--color-text-game, #ffffff)" : "var(--text-secondary)",
+                            background: effectiveGameFilter === "endless" ? "var(--color-game, #10b981)" : "transparent",
+                            color: effectiveGameFilter === "endless" ? "var(--color-text-game, #ffffff)" : "var(--text-secondary)",
                             padding: "4px 10px",
                             borderRadius: "6px",
                             fontSize: "0.8rem",
@@ -3927,8 +3982,8 @@ export const Home: React.FC = () => {
                         {catItems.length === 0 ? (
                           <div style={{ padding: "1rem 0", color: "var(--text-secondary)", fontSize: "0.9rem" }}>
                             {language === "es" 
-                              ? (gameFilter === "endless" ? "No hay juegos infinitos." : "No hay juegos en curso.") 
-                              : (gameFilter === "endless" ? "No endless games." : "No games in progress.")}
+                              ? (effectiveGameFilter === "endless" ? "No hay juegos infinitos." : "No hay juegos en curso.") 
+                              : (effectiveGameFilter === "endless" ? "No endless games." : "No games in progress.")}
                           </div>
                         ) : (
                           catItems.map(item => renderItemCard(item))

@@ -13,6 +13,20 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# Sentry Production Error Monitoring
+if settings.SENTRY_DSN:
+    try:
+        import sentry_sdk
+        sentry_sdk.init(
+            dsn=settings.SENTRY_DSN,
+            environment=settings.ENVIRONMENT,
+            traces_sample_rate=0.1,
+            profiles_sample_rate=0.1,
+        )
+        logger.info("Sentry monitoring initialized successfully.")
+    except Exception as e:
+        logger.warning(f"Could not initialize Sentry: {e}")
+
 def migrate_enums():
     if engine.dialect.name == "postgresql":
         enum_migrations = [
@@ -48,11 +62,46 @@ def migrate_enums():
         except Exception as e:
             logger.error(f"Error during raw PostgreSQL enum migration: {e}")
 
-# 1. Migrate enums first before creating any tables or opening ORM sessions
-migrate_enums()
+def run_database_migrations():
+    """
+    Executes formal Alembic migrations on startup:
+    - If database is fresh: runs upgrade head to build schema.
+    - If database is existing pre-Alembic: stamps head to avoid table creation collisions.
+    - If database is tracked: runs pending migrations to head.
+    - Gracefully falls back to create_all if alembic config is not reachable.
+    """
+    migrate_enums()
+    try:
+        import os
+        from alembic.config import Config
+        from alembic import command
 
-# 2. Create tables
-Base.metadata.create_all(bind=engine)
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        ini_path = os.path.join(base_dir, "alembic.ini")
+        if os.path.exists(ini_path):
+            alembic_cfg = Config(ini_path)
+            inspector = inspect(engine)
+            tables = inspector.get_table_names()
+
+            if "alembic_version" not in tables:
+                if "users" in tables:
+                    logger.info("Alembic: Existing schema detected without alembic_version. Stamping head...")
+                    command.stamp(alembic_cfg, "head")
+                else:
+                    logger.info("Alembic: Fresh database detected. Upgrading to head...")
+                    command.upgrade(alembic_cfg, "head")
+            else:
+                logger.info("Alembic: Applying pending migrations to head...")
+                command.upgrade(alembic_cfg, "head")
+        else:
+            Base.metadata.create_all(bind=engine)
+    except Exception as e:
+        logger.warning(f"Alembic auto-migration encountered an issue: {e}. Ensuring tables via Base.metadata.create_all.")
+        Base.metadata.create_all(bind=engine)
+
+# Execute formal migrations on startup
+run_database_migrations()
+
 
 def auto_migrate_schema():
     try:

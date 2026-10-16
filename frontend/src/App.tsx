@@ -2,25 +2,27 @@ import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-route
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Sidebar } from './components/Sidebar';
 import { RouteGuard } from './components/RouteGuard';
-import { Landing } from './pages/Landing';
-import { Login } from './pages/Login';
-import { Register } from './pages/Register';
-import { Search } from './pages/Search';
-import { AdminPanel } from './pages/AdminPanel';
-import { Recommended } from './pages/Recommended';
-import { ForgotPassword } from './pages/ForgotPassword';
-import { ResetPassword } from './pages/ResetPassword';
-import { VerifyEmail } from './pages/VerifyEmail';
+// Lazy-loaded page components for Code-Splitting and instant initial page load
+const Landing = React.lazy(() => import('./pages/Landing'));
+const Login = React.lazy(() => import('./pages/Login'));
+const Register = React.lazy(() => import('./pages/Register'));
+const Search = React.lazy(() => import('./pages/Search'));
+const AdminPanel = React.lazy(() => import('./pages/AdminPanel'));
+const Recommended = React.lazy(() => import('./pages/Recommended'));
+const ForgotPassword = React.lazy(() => import('./pages/ForgotPassword'));
+const ResetPassword = React.lazy(() => import('./pages/ResetPassword'));
+const VerifyEmail = React.lazy(() => import('./pages/VerifyEmail'));
 
-import { Home } from './pages/Home';
-import { Profile } from './pages/Profile';
-import { Social } from './pages/Social';
-import { CreateGuide } from './pages/CreateGuide';
-import { ViewGuide } from './pages/ViewGuide';
-import { SettingsPage } from './pages/Settings';
-import CustomizePage from './pages/Customize';
-import { PrivacyPolicy } from './pages/PrivacyPolicy';
-import { TermsOfService } from './pages/TermsOfService';
+const Home = React.lazy(() => import('./pages/Home'));
+const Profile = React.lazy(() => import('./pages/Profile'));
+const Social = React.lazy(() => import('./pages/Social'));
+const CreateGuide = React.lazy(() => import('./pages/CreateGuide'));
+const ViewGuide = React.lazy(() => import('./pages/ViewGuide'));
+const SettingsPage = React.lazy(() => import('./pages/Settings'));
+const CustomizePage = React.lazy(() => import('./pages/Customize'));
+const PrivacyPolicy = React.lazy(() => import('./pages/PrivacyPolicy'));
+const TermsOfService = React.lazy(() => import('./pages/TermsOfService'));
+const NotFound = React.lazy(() => import('./pages/NotFound'));
 
 import { LanguageProvider } from './context/LanguageContext';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
@@ -29,6 +31,8 @@ import { getProfileTheme } from './utils/profileThemes';
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { OfflineDetector } from './components/OfflineDetector';
 import { CookieBanner } from './components/CookieBanner';
 import { SuspendedAccountModal } from './components/SuspendedAccountModal';
 import { RightSidebarAd } from './components/RightSidebarAd';
@@ -41,7 +45,7 @@ import { MusicRouteModal } from './components/MusicRouteModal';
 import { PremiumRouteModal } from './components/PremiumRouteModal';
 import { MobileHeader } from './components/MobileHeader';
 import { MobileBottomNav } from './components/MobileBottomNav';
-import React, { useEffect } from 'react';
+import React, { useEffect, Suspense } from 'react';
 
 function AppContent() {
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -128,6 +132,7 @@ function AppContent() {
       className="app-container"
       style={appProfileTheme?.cssVariables}
     >
+      <OfflineDetector />
       <SuspendedAccountModal />
       <Sidebar />
       <MobileHeader />
@@ -136,7 +141,9 @@ function AppContent() {
         className="main-content"
         style={{ '--main-content-margin-right': `${contentMarginRight}px` } as React.CSSProperties}
       >
-        <Routes location={state?.backgroundLocation || location}>
+        <ErrorBoundary>
+          <Suspense fallback={<PathdLoader fullScreen />}>
+            <Routes location={state?.backgroundLocation || location}>
             {/* Conditional homepage depending on authentication status */}
             <Route
               path="/"
@@ -288,18 +295,16 @@ function AppContent() {
                 </RouteGuard>
               }
             />
-            <Route
-              path="/music/:type/:artist/:name"
-              element={
-                <RouteGuard>
-                  <Profile />
-                </RouteGuard>
-              }
-            />
+            {/* 404 Catch-All Route */}
+            <Route path="*" element={<NotFound />} />
           </Routes>
+        </Suspense>
+      </ErrorBoundary>
 
-          {/* Modal overlay route when navigating from within the app */}
-          {state?.backgroundLocation && (
+      {/* Modal overlay route when navigating from within the app */}
+      {state?.backgroundLocation && (
+        <ErrorBoundary>
+          <Suspense fallback={null}>
             <Routes>
               <Route
                 path="/item/:type/:id"
@@ -318,7 +323,9 @@ function AppContent() {
                 element={<MusicRouteModal key={location.pathname} />}
               />
             </Routes>
-          )}
+          </Suspense>
+        </ErrorBoundary>
+      )}
 
           {/* Also mount ItemRouteModal, PostRouteModal or MusicRouteModal if accessed directly over fallback background */}
           {!state?.backgroundLocation && (location.pathname.startsWith('/item/') || location.pathname.startsWith('/post/') || location.pathname.startsWith('/music/')) && (

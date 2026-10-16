@@ -15,6 +15,8 @@ from app.services.igdb import IGDBService
 from app.services.anilist import AnilistService
 from app.core.limiter import limiter
 from app.core.sfw_filter import is_safe_text, is_safe_media_item
+from app.core.circuit_breaker import execute_with_circuit_breaker
+from app.core.popular_cache import popular_cache
 
 import re
 import concurrent.futures
@@ -215,19 +217,19 @@ def search_media(
     
     def fetch_var(var):
         if type_lower == "comic":
-            return ComicVineService.search_comics(var)
+            return execute_with_circuit_breaker("comicvine", ComicVineService.search_comics, var, fallback=[])
         elif type_lower == "book":
-            return GoogleBooksService.search_books(var)
+            return execute_with_circuit_breaker("googlebooks", GoogleBooksService.search_books, var, fallback=[])
         elif type_lower == "manga":
-            return AnilistService.search_manga(var)
+            return execute_with_circuit_breaker("anilist", AnilistService.search_manga, var, fallback=[])
         elif type_lower == "game":
-            return IGDBService.search_games(var)
+            return execute_with_circuit_breaker("igdb", IGDBService.search_games, var, fallback=[])
         elif type_lower == "movie":
-            return OMDbService.search_movies(var)
+            return execute_with_circuit_breaker("omdb", OMDbService.search_movies, var, fallback=[])
         elif type_lower == "anime":
-            return TVMazeService.search_shows(var, is_anime=True, lang=client_lang, country_code=client_country)
+            return execute_with_circuit_breaker("tvmaze", TVMazeService.search_shows, var, is_anime=True, lang=client_lang, country_code=client_country, fallback=[])
         elif type_lower == "series":
-            return TVMazeService.search_shows(var, is_anime=False, lang=client_lang, country_code=client_country)
+            return execute_with_circuit_breaker("tvmaze", TVMazeService.search_shows, var, is_anime=False, lang=client_lang, country_code=client_country, fallback=[])
         return []
 
     from app.models.social import BlockedMediaItem
@@ -289,13 +291,13 @@ def search_all_media(
     with concurrent.futures.ThreadPoolExecutor(max_workers=max(7, len(variations) * 7)) as executor:
         futures = []
         for var in variations:
-            futures.append(executor.submit(OMDbService.search_movies, var))
-            futures.append(executor.submit(TVMazeService.search_shows, var, False, client_lang, client_country))
-            futures.append(executor.submit(TVMazeService.search_shows, var, True, client_lang, client_country))
-            futures.append(executor.submit(GoogleBooksService.search_books, var))
-            futures.append(executor.submit(IGDBService.search_games, var))
-            futures.append(executor.submit(ComicVineService.search_comics, var))
-            futures.append(executor.submit(AnilistService.search_manga, var))
+            futures.append(executor.submit(execute_with_circuit_breaker, "omdb", OMDbService.search_movies, var, fallback=[]))
+            futures.append(executor.submit(execute_with_circuit_breaker, "tvmaze", TVMazeService.search_shows, var, False, client_lang, client_country, fallback=[]))
+            futures.append(executor.submit(execute_with_circuit_breaker, "tvmaze", TVMazeService.search_shows, var, True, client_lang, client_country, fallback=[]))
+            futures.append(executor.submit(execute_with_circuit_breaker, "googlebooks", GoogleBooksService.search_books, var, fallback=[]))
+            futures.append(executor.submit(execute_with_circuit_breaker, "igdb", IGDBService.search_games, var, fallback=[]))
+            futures.append(executor.submit(execute_with_circuit_breaker, "comicvine", ComicVineService.search_comics, var, fallback=[]))
+            futures.append(executor.submit(execute_with_circuit_breaker, "anilist", AnilistService.search_manga, var, fallback=[]))
             
         for future in concurrent.futures.as_completed(futures):
             try:
@@ -714,22 +716,22 @@ def get_explore_tabs(
             futures_trend = {}
 
             if need_nuevo:
-                futures_nuevo["tv"] = executor.submit(lambda: [x for x in TVMazeService.get_new_shows() if is_safe_media_item(x.title, x.description)])
-                futures_nuevo["anime"] = executor.submit(lambda: [x for x in TVMazeService.get_new_anime() if is_safe_media_item(x.title, x.description)])
-                futures_nuevo["manga"] = executor.submit(lambda: [x for x in AnilistService.get_new_manga() if is_safe_media_item(x.title, x.description)])
-                futures_nuevo["games"] = executor.submit(lambda: [x for x in IGDBService.get_new_games() if is_safe_media_item(x.title, x.description)])
-                futures_nuevo["movies"] = executor.submit(lambda: [x for x in OMDbService.get_new_movies() if is_safe_media_item(x.title, x.description)])
-                futures_nuevo["books"] = executor.submit(lambda: [x for x in GoogleBooksService.get_new_books() if is_safe_media_item(x.title, x.description)])
-                futures_nuevo["comics"] = executor.submit(lambda: [x for x in ComicVineService.get_new_comics() if is_safe_media_item(x.title, x.description)])
+                futures_nuevo["tv"] = executor.submit(lambda: execute_with_circuit_breaker("tvmaze", lambda: [x for x in TVMazeService.get_new_shows() if is_safe_media_item(x.title, x.description)], fallback=[]))
+                futures_nuevo["anime"] = executor.submit(lambda: execute_with_circuit_breaker("tvmaze", lambda: [x for x in TVMazeService.get_new_anime() if is_safe_media_item(x.title, x.description)], fallback=[]))
+                futures_nuevo["manga"] = executor.submit(lambda: execute_with_circuit_breaker("anilist", lambda: [x for x in AnilistService.get_new_manga() if is_safe_media_item(x.title, x.description)], fallback=[]))
+                futures_nuevo["games"] = executor.submit(lambda: execute_with_circuit_breaker("igdb", lambda: [x for x in IGDBService.get_new_games() if is_safe_media_item(x.title, x.description)], fallback=[]))
+                futures_nuevo["movies"] = executor.submit(lambda: execute_with_circuit_breaker("omdb", lambda: [x for x in OMDbService.get_new_movies() if is_safe_media_item(x.title, x.description)], fallback=[]))
+                futures_nuevo["books"] = executor.submit(lambda: execute_with_circuit_breaker("googlebooks", lambda: [x for x in GoogleBooksService.get_new_books() if is_safe_media_item(x.title, x.description)], fallback=[]))
+                futures_nuevo["comics"] = executor.submit(lambda: execute_with_circuit_breaker("comicvine", lambda: [x for x in ComicVineService.get_new_comics() if is_safe_media_item(x.title, x.description)], fallback=[]))
 
             if need_tendencias:
-                futures_trend["tv"] = executor.submit(lambda: [x for x in TVMazeService.get_trending_series() if is_safe_media_item(x.title, x.description)])
-                futures_trend["anime"] = executor.submit(lambda: [x for x in TVMazeService.get_trending_anime() if is_safe_media_item(x.title, x.description)])
-                futures_trend["manga"] = executor.submit(lambda: [x for x in AnilistService.get_trending_manga() if is_safe_media_item(x.title, x.description)])
-                futures_trend["games"] = executor.submit(lambda: [x for x in IGDBService.get_trending_games() if is_safe_media_item(x.title, x.description)])
-                futures_trend["movies"] = executor.submit(lambda: [x for x in OMDbService.get_trending_movies() if is_safe_media_item(x.title, x.description)])
-                futures_trend["books"] = executor.submit(lambda: [x for x in GoogleBooksService.get_trending_books() if is_safe_media_item(x.title, x.description)])
-                futures_trend["comics"] = executor.submit(lambda: [x for x in ComicVineService.get_trending_comics() if is_safe_media_item(x.title, x.description)])
+                futures_trend["tv"] = executor.submit(lambda: execute_with_circuit_breaker("tvmaze", lambda: [x for x in TVMazeService.get_trending_series() if is_safe_media_item(x.title, x.description)], fallback=[]))
+                futures_trend["anime"] = executor.submit(lambda: execute_with_circuit_breaker("tvmaze", lambda: [x for x in TVMazeService.get_trending_anime() if is_safe_media_item(x.title, x.description)], fallback=[]))
+                futures_trend["manga"] = executor.submit(lambda: execute_with_circuit_breaker("anilist", lambda: [x for x in AnilistService.get_trending_manga() if is_safe_media_item(x.title, x.description)], fallback=[]))
+                futures_trend["games"] = executor.submit(lambda: execute_with_circuit_breaker("igdb", lambda: [x for x in IGDBService.get_trending_games() if is_safe_media_item(x.title, x.description)], fallback=[]))
+                futures_trend["movies"] = executor.submit(lambda: execute_with_circuit_breaker("omdb", lambda: [x for x in OMDbService.get_trending_movies() if is_safe_media_item(x.title, x.description)], fallback=[]))
+                futures_trend["books"] = executor.submit(lambda: execute_with_circuit_breaker("googlebooks", lambda: [x for x in GoogleBooksService.get_trending_books() if is_safe_media_item(x.title, x.description)], fallback=[]))
+                futures_trend["comics"] = executor.submit(lambda: execute_with_circuit_breaker("comicvine", lambda: [x for x in ComicVineService.get_trending_comics() if is_safe_media_item(x.title, x.description)], fallback=[]))
 
             if need_nuevo:
                 fetched_nuevo = []
@@ -1074,6 +1076,72 @@ def lookup_media_item(
         result_data["completed_at"] = existing.completed_at.isoformat() if existing.completed_at else None
 
     return result_data
+
+
+@router.get("/popular", response_model=List[SearchResultItem])
+@limiter.limit("60/minute")
+def get_popular_works(
+    request: Request,
+    media_type: Optional[str] = Query(None, description="Optional media type: movie, series, anime, book, comic, manga, game"),
+    db: Session = Depends(get_db)
+):
+    """
+    Returns server-cached popular works with instant memory response and circuit breaker fallback protection.
+    Results are cached in memory with automatic resilience.
+    """
+    clean_type = (media_type or "all").lower().strip()
+    cache_key = f"popular_works_{clean_type}"
+    cached = popular_cache.get(cache_key)
+    if cached:
+        return cached
+
+    popular_seed_queries = {
+        "movie": ["The Dark Knight", "Inception", "Interstellar"],
+        "series": ["Breaking Bad", "Stranger Things", "Severance"],
+        "anime": ["Attack on Titan", "Demon Slayer", "Frieren"],
+        "game": ["Elden Ring", "The Legend of Zelda", "Baldur's Gate 3"],
+        "book": ["Dune", "The Hobbit", "1984"],
+        "comic": ["Watchmen", "Batman: Year One", "Spider-Man: Blue"],
+        "manga": ["Berserk", "One Piece", "Monster"]
+    }
+
+    results: List[SearchResultItem] = []
+    seen = set()
+
+    types_to_fetch = [clean_type] if clean_type in popular_seed_queries else list(popular_seed_queries.keys())
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(14, len(types_to_fetch) * 2)) as executor:
+        futures = []
+        for t in types_to_fetch:
+            for seed in popular_seed_queries.get(t, [])[:2]:
+                if t == "movie":
+                    futures.append(executor.submit(execute_with_circuit_breaker, "omdb", OMDbService.search_movies, seed, fallback=[]))
+                elif t in ("series", "anime"):
+                    is_an = (t == "anime")
+                    futures.append(executor.submit(execute_with_circuit_breaker, "tvmaze", TVMazeService.search_shows, seed, is_an, fallback=[]))
+                elif t == "game":
+                    futures.append(executor.submit(execute_with_circuit_breaker, "igdb", IGDBService.search_games, seed, fallback=[]))
+                elif t == "book":
+                    futures.append(executor.submit(execute_with_circuit_breaker, "googlebooks", GoogleBooksService.search_books, seed, fallback=[]))
+                elif t == "comic":
+                    futures.append(executor.submit(execute_with_circuit_breaker, "comicvine", ComicVineService.search_comics, seed, fallback=[]))
+                elif t == "manga":
+                    futures.append(executor.submit(execute_with_circuit_breaker, "anilist", AnilistService.search_manga, seed, fallback=[]))
+
+        for fut in concurrent.futures.as_completed(futures):
+            try:
+                items = fut.result()
+                for item in items:
+                    if item.external_id not in seen and is_safe_media_item(item.title, item.description):
+                        seen.add(item.external_id)
+                        results.append(item)
+            except Exception:
+                pass
+
+    if results:
+        popular_cache.set(cache_key, results)
+    return results
+
 
 
 

@@ -63,6 +63,10 @@ class Settings(BaseSettings):
     DODO_PAYMENTS_WEBHOOK_KEY: str = ""
     DODO_PAYMENTS_ENVIRONMENT: str = "test_mode"
 
+    # Monitoring (Sentry) & Environment
+    SENTRY_DSN: str = ""
+    ENVIRONMENT: str = "development"
+
 settings = Settings()
 
 

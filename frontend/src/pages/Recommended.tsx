@@ -8,3 +8,5 @@ export const Recommended: React.FC = () => {
     </div>
   );
 };
+
+export default Recommended;
