@@ -1179,7 +1179,7 @@ h1, h2, h3, h4, h5, h6 {
   font-size: 0.72rem;
   font-weight: 700;
   padding: 0.15rem 0.45rem;
-  borderRadius: 6px;
+  border-radius: 6px;
   backdrop-filter: blur(4px);
 }
 
