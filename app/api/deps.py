@@ -57,13 +57,15 @@ def get_current_user(
                 reason = user.suspension_reason or "Infracción de las Normas Comunitarias"
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail=f"Cuenta suspendida temporalmente hasta el {formatted_date}. Motivo: {reason}"
+                    detail=f"Cuenta suspendida temporalmente hasta el {formatted_date}. Motivo: {reason}",
+                    headers={"X-User-Suspended": "true"}
                 )
         else:
             reason = user.suspension_reason or "Infracción de las Normas Comunitarias"
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Tu cuenta ha sido suspendida permanentemente. Motivo: {reason}"
+                detail=f"Tu cuenta ha sido suspendida permanentemente. Motivo: {reason}",
+                headers={"X-User-Suspended": "true"}
             )
 
     return user
@@ -91,6 +93,20 @@ def get_current_user_allow_suspended(
     user = db.query(User).filter(User.id == user_id).first()
     if user is None:
         raise credentials_exception
+
+    # Auto-lift temporary suspension if expired
+    if user.is_suspended and user.suspended_until:
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc)
+        susp_end = user.suspended_until
+        if susp_end.tzinfo is None:
+            susp_end = susp_end.replace(tzinfo=timezone.utc)
+        if susp_end <= now:
+            user.is_suspended = False
+            user.suspended_until = None
+            user.suspension_reason = None
+            db.commit()
+
     return user
 
 def get_current_user_optional(

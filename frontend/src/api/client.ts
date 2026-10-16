@@ -56,6 +56,18 @@ apiClient.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
+    // Check if the error is due to user suspension
+    const isSuspendedError = 
+      error.response?.status === 403 && (
+        error.response?.headers?.['x-user-suspended'] === 'true' ||
+        String(error.response?.data?.detail || '').toLowerCase().includes('suspendid')
+      );
+
+    if (isSuspendedError) {
+      window.dispatchEvent(new CustomEvent('user-suspended', { detail: error.response?.data?.detail }));
+      return Promise.reject(error);
+    }
+
     // If 401 response and request has not retried yet
     if (error.response?.status === 401 && !originalRequest._retry) {
       if (isRefreshing) {

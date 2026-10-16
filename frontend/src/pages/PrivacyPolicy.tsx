@@ -1,7 +1,9 @@
 import React from 'react';
 import { useTranslation } from '../context/LanguageContext';
-import { Shield, Lock, Eye, Database, Mail, ArrowLeft, X } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { Shield, Lock, Eye, Database, Mail, ArrowLeft, X, Ban } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { CopyEmailButton } from '../components/CopyEmailButton';
 
 interface PrivacyPolicyProps {
   onClose?: () => void;
@@ -10,14 +12,51 @@ interface PrivacyPolicyProps {
 
 export const PrivacyPolicy: React.FC<PrivacyPolicyProps> = ({ onClose, isModal }) => {
   const { language } = useTranslation();
-
+  const { user } = useAuth();
+  const isSuspended = Boolean(user?.is_suspended);
   const isEs = language === 'es';
 
   return (
     <div style={{ maxWidth: '800px', margin: isModal ? '0 auto' : '2rem auto', padding: isModal ? '0.5rem' : '1rem 1.5rem', lineHeight: 1.7 }}>
+      {isSuspended && !isModal && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '0.75rem',
+          background: 'rgba(239, 68, 68, 0.12)',
+          border: '1px solid rgba(239, 68, 68, 0.3)',
+          borderRadius: 12,
+          padding: '0.75rem 1rem',
+          marginBottom: '1.25rem',
+          color: '#ef4444',
+          fontSize: '0.88rem'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Ban size={16} />
+            <span>{isEs ? 'Tu cuenta se encuentra actualmente suspendida.' : 'Your account is currently suspended.'}</span>
+          </div>
+          <Link
+            to="/suspended"
+            style={{
+              color: '#ef4444',
+              fontWeight: 600,
+              textDecoration: 'underline',
+              fontSize: '0.85rem'
+            }}
+          >
+            {isEs ? 'Ver estado de suspensión' : 'View suspension status'}
+          </Link>
+        </div>
+      )}
+
       {!isModal && (
-        <Link to="/" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', color: 'var(--accent-primary)', textDecoration: 'none', marginBottom: '1.5rem', fontSize: '0.9rem', fontWeight: 500 }}>
-          <ArrowLeft size={16} /> {isEs ? 'Volver al inicio' : 'Back to Home'}
+        <Link 
+          to={isSuspended ? "/suspended" : "/"} 
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', color: 'var(--accent-primary)', textDecoration: 'none', marginBottom: '1.5rem', fontSize: '0.9rem', fontWeight: 500 }}
+        >
+          <ArrowLeft size={16} /> {isSuspended ? (isEs ? 'Volver al estado de cuenta' : 'Back to account status') : (isEs ? 'Volver al inicio' : 'Back to Home')}
         </Link>
       )}
 
@@ -258,7 +297,8 @@ export const PrivacyPolicy: React.FC<PrivacyPolicyProps> = ({ onClose, isModal }
             {isEs
               ? 'Si tienes dudas sobre esta Política de Privacidad, pagos, soporte o tus datos personales, puedes escribirnos a '
               : 'If you have any questions regarding this Privacy Policy, billing, support, or your personal data, you can reach us at '}
-            <a href="mailto:support@pathd.net" style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>support@pathd.net</a>.
+            <a href="mailto:support@pathd.net" style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>support@pathd.net</a>
+            <CopyEmailButton email="support@pathd.net" />.
           </p>
         </section>
       </div>

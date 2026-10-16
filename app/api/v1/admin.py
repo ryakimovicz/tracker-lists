@@ -10,6 +10,7 @@ from app.models.library import UserLibraryItem
 from app.models.social import ListReport, Comment, CommentReport
 
 from app.models.review import MediaReview, MediaReviewReport
+from app.services.email import EmailService
 from pydantic import BaseModel
 
 router = APIRouter()
@@ -764,7 +765,7 @@ def admin_get_users(
             "is_pro_cancelled": bool(u.is_pro_cancelled),
             "pro_expires_at": u.pro_expires_at,
             "is_suspended": bool(u.is_suspended),
-            "suspended_until": u.suspended_until,
+            "suspended_until": (u.suspended_until.replace(tzinfo=timezone.utc).isoformat() if u.suspended_until and u.suspended_until.tzinfo is None else (u.suspended_until.isoformat() if u.suspended_until else None)),
             "suspension_reason": u.suspension_reason,
             "admin_warning": u.admin_warning,
             "admin_warning_at": u.admin_warning_at,
@@ -887,12 +888,15 @@ def admin_warn_user(
 class SuspendUserRequest(BaseModel):
     duration_value: int | None = None
     duration_unit: str = "days"  # "hours", "days", "weeks", "months", "years", "permanent"
+    value: int | None = None
+    unit: str | None = None
     reason: str = ""
 
 @router.post("/users/{user_id}/suspend")
 def admin_suspend_user(
     user_id: int,
     req: SuspendUserRequest,
+    background_tasks: BackgroundTasks,
     current_admin: User = Depends(get_current_admin),
     db: Session = Depends(get_db)
 ):
@@ -905,25 +909,41 @@ def admin_suspend_user(
     user.is_suspended = True
     user.suspension_reason = req.reason.strip() or "Violación de las Normas de la Comunidad"
     
+    dur_val = req.duration_value if req.duration_value is not None else req.value
+    dur_unit = req.unit if req.unit else (req.duration_unit or "days")
+
     now = datetime.now(timezone.utc)
-    if req.duration_unit == "permanent" or req.duration_value is None or req.duration_value <= 0:
+    if dur_unit == "permanent" or dur_val is None or dur_val <= 0:
         user.suspended_until = None
-    elif req.duration_unit == "hours":
-        user.suspended_until = now + timedelta(hours=req.duration_value)
-    elif req.duration_unit == "weeks":
-        user.suspended_until = now + timedelta(weeks=req.duration_value)
-    elif req.duration_unit == "months":
-        user.suspended_until = now + timedelta(days=req.duration_value * 30)
-    elif req.duration_unit == "years":
-        user.suspended_until = now + timedelta(days=req.duration_value * 365)
+    elif dur_unit == "hours":
+        user.suspended_until = now + timedelta(hours=dur_val)
+    elif dur_unit == "weeks":
+        user.suspended_until = now + timedelta(weeks=dur_val)
+    elif dur_unit == "months":
+        user.suspended_until = now + timedelta(days=dur_val * 30)
+    elif dur_unit == "years":
+        user.suspended_until = now + timedelta(days=dur_val * 365)
     else:  # default "days"
-        user.suspended_until = now + timedelta(days=req.duration_value)
+        user.suspended_until = now + timedelta(days=dur_val)
 
     db.commit()
+
+    # Send suspension email in background
+    if user.email:
+        user_lang = getattr(user, 'preferred_language', 'es') or 'es'
+        background_tasks.add_task(
+            EmailService.send_suspension_email,
+            to_email=user.email,
+            username=user.username,
+            reason=user.suspension_reason,
+            suspended_until=user.suspended_until,
+            lang=user_lang
+        )
+
     return {
         "message": "User suspended successfully",
         "is_suspended": True,
-        "suspended_until": user.suspended_until,
+        "suspended_until": (user.suspended_until.replace(tzinfo=timezone.utc).isoformat() if user.suspended_until and user.suspended_until.tzinfo is None else (user.suspended_until.isoformat() if user.suspended_until else None)),
         "suspension_reason": user.suspension_reason
     }
 

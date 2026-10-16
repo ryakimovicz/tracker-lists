@@ -1,7 +1,7 @@
 import json
 import urllib.request
 import urllib.error
-from typing import Optional
+from typing import Optional, Any
 from app.core.config import settings
 
 class EmailService:
@@ -547,3 +547,187 @@ class EmailService:
             subject=subject,
             html_content=html_content
         )
+
+    @classmethod
+    def send_suspension_email(
+        cls,
+        to_email: str,
+        username: str,
+        reason: str,
+        suspended_until: Optional[Any] = None,
+        lang: str = "es"
+    ) -> bool:
+        """
+        Sends an email notifying the user that their account has been suspended,
+        including the reason, duration, appeal contact, and links to terms.
+        """
+        frontend_url = getattr(settings, "FRONTEND_URL", "http://localhost:5173").rstrip("/")
+        is_en = str(lang).lower().startswith("en")
+        safe_reason = reason.strip() if reason else ("Community Guidelines Violation" if is_en else "Infracción de las Normas Comunitarias")
+
+        # Format suspension duration
+        if suspended_until:
+            try:
+                if hasattr(suspended_until, "strftime"):
+                    formatted_date = suspended_until.strftime('%d/%m/%Y %H:%M UTC') if not is_en else suspended_until.strftime('%b %d, %Y at %H:%M UTC')
+                else:
+                    formatted_date = str(suspended_until)
+                duration_text = f"Temporal hasta el {formatted_date}" if not is_en else f"Temporary until {formatted_date}"
+            except Exception:
+                duration_text = str(suspended_until)
+        else:
+            duration_text = "Permanente (Indefinida)" if not is_en else "Permanent (Indefinite)"
+
+        if is_en:
+            subject = "⚠️ Your Pathd account has been suspended"
+            heading = f"Hello, {username}"
+            intro = "We are writing to notify you that access to your <strong>Pathd</strong> account has been suspended by our moderation team."
+            reason_label = "REASON FOR SUSPENSION"
+            duration_label = "SUSPENSION DURATION"
+            appeal_text = "During this suspension, your access to the platform will be restricted. If you believe this decision was made in error or wish to submit an appeal, you may contact us by replying to this email or reaching out to <a href='mailto:support@pathd.net' style='color: #f59e0b; text-decoration: underline;'>support@pathd.net</a>."
+            terms_text = "Terms of Service"
+            privacy_text = "Privacy Policy"
+            tagline = f"© {settings.PROJECT_NAME} • Moderation and Trust & Safety Team."
+        else:
+            subject = "⚠️ Tu cuenta en Pathd ha sido suspendida"
+            heading = f"Hola, {username}"
+            intro = "Te notificamos que el acceso a tu cuenta en <strong>Pathd</strong> ha sido suspendido por el equipo de moderación."
+            reason_label = "MOTIVO DE LA SUSPENSIÓN"
+            duration_label = "DURACIÓN DE LA SANCIÓN"
+            appeal_text = "Durante este período de suspensión, tu acceso a la plataforma permanecerá restringido. Si consideras que se trata de un error o deseas presentar una apelación, puedes responder a este correo o escribirnos a <a href='mailto:support@pathd.net' style='color: #f59e0b; text-decoration: underline;'>support@pathd.net</a>."
+            terms_text = "Términos del Servicio"
+            privacy_text = "Política de Privacidad"
+            tagline = f"© {settings.PROJECT_NAME} • Equipo de Moderación y Seguridad."
+
+        html_content = f"""
+<!DOCTYPE html>
+<html lang="{ 'en' if is_en else 'es' }">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{subject}</title>
+  <style>
+    body {{
+      margin: 0;
+      padding: 0;
+      background-color: #090d16;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      color: #f8fafc;
+    }}
+    .container {{
+      max-width: 560px;
+      margin: 40px auto;
+      background-color: #121826;
+      border: 1px solid rgba(239, 68, 68, 0.35);
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.7);
+    }}
+    .header {{
+      background-color: #0d131f;
+      padding: 30px 24px;
+      text-align: center;
+      border-bottom: 1px solid rgba(239, 68, 68, 0.25);
+    }}
+    .logo-text {{
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      color: #f8fafc;
+      text-decoration: none;
+    }}
+    .logo-accent {{
+      color: #f59e0b;
+    }}
+    .content {{
+      padding: 36px 32px;
+      line-height: 1.6;
+    }}
+    h2 {{
+      color: #ef4444;
+      font-size: 22px;
+      margin-top: 0;
+      margin-bottom: 16px;
+      font-weight: 700;
+    }}
+    p {{
+      color: #94a3b8;
+      font-size: 15px;
+      margin: 16px 0;
+    }}
+    .highlight-card {{
+      background: rgba(239, 68, 68, 0.08);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      border-radius: 12px;
+      padding: 18px 20px;
+      margin: 22px 0;
+    }}
+    .detail-label {{
+      font-size: 11px;
+      text-transform: uppercase;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      color: #ef4444;
+      margin-bottom: 4px;
+    }}
+    .detail-value {{
+      font-size: 15px;
+      font-weight: 600;
+      color: #f8fafc;
+      margin-bottom: 14px;
+    }}
+    .footer {{
+      padding: 24px 32px;
+      background-color: #090d16;
+      border-top: 1px solid #1e293b;
+      text-align: center;
+      font-size: 12px;
+      color: #64748b;
+    }}
+    .footer-links {{
+      margin-top: 12px;
+    }}
+    .footer-links a {{
+      color: #94a3b8;
+      text-decoration: underline;
+      margin: 0 8px;
+    }}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <span class="logo-text">Path<span class="logo-accent">d</span></span>
+    </div>
+    <div class="content">
+      <h2>{heading}</h2>
+      <p>{intro}</p>
+      
+      <div class="highlight-card">
+        <div class="detail-label">{reason_label}</div>
+        <div class="detail-value">{safe_reason}</div>
+        
+        <div class="detail-label">{duration_label}</div>
+        <div class="detail-value" style="margin-bottom: 0;">{duration_text}</div>
+      </div>
+
+      <p>{appeal_text}</p>
+    </div>
+    <div class="footer">
+      <p style="margin: 0;">{tagline}</p>
+      <div class="footer-links">
+        <a href="{frontend_url}/terms">{terms_text}</a>
+        <span>•</span>
+        <a href="{frontend_url}/privacy">{privacy_text}</a>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+        """
+        return cls.send_email(
+            to_email=to_email,
+            subject=subject,
+            html_content=html_content
+        )
+

@@ -20,6 +20,10 @@ export const RouteGuard: React.FC<RouteGuardProps> = ({ children, requireAdmin =
     return <Navigate to="/login" replace />;
   }
 
+  if (user?.is_suspended) {
+    return <Navigate to="/suspended" replace />;
+  }
+
   if (requireAdmin && !user?.is_admin) {
     return <Navigate to="/" replace />;
   }

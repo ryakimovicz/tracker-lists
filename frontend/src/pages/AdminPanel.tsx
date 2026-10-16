@@ -51,6 +51,16 @@ interface AdminUser {
   lists_count: number;
 }
 
+const parseUtcDate = (dateStr?: string | null): Date | null => {
+  if (!dateStr) return null;
+  let s = String(dateStr).trim();
+  if (!s.endsWith('Z') && !/[+-]\d{2}:\d{2}$/.test(s)) {
+    s = `${s.replace(' ', 'T')}Z`;
+  }
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? null : d;
+};
+
 export const AdminPanel: React.FC = () => {
   const { language } = useTranslation();
   const isEs = language === 'es';
@@ -528,6 +538,8 @@ export const AdminPanel: React.FC = () => {
     setModalFeedback(null);
     try {
       const payload: any = {
+        duration_value: suspensionValue,
+        duration_unit: suspensionUnit,
         value: suspensionValue,
         unit: suspensionUnit,
         reason: suspensionReason.trim() || undefined
@@ -1804,7 +1816,14 @@ export const AdminPanel: React.FC = () => {
                   <div>
                     <div style={{ fontSize: '0.85rem', color: '#ef4444', margin: '0.5rem 0' }}>
                       <strong>{isEs ? 'Actualmente suspendido' : 'Currently suspended'}</strong>
-                      {selectedUser.suspended_until ? ` (${isEs ? 'Hasta' : 'Until'} ${new Date(selectedUser.suspended_until).toLocaleString()})` : ` (${isEs ? 'Permanente' : 'Permanent'})`}
+                      {(() => {
+                        if (!selectedUser.suspended_until) return ` (${isEs ? 'Permanente' : 'Permanent'})`;
+                        const endDate = parseUtcDate(selectedUser.suspended_until);
+                        if (!endDate) return '';
+                        return isEs
+                          ? ` (Hasta el ${endDate.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })} ${endDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', hour12: false })} hs)`
+                          : ` (Until ${endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} ${endDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })})`;
+                      })()}
                       {selectedUser.suspension_reason && <div style={{ marginTop: '0.2rem', color: 'var(--text-secondary)' }}>{isEs ? 'Motivo:' : 'Reason:'} {selectedUser.suspension_reason}</div>}
                     </div>
 

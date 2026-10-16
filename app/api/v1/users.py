@@ -140,7 +140,7 @@ async def reconcile_user_subscription(user: User, db: Session) -> bool:
 
 @router.get("/me", response_model=UserDashboardResponse)
 async def get_user_dashboard(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_allow_suspended),
     db: Session = Depends(get_db)
 ):
     # Reconcile user pro and subscription status
@@ -219,7 +219,7 @@ async def get_user_dashboard(
         has_active_subscription=bool(current_user.dodo_subscription_id and not current_user.is_pro_cancelled),
         pro_expires_at=current_user.pro_expires_at,
         is_suspended=bool(current_user.is_suspended),
-        suspended_until=current_user.suspended_until,
+        suspended_until=(current_user.suspended_until.replace(tzinfo=timezone.utc) if current_user.suspended_until and current_user.suspended_until.tzinfo is None else current_user.suspended_until),
         suspension_reason=current_user.suspension_reason,
         admin_warning=current_user.admin_warning,
         profile_color=current_user.profile_color,
@@ -1190,7 +1190,7 @@ def get_any_user_profile(
         has_active_subscription=bool(user.dodo_subscription_id and not user.is_pro_cancelled),
         pro_expires_at=user.pro_expires_at,
         is_suspended=bool(user.is_suspended),
-        suspended_until=user.suspended_until,
+        suspended_until=(user.suspended_until.replace(tzinfo=timezone.utc) if user.suspended_until and user.suspended_until.tzinfo is None else user.suspended_until),
         suspension_reason=user.suspension_reason,
         admin_warning=user.admin_warning if (current_user and (current_user.id == user.id or current_user.is_admin)) else None,
         profile_color=user.profile_color,

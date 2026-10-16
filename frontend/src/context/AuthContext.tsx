@@ -78,8 +78,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       window.dispatchEvent(new CustomEvent('profile-updated', { detail: userData }));
     } catch (err: any) {
-      // Only clear user on definitive 401 Unauthorized / forbidden auth failures
-      if (err?.response?.status === 401 || err?.response?.status === 403) {
+      const isSuspended = err?.response?.headers?.['x-user-suspended'] === 'true' || 
+                          String(err?.response?.data?.detail || '').toLowerCase().includes('suspendid');
+      // Only clear user on definitive 401 Unauthorized / auth failures, NOT if suspended
+      if (err?.response?.status === 401 || (err?.response?.status === 403 && !isSuspended)) {
         setUser(null);
         localStorage.removeItem('access_token');
         localStorage.removeItem('pathd_user_profile');
@@ -141,9 +143,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     };
 
+    // Listen for real-time suspension events to refresh profile and display modal
+    const handleUserSuspended = async () => {
+      await refreshProfile();
+    };
+
     window.addEventListener('auth-logout', handleLogoutEvent);
+    window.addEventListener('user-suspended', handleUserSuspended);
     return () => {
       window.removeEventListener('auth-logout', handleLogoutEvent);
+      window.removeEventListener('user-suspended', handleUserSuspended);
     };
   }, []);
 

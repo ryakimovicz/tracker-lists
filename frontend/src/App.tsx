@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Sidebar } from './components/Sidebar';
 import { RouteGuard } from './components/RouteGuard';
@@ -23,6 +23,7 @@ const CustomizePage = React.lazy(() => import('./pages/Customize'));
 const PrivacyPolicy = React.lazy(() => import('./pages/PrivacyPolicy'));
 const TermsOfService = React.lazy(() => import('./pages/TermsOfService'));
 const NotFound = React.lazy(() => import('./pages/NotFound'));
+const SuspendedPage = React.lazy(() => import('./pages/Suspended'));
 
 import { LanguageProvider } from './context/LanguageContext';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
@@ -34,7 +35,6 @@ const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { OfflineDetector } from './components/OfflineDetector';
 import { CookieBanner } from './components/CookieBanner';
-import { SuspendedAccountModal } from './components/SuspendedAccountModal';
 import { RightSidebarAd } from './components/RightSidebarAd';
 
 import { PathdLoader } from './components/PathdLoader';
@@ -54,13 +54,32 @@ function AppContent() {
   const [contentMarginRight, setContentMarginRight] = React.useState<number>(0);
   const hasToken = Boolean(localStorage.getItem('access_token'));
   const location = useLocation();
+  const navigate = useNavigate();
   const state = location.state as { backgroundLocation?: any } | undefined;
 
+  const isSuspended = Boolean(user?.is_suspended);
+  const isAllowedSuspendedRoute = 
+    location.pathname === '/suspended' || 
+    location.pathname === '/terms' || 
+    location.pathname === '/privacy';
+
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isSuspended && !isAllowedSuspendedRoute) {
+      navigate('/suspended', { replace: true });
+    }
+  }, [isSuspended, isAllowedSuspendedRoute, navigate]);
+
+  useEffect(() => {
+    if (!isLoading && !isSuspended && location.pathname === '/suspended') {
+      navigate('/', { replace: true });
+    }
+  }, [isLoading, isSuspended, location.pathname, navigate]);
+
+  useEffect(() => {
+    if (isAuthenticated && !isSuspended) {
       initGlobalPrefetch();
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, isSuspended]);
 
   useEffect(() => {
     const updateCentering = () => {
@@ -133,13 +152,15 @@ function AppContent() {
       style={appProfileTheme?.cssVariables}
     >
       <OfflineDetector />
-      <SuspendedAccountModal />
-      <Sidebar />
-      <MobileHeader />
+      {!isSuspended && <Sidebar />}
+      {!isSuspended && <MobileHeader />}
 
       <main 
         className="main-content"
-        style={{ '--main-content-margin-right': `${contentMarginRight}px` } as React.CSSProperties}
+        style={{
+          '--main-content-margin-right': `${isSuspended ? 0 : contentMarginRight}px`,
+          ...(isSuspended ? { width: '100%', maxWidth: '100%', padding: location.pathname === '/suspended' ? 0 : '1.5rem', minHeight: '100vh' } : {})
+        } as React.CSSProperties}
       >
         <ErrorBoundary>
           <Suspense fallback={<PathdLoader fullScreen />}>
@@ -165,6 +186,7 @@ function AppContent() {
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route path="/terms" element={<TermsOfService />} />
+            <Route path="/suspended" element={<SuspendedPage />} />
             <Route
               path="/premium"
               element={
@@ -302,7 +324,7 @@ function AppContent() {
       </ErrorBoundary>
 
       {/* Modal overlay route when navigating from within the app */}
-      {state?.backgroundLocation && (
+      {!isSuspended && state?.backgroundLocation && (
         <ErrorBoundary>
           <Suspense fallback={null}>
             <Routes>
@@ -328,7 +350,7 @@ function AppContent() {
       )}
 
           {/* Also mount ItemRouteModal, PostRouteModal or MusicRouteModal if accessed directly over fallback background */}
-          {!state?.backgroundLocation && (location.pathname.startsWith('/item/') || location.pathname.startsWith('/post/') || location.pathname.startsWith('/music/')) && (
+          {!isSuspended && !state?.backgroundLocation && (location.pathname.startsWith('/item/') || location.pathname.startsWith('/post/') || location.pathname.startsWith('/music/')) && (
             <Routes>
               <Route
                 path="/item/:type/:id"
@@ -349,10 +371,10 @@ function AppContent() {
             </Routes>
           )}
         </main>
-        <PremiumRouteModal />
-        <RightSidebarAd />
+        {!isSuspended && <PremiumRouteModal />}
+        {!isSuspended && <RightSidebarAd />}
         <CookieBanner />
-        <MobileBottomNav />
+        {!isSuspended && <MobileBottomNav />}
       </div>
   );
 }
