@@ -18,3 +18,27 @@ def test_search_validation_empty_query(client):
     response = client.get("/api/v1/search/all?q=")
     # FastAPI rejects query parameter with min_length constraint with 422
     assert response.status_code == 422
+
+
+def test_mock_google_token_blocked_in_production(client):
+    from app.core.config import settings
+    orig_env = settings.ENVIRONMENT
+    try:
+        settings.ENVIRONMENT = "production"
+        response = client.post(
+            "/api/v1/auth/google",
+            json={"id_token": "mock-google-victim@test.com-victim"}
+        )
+        assert response.status_code == 403
+    finally:
+        settings.ENVIRONMENT = orig_env
+
+
+def test_forgot_password_generic_response(client):
+    response = client.post(
+        "/api/v1/auth/forgot-password",
+        json={"email": "nonexistent_email_for_testing@domain.com"}
+    )
+    assert response.status_code == 200
+    assert "password reset link has been generated" in response.json().get("message", "")
+

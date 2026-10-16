@@ -9,6 +9,7 @@ from email.mime.text import MIMEText
 
 from app.core.config import settings
 from app.core.database import get_db
+from app.core.limiter import limiter
 from app.core.security import (
     create_access_token,
     verify_password,
@@ -73,11 +74,12 @@ def send_reset_email(to_email: str, username: str, token: str, lang: str = "es")
 
 # Helper to set cookie
 def set_refresh_cookie(response: Response, refresh_token: str):
+    is_prod = settings.ENVIRONMENT in ("production", "staging")
     response.set_cookie(
         key="refresh_token",
         value=refresh_token,
         httponly=True,
-        secure=False, # Set to True in production with HTTPS
+        secure=is_prod,
         samesite="lax",
         max_age=14 * 24 * 60 * 60  # 14 days
     )
@@ -85,6 +87,7 @@ def set_refresh_cookie(response: Response, refresh_token: str):
 from sqlalchemy import func
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit("5/minute")
 def register(
     request: Request,
     user_in: UserCreate,
@@ -193,6 +196,7 @@ def verify_email(
     }
 
 @router.post("/resend-verification")
+@limiter.limit("5/minute")
 def resend_verification(
     request: Request,
     payload: ResendVerificationRequest,
@@ -211,7 +215,9 @@ def resend_verification(
 
 
 @router.post("/login", response_model=Token)
+@limiter.limit("10/minute")
 def login(
+    request: Request,
     response: Response,
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
@@ -305,7 +311,9 @@ def logout(
 
 # --- Google OAuth2 Scaffold ---
 @router.post("/google", response_model=GoogleAuthResponse)
+@limiter.limit("15/minute")
 def google_auth(
+    request: Request,
     response: Response,
     payload: GoogleLoginRequest,
     db: Session = Depends(get_db)
@@ -313,8 +321,13 @@ def google_auth(
     email = None
     suggested_username = None
     
-    # Try mock token first for easy integration and local developer verification
+    # Mock tokens are strictly restricted to local development and automated testing
     if payload.id_token.startswith("mock-google-"):
+        if settings.ENVIRONMENT not in ("development", "test"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Mock Google authentication is disabled in production."
+            )
         parts = payload.id_token.split("-")
         # format: mock-google-<email>-<username>
         if len(parts) >= 4:
@@ -447,13 +460,14 @@ def google_auth(
 
 # --- Password Reset Flow ---
 @router.post("/forgot-password")
+@limiter.limit("5/minute")
 def forgot_password(
     request: Request,
     payload: ForgotPasswordRequest,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
 ):
-    user = db.query(User).filter(User.email == payload.email).first()
+    user = db.query(User).filter(func.lower(User.email) == payload.email.strip().lower()).first()
     # Always return a success response to avoid email enumeration attacks
     if not user:
         return {"message": "If the email is registered, a password reset link has been generated."}
@@ -472,7 +486,9 @@ def forgot_password(
 
 
 @router.post("/reset-password")
+@limiter.limit("10/minute")
 def reset_password(
+    request: Request,
     payload: ResetPasswordRequest,
     db: Session = Depends(get_db)
 ):
