@@ -147,7 +147,7 @@ export const SettingsPage: React.FC = () => {
   const [privacyMsg, setPrivacyMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // Anti-spoilers state (Blur unwatched episode thumbnails)
-  const [blurUnwatched, setBlurUnwatched] = useState<boolean>(Boolean(user?.blur_unwatched_episodes));
+  const [blurUnwatched, setBlurUnwatched] = useState<boolean>(Boolean(user?.is_pro && user?.blur_unwatched_episodes));
   const [blurLoading, setBlurLoading] = useState(false);
   const [blurMsg, setBlurMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -158,14 +158,16 @@ export const SettingsPage: React.FC = () => {
   useEffect(() => {
     if (user) {
       setIsPrivate(Boolean((user as any)?.is_private));
-      setBlurUnwatched(Boolean(user?.blur_unwatched_episodes));
+      setBlurUnwatched(Boolean(user?.is_pro && user?.blur_unwatched_episodes));
       setUsername(user.username || '');
     }
   }, [user]);
 
   const handleToggleBlurUnwatched = async (newVal: boolean) => {
     if (!user?.is_pro) {
-      setShowProModal(true);
+      if (newVal) {
+        setShowProModal(true);
+      }
       return;
     }
     setBlurLoading(true);

@@ -214,6 +214,7 @@ async def cancel_my_subscription(
         current_user.banner_url = None
         current_user.background_url = None
         current_user.profile_color = None
+        current_user.blur_unwatched_episodes = False
         db.commit()
         return {
             "message": "Suscripción Premium cancelada con éxito.",
@@ -349,6 +350,7 @@ async def dodo_webhook(
         user.banner_url = None
         user.background_url = None
         user.profile_color = None
+        user.blur_unwatched_episodes = False
         trim_downgraded_user_favorites(db, user.id)
         db.commit()
         logger.info(f"User {user.username} (ID: {user.id}) downgraded from Pro via webhook event: {event_type}")

@@ -591,6 +591,7 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
   );
 
   const shouldBlurCardCover = Boolean(
+    (user?.is_pro || user?.is_admin || user?.is_vip) &&
     user?.blur_unwatched_episodes &&
     isEpisodeActivity &&
     !isCoverRevealed &&

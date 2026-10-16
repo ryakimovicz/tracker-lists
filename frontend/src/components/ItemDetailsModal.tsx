@@ -4013,6 +4013,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   );
 
   const shouldBlurEpisodeCover = Boolean(
+    (user?.is_pro || user?.is_admin || user?.is_vip) &&
     user?.blur_unwatched_episodes &&
     isEpisode &&
     !isComicOrIssue &&

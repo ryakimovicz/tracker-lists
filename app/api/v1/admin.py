@@ -718,6 +718,7 @@ def admin_get_users(
             eu.banner_url = None
             eu.background_url = None
             eu.profile_color = None
+            eu.blur_unwatched_episodes = False
             trim_downgraded_user_favorites(db, eu.id)
         db.commit()
 
@@ -800,6 +801,7 @@ def admin_toggle_vip(
         
     user.is_vip = req.is_vip
     if not req.is_vip and not user.is_pro and not user.is_admin:
+        user.blur_unwatched_episodes = False
         trim_downgraded_user_favorites(db, user.id)
     db.commit()
     return {"message": f"User VIP status set to {req.is_vip}", "is_vip": user.is_vip, "is_pro": check_user_is_pro(user)}
@@ -1012,6 +1014,7 @@ async def admin_cancel_user_subscription(
         user.banner_url = None
         user.background_url = None
         user.profile_color = None
+        user.blur_unwatched_episodes = False
         trim_downgraded_user_favorites(db, user.id)
         db.commit()
         return {
@@ -1044,6 +1047,7 @@ def admin_revoke_user_pro(
     user.banner_url = None
     user.background_url = None
     user.profile_color = None
+    user.blur_unwatched_episodes = False
     trim_downgraded_user_favorites(db, user.id)
     db.commit()
     return {
@@ -1084,6 +1088,7 @@ async def admin_sync_user_subscription(
                 user.banner_url = None
                 user.background_url = None
                 user.profile_color = None
+                user.blur_unwatched_episodes = False
                 trim_downgraded_user_favorites(db, user.id)
                 db.commit()
         return {
@@ -1109,6 +1114,7 @@ async def admin_sync_user_subscription(
             user.banner_url = None
             user.background_url = None
             user.profile_color = None
+            user.blur_unwatched_episodes = False
             trim_downgraded_user_favorites(db, user.id)
             db.commit()
             return {
@@ -1140,6 +1146,7 @@ async def admin_sync_user_subscription(
                         user.banner_url = None
                         user.background_url = None
                         user.profile_color = None
+                        user.blur_unwatched_episodes = False
                         trim_downgraded_user_favorites(db, user.id)
                         db.commit()
                         return {

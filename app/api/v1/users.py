@@ -77,6 +77,7 @@ async def reconcile_user_subscription(user: User, db: Session) -> bool:
             user.banner_url = None
             user.background_url = None
             user.profile_color = None
+            user.blur_unwatched_episodes = False
             trim_downgraded_user_favorites(db, user.id)
             db.commit()
             logger.info(f"User {user.username} (ID: {user.id}) auto-downgraded: pro_expires_at expired.")
@@ -103,6 +104,7 @@ async def reconcile_user_subscription(user: User, db: Session) -> bool:
                     user.banner_url = None
                     user.background_url = None
                     user.profile_color = None
+                    user.blur_unwatched_episodes = False
                     trim_downgraded_user_favorites(db, user.id)
                     db.commit()
                     logger.info(f"User {user.username} auto-downgraded after reconciling with Dodo (status={status}).")
@@ -128,12 +130,18 @@ async def reconcile_user_subscription(user: User, db: Session) -> bool:
                                 user.banner_url = None
                                 user.background_url = None
                                 user.profile_color = None
+                                user.blur_unwatched_episodes = False
                                 trim_downgraded_user_favorites(db, user.id)
                                 db.commit()
                                 return False
                             db.commit()
         except Exception as e:
             logger.warning(f"Failed to reconcile subscription {user.dodo_subscription_id} with Dodo: {e}")
+
+    # Auto-disable blur_unwatched_episodes if user is not pro
+    if not check_user_is_pro(user) and getattr(user, 'blur_unwatched_episodes', False):
+        user.blur_unwatched_episodes = False
+        db.commit()
 
     return bool(user.is_pro)
 
@@ -227,7 +235,7 @@ async def get_user_dashboard(
         lastfm_username=current_user.lastfm_username,
         preferred_language=getattr(current_user, 'preferred_language', 'es') or 'es',
         is_private=bool(getattr(current_user, 'is_private', False)),
-        blur_unwatched_episodes=bool(getattr(current_user, 'blur_unwatched_episodes', False)),
+        blur_unwatched_episodes=bool(getattr(current_user, 'blur_unwatched_episodes', False)) if is_pro else False,
         followers_count=followers_count,
         following_count=following_count,
         is_following=False,
@@ -966,6 +974,7 @@ def update_user_settings(
         was_pro = current_user.is_pro
         current_user.is_pro = req.is_pro
         if was_pro and not req.is_pro:
+            current_user.blur_unwatched_episodes = False
             trim_downgraded_user_favorites(db, current_user.id)
         
     db.commit()
@@ -1197,7 +1206,7 @@ def get_any_user_profile(
         category_order=user.category_order,
         lastfm_username=user.lastfm_username if not is_private_locked else None,
         is_private=is_user_private,
-        blur_unwatched_episodes=bool(getattr(user, 'blur_unwatched_episodes', False)),
+        blur_unwatched_episodes=bool(getattr(user, 'blur_unwatched_episodes', False)) if is_pro else False,
         followers_count=followers_count,
         following_count=following_count,
         is_following=is_following,

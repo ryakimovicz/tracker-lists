@@ -46,7 +46,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const token = localStorage.getItem('access_token');
       if (!token) return null;
       const cached = localStorage.getItem('pathd_user_profile');
-      return cached ? JSON.parse(cached) : null;
+      if (!cached) return null;
+      const parsed = JSON.parse(cached);
+      const isPro = Boolean(parsed.is_pro || parsed.is_admin || parsed.is_vip);
+      return {
+        ...parsed,
+        is_pro: isPro,
+        blur_unwatched_episodes: isPro ? Boolean(parsed.blur_unwatched_episodes) : false
+      };
     } catch {
       return null;
     }
@@ -67,9 +74,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const refreshProfile = async () => {
     try {
       const resp = await apiClient.get('/users/me');
+      const isPro = Boolean(resp.data.is_pro || resp.data.is_admin || resp.data.is_vip);
       const userData = {
         ...resp.data,
-        is_pro: Boolean(resp.data.is_pro || resp.data.is_admin || resp.data.is_vip)
+        is_pro: isPro,
+        blur_unwatched_episodes: isPro ? Boolean(resp.data.blur_unwatched_episodes) : false
       };
       setUser(userData);
       try {

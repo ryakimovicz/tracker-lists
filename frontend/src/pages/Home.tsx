@@ -1250,6 +1250,7 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
 
   const isPoster = variant === 'poster';
   const shouldBlurEpisodeCover = Boolean(
+    (user?.is_pro || user?.is_admin || user?.is_vip) &&
     user?.blur_unwatched_episodes &&
     !isPoster &&
     !isComic &&
@@ -3750,6 +3751,7 @@ export const Home: React.FC = () => {
 
                 const isGuideEpisode = Boolean(g.title.match(/S(\d+)E(\d+)/i));
                 const shouldBlurGuide = Boolean(
+                  (currentUser?.is_pro || currentUser?.is_admin || currentUser?.is_vip) &&
                   currentUser?.blur_unwatched_episodes &&
                   isGuideEpisode &&
                   !g.is_completed &&
@@ -3813,6 +3815,7 @@ export const Home: React.FC = () => {
 
                   const isGuideEpisode = Boolean(g.title.match(/S(\d+)E(\d+)/i));
                   const shouldBlurGuide = Boolean(
+                    (currentUser?.is_pro || currentUser?.is_admin || currentUser?.is_vip) &&
                     currentUser?.blur_unwatched_episodes &&
                     isGuideEpisode &&
                     !g.is_completed &&
@@ -3971,6 +3974,7 @@ export const Home: React.FC = () => {
 
                 const isGuideEpisode = Boolean(g.title.match(/S(\d+)E(\d+)/i));
                 const shouldBlurGuide = Boolean(
+                  (currentUser?.is_pro || currentUser?.is_admin || currentUser?.is_vip) &&
                   currentUser?.blur_unwatched_episodes &&
                   isGuideEpisode &&
                   !g.is_completed &&
