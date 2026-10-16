@@ -11,6 +11,7 @@ interface MediaPosterProps {
   aspectRatio?: string;
   borderRadius?: string | number;
   style?: React.CSSProperties;
+  shouldBlur?: boolean;
 }
 
 export const MediaPoster: React.FC<MediaPosterProps> = ({
@@ -22,7 +23,8 @@ export const MediaPoster: React.FC<MediaPosterProps> = ({
   width = '100%',
   aspectRatio,
   borderRadius = '8px',
-  style = {}
+  style = {},
+  shouldBlur = false
 }) => {
   const [imgError, setImgError] = useState(false);
 
@@ -153,8 +155,9 @@ export const MediaPoster: React.FC<MediaPosterProps> = ({
           aspectRatio,
           objectFit: 'cover',
           borderRadius,
-          filter: 'none',
-          transition: 'transform 0.2s',
+          filter: shouldBlur ? 'blur(16px)' : 'none',
+          transform: shouldBlur ? 'scale(1.12)' : 'none',
+          transition: 'filter 0.3s ease, transform 0.3s ease',
           display: 'block',
           userSelect: 'none',
           WebkitUserDrag: 'none',

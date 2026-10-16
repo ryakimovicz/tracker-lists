@@ -9,7 +9,7 @@ import { AdBanner } from '../components/AdBanner';
 import { ReplaceFavoriteModal } from '../components/ReplaceFavoriteModal';
 import { ProModal } from '../components/ProModal';
 import { PathdLoader } from '../components/PathdLoader';
-import { ChevronLeft, ChevronRight, ChevronDown, ChevronsDown, Check, Play, BookOpen, Bookmark, CheckCircle, XCircle, Calendar, Sparkles } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronDown, ChevronsDown, Check, Play, BookOpen, Bookmark, CheckCircle, XCircle, Calendar, Sparkles, Eye } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { getOrderedCategories, getCategoryLabel, getCategoryIcon, sortFilterTabs } from '../utils/categoryOrder';
 import { prefetchMediaDetails } from '../utils/prefetch';
@@ -472,7 +472,9 @@ const ScrollRow = ({
       )}
     </div>
   );
-};const CustomCard = ({ 
+};
+
+const CustomCard = ({ 
   title, 
   coverUrl, 
   itemType,
@@ -489,7 +491,9 @@ const ScrollRow = ({
   language,
   themeColor,
   themeTextColor,
-  actionIcon = 'check'
+  actionIcon = 'check',
+  shouldBlurCover = false,
+  onRevealCover
 }: { 
   title: string; 
   coverUrl?: string; 
@@ -508,6 +512,8 @@ const ScrollRow = ({
   themeColor?: string;
   themeTextColor?: string;
   actionIcon?: 'check' | 'play';
+  shouldBlurCover?: boolean;
+  onRevealCover?: () => void;
 }) => {
   const showBoth = !!(onCheck && onPlay);
   const hasAction = !!(onCheck || onPlay);
@@ -555,7 +561,7 @@ const ScrollRow = ({
           title
         )}
       </div>
-      <div className="card-media-cover" style={{ width: "100%", height: "240px", background: "var(--bg-tertiary)", position: "relative" }}>
+      <div className="card-media-cover" style={{ width: "100%", height: "240px", background: "var(--bg-tertiary)", position: "relative", overflow: "hidden" }}>
         <MediaPoster
           src={coverUrl}
           title={title}
@@ -563,7 +569,54 @@ const ScrollRow = ({
           height="100%"
           width="100%"
           borderRadius={0}
+          shouldBlur={shouldBlurCover}
         />
+        {shouldBlurCover && (
+          <div
+            onClick={(e) => {
+              e.stopPropagation();
+              onRevealCover?.();
+            }}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.35rem',
+              padding: '0.5rem',
+              textAlign: 'center',
+              cursor: 'pointer',
+              background: 'rgba(0, 0, 0, 0.45)',
+              backdropFilter: 'blur(3px)',
+              WebkitBackdropFilter: 'blur(3px)',
+              color: '#fff',
+              zIndex: 2,
+              userSelect: 'none'
+            }}
+            title={language === 'es' ? 'Haz clic para revelar la portada' : 'Click to reveal cover'}
+          >
+            <div style={{
+              background: 'rgba(0, 0, 0, 0.65)',
+              borderRadius: '50%',
+              padding: '0.45rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              border: '1px solid rgba(255, 255, 255, 0.25)',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.4)'
+            }}>
+              <Eye size={18} />
+            </div>
+            <span style={{ fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.02em', textShadow: '0 1px 4px rgba(0,0,0,0.9)' }}>
+              {language === 'es' ? 'Anti-Spoiler' : 'Anti-Spoiler'}
+            </span>
+          </div>
+        )}
         {coverTopText && (
           <div style={{ position: "absolute", top: 0, left: 0, right: 0, padding: "0.5rem", background: "linear-gradient(to bottom, rgba(0,0,0,0.8), transparent)", color: "#fff", fontSize: "0.85rem", fontWeight: 700, textShadow: "0 1px 3px rgba(0,0,0,0.8)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
             {coverTopText}
@@ -645,6 +698,8 @@ const ScrollRow = ({
 };
 
 const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, themeTextColor, actionIcon = 'check', variant = 'episode' }: { item: any, onUpdate: () => void, language: string, onOpenSeries: (item: any) => void, themeColor?: string, themeTextColor?: string, actionIcon?: 'check' | 'play', variant?: 'episode' | 'poster' }) => {
+  const { user } = useAuth();
+  const [isCoverRevealed, setIsCoverRevealed] = useState(false);
   const pad = (n: number) => n < 10 ? '0' + n : n;
   const isComic = item.item_type === 'comic' || String(item.external_id || '').startsWith('cv_vol_');
 
@@ -778,6 +833,10 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
   const [trackedEpisodes, setTrackedEpisodes] = useState<any[]>(Array.isArray(initialCachedList) ? initialCachedList : []);
   const [isLoading, setIsLoading] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState<boolean>(initialIsLoading);
+
+  useEffect(() => {
+    setIsCoverRevealed(false);
+  }, [nextEp?.id, nextEp?.name]);
 
   const optimisticLockUntilRef = useRef<number>(0);
 
@@ -1170,12 +1229,23 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
     if (isComic) {
       return nextEp?.image_url || nextEp?.image?.original || nextEp?.image?.medium || nextEp?.still_path || item.image_url;
     }
-    if (nextEp?.still_path) {
-      return nextEp.still_path;
+    const episodeStill = nextEp?.still_path || nextEp?.image?.original || nextEp?.image?.medium || nextEp?.image_url;
+    if (episodeStill) {
+      return episodeStill;
     }
     return item.image_url;
   };
   const coverUrl = getCoverUrl();
+
+  const isPoster = variant === 'poster';
+  const shouldBlurEpisodeCover = Boolean(
+    user?.blur_unwatched_episodes &&
+    !isPoster &&
+    !isComic &&
+    (item.item_type === 'series' || item.item_type === 'anime') &&
+    Boolean(nextEp) &&
+    !isCoverRevealed
+  );
 
   let seasonText = '';
   let epName = '';
@@ -1206,8 +1276,6 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
   if (!isInitialLoad && !nextEp) {
     return null;
   }
-
-  const isPoster = variant === 'poster';
 
   return (
     <>
@@ -1240,7 +1308,7 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
           {!isPoster && <ChevronRight size={14} style={{ flexShrink: 0, marginLeft: "0.25rem", opacity: 0.7 }} />}
         </div>
         
-        <div className="card-media-cover" style={{ width: "100%", height: (isPoster || isComic) ? "240px" : "125px", background: "var(--bg-tertiary)", position: "relative" }}>
+        <div className="card-media-cover" style={{ width: "100%", height: (isPoster || isComic) ? "240px" : "125px", background: "var(--bg-tertiary)", position: "relative", overflow: "hidden" }}>
           <MediaPoster
             src={isPoster ? item.image_url : coverUrl}
             title={item.title}
@@ -1248,7 +1316,55 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
             height="100%"
             width="100%"
             borderRadius={0}
+            shouldBlur={shouldBlurEpisodeCover}
           />
+          {shouldBlurEpisodeCover && (
+            <div
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsCoverRevealed(true);
+              }}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.35rem',
+                padding: '0.5rem',
+                textAlign: 'center',
+                cursor: 'pointer',
+                background: 'rgba(0, 0, 0, 0.45)',
+                backdropFilter: 'blur(3px)',
+                WebkitBackdropFilter: 'blur(3px)',
+                color: '#fff',
+                zIndex: 2,
+                userSelect: 'none'
+              }}
+              title={language === 'es' ? 'Haz clic para revelar la portada' : 'Click to reveal cover'}
+            >
+              <div style={{
+                background: 'rgba(0, 0, 0, 0.65)',
+                borderRadius: '50%',
+                padding: '0.45rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                border: '1px solid rgba(255, 255, 255, 0.25)',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+                transition: 'transform 0.15s ease'
+              }}>
+                <Eye size={18} />
+              </div>
+              <span style={{ fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.02em', textShadow: '0 1px 4px rgba(0,0,0,0.9)' }}>
+                {language === 'es' ? 'Anti-Spoiler' : 'Anti-Spoiler'}
+              </span>
+            </div>
+          )}
         </div>
         
         <div className="card-body-content" style={{ padding: "0.75rem", display: "flex", flexDirection: "column", gap: "0.25rem", flex: 1, minHeight: isPoster ? "2.5rem" : undefined, paddingRight: isPoster ? "75px" : undefined }}>
@@ -1910,6 +2026,7 @@ export const Home: React.FC = () => {
   });
   const [isSyncingEpisodes, setIsSyncingEpisodes] = useState<boolean>(false);
   const [selectedItem, setSelectedItem] = useState<any>(null);
+  const [revealedGuides, setRevealedGuides] = useState<Record<string | number, boolean>>({});
 
   const handleOpenItem = useCallback((item: any) => {
     if (!item) return;
@@ -3609,6 +3726,14 @@ export const Home: React.FC = () => {
                   }
                 }
 
+                const isGuideEpisode = Boolean(g.title.match(/S(\d+)E(\d+)/i));
+                const shouldBlurGuide = Boolean(
+                  currentUser?.blur_unwatched_episodes &&
+                  isGuideEpisode &&
+                  !g.is_completed &&
+                  !revealedGuides[g.item_id]
+                );
+
                 return (
                   <CustomCard 
                     key={g.item_id}
@@ -3625,6 +3750,8 @@ export const Home: React.FC = () => {
                     onClick={() => handleOpenItem({ ...g, id: g.item_id })}
                     onTitleClick={(e) => { e.stopPropagation(); navigate(`/guide/${g.list_id}`); }}
                     language={language}
+                    shouldBlurCover={shouldBlurGuide}
+                    onRevealCover={() => setRevealedGuides(prev => ({ ...prev, [g.item_id]: true }))}
                   />
                 );
               })}
@@ -3662,6 +3789,14 @@ export const Home: React.FC = () => {
                     }
                   }
 
+                  const isGuideEpisode = Boolean(g.title.match(/S(\d+)E(\d+)/i));
+                  const shouldBlurGuide = Boolean(
+                    currentUser?.blur_unwatched_episodes &&
+                    isGuideEpisode &&
+                    !g.is_completed &&
+                    !revealedGuides[g.item_id]
+                  );
+
                   return (
                     <CustomCard 
                       key={g.item_id}
@@ -3678,6 +3813,8 @@ export const Home: React.FC = () => {
                       onClick={() => handleOpenItem({ ...g, id: g.item_id })}
                       onTitleClick={(e) => { e.stopPropagation(); navigate(`/guide/${g.list_id}`); }}
                       language={language}
+                      shouldBlurCover={shouldBlurGuide}
+                      onRevealCover={() => setRevealedGuides(prev => ({ ...prev, [g.item_id]: true }))}
                     />
                   );
                 })}
@@ -3810,6 +3947,14 @@ export const Home: React.FC = () => {
                   }
                 }
 
+                const isGuideEpisode = Boolean(g.title.match(/S(\d+)E(\d+)/i));
+                const shouldBlurGuide = Boolean(
+                  currentUser?.blur_unwatched_episodes &&
+                  isGuideEpisode &&
+                  !g.is_completed &&
+                  !revealedGuides[g.item_id]
+                );
+
                 return (
                   <CustomCard 
                     key={g.item_id}
@@ -3826,6 +3971,8 @@ export const Home: React.FC = () => {
                     onClick={() => handleOpenItem({ ...g, id: g.item_id })}
                     onTitleClick={(e) => { e.stopPropagation(); navigate(`/guide/${g.list_id}`); }}
                     language={language}
+                    shouldBlurCover={shouldBlurGuide}
+                    onRevealCover={() => setRevealedGuides(prev => ({ ...prev, [g.item_id]: true }))}
                   />
                 );
               };

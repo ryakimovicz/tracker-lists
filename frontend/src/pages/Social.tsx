@@ -36,10 +36,29 @@ export const Social: React.FC = () => {
     ? (tabParam as SocialTab)
     : 'following';
 
-  const [activities, setActivities] = useState<ActivityCardData[]>(() => getCachedFeed(activeTab));
-  const [loading, setLoading] = useState<boolean>(() => getCachedFeed(activeTab).length === 0);
+  // Fast in-memory cache to allow 0ms instantaneous tab switching
+  const feedCacheRef = useRef<Partial<Record<SocialTab, ActivityCardData[]>>>({
+    following: getCachedFeed('following'),
+    discover: getCachedFeed('discover'),
+    reviews: getCachedFeed('reviews'),
+    me: getCachedFeed('me'),
+  });
+
+  const activeTabRef = useRef<SocialTab>(activeTab);
+  activeTabRef.current = activeTab;
+
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  const initialCached = feedCacheRef.current[activeTab] || [];
+  const [activities, setActivities] = useState<ActivityCardData[]>(initialCached);
+  const [loading, setLoading] = useState<boolean>(initialCached.length === 0);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedItem, setSelectedItem] = useState<any | null>(null);
+
+  const loadingRef = useRef(loading);
+  loadingRef.current = loading;
+  const refreshingRef = useRef(refreshing);
+  refreshingRef.current = refreshing;
 
   const handleOpenItem = (item: any) => {
     if (!item) return;
@@ -54,16 +73,15 @@ export const Social: React.FC = () => {
     }
   };
 
-  const fetchTabFeed = async (tab: SocialTab, isRefresh = false) => {
-    const cached = getCachedFeed(tab);
-    if (!isRefresh && cached.length > 0) {
-      setActivities(cached);
-      setLoading(false);
-    } else if (!isRefresh && activities.length === 0) {
-      setLoading(true);
+  const fetchTabFeed = async (tab: SocialTab, isRefresh = false, signal?: AbortSignal) => {
+    if (signal?.aborted || activeTabRef.current !== tab) {
+      return;
     }
 
-    if (isRefresh) setRefreshing(true);
+    if (isRefresh) {
+      setRefreshing(true);
+      refreshingRef.current = true;
+    }
 
     try {
       let endpoint = '/social/feed/following';
@@ -71,7 +89,13 @@ export const Social: React.FC = () => {
       else if (tab === 'reviews') endpoint = '/social/feed/reviews';
       else if (tab === 'me') endpoint = '/social/feed/me';
 
-      const res = await apiClient.get(endpoint);
+      const res = await apiClient.get(endpoint, { signal });
+
+      // Discard stale response if user switched tabs during network request
+      if (signal?.aborted || activeTabRef.current !== tab) {
+        return;
+      }
+
       if (Array.isArray(res.data)) {
         // Consolidate legacy dual activities:
         // 1. One item_rated + one item_reviewed for same entity/item
@@ -144,7 +168,6 @@ export const Social: React.FC = () => {
 
           // Unify Shelf Add + Status Changed for unadded works marked directly (e.g. Added and watched / finished)
           if (isShelfAdd) {
-            // Check if there is already a recent status change for this work
             const itemWorkExt = (item.external_id || '').trim().toLowerCase();
             const itemWorkTitle = (item.item_title || '').trim().toLowerCase();
             for (let i = consolidated.length - 1; i >= Math.max(0, consolidated.length - 15); i--) {
@@ -159,7 +182,6 @@ export const Social: React.FC = () => {
                 (itemWorkTitle && targetTitle && itemWorkTitle === targetTitle);
 
               if (matchesWork) {
-                // Merge into the status changed activity
                 const targetMeta = target.metadata_json ? (typeof target.metadata_json === 'string' ? JSON.parse(target.metadata_json) : target.metadata_json) : {};
                 targetMeta.also_added = true;
                 target.metadata_json = JSON.stringify(targetMeta);
@@ -168,7 +190,6 @@ export const Social: React.FC = () => {
               }
             }
           } else if (isStatusChanged) {
-            // Check if there is already a recent shelf add for this work
             const itemWorkExt = (item.external_id || '').trim().toLowerCase();
             const itemWorkTitle = (item.item_title || '').trim().toLowerCase();
             for (let i = consolidated.length - 1; i >= Math.max(0, consolidated.length - 15); i--) {
@@ -183,7 +204,6 @@ export const Social: React.FC = () => {
                 (itemWorkTitle && targetTitle && itemWorkTitle === targetTitle);
 
               if (matchesWork) {
-                // Replace the shelf_add with this item_status_changed, tagging also_added = true
                 itemMeta.also_added = true;
                 item.metadata_json = JSON.stringify(itemMeta);
                 consolidated[i] = item;
@@ -194,7 +214,6 @@ export const Social: React.FC = () => {
           }
 
           if (!mergedWithExisting && isWorkCompletion) {
-            // Find recent unit consumption event by the same user for this work (within the consolidated list)
             const itemWorkTitle = (item.item_title || '').trim().toLowerCase();
             const itemWorkExt = (item.external_id || '').trim().toLowerCase();
             for (let i = consolidated.length - 1; i >= Math.max(0, consolidated.length - 15); i--) {
@@ -206,7 +225,6 @@ export const Social: React.FC = () => {
                 (itemWorkTitle && target.item_title && target.item_title.toLowerCase().startsWith(itemWorkTitle));
               
               if (matchesWork) {
-                // Merge completion flag into target unit activity
                 const targetMeta = target.metadata_json ? (typeof target.metadata_json === 'string' ? JSON.parse(target.metadata_json) : target.metadata_json) : {};
                 targetMeta.finished_work = true;
                 target.metadata_json = JSON.stringify(targetMeta);
@@ -215,7 +233,6 @@ export const Social: React.FC = () => {
               }
             }
           } else if (!mergedWithExisting && isUnitConsumption) {
-            // Check if there is already a work completion event for this work in consolidated
             const unitIdent = getWorkIdent(item);
             for (let i = consolidated.length - 1; i >= Math.max(0, consolidated.length - 15); i--) {
               const target = consolidated[i];
@@ -232,7 +249,6 @@ export const Social: React.FC = () => {
                   (targetTitle && item.item_title && item.item_title.toLowerCase().startsWith(targetTitle));
 
                 if (matchesWork) {
-                  // Replace the stand-alone completion event with this episode/issue event, marking it finished_work = true
                   itemMeta.finished_work = true;
                   item.metadata_json = JSON.stringify(itemMeta);
                   consolidated[i] = item;
@@ -248,18 +264,33 @@ export const Social: React.FC = () => {
           }
         }
 
-        setActivities(consolidated);
+        // Cache both in memory ref and storage
+        feedCacheRef.current[tab] = consolidated;
         const serialized = JSON.stringify(consolidated);
         try {
           sessionStorage.setItem(`pathd_social_feed_${tab}`, serialized);
           localStorage.setItem(`pathd_social_feed_${tab}`, serialized);
         } catch (_) {}
+
+        // Only update visible activities if this is still the active tab
+        if (activeTabRef.current === tab) {
+          setActivities(consolidated);
+          setLoading(false);
+          loadingRef.current = false;
+        }
       }
-    } catch (err) {
+    } catch (err: any) {
+      if (err?.name === 'CanceledError' || err?.code === 'ERR_CANCELED' || signal?.aborted) {
+        return; // Request was aborted due to tab switch; ignore silently
+      }
       console.error(`Error loading social feed for tab ${tab}:`, err);
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (activeTabRef.current === tab) {
+        setLoading(false);
+        loadingRef.current = false;
+        setRefreshing(false);
+        refreshingRef.current = false;
+      }
     }
   };
 
@@ -267,21 +298,48 @@ export const Social: React.FC = () => {
   const lastFeedFetchRef = useRef<number>(Date.now());
 
   useEffect(() => {
-    // Show cached immediately, then fetch fresh in background
-    fetchTabFeed(activeTab);
+    activeTabRef.current = activeTab;
+
+    // Abort any pending fetch for another tab
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    // Immediately show cached items if available; otherwise show loader and clear previous tab data
+    const cached = feedCacheRef.current[activeTab] || getCachedFeed(activeTab);
+    if (cached && cached.length > 0) {
+      feedCacheRef.current[activeTab] = cached;
+      setActivities(cached);
+      setLoading(false);
+      loadingRef.current = false;
+    } else {
+      setActivities([]);
+      setLoading(true);
+      loadingRef.current = true;
+    }
+
     setHasNewUpdates(false);
     lastFeedFetchRef.current = Date.now();
+
+    fetchTabFeed(activeTab, false, controller.signal);
+
+    return () => {
+      controller.abort();
+    };
   }, [activeTab]);
 
   // Listen to system library and progress events to immediately refresh Social in the background
   useEffect(() => {
     const handleImmediateRefresh = () => {
-      // Clear cache for current tab and refetch fresh activities immediately
+      const currentTab = activeTabRef.current;
       try {
-        sessionStorage.removeItem(`pathd_social_feed_${activeTab}`);
-        localStorage.removeItem(`pathd_social_feed_${activeTab}`);
+        sessionStorage.removeItem(`pathd_social_feed_${currentTab}`);
+        localStorage.removeItem(`pathd_social_feed_${currentTab}`);
       } catch (_) {}
-      fetchTabFeed(activeTab, true);
+      delete feedCacheRef.current[currentTab];
+      fetchTabFeed(currentTab, true);
     };
 
     window.addEventListener('library-updated', handleImmediateRefresh);
@@ -293,16 +351,17 @@ export const Social: React.FC = () => {
       window.removeEventListener('progress-updated', handleImmediateRefresh);
       window.removeEventListener('activity-created', handleImmediateRefresh);
     };
-  }, [activeTab]);
+  }, []);
 
-  // Check for updates when user returns to the tab or refocuses
+  // Check for updates when user returns to the tab or refocuses (debounced with ref check)
   useEffect(() => {
-    const handleVisibilityOrFocus = async () => {
+    const handleVisibilityOrFocus = () => {
       if (document.visibilityState === 'visible') {
         const timePassed = Date.now() - lastFeedFetchRef.current;
-        // If more than 5 seconds passed, refresh feed to keep Social totally up to date
-        if (timePassed > 5000 && !loading && !refreshing) {
-          fetchTabFeed(activeTab, true);
+        // If more than 30 seconds passed and not busy, refresh feed
+        if (timePassed > 30000 && !loadingRef.current && !refreshingRef.current) {
+          const currentTab = activeTabRef.current;
+          fetchTabFeed(currentTab, true);
           lastFeedFetchRef.current = Date.now();
         }
       }
@@ -314,27 +373,57 @@ export const Social: React.FC = () => {
       document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
       window.removeEventListener('focus', handleVisibilityOrFocus);
     };
-  }, [activeTab, loading, refreshing]);
+  }, []);
 
   const handleTabChange = (tab: SocialTab) => {
+    if (tab === activeTab) return;
     setHasNewUpdates(false);
+
+    // Instantly set target tab in activeTabRef and update displayed activities for 0ms response
+    activeTabRef.current = tab;
+    const cached = feedCacheRef.current[tab] || getCachedFeed(tab);
+    if (cached && cached.length > 0) {
+      feedCacheRef.current[tab] = cached;
+      setActivities(cached);
+      setLoading(false);
+      loadingRef.current = false;
+    } else {
+      setActivities([]);
+      setLoading(true);
+      loadingRef.current = true;
+    }
+
     const newParams = new URLSearchParams(searchParams);
     if (tab === 'following') {
       newParams.delete('tab');
     } else {
       newParams.set('tab', tab);
     }
-    setSearchParams(newParams);
+    setSearchParams(newParams, { replace: true });
   };
 
   const handleApplyUpdates = () => {
     setHasNewUpdates(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
-    fetchTabFeed(activeTab, true);
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    fetchTabFeed(activeTab, true, controller.signal);
   };
 
   const handleDeleteActivity = (id: number) => {
-    setActivities(prev => prev.filter(a => a.id !== id));
+    setActivities(prev => {
+      const updated = prev.filter(a => a.id !== id);
+      feedCacheRef.current[activeTab] = updated;
+      try {
+        const serialized = JSON.stringify(updated);
+        sessionStorage.setItem(`pathd_social_feed_${activeTab}`, serialized);
+        localStorage.setItem(`pathd_social_feed_${activeTab}`, serialized);
+      } catch (_) {}
+      return updated;
+    });
   };
 
   const tabsConfig = [
@@ -531,7 +620,12 @@ export const Social: React.FC = () => {
           onClose={() => setSelectedItem(null)}
           onOpenItem={(item) => handleOpenItem(item)}
           onUpdate={() => {
-            fetchTabFeed(activeTab, true);
+            if (abortControllerRef.current) {
+              abortControllerRef.current.abort();
+            }
+            const controller = new AbortController();
+            abortControllerRef.current = controller;
+            fetchTabFeed(activeTab, true, controller.signal);
           }}
         />
       )}
