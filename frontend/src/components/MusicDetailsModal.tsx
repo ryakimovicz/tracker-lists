@@ -487,6 +487,7 @@ const MusicDetailsModalInner: React.FC<MusicDetailsModalProps> = ({
 
   const filteredDiscography = (details?.discography || []).filter((item: any) => {
     if (discographyFilter === 'all') return true;
+    if (discographyFilter === 'album') return item.record_type === 'album' || item.record_type === 'compile';
     return item.record_type === discographyFilter;
   });
 
@@ -1145,6 +1146,8 @@ const MusicDetailsModalInner: React.FC<MusicDetailsModalProps> = ({
                         ? 'EP'
                         : itemRecordType === 'single'
                         ? (isEs ? 'Sencillo' : 'Single')
+                        : itemRecordType === 'compile'
+                        ? (isEs ? 'Recopilatorio' : 'Compilation')
                         : (isEs ? 'Álbum' : 'Album');
 
                       return (

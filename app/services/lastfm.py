@@ -906,9 +906,17 @@ class LastFMService(metaclass=LastFMMeta):
                                     img = enriched_img
                             except Exception:
                                 pass
+                        # Infer sensible record_type from title if available
+                        norm_low = title.lower()
+                        rec_type = "album"
+                        if " - single" in norm_low or "(single)" in norm_low or "[single]" in norm_low or norm_low.endswith(" single"):
+                            rec_type = "single"
+                        elif " - ep" in norm_low or "(ep)" in norm_low or "[ep]" in norm_low or norm_low.endswith(" ep") or "live session" in norm_low:
+                            rec_type = "ep"
+
                         results.append({
                             "title": title,
-                            "record_type": "album",
+                            "record_type": rec_type,
                             "release_date": "",
                             "year": "",
                             "cover": img if not cls._is_placeholder_or_empty(img) else ""
@@ -918,8 +926,9 @@ class LastFMService(metaclass=LastFMMeta):
             pass
         return []
 
-    _cache_discography: Dict[str, tuple] = {} # key -> (timestamp, list)
-    DISCO_TTL = 3600 # 1 hour
+    _cache_discography: Dict[str, tuple] = {} # key -> (timestamp, list, ttl)
+    DISCO_TTL = 3600 # 1 hour for full Deezer catalog
+    DISCO_FALLBACK_TTL = 60 # 1 minute for Last.fm degraded fallback
 
     @classmethod
     def get_artist_discography(cls, artist_name: str) -> List[Dict[str, Any]]:
@@ -929,17 +938,21 @@ class LastFMService(metaclass=LastFMMeta):
         cache_key = artist_name.strip().lower()
         now = time.time()
         if cache_key in cls._cache_discography:
-            ts, data = cls._cache_discography[cache_key]
-            if now - ts < cls.DISCO_TTL:
+            cached = cls._cache_discography[cache_key]
+            ts = cached[0]
+            data = cached[1]
+            entry_ttl = cached[2] if len(cached) > 2 else cls.DISCO_TTL
+            if now - ts < entry_ttl:
                 return data
 
         results = []
+        is_fallback = False
         try:
             matched_artist = cls._resolve_deezer_artist(artist_name)
             if matched_artist and matched_artist.get("id"):
                 artist_id = matched_artist["id"]
                 req_alb = urllib.request.Request(f"https://api.deezer.com/artist/{artist_id}/albums?limit=100", headers={"User-Agent": "PathdApp/1.0"})
-                with urllib.request.urlopen(req_alb, timeout=5) as a_res:
+                with urllib.request.urlopen(req_alb, timeout=6) as a_res:
                     if a_res.status == 200:
                         alb_data = json.loads(a_res.read().decode('utf-8', errors='replace'))
                         raw_albums = alb_data.get("data", [])
@@ -973,6 +986,7 @@ class LastFMService(metaclass=LastFMMeta):
 
         # If Deezer returned no albums (or Deezer artist catalog is empty), fallback to Last.fm top albums
         if not results:
+            is_fallback = True
             results = cls._get_lastfm_top_albums_discography(artist_name)
 
         # Cross-reference with iTunes catalog to correct re-issue/upload dates
@@ -1028,7 +1042,8 @@ class LastFMService(metaclass=LastFMMeta):
         # Re-sort newest first by corrected release_date
         results.sort(key=lambda x: x["release_date"] or "", reverse=True)
 
-        cls._cache_discography[cache_key] = (now, results)
+        applied_ttl = cls.DISCO_FALLBACK_TTL if is_fallback else cls.DISCO_TTL
+        cls._cache_discography[cache_key] = (now, results, applied_ttl)
         return results
 
     _cache_album_release_info: Dict[str, Dict[str, str]] = {}
