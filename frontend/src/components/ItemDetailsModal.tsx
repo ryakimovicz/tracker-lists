@@ -16,6 +16,7 @@ import type { SelectedKlipyMedia } from './KlipyPicker';
 import { isKlipyFavorite, toggleKlipyFavorite } from '../utils/klipyFavorites';
 import { renderFormattedContentWithMentions, AuthorUsername } from './MentionTag';
 import { ConfirmModal } from './ConfirmModal';
+import { MobileProgressPickerModal } from './MobileProgressPickerModal';
 
 
 
@@ -1403,6 +1404,18 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   const [pendingStatusChange, setPendingStatusChange] = useState<string | null>(null);
   const [showRemoveShelfModal, setShowRemoveShelfModal] = useState(false);
   const [showReportMediaModal, setShowReportMediaModal] = useState(false);
+  const [showProgressPickerModal, setShowProgressPickerModal] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    const p = new URLSearchParams(window.location.search);
+    return p.get('modal') === 'progress_picker';
+  });
+  const [progressPickerTarget, setProgressPickerTarget] = useState<'time' | 'pages_read' | 'total_pages'>(() => {
+    if (typeof window === 'undefined') return 'time';
+    const p = new URLSearchParams(window.location.search);
+    const target = p.get('picker');
+    if (target === 'pages_read' || target === 'total_pages' || target === 'time') return target;
+    return 'time';
+  });
   const [reportReason, setReportReason] = useState('Contenido para adultos / explícito');
   const [reportFeedback, setReportFeedback] = useState<string | null>(null);
   const [isSubmittingReport, setIsSubmittingReport] = useState(false);
@@ -3813,6 +3826,10 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       setShowReportMediaModal(true);
     } else if (modalParam === 'remove_shelf') {
       setShowRemoveShelfModal(true);
+    } else if (modalParam === 'progress_picker') {
+      setShowProgressPickerModal(true);
+      const pickerParam = params.get('picker') as 'time' | 'pages_read' | 'total_pages' | null;
+      if (pickerParam) setProgressPickerTarget(pickerParam);
     }
 
     initialUrlCheckDone.current = true;
@@ -3843,13 +3860,20 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     }
   };
 
-  const openSubModal = (modalName: 'reconsume' | 'report' | 'remove_shelf') => {
+  const openSubModal = (modalName: 'reconsume' | 'report' | 'remove_shelf' | 'progress_picker', pickerType?: 'time' | 'pages_read' | 'total_pages') => {
     if (modalName === 'reconsume') setShowReconsumedModal(true);
     if (modalName === 'report') setShowReportMediaModal(true);
     if (modalName === 'remove_shelf') setShowRemoveShelfModal(true);
+    if (modalName === 'progress_picker') {
+      if (pickerType) setProgressPickerTarget(pickerType);
+      setShowProgressPickerModal(true);
+    }
     if (typeof window !== 'undefined') {
       const currentUrl = new URL(window.location.href);
       currentUrl.searchParams.set('modal', modalName);
+      if (modalName === 'progress_picker' && pickerType) {
+        currentUrl.searchParams.set('picker', pickerType);
+      }
       const newRelative = currentUrl.pathname + (currentUrl.search || '') + (currentUrl.hash || '');
       window.history.pushState(window.history.state, '', newRelative);
     }
@@ -3859,15 +3883,17 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     setShowReconsumedModal(false);
     setShowReportMediaModal(false);
     setShowRemoveShelfModal(false);
+    setShowProgressPickerModal(false);
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const m = params.get('modal');
-      if (m && ['reconsume', 'report', 'remove_shelf'].includes(m)) {
+      if (m && ['reconsume', 'report', 'remove_shelf', 'progress_picker'].includes(m)) {
         if (useBack) {
           window.history.back();
         } else {
           const currentUrl = new URL(window.location.href);
           currentUrl.searchParams.delete('modal');
+          currentUrl.searchParams.delete('picker');
           const newRelative = currentUrl.pathname + (currentUrl.search || '') + (currentUrl.hash || '');
           window.history.replaceState(window.history.state, '', newRelative);
         }
@@ -3891,6 +3917,11 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       setShowReconsumedModal(modalParam === 'reconsume');
       setShowReportMediaModal(modalParam === 'report');
       setShowRemoveShelfModal(modalParam === 'remove_shelf');
+      setShowProgressPickerModal(modalParam === 'progress_picker');
+      if (modalParam === 'progress_picker') {
+        const pickerParam = params.get('picker') as 'time' | 'pages_read' | 'total_pages' | null;
+        if (pickerParam) setProgressPickerTarget(pickerParam);
+      }
 
       // If Klipy modal is active, let KlipyPicker handle its own popstate
       if (modalParam === 'media') return;
@@ -3937,8 +3968,9 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
           changed = true;
         }
         const m = params.get('modal');
-        if (m && ['reconsume', 'report', 'remove_shelf'].includes(m)) {
+        if (m && ['reconsume', 'report', 'remove_shelf', 'progress_picker'].includes(m)) {
           params.delete('modal');
+          params.delete('picker');
           changed = true;
         }
         if (changed) {
@@ -5316,6 +5348,89 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     }
   };
 
+  const handleUpdatePages = (newPages: number) => {
+    setHasInteractedWithTime(true);
+    const maxPages = (typeof totalPagesVal === 'number' && totalPagesVal > 0) ? totalPagesVal : 0;
+    let finalPages = Math.max(0, isNaN(newPages) ? 0 : newPages);
+    if (maxPages > 0) {
+      if (finalPages >= maxPages) {
+        finalPages = maxPages;
+        if (selectedItem?.status !== 'read') {
+          if (isComicIssue) {
+            handleToggleComicIssueStatus('read');
+          } else {
+            handleToggleStatus('read');
+          }
+        }
+      } else if (selectedItem?.status === 'read') {
+        if (isComicIssue) {
+          handleToggleComicIssueStatus('reading');
+        } else {
+          handleToggleStatus('reading');
+        }
+      }
+    }
+    setPagesReadVal(finalPages);
+    handleSavePagesRead(finalPages);
+  };
+
+  const handleSaveTotalPages = (newTotal?: number | '') => {
+    const valToSave = newTotal !== undefined ? newTotal : totalPagesVal;
+    const finalTotal = (valToSave === '' || valToSave === 0) ? null : valToSave;
+    setTotalPagesVal(valToSave);
+    const cleanId = String(selectedItem?.external_id || selectedItem?.id || '').replace('cv_issue_', '').replace('cv_', '');
+    const extId = `cv_issue_${cleanId}`;
+
+    if (isComicIssue) {
+      const stateToSave = {
+        status: selectedItem?.status || 'reading',
+        pages_read: pagesReadVal || 0,
+        total_pages: finalTotal
+      };
+      setCachedSeries(`issue_state_${extId}`, stateToSave);
+      setCachedSeries(`issue_state_cv_issue_${cleanId}`, stateToSave);
+      setSelectedItem((prev: any) => prev ? { ...prev, total_pages: finalTotal, page_count: finalTotal } : null);
+      window.dispatchEvent(new Event('library-updated'));
+      onUpdate && onUpdate();
+      return;
+    }
+
+    if (selectedItem?.id) {
+      apiClient.put(`/library/${selectedItem.id}`, { total_pages: finalTotal }).then(() => {
+        setSelectedItem((prev: any) => prev ? { ...prev, total_pages: finalTotal } : null);
+        window.dispatchEvent(new Event('library-updated'));
+        onUpdate && onUpdate();
+      }).catch(() => {});
+    }
+  };
+
+  const updateDuration = (newTotalMins: number) => {
+    setHasInteractedWithTime(true);
+    const maxDurationMins = selectedItem?.total_pages || selectedItem?.runtime || selectedItem?.page_count || (isEpisode && !isComicIssue ? 45 : 0);
+    let finalMins = Math.max(0, newTotalMins);
+    if (selectedItem?.item_type === 'movie' && maxDurationMins > 0) {
+      if (finalMins >= maxDurationMins) {
+        finalMins = maxDurationMins;
+        if (selectedItem.status !== 'completed') {
+          handleToggleStatus('completed');
+        }
+      } else if (selectedItem.status === 'completed') {
+        handleToggleStatus('watching');
+      }
+    } else if (isEpisode && !isComicIssue && maxDurationMins > 0) {
+      if (finalMins >= maxDurationMins) {
+        finalMins = maxDurationMins;
+        if (selectedItem?.status !== 'completed' && !isEpisodeCompleted) {
+          handleToggleSeriesEpisodeStatus('completed');
+        }
+      } else if (selectedItem?.status === 'completed' || isEpisodeCompleted) {
+        handleToggleSeriesEpisodeStatus('watching');
+      }
+    }
+    setPagesReadVal(finalMins);
+    handleSavePagesRead(finalMins);
+  };
+
   const handleOpenRelatedGame = (related: any) => {
     setHistoryStack(prev => [...prev, selectedItem]);
     const target = {
@@ -6240,58 +6355,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                     const maxPages = (typeof totalPagesVal === 'number' && totalPagesVal > 0) ? totalPagesVal : 0;
                     const progressPercent = maxPages > 0 ? Math.min(100, Math.round((currentPages / maxPages) * 100)) : 0;
 
-                    const handleUpdatePages = (newPages: number) => {
-                      setHasInteractedWithTime(true);
-                      let finalPages = Math.max(0, isNaN(newPages) ? 0 : newPages);
-                      if (maxPages > 0) {
-                        if (finalPages >= maxPages) {
-                          finalPages = maxPages;
-                          if (selectedItem.status !== 'read') {
-                            if (isComicIssue) {
-                              handleToggleComicIssueStatus('read');
-                            } else {
-                              handleToggleStatus('read');
-                            }
-                          }
-                        } else if (selectedItem.status === 'read') {
-                          if (isComicIssue) {
-                            handleToggleComicIssueStatus('reading');
-                          } else {
-                            handleToggleStatus('reading');
-                          }
-                        }
-                      }
-                      setPagesReadVal(finalPages);
-                      handleSavePagesRead(finalPages);
-                    };
-
                     const handleTotalPagesBlur = () => {
-                      const finalTotal = (totalPagesVal === '' || totalPagesVal === 0) ? null : totalPagesVal;
-                      setTotalPagesVal(totalPagesVal);
-                      const cleanId = String(selectedItem?.external_id || selectedItem?.id || '').replace('cv_issue_', '').replace('cv_', '');
-                      const extId = `cv_issue_${cleanId}`;
-
-                      if (isComicIssue) {
-                        const stateToSave = {
-                          status: selectedItem?.status || 'reading',
-                          pages_read: pagesReadVal || 0,
-                          total_pages: finalTotal
-                        };
-                        setCachedSeries(`issue_state_${extId}`, stateToSave);
-                        setCachedSeries(`issue_state_cv_issue_${cleanId}`, stateToSave);
-                        setSelectedItem((prev: any) => prev ? { ...prev, total_pages: finalTotal, page_count: finalTotal } : null);
-                        window.dispatchEvent(new Event('library-updated'));
-                        onUpdate && onUpdate();
-                        return;
-                      }
-
-                      if (selectedItem?.id) {
-                        apiClient.put(`/library/${selectedItem.id}`, { total_pages: finalTotal }).then(() => {
-                          setSelectedItem((prev: any) => prev ? { ...prev, total_pages: finalTotal } : null);
-                          window.dispatchEvent(new Event('library-updated'));
-                          onUpdate && onUpdate();
-                        }).catch(() => {});
-                      }
+                      handleSaveTotalPages();
                     };
 
                     if (isRead) {
@@ -6314,23 +6379,37 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                             {language === 'es' ? 'Páginas totales:' : 'Total pages:'}
                           </span>
 
-                          <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            background: 'var(--bg-secondary)',
-                            border: '1px solid var(--border-color)',
-                            borderRadius: '6px',
-                            padding: '0.25rem 0.55rem',
-                            gap: '0.3rem'
-                          }}>
+                          <div
+                            onClick={() => {
+                              if (typeof window !== 'undefined' && window.innerWidth <= 768) {
+                                openSubModal('progress_picker', 'total_pages');
+                              }
+                            }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              background: 'var(--bg-secondary)',
+                              border: '1px solid var(--border-color)',
+                              borderRadius: '6px',
+                              padding: '0.25rem 0.55rem',
+                              gap: '0.3rem',
+                              cursor: (typeof window !== 'undefined' && window.innerWidth <= 768) ? 'pointer' : 'default'
+                            }}
+                          >
                             <input
                               type="number"
                               min={0}
                               max={99999}
                               disabled={!user}
+                              readOnly={typeof window !== 'undefined' && window.innerWidth <= 768}
                               value={totalPagesVal}
                               placeholder={language === 'es' ? 'Ej: 320' : 'Ex: 320'}
-                              onFocus={() => {
+                              onFocus={(e) => {
+                                if (typeof window !== 'undefined' && window.innerWidth <= 768) {
+                                  e.target.blur();
+                                  openSubModal('progress_picker', 'total_pages');
+                                  return;
+                                }
                                 if (totalPagesVal === 0) setTotalPagesVal('');
                               }}
                               onChange={(e) => {
@@ -6353,7 +6432,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                 fontWeight: 700,
                                 fontSize: '0.9rem',
                                 outline: 'none',
-                                padding: 0
+                                padding: 0,
+                                cursor: (typeof window !== 'undefined' && window.innerWidth <= 768) ? 'pointer' : 'text'
                               }}
                             />
                             <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>
@@ -6384,23 +6464,37 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                             {/* Current Pages Input Box */}
-                            <div style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              background: 'var(--bg-secondary)',
-                              border: '1px solid var(--border-color)',
-                              borderRadius: '6px',
-                              padding: '0.25rem 0.55rem',
-                              gap: '0.25rem'
-                            }}>
+                            <div
+                              onClick={() => {
+                                if (typeof window !== 'undefined' && window.innerWidth <= 768) {
+                                  openSubModal('progress_picker', 'pages_read');
+                                }
+                              }}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                background: 'var(--bg-secondary)',
+                                border: '1px solid var(--border-color)',
+                                borderRadius: '6px',
+                                padding: '0.25rem 0.55rem',
+                                gap: '0.25rem',
+                                cursor: (typeof window !== 'undefined' && window.innerWidth <= 768) ? 'pointer' : 'default'
+                              }}
+                            >
                               <input
                                 type="number"
                                 min={0}
                                 max={maxPages > 0 ? maxPages : 99999}
                                 disabled={!user}
+                                readOnly={typeof window !== 'undefined' && window.innerWidth <= 768}
                                 value={currentPages === 0 ? (pagesReadVal === '' ? '' : 0) : currentPages}
                                 placeholder="0"
-                                onFocus={() => {
+                                onFocus={(e) => {
+                                  if (typeof window !== 'undefined' && window.innerWidth <= 768) {
+                                    e.target.blur();
+                                    openSubModal('progress_picker', 'pages_read');
+                                    return;
+                                  }
                                   if (pagesReadVal === 0) setPagesReadVal('');
                                 }}
                                 onChange={(e) => {
@@ -6419,7 +6513,6 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                     handleUpdatePages(currentPages + (e.deltaY < 0 ? 1 : -1));
                                   }
                                 }}
-
                                 style={{
                                   width: '60px',
                                   textAlign: 'center',
@@ -6429,7 +6522,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                   fontWeight: 700,
                                   fontSize: '0.9rem',
                                   outline: 'none',
-                                  padding: 0
+                                  padding: 0,
+                                  cursor: (typeof window !== 'undefined' && window.innerWidth <= 768) ? 'pointer' : 'text'
                                 }}
                               />
                             </div>
@@ -6437,23 +6531,37 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                             <span style={{ fontWeight: 700, color: 'var(--text-muted)' }}>/</span>
 
                             {/* Total Pages Input Box (Editable if needed) */}
-                            <div style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              background: 'var(--bg-secondary)',
-                              border: '1px solid var(--border-color)',
-                              borderRadius: '6px',
-                              padding: '0.25rem 0.55rem',
-                              gap: '0.25rem'
-                            }}>
+                            <div
+                              onClick={() => {
+                                if (typeof window !== 'undefined' && window.innerWidth <= 768) {
+                                  openSubModal('progress_picker', 'total_pages');
+                                }
+                              }}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                background: 'var(--bg-secondary)',
+                                border: '1px solid var(--border-color)',
+                                borderRadius: '6px',
+                                padding: '0.25rem 0.55rem',
+                                gap: '0.25rem',
+                                cursor: (typeof window !== 'undefined' && window.innerWidth <= 768) ? 'pointer' : 'default'
+                              }}
+                            >
                               <input
                                 type="number"
                                 min={0}
                                 max={99999}
                                 disabled={!user}
+                                readOnly={typeof window !== 'undefined' && window.innerWidth <= 768}
                                 value={totalPagesVal}
                                 placeholder={language === 'es' ? 'Total' : 'Total'}
-                                onFocus={() => {
+                                onFocus={(e) => {
+                                  if (typeof window !== 'undefined' && window.innerWidth <= 768) {
+                                    e.target.blur();
+                                    openSubModal('progress_picker', 'total_pages');
+                                    return;
+                                  }
                                   if (totalPagesVal === 0) setTotalPagesVal('');
                                 }}
                                 onChange={(e) => {
@@ -6476,7 +6584,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                   fontWeight: 700,
                                   fontSize: '0.9rem',
                                   outline: 'none',
-                                  padding: 0
+                                  padding: 0,
+                                  cursor: (typeof window !== 'undefined' && window.innerWidth <= 768) ? 'pointer' : 'text'
                                 }}
                               />
                               <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>
@@ -6523,32 +6632,6 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                     const currentMinutes = currentTotalMins % 60;
                     const maxDurationMins = selectedItem.total_pages || selectedItem.runtime || selectedItem.page_count || (isEpisode && !isComicIssue ? 45 : 0);
 
-                    const updateDuration = (newTotalMins: number) => {
-                      setHasInteractedWithTime(true);
-                      let finalMins = Math.max(0, newTotalMins);
-                      if (selectedItem.item_type === 'movie' && maxDurationMins > 0) {
-                        if (finalMins >= maxDurationMins) {
-                          finalMins = maxDurationMins;
-                          if (selectedItem.status !== 'completed') {
-                            handleToggleStatus('completed');
-                          }
-                        } else if (selectedItem.status === 'completed') {
-                          handleToggleStatus('watching');
-                        }
-                      } else if (isEpisode && !isComicIssue && maxDurationMins > 0) {
-                        if (finalMins >= maxDurationMins) {
-                          finalMins = maxDurationMins;
-                          if (selectedItem.status !== 'completed' && !isEpisodeCompleted) {
-                            handleToggleSeriesEpisodeStatus('completed');
-                          }
-                        } else if (selectedItem.status === 'completed' || isEpisodeCompleted) {
-                          handleToggleSeriesEpisodeStatus('watching');
-                        }
-                      }
-                      setPagesReadVal(finalMins);
-                      handleSavePagesRead(finalMins);
-                    };
-
                     const handleHoursChange = (h: number) => {
                       const validH = Math.max(0, isNaN(h) ? 0 : h);
                       updateDuration(validH * 60 + currentMinutes);
@@ -6564,7 +6647,6 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         updateDuration(currentHours * 60 + validM);
                       }
                     };
-
 
                     return (
                       <div style={{
@@ -6586,7 +6668,19 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                               : (language === 'es' ? 'Horas jugadas:' : 'Hours played:')}
                           </span>
 
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                          <div
+                            onClick={() => {
+                              if (typeof window !== 'undefined' && window.innerWidth <= 768) {
+                                openSubModal('progress_picker', 'time');
+                              }
+                            }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.4rem',
+                              cursor: (typeof window !== 'undefined' && window.innerWidth <= 768) ? 'pointer' : 'default'
+                            }}
+                          >
                             {/* Hours Input Box */}
                             <div style={{
                               display: 'flex',
@@ -6602,7 +6696,14 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                 min={0}
                                 max={9999}
                                 disabled={!user}
+                                readOnly={typeof window !== 'undefined' && window.innerWidth <= 768}
                                 value={currentHours}
+                                onFocus={(e) => {
+                                  if (typeof window !== 'undefined' && window.innerWidth <= 768) {
+                                    e.target.blur();
+                                    openSubModal('progress_picker', 'time');
+                                  }
+                                }}
                                 onChange={(e) => handleHoursChange(parseInt(e.target.value) || 0)}
                                 onWheel={(e) => {
                                   if (user) {
@@ -6618,7 +6719,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                   fontWeight: 700,
                                   fontSize: '0.9rem',
                                   outline: 'none',
-                                  padding: 0
+                                  padding: 0,
+                                  cursor: (typeof window !== 'undefined' && window.innerWidth <= 768) ? 'pointer' : 'text'
                                 }}
                               />
                               <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>h</span>
@@ -6641,14 +6743,20 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                 min={0}
                                 max={59}
                                 disabled={!user}
+                                readOnly={typeof window !== 'undefined' && window.innerWidth <= 768}
                                 value={String(currentMinutes).padStart(2, '0')}
+                                onFocus={(e) => {
+                                  if (typeof window !== 'undefined' && window.innerWidth <= 768) {
+                                    e.target.blur();
+                                    openSubModal('progress_picker', 'time');
+                                  }
+                                }}
                                 onChange={(e) => handleMinutesChange(parseInt(e.target.value) || 0)}
                                 onWheel={(e) => {
                                   if (user) {
                                     handleMinutesChange(currentMinutes + (e.deltaY < 0 ? 1 : -1));
                                   }
                                 }}
-
                                 style={{
                                   width: '38px',
                                   textAlign: 'center',
@@ -6658,7 +6766,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                   fontWeight: 700,
                                   fontSize: '0.9rem',
                                   outline: 'none',
-                                  padding: 0
+                                  padding: 0,
+                                  cursor: (typeof window !== 'undefined' && window.innerWidth <= 768) ? 'pointer' : 'text'
                                 }}
                               />
                               <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>m</span>
@@ -11676,6 +11785,44 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                   }
                 }}
                 onClose={() => closeDeleteReviewConfirm(true)}
+              />
+
+              <MobileProgressPickerModal
+                isOpen={showProgressPickerModal}
+                onClose={() => closeSubModal(true)}
+                mode={progressPickerTarget === 'time' ? 'time' : 'pages'}
+                value={
+                  progressPickerTarget === 'time'
+                    ? (typeof pagesReadVal === 'number' ? pagesReadVal : 0)
+                    : progressPickerTarget === 'total_pages'
+                      ? (typeof totalPagesVal === 'number' && totalPagesVal > 0 ? totalPagesVal : 0)
+                      : (typeof pagesReadVal === 'number' ? pagesReadVal : 0)
+                }
+                maxValue={
+                  progressPickerTarget === 'time'
+                    ? (selectedItem?.total_pages || selectedItem?.runtime || selectedItem?.page_count || (isEpisode && !isComicIssue ? 45 : 0))
+                    : progressPickerTarget === 'total_pages'
+                      ? 0
+                      : ((typeof totalPagesVal === 'number' && totalPagesVal > 0) ? totalPagesVal : (selectedItem?.total_pages || selectedItem?.page_count || 0))
+                }
+                title={
+                  progressPickerTarget === 'time'
+                    ? ((selectedItem?.item_type === 'movie' || isEpisode)
+                        ? (language === 'es' ? 'Tiempo visto' : 'Time watched')
+                        : (language === 'es' ? 'Horas jugadas' : 'Hours played'))
+                    : progressPickerTarget === 'total_pages'
+                      ? (language === 'es' ? 'Páginas totales' : 'Total pages')
+                      : (language === 'es' ? 'Páginas leídas' : 'Pages read')
+                }
+                onChange={(val) => {
+                  if (progressPickerTarget === 'time') {
+                    updateDuration(val);
+                  } else if (progressPickerTarget === 'total_pages') {
+                    handleSaveTotalPages(val);
+                  } else {
+                    handleUpdatePages(val);
+                  }
+                }}
               />
     </div>
   );
