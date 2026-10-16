@@ -3691,6 +3691,9 @@ export const Profile: React.FC = () => {
                 <Grid size={18} strokeWidth={1.8} />
               )}
               <span className="profile-tab-label">{language === 'es' ? 'Estantería' : 'My Shelf'}</span>
+              {activeTab === 'shelf' && (
+                <div className="profile-tab-indicator" style={{ position: 'absolute', bottom: '-0.75rem', left: 0, right: 0, height: '2px', background: 'var(--accent-primary)' }} />
+              )}
             </button>
 
         <button
@@ -3723,6 +3726,9 @@ export const Profile: React.FC = () => {
             <BookOpen size={18} strokeWidth={1.8} />
           )}
           <span className="profile-tab-label">{language === 'es' ? 'Guías' : 'Guides'}</span>
+          {activeTab === 'guides' && (
+            <div className="profile-tab-indicator" style={{ position: 'absolute', bottom: '-0.75rem', left: 0, right: 0, height: '2px', background: 'var(--color-guide, #2DD4BF)' }} />
+          )}
         </button>
 
         {(Boolean(profile?.lastfm_username) || isOwnProfile) && (
@@ -3749,6 +3755,9 @@ export const Profile: React.FC = () => {
               <circle cx="18" cy="16" r="3" fill={activeTab === 'music' ? 'currentColor' : 'none'} />
             </svg>
             <span className="profile-tab-label">{language === 'es' ? 'Música' : 'Music'}</span>
+            {activeTab === 'music' && (
+              <div className="profile-tab-indicator" style={{ position: 'absolute', bottom: '-0.75rem', left: 0, right: 0, height: '2px', background: 'var(--color-music, #1DB954)' }} />
+            )}
           </button>
         )}
 
@@ -3762,6 +3771,9 @@ export const Profile: React.FC = () => {
         >
           <Heart size={18} fill={activeTab === 'favorites' ? 'currentColor' : 'none'} strokeWidth={activeTab === 'favorites' ? 2 : 1.8} />
           <span className="profile-tab-label">{language === 'es' ? 'Destacados' : 'Favorites'}</span>
+          {activeTab === 'favorites' && (
+            <div className="profile-tab-indicator" style={{ position: 'absolute', bottom: '-0.75rem', left: 0, right: 0, height: '2px', background: '#F472B6' }} />
+          )}
         </button>
       </div>
 
