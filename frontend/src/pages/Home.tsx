@@ -561,7 +561,14 @@ const CustomCard = ({
           title
         )}
       </div>
-      <div className="card-media-cover" style={{ width: "100%", height: "240px", background: "var(--bg-tertiary)", position: "relative", overflow: "hidden" }}>
+      <div 
+        className="card-media-cover" 
+        style={{ width: "100%", height: "240px", background: "var(--bg-tertiary)", position: "relative", overflow: "hidden" }}
+        onClick={shouldBlurCover ? (e) => {
+          e.stopPropagation();
+          onRevealCover?.();
+        } : undefined}
+      >
         <MediaPoster
           src={coverUrl}
           title={title}
@@ -573,6 +580,7 @@ const CustomCard = ({
         />
         {shouldBlurCover && (
           <div
+            className="anti-spoiler-overlay"
             onClick={(e) => {
               e.stopPropagation();
               onRevealCover?.();
@@ -600,19 +608,22 @@ const CustomCard = ({
             }}
             title={language === 'es' ? 'Haz clic para revelar la portada' : 'Click to reveal cover'}
           >
-            <div style={{
-              background: 'rgba(0, 0, 0, 0.65)',
-              borderRadius: '50%',
-              padding: '0.45rem',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              border: '1px solid rgba(255, 255, 255, 0.25)',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.4)'
-            }}>
+            <div 
+              className="anti-spoiler-icon-badge"
+              style={{
+                background: 'rgba(0, 0, 0, 0.65)',
+                borderRadius: '50%',
+                padding: '0.45rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                border: '1px solid rgba(255, 255, 255, 0.25)',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.4)'
+              }}
+            >
               <Eye size={18} />
             </div>
-            <span style={{ fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.02em', textShadow: '0 1px 4px rgba(0,0,0,0.9)' }}>
+            <span className="anti-spoiler-text" style={{ fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.02em', textShadow: '0 1px 4px rgba(0,0,0,0.9)' }}>
               {language === 'es' ? 'Anti-Spoiler' : 'Anti-Spoiler'}
             </span>
           </div>
@@ -1308,7 +1319,14 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
           {!isPoster && <ChevronRight size={14} style={{ flexShrink: 0, marginLeft: "0.25rem", opacity: 0.7 }} />}
         </div>
         
-        <div className="card-media-cover" style={{ width: "100%", height: (isPoster || isComic) ? "240px" : "125px", background: "var(--bg-tertiary)", position: "relative", overflow: "hidden" }}>
+        <div 
+          className="card-media-cover" 
+          style={{ width: "100%", height: (isPoster || isComic) ? "240px" : "125px", background: "var(--bg-tertiary)", position: "relative", overflow: "hidden" }}
+          onClick={shouldBlurEpisodeCover ? (e) => {
+            e.stopPropagation();
+            setIsCoverRevealed(true);
+          } : undefined}
+        >
           <MediaPoster
             src={isPoster ? item.image_url : coverUrl}
             title={item.title}
@@ -1320,6 +1338,7 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
           />
           {shouldBlurEpisodeCover && (
             <div
+              className="anti-spoiler-overlay"
               onClick={(e) => {
                 e.stopPropagation();
                 setIsCoverRevealed(true);
@@ -1347,20 +1366,23 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
               }}
               title={language === 'es' ? 'Haz clic para revelar la portada' : 'Click to reveal cover'}
             >
-              <div style={{
-                background: 'rgba(0, 0, 0, 0.65)',
-                borderRadius: '50%',
-                padding: '0.45rem',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                border: '1px solid rgba(255, 255, 255, 0.25)',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
-                transition: 'transform 0.15s ease'
-              }}>
+              <div 
+                className="anti-spoiler-icon-badge"
+                style={{
+                  background: 'rgba(0, 0, 0, 0.65)',
+                  borderRadius: '50%',
+                  padding: '0.45rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  border: '1px solid rgba(255, 255, 255, 0.25)',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+                  transition: 'transform 0.15s ease'
+                }}
+              >
                 <Eye size={18} />
               </div>
-              <span style={{ fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.02em', textShadow: '0 1px 4px rgba(0,0,0,0.9)' }}>
+              <span className="anti-spoiler-text" style={{ fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.02em', textShadow: '0 1px 4px rgba(0,0,0,0.9)' }}>
                 {language === 'es' ? 'Anti-Spoiler' : 'Anti-Spoiler'}
               </span>
             </div>

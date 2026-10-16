@@ -2068,8 +2068,31 @@ h1, h2, h3, h4, h5, h6 {
   }
 
   /* Explore & Activity Cards: Hide overlaid badges from cover on mobile */
-  .activity-card .card-media-cover > div:not(.media-poster-container):not(.media-poster-placeholder) {
+  .activity-card .card-media-cover > div:not(.media-poster-container):not(.media-poster-placeholder):not(.anti-spoiler-overlay) {
     display: none !important;
+  }
+
+  /* Keep anti-spoiler overlay visible and compact on mobile */
+  .activity-card .card-media-cover .anti-spoiler-overlay {
+    display: flex !important;
+    padding: 0 !important;
+    gap: 0 !important;
+    justify-content: center !important;
+    align-items: center !important;
+    z-index: 2 !important;
+  }
+
+  .activity-card .card-media-cover .anti-spoiler-overlay .anti-spoiler-text {
+    display: none !important;
+  }
+
+  .activity-card .card-media-cover .anti-spoiler-overlay .anti-spoiler-icon-badge {
+    padding: 0.35rem !important;
+  }
+
+  .activity-card .card-media-cover .anti-spoiler-overlay .anti-spoiler-icon-badge svg {
+    width: 16px !important;
+    height: 16px !important;
   }
 
   /* Inline badges on mobile inside card-body-content */
