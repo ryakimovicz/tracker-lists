@@ -25,6 +25,7 @@ const translations: Translations = {
   navProfile: { en: 'Profile', es: 'Perfil' },
   navSettings: { en: 'Settings', es: 'Ajustes' },
   navUpgradePro: { en: 'Get Premium', es: 'Hacerse Premium' },
+  exitAppPrompt: { en: 'Press back again to exit', es: 'Presiona atrás otra vez para salir' },
 
 
 

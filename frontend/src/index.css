@@ -2869,6 +2869,38 @@ h1, h2, h3, h4, h5, h6 {
   }
 }
 
+.mobile-exit-toast {
+  position: fixed;
+  bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 999999;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.65rem 1.25rem;
+  border-radius: 9999px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #ffffff;
+  background: rgba(15, 23, 42, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  pointer-events: none;
+  animation: toastSlideUpDesktop 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  white-space: nowrap;
+}
+
+[data-theme="light"] .mobile-exit-toast {
+  background: rgba(255, 255, 255, 0.94);
+  color: #0f172a;
+  border-color: rgba(15, 23, 42, 0.15);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+}
+
 .customize-floating-toast {
   position: fixed;
   bottom: 24px;

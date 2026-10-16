@@ -1861,7 +1861,7 @@ export const Home: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { language } = useTranslation();
+  const { language, t } = useTranslation();
   const { user: currentUser } = useAuth();
 
   const validHomeTabs = ["watching", "guides", "plan_to_watch", "completed", "dropped", "upcoming"] as const;
@@ -1943,6 +1943,52 @@ export const Home: React.FC = () => {
   const [showFiltersOnScroll, setShowFiltersOnScroll] = useState<boolean>(true);
   const lastScrollYRef = useRef<number>(0);
   const scrollAccumulatorRef = useRef<number>(0);
+
+  // Mobile Double-Back Exit confirmation (especially for PWA / installed webapp)
+  const [showExitToast, setShowExitToast] = useState(false);
+  const exitToastTimerRef = useRef<any>(null);
+  const backPressTimeRef = useRef<number>(0);
+
+  useEffect(() => {
+    // Only engage double-back interception on mobile screens
+    if (typeof window === 'undefined') return;
+    if (window.innerWidth > 768) return;
+
+    // Push dummy state to the history stack so the first back button triggers popstate instead of exiting
+    const currentLoc = window.location.pathname + window.location.search + window.location.hash;
+    window.history.pushState({ pathd_home_guard: true }, '', currentLoc);
+
+    const handlePopState = (e: PopStateEvent) => {
+      const now = Date.now();
+      const elapsed = now - backPressTimeRef.current;
+
+      // If user tapped back within 2 seconds of the prompt, allow exit
+      if (backPressTimeRef.current > 0 && elapsed < 2000) {
+        if (exitToastTimerRef.current) clearTimeout(exitToastTimerRef.current);
+        setShowExitToast(false);
+        // Step back through the history stack to exit the app
+        window.history.back();
+        return;
+      }
+
+      // First back press: re-push guard state, record time and display toast
+      backPressTimeRef.current = now;
+      window.history.pushState({ pathd_home_guard: true }, '', currentLoc);
+      setShowExitToast(true);
+
+      if (exitToastTimerRef.current) clearTimeout(exitToastTimerRef.current);
+      exitToastTimerRef.current = setTimeout(() => {
+        setShowExitToast(false);
+        backPressTimeRef.current = 0;
+      }, 2000);
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      if (exitToastTimerRef.current) clearTimeout(exitToastTimerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     // Only monitor scroll behavior on mobile screens (width <= 768)
@@ -4093,6 +4139,13 @@ export const Home: React.FC = () => {
         }}
         onOpenProModal={() => setShowProModal(true)}
       />
+
+      {/* Double-back exit toast confirmation on mobile / PWA */}
+      {showExitToast && (
+        <div className="mobile-exit-toast">
+          {t('exitAppPrompt') || (language === 'es' ? 'Presiona atrás otra vez para salir' : 'Press back again to exit')}
+        </div>
+      )}
     </div>
   );
 };
