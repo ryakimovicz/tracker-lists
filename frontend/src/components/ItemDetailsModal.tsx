@@ -1717,7 +1717,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       });
       setReportFeedback(language === 'es' ? '¡Gracias! El reporte fue enviado a los administradores.' : 'Thank you! The report has been sent to admins.');
       setTimeout(() => {
-        setShowReportMediaModal(false);
+        closeSubModal(false);
         setReportFeedback(null);
       }, 1800);
     } catch (e: any) {
@@ -2174,7 +2174,19 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     try {
       const url = isHundred ? `/library/${selectedItem.id}/mark-consumed?is_hundred_percent=true` : `/library/${selectedItem.id}/mark-consumed`;
       const res = await apiClient.post(url);
-      setSelectedItem((prev: any) => prev ? { ...prev, ...res.data } : null);
+      const updatedItem = { ...selectedItem, ...res.data };
+      setSelectedItem((prev: any) => prev ? updatedItem : null);
+
+      try {
+        const cachedLibStr = sessionStorage.getItem('pathd_lib_cache');
+        if (cachedLibStr) {
+          let cachedLib: any[] = JSON.parse(cachedLibStr);
+          cachedLib = cachedLib.map((it: any) => it.id === selectedItem.id ? { ...it, ...res.data } : it);
+          sessionStorage.setItem('pathd_lib_cache', JSON.stringify(cachedLib));
+        }
+      } catch (e) {}
+
+      updateCachedShelfItem(updatedItem);
       
       // Refresh history list
       if (user?.is_pro) {
@@ -2187,7 +2199,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
           })
           .catch(console.error);
       }
-      onUpdate && onUpdate();
+      window.dispatchEvent(new Event('library-updated'));
+      onUpdate && onUpdate(updatedItem);
     } catch (e: any) {
       if (e.response?.data?.detail) {
         alert(e.response.data.detail);
@@ -2204,7 +2217,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     if (selectedItem.status === 'completed') {
       if (selectedItem.is_hundred_percent) {
         // Already 100%: clicking 100% again opens re-consumption options modal
-        setShowReconsumedModal(true);
+        openSubModal('reconsume');
       } else {
         // Completed but not 100%: ask if they want to update current playthrough or log new 100% playthrough
         setShowHundredPercentDecisionModal(true);
@@ -2291,8 +2304,20 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     setShowAllWatchedMenu(false);
     try {
       const res = await apiClient.delete(`/library/${selectedItem.id}/consumption-history/latest`);
-      setSelectedItem((prev: any) => prev ? { ...prev, ...res.data } : null);
+      const updatedItem = { ...selectedItem, ...res.data };
+      setSelectedItem((prev: any) => prev ? updatedItem : null);
       
+      try {
+        const cachedLibStr = sessionStorage.getItem('pathd_lib_cache');
+        if (cachedLibStr) {
+          let cachedLib: any[] = JSON.parse(cachedLibStr);
+          cachedLib = cachedLib.map((it: any) => it.id === selectedItem.id ? { ...it, ...res.data } : it);
+          sessionStorage.setItem('pathd_lib_cache', JSON.stringify(cachedLib));
+        }
+      } catch (e) {}
+
+      updateCachedShelfItem(updatedItem);
+
       // Refresh history and entries
       if (user?.is_pro) {
         apiClient.get(`/library/${selectedItem.id}/consumption-history`)
@@ -2304,7 +2329,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
           })
           .catch(console.error);
       }
-      onUpdate && onUpdate();
+      window.dispatchEvent(new Event('library-updated'));
+      onUpdate && onUpdate(updatedItem);
     } catch (e) {
       console.error(e);
     }
@@ -3780,6 +3806,15 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       return;
     }
 
+    const modalParam = params.get('modal');
+    if (modalParam === 'reconsume') {
+      setShowReconsumedModal(true);
+    } else if (modalParam === 'report') {
+      setShowReportMediaModal(true);
+    } else if (modalParam === 'remove_shelf') {
+      setShowRemoveShelfModal(true);
+    }
+
     initialUrlCheckDone.current = true;
   }, [isItemConsumed, updateModalUrlParams]);
 
@@ -3808,7 +3843,39 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     }
   };
 
-  // Listen for browser Back/Forward (popstate) to handle spoiler warning modal, delete confirmation, and tab changes
+  const openSubModal = (modalName: 'reconsume' | 'report' | 'remove_shelf') => {
+    if (modalName === 'reconsume') setShowReconsumedModal(true);
+    if (modalName === 'report') setShowReportMediaModal(true);
+    if (modalName === 'remove_shelf') setShowRemoveShelfModal(true);
+    if (typeof window !== 'undefined') {
+      const currentUrl = new URL(window.location.href);
+      currentUrl.searchParams.set('modal', modalName);
+      const newRelative = currentUrl.pathname + (currentUrl.search || '') + (currentUrl.hash || '');
+      window.history.pushState(window.history.state, '', newRelative);
+    }
+  };
+
+  const closeSubModal = (useBack: boolean = true) => {
+    setShowReconsumedModal(false);
+    setShowReportMediaModal(false);
+    setShowRemoveShelfModal(false);
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const m = params.get('modal');
+      if (m && ['reconsume', 'report', 'remove_shelf'].includes(m)) {
+        if (useBack) {
+          window.history.back();
+        } else {
+          const currentUrl = new URL(window.location.href);
+          currentUrl.searchParams.delete('modal');
+          const newRelative = currentUrl.pathname + (currentUrl.search || '') + (currentUrl.hash || '');
+          window.history.replaceState(window.history.state, '', newRelative);
+        }
+      }
+    }
+  };
+
+  // Listen for browser Back/Forward (popstate) to handle spoiler warning modal, delete confirmation, submodals, and tab changes
   useEffect(() => {
     const handlePopState = () => {
       const params = new URLSearchParams(window.location.search);
@@ -3819,6 +3886,11 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
       // Sync delete comment confirmation
       setDeleteCommentId(deleteCommentParam ? Number(deleteCommentParam) : null);
+
+      // Sync submodals
+      setShowReconsumedModal(modalParam === 'reconsume');
+      setShowReportMediaModal(modalParam === 'report');
+      setShowRemoveShelfModal(modalParam === 'remove_shelf');
 
       // If Klipy modal is active, let KlipyPicker handle its own popstate
       if (modalParam === 'media') return;
@@ -3862,6 +3934,11 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
         }
         if (params.get('delete_comment')) {
           params.delete('delete_comment');
+          changed = true;
+        }
+        const m = params.get('modal');
+        if (m && ['reconsume', 'report', 'remove_shelf'].includes(m)) {
+          params.delete('modal');
           changed = true;
         }
         if (changed) {
@@ -5754,7 +5831,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                   {user && !isEpisode && (
                     <button
                       type="button"
-                      onClick={() => setShowReportMediaModal(true)}
+                      onClick={() => openSubModal('report')}
                       className="btn-circle-action"
                       title={language === 'es' ? 'Reportar obra' : 'Report media'}
                       style={{
@@ -5829,7 +5906,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                             if (!hasProgress) {
                               await handleRemoveFromShelf(true);
                             } else {
-                              setShowRemoveShelfModal(true);
+                              openSubModal('remove_shelf');
                             }
                           } else {
                             handleAddToShelf();
@@ -6656,7 +6733,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                             type="button"
                             onClick={() => {
                               if (selectedItem?.status === 'completed') {
-                                setShowReconsumedModal(true);
+                                openSubModal('reconsume');
                               } else {
                                 handleToggleStatus('completed');
                               }
@@ -6909,7 +6986,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                               type="button"
                               onClick={() => {
                                 if (isAllIssuesRead || selectedItem?.status === 'read' || selectedItem?.status === 'completed') {
-                                  setShowReconsumedModal(true);
+                                  openSubModal('reconsume');
                                 } else {
                                   const cacheKey = `${selectedItem.external_id}_all_episodes`;
                                   const list = (seasonEpisodes[1] && seasonEpisodes[1].length > 0) ? seasonEpisodes[1] : (getCachedSeries(cacheKey) || []);
@@ -7037,7 +7114,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                               type="button"
                               onClick={async () => {
                                 if (selectedItem?.status === 'completed' || isAllWatched) {
-                                  setShowReconsumedModal(true);
+                                  openSubModal('reconsume');
                                 } else {
                                   const cacheKeyAll = `${selectedItem?.external_id}_all_episodes`;
                                   let cachedAll = getCachedSeries(cacheKeyAll);
@@ -7126,7 +7203,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                             type="button"
                             onClick={() => {
                               if (selectedItem?.status === 'completed' || selectedItem?.status === 'read') {
-                                setShowSingleWatchedMenu(true);
+                                openSubModal('reconsume');
                               } else {
                                 handleToggleStatus(['book', 'comic', 'manga'].includes(selectedItem?.item_type) ? 'read' : 'completed');
                               }
@@ -9518,7 +9595,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                     justifyContent: 'center',
                     padding: '1rem'
                   }}
-                  onClick={() => setShowReconsumedModal(false)}
+                  onClick={() => closeSubModal(true)}
                 >
                   <div
                     className="glass-card"
@@ -9549,7 +9626,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                       </h3>
                       <button
                         type="button"
-                        onClick={() => setShowReconsumedModal(false)}
+                        onClick={() => closeSubModal(true)}
                         style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '0.2rem' }}
                       >
                         <X size={18} />
@@ -9560,7 +9637,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                       <button
                         type="button"
                         onClick={async () => {
-                          setShowReconsumedModal(false);
+                          closeSubModal(false);
                           if (selectedItem.item_type === 'series' || selectedItem.item_type === 'anime') {
                             const cacheKeyAll = `${selectedItem?.external_id}_all_episodes`;
                             let cachedAll = getCachedSeries(cacheKeyAll);
@@ -9622,7 +9699,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                         <button
                           type="button"
                           onClick={async () => {
-                            setShowReconsumedModal(false);
+                            closeSubModal(false);
                             await handleMarkConsumedAgain(true);
                           }}
                           style={{
@@ -9650,7 +9727,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                       <button
                         type="button"
                         onClick={async () => {
-                          setShowReconsumedModal(false);
+                          closeSubModal(false);
                           if (selectedItem.item_type === 'series' || selectedItem.item_type === 'anime') {
                             const cacheKeyAll = `${selectedItem?.external_id}_all_episodes`;
                             let cachedAll = getCachedSeries(cacheKeyAll);
@@ -9697,7 +9774,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                       >
                         <Trash2 size={16} style={{ flexShrink: 0 }} />
                         <span>
-                          {(selectedItem.item_type === 'series' || selectedItem.item_type === 'anime' || (selectedItem.item_type === 'comic' && !isEpisode))
+                          {(selectedItem.item_type === 'series' || selectedItem.item_type === 'anime' || (selectedItem.item_type === 'comic' && !isEpisode) || !consumptionHistory || consumptionHistory.length <= 1)
                             ? (language === 'es' ? 'Desmarcar' : 'Unmark')
                             : (language === 'es' ? 'Desmarcar última visualización' : 'Unmark latest completion')
                           }
@@ -9707,7 +9784,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
                     <button
                       type="button"
-                      onClick={() => setShowReconsumedModal(false)}
+                      onClick={() => closeSubModal(true)}
                       style={{
                         padding: '0.55rem',
                         borderRadius: '6px',
@@ -10237,7 +10314,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                     justifyContent: 'center',
                     padding: '1rem'
                   }}
-                  onClick={() => setShowRemoveShelfModal(false)}
+                  onClick={() => closeSubModal(true)}
                 >
                   <div
                     className="glass-card"
@@ -10261,7 +10338,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                       </h3>
                       <button
                         type="button"
-                        onClick={() => setShowRemoveShelfModal(false)}
+                        onClick={() => closeSubModal(true)}
                         style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '0.2rem' }}
                       >
                         <X size={18} />
@@ -10279,7 +10356,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                       <button
                         type="button"
                         onClick={() => {
-                          setShowRemoveShelfModal(false);
+                          closeSubModal(false);
                           handleRemoveFromShelf(false);
                         }}
                         style={{
@@ -10312,7 +10389,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                       <button
                         type="button"
                         onClick={() => {
-                          setShowRemoveShelfModal(false);
+                          closeSubModal(false);
                           handleRemoveFromShelf(true);
                         }}
                         style={{
@@ -10345,7 +10422,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
                     <button
                       type="button"
-                      onClick={() => setShowRemoveShelfModal(false)}
+                      onClick={() => closeSubModal(true)}
                       style={{
                         padding: '0.55rem',
                         borderRadius: '6px',
@@ -10377,7 +10454,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                     justifyContent: 'center',
                     padding: '1rem'
                   }}
-                  onClick={() => setShowReportMediaModal(false)}
+                  onClick={() => closeSubModal(true)}
                 >
                   <div
                     className="glass-card"
@@ -10404,7 +10481,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                       </div>
                       <button
                         type="button"
-                        onClick={() => setShowReportMediaModal(false)}
+                        onClick={() => closeSubModal(true)}
                         style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '0.2rem' }}
                       >
                         <X size={18} />
@@ -10487,7 +10564,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
                       <button
                         type="button"
-                        onClick={() => setShowReportMediaModal(false)}
+                        onClick={() => closeSubModal(true)}
                         style={{
                           padding: '0.6rem 1rem',
                           borderRadius: '8px',

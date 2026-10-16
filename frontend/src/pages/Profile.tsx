@@ -1896,9 +1896,15 @@ export const Profile: React.FC = () => {
   const [followingList, setFollowingList] = useState<UserProfile[]>([]);
   const [followListLoading, setFollowListLoading] = useState(false);
 
-  const handleOpenFollowModal = async (initialTab: 'followers' | 'following') => {
+  const handleOpenFollowModal = async (initialTab: 'followers' | 'following', updateUrl: boolean = true) => {
     setFollowModalTab(initialTab);
     setShowFollowModal(true);
+    if (updateUrl && typeof window !== 'undefined') {
+      const currentUrl = new URL(window.location.href);
+      currentUrl.searchParams.set('modal', initialTab);
+      const newRelative = currentUrl.pathname + (currentUrl.search || '') + (currentUrl.hash || '');
+      window.history.pushState(window.history.state, '', newRelative);
+    }
     setFollowListLoading(true);
     try {
       const myId = currentUser?.id || profile?.id;
@@ -1914,6 +1920,60 @@ export const Profile: React.FC = () => {
       setFollowListLoading(false);
     }
   };
+
+  const closeFollowModal = (useBack: boolean = true) => {
+    setShowFollowModal(false);
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const m = params.get('modal');
+      if (m === 'followers' || m === 'following') {
+        if (useBack) {
+          window.history.back();
+        } else {
+          const currentUrl = new URL(window.location.href);
+          currentUrl.searchParams.delete('modal');
+          const newRelative = currentUrl.pathname + (currentUrl.search || '') + (currentUrl.hash || '');
+          window.history.replaceState(window.history.state, '', newRelative);
+        }
+      }
+    }
+  };
+
+  const handleChangeFollowModalTab = (newTab: 'followers' | 'following') => {
+    setFollowModalTab(newTab);
+    if (typeof window !== 'undefined') {
+      const currentUrl = new URL(window.location.href);
+      currentUrl.searchParams.set('modal', newTab);
+      const newRelative = currentUrl.pathname + (currentUrl.search || '') + (currentUrl.hash || '');
+      window.history.replaceState(window.history.state, '', newRelative);
+    }
+  };
+
+  // Sync follow modal with URL on popstate
+  useEffect(() => {
+    const handlePopState = () => {
+      const p = new URLSearchParams(window.location.search);
+      const m = p.get('modal');
+      if (m === 'followers' || m === 'following') {
+        setFollowModalTab(m);
+        setShowFollowModal(true);
+      } else {
+        setShowFollowModal(false);
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  // Check URL on mount or profile change for modal=followers / modal=following
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const p = new URLSearchParams(window.location.search);
+    const m = p.get('modal');
+    if (m === 'followers' || m === 'following') {
+      handleOpenFollowModal(m, false);
+    }
+  }, [profile?.id]);
 
   const handleToggleFollowUserInModal = async (targetUser: UserProfile) => {
     try {
@@ -6845,7 +6905,7 @@ export const Profile: React.FC = () => {
             zIndex: 4000,
             padding: '1rem'
           }} 
-          onClick={() => setShowFollowModal(false)}
+          onClick={() => closeFollowModal(true)}
         >
           <div 
             className="glass-card" 
@@ -6875,7 +6935,7 @@ export const Profile: React.FC = () => {
               <div style={{ display: 'flex', gap: '0.75rem' }}>
                 <button
                   type="button"
-                  onClick={() => setFollowModalTab('followers')}
+                  onClick={() => handleChangeFollowModalTab('followers')}
                   style={{
                     padding: '0.45rem 0.9rem',
                     borderRadius: '8px',
@@ -6892,7 +6952,7 @@ export const Profile: React.FC = () => {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setFollowModalTab('following')}
+                  onClick={() => handleChangeFollowModalTab('following')}
                   style={{
                     padding: '0.45rem 0.9rem',
                     borderRadius: '8px',
@@ -6911,7 +6971,7 @@ export const Profile: React.FC = () => {
 
               <button
                 type="button"
-                onClick={() => setShowFollowModal(false)}
+                onClick={() => closeFollowModal(true)}
                 style={{
                   background: 'none',
                   border: 'none',

@@ -1880,6 +1880,8 @@ export const Home: React.FC = () => {
       newParams.set('tab', tab);
     }
     setSearchParams(newParams);
+    showFiltersRef.current = true;
+    setShowFiltersOnScroll(true);
   };
   
   const [libraryItems, setLibraryItems] = useState<any[]>(() => {
@@ -1939,10 +1941,12 @@ export const Home: React.FC = () => {
 
   // Scroll direction state for category filters:
   // When scrolling down past threshold, filters hide.
-  // When scrolling up even a little bit, filters reappear!
+  // When scrolling up intentionally, filters reappear smoothly without flickering.
   const [showFiltersOnScroll, setShowFiltersOnScroll] = useState<boolean>(true);
+  const showFiltersRef = useRef<boolean>(true);
   const lastScrollYRef = useRef<number>(0);
   const scrollAccumulatorRef = useRef<number>(0);
+  const lastToggleTimeRef = useRef<number>(0);
 
   // Mobile Double-Back Exit confirmation (especially for PWA / installed webapp)
   const [showExitToast, setShowExitToast] = useState(false);
@@ -1999,7 +2003,10 @@ export const Home: React.FC = () => {
     
     const handleScroll = () => {
       if (window.innerWidth > 768) {
-        setShowFiltersOnScroll(true);
+        if (!showFiltersRef.current) {
+          showFiltersRef.current = true;
+          setShowFiltersOnScroll(true);
+        }
         return;
       }
 
@@ -2009,16 +2016,27 @@ export const Home: React.FC = () => {
           const delta = currentScrollY - lastScrollYRef.current;
           lastScrollYRef.current = currentScrollY;
 
-          // While within the initial header scroll area (0 to 140px), keep filters visible without any flickering
-          if (currentScrollY <= 140) {
-            setShowFiltersOnScroll(true);
+          // When near the very top of the page (<= 30px), keep filters visible without any flickering
+          if (currentScrollY <= 30) {
+            if (!showFiltersRef.current) {
+              showFiltersRef.current = true;
+              setShowFiltersOnScroll(true);
+              lastToggleTimeRef.current = Date.now();
+            }
             scrollAccumulatorRef.current = 0;
             ticking = false;
             return;
           }
 
-          // Ignore tiny noise (< 2px)
-          if (Math.abs(delta) < 2) {
+          // Ignore micro jitter noise (< 3px)
+          if (Math.abs(delta) < 3) {
+            ticking = false;
+            return;
+          }
+
+          // Cool-down check: don't toggle back and forth while transition animation is active (300ms)
+          const now = Date.now();
+          if (now - lastToggleTimeRef.current < 300) {
             ticking = false;
             return;
           }
@@ -2030,15 +2048,23 @@ export const Home: React.FC = () => {
 
           scrollAccumulatorRef.current += delta;
 
-          // Only hide after user has scrolled down past the top zone and accumulated > 60px of downward movement
-          if (scrollAccumulatorRef.current > 60) {
-            setShowFiltersOnScroll(false);
-            scrollAccumulatorRef.current = 0;
+          // HIDE: Only hide if currently visible, scrolled past header (> 70px), and accumulated > 50px downward scroll
+          if (showFiltersRef.current) {
+            if (currentScrollY > 70 && scrollAccumulatorRef.current > 50) {
+              showFiltersRef.current = false;
+              setShowFiltersOnScroll(false);
+              scrollAccumulatorRef.current = 0;
+              lastToggleTimeRef.current = now;
+            }
           }
-          // Only show when user scrolls back up with intentional movement (> 40px)
-          else if (scrollAccumulatorRef.current < -40) {
-            setShowFiltersOnScroll(true);
-            scrollAccumulatorRef.current = 0;
+          // SHOW: Only show if currently hidden and accumulated > 50px upward scroll
+          else {
+            if (scrollAccumulatorRef.current < -50) {
+              showFiltersRef.current = true;
+              setShowFiltersOnScroll(true);
+              scrollAccumulatorRef.current = 0;
+              lastToggleTimeRef.current = now;
+            }
           }
 
           ticking = false;

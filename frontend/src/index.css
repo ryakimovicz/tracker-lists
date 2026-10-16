@@ -1580,6 +1580,7 @@ h1, h2, h3, h4, h5, h6 {
     width: 100% !important;
     box-sizing: border-box !important;
     overflow: hidden !important;
+    overflow-anchor: none !important;
   }
 
   .home-tabs-container {
@@ -1641,6 +1642,7 @@ h1, h2, h3, h4, h5, h6 {
     box-sizing: border-box !important;
     width: 100% !important;
     position: relative !important;
+    z-index: 1 !important;
     background: transparent !important;
     border: none !important;
     box-shadow: none !important;
@@ -1648,6 +1650,7 @@ h1, h2, h3, h4, h5, h6 {
     transform: translateY(0);
     opacity: 1;
     overflow: hidden !important;
+    overflow-anchor: none !important;
   }
 
   .home-category-filters-container.hide {
@@ -1790,6 +1793,8 @@ h1, h2, h3, h4, h5, h6 {
     padding-bottom: 0.25rem !important;
     width: 100% !important;
     box-sizing: border-box !important;
+    overflow: hidden !important;
+    overflow-anchor: none !important;
   }
 
   .explore-sticky-search-bar {
@@ -1800,9 +1805,9 @@ h1, h2, h3, h4, h5, h6 {
     padding-bottom: 0.4rem !important;
     padding-left: 0.5rem !important;
     padding-right: 0.5rem !important;
-    background: transparent !important;
+    background: var(--bg-primary) !important;
     box-sizing: border-box !important;
-    z-index: 2 !important;
+    z-index: 5 !important;
   }
 
   /* Explore Category Filter Buttons on mobile: Clean, loose button appearance below search bar that smoothly slides away on scroll down and returns on scroll up */
@@ -1816,7 +1821,9 @@ h1, h2, h3, h4, h5, h6 {
     box-sizing: border-box !important;
     width: 100% !important;
     position: relative !important;
+    z-index: 1 !important;
     overflow: hidden !important;
+    overflow-anchor: none !important;
     height: auto !important;
     max-height: 120px !important;
     margin-top: 0.35rem !important;
