@@ -1,6 +1,6 @@
 # Pathd - Especificación Técnica & Referencia de API ⚡
 
-Documento de referencia para desarrolladores, arquitectura del sistema y catálogo completo de endpoints REST de **Pathd (v0.9.9 Beta)**.
+Documento de referencia para desarrolladores, arquitectura del sistema y catálogo completo de endpoints REST de **Pathd (v0.9.10)**.
 
 ---
 
@@ -9,7 +9,10 @@ Documento de referencia para desarrolladores, arquitectura del sistema y catálo
 ### Backend
 - **Framework**: FastAPI (Python 3.11+)
 - **Base de Datos y ORM**: PostgreSQL (Neon Serverless en producción) / SQLite (desarrollo local) via SQLAlchemy
+- **Migraciones de Base de Datos**: Alembic (`alembic/` y `alembic.ini`) para versionado y despliegue formal de esquemas
 - **Autenticación**: OAuth2 Password Bearer con JWT + cookie HttpOnly segura para rotación de token de refresco
+- **Monitoreo de Errores & Rendimiento**: Sentry (`sentry-sdk`) con seguimiento de excepciones y transacciones en producción
+- **Resiliencia & Circuit Breakers**: Patrón Circuit Breaker (`app/core/circuit_breaker.py`) para aislar fallos de APIs externas (OMDb, TVMaze, AniList, ComicVine, IGDB, Last.fm, Deezer, etc.)
 - **Email Transaccional**: Resend API con dominio personalizado `@pathd.net` y soporte bilingüe (ES/EN)
 - **Pagos y Suscripciones**: Dodo Payments API (Checkout Sessions, Customer Portal y Webhooks de ciclo de vida)
 - **Rate Limiting**: `slowapi` con límites dinámicos por IP y endpoints protegidos
@@ -19,6 +22,7 @@ Documento de referencia para desarrolladores, arquitectura del sistema y catálo
   - Persistencia de fechas de lanzamiento (`release_date`) en la tabla `user_library_items` para carga en 0 ms
   - **Idempotencia Multidispositivo**: Endpoints de marcado de episodios (`action=complete`) y likes de actividad protegidos contra duplicación de registros de consumo (`ConsumptionHistory`) y condiciones de carrera de red
 - **Tareas en Segundo Plano**: FastAPI `BackgroundTasks` (despacho asíncrono de correos y sincronizaciones de actividad)
+- **Integración Continua (CI)**: GitHub Actions workflow con pruebas automatizadas (`pytest`) y validación estricta de migraciones Alembic
 
 ### Frontend
 - **Framework**: React 19 + TypeScript + Vite
@@ -26,7 +30,11 @@ Documento de referencia para desarrolladores, arquitectura del sistema y catálo
 - **Estilos**: Vanilla CSS con sistema de diseño modular (**Solar Amber `#f59e0b`** y **Deep Cinema Charcoal `#090d16`**), *Glassmorphism*, colores temáticos por categoría y tipografía Inter
 - **Integraciones Multimedia**:
   - **KLIPY API**: Selector de contenido enriquecido (**GIFs, Stickers, Memes y Clips de Audio**) para comentarios y reseñas, con persistencia local de favoritos, barra de búsqueda reactiva y auto-silenciado en scroll
-- **Optimización de Rendimiento**:
+- **Optimización de Rendimiento & Resiliencia**:
+  - **Code-Splitting & Lazy Loading**: Rutas cargadas bajo demanda con `React.lazy()` y `Suspense` respaldado por `PathdLoader`
+  - **Error Boundaries Globales**: `ErrorBoundary.tsx` para aislamiento y recuperación de errores de renderizado
+  - **Detección Offline en Vivo**: `OfflineDetector.tsx` para notificación no intrusiva de pérdida de red y reconexión suave
+  - **Deep-Linking de Modales**: Sincronización de modales con parámetros de URL (`?item=...`, `?music=...`, `?discography=...`)
   - **Idle Warmup**: Calentamiento automático de datos durante períodos de inactividad de CPU
   - **Hover & Touch Prefetching**: Anticipación inteligente al clic en enlaces del Sidebar y tarjetas
   - **Multi-tier Cache**: Caché en memoria + `sessionStorage` para aperturas en 0 ms
@@ -39,7 +47,7 @@ Documento de referencia para desarrolladores, arquitectura del sistema y catálo
 - **Base de Datos**: [Neon.tech](https://neon.tech/) (PostgreSQL Serverless gestionado)
 - **DNS & SSL**: [Cloudflare](https://cloudflare.com/) (`pathd.net` y `api.pathd.net`)
 - **Correos**: [Resend](https://resend.com/) (`noreply@pathd.net`)
-- **Monitorización**: [UptimeRobot](https://uptimerobot.com/) realizando pings continuos 24/7 a `GET /health`
+- **Monitorización**: [UptimeRobot](https://uptimerobot.com/) realizando pings continuos 24/7 a `GET /health` y Sentry para rastreo de errores
 
 ---
 
@@ -244,7 +252,10 @@ pip install -r requirements.txt
 # 3. Configurar variables de entorno
 cp .env.example .env
 
-# 4. Levantar el servidor de desarrollo
+# 4. Aplicar migraciones de base de datos
+alembic upgrade head
+
+# 5. Levantar el servidor de desarrollo
 uvicorn app.main:app --reload
 ```
 

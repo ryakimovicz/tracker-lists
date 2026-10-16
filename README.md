@@ -5,7 +5,8 @@
   <p><strong>La plataforma definitiva para el seguimiento de tu universo multimedia, guías cronológicas y biblioteca personal</strong></p>
 
   <p>
-    <a href="https://pathd.net"><img src="https://img.shields.io/badge/Version-v0.9.9_Beta-f59e0b?style=for-the-badge&logo=rocket" alt="Pathd Version" /></a>
+    <a href="https://pathd.net"><img src="https://img.shields.io/badge/Version-v0.9.10-f59e0b?style=for-the-badge&logo=rocket" alt="Pathd Version" /></a>
+    <a href="https://github.com/ryakimovicz/tracker-lists/actions"><img src="https://img.shields.io/badge/CI-Passing-10b981?style=for-the-badge&logo=githubactions" alt="CI Status" /></a>
     <a href="https://pathd.net"><img src="https://img.shields.io/badge/Production-Online-10b981?style=for-the-badge&logo=cloudflare" alt="Production Status" /></a>
     <a href="https://react.dev/"><img src="https://img.shields.io/badge/Frontend-React_19_+_TypeScript-61dafb?style=for-the-badge&logo=react" alt="React" /></a>
     <a href="https://fastapi.tiangolo.com/"><img src="https://img.shields.io/badge/Backend-FastAPI-009688?style=for-the-badge&logo=fastapi" alt="FastAPI" /></a>
@@ -62,10 +63,13 @@ Cuenta con un potente constructor de **Guías Cronológicas interactivas**, modi
   - Tops semanales, mensuales e históricos de artistas, álbumes y canciones.
   - Enriquecimiento de portadas HD multifuente (*Last.fm, Deezer, MusicBrainz, Discogs*) y modal interactivo de detalles de álbumes y pistas con tracklist completo.
 
-### ⚡ Rendimiento Ultrarrápido & Sincronización Multidispositivo (0 ms)
+### ⚡ Rendimiento Ultrarrápido, Resiliencia & Sincronización Multidispositivo (0 ms)
 - **Sincronización Inteligente Multidispositivo**:
   - Detección reactiva de visibilidad (`visibilitychange` / `focus`) para sincronizar estantería, notificaciones no leídas y listas de seguimiento entre PC y móvil sin recargas forzadas ni saturación del servidor.
   - Marcado instantáneo de episodios y números de cómics en Inicio con avance optimista y backend idempotente (`action=complete`), garantizando **cero registros duplicados** en el historial.
+- **Code-Splitting y Carga Asíncrona (`React.lazy`)**: División granular del bundle de frontend con `Suspense` y loader nativo, minimizando el tiempo hasta la interacción (TTI).
+- **Resiliencia con Circuit Breakers & Sentry**: Aislamiento proactivo de llamadas a APIs externas mediante interruptores automáticos (`CircuitBreaker`) y monitoreo de excepciones en tiempo real en producción con Sentry.
+- **Detección Offline en Tiempo Real**: Detección inmediata de cortes de red y reconexión suave con banners no intrusivos.
 - **Motor de Prefetching Inteligente**: Calentamiento silencioso en segundo plano (*Idle Warmup*) y precarga anticipada al interactuar con enlaces (*Hover & Touch Prefetching*).
 - **Búsqueda Multicapa con Caché y Debounce**: Barra de búsqueda con limpieza instantánea, filtros por categoría persistentes y caché en memoria y `sessionStorage`.
 - **Sincronización Instantánea de Estantería (Frame-0)**: Caché local persistente con indexación hash $O(1)$ para marcar de inmediato las obras agregadas en Explorar y modales sin esperar peticiones de red.
@@ -97,7 +101,7 @@ Pathd se alimenta e integra con los mejores servicios y APIs abiertas del mundo:
 - 🦸 **Cómics**: [Comic Vine](https://comicvine.gamespot.com/)
 - 🌸 **Mangas & Novelas Ligeras**: [AniList GraphQL](https://anilist.co/)
 - 🎮 **Videojuegos**: [IGDB / Twitch](https://www.igdb.com/)
-- 🎵 **Música & Scrobbling**: [Last.fm](https://www.last.fm/)
+- 🎵 **Música & Scrobbling**: [Last.fm](https://www.last.fm/), [Deezer API](https://developers.deezer.com/) & [Apple iTunes](https://developer.apple.com/library/archive/documentation/AudioVideo/Conceptual/iTuneSearchAPI/index.html)
 - 🎭 **GIFs, Memes & Clips**: [KLIPY API](https://klipy.co/)
 - 💳 **Pagos Seguros**: [Dodo Payments](https://dodopayments.com/)
 - 💌 **Correos Transaccionales**: [Resend](https://resend.com/)
