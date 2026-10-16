@@ -497,7 +497,14 @@ h1, h2, h3, h4, h5, h6 {
     background: transparent !important;
     border: none !important;
     border-bottom: none !important;
-    color: var(--text-secondary) !important;
+    color: var(--tab-color, var(--text-secondary)) !important;
+    opacity: 0.78;
+    transition: opacity 0.22s cubic-bezier(0.4, 0, 0.2, 1), transform 0.22s cubic-bezier(0.4, 0, 0.2, 1), color 0.22s ease !important;
+  }
+
+  .profile-tab-btn.active {
+    color: var(--tab-color, var(--accent-primary)) !important;
+    opacity: 1 !important;
   }
 
   .profile-tab-btn .profile-tab-label {
@@ -527,10 +534,12 @@ h1, h2, h3, h4, h5, h6 {
   .profile-tab-btn svg {
     width: 20px !important;
     height: 20px !important;
-    transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    color: var(--tab-color, currentColor) !important;
+    transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1), color 0.22s ease !important;
   }
 
   .profile-tab-btn.active svg {
+    color: var(--tab-color, var(--accent-primary)) !important;
     transform: translateY(-5px) !important;
   }
 
