@@ -31,6 +31,7 @@ Frontend oficial de **Pathd (v0.9.10)**, desarrollado como una Single Page Appli
   - **Multi-tier Cache**: Caché en memoria + `sessionStorage` para apertura de vistas y modales en 0 ms.
   - **Instant Shelf Cache**: Persistencia local inmediata de la estantería del usuario con indexación $O(1)$ para marcar obras agregadas sin retraso en Explorar y modales.
   - **Debounced Search**: Búsqueda reactiva optimizada con botón de borrado instantáneo y filtros de categoría permanentes.
+  - **Seguridad en Cliente & Manejo de Sesión**: Renovación transparente de tokens JWT mediante interceptores de Axios con rotación de cookies `HttpOnly`/`Secure`, tolerancia a respuestas de límite de tasa (`429 Too Many Requests`) y renderizado estrictamente sanitizado en React 19 sin scripts embebidos.
 - **Monetización**: Google AdSense con bloques responsivos integrados y soporte nativo para cuentas Premium sin anuncios.
 
 ---

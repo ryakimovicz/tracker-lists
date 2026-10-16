@@ -10,12 +10,12 @@ Documento de referencia para desarrolladores, arquitectura del sistema y catálo
 - **Framework**: FastAPI (Python 3.11+)
 - **Base de Datos y ORM**: PostgreSQL (Neon Serverless en producción) / SQLite (desarrollo local) via SQLAlchemy
 - **Migraciones de Base de Datos**: Alembic (`alembic/` y `alembic.ini`) para versionado y despliegue formal de esquemas
-- **Autenticación**: OAuth2 Password Bearer con JWT + cookie HttpOnly segura para rotación de token de refresco
+- **Autenticación & Criptografía**: OAuth2 Password Bearer con JWT, cifrado irreversible de contraseñas mediante `bcrypt` (`gensalt`), rotación de token de refresco con cookies `HttpOnly`/`Secure` (HTTPS) y bloqueo estricto de tokens de prueba en producción
 - **Monitoreo de Errores & Rendimiento**: Sentry (`sentry-sdk`) con seguimiento de excepciones y transacciones en producción
 - **Resiliencia & Circuit Breakers**: Patrón Circuit Breaker (`app/core/circuit_breaker.py`) para aislar fallos de APIs externas (OMDb, TVMaze, AniList, ComicVine, IGDB, Last.fm, Deezer, etc.)
 - **Email Transaccional**: Resend API con dominio personalizado `@pathd.net` y soporte bilingüe (ES/EN)
 - **Pagos y Suscripciones**: Dodo Payments API (Checkout Sessions, Customer Portal y Webhooks de ciclo de vida)
-- **Rate Limiting**: `slowapi` con límites dinámicos por IP y endpoints protegidos
+- **Rate Limiting (Protección Anti-Fuerza Bruta & Anti-Spam)**: `slowapi` con límites dinámicos por IP en endpoints sensibles (búsqueda: 60/min, login: 10/min, registro: 5/min, recuperación de contraseña: 5/min, Google auth: 15/min)
 - **Caché y Rendimiento**:
   - In-memory TTL Cache (Explorar, Tendencias y Búsqueda global/individual por tipo)
   - Filtrado dinámico en tiempo real contra `BlockedFranchise` y `BlockedMediaItem`
@@ -62,15 +62,15 @@ Documento de referencia para desarrolladores, arquitectura del sistema y catálo
 ### Autenticación (`/api/v1/auth`)
 | Método | Ruta | Descripción |
 |---|---|---|
-| POST | `/register` | Registro de nueva cuenta y despacho de correo de verificación |
-| GET | `/verify-email?token={token}` | Confirmación de correo electrónico y auto-login |
-| POST | `/resend-verification` | Reenviar correo de confirmación de cuenta |
-| POST | `/login` | Inicio de sesión (bloquea cuentas no verificadas con `403`) |
-| POST | `/refresh` | Renovar token de acceso con cookie HttpOnly |
+| POST | `/register` | Registro de nueva cuenta y despacho de correo de verificación (Rate limit: 5/min) |
+| GET | `/verify-email?token={token}` | Confirmación de correo electrónico y auto-login con emisión de refresh token seguro |
+| POST | `/resend-verification` | Reenviar correo de confirmación de cuenta (Rate limit: 5/min) |
+| POST | `/login` | Inicio de sesión con validación de credenciales (Rate limit: 10/min, cookie refresh HttpOnly/Secure) |
+| POST | `/refresh` | Renovar token de acceso con cookie HttpOnly y rotación atómica de sesión |
 | POST | `/logout` | Cerrar sesión y revocar tokens |
-| POST | `/forgot-password` | Envía enlace de restablecimiento de contraseña por email |
-| POST | `/reset-password` | Valida token y actualiza la contraseña del usuario |
-| POST | `/google` | Autenticación y registro con Google OAuth2 |
+| POST | `/forgot-password` | Envía enlace de restablecimiento de contraseña con protección anti-enumeración (Rate limit: 5/min) |
+| POST | `/reset-password` | Valida token y actualiza la contraseña del usuario (Rate limit: 10/min) |
+| POST | `/google` | Autenticación y registro con Google OAuth2 verificando certificados de Google (Rate limit: 15/min) |
 
 ### Usuarios (`/api/v1/users`)
 | Método | Ruta | Descripción |

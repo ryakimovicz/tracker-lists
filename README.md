@@ -75,6 +75,13 @@ Cuenta con un potente constructor de **Guías Cronológicas interactivas**, modi
 - **Sincronización Instantánea de Estantería (Frame-0)**: Caché local persistente con indexación hash $O(1)$ para marcar de inmediato las obras agregadas en Explorar y modales sin esperar peticiones de red.
 - **Navegación Continua en Carruseles**: Desplazamiento fluido con soporte de clic único (paso fijo) o pulsación sostenida (*Smooth Continuous Scrolling*) y máscaras de gradiente.
 
+### 🔒 Seguridad & Privacidad de Datos
+- **Cifrado Irreversible de Contraseñas**: Implementación de `bcrypt` con sal dinámica (`gensalt()`); las contraseñas nunca se almacenan ni se transmiten en texto plano.
+- **Protección contra Fuerza Bruta & Abuso (Rate Limiting)**: Limitadores de peticiones basados en IP con `slowapi` en login (10/min), registro (5/min), recuperación de contraseña (5/min) y Google auth (15/min).
+- **Protección de Sesión Cifrada (HTTPS)**: Rotación automática de tokens mediante cookies `HttpOnly`, `SameSite=Lax` y `Secure=True` obligatorio en producción.
+- **Defensa contra Inyecciones SQL & XSS**: ORM parametrizado con SQLAlchemy y renderizado sanitizado nativo en React 19 sin scripts embebidos.
+- **Cero Datos Bancarios en Servidores**: Pagos y suscripciones procesados enteramente por Dodo Payments / Stripe bajo certificación bancaria PCI-DSS.
+
 ---
 
 ## 💎 Niveles de Membresía
