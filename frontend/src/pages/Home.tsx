@@ -3094,7 +3094,7 @@ export const Home: React.FC = () => {
               className={`upcoming-mobile-tab-btn ${upcomingFilter === "tba" ? "active" : ""}`}
               onClick={() => handleSelectUpcomingSubtab("tba")}
             >
-              <span>{language === "es" ? "Por confirmar" : "Por confirmar (TBA)"}</span>
+              <span>{language === "es" ? "Por confirmar" : "TBA"}</span>
               {upcomingFilter === "tba" && <div className="upcoming-tab-indicator" />}
             </button>
           </div>
