@@ -23,6 +23,7 @@ import {
   Moon, 
   Monitor, 
   Crown,
+  Clock,
   LogOut 
 } from 'lucide-react';
 
@@ -719,47 +720,116 @@ export const SettingsPage: React.FC = () => {
                     {isEs ? 'Invitado VIP' : 'VIP Guest'}
                   </span>
                 ) : user?.has_active_subscription ? (
-                  <span
-                    style={{
-                      fontSize: '0.75rem',
-                      padding: '0.2rem 0.55rem',
-                      borderRadius: '6px',
-                      background: 'rgba(16, 185, 129, 0.15)',
-                      color: '#10b981',
-                      border: '1px solid rgba(16, 185, 129, 0.3)',
-                      fontWeight: 600
-                    }}
-                  >
-                    {isEs ? 'Activa' : 'Active'}
-                  </span>
-                ) : user?.is_pro_cancelled ? (
-                  <span
-                    style={{
-                      fontSize: '0.75rem',
-                      padding: '0.2rem 0.55rem',
-                      borderRadius: '6px',
-                      background: 'rgba(239, 68, 68, 0.15)',
-                      color: '#ef4444',
-                      border: '1px solid rgba(239, 68, 68, 0.3)',
-                      fontWeight: 600
-                    }}
-                  >
-                    {isEs ? 'Renovación Cancelada' : 'Renewal Cancelled'}
-                  </span>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
+                    <span
+                      style={{
+                        fontSize: '0.75rem',
+                        padding: '0.2rem 0.55rem',
+                        borderRadius: '6px',
+                        background: 'rgba(16, 185, 129, 0.15)',
+                        color: '#10b981',
+                        border: '1px solid rgba(16, 185, 129, 0.3)',
+                        fontWeight: 600
+                      }}
+                    >
+                      {isEs ? 'Activa' : 'Active'}
+                    </span>
+                    {user?.pro_expires_at && (
+                      <span
+                        style={{
+                          fontSize: '0.75rem',
+                          padding: '0.2rem 0.55rem',
+                          borderRadius: '6px',
+                          background: 'rgba(255, 255, 255, 0.05)',
+                          color: 'var(--text-secondary)',
+                          border: '1px solid var(--border-color)',
+                          fontWeight: 500,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.3rem'
+                        }}
+                      >
+                        <Clock size={12} />
+                        {isEs
+                          ? `Renueva: ${new Date(user.pro_expires_at).toLocaleDateString()}`
+                          : `Renews: ${new Date(user.pro_expires_at).toLocaleDateString()}`}
+                      </span>
+                    )}
+                  </div>
+                ) : (user?.is_pro && user?.is_pro_cancelled) ? (
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
+                    <span
+                      style={{
+                        fontSize: '0.75rem',
+                        padding: '0.2rem 0.55rem',
+                        borderRadius: '6px',
+                        background: 'rgba(239, 68, 68, 0.15)',
+                        color: '#ef4444',
+                        border: '1px solid rgba(239, 68, 68, 0.3)',
+                        fontWeight: 600
+                      }}
+                    >
+                      {isEs ? 'Renovación Cancelada' : 'Renewal Cancelled'}
+                    </span>
+                    {user?.pro_expires_at && (
+                      <span
+                        style={{
+                          fontSize: '0.75rem',
+                          padding: '0.2rem 0.55rem',
+                          borderRadius: '6px',
+                          background: 'rgba(239, 68, 68, 0.08)',
+                          color: '#f87171',
+                          border: '1px solid rgba(239, 68, 68, 0.25)',
+                          fontWeight: 500,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.3rem'
+                        }}
+                      >
+                        <Clock size={12} />
+                        {isEs
+                          ? `Acceso hasta: ${new Date(user.pro_expires_at).toLocaleDateString()}`
+                          : `Access until: ${new Date(user.pro_expires_at).toLocaleDateString()}`}
+                      </span>
+                    )}
+                  </div>
                 ) : user?.is_pro ? (
-                  <span
-                    style={{
-                      fontSize: '0.75rem',
-                      padding: '0.2rem 0.55rem',
-                      borderRadius: '6px',
-                      background: 'rgba(245, 158, 11, 0.15)',
-                      color: '#f59e0b',
-                      border: '1px solid rgba(245, 158, 11, 0.3)',
-                      fontWeight: 600
-                    }}
-                  >
-                    {isEs ? 'Acceso de Regalo' : 'Gifted Access'}
-                  </span>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
+                    <span
+                      style={{
+                        fontSize: '0.75rem',
+                        padding: '0.2rem 0.55rem',
+                        borderRadius: '6px',
+                        background: 'rgba(245, 158, 11, 0.15)',
+                        color: '#f59e0b',
+                        border: '1px solid rgba(245, 158, 11, 0.3)',
+                        fontWeight: 600
+                      }}
+                    >
+                      {isEs ? 'Acceso de Regalo' : 'Gifted Access'}
+                    </span>
+                    {user?.pro_expires_at && (
+                      <span
+                        style={{
+                          fontSize: '0.75rem',
+                          padding: '0.2rem 0.55rem',
+                          borderRadius: '6px',
+                          background: 'rgba(245, 158, 11, 0.08)',
+                          color: '#f59e0b',
+                          border: '1px solid rgba(245, 158, 11, 0.25)',
+                          fontWeight: 500,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.3rem'
+                        }}
+                      >
+                        <Clock size={12} />
+                        {isEs
+                          ? `Vence: ${new Date(user.pro_expires_at).toLocaleDateString()}`
+                          : `Expires: ${new Date(user.pro_expires_at).toLocaleDateString()}`}
+                      </span>
+                    )}
+                  </div>
                 ) : (
                   <span
                     style={{
@@ -787,12 +857,12 @@ export const SettingsPage: React.FC = () => {
                     : 'You have exclusive unlimited access to all Pathd Premium features as an honored guest.')
                   : user?.has_active_subscription
                   ? (isEs
-                    ? 'Tu suscripción recurrente está activa. Puedes cancelar la renovación automática en cualquier momento.'
-                    : 'Your recurring subscription is active. You can cancel auto-renewal at any time.')
-                  : user?.is_pro_cancelled
+                    ? `Tu suscripción recurrente está activa. Tu próximo cobro automático está programado para el ${user?.pro_expires_at ? new Date(user.pro_expires_at).toLocaleDateString() : 'próximo ciclo de facturación'}. Puedes cancelar la renovación automática en cualquier momento.`
+                    : `Your recurring subscription is active. Your next auto-charge is scheduled for ${user?.pro_expires_at ? new Date(user.pro_expires_at).toLocaleDateString() : 'the next billing cycle'}. You can cancel auto-renewal at any time.`)
+                  : (user?.is_pro && user?.is_pro_cancelled)
                   ? (isEs
-                    ? 'La renovación automática está desactivada. Mantienes el acceso Premium hasta el final de tu período y no se te cobrará ningún cargo futuro.'
-                    : 'Auto-renewal is turned off. You keep full Premium access until the end of your billing period and will not be charged again.')
+                    ? `La renovación automática está desactivada. Mantienes todos tus beneficios Premium hasta el ${user?.pro_expires_at ? new Date(user.pro_expires_at).toLocaleDateString() : 'final de tu período'} y luego pasarás al plan Gratuito sin cobros adicionales.`
+                    : `Auto-renewal is turned off. You retain all Premium benefits until ${user?.pro_expires_at ? new Date(user.pro_expires_at).toLocaleDateString() : 'the end of your period'}, after which your account transitions to the Free plan with no further charges.`)
                   : user?.is_pro
                   ? (isEs
                     ? `Tienes acceso de regalo activo hasta el ${user?.pro_expires_at ? new Date(user.pro_expires_at).toLocaleDateString() : 'fin del período'}. Puedes activar tu suscripción ahora y el primer cobro se realizará recién al vencer el regalo.`

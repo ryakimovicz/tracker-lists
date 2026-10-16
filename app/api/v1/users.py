@@ -24,10 +24,11 @@ from app.models.activity import UserActivityLog
 from app.schemas.user import UserResponse, UserDashboardResponse
 from app.schemas.list import ReadingListResponse
 from app.schemas.social import UpNextResponse, UpNextItemResponse
+import logging
 from datetime import datetime, timezone
 from app.schemas.auth import PasswordChangeRequest, UsernameUpdateRequest
 
-
+logger = logging.getLogger(__name__)
 router = APIRouter()
 tvmaze_service = TVMazeService()
 
@@ -37,21 +38,114 @@ RANKINGS_CACHE_TTL = 300  # 5 minutes cache for Pathd community rankings
 def check_user_is_pro(user: User) -> bool:
     if not user:
         return False
+    if getattr(user, 'is_admin', False) or getattr(user, 'is_vip', False):
+        return True
     now = datetime.now(timezone.utc)
-    expires_active = False
+    if getattr(user, 'pro_expires_at', None):
+        exp = user.pro_expires_at
+        if exp.tzinfo is None:
+            exp = exp.replace(tzinfo=timezone.utc)
+        if exp <= now:
+            return False
+        return True
+    return bool(user.is_pro)
+
+
+async def reconcile_user_subscription(user: User, db: Session) -> bool:
+    """
+    Checks if a user's subscription or pro status has expired.
+    Auto-downgrades if expiration passed or if Dodo confirms cancellation/expiration.
+    Returns True if user remains Pro, False otherwise.
+    """
+    if not user:
+        return False
+    if getattr(user, 'is_admin', False) or getattr(user, 'is_vip', False):
+        return True
+
+    now = datetime.now(timezone.utc)
+
+    # 1. Check local pro_expires_at
     if user.pro_expires_at:
         exp = user.pro_expires_at
         if exp.tzinfo is None:
             exp = exp.replace(tzinfo=timezone.utc)
-        expires_active = exp > now
-    return bool(user.is_pro or user.is_admin or user.is_vip or expires_active)
+        if exp <= now:
+            user.is_pro = False
+            user.is_pro_cancelled = False
+            user.dodo_subscription_id = None
+            user.pro_expires_at = None
+            user.banner_url = None
+            user.background_url = None
+            user.profile_color = None
+            trim_downgraded_user_favorites(db, user.id)
+            db.commit()
+            logger.info(f"User {user.username} (ID: {user.id}) auto-downgraded: pro_expires_at expired.")
+            return False
+        return True
+
+    # 2. If user is marked is_pro and has a dodo_subscription_id, check Dodo if is_pro_cancelled is True or pro_expires_at is missing
+    if user.is_pro and user.dodo_subscription_id and (user.is_pro_cancelled or not user.pro_expires_at):
+        try:
+            from app.api.v1.payments import get_dodo_client
+            from app.core.config import settings
+            if settings.DODO_PAYMENTS_API_KEY:
+                client = get_dodo_client()
+                sub = await client.subscriptions.retrieve(subscription_id=user.dodo_subscription_id)
+                status = str(getattr(sub, 'status', '')).lower()
+                next_billing = getattr(sub, 'next_billing_date', None) or getattr(sub, 'expires_at', None)
+                cancel_at_period_end = getattr(sub, 'cancel_at_next_billing_date', False)
+
+                if status in ['cancelled', 'expired', 'failed']:
+                    user.is_pro = False
+                    user.is_pro_cancelled = False
+                    user.dodo_subscription_id = None
+                    user.pro_expires_at = None
+                    user.banner_url = None
+                    user.background_url = None
+                    user.profile_color = None
+                    trim_downgraded_user_favorites(db, user.id)
+                    db.commit()
+                    logger.info(f"User {user.username} auto-downgraded after reconciling with Dodo (status={status}).")
+                    return False
+                elif status in ['active', 'on_hold', 'trialing']:
+                    user.is_pro_cancelled = bool(cancel_at_period_end)
+                    if next_billing:
+                        if isinstance(next_billing, str):
+                            exp = datetime.fromisoformat(next_billing.replace("Z", "+00:00"))
+                        elif isinstance(next_billing, datetime):
+                            exp = next_billing
+                        else:
+                            exp = None
+                        if exp:
+                            if exp.tzinfo is None:
+                                exp = exp.replace(tzinfo=timezone.utc)
+                            user.pro_expires_at = exp
+                            if exp <= now and user.is_pro_cancelled:
+                                user.is_pro = False
+                                user.is_pro_cancelled = False
+                                user.dodo_subscription_id = None
+                                user.pro_expires_at = None
+                                user.banner_url = None
+                                user.background_url = None
+                                user.profile_color = None
+                                trim_downgraded_user_favorites(db, user.id)
+                                db.commit()
+                                return False
+                            db.commit()
+        except Exception as e:
+            logger.warning(f"Failed to reconcile subscription {user.dodo_subscription_id} with Dodo: {e}")
+
+    return bool(user.is_pro)
+
 
 @router.get("/me", response_model=UserDashboardResponse)
-def get_user_dashboard(
-
+async def get_user_dashboard(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    # Reconcile user pro and subscription status
+    is_pro = await reconcile_user_subscription(current_user, db)
+
     # Auto-repair creator_id for any tracking lists owned by current_user
     db.execute(text("""
         UPDATE reading_lists 
@@ -70,7 +164,6 @@ def get_user_dashboard(
         UserLibraryItem.tracking_list_id.isnot(None)
     )
     
-    is_pro = check_user_is_pro(current_user)
     raw_created_lists = db.query(ReadingList).filter(
         ReadingList.creator_id == current_user.id,
         ~ReadingList.id.in_(tracker_list_ids_query)

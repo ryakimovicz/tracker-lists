@@ -699,6 +699,27 @@ def admin_get_users(
     """
     Search and paginate all registered users with admin and moderation metadata.
     """
+    # Auto-downgrade any non-admin/VIP users whose pro_expires_at has passed
+    now = datetime.now(timezone.utc)
+    expired_users = db.query(User).filter(
+        User.is_pro == True,
+        User.is_admin == False,
+        User.is_vip == False,
+        User.pro_expires_at.isnot(None),
+        User.pro_expires_at <= now
+    ).all()
+    if expired_users:
+        for eu in expired_users:
+            eu.is_pro = False
+            eu.is_pro_cancelled = False
+            eu.dodo_subscription_id = None
+            eu.pro_expires_at = None
+            eu.banner_url = None
+            eu.background_url = None
+            eu.profile_color = None
+            trim_downgraded_user_favorites(db, eu.id)
+        db.commit()
+
     query = db.query(User)
     if q.strip():
         search_term = f"%{q.strip()}%"
@@ -946,25 +967,186 @@ async def admin_cancel_user_subscription(
     sub_id = user.dodo_subscription_id
     if sub_id:
         from app.api.v1.payments import cancel_dodo_subscription_direct
-        await cancel_dodo_subscription_direct(sub_id)
-        user.dodo_subscription_id = None
+        sub_info = await cancel_dodo_subscription_direct(sub_id)
         user.is_pro_cancelled = True
+        if sub_info and sub_info.get("next_billing_date"):
+            nb = sub_info["next_billing_date"]
+            try:
+                if isinstance(nb, str):
+                    user.pro_expires_at = datetime.fromisoformat(nb.replace("Z", "+00:00"))
+                elif isinstance(nb, datetime):
+                    user.pro_expires_at = nb
+            except Exception:
+                pass
         db.commit()
         return {
-            "message": f"Suscripción de Dodo Payments cancelada con éxito para @{user.username}.",
+            "message": f"Suscripción de Dodo Payments cancelada con éxito para @{user.username}. Mantendrá acceso hasta el fin de ciclo.",
             "is_pro": check_user_is_pro(user),
-            "is_pro_cancelled": True
+            "is_pro_cancelled": True,
+            "pro_expires_at": user.pro_expires_at
         }
     else:
         user.is_pro = False
-        user.is_pro_cancelled = True
+        user.is_pro_cancelled = False
         user.pro_expires_at = None
+        user.banner_url = None
+        user.background_url = None
+        user.profile_color = None
+        trim_downgraded_user_favorites(db, user.id)
         db.commit()
         return {
             "message": f"Beneficio Premium cancelado para @{user.username}.",
-            "is_pro": check_user_is_pro(user),
-            "is_pro_cancelled": True
+            "is_pro": False,
+            "is_pro_cancelled": False,
+            "pro_expires_at": None
         }
+
+
+@router.post("/users/{user_id}/revoke-pro")
+def admin_revoke_user_pro(
+    user_id: int,
+    current_admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    Immediately revokes Pro/Premium status from a user.
+    """
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.is_admin or user.is_vip:
+        raise HTTPException(status_code=400, detail="No aplica para Administradores ni usuarios VIP.")
+
+    user.is_pro = False
+    user.is_pro_cancelled = False
+    user.dodo_subscription_id = None
+    user.pro_expires_at = None
+    user.banner_url = None
+    user.background_url = None
+    user.profile_color = None
+    trim_downgraded_user_favorites(db, user.id)
+    db.commit()
+    return {
+        "message": f"Acceso Premium revocado de forma inmediata para @{user.username}.",
+        "is_pro": False,
+        "is_pro_cancelled": False,
+        "pro_expires_at": None
+    }
+
+
+@router.post("/users/{user_id}/sync-subscription")
+async def admin_sync_user_subscription(
+    user_id: int,
+    current_admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    Checks the real status in Dodo Payments and synchronizes with local database.
+    """
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    from app.api.v1.payments import get_dodo_client
+    from app.core.config import settings
+
+    now = datetime.now(timezone.utc)
+
+    if not user.dodo_subscription_id or not settings.DODO_PAYMENTS_API_KEY:
+        if user.pro_expires_at:
+            exp = user.pro_expires_at
+            if exp.tzinfo is None:
+                exp = exp.replace(tzinfo=timezone.utc)
+            if exp <= now:
+                user.is_pro = False
+                user.is_pro_cancelled = False
+                user.pro_expires_at = None
+                user.banner_url = None
+                user.background_url = None
+                user.profile_color = None
+                trim_downgraded_user_favorites(db, user.id)
+                db.commit()
+        return {
+            "message": f"Estado verificado para @{user.username}.",
+            "is_pro": check_user_is_pro(user),
+            "is_pro_cancelled": bool(user.is_pro_cancelled),
+            "pro_expires_at": user.pro_expires_at,
+            "dodo_status": "none"
+        }
+
+    client = get_dodo_client()
+    try:
+        sub = await client.subscriptions.retrieve(subscription_id=user.dodo_subscription_id)
+        sub_status = str(getattr(sub, 'status', '')).lower()
+        next_billing = getattr(sub, 'next_billing_date', None) or getattr(sub, 'expires_at', None)
+        cancel_at_period_end = getattr(sub, 'cancel_at_next_billing_date', False)
+
+        if sub_status in ['cancelled', 'expired', 'failed']:
+            user.is_pro = False
+            user.is_pro_cancelled = False
+            user.dodo_subscription_id = None
+            user.pro_expires_at = None
+            user.banner_url = None
+            user.background_url = None
+            user.profile_color = None
+            trim_downgraded_user_favorites(db, user.id)
+            db.commit()
+            return {
+                "message": f"Suscripción en Dodo finalizada ({sub_status}). Usuario degradado al plan Gratuito.",
+                "is_pro": False,
+                "is_pro_cancelled": False,
+                "pro_expires_at": None,
+                "dodo_status": sub_status
+            }
+        elif sub_status in ['active', 'trialing']:
+            user.is_pro = True
+            user.is_pro_cancelled = bool(cancel_at_period_end)
+            if next_billing:
+                if isinstance(next_billing, str):
+                    exp = datetime.fromisoformat(next_billing.replace("Z", "+00:00"))
+                elif isinstance(next_billing, datetime):
+                    exp = next_billing
+                else:
+                    exp = None
+                if exp:
+                    if exp.tzinfo is None:
+                        exp = exp.replace(tzinfo=timezone.utc)
+                    user.pro_expires_at = exp
+                    if exp <= now and user.is_pro_cancelled:
+                        user.is_pro = False
+                        user.is_pro_cancelled = False
+                        user.dodo_subscription_id = None
+                        user.pro_expires_at = None
+                        user.banner_url = None
+                        user.background_url = None
+                        user.profile_color = None
+                        trim_downgraded_user_favorites(db, user.id)
+                        db.commit()
+                        return {
+                            "message": "El período de la suscripción ya finalizó. Usuario degradado.",
+                            "is_pro": False,
+                            "is_pro_cancelled": False,
+                            "pro_expires_at": None,
+                            "dodo_status": "period_ended"
+                        }
+            db.commit()
+            return {
+                "message": f"Suscripción sincronizada ({sub_status}).",
+                "is_pro": user.is_pro,
+                "is_pro_cancelled": user.is_pro_cancelled,
+                "pro_expires_at": user.pro_expires_at,
+                "dodo_status": sub_status
+            }
+        else:
+            return {
+                "message": f"Estado en Dodo: {sub_status}",
+                "is_pro": user.is_pro,
+                "is_pro_cancelled": user.is_pro_cancelled,
+                "pro_expires_at": user.pro_expires_at,
+                "dodo_status": sub_status
+            }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error consultando Dodo Payments: {str(e)}")
 
 
 from sqlalchemy import text

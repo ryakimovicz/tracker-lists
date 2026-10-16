@@ -12,6 +12,7 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.api.deps import get_current_user, get_current_user_allow_suspended
 
+from datetime import datetime, timezone
 from app.models.user import User
 
 from app.api.v1.users import trim_downgraded_user_favorites
@@ -129,34 +130,50 @@ async def verify_payment_success(
             current_user.is_pro = True
             current_user.is_pro_cancelled = False
             current_user.dodo_subscription_id = sub_id
+            next_billing = getattr(sub, 'next_billing_date', None) or getattr(sub, 'expires_at', None)
+            if next_billing:
+                try:
+                    if isinstance(next_billing, str):
+                        current_user.pro_expires_at = datetime.fromisoformat(next_billing.replace("Z", "+00:00"))
+                    elif isinstance(next_billing, datetime):
+                        current_user.pro_expires_at = next_billing
+                except Exception:
+                    pass
             db.commit()
             db.refresh(current_user)
             logger.info(f"User {current_user.username} verified and activated Pro via Dodo API (sub={sub_id})")
-            return {"status": "success", "is_pro": True, "is_pro_cancelled": False}
+            return {"status": "success", "is_pro": True, "is_pro_cancelled": False, "pro_expires_at": current_user.pro_expires_at}
         else:
             logger.warning(f"Subscription check failed for user {current_user.username}: status={sub_status}, matches={matches_user}")
     except Exception as e:
         logger.error(f"Error validating Dodo subscription {sub_id} with API: {e}")
 
-    return {"status": "pending", "is_pro": current_user.is_pro, "is_pro_cancelled": current_user.is_pro_cancelled}
+    return {"status": "pending", "is_pro": current_user.is_pro, "is_pro_cancelled": current_user.is_pro_cancelled, "pro_expires_at": current_user.pro_expires_at}
 
 
-async def cancel_dodo_subscription_direct(subscription_id: str):
+async def cancel_dodo_subscription_direct(subscription_id: str) -> dict | None:
     """
     Directly requests Dodo Payments to cancel a subscription at next billing date (stops renewals)
     """
     if not subscription_id or not settings.DODO_PAYMENTS_API_KEY:
-        return
+        return None
     client = get_dodo_client()
     try:
-        await client.subscriptions.update(
+        sub = await client.subscriptions.update(
             subscription_id=subscription_id,
             cancel_at_next_billing_date=True,
             cancel_reason="cancelled_by_customer"
         )
         logger.info(f"Dodo subscription {subscription_id} scheduled for cancellation at next billing date.")
+        next_billing = getattr(sub, 'next_billing_date', None) or getattr(sub, 'expires_at', None)
+        return {
+            "subscription_id": subscription_id,
+            "next_billing_date": next_billing,
+            "status": getattr(sub, 'status', None)
+        }
     except Exception as e:
         logger.error(f"Error cancelling Dodo subscription {subscription_id}: {e}")
+        return None
 
 
 @router.post("/cancel-subscription")
@@ -169,19 +186,30 @@ async def cancel_my_subscription(
     """
     sub_id = current_user.dodo_subscription_id
     if sub_id:
-        await cancel_dodo_subscription_direct(sub_id)
+        sub_info = await cancel_dodo_subscription_direct(sub_id)
         current_user.is_pro_cancelled = True
+        if sub_info and sub_info.get("next_billing_date"):
+            nb = sub_info["next_billing_date"]
+            try:
+                if isinstance(nb, str):
+                    current_user.pro_expires_at = datetime.fromisoformat(nb.replace("Z", "+00:00"))
+                elif isinstance(nb, datetime):
+                    current_user.pro_expires_at = nb
+            except Exception:
+                pass
         db.commit()
         db.refresh(current_user)
         return {
             "message": "Tu suscripción ha sido cancelada. Mantendrás todos los beneficios Premium hasta que finalice tu período ya abonado y no se te volverá a cobrar.",
             "status": "cancelled_at_period_end",
-            "is_pro_cancelled": True
+            "is_pro_cancelled": True,
+            "pro_expires_at": current_user.pro_expires_at
         }
     else:
         # If user had a manual grant or mock pro
         current_user.is_pro = False
-        current_user.is_pro_cancelled = True
+        current_user.is_pro_cancelled = False
+        current_user.pro_expires_at = None
         trim_downgraded_user_favorites(db, current_user.id)
         current_user.banner_url = None
         current_user.background_url = None
@@ -190,7 +218,8 @@ async def cancel_my_subscription(
         return {
             "message": "Suscripción Premium cancelada con éxito.",
             "status": "cancelled",
-            "is_pro_cancelled": True
+            "is_pro_cancelled": False,
+            "pro_expires_at": None
         }
 
 
@@ -234,13 +263,13 @@ async def dodo_webhook(
     
     logger.info(f"Received Dodo Payments webhook event: {event_type}")
 
-    # Extract user identifiers from metadata or customer info
+    # Extract user identifiers from metadata, customer info, or subscription/customer IDs
     metadata = data.get("metadata", {}) or {}
     user_id = metadata.get("user_id")
     customer = data.get("customer", {}) or {}
     customer_email = customer.get("email")
-    subscription_id = data.get("subscription_id")
-    customer_id = data.get("customer_id")
+    subscription_id = data.get("subscription_id") or data.get("id")
+    customer_id = data.get("customer_id") or customer.get("customer_id")
 
     user = None
     if user_id:
@@ -249,17 +278,26 @@ async def dodo_webhook(
         except (ValueError, TypeError):
             pass
 
+    # Reliable fallback: match by stored dodo_subscription_id
+    if not user and subscription_id:
+        user = db.query(User).filter(User.dodo_subscription_id == str(subscription_id)).first()
+
+    # Reliable fallback: match by stored dodo_customer_id
+    if not user and customer_id:
+        user = db.query(User).filter(User.dodo_customer_id == str(customer_id)).first()
+
+    # Fallback: match by email case-insensitively
     if not user and customer_email:
-        user = db.query(User).filter(User.email == customer_email).first()
+        user = db.query(User).filter(User.email.ilike(customer_email.strip())).first()
 
     if not user:
-        logger.warning(f"Webhook received for unknown user (user_id={user_id}, email={customer_email})")
+        logger.warning(f"Webhook received for unknown user (user_id={user_id}, subscription_id={subscription_id}, customer_id={customer_id}, email={customer_email})")
         return {"status": "ignored", "reason": "User not found"}
 
-    if subscription_id:
-        user.dodo_subscription_id = subscription_id
-    if customer_id:
-        user.dodo_customer_id = customer_id
+    if subscription_id and not user.dodo_subscription_id:
+        user.dodo_subscription_id = str(subscription_id)
+    if customer_id and not user.dodo_customer_id:
+        user.dodo_customer_id = str(customer_id)
 
     # Events that grant or maintain Pro / Premium
     pro_active_events = [
@@ -276,6 +314,7 @@ async def dodo_webhook(
         "subscription.expired",
         "subscription.failed",
         "subscription.paused",
+        "subscription.on_hold",
         "entitlement_grant.revoked",
         "refund.succeeded",
         "dispute.lost",
@@ -286,21 +325,52 @@ async def dodo_webhook(
     if event_type in pro_active_events:
         user.is_pro = True
         user.is_pro_cancelled = False
+        if subscription_id:
+            user.dodo_subscription_id = str(subscription_id)
+        if customer_id:
+            user.dodo_customer_id = str(customer_id)
+        next_billing = data.get("next_billing_date")
+        if next_billing:
+            try:
+                if isinstance(next_billing, str):
+                    user.pro_expires_at = datetime.fromisoformat(next_billing.replace("Z", "+00:00"))
+                elif isinstance(next_billing, datetime):
+                    user.pro_expires_at = next_billing
+            except Exception:
+                pass
         db.commit()
-        logger.info(f"User {user.username} (ID: {user.id}) upgraded to Pro via webhook event: {event_type}")
+        logger.info(f"User {user.username} (ID: {user.id}) upgraded/maintained Pro via webhook event: {event_type}")
 
     elif event_type in pro_revoked_events:
         user.is_pro = False
-        user.is_pro_cancelled = True
+        user.is_pro_cancelled = False
+        user.dodo_subscription_id = None
+        user.pro_expires_at = None
+        user.banner_url = None
+        user.background_url = None
+        user.profile_color = None
         trim_downgraded_user_favorites(db, user.id)
         db.commit()
         logger.info(f"User {user.username} (ID: {user.id}) downgraded from Pro via webhook event: {event_type}")
 
     elif event_type in ["subscription.updated"]:
-        cancel_at_period_end = data.get("cancel_at_next_billing_date", False)
-        if cancel_at_period_end:
+        cancel_at_period_end = data.get("cancel_at_next_billing_date")
+        if cancel_at_period_end is True:
             user.is_pro_cancelled = True
+            next_billing = data.get("next_billing_date") or data.get("expires_at")
+            if next_billing:
+                try:
+                    if isinstance(next_billing, str):
+                        user.pro_expires_at = datetime.fromisoformat(next_billing.replace("Z", "+00:00"))
+                    elif isinstance(next_billing, datetime):
+                        user.pro_expires_at = next_billing
+                except Exception:
+                    pass
             db.commit()
-            logger.info(f"User {user.username} marked as pro_cancelled (will expire at period end).")
+            logger.info(f"User {user.username} marked as pro_cancelled (expires at {user.pro_expires_at}).")
+        elif cancel_at_period_end is False:
+            user.is_pro_cancelled = False
+            db.commit()
+            logger.info(f"User {user.username} renewed auto-renewal (is_pro_cancelled=False).")
 
     return {"status": "success", "event": event_type}

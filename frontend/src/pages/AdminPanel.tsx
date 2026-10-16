@@ -412,12 +412,12 @@ export const AdminPanel: React.FC = () => {
   const handleCancelUserSubscription = () => {
     if (!selectedUser || selectedUser.is_admin || selectedUser.is_vip) return;
     openConfirmDialog({
-      title: isEs ? '¿Cancelar Suscripción?' : 'Cancel Subscription?',
+      title: isEs ? '¿Cancelar Renovación?' : 'Cancel Renewal?',
       message: isEs
-        ? `¿Estás seguro de que deseas cancelar la suscripción Premium de "${selectedUser.username}"? Se detendrán los cobros automáticos en Dodo Payments.`
-        : `Are you sure you want to cancel the Premium subscription for "${selectedUser.username}"? Auto-billing will be stopped in Dodo Payments.`,
+        ? `¿Estás seguro de que deseas cancelar la renovación automática de la suscripción de "${selectedUser.username}"? Se detendrán los cobros automáticos en Dodo Payments y mantendrá acceso hasta el fin de su período actual.`
+        : `Are you sure you want to cancel auto-renewal for "${selectedUser.username}"? Auto-billing will be stopped in Dodo Payments and they keep access until the end of their current period.`,
       type: 'warning',
-      confirmText: isEs ? 'Cancelar Suscripción' : 'Cancel Subscription',
+      confirmText: isEs ? 'Cancelar Renovación' : 'Cancel Renewal',
       onConfirm: async () => {
         closeConfirmDialog(false);
         setActionLoading(true);
@@ -426,13 +426,14 @@ export const AdminPanel: React.FC = () => {
           const updated = {
             ...selectedUser,
             is_pro: res.data.is_pro,
-            pro_expires_at: undefined
+            is_pro_cancelled: res.data.is_pro_cancelled,
+            pro_expires_at: res.data.pro_expires_at
           };
           setSelectedUser(updated);
           setUsers(prev => prev.map(u => u.id === selectedUser.id ? updated : u));
           setModalFeedback({
             type: 'success',
-            text: isEs ? `Suscripción de "${selectedUser.username}" cancelada exitosamente.` : `Subscription for "${selectedUser.username}" cancelled successfully.`
+            text: res.data.message || (isEs ? `Renovación de "${selectedUser.username}" cancelada exitosamente.` : `Subscription renewal for "${selectedUser.username}" cancelled successfully.`)
           });
         } catch (err: any) {
           setModalFeedback({ type: 'error', text: err.response?.data?.detail || 'Error cancelling subscription.' });
@@ -441,6 +442,65 @@ export const AdminPanel: React.FC = () => {
         }
       }
     }, 'cancel_user_sub');
+  };
+
+  const handleRevokeUserPro = () => {
+    if (!selectedUser || selectedUser.is_admin || selectedUser.is_vip) return;
+    openConfirmDialog({
+      title: isEs ? '¿Revocar Acceso Premium Inmediato?' : 'Revoke Premium Access Immediately?',
+      message: isEs
+        ? `¿Estás seguro de que deseas revocar inmediatamente el acceso Premium de "${selectedUser.username}"? El usuario pasará al plan Gratuito de forma instantánea.`
+        : `Are you sure you want to immediately revoke Premium access for "${selectedUser.username}"? The user will be downgraded to Free instantly.`,
+      type: 'danger',
+      confirmText: isEs ? 'Revocar Inmediatamente' : 'Revoke Immediately',
+      onConfirm: async () => {
+        closeConfirmDialog(false);
+        setActionLoading(true);
+        try {
+          const res = await apiClient.post(`/admin/users/${selectedUser.id}/revoke-pro`);
+          const updated = {
+            ...selectedUser,
+            is_pro: false,
+            is_pro_cancelled: false,
+            pro_expires_at: undefined
+          };
+          setSelectedUser(updated);
+          setUsers(prev => prev.map(u => u.id === selectedUser.id ? updated : u));
+          setModalFeedback({
+            type: 'success',
+            text: res.data.message || (isEs ? `Premium revocado para "${selectedUser.username}".` : `Premium revoked for "${selectedUser.username}".`)
+          });
+        } catch (err: any) {
+          setModalFeedback({ type: 'error', text: err.response?.data?.detail || 'Error revoking Premium.' });
+        } finally {
+          setActionLoading(false);
+        }
+      }
+    }, 'revoke_user_pro');
+  };
+
+  const handleSyncUserSubscription = async () => {
+    if (!selectedUser) return;
+    setActionLoading(true);
+    try {
+      const res = await apiClient.post(`/admin/users/${selectedUser.id}/sync-subscription`);
+      const updated = {
+        ...selectedUser,
+        is_pro: res.data.is_pro,
+        is_pro_cancelled: res.data.is_pro_cancelled,
+        pro_expires_at: res.data.pro_expires_at
+      };
+      setSelectedUser(updated);
+      setUsers(prev => prev.map(u => u.id === selectedUser.id ? updated : u));
+      setModalFeedback({
+        type: 'success',
+        text: res.data.message || (isEs ? 'Suscripción sincronizada con Dodo con éxito.' : 'Subscription synced with Dodo successfully.')
+      });
+    } catch (err: any) {
+      setModalFeedback({ type: 'error', text: err.response?.data?.detail || 'Error syncing with Dodo.' });
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   const handleSendWarning = async () => {
@@ -843,6 +903,11 @@ export const AdminPanel: React.FC = () => {
                     {u.is_pro && (
                       <span style={{ fontSize: '0.7rem', background: u.is_pro_cancelled ? 'rgba(239, 68, 68, 0.15)' : 'linear-gradient(135deg, #f59e0b, #d97706)', color: u.is_pro_cancelled ? '#ef4444' : 'white', border: u.is_pro_cancelled ? '1px solid rgba(239, 68, 68, 0.3)' : 'none', padding: '0.15rem 0.45rem', borderRadius: 4, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
                         <Star size={10} fill={u.is_pro_cancelled ? '#ef4444' : 'white'} /> {u.is_pro_cancelled ? (isEs ? 'PREMIUM (CANCELADO)' : 'PREMIUM (CANCELLED)') : 'PREMIUM'}
+                        {u.pro_expires_at && (
+                          <span style={{ opacity: 0.9, fontWeight: 500, fontSize: '0.65rem', marginLeft: '0.25rem' }}>
+                            • {new Date(u.pro_expires_at).toLocaleDateString()}
+                          </span>
+                        )}
                       </span>
                     )}
 
@@ -1352,11 +1417,49 @@ export const AdminPanel: React.FC = () => {
                   </div>
                 )}
                 <div>
-                  <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                     {selectedUser.username}
                     {selectedUser.is_admin && <span style={{ fontSize: '0.7rem', background: '#ef4444', color: 'white', padding: '0.1rem 0.4rem', borderRadius: 4 }}>ADMIN</span>}
+                    {selectedUser.is_vip && <span style={{ fontSize: '0.7rem', background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)', color: 'white', padding: '0.1rem 0.4rem', borderRadius: 4 }}>VIP</span>}
+                    {selectedUser.is_pro && (
+                      <span style={{ fontSize: '0.7rem', background: selectedUser.is_pro_cancelled ? 'rgba(239, 68, 68, 0.15)' : 'linear-gradient(135deg, #f59e0b, #d97706)', color: selectedUser.is_pro_cancelled ? '#ef4444' : 'white', border: selectedUser.is_pro_cancelled ? '1px solid rgba(239, 68, 68, 0.3)' : 'none', padding: '0.15rem 0.45rem', borderRadius: 4, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
+                        <Star size={10} fill={selectedUser.is_pro_cancelled ? '#ef4444' : 'white'} /> {selectedUser.is_pro_cancelled ? (isEs ? 'PREMIUM (CANCELADO)' : 'PREMIUM (CANCELLED)') : 'PREMIUM'}
+                      </span>
+                    )}
                   </h2>
-                  <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{selectedUser.email} • ID #{selectedUser.id}</div>
+                  <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.2rem' }}>
+                    <span>{selectedUser.email}</span>
+                    <span>•</span>
+                    <span>ID #{selectedUser.id}</span>
+                  </div>
+
+                  {selectedUser.is_pro && (
+                    <div style={{ marginTop: '0.45rem', display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                      <span
+                        style={{
+                          fontSize: '0.78rem',
+                          padding: '0.2rem 0.6rem',
+                          borderRadius: '6px',
+                          fontWeight: 600,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.35rem',
+                          background: selectedUser.is_pro_cancelled ? 'rgba(239, 68, 68, 0.12)' : 'rgba(245, 158, 11, 0.12)',
+                          color: selectedUser.is_pro_cancelled ? '#ef4444' : '#f59e0b',
+                          border: selectedUser.is_pro_cancelled ? '1px solid rgba(239, 68, 68, 0.25)' : '1px solid rgba(245, 158, 11, 0.25)'
+                        }}
+                      >
+                        <Clock size={12} />
+                        {selectedUser.is_pro_cancelled
+                          ? (isEs
+                              ? `Acceso vigente hasta: ${selectedUser.pro_expires_at ? new Date(selectedUser.pro_expires_at).toLocaleDateString() : 'Fin de ciclo'}`
+                              : `Access active until: ${selectedUser.pro_expires_at ? new Date(selectedUser.pro_expires_at).toLocaleDateString() : 'Cycle end'}`)
+                          : (isEs
+                              ? `Próxima renovación: ${selectedUser.pro_expires_at ? new Date(selectedUser.pro_expires_at).toLocaleDateString() : 'Activa (ciclo mensual)'}`
+                              : `Next renewal: ${selectedUser.pro_expires_at ? new Date(selectedUser.pro_expires_at).toLocaleDateString() : 'Active (monthly cycle)'}`)}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1599,7 +1702,7 @@ export const AdminPanel: React.FC = () => {
               </div>
 
 
-              {/* Action 2.5: Cancelar Suscripción Premium del Usuario (Solo si tiene Pro y no es Admin ni VIP) */}
+              {/* Action 2.5: Gestión de Suscripción Premium del Usuario (Solo si tiene Pro y no es Admin ni VIP) */}
               {selectedUser.is_pro && !selectedUser.is_admin && !selectedUser.is_vip && (
                 <div style={{ background: selectedUser.is_pro_cancelled ? 'rgba(245, 158, 11, 0.04)' : 'rgba(239, 68, 68, 0.04)', padding: '1rem 1.25rem', borderRadius: 12, border: selectedUser.is_pro_cancelled ? '1px solid rgba(245, 158, 11, 0.25)' : '1px solid rgba(239, 68, 68, 0.25)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
                   <div>
@@ -1607,30 +1710,53 @@ export const AdminPanel: React.FC = () => {
                       <Star size={16} fill={selectedUser.is_pro_cancelled ? '#f59e0b' : 'none'} />
                       {selectedUser.is_pro_cancelled 
                         ? (isEs ? 'Renovación de Suscripción Cancelada' : 'Subscription Renewal Cancelled')
-                        : (isEs ? 'Cancelar Suscripción Premium' : 'Cancel Premium Subscription')}
+                        : (isEs ? 'Suscripción Premium Activa' : 'Active Premium Subscription')}
                     </div>
                     <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
                       {selectedUser.is_pro_cancelled
                         ? (isEs
-                          ? 'El usuario ya canceló la renovación automática. Mantiene acceso Premium hasta el fin de su ciclo de facturación y no se le cobrará de nuevo.'
-                          : 'User already cancelled auto-renewal. Premium access remains active until the end of their billing period without future charges.')
+                          ? `El usuario canceló la renovación automática. Mantiene acceso Premium hasta el fin de ciclo${selectedUser.pro_expires_at ? ` (${new Date(selectedUser.pro_expires_at).toLocaleDateString()})` : ''} y no se cobrará de nuevo.`
+                          : `User cancelled auto-renewal. Premium access remains active until the end of their period${selectedUser.pro_expires_at ? ` (${new Date(selectedUser.pro_expires_at).toLocaleDateString()})` : ''} without future charges.`)
                         : (isEs
-                          ? 'Detiene la renovación automática en Dodo Payments y anula futuros cobros del usuario.'
-                          : 'Stops automatic renewal in Dodo Payments and prevents future billing for this user.')}
+                          ? `Suscripción recurrente activa. Próxima fecha de cobro / renovación: ${selectedUser.pro_expires_at ? new Date(selectedUser.pro_expires_at).toLocaleDateString() : 'Pendiente de sincronizar'}. Puedes cancelar la renovación automática o revocar el acceso de inmediato.`
+                          : `Active subscription. Next billing / renewal date: ${selectedUser.pro_expires_at ? new Date(selectedUser.pro_expires_at).toLocaleDateString() : 'Pending sync'}. You can cancel auto-renewal or revoke access immediately.`)}
                     </div>
                   </div>
 
-                  {!selectedUser.is_pro_cancelled && (
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
                     <button
                       type="button"
                       disabled={actionLoading}
-                      onClick={handleCancelUserSubscription}
+                      onClick={handleSyncUserSubscription}
                       className="btn-secondary"
-                      style={{ color: '#ef4444', borderColor: '#ef4444', fontSize: '0.85rem', padding: '0.45rem 1rem' }}
+                      style={{ fontSize: '0.8rem', padding: '0.4rem 0.8rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+                      title={isEs ? 'Consultar estado real en Dodo Payments' : 'Check real status in Dodo Payments'}
                     >
-                      {isEs ? 'Cancelar Suscripción' : 'Cancel Subscription'}
+                      <RefreshCw size={13} className={actionLoading ? 'animate-spin' : ''} /> {isEs ? 'Sincronizar Dodo' : 'Sync Dodo'}
                     </button>
-                  )}
+
+                    {!selectedUser.is_pro_cancelled && (
+                      <button
+                        type="button"
+                        disabled={actionLoading}
+                        onClick={handleCancelUserSubscription}
+                        className="btn-secondary"
+                        style={{ color: '#f59e0b', borderColor: '#f59e0b', fontSize: '0.8rem', padding: '0.4rem 0.8rem' }}
+                      >
+                        {isEs ? 'Cancelar Renovación' : 'Cancel Renewal'}
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      disabled={actionLoading}
+                      onClick={handleRevokeUserPro}
+                      className="btn-secondary"
+                      style={{ color: '#ef4444', borderColor: '#ef4444', fontSize: '0.8rem', padding: '0.4rem 0.8rem' }}
+                    >
+                      {isEs ? 'Revocar Inmediato' : 'Revoke Immediately'}
+                    </button>
+                  </div>
                 </div>
               )}
 
