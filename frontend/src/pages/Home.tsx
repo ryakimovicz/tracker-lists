@@ -515,8 +515,32 @@ const CustomCard = ({
   shouldBlurCover?: boolean;
   onRevealCover?: () => void;
 }) => {
+  const [activeAction, setActiveAction] = useState<'check' | 'play' | null>(null);
+  const actionTimerRef = useRef<any>(null);
+
+  useEffect(() => {
+    return () => {
+      if (actionTimerRef.current) clearTimeout(actionTimerRef.current);
+    };
+  }, []);
+
+  const handleActionClick = (e: React.MouseEvent, type: 'check' | 'play', callback?: (e: React.MouseEvent) => void) => {
+    e.stopPropagation();
+    if (activeAction) return;
+    try { (e.currentTarget as HTMLButtonElement)?.blur(); } catch {}
+    setActiveAction(type);
+
+    if (actionTimerRef.current) clearTimeout(actionTimerRef.current);
+    actionTimerRef.current = setTimeout(() => {
+      callback && callback(e);
+    }, 250);
+  };
+
   const showBoth = !!(onCheck && onPlay);
   const hasAction = !!(onCheck || onPlay);
+  const isSinglePlay = actionIcon === 'play' || !!onPlay;
+  const singleType: 'check' | 'play' = isSinglePlay ? 'play' : 'check';
+  const singleHandler = onCheck || onPlay;
 
   return (
     <div 
@@ -655,31 +679,37 @@ const CustomCard = ({
       {showBoth ? (
         <div className="card-actions-wrap" style={{ position: "absolute", bottom: "0.5rem", right: "0.5rem", display: "flex", gap: "0.35rem", zIndex: 2 }}>
           <button 
-            onClick={onCheck}
-            className="btn-check-seen"
+            onClick={(e) => handleActionClick(e, 'check', onCheck)}
+            className={`btn-check-seen ${activeAction === 'check' ? 'is-checked-active' : ''}`}
             title={language === 'es' ? 'Marcar como completado' : 'Mark as completed'}
             style={{
               width: "30px", height: "30px", borderRadius: "50%",
-              background: "var(--bg-tertiary)", border: `2px solid ${themeColor || "var(--text-muted)"}`,
+              background: activeAction === 'check' ? (themeColor || "var(--accent-primary)") : "var(--bg-tertiary)",
+              border: `2px solid ${activeAction === 'check' ? (themeColor || "var(--accent-primary)") : (themeColor || "var(--text-muted)")}`,
               display: "flex", alignItems: "center", justifyContent: "center",
-              cursor: "pointer", color: themeColor || "var(--text-primary)",
+              cursor: "pointer",
+              color: activeAction === 'check' ? (themeTextColor || "#ffffff") : (themeColor || "var(--text-primary)"),
               "--btn-hover-bg": themeColor,
-              "--btn-hover-text": themeTextColor
+              "--btn-hover-text": themeTextColor,
+              transition: "background 0.15s ease, color 0.15s ease"
             } as React.CSSProperties}
           >
             <Check size={15} />
           </button>
           <button 
-            onClick={onPlay}
-            className="btn-check-seen"
+            onClick={(e) => handleActionClick(e, 'play', onPlay)}
+            className={`btn-check-seen ${activeAction === 'play' ? 'is-checked-active' : ''}`}
             title={language === 'es' ? 'Comenzar' : 'Start'}
             style={{
               width: "30px", height: "30px", borderRadius: "50%",
-              background: "var(--bg-tertiary)", border: `2px solid ${themeColor || "var(--text-muted)"}`,
+              background: activeAction === 'play' ? (themeColor || "var(--accent-primary)") : "var(--bg-tertiary)",
+              border: `2px solid ${activeAction === 'play' ? (themeColor || "var(--accent-primary)") : (themeColor || "var(--text-muted)")}`,
               display: "flex", alignItems: "center", justifyContent: "center",
-              cursor: "pointer", color: themeColor || "var(--text-primary)",
+              cursor: "pointer",
+              color: activeAction === 'play' ? (themeTextColor || "#ffffff") : (themeColor || "var(--text-primary)"),
               "--btn-hover-bg": themeColor,
-              "--btn-hover-text": themeTextColor
+              "--btn-hover-text": themeTextColor,
+              transition: "background 0.15s ease, color 0.15s ease"
             } as React.CSSProperties}
           >
             <Play size={14} style={{ marginLeft: '2px' }} />
@@ -688,19 +718,22 @@ const CustomCard = ({
       ) : hasAction ? (
         <div className="card-actions-wrap" style={{ position: "absolute", bottom: "0.5rem", right: "0.5rem", zIndex: 2 }}>
           <button 
-            onClick={onCheck || onPlay}
-            className="btn-check-seen"
+            onClick={(e) => handleActionClick(e, singleType, singleHandler)}
+            className={`btn-check-seen ${activeAction === singleType ? 'is-checked-active' : ''}`}
             title={onPlay ? (language === 'es' ? 'Reanudar en Continuar' : 'Resume in Continue') : (language === 'es' ? 'Marcar como completado' : 'Mark as completed')}
             style={{
               width: "32px", height: "32px", borderRadius: "50%",
-              background: "var(--bg-tertiary)", border: `2px solid ${themeColor || "var(--text-muted)"}`,
+              background: activeAction === singleType ? (themeColor || "var(--accent-primary)") : "var(--bg-tertiary)",
+              border: `2px solid ${activeAction === singleType ? (themeColor || "var(--accent-primary)") : (themeColor || "var(--text-muted)")}`,
               display: "flex", alignItems: "center", justifyContent: "center",
-              cursor: "pointer", color: themeColor || "var(--text-primary)",
+              cursor: "pointer",
+              color: activeAction === singleType ? (themeTextColor || "#ffffff") : (themeColor || "var(--text-primary)"),
               "--btn-hover-bg": themeColor,
-              "--btn-hover-text": themeTextColor
+              "--btn-hover-text": themeTextColor,
+              transition: "background 0.15s ease, color 0.15s ease"
             } as React.CSSProperties}
           >
-            {actionIcon === 'play' || onPlay ? <Play size={15} style={{ marginLeft: '2px' }} /> : <Check size={16} />}
+            {isSinglePlay ? <Play size={15} style={{ marginLeft: '2px' }} /> : <Check size={16} />}
           </button>
         </div>
       ) : null}
@@ -711,6 +744,17 @@ const CustomCard = ({
 const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, themeTextColor, actionIcon = 'check', variant = 'episode' }: { item: any, onUpdate: () => void, language: string, onOpenSeries: (item: any) => void, themeColor?: string, themeTextColor?: string, actionIcon?: 'check' | 'play', variant?: 'episode' | 'poster' }) => {
   const { user } = useAuth();
   const [isCoverRevealed, setIsCoverRevealed] = useState(false);
+  const [isJustChecked, setIsJustChecked] = useState(false);
+  const justCheckedTimerRef = useRef<any>(null);
+  const [isJustPlayed, setIsJustPlayed] = useState(false);
+  const justPlayedTimerRef = useRef<any>(null);
+
+  useEffect(() => {
+    return () => {
+      if (justCheckedTimerRef.current) clearTimeout(justCheckedTimerRef.current);
+      if (justPlayedTimerRef.current) clearTimeout(justPlayedTimerRef.current);
+    };
+  }, []);
   const pad = (n: number) => n < 10 ? '0' + n : n;
   const isComic = item.item_type === 'comic' || String(item.external_id || '').startsWith('cv_vol_');
 
@@ -969,11 +1013,15 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
     return () => {
       window.removeEventListener('library-updated', handleUpdate);
       window.removeEventListener('progress-updated', handleUpdate);
+      if (justCheckedTimerRef.current) clearTimeout(justCheckedTimerRef.current);
     };
   }, [item.id, item.status, item.tracking_list_id]);
 
   const handleMarkSeen = async (e: React.MouseEvent) => {
     e.stopPropagation();
+    try {
+      (e.currentTarget as HTMLButtonElement)?.blur();
+    } catch {}
     if (!nextEp) return;
 
     const currentEpToMark = nextEp;
@@ -1051,12 +1099,18 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
       }
     }
 
+    // Visual feedback: paint the tick button immediately so user sees it filled!
+    setIsJustChecked(true);
+    if (justCheckedTimerRef.current) clearTimeout(justCheckedTimerRef.current);
+
     // Lock candidate re-computations for 3 seconds to avoid stale server responses overwriting nextEp
     optimisticLockUntilRef.current = Date.now() + 3000;
 
-    // Immediately show next candidate (or pending skipped episode)
-    setNextEp(nextCandidate);
-    setCachedSeries(`next_candidate_${item.id}`, { nextEp: nextCandidate, isCaughtUp: isLastEpisodeOfAll });
+    // Cache the next candidate immediately in storage ONLY if not last episode of all;
+    // for the last episode, we wait until the 450ms animation finishes so it doesn't vanish prematurely!
+    if (!isLastEpisodeOfAll) {
+      setCachedSeries(`next_candidate_${item.id}`, { nextEp: nextCandidate, isCaughtUp: false });
+    }
 
     if (isComic) {
       setCachedSeries(`issue_state_cv_issue_${cleanId}`, {
@@ -1065,6 +1119,16 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
         total_pages: currentEpToMark.page_count || 0
       });
     }
+
+    // Delay transitioning to the next episode/issue (or caught-up state) by 250ms so the user has time to see the button painted!
+    justCheckedTimerRef.current = setTimeout(() => {
+      setIsJustChecked(false);
+      setNextEp(nextCandidate);
+      if (isLastEpisodeOfAll) {
+        setIsCaughtUp(true);
+        setCachedSeries(`next_candidate_${item.id}`, { nextEp: null, isCaughtUp: true });
+      }
+    }, 250);
 
     // Check if this item was already completed before in a previous run (rewatch mode)
     let url = `/lists/${item.tracking_list_id}/toggle-series-episode`;
@@ -1135,22 +1199,30 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
     });
   };
 
-  const handleStartWatching = async (e: React.MouseEvent) => {
+  const handleStartWatching = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setIsLoading(true);
-    try {
-      const nextSt = isComic ? 'reading' : 'watching';
-      const res = await apiClient.put(`/library/${item.id}`, { status: nextSt });
-      if (res.data?.tracking_list_id) {
-        item.tracking_list_id = res.data.tracking_list_id;
+    if (isLoading || isJustPlayed) return;
+    setIsJustPlayed(true);
+    try { (e.currentTarget as HTMLButtonElement)?.blur(); } catch {}
+
+    if (justPlayedTimerRef.current) clearTimeout(justPlayedTimerRef.current);
+    justPlayedTimerRef.current = setTimeout(async () => {
+      setIsLoading(true);
+      try {
+        const nextSt = isComic ? 'reading' : 'watching';
+        const res = await apiClient.put(`/library/${item.id}`, { status: nextSt });
+        if (res.data?.tracking_list_id) {
+          item.tracking_list_id = res.data.tracking_list_id;
+        }
+        onUpdate();
+        window.dispatchEvent(new Event('library-updated'));
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setIsLoading(false);
+        setIsJustPlayed(false);
       }
-      onUpdate();
-      window.dispatchEvent(new Event('library-updated'));
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setIsLoading(false);
-    }
+    }, 250);
   };
 
   const handleCardClick = () => {
@@ -1280,12 +1352,12 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
     }
   }
 
-  if (isCaughtUp) {
+  if (isCaughtUp && !isJustChecked) {
     return null;
   }
 
   // If nextEp hasn't been found yet and initialLoad is done (truly caught up or nothing left)
-  if (!isInitialLoad && !nextEp) {
+  if (!isInitialLoad && !nextEp && !isJustChecked) {
     return null;
   }
 
@@ -1415,30 +1487,36 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
             <div className="card-actions-wrap" style={{ position: "absolute", bottom: "0.5rem", right: "0.5rem", display: "flex", gap: "0.35rem", zIndex: 2 }}>
               <button 
                 onClick={handleMarkSeen}
-                className="btn-check-seen"
+                className={`btn-check-seen ${isJustChecked ? 'is-checked-active' : ''}`}
                 title={language === 'es' ? (isComic ? 'Marcar primer número' : 'Marcar primer episodio') : (isComic ? 'Mark first issue' : 'Mark first episode')}
                 style={{
                   width: "30px", height: "30px", borderRadius: "50%",
-                  background: "var(--bg-tertiary)", border: `2px solid ${themeColor || "var(--text-muted)"}`,
+                  background: isJustChecked ? (themeColor || "var(--accent-primary)") : "var(--bg-tertiary)", 
+                  border: `2px solid ${themeColor || "var(--text-muted)"}`,
                   display: "flex", alignItems: "center", justifyContent: "center",
-                  cursor: "pointer", color: themeColor || "var(--text-primary)",
+                  cursor: "pointer", 
+                  color: isJustChecked ? (themeTextColor || "#ffffff") : (themeColor || "var(--text-primary)"),
                   "--btn-hover-bg": themeColor,
-                  "--btn-hover-text": themeTextColor
+                  "--btn-hover-text": themeTextColor,
+                  transition: "background 0.15s ease, color 0.15s ease"
                 } as React.CSSProperties}
               >
                 <Check size={15} />
               </button>
               <button 
                 onClick={handleStartWatching}
-                className="btn-check-seen"
+                className={`btn-check-seen ${isJustPlayed ? 'is-checked-active' : ''}`}
                 title={language === 'es' ? (isComic ? 'Comenzar a leer' : 'Comenzar a ver') : (isComic ? 'Start reading' : 'Start watching')}
                 style={{
                   width: "30px", height: "30px", borderRadius: "50%",
-                  background: "var(--bg-tertiary)", border: `2px solid ${themeColor || "var(--text-muted)"}`,
+                  background: isJustPlayed ? (themeColor || "var(--accent-primary)") : "var(--bg-tertiary)", 
+                  border: `2px solid ${isJustPlayed ? (themeColor || "var(--accent-primary)") : (themeColor || "var(--text-muted)")}`,
                   display: "flex", alignItems: "center", justifyContent: "center",
-                  cursor: "pointer", color: themeColor || "var(--text-primary)",
+                  cursor: (isLoading || isJustPlayed) ? "wait" : "pointer", 
+                  color: isJustPlayed ? (themeTextColor || "#ffffff") : (themeColor || "var(--text-primary)"),
                   "--btn-hover-bg": themeColor,
-                  "--btn-hover-text": themeTextColor
+                  "--btn-hover-text": themeTextColor,
+                  transition: "background 0.15s ease, color 0.15s ease"
                 } as React.CSSProperties}
               >
                 <Play size={14} style={{ marginLeft: '2px' }} />
@@ -1448,14 +1526,17 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
             <div className="card-actions-wrap" style={{ position: "absolute", bottom: "0.5rem", right: "0.5rem", zIndex: 2 }}>
               <button 
                 onClick={handleMarkSeen}
-                className="btn-check-seen"
+                className={`btn-check-seen ${isJustChecked ? 'is-checked-active' : ''}`}
                 style={{
                   width: "32px", height: "32px", borderRadius: "50%",
-                  background: "var(--bg-tertiary)", border: `2px solid ${themeColor || "var(--text-muted)"}`,
+                  background: isJustChecked ? (themeColor || "var(--accent-primary)") : "var(--bg-tertiary)", 
+                  border: `2px solid ${themeColor || "var(--text-muted)"}`,
                   display: "flex", alignItems: "center", justifyContent: "center",
-                  cursor: "pointer", color: themeColor || "var(--text-primary)",
+                  cursor: "pointer", 
+                  color: isJustChecked ? (themeTextColor || "#ffffff") : (themeColor || "var(--text-primary)"),
                   "--btn-hover-bg": themeColor,
-                  "--btn-hover-text": themeTextColor
+                  "--btn-hover-text": themeTextColor,
+                  transition: "background 0.15s ease, color 0.15s ease"
                 } as React.CSSProperties}
               >
                 <Check size={16} />
@@ -1711,6 +1792,14 @@ const DroppedSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor,
 
   const [lastEpInfo, setLastEpInfo] = useState<{ seasonText: string; epName: string } | null>(parseInitialLastSeen);
   const [isLoading, setIsLoading] = useState(false);
+  const [isJustPlayed, setIsJustPlayed] = useState(false);
+  const justPlayedTimerRef = useRef<any>(null);
+
+  useEffect(() => {
+    return () => {
+      if (justPlayedTimerRef.current) clearTimeout(justPlayedTimerRef.current);
+    };
+  }, []);
 
   const pad = (n: number) => n < 10 ? '0' + n : n;
 
@@ -1784,18 +1873,26 @@ const DroppedSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor,
     return () => { isMounted = false; };
   }, [item, language]);
 
-  const handleResume = async (e: React.MouseEvent) => {
+  const handleResume = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setIsLoading(true);
-    try {
-      const nextSt = isComic ? 'reading' : 'watching';
-      await apiClient.put(`/library/${item.id}`, { status: nextSt });
-      onUpdate();
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setIsLoading(false);
-    }
+    if (isLoading || isJustPlayed) return;
+    setIsJustPlayed(true);
+    try { (e.currentTarget as HTMLButtonElement)?.blur(); } catch {}
+
+    if (justPlayedTimerRef.current) clearTimeout(justPlayedTimerRef.current);
+    justPlayedTimerRef.current = setTimeout(async () => {
+      setIsLoading(true);
+      try {
+        const nextSt = isComic ? 'reading' : 'watching';
+        await apiClient.put(`/library/${item.id}`, { status: nextSt });
+        onUpdate();
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setIsLoading(false);
+        setIsJustPlayed(false);
+      }
+    }, 250);
   };
 
   return (
@@ -1852,16 +1949,19 @@ const DroppedSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor,
         <button 
           onClick={handleResume}
           disabled={isLoading}
-          className="btn-check-seen"
+          className={`btn-check-seen ${isJustPlayed ? 'is-checked-active' : ''}`}
           title={language === 'es' ? 'Reanudar en Continuar' : 'Resume in Continue'}
           style={{
             width: "32px", height: "32px", borderRadius: "50%",
-            background: "var(--bg-tertiary)", border: `2px solid ${themeColor || "var(--text-muted)"}`,
+            background: isJustPlayed ? (themeColor || "var(--accent-primary)") : "var(--bg-tertiary)",
+            border: `2px solid ${isJustPlayed ? (themeColor || "var(--accent-primary)") : (themeColor || "var(--text-muted)")}`,
             display: "flex", alignItems: "center", justifyContent: "center",
-            cursor: isLoading ? "wait" : "pointer", color: themeColor || "var(--text-primary)",
+            cursor: (isLoading || isJustPlayed) ? "wait" : "pointer",
+            color: isJustPlayed ? (themeTextColor || "#ffffff") : (themeColor || "var(--text-primary)"),
             opacity: isLoading ? 0.5 : 1,
             "--btn-hover-bg": themeColor,
-            "--btn-hover-text": themeTextColor
+            "--btn-hover-text": themeTextColor,
+            transition: "background 0.15s ease, color 0.15s ease"
           } as React.CSSProperties}
         >
           <Play size={15} style={{ marginLeft: '2px' }} />

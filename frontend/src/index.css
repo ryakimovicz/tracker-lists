@@ -707,11 +707,28 @@ h1, h2, h3, h4, h5, h6 {
 .btn-check-seen {
   transition: all 0.2s ease;
 }
-.btn-check-seen:not(:disabled):hover {
+@media (hover: hover) and (pointer: fine) {
+  .btn-check-seen:not(:disabled):hover {
+    background: var(--btn-hover-bg, var(--accent-primary)) !important;
+    border-color: var(--btn-hover-bg, var(--accent-primary)) !important;
+    color: var(--btn-hover-text, #fff) !important;
+    transform: scale(1.1);
+  }
+}
+.btn-check-seen.is-checked-active {
   background: var(--btn-hover-bg, var(--accent-primary)) !important;
   border-color: var(--btn-hover-bg, var(--accent-primary)) !important;
   color: var(--btn-hover-text, #fff) !important;
-  transform: scale(1.1);
+  transform: scale(1.08);
+}
+.btn-check-seen:active {
+  background: var(--btn-hover-bg, var(--accent-primary)) !important;
+  border-color: var(--btn-hover-bg, var(--accent-primary)) !important;
+  color: var(--btn-hover-text, #fff) !important;
+}
+.btn-check-seen:focus,
+.btn-check-seen:focus-visible {
+  outline: none;
 }
 
 
