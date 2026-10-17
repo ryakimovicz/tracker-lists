@@ -450,25 +450,42 @@ class IGDBService:
             return []
 
         try:
-            # Query IGDB real-time popularity primitives (live visits, twitch streams, steam players)
-            body_pop = "fields game_id, value; where popularity_type = 5; sort value desc; limit 35;"
-            req = urllib.request.Request(
-                "https://api.igdb.com/v4/popularity_primitives",
-                data=body_pop.encode("utf-8"),
-                headers={"Client-ID": client_id, "Authorization": f"Bearer {token}", "Accept": "application/json"}
-            )
-            with urllib.request.urlopen(req, timeout=6) as res:
-                if res.status == 200:
-                    pop_data = json.loads(res.read().decode())
-                    gids = [str(p["game_id"]) for p in pop_data if "game_id" in p]
-                    if gids:
-                        body_games = f"fields id, name, category, game_type, parent_game, version_parent, cover.image_id, first_release_date, summary, total_rating; where id = ({','.join(gids)}) & cover != null; limit 35;"
-                        items = cls._execute_query(body_games)
-                        # Maintain rank order of popularity
-                        id_to_item = {str(item.external_id): item for item in items}
-                        ordered_results = [id_to_item[gid] for gid in gids if gid in id_to_item]
-                        if ordered_results:
-                            return ordered_results[:24]
+            # Query IGDB real-time popularity primitives combining:
+            # 9: Steam Global Top Sellers (viral sales surges)
+            # 34: Twitch 24hr Hours Watched (viral livestream sensations)
+            # 5: Steam 24hr Peak Players (most played games today)
+            headers = {"Client-ID": client_id, "Authorization": f"Bearer {token}", "Accept": "application/json"}
+            url = "https://api.igdb.com/v4/popularity_primitives"
+            lists = []
+            for pop_type in [9, 34, 5]:
+                try:
+                    body = f"fields game_id, value; where popularity_type = {pop_type}; sort value desc; limit 15;"
+                    req = urllib.request.Request(url, data=body.encode("utf-8"), headers=headers)
+                    with urllib.request.urlopen(req, timeout=4) as res:
+                        if res.status == 200:
+                            data = json.loads(res.read().decode())
+                            lists.append([str(p["game_id"]) for p in data if "game_id" in p])
+                        else:
+                            lists.append([])
+                except Exception:
+                    lists.append([])
+
+            # Interleave round-robin to balance sales surges, streams, and active players
+            gids = []
+            for i in range(15):
+                for l in lists:
+                    if i < len(l) and l[i] not in gids:
+                        gids.append(l[i])
+
+            if gids:
+                joined_gids = ",".join(gids[:35])
+                body_games = f"fields id, name, category, game_type, parent_game, version_parent, cover.image_id, first_release_date, summary, total_rating; where id = ({joined_gids}) & cover != null; limit 35;"
+                items = cls._execute_query(body_games)
+                # Maintain rank order of blended popularity
+                id_to_item = {str(item.external_id): item for item in items}
+                ordered_results = [id_to_item[gid] for gid in gids if gid in id_to_item]
+                if ordered_results:
+                    return ordered_results[:24]
         except Exception as e:
             print(f"IGDB popularity_primitives error: {e}")
 

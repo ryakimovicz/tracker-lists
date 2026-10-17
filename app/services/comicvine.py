@@ -664,13 +664,13 @@ class ComicVineService:
         # 1. Check trending comic characters / graphic novels from Wikipedia Pageviews
         try:
             wiki_comic_names = []
-            for days_ago in [1, 2]:
+            for days_ago in [1, 2, 3]:
                 dt = datetime.utcnow() - timedelta(days=days_ago)
                 ymd = dt.strftime("%Y/%m/%d")
                 top_url = f"https://wikimedia.org/api/rest_v1/metrics/pageviews/top/en.wikipedia/all-access/{ymd}"
                 try:
-                    req_w = urllib.request.Request(top_url, headers={"User-Agent": "TrackerLists/1.0 (contact@pathd.net)"})
-                    with urllib.request.urlopen(req_w, timeout=6) as resp_w:
+                    req_w = urllib.request.Request(top_url, headers={"User-Agent": "Pathd/1.0 (https://pathd.net; contact@pathd.net)"})
+                    with urllib.request.urlopen(req_w, timeout=7) as resp_w:
                         if resp_w.status == 200:
                             data_w = json.loads(resp_w.read().decode())
                             items_w = data_w.get("items", [{}])[0].get("articles", [])

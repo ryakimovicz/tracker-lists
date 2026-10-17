@@ -416,13 +416,13 @@ class OMDbService:
         try:
             from datetime import datetime, timedelta
             articles = []
-            for days_ago in [1, 2]:
+            for days_ago in [1, 2, 3]:
                 dt = datetime.utcnow() - timedelta(days=days_ago)
                 ymd = dt.strftime("%Y/%m/%d")
                 top_url = f"https://wikimedia.org/api/rest_v1/metrics/pageviews/top/en.wikipedia/all-access/{ymd}"
                 try:
-                    req = urllib.request.Request(top_url, headers={"User-Agent": "TrackerLists/1.0 (contact@pathd.net)"})
-                    with urllib.request.urlopen(req, timeout=6) as resp:
+                    req = urllib.request.Request(top_url, headers={"User-Agent": "Pathd/1.0 (https://pathd.net; contact@pathd.net)"})
+                    with urllib.request.urlopen(req, timeout=7) as resp:
                         if resp.status == 200:
                             data = json.loads(resp.read().decode())
                             items = data.get("items", [{}])[0].get("articles", [])

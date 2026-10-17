@@ -536,7 +536,7 @@ class TVMazeService:
 
     @staticmethod
     def get_trending_series() -> List[SearchResultItem]:
-        cache_key = "tvmaze_trending_series_wiki_v3"
+        cache_key = "tvmaze_trending_series_wiki_v4"
         now_ts = time.time()
         if cache_key in TVMazeService._schedule_cache:
             ts, data = TVMazeService._schedule_cache[cache_key]
@@ -550,16 +550,16 @@ class TVMazeService:
         seen_ids = set()
         seen_titles = set()
 
-        # 1. Fetch top Wikipedia articles in the last 24-48 hours
+        # 1. Fetch top Wikipedia articles in the last 24-72 hours
         try:
             articles = []
-            for days_ago in [1, 2]:
+            for days_ago in [1, 2, 3]:
                 dt = datetime.utcnow() - timedelta(days=days_ago)
                 ymd = dt.strftime("%Y/%m/%d")
                 top_url = f"https://wikimedia.org/api/rest_v1/metrics/pageviews/top/en.wikipedia/all-access/{ymd}"
                 try:
-                    req = urllib.request.Request(top_url, headers={"User-Agent": "TrackerLists/1.0 (contact@pathd.net)"})
-                    with urllib.request.urlopen(req, timeout=6) as resp:
+                    req = urllib.request.Request(top_url, headers={"User-Agent": "Pathd/1.0 (https://pathd.net; contact@pathd.net)"})
+                    with urllib.request.urlopen(req, timeout=7) as resp:
                         if resp.status == 200:
                             data = json.loads(resp.read().decode())
                             items = data.get("items", [{}])[0].get("articles", [])
@@ -586,14 +586,15 @@ class TVMazeService:
                 def fetch_tvm_show(title_query: str):
                     try:
                         shows = TVMazeService.search_shows(title_query)
-                        if shows:
+                        if shows and shows[0].image_url:
                             return shows[0]
                     except Exception:
                         pass
                     return None
 
-                with concurrent.futures.ThreadPoolExecutor(max_workers=8) as ex:
-                    matched_shows = list(ex.map(fetch_tvm_show, series_titles[:35]))
+                # Keep max_workers low (3) to respect TVMaze public rate limit (max 20 req/10s)
+                with concurrent.futures.ThreadPoolExecutor(max_workers=3) as ex:
+                    matched_shows = list(ex.map(fetch_tvm_show, series_titles[:25]))
 
                 for show in matched_shows:
                     if show and show.image_url and show.title:
@@ -602,17 +603,63 @@ class TVMazeService:
                             seen_ids.add(show.external_id)
                             seen_titles.add(norm)
                             results.append(show)
-                        if len(results) >= 25:
+                        if len(results) >= 20:
                             break
         except Exception as e:
             print(f"Error fetching trending series via Wikipedia/TVMaze: {e}")
 
-        # Fallback / completion if Wikipedia yielded fewer than 20
+        # 2. Resilient fallback: if Wikipedia yielded fewer than 20, supplement with active running shows from schedule
+        if len(results) < 20:
+            try:
+                today = datetime.utcnow().date()
+                schedule_shows: List[dict] = []
+                for days_back in [0, 1, 2, 3]:
+                    d_str = (today - timedelta(days=days_back)).strftime("%Y-%m-%d")
+                    for sched_url in [f"https://api.tvmaze.com/schedule/web?date={d_str}", f"https://api.tvmaze.com/schedule?date={d_str}&country=US"]:
+                        try:
+                            s_req = urllib.request.Request(sched_url, headers={"User-Agent": "Pathd/1.0 (https://pathd.net; contact@pathd.net)"})
+                            with urllib.request.urlopen(s_req, timeout=3.5) as s_resp:
+                                if s_resp.status == 200:
+                                    s_data = json.loads(s_resp.read().decode())
+                                    for ep in s_data:
+                                        sh = ep.get("_embedded", {}).get("show")
+                                        if sh and sh.get("id") and sh.get("type") != "Animation":
+                                            schedule_shows.append(sh)
+                        except Exception:
+                            continue
+                    if len(schedule_shows) >= 30:
+                        break
+
+                if schedule_shows:
+                    sorted_sched = sorted(schedule_shows, key=lambda x: x.get("weight", 0), reverse=True)
+                    for sh in sorted_sched:
+                        ext_id = f"tvm_{sh.get('id')}"
+                        norm = (sh.get("name") or "").lower().strip()
+                        img = sh.get("image") or {}
+                        img_url = img.get("original") or img.get("medium")
+                        if ext_id not in seen_ids and norm not in seen_titles and img_url:
+                            seen_ids.add(ext_id)
+                            seen_titles.add(norm)
+                            results.append(SearchResultItem(
+                                external_id=ext_id,
+                                title=sh.get("name"),
+                                image_url=img_url,
+                                description=sh.get("summary", ""),
+                                item_type="series",
+                                release_date=sh.get("premiered"),
+                                popularity=sh.get("weight", 0)
+                            ))
+                        if len(results) >= 20:
+                            break
+            except Exception as e:
+                print(f"Error in TVMaze schedule fallback: {e}")
+
+        # 3. Final completion fallback from catalog if still < 20
         if len(results) < 20:
             try:
                 url = "https://api.tvmaze.com/shows"
-                req = urllib.request.Request(url, headers={"User-Agent": "TrackerLists/1.0"})
-                with urllib.request.urlopen(req, timeout=6) as response:
+                req = urllib.request.Request(url, headers={"User-Agent": "Pathd/1.0 (https://pathd.net; contact@pathd.net)"})
+                with urllib.request.urlopen(req, timeout=5) as response:
                     if response.status == 200:
                         data = json.loads(response.read().decode())
                         series_list = []
@@ -645,7 +692,7 @@ class TVMazeService:
                                     release_date=show.get("premiered"),
                                     popularity=show.get("weight", 0)
                                 ))
-                            if len(results) >= 25:
+                            if len(results) >= 20:
                                 break
             except Exception as e:
                 print(f"Error in TVMaze fallback trending series: {e}")
