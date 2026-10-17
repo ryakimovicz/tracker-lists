@@ -3400,5 +3400,74 @@ h1, h2, h3, h4, h5, h6 {
   }
 }
 
+/* =========================================================================
+   Offline Detector Toast (Responsive for Desktop & Mobile)
+   ========================================================================= */
+.offline-toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 999999;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 1.15rem;
+  border-radius: 9999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #ffffff;
+  pointer-events: none;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+  animation: toastSlideUpDesktop 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  white-space: nowrap;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.offline-toast--offline {
+  background: rgba(220, 38, 38, 0.92);
+  border: 1px solid rgba(254, 202, 202, 0.35);
+  box-shadow: 0 8px 24px -4px rgba(220, 38, 38, 0.5), 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.offline-toast--restored {
+  background: rgba(16, 185, 129, 0.92);
+  border: 1px solid rgba(167, 243, 208, 0.4);
+  box-shadow: 0 8px 24px -4px rgba(16, 185, 129, 0.5), 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.offline-toast--leaving {
+  opacity: 0 !important;
+  transform: translate(-50%, 12px) scale(0.96) !important;
+  transition: opacity 0.3s ease, transform 0.3s ease !important;
+}
+
+.offline-toast-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.offline-toast-text {
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+@media (max-width: 768px) {
+  .offline-toast {
+    bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+    max-width: calc(100vw - 32px);
+    padding: 0.55rem 1rem;
+    font-size: 0.82rem;
+    gap: 0.5rem;
+  }
+}
+
+
 
 
