@@ -2520,12 +2520,14 @@ def bulk_toggle_all_seasons(
                     section=section_name[:95] if section_name else None
                 )
                 db.add(item)
-                db.flush()
                 list_items_by_ext[ext_id] = item
 
             processed_eps.append((ext_id, item, media_item_type))
 
-        # Query all existing ItemProgress for the user across all relevant identifiers
+        # Single flush to generate IDs for all newly created ListItems at once
+        db.flush()
+
+        # Query all existing ItemProgress for the user across all relevant identifiers in ONE single query
         all_ext_variations = set(seen_ext_ids)
         for eid in seen_ext_ids:
             clean = eid.replace("cv_issue_", "").replace("tvm-ep-", "").replace("cv_", "").replace("cv-", "")
@@ -2556,96 +2558,80 @@ def bulk_toggle_all_seasons(
                 progs_by_item_id[p.list_item_id] = p
 
         now_dt = datetime.now(timezone.utc)
+        new_progress_items = []
+        new_history_items = []
 
-        for ext_id, item, media_item_type in processed_eps:
-            clean_ext = ext_id.replace("cv_issue_", "").replace("tvm-ep-", "").replace("cv_", "").replace("cv-", "")
-            progress = progs_by_ext.get(ext_id) or progs_by_ext.get(clean_ext) or progs_by_item_id.get(item.id)
-            media_type_str = (media_item_type.value if hasattr(media_item_type, 'value') else str(media_item_type)).lower()
+        if req.completed:
+            for ext_id, item, media_item_type in processed_eps:
+                clean_ext = ext_id.replace("cv_issue_", "").replace("tvm-ep-", "").replace("cv_", "").replace("cv-", "")
+                progress = progs_by_ext.get(ext_id) or progs_by_ext.get(clean_ext) or (progs_by_item_id.get(item.id) if item.id else None)
+                media_type_str = (media_item_type.value if hasattr(media_item_type, 'value') else str(media_item_type)).lower()
 
-            if not progress:
-                # Double-check database directly before attempting insert to prevent race or missed variation
-                progress = db.query(ItemProgress).filter(
-                    ItemProgress.user_id == current_user.id,
-                    (
-                        (ItemProgress.list_item_id == item.id) |
-                        (ItemProgress.external_id.in_([ext_id, clean_ext, f"cv_issue_{clean_ext}", f"cv_{clean_ext}", f"tvm-ep-{clean_ext}"]))
-                    )
-                ).first()
-
-            if req.completed:
                 was_already_completed = progress.is_completed if progress else False
                 if progress:
                     progress.is_completed = True
                     progress.external_id = ext_id
-                    progress.list_item_id = item.id
+                    if item.id:
+                        progress.list_item_id = item.id
                     progress.item_type = media_type_str
                     if not was_already_completed or req.mark_again:
                         progress.completed_at = now_dt
                 else:
-                    try:
-                        with db.begin_nested():
-                            progress = ItemProgress(
-                                user_id=current_user.id,
-                                item_type=media_type_str,
-                                external_id=ext_id,
-                                list_item_id=item.id,
-                                is_completed=True,
-                                is_skipped=False,
-                                completed_at=now_dt
-                            )
-                            db.add(progress)
-                            db.flush()
-                    except Exception:
-                        progress = db.query(ItemProgress).filter(
-                            ItemProgress.user_id == current_user.id,
-                            (
-                                (ItemProgress.list_item_id == item.id) |
-                                (ItemProgress.external_id.in_([ext_id, clean_ext, f"cv_issue_{clean_ext}", f"cv_{clean_ext}", f"tvm-ep-{clean_ext}"]))
-                            )
-                        ).first()
-                        if progress:
-                            progress.is_completed = True
-                            progress.external_id = ext_id
-                            progress.list_item_id = item.id
-                            progress.item_type = media_type_str
-                            progress.completed_at = now_dt
-                
-                if progress:
-                    progs_by_ext[ext_id] = progress
-                    progs_by_ext[clean_ext] = progress
-                    progs_by_item_id[item.id] = progress
-
-                # Record ConsumptionHistory only if not previously completed or if explicitly doing mark_again
-                if not was_already_completed or req.mark_again:
-                    ch = ConsumptionHistory(
+                    progress = ItemProgress(
                         user_id=current_user.id,
                         item_type=media_type_str,
                         external_id=ext_id,
                         list_item_id=item.id,
-                        consumed_at=now_dt
+                        is_completed=True,
+                        is_skipped=False,
+                        completed_at=now_dt
                     )
-                    db.add(ch)
-            else:
-                # Unwatch: remove latest consumption history entry
-                history = db.query(ConsumptionHistory).filter(
-                    ConsumptionHistory.user_id == current_user.id,
-                    ConsumptionHistory.external_id == ext_id
-                ).order_by(ConsumptionHistory.consumed_at.desc()).all()
-                
-                if history:
-                    db.delete(history[0])
-                if progress:
-                    progress.is_completed = False
-                    progress.completed_at = None
+                    new_progress_items.append(progress)
+                    # Register into in-memory maps to avoid duplicates within this batch
+                    progs_by_ext[ext_id] = progress
+                    progs_by_ext[clean_ext] = progress
+                    if item.id:
+                        progs_by_item_id[item.id] = progress
 
-        if not req.completed:
-            # Guarantee all ItemProgress for this tracking list are set to completed = False
+                # Record ConsumptionHistory only if not previously completed or if explicitly doing mark_again
+                if not was_already_completed or req.mark_again:
+                    new_history_items.append(
+                        ConsumptionHistory(
+                            user_id=current_user.id,
+                            item_type=media_type_str,
+                            external_id=ext_id,
+                            list_item_id=item.id,
+                            consumed_at=now_dt
+                        )
+                    )
+
+            if new_progress_items:
+                db.add_all(new_progress_items)
+            if new_history_items:
+                db.add_all(new_history_items)
+            db.flush()
+        else:
+            # Fast bulk unwatch:
             all_list_items = db.query(ListItem).filter(ListItem.list_id == list_id).all()
-            list_ext_ids = [it.external_id for it in all_list_items if it.external_id]
-            if list_ext_ids:
+            all_known_exts = set(seen_ext_ids)
+            for it in all_list_items:
+                if it.external_id:
+                    all_known_exts.add(it.external_id)
+            all_known_item_ids = [it.id for it in all_list_items if it.id]
+
+            if all_known_exts:
+                db.query(ConsumptionHistory).filter(
+                    ConsumptionHistory.user_id == current_user.id,
+                    ConsumptionHistory.external_id.in_(list(all_known_exts))
+                ).delete(synchronize_session=False)
+
+            if all_known_exts or all_known_item_ids:
                 db.query(ItemProgress).filter(
                     ItemProgress.user_id == current_user.id,
-                    ItemProgress.external_id.in_(list_ext_ids)
+                    (
+                        ItemProgress.external_id.in_(list(all_known_exts)) |
+                        ItemProgress.list_item_id.in_(all_known_item_ids)
+                    )
                 ).update({"is_completed": False, "completed_at": None}, synchronize_session=False)
                 
         if lib_item:

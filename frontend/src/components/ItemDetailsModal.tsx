@@ -1419,6 +1419,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   const [reportReason, setReportReason] = useState('Contenido para adultos / explícito');
   const [reportFeedback, setReportFeedback] = useState<string | null>(null);
   const [isSubmittingReport, setIsSubmittingReport] = useState(false);
+  const toggleAllSeqRef = useRef<number>(0);
 
   // Dialog for prompt to mark previous missing episodes
   const [pendingPreviousPrompt, setPendingPreviousPrompt] = useState<{
@@ -1836,16 +1837,101 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     const isMarkAgain = action === 'mark_again';
     const targetCompleted = (action === 'mark_all' || isMarkAgain) ? true : action === 'remove' ? false : !isAllCompleted;
 
+    // Sequence ID for race condition protection against rapid clicks
+    const opSeq = ++toggleAllSeqRef.current;
+
+    // 1. Optimistic UI: Immediately update selectedItem status so the button changes state in 0ms!
+    const optimisticStatus = targetCompleted 
+      ? (isComic ? 'read' : 'completed') 
+      : (isComic ? 'plan_to_read' : 'plan_to_watch');
+
+    const optimisticItem = {
+      ...selectedItem,
+      status: optimisticStatus,
+      completed_at: targetCompleted ? (selectedItem.completed_at || new Date().toISOString()) : null,
+      last_seen_episode: targetCompleted ? selectedItem.last_seen_episode : null,
+      pages_read: isComic ? (targetCompleted ? (selectedItem.total_pages || selectedItem.pages_read) : 0) : selectedItem.pages_read
+    };
+    if (isComic && !targetCompleted) setPagesReadVal(0);
+    setSelectedItem(optimisticItem);
+    onUpdate && onUpdate(optimisticItem);
+
+    // 2. Optimistic UI: Immediately mark all currently known episodes so seasons and episode rows update in 0ms!
     const cacheKeyAll = `${selectedItem.external_id}_all_episodes`;
     let cachedAll = passedEpisodes || getCachedSeries(cacheKeyAll);
+    const existingKnown: any[] = (cachedAll && Array.isArray(cachedAll) && cachedAll.length > 0)
+      ? cachedAll
+      : (episodes && episodes.length > 0 ? episodes : Object.values(seasonEpisodes).flat());
+
+    if (existingKnown.length > 0) {
+      const newProg: Record<string, boolean> = {};
+      existingKnown.forEach((ep: any) => {
+        if (isComic) {
+          const cleanEpId = String(ep.id || ep.external_id || '').replace('cv_issue_', '').replace('cv_', '');
+          const idKey = `cv_issue_${cleanEpId}`;
+          newProg[idKey] = targetCompleted;
+          if (cleanEpId) newProg[cleanEpId] = targetCompleted;
+          if (ep.id) newProg[String(ep.id)] = targetCompleted;
+          if (ep.external_id) newProg[ep.external_id] = targetCompleted;
+
+          const stateToSave = targetCompleted ? {
+            status: 'read',
+            pages_read: ep.page_count || ep.total_pages || 0,
+            total_pages: ep.page_count || ep.total_pages || null
+          } : {
+            status: '',
+            pages_read: 0,
+            total_pages: ep.page_count || ep.total_pages || null
+          };
+          setCachedSeries(`issue_state_cv_issue_${cleanEpId}`, stateToSave);
+          setCachedSeries(`issue_state_${idKey}`, stateToSave);
+          if (ep.external_id) setCachedSeries(`issue_state_${ep.external_id}`, stateToSave);
+        } else {
+          const idKey = ep.external_id || (typeof ep.id === 'string' && ep.id.startsWith('tvm-ep-') ? ep.id : `tvm-ep-${ep.id}`);
+          if (idKey) newProg[idKey] = targetCompleted;
+          if (ep.id) newProg[`tvm-ep-${ep.id}`] = targetCompleted;
+        }
+      });
+      setGlobalProgress(prev => ({ ...prev, ...newProg }));
+    }
 
     if (!cachedAll || !Array.isArray(cachedAll) || cachedAll.length === 0) {
       try {
         const endpoint = isComic ? `/search/comic/volume/${selectedItem.external_id}/issues` : `/search/series/${selectedItem.external_id}/episodes`;
         const epRes = await apiClient.get(endpoint);
+        if (opSeq !== toggleAllSeqRef.current) return;
         if (Array.isArray(epRes.data) && epRes.data.length > 0) {
           cachedAll = epRes.data;
           setCachedSeries(cacheKeyAll, cachedAll);
+          const extraProg: Record<string, boolean> = {};
+          cachedAll.forEach((ep: any) => {
+            if (isComic) {
+              const cleanEpId = String(ep.id || ep.external_id || '').replace('cv_issue_', '').replace('cv_', '');
+              const idKey = `cv_issue_${cleanEpId}`;
+              extraProg[idKey] = targetCompleted;
+              if (cleanEpId) extraProg[cleanEpId] = targetCompleted;
+              if (ep.id) extraProg[String(ep.id)] = targetCompleted;
+              if (ep.external_id) extraProg[ep.external_id] = targetCompleted;
+
+              const stateToSave = targetCompleted ? {
+                status: 'read',
+                pages_read: ep.page_count || ep.total_pages || 0,
+                total_pages: ep.page_count || ep.total_pages || null
+              } : {
+                status: '',
+                pages_read: 0,
+                total_pages: ep.page_count || ep.total_pages || null
+              };
+              setCachedSeries(`issue_state_cv_issue_${cleanEpId}`, stateToSave);
+              setCachedSeries(`issue_state_${idKey}`, stateToSave);
+              if (ep.external_id) setCachedSeries(`issue_state_${ep.external_id}`, stateToSave);
+            } else {
+              const idKey = ep.external_id || (typeof ep.id === 'string' && ep.id.startsWith('tvm-ep-') ? ep.id : `tvm-ep-${ep.id}`);
+              if (idKey) extraProg[idKey] = targetCompleted;
+              if (ep.id) extraProg[`tvm-ep-${ep.id}`] = targetCompleted;
+            }
+          });
+          setGlobalProgress(prev => ({ ...prev, ...extraProg }));
         }
       } catch (err) {
         console.error("Failed to fetch all episodes for bulk toggle", err);
@@ -1878,51 +1964,6 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       }
     }
 
-    // Optimistically update global progress only for the episodes in this scope
-    const allKnownEps: any[] = (cachedAll && Array.isArray(cachedAll) && cachedAll.length > 0) ? cachedAll : (episodes || []);
-    const epsToToggle = targetEps.length > 0 ? targetEps : (action === 'remove' ? allKnownEps : []);
-    if (epsToToggle.length > 0) {
-      const newProg: Record<string, boolean> = {};
-      epsToToggle.forEach((ep: any) => {
-        if (isComic) {
-          const cleanEpId = String(ep.id || ep.external_id || '').replace('cv_issue_', '').replace('cv_', '');
-          const idKey = `cv_issue_${cleanEpId}`;
-          newProg[idKey] = targetCompleted;
-          if (cleanEpId) newProg[cleanEpId] = targetCompleted;
-          if (ep.id) newProg[String(ep.id)] = targetCompleted;
-          if (ep.external_id) newProg[ep.external_id] = targetCompleted;
-
-          const stateToSave = targetCompleted ? {
-            status: 'read',
-            pages_read: ep.page_count || ep.total_pages || 0,
-            total_pages: ep.page_count || ep.total_pages || null
-          } : {
-            status: '',
-            pages_read: 0,
-            total_pages: ep.page_count || ep.total_pages || null
-          };
-          setCachedSeries(`issue_state_cv_issue_${cleanEpId}`, stateToSave);
-          setCachedSeries(`issue_state_${idKey}`, stateToSave);
-          if (ep.external_id) setCachedSeries(`issue_state_${ep.external_id}`, stateToSave);
-        } else {
-          const idKey = ep.external_id || (typeof ep.id === 'string' && ep.id.startsWith('tvm-ep-') ? ep.id : `tvm-ep-${ep.id}`);
-          if (idKey) newProg[idKey] = targetCompleted;
-        }
-      });
-      setGlobalProgress(prev => ({ ...prev, ...newProg }));
-    }
-
-    if (!targetCompleted) {
-      if (isComic) setPagesReadVal(0);
-      setSelectedItem((prev: any) => prev ? {
-        ...prev,
-        status: isComic ? 'plan_to_read' : 'plan_to_watch',
-        completed_at: null,
-        last_seen_episode: null,
-        pages_read: isComic ? 0 : prev.pages_read
-      } : null);
-    }
-
     try {
       const res = await apiClient.post(`/lists/${effectiveListId}/bulk-toggle-all-seasons`, {
         episodes: targetEps.length > 0 ? targetEps : (cachedAll || null),
@@ -1930,18 +1971,24 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
         mark_again: isMarkAgain
       });
 
+      // Discard stale response if the user triggered a newer action
+      if (opSeq !== toggleAllSeqRef.current) return;
+
       let updatedList = episodes;
       if (episodes.length === 0) {
         const listRes = await apiClient.get(`/lists/${effectiveListId}`);
+        if (opSeq !== toggleAllSeqRef.current) return;
         updatedList = listRes.data.items || [];
         setEpisodes(updatedList);
         setCachedSeries(`list_${effectiveListId}`, updatedList);
       }
 
+      const allKnownEps: any[] = (cachedAll && Array.isArray(cachedAll) && cachedAll.length > 0) ? cachedAll : (episodes || []);
       const extIds = (updatedList.length > 0 ? updatedList : allKnownEps).map((x: any) => x.external_id || (x.id ? `cv_issue_${String(x.id).replace('cv_issue_', '').replace('cv_', '')}` : '')).filter(Boolean);
       let latestProg: Record<string, boolean> = {};
       if (!targetCompleted && extIds.length > 0) {
         const progRes = await apiClient.post('/users/me/progress/bulk-check', { external_ids: extIds });
+        if (opSeq !== toggleAllSeqRef.current) return;
         latestProg = progRes.data || {};
         const resetProg: Record<string, boolean> = {};
         allKnownEps.forEach((ep: any) => {
@@ -2042,6 +2089,11 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       updateCachedShelfItem(updatedSelected);
 
       const targetId = updatedSelected.id;
+      if (targetId && onStatusChange) {
+        onStatusChange(targetId, nextStatus);
+      }
+      onUpdate && onUpdate(updatedSelected);
+
       if (targetId && user?.is_pro) {
         apiClient.get(`/library/${targetId}/consumption-history`)
           .then(hRes => {
@@ -2054,8 +2106,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       }
 
       window.dispatchEvent(new Event('library-updated'));
-      onUpdate && onUpdate(updatedSelected);
     } catch (err: any) {
+      if (opSeq !== toggleAllSeqRef.current) return;
       console.error("Bulk toggle all seasons failed:", err?.response?.data || err);
     }
   };
