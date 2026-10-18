@@ -19,6 +19,7 @@ import { ConfirmModal } from '../components/ConfirmModal';
 import { PathdLoader } from '../components/PathdLoader';
 import { getOrderedCategories, getCategoryIcon } from '../utils/categoryOrder';
 import { useContinuousScroll } from '../hooks/useContinuousScroll';
+import { SwipeViewPager } from '../components/SwipeViewPager';
 
 
 import {
@@ -839,94 +840,200 @@ export const Profile: React.FC = () => {
   const guidesSubTabParam = searchParams.get('subtab');
   const profileGuidesSubTab: 'created' | 'saved' = (guidesSubTabParam === 'saved') ? 'saved' : 'created';
 
-  const guidesSwipeRef = useRef<HTMLDivElement>(null);
-  const isUserTouchingGuidesSwipeRef = useRef(false);
-  const isProgrammaticGuidesScrollRef = useRef(false);
-  const guidesScrollTimeoutRef = useRef<any>(null);
-  const guidesSwipeDebounceRef = useRef<any>(null);
+  const musicTypeParam = searchParams.get('type');
+  const validMusicTypes = ['artists', 'albums', 'tracks'] as const;
+  const initialMusicType: 'artists' | 'albums' | 'tracks' = (musicTypeParam && validMusicTypes.includes(musicTypeParam as any))
+    ? (musicTypeParam as 'artists' | 'albums' | 'tracks')
+    : 'artists';
+
+  const musicPeriodParam = searchParams.get('period');
+  const validMusicPeriods = ['7day', '1month', 'overall'] as const;
+  const initialMusicPeriod: '7day' | '1month' | 'overall' = (musicPeriodParam && validMusicPeriods.includes(musicPeriodParam as any))
+    ? (musicPeriodParam as '7day' | '1month' | 'overall')
+    : '7day';
+
+  const [musicType, setMusicType] = useState<'artists' | 'albums' | 'tracks'>(initialMusicType);
+  const [musicPeriod, setMusicPeriod] = useState<'7day' | '1month' | 'overall'>(initialMusicPeriod);
+
+  useEffect(() => {
+    if (musicTypeParam && validMusicTypes.includes(musicTypeParam as any)) {
+      setMusicType(musicTypeParam as 'artists' | 'albums' | 'tracks');
+    } else if (activeTab === 'music' && !musicTypeParam) {
+      setMusicType('artists');
+    }
+  }, [musicTypeParam, activeTab]);
+
+  const hasMusic = Boolean(profile?.lastfm_username) || isOwnProfile;
+
+  const getCurrentProfileStep = useCallback((): number => {
+    if (activeTab === 'shelf') return 0;
+    if (activeTab === 'guides') {
+      return profileGuidesSubTab === 'saved' ? 2 : 1;
+    }
+    if (hasMusic) {
+      if (activeTab === 'music') {
+        if (musicType === 'albums') return 4;
+        if (musicType === 'tracks') return 5;
+        return 3;
+      }
+      if (activeTab === 'favorites') return 6;
+    } else {
+      if (activeTab === 'favorites') return 3;
+    }
+    return 0;
+  }, [activeTab, profileGuidesSubTab, hasMusic, musicType]);
+
+  const currentProfileStep = getCurrentProfileStep();
+
+  const goToProfileStep = useCallback((step: number) => {
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    }
+
+    const newParams = new URLSearchParams(searchParams);
+
+    if (step === 0) {
+      newParams.delete('tab');
+      newParams.delete('subtab');
+      newParams.delete('type');
+      newParams.delete('period');
+    } else if (step === 1) {
+      newParams.set('tab', 'guides');
+      newParams.delete('subtab');
+      newParams.delete('type');
+      newParams.delete('period');
+    } else if (step === 2) {
+      newParams.set('tab', 'guides');
+      newParams.set('subtab', 'saved');
+      newParams.delete('type');
+      newParams.delete('period');
+    } else if (hasMusic && step === 3) {
+      newParams.set('tab', 'music');
+      newParams.delete('subtab');
+      newParams.delete('type');
+      setMusicType('artists');
+    } else if (hasMusic && step === 4) {
+      newParams.set('tab', 'music');
+      newParams.delete('subtab');
+      newParams.set('type', 'albums');
+      setMusicType('albums');
+    } else if (hasMusic && step === 5) {
+      newParams.set('tab', 'music');
+      newParams.delete('subtab');
+      newParams.set('type', 'tracks');
+      setMusicType('tracks');
+    } else if ((hasMusic && step === 6) || (!hasMusic && step === 3)) {
+      newParams.set('tab', 'favorites');
+      newParams.delete('subtab');
+      newParams.delete('type');
+      newParams.delete('period');
+    }
+
+    setSearchParams(newParams);
+  }, [hasMusic, searchParams, setSearchParams]);
 
   const handleSelectGuidesSubtab = useCallback((mode: 'created' | 'saved') => {
-    const newParams = new URLSearchParams(searchParams);
-    if (newParams.get('tab') !== 'guides') {
-      newParams.set('tab', 'guides');
-    }
-    if (mode === 'saved') {
-      newParams.set('subtab', 'saved');
+    goToProfileStep(mode === 'saved' ? 2 : 1);
+  }, [goToProfileStep]);
+
+  // Compute 0-3 (or 0-2) main tab progress from 0-6 (or 0-3) slide progress
+  const computeMainProgress = useCallback((p: number, hasM: boolean): number => {
+    if (hasM) {
+      if (p <= 1) return p;
+      if (p <= 2) return 1;
+      if (p <= 3) return 1 + (p - 2);
+      if (p <= 5) return 2;
+      return 2 + (p - 5);
     } else {
-      newParams.delete('subtab');
+      if (p <= 1) return p;
+      if (p <= 2) return 1;
+      return 1 + (p - 2);
     }
-    setSearchParams(newParams);
+  }, []);
 
-    if (guidesSwipeRef.current) {
-      const el = guidesSwipeRef.current;
-      isProgrammaticGuidesScrollRef.current = true;
-      if (guidesScrollTimeoutRef.current) clearTimeout(guidesScrollTimeoutRef.current);
+  // Gestural tracking refs
+  const profileTabsNavRef = useRef<HTMLDivElement>(null);
+  const profileTabBtnRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const guidesSubtabsNavRef = useRef<HTMLDivElement>(null);
+  const guidesSubtabBtnRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const musicSubtabsNavRef = useRef<HTMLDivElement>(null);
+  const musicSubtabBtnRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
-      const maxScroll = el.scrollWidth - el.clientWidth;
-      const targetScroll = mode === 'created' ? 0 : (maxScroll > 0 ? maxScroll : el.clientWidth);
-      el.scrollTo({ left: targetScroll, behavior: 'smooth' });
+  const handleScrollProgress = useCallback((progress: number) => {
+    const totalSlidesCount = hasMusic ? 7 : 4;
+    const clamped = Math.min(totalSlidesCount - 1, Math.max(0, progress));
 
-      guidesScrollTimeoutRef.current = setTimeout(() => {
-        isProgrammaticGuidesScrollRef.current = false;
-      }, 500);
-    }
-  }, [searchParams, setSearchParams]);
+    const mainProg = computeMainProgress(clamped, hasMusic);
+    if (profileTabsNavRef.current) {
+      profileTabsNavRef.current.style.setProperty('--tab-progress', mainProg.toFixed(4));
 
-  const checkGuidesSwipeSettled = useCallback(() => {
-    if (!guidesSwipeRef.current) return;
-    if (isProgrammaticGuidesScrollRef.current) return;
-    if (isUserTouchingGuidesSwipeRef.current) return;
-    const el = guidesSwipeRef.current;
-    const scrollPos = el.scrollLeft;
-    const maxScroll = el.scrollWidth - el.clientWidth;
-    if (maxScroll <= 0) return;
-
-    const scrollFraction = scrollPos / maxScroll;
-    if (scrollFraction > 0.25 && scrollFraction < 0.75) {
-      if (guidesSwipeDebounceRef.current) clearTimeout(guidesSwipeDebounceRef.current);
-      guidesSwipeDebounceRef.current = setTimeout(() => {
-        checkGuidesSwipeSettled();
-      }, 100);
-      return;
-    }
-
-    const newMode: 'created' | 'saved' = scrollFraction >= 0.5 ? 'saved' : 'created';
-    if (newMode !== profileGuidesSubTab) {
-      const newParams = new URLSearchParams(searchParams);
-      if (newParams.get('tab') !== 'guides') {
-        newParams.set('tab', 'guides');
-      }
-      if (newMode === 'saved') {
-        newParams.set('subtab', 'saved');
+      let indColor = 'var(--accent-primary)';
+      if (hasMusic) {
+        if (mainProg < 0.5) indColor = 'var(--accent-primary)';
+        else if (mainProg < 1.5) indColor = 'var(--color-guide, #2DD4BF)';
+        else if (mainProg < 2.5) indColor = 'var(--color-music, #1DB954)';
+        else indColor = '#F472B6';
       } else {
-        newParams.delete('subtab');
+        if (mainProg < 0.5) indColor = 'var(--accent-primary)';
+        else if (mainProg < 1.5) indColor = 'var(--color-guide, #2DD4BF)';
+        else indColor = '#F472B6';
       }
-      setSearchParams(newParams);
+      profileTabsNavRef.current.style.setProperty('--profile-indicator-color', indColor);
     }
-  }, [profileGuidesSubTab, searchParams, setSearchParams]);
 
-  const handleGuidesSwipeScroll = useCallback(() => {
-    if (!guidesSwipeRef.current) return;
-    if (isProgrammaticGuidesScrollRef.current) return;
+    const mainTabCount = hasMusic ? 4 : 3;
+    for (let i = 0; i < mainTabCount; i++) {
+      const el = profileTabBtnRefs.current[i];
+      if (!el) continue;
+      const dist = Math.abs(mainProg - i);
+      const act = Math.max(0, Math.min(1, 1 - dist));
+      el.style.setProperty('--tab-act', act.toFixed(4));
+    }
 
-    if (guidesSwipeDebounceRef.current) clearTimeout(guidesSwipeDebounceRef.current);
-    guidesSwipeDebounceRef.current = setTimeout(() => {
-      checkGuidesSwipeSettled();
-    }, 180);
-  }, [checkGuidesSwipeSettled]);
-
-  // Synchronize mobile swipe scroll position when entering guides tab or changing view
-  useEffect(() => {
-    if (activeTab === 'guides' && guidesSwipeRef.current) {
-      if (isUserTouchingGuidesSwipeRef.current) return;
-      const el = guidesSwipeRef.current;
-      const maxScroll = el.scrollWidth - el.clientWidth;
-      const targetScroll = profileGuidesSubTab === 'created' ? 0 : (maxScroll > 0 ? maxScroll : el.clientWidth);
-      if (Math.abs(el.scrollLeft - targetScroll) > 10) {
-        el.scrollTo({ left: targetScroll, behavior: 'instant' as any });
+    // Guides subtabs (between step 1 and 2)
+    if (clamped >= 0.5 && clamped <= 2.5) {
+      const gSubProg = Math.max(0, Math.min(1, clamped - 1));
+      if (guidesSubtabsNavRef.current) {
+        guidesSubtabsNavRef.current.style.setProperty('--guides-subtab-progress', gSubProg.toFixed(4));
       }
+      guidesSubtabBtnRefs.current.forEach((el, idx) => {
+        if (!el) return;
+        const dist = Math.abs(gSubProg - idx);
+        const act = Math.max(0, Math.min(1, 1 - dist));
+        el.style.setProperty('--subtab-act', act.toFixed(4));
+      });
     }
-  }, [activeTab, profileGuidesSubTab]);
+
+    // Music subtabs (between step 3, 4, 5)
+    if (hasMusic && clamped >= 2.5 && clamped <= 5.5) {
+      const mSubProg = Math.max(0, Math.min(2, clamped - 3));
+      if (musicSubtabsNavRef.current) {
+        musicSubtabsNavRef.current.style.setProperty('--music-subtab-progress', mSubProg.toFixed(4));
+      }
+      musicSubtabBtnRefs.current.forEach((el, idx) => {
+        if (!el) return;
+        const dist = Math.abs(mSubProg - idx);
+        const act = Math.max(0, Math.min(1, 1 - dist));
+        el.style.setProperty('--subtab-act', act.toFixed(4));
+      });
+    }
+  }, [hasMusic, computeMainProgress]);
+
+  const mainTabs = useMemo(() => {
+    const tabs: { id: 'shelf' | 'guides' | 'music' | 'favorites'; label: string; color: string; step: number }[] = [
+      { id: 'shelf', label: language === 'es' ? 'Estantería' : 'My Shelf', color: 'var(--accent-primary)', step: 0 },
+      { id: 'guides', label: language === 'es' ? 'Guías' : 'Guides', color: 'var(--color-guide, #2DD4BF)', step: 1 },
+    ];
+    if (hasMusic) {
+      tabs.push({ id: 'music', label: language === 'es' ? 'Música' : 'Music', color: 'var(--color-music, #1DB954)', step: 3 });
+    }
+    tabs.push({ id: 'favorites', label: language === 'es' ? 'Destacados' : 'Favorites', color: '#F472B6', step: hasMusic ? 6 : 3 });
+    return tabs;
+  }, [language, hasMusic]);
+
+  const isCarouselFilter = (currentProfileStep === 0 && mediaFilter === 'all') ||
+    ((hasMusic ? currentProfileStep === 6 : currentProfileStep === 3) && favoritesMediaFilter === 'all');
+
   const [favoritesPage, setFavoritesPage] = useState(1);
   const [shelfViewMode, setShelfViewMode] = useState<'grid' | 'list'>(() => {
     try {
@@ -1817,21 +1924,6 @@ export const Profile: React.FC = () => {
   const [nowPlaying, setNowPlaying] = useState<any>(null);
   const [topAlbums, setTopAlbums] = useState<any[]>([]);
 
-  const musicTypeParam = searchParams.get('type');
-  const validMusicTypes = ['artists', 'albums', 'tracks'] as const;
-  const initialMusicType: 'artists' | 'albums' | 'tracks' = (musicTypeParam && validMusicTypes.includes(musicTypeParam as any))
-    ? (musicTypeParam as 'artists' | 'albums' | 'tracks')
-    : 'artists';
-
-  const musicPeriodParam = searchParams.get('period');
-  const validMusicPeriods = ['7day', '1month', 'overall'] as const;
-  const initialMusicPeriod: '7day' | '1month' | 'overall' = (musicPeriodParam && validMusicPeriods.includes(musicPeriodParam as any))
-    ? (musicPeriodParam as '7day' | '1month' | 'overall')
-    : '7day';
-
-  const [musicType, setMusicType] = useState<'artists' | 'albums' | 'tracks'>(initialMusicType);
-  const [musicPeriod, setMusicPeriod] = useState<'7day' | '1month' | 'overall'>(initialMusicPeriod);
-
   // Sync state if URL searchParams change externally (e.g. back/forward navigation)
   useEffect(() => {
     if (activeTab === 'music') {
@@ -1873,6 +1965,16 @@ export const Profile: React.FC = () => {
     setSearchParams(newParams);
   };
   const [musicItems, setMusicItems] = useState<any[]>([]);
+  const [musicMap, setMusicMap] = useState<Record<'artists' | 'albums' | 'tracks', any[]>>({
+    artists: [],
+    albums: [],
+    tracks: []
+  });
+  const [musicLoadingMap, setMusicLoadingMap] = useState<Record<'artists' | 'albums' | 'tracks', boolean>>({
+    artists: false,
+    albums: false,
+    tracks: false
+  });
   const [isMusicDataLoading, setIsMusicDataLoading] = useState<boolean>(false);
   const [isConnectingLastFm, setIsConnectingLastFm] = useState(false);
   const [isLastFmLoading, setIsLastFmLoading] = useState<boolean>(false);
@@ -2350,6 +2452,12 @@ export const Profile: React.FC = () => {
           if (tartData && tartData.length > 0) musicCacheRef.current[`${targetId}_artists_7day`] = tartData;
           if (ttrData && ttrData.length > 0) musicCacheRef.current[`${targetId}_tracks_7day`] = ttrData;
 
+          setMusicMap({
+            artists: tartData,
+            albums: taData,
+            tracks: ttrData
+          });
+
           // If current view items empty, update
           setMusicItems((prevItems) => {
             if (prevItems && prevItems.length > 0) return prevItems;
@@ -2434,76 +2542,76 @@ export const Profile: React.FC = () => {
     if (!profile?.lastfm_username || !profile?.id) return;
 
     const targetId = profile.id;
-    let endpoint = 'top-albums';
-    if (musicType === 'artists') endpoint = 'top-artists';
-    if (musicType === 'tracks') endpoint = 'top-tracks';
-
-    const cacheKey = `${targetId}_${musicType}_${musicPeriod}`;
-    if (musicCacheRef.current[cacheKey] && musicCacheRef.current[cacheKey].length > 0) {
-      const cachedItems = musicCacheRef.current[cacheKey];
-      setMusicItems(cachedItems);
-      setIsMusicDataLoading(false);
-
-      // Stagger prefetch details for top visible items in background
-      const prefetchList = cachedItems.slice(0, 8).map(item => ({
-        type: (musicType === 'artists' ? 'artist' : musicType === 'albums' ? 'album' : 'track') as 'artist' | 'album' | 'track',
-        artist: musicType === 'artists' ? item.name : item.artist,
-        name: musicType === 'artists' ? undefined : item.name
-      }));
-      batchPrefetchMusicItems(prefetchList, 8, 250);
-    } else {
-      if (activeTab === 'music') {
-        setIsMusicDataLoading(true);
-      }
-    }
-
-    const url = `/users/${targetId}/music/${endpoint}?period=${musicPeriod}`;
-
     let isMounted = true;
-    apiClient.get(url)
-      .then(res => {
-        if (!isMounted) return;
-        const items = Array.isArray(res.data) ? res.data : [];
-        if (items.length > 0) {
-          musicCacheRef.current[cacheKey] = items;
-        }
-        setMusicItems(items);
 
-        // Stagger prefetch details for top visible items in background
-        const prefetchList = items.slice(0, 8).map(item => ({
-          type: (musicType === 'artists' ? 'artist' : musicType === 'albums' ? 'album' : 'track') as 'artist' | 'album' | 'track',
-          artist: musicType === 'artists' ? item.name : item.artist,
-          name: musicType === 'artists' ? undefined : item.name
-        }));
-        batchPrefetchMusicItems(prefetchList, 8, 250);
-      })
-      .catch(() => {
-        if (!isMounted) return;
-        if (!musicCacheRef.current[cacheKey] || musicCacheRef.current[cacheKey].length === 0) {
-          setMusicItems([]);
-        }
-      })
-      .finally(() => {
-        if (isMounted) {
+    const types = ['artists', 'albums', 'tracks'] as const;
+
+    types.forEach(type => {
+      let endpoint = 'top-albums';
+      if (type === 'artists') endpoint = 'top-artists';
+      if (type === 'tracks') endpoint = 'top-tracks';
+
+      const cacheKey = `${targetId}_${type}_${musicPeriod}`;
+      if (musicCacheRef.current[cacheKey] && musicCacheRef.current[cacheKey].length > 0) {
+        const cachedItems = musicCacheRef.current[cacheKey];
+        setMusicMap(prev => ({ ...prev, [type]: cachedItems }));
+        setMusicLoadingMap(prev => ({ ...prev, [type]: false }));
+        if (musicType === type) {
+          setMusicItems(cachedItems);
           setIsMusicDataLoading(false);
         }
-      });
 
-    // Background prefetch the other periods for this category so switching 7day -> 1month -> overall is instantaneous
-    const otherPeriods = (['7day', '1month', 'overall'] as const).filter(p => p !== musicPeriod);
-    otherPeriods.forEach((otherP, idx) => {
-      const otherKey = `${targetId}_${musicType}_${otherP}`;
-      if (!musicCacheRef.current[otherKey] || musicCacheRef.current[otherKey].length === 0) {
-        setTimeout(() => {
-          if (!isMounted) return;
-          apiClient.get(`/users/${targetId}/music/${endpoint}?period=${otherP}`)
-            .then(res => {
-              if (Array.isArray(res.data)) {
-                musicCacheRef.current[otherKey] = res.data;
+        // Stagger prefetch details for top visible items in background
+        const prefetchList = cachedItems.slice(0, 8).map(item => ({
+          type: (type === 'artists' ? 'artist' : type === 'albums' ? 'album' : 'track') as 'artist' | 'album' | 'track',
+          artist: type === 'artists' ? item.name : item.artist,
+          name: type === 'artists' ? undefined : item.name
+        }));
+        batchPrefetchMusicItems(prefetchList, 8, 250);
+      } else {
+        setMusicLoadingMap(prev => ({ ...prev, [type]: true }));
+        if (musicType === type && activeTab === 'music') {
+          setIsMusicDataLoading(true);
+        }
+
+        const url = `/users/${targetId}/music/${endpoint}?period=${musicPeriod}`;
+        apiClient.get(url)
+          .then(res => {
+            if (!isMounted) return;
+            const items = Array.isArray(res.data) ? res.data : [];
+            if (items.length > 0) {
+              musicCacheRef.current[cacheKey] = items;
+            }
+            setMusicMap(prev => ({ ...prev, [type]: items }));
+            if (musicType === type) {
+              setMusicItems(items);
+            }
+
+            // Stagger prefetch details for top visible items in background
+            const prefetchList = items.slice(0, 8).map(item => ({
+              type: (type === 'artists' ? 'artist' : type === 'albums' ? 'album' : 'track') as 'artist' | 'album' | 'track',
+              artist: type === 'artists' ? item.name : item.artist,
+              name: type === 'artists' ? undefined : item.name
+            }));
+            batchPrefetchMusicItems(prefetchList, 8, 250);
+          })
+          .catch(() => {
+            if (!isMounted) return;
+            if (!musicCacheRef.current[cacheKey] || musicCacheRef.current[cacheKey].length === 0) {
+              setMusicMap(prev => ({ ...prev, [type]: [] }));
+              if (musicType === type) {
+                setMusicItems([]);
               }
-            })
-            .catch(() => {});
-        }, (idx + 1) * 350);
+            }
+          })
+          .finally(() => {
+            if (isMounted) {
+              setMusicLoadingMap(prev => ({ ...prev, [type]: false }));
+              if (musicType === type) {
+                setIsMusicDataLoading(false);
+              }
+            }
+          });
       }
     });
 
@@ -3143,6 +3251,1189 @@ export const Profile: React.FC = () => {
 
   const profileTheme = getProfileTheme(profile?.profile_color, isLight);
 
+  const renderGuideMediaIcon = (mt: string) => {
+    switch (mt) {
+      case 'movie':
+        return <span key={mt} style={{ display: 'inline-flex', alignItems: 'center' }} title={language === 'es' ? 'Películas' : 'Movies'}><Film size={13} color="var(--color-movie)" /></span>;
+      case 'series':
+        return <span key={mt} style={{ display: 'inline-flex', alignItems: 'center' }} title={language === 'es' ? 'Series' : 'TV Shows'}><Tv size={13} color="var(--color-series)" /></span>;
+      case 'anime':
+        return <span key={mt} style={{ display: 'inline-flex', alignItems: 'center' }} title="Anime"><Sparkles size={13} color="var(--color-anime)" /></span>;
+      case 'manga':
+        return <span key={mt} style={{ display: 'inline-flex', alignItems: 'center' }} title="Manga"><MessageCircle size={13} color="var(--color-manga)" /></span>;
+      case 'game':
+        return <span key={mt} style={{ display: 'inline-flex', alignItems: 'center' }} title={language === 'es' ? 'Juegos' : 'Games'}><Gamepad2 size={13} color="var(--color-game)" /></span>;
+      case 'book':
+        return <span key={mt} style={{ display: 'inline-flex', alignItems: 'center' }} title={language === 'es' ? 'Libros' : 'Books'}><Book size={13} color="var(--color-book)" /></span>;
+      case 'comic':
+        return <span key={mt} style={{ display: 'inline-flex', alignItems: 'center' }} title={language === 'es' ? 'Cómics' : 'Comics'}><MessageSquare size={13} color="var(--color-comic)" /></span>;
+      default:
+        return null;
+    }
+  };
+
+  const renderGuideCard = (list: any, isSaved: boolean) => {
+    const guideItemsCount = list.items_count ?? list.items?.length ?? 0;
+    return (
+      <div
+        key={list.id}
+        className="activity-card activity-card-portrait guide-explore-card profile-guide-card"
+        style={{
+          minWidth: '240px',
+          width: '240px',
+          background: 'var(--bg-secondary)',
+          border: '1px solid var(--border-color)',
+          borderRadius: '12px',
+          overflow: 'hidden',
+          cursor: 'pointer',
+          position: 'relative',
+          display: 'flex',
+          flexDirection: 'column',
+          transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+        }}
+        onClick={() => handleOpenGuide(list.id)}
+      >
+        <div
+          className="card-item-title"
+          style={{
+            padding: '0.5rem 0.75rem',
+            fontSize: '0.85rem',
+            fontWeight: 600,
+            borderBottom: '1px solid var(--border-color)',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis'
+          }}
+          title={list.title}
+        >
+          {list.title}
+        </div>
+
+        <div
+          className="card-media-cover"
+          style={{
+            position: 'relative',
+            width: '100%',
+            height: '140px',
+            background: 'linear-gradient(135deg, rgba(255,255,255,0.05), rgba(0,0,0,0.4))',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            overflow: 'hidden'
+          }}
+        >
+          {list.covers && list.covers.length > 0 ? (
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: list.covers.length >= 2 ? '1fr 1fr' : '1fr',
+                gridTemplateRows: list.covers.length >= 3 ? '1fr 1fr' : '1fr',
+                width: '100%',
+                height: '100%',
+                gap: '2px',
+                background: '#000'
+              }}
+            >
+              {list.covers.slice(0, 4).map((img: string, cIdx: number) => (
+                <img
+                  key={cIdx}
+                  src={img}
+                  alt=""
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                />
+              ))}
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', color: 'var(--text-secondary)' }}>
+              <BookOpen size={28} color="var(--color-guide, #2DD4BF)" />
+            </div>
+          )}
+
+          {!isSaved && (
+            <span
+              className="guide-visibility-badge"
+              style={{
+                position: 'absolute',
+                top: '6px',
+                left: '6px',
+                fontSize: '0.7rem',
+                padding: '0.15rem 0.45rem',
+                borderRadius: '4px',
+                background: list.visibility === 'draft' ? 'rgba(245, 158, 11, 0.9)' : list.visibility === 'private' ? 'rgba(15, 23, 42, 0.85)' : 'rgba(45, 212, 191, 0.9)',
+                color: list.visibility === 'draft' ? '#0f172a' : '#ffffff',
+                fontWeight: 700,
+                backdropFilter: 'blur(4px)',
+                zIndex: 2
+              }}
+            >
+              {list.visibility === 'draft'
+                ? (language === 'es' ? 'Borrador' : 'Draft')
+                : (list.visibility === 'private'
+                    ? (language === 'es' ? 'Privada' : 'Private')
+                    : (language === 'es' ? 'Pública' : 'Public')
+                  )
+              }
+            </span>
+          )}
+
+          <div
+            className="guide-items-badge"
+            style={{
+              position: 'absolute',
+              bottom: '6px',
+              right: '6px',
+              background: 'rgba(0,0,0,0.75)',
+              backdropFilter: 'blur(4px)',
+              padding: '2px 7px',
+              borderRadius: '4px',
+              fontSize: '0.72rem',
+              fontWeight: 600,
+              color: '#fff',
+              zIndex: 2
+            }}
+          >
+            {guideItemsCount} {t('guidesWorksCount')}
+          </div>
+        </div>
+
+        <div
+          className="card-body-content"
+          style={{
+            padding: '0.75rem',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.35rem',
+            flex: 1,
+            minHeight: '2.5rem',
+            justifyContent: 'center'
+          }}
+        >
+          {list.description ? (
+            <p
+              className="profile-guide-desc"
+              style={{
+                color: 'var(--text-secondary)',
+                fontSize: '0.78rem',
+                margin: 0,
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+                lineHeight: 1.25
+              }}
+            >
+              {list.description}
+            </p>
+          ) : null}
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+            <span>{guideItemsCount} {t('guidesWorksCount')}</span>
+            {list.media_types && list.media_types.length > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                {list.media_types.map((mt: string) => renderGuideMediaIcon(mt))}
+              </div>
+            )}
+            {!isSaved && (
+              <span
+                className="profile-guide-status-inline"
+                style={{
+                  fontSize: '0.7rem',
+                  fontWeight: 600,
+                  color: list.visibility === 'draft' ? '#f59e0b' : list.visibility === 'private' ? 'var(--text-secondary)' : 'var(--color-guide, #2DD4BF)'
+                }}
+              >
+                • {list.visibility === 'draft'
+                    ? (language === 'es' ? 'Borrador' : 'Draft')
+                    : (list.visibility === 'private'
+                        ? (language === 'es' ? 'Privada' : 'Private')
+                        : (language === 'es' ? 'Pública' : 'Public')
+                      )
+                  }
+              </span>
+            )}
+          </div>
+        </div>
+
+        {!isSaved && isOwnProfile ? (
+          <div
+            className="card-actions-wrap profile-guide-actions"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              display: 'flex',
+              gap: '0.35rem',
+              alignItems: 'center',
+              padding: '0.5rem 0.75rem',
+              borderTop: '1px solid var(--border-color)',
+              background: 'rgba(0,0,0,0.15)'
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => handleOpenGuide(list.id)}
+              className="btn-secondary"
+              style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.78rem', padding: '0.25rem 0.55rem', flex: 1, justifyContent: 'center' }}
+            >
+              <Eye size={13} /> {language === 'es' ? 'Ver' : 'View'}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (list.can_edit !== false) {
+                  navigate(`/create?edit=${list.id}`);
+                } else {
+                  setShowProModal(true);
+                }
+              }}
+              className="btn-secondary"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.3rem',
+                fontSize: '0.78rem',
+                padding: '0.25rem 0.55rem',
+                color: list.can_edit === false ? '#f59e0b' : 'inherit',
+                borderColor: list.can_edit === false ? 'rgba(245, 158, 11, 0.3)' : 'var(--border-color)'
+              }}
+              title={language === 'es' ? 'Editar' : 'Edit'}
+            >
+              {list.can_edit === false ? <Lock size={13} /> : <Edit size={13} />}
+            </button>
+            <button
+              type="button"
+              onClick={() => handleDeleteGuide(list.id)}
+              className="btn-secondary"
+              style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.78rem', padding: '0.25rem 0.55rem', color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.2)' }}
+              title={language === 'es' ? 'Eliminar' : 'Delete'}
+            >
+              <Trash2 size={13} />
+            </button>
+          </div>
+        ) : null}
+      </div>
+    );
+  };
+
+  const guideBtnBaseStyle: React.CSSProperties = {
+    position: 'absolute',
+    top: '50%',
+    transform: 'translateY(-50%)',
+    zIndex: 10,
+    background: 'var(--bg-tertiary)',
+    border: '1.5px solid var(--border-color)',
+    borderRadius: '50%',
+    width: '40px',
+    height: '40px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: 'pointer',
+    boxShadow: '0 4px 6px rgba(0,0,0,0.3)',
+    color: 'var(--text-primary)',
+    transition: 'border-color 0.15s ease, background 0.1s ease, color 0.1s ease, transform 0.1s ease, opacity 0.2s ease, visibility 0.2s ease'
+  };
+
+  const handleMouseEnterGuideBtn = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.currentTarget.style.borderColor = 'var(--color-guide, #2DD4BF)';
+  };
+  const handleMouseLeaveGuideBtn = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.currentTarget.style.borderColor = 'var(--border-color)';
+    e.currentTarget.style.background = 'var(--bg-tertiary)';
+    e.currentTarget.style.color = 'var(--text-primary)';
+  };
+  const handleMouseDownGuideBtn = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.currentTarget.style.background = 'var(--color-guide, #2DD4BF)';
+    e.currentTarget.style.borderColor = 'var(--color-guide, #2DD4BF)';
+    e.currentTarget.style.color = '#0f172a';
+  };
+  const handleMouseUpGuideBtn = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.currentTarget.style.background = 'var(--bg-tertiary)';
+    e.currentTarget.style.borderColor = 'var(--color-guide, #2DD4BF)';
+    e.currentTarget.style.color = 'var(--text-primary)';
+  };
+
+  const getCreatedMaskImage = () => {
+    if (canCreatedGuidesScrollLeft && canCreatedGuidesScrollRight) {
+      return 'linear-gradient(to right, transparent 0px, transparent 45px, black 95px, black calc(100% - 95px), transparent calc(100% - 45px), transparent 100%)';
+    } else if (canCreatedGuidesScrollLeft) {
+      return 'linear-gradient(to right, transparent 0px, transparent 45px, black 95px, black 100%)';
+    } else if (canCreatedGuidesScrollRight) {
+      return 'linear-gradient(to right, black 0px, black calc(100% - 95px), transparent calc(100% - 45px), transparent 100%)';
+    }
+    return 'none';
+  };
+
+  const getSavedMaskImage = () => {
+    if (canSavedGuidesScrollLeft && canSavedGuidesScrollRight) {
+      return 'linear-gradient(to right, transparent 0px, transparent 45px, black 95px, black calc(100% - 95px), transparent calc(100% - 45px), transparent 100%)';
+    } else if (canSavedGuidesScrollLeft) {
+      return 'linear-gradient(to right, transparent 0px, transparent 45px, black 95px, black 100%)';
+    } else if (canSavedGuidesScrollRight) {
+      return 'linear-gradient(to right, black 0px, black calc(100% - 95px), transparent calc(100% - 45px), transparent 100%)';
+    }
+    return 'none';
+  };
+
+  const renderCreatedGuidesSlide = () => {
+    if (!profile) return null;
+    const availableGuidesWidth = Math.max(0, guidesContainerWidth - 90);
+    const maxGuidesInOneRow = Math.max(1, Math.floor((availableGuidesWidth + 16) / 276));
+    const canExpandCreated = profile.created_lists.length > maxGuidesInOneRow;
+    const isCreatedTwoRows = isCreatedGuidesExpanded;
+    const totalCreatedCols = isCreatedTwoRows ? Math.ceil(profile.created_lists.length / 2) : profile.created_lists.length;
+    const totalCreatedPages = Math.max(1, Math.ceil(totalCreatedCols / maxGuidesInOneRow));
+    const currentCreatedPage = Math.min(totalCreatedPages, Math.max(1, createdGuidesPage));
+
+    return (
+      <div
+        ref={el => { if (el) (guidesContainerRef as any).current = el; }}
+        style={{ width: '100%', flex: 1, display: 'flex', flexDirection: 'column', gap: '1.5rem', textAlign: 'left' }}
+      >
+        {/* Mobile View */}
+        <div className="home-mobile-only" style={{ width: '100%' }}>
+          {profile.created_lists.length === 0 ? (
+            <div className="glass-card" style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+              {language === 'es' ? 'Aún no has creado ninguna guía.' : 'You have not created any guides yet.'}
+            </div>
+          ) : (
+            <div className="mobile-vertical-stack">
+              {profile.created_lists.map(list => (
+                <div key={list.id} className="profile-guide-item-wrapper" style={{ width: '100%' }}>
+                  {renderGuideCard(list, false)}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Desktop View */}
+        <div className="home-desktop-only" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', width: '100%' }}>
+          {/* Desktop Sub-tabs Pills */}
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <div style={{ display: 'flex', background: 'var(--bg-tertiary)', padding: '3px', borderRadius: '8px', gap: '4px', border: '1px solid var(--border-color)' }}>
+              <button
+                type="button"
+                onClick={() => goToProfileStep(1)}
+                style={{
+                  border: 'none',
+                  background: 'var(--color-guide, #2DD4BF)',
+                  color: '#0f172a',
+                  padding: '6px 14px',
+                  borderRadius: '6px',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.45rem'
+                }}
+              >
+                <span>{language === 'es' ? 'Guías creadas' : 'Created Guides'}</span>
+                <span style={{ fontSize: '0.78rem', opacity: 0.9 }}>({profile.created_lists.length})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => goToProfileStep(2)}
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  color: 'var(--text-secondary)',
+                  padding: '6px 14px',
+                  borderRadius: '6px',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.45rem'
+                }}
+              >
+                <span>{language === 'es' ? 'Guías guardadas' : 'Saved Guides'}</span>
+                <span style={{ fontSize: '0.78rem', opacity: 0.9 }}>({profile.saved_lists.length})</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Created Guides Section */}
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                <h3 style={{ margin: 0 }}>{language === 'es' ? 'Guías Creadas' : 'Created Guides'}</h3>
+                <span
+                  style={{
+                    fontSize: '0.8rem',
+                    fontWeight: 700,
+                    padding: '0.15rem 0.55rem',
+                    borderRadius: '12px',
+                    background: 'rgba(45, 212, 191, 0.15)',
+                    color: 'var(--color-guide, #2DD4BF)',
+                    border: '1px solid rgba(45, 212, 191, 0.3)'
+                  }}
+                >
+                  {profile.created_lists.length}
+                </span>
+              </div>
+              {canExpandCreated && (
+                <button
+                  type="button"
+                  onClick={handleToggleCreatedGuidesExpanded}
+                  className="shelf-view-toggle-btn"
+                  title={isCreatedGuidesExpanded
+                    ? (language === 'es' ? 'Contraer' : 'Collapse')
+                    : (language === 'es' ? 'Expandir' : 'Expand')
+                  }
+                  aria-label={isCreatedGuidesExpanded
+                    ? (language === 'es' ? 'Contraer' : 'Collapse')
+                    : (language === 'es' ? 'Expandir' : 'Expand')
+                  }
+                  style={{ padding: '0.3rem 0.55rem', borderRadius: '6px' }}
+                >
+                  {isCreatedGuidesExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                </button>
+              )}
+            </div>
+
+            {profile.created_lists.length === 0 ? (
+              <div className="glass-card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                {language === 'es' ? 'Aún no has creado ninguna guía.' : 'You have not created any guides yet.'}
+              </div>
+            ) : (
+              <div style={{ position: 'relative', width: '100%' }}>
+                {/* Left fade click-blocking zone */}
+                {canCreatedGuidesScrollLeft && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      left: 0,
+                      top: 0,
+                      bottom: 0,
+                      width: '70px',
+                      zIndex: 8,
+                      pointerEvents: 'auto',
+                      cursor: 'default'
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                )}
+
+                {/* Left Arrow Button */}
+                <button
+                  type="button"
+                  onClick={() => createdContinuousScroll.handleClick('left', isCreatedGuidesExpanded ? 480 : 360)}
+                  onMouseEnter={handleMouseEnterGuideBtn}
+                  onMouseLeave={(e) => {
+                    handleMouseLeaveGuideBtn(e);
+                    createdContinuousScroll.stopScrolling();
+                  }}
+                  onMouseDown={(e) => {
+                    handleMouseDownGuideBtn(e);
+                    createdContinuousScroll.startScrolling('left');
+                  }}
+                  onMouseUp={(e) => {
+                    handleMouseUpGuideBtn(e);
+                    createdContinuousScroll.stopScrolling();
+                  }}
+                  onTouchStart={() => createdContinuousScroll.startScrolling('left')}
+                  onTouchEnd={createdContinuousScroll.stopScrolling}
+                  onTouchCancel={createdContinuousScroll.stopScrolling}
+                  style={{
+                    ...guideBtnBaseStyle,
+                    left: '0px',
+                    opacity: canCreatedGuidesScrollLeft ? 1 : 0,
+                    visibility: canCreatedGuidesScrollLeft ? 'visible' : 'hidden',
+                    pointerEvents: canCreatedGuidesScrollLeft ? 'auto' : 'none'
+                  }}
+                  aria-label={language === 'es' ? 'Desplazar a la izquierda' : 'Scroll left'}
+                >
+                  <ChevronLeft size={20} color="currentColor" />
+                </button>
+
+                {/* Horizontal scroll container */}
+                <div
+                  ref={createdGuidesScrollRef}
+                  onScroll={updateCreatedGuidesScrollState}
+                  style={{
+                    display: isCreatedTwoRows ? 'grid' : 'flex',
+                    gridTemplateRows: isCreatedTwoRows ? 'repeat(2, auto)' : undefined,
+                    gridAutoFlow: isCreatedTwoRows ? 'column' : undefined,
+                    gridAutoColumns: isCreatedTwoRows ? '260px' : undefined,
+                    gap: '1rem',
+                    overflowX: 'auto',
+                    overflowY: 'hidden',
+                    scrollSnapType: 'none',
+                    scrollBehavior: 'smooth',
+                    scrollbarWidth: 'none',
+                    msOverflowStyle: 'none',
+                    paddingTop: '8px',
+                    paddingBottom: '1rem',
+                    paddingLeft: '45px',
+                    paddingRight: '45px',
+                    WebkitMaskImage: getCreatedMaskImage(),
+                    maskImage: getCreatedMaskImage()
+                  }}
+                >
+                  {profile.created_lists.map(list => (
+                    <div key={list.id} className="profile-guide-item-wrapper" style={{ minWidth: '260px', maxWidth: '260px', flexShrink: 0 }}>
+                      {renderGuideCard(list, false)}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Right Arrow Button */}
+                <button
+                  type="button"
+                  onClick={() => createdContinuousScroll.handleClick('right', isCreatedGuidesExpanded ? 480 : 360)}
+                  onMouseEnter={handleMouseEnterGuideBtn}
+                  onMouseLeave={(e) => {
+                    handleMouseLeaveGuideBtn(e);
+                    createdContinuousScroll.stopScrolling();
+                  }}
+                  onMouseDown={(e) => {
+                    handleMouseDownGuideBtn(e);
+                    createdContinuousScroll.startScrolling('right');
+                  }}
+                  onMouseUp={(e) => {
+                    handleMouseUpGuideBtn(e);
+                    createdContinuousScroll.stopScrolling();
+                  }}
+                  onTouchStart={() => createdContinuousScroll.startScrolling('right')}
+                  onTouchEnd={createdContinuousScroll.stopScrolling}
+                  onTouchCancel={createdContinuousScroll.stopScrolling}
+                  style={{
+                    ...guideBtnBaseStyle,
+                    right: '0px',
+                    opacity: canCreatedGuidesScrollRight ? 1 : 0,
+                    visibility: canCreatedGuidesScrollRight ? 'visible' : 'hidden',
+                    pointerEvents: canCreatedGuidesScrollRight ? 'auto' : 'none'
+                  }}
+                  aria-label={language === 'es' ? 'Desplazar a la derecha' : 'Scroll right'}
+                >
+                  <ChevronRight size={20} color="currentColor" />
+                </button>
+
+                {/* Right fade click-blocking zone */}
+                {canCreatedGuidesScrollRight && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      right: 0,
+                      top: 0,
+                      bottom: 0,
+                      width: '70px',
+                      zIndex: 8,
+                      pointerEvents: 'auto',
+                      cursor: 'default'
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                )}
+
+                {/* Created Guides Page indicator */}
+                {totalCreatedPages > 1 && (
+                  <div style={{ textAlign: 'center', marginTop: '0.75rem', fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
+                    {language === 'es' ? `Página ${currentCreatedPage} de ${totalCreatedPages}` : `Page ${currentCreatedPage} of ${totalCreatedPages}`}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderSavedGuidesSlide = () => {
+    if (!profile) return null;
+    const availableGuidesWidth = Math.max(0, guidesContainerWidth - 90);
+    const maxGuidesInOneRow = Math.max(1, Math.floor((availableGuidesWidth + 16) / 276));
+    const canExpandSaved = profile.saved_lists.length > maxGuidesInOneRow;
+    const isSavedTwoRows = isSavedGuidesExpanded;
+    const totalSavedCols = isSavedTwoRows ? Math.ceil(profile.saved_lists.length / 2) : profile.saved_lists.length;
+    const totalSavedPages = Math.max(1, Math.ceil(totalSavedCols / maxGuidesInOneRow));
+    const currentSavedPage = Math.min(totalSavedPages, Math.max(1, savedGuidesPage));
+
+    return (
+      <div
+        ref={el => { if (el) (guidesContainerRef as any).current = el; }}
+        style={{ width: '100%', flex: 1, display: 'flex', flexDirection: 'column', gap: '1.5rem', textAlign: 'left' }}
+      >
+        {/* Mobile View */}
+        <div className="home-mobile-only" style={{ width: '100%' }}>
+          {profile.saved_lists.length === 0 ? (
+            <div className="glass-card" style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+              {language === 'es' ? 'Aún no tienes guías guardadas.' : 'You have no saved guides yet.'}
+            </div>
+          ) : (
+            <div className="mobile-vertical-stack">
+              {profile.saved_lists.map(list => (
+                <div key={list.id} className="profile-guide-item-wrapper" style={{ width: '100%' }}>
+                  {renderGuideCard(list, true)}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Desktop View */}
+        <div className="home-desktop-only" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', width: '100%' }}>
+          {/* Desktop Sub-tabs Pills */}
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <div style={{ display: 'flex', background: 'var(--bg-tertiary)', padding: '3px', borderRadius: '8px', gap: '4px', border: '1px solid var(--border-color)' }}>
+              <button
+                type="button"
+                onClick={() => goToProfileStep(1)}
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  color: 'var(--text-secondary)',
+                  padding: '6px 14px',
+                  borderRadius: '6px',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.45rem'
+                }}
+              >
+                <span>{language === 'es' ? 'Guías creadas' : 'Created Guides'}</span>
+                <span style={{ fontSize: '0.78rem', opacity: 0.9 }}>({profile.created_lists.length})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => goToProfileStep(2)}
+                style={{
+                  border: 'none',
+                  background: 'var(--color-guide, #2DD4BF)',
+                  color: '#0f172a',
+                  padding: '6px 14px',
+                  borderRadius: '6px',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.45rem'
+                }}
+              >
+                <span>{language === 'es' ? 'Guías guardadas' : 'Saved Guides'}</span>
+                <span style={{ fontSize: '0.78rem', opacity: 0.9 }}>({profile.saved_lists.length})</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Saved Guides Section */}
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                <h3 style={{ margin: 0 }}>{language === 'es' ? 'Guías Guardadas' : 'Saved Guides'}</h3>
+                <span
+                  style={{
+                    fontSize: '0.8rem',
+                    fontWeight: 700,
+                    padding: '0.15rem 0.55rem',
+                    borderRadius: '12px',
+                    background: 'rgba(45, 212, 191, 0.15)',
+                    color: 'var(--color-guide, #2DD4BF)',
+                    border: '1px solid rgba(45, 212, 191, 0.3)'
+                  }}
+                >
+                  {profile.saved_lists.length}
+                </span>
+              </div>
+              {canExpandSaved && (
+                <button
+                  type="button"
+                  onClick={handleToggleSavedGuidesExpanded}
+                  className="shelf-view-toggle-btn"
+                  title={isSavedGuidesExpanded
+                    ? (language === 'es' ? 'Contraer' : 'Collapse')
+                    : (language === 'es' ? 'Expandir' : 'Expand')
+                  }
+                  aria-label={isSavedGuidesExpanded
+                    ? (language === 'es' ? 'Contraer' : 'Collapse')
+                    : (language === 'es' ? 'Expandir' : 'Expand')
+                  }
+                  style={{ padding: '0.3rem 0.55rem', borderRadius: '6px' }}
+                >
+                  {isSavedGuidesExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                </button>
+              )}
+            </div>
+
+            {profile.saved_lists.length === 0 ? (
+              <div className="glass-card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                {language === 'es' ? 'Aún no tienes guías guardadas.' : 'You have no saved guides yet.'}
+              </div>
+            ) : (
+              <div style={{ position: 'relative', width: '100%' }}>
+                {/* Left fade click-blocking zone */}
+                {canSavedGuidesScrollLeft && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      left: 0,
+                      top: 0,
+                      bottom: 0,
+                      width: '70px',
+                      zIndex: 8,
+                      pointerEvents: 'auto',
+                      cursor: 'default'
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                )}
+
+                {/* Left Arrow Button */}
+                <button
+                  type="button"
+                  onClick={() => savedContinuousScroll.handleClick('left', isSavedGuidesExpanded ? 480 : 360)}
+                  onMouseEnter={handleMouseEnterGuideBtn}
+                  onMouseLeave={(e) => {
+                    handleMouseLeaveGuideBtn(e);
+                    savedContinuousScroll.stopScrolling();
+                  }}
+                  onMouseDown={(e) => {
+                    handleMouseDownGuideBtn(e);
+                    savedContinuousScroll.startScrolling('left');
+                  }}
+                  onMouseUp={(e) => {
+                    handleMouseUpGuideBtn(e);
+                    savedContinuousScroll.stopScrolling();
+                  }}
+                  onTouchStart={() => savedContinuousScroll.startScrolling('left')}
+                  onTouchEnd={savedContinuousScroll.stopScrolling}
+                  onTouchCancel={savedContinuousScroll.stopScrolling}
+                  style={{
+                    ...guideBtnBaseStyle,
+                    left: '0px',
+                    opacity: canSavedGuidesScrollLeft ? 1 : 0,
+                    visibility: canSavedGuidesScrollLeft ? 'visible' : 'hidden',
+                    pointerEvents: canSavedGuidesScrollLeft ? 'auto' : 'none'
+                  }}
+                  aria-label={language === 'es' ? 'Desplazar a la izquierda' : 'Scroll left'}
+                >
+                  <ChevronLeft size={20} color="currentColor" />
+                </button>
+
+                {/* Horizontal scroll container */}
+                <div
+                  ref={savedGuidesScrollRef}
+                  onScroll={updateSavedGuidesScrollState}
+                  style={{
+                    display: isSavedTwoRows ? 'grid' : 'flex',
+                    gridTemplateRows: isSavedTwoRows ? 'repeat(2, auto)' : undefined,
+                    gridAutoFlow: isSavedTwoRows ? 'column' : undefined,
+                    gridAutoColumns: isSavedTwoRows ? '260px' : undefined,
+                    gap: '1rem',
+                    overflowX: 'auto',
+                    overflowY: 'hidden',
+                    scrollSnapType: 'none',
+                    scrollBehavior: 'smooth',
+                    scrollbarWidth: 'none',
+                    msOverflowStyle: 'none',
+                    paddingTop: '8px',
+                    paddingBottom: '1rem',
+                    paddingLeft: '45px',
+                    paddingRight: '45px',
+                    WebkitMaskImage: getSavedMaskImage(),
+                    maskImage: getSavedMaskImage()
+                  }}
+                >
+                  {profile.saved_lists.map(list => (
+                    <div key={list.id} className="profile-guide-item-wrapper" style={{ minWidth: '260px', maxWidth: '260px', flexShrink: 0 }}>
+                      {renderGuideCard(list, true)}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Right Arrow Button */}
+                <button
+                  type="button"
+                  onClick={() => savedContinuousScroll.handleClick('right', isSavedGuidesExpanded ? 480 : 360)}
+                  onMouseEnter={handleMouseEnterGuideBtn}
+                  onMouseLeave={(e) => {
+                    handleMouseLeaveGuideBtn(e);
+                    savedContinuousScroll.stopScrolling();
+                  }}
+                  onMouseDown={(e) => {
+                    handleMouseDownGuideBtn(e);
+                    savedContinuousScroll.startScrolling('right');
+                  }}
+                  onMouseUp={(e) => {
+                    handleMouseUpGuideBtn(e);
+                    savedContinuousScroll.stopScrolling();
+                  }}
+                  onTouchStart={() => savedContinuousScroll.startScrolling('right')}
+                  onTouchEnd={savedContinuousScroll.stopScrolling}
+                  onTouchCancel={savedContinuousScroll.stopScrolling}
+                  style={{
+                    ...guideBtnBaseStyle,
+                    right: '0px',
+                    opacity: canSavedGuidesScrollRight ? 1 : 0,
+                    visibility: canSavedGuidesScrollRight ? 'visible' : 'hidden',
+                    pointerEvents: canSavedGuidesScrollRight ? 'auto' : 'none'
+                  }}
+                  aria-label={language === 'es' ? 'Desplazar a la derecha' : 'Scroll right'}
+                >
+                  <ChevronRight size={20} color="currentColor" />
+                </button>
+
+                {/* Right fade click-blocking zone */}
+                {canSavedGuidesScrollRight && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      right: 0,
+                      top: 0,
+                      bottom: 0,
+                      width: '70px',
+                      zIndex: 8,
+                      pointerEvents: 'auto',
+                      cursor: 'default'
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                )}
+
+                {/* Saved Guides Page indicator */}
+                {totalSavedPages > 1 && (
+                  <div style={{ textAlign: 'center', marginTop: '0.75rem', fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
+                    {language === 'es' ? `Página ${currentSavedPage} de ${totalSavedPages}` : `Page ${currentSavedPage} of ${totalSavedPages}`}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderMusicPeriodSelector = () => (
+    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', background: 'var(--bg-secondary)', padding: '0.2rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+      {[
+        { id: '7day', label: language === 'es' ? '7 días' : '7 days', icon: Clock },
+        { id: '1month', label: language === 'es' ? '1 mes' : '1 month', icon: CalendarDays },
+        { id: 'overall', label: language === 'es' ? 'Siempre' : 'All time', icon: InfinityIcon }
+      ].map(p => {
+        const isSelected = musicPeriod === p.id;
+        const PeriodIcon = p.icon;
+        return (
+          <button
+            key={p.id}
+            type="button"
+            onClick={() => handleMusicPeriodChange(p.id as any)}
+            className={`shelf-view-toggle-btn ${isSelected ? 'active' : ''}`}
+            style={{
+              padding: '0.3rem 0.65rem',
+              borderRadius: '6px',
+              fontSize: '0.78rem',
+              fontWeight: isSelected ? 600 : 500,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.35rem',
+              border: 'none',
+              background: isSelected ? 'var(--color-music, #1DB954)' : 'transparent',
+              color: isSelected ? '#ffffff' : 'var(--text-secondary)'
+            }}
+          >
+            <PeriodIcon size={13} />
+            <span>{p.label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+
+  const renderLastFmConnectPanel = () => (
+    <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px', textAlign: 'left', width: '100%' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.75rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+          <h2 style={{ fontSize: '1.2rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0, color: 'var(--text-primary)' }}>
+            <Music size={20} color="#ef4444" />
+            {language === 'es' ? 'Mostrar música escuchada (Last.fm)' : 'Show Currently Playing Music (Last.fm)'}
+          </h2>
+          <span
+            style={{
+              fontSize: '0.75rem',
+              padding: '0.2rem 0.55rem',
+              borderRadius: '6px',
+              background: 'rgba(255, 255, 255, 0.05)',
+              color: 'var(--text-muted)',
+              border: '1px solid var(--border-color)',
+              fontWeight: 600
+            }}
+          >
+            {language === 'es' ? 'No conectado' : 'Not connected'}
+          </span>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setShowMusicGuideModal(true)}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            color: 'var(--accent-primary)',
+            fontSize: '0.85rem',
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.35rem',
+            padding: '0.2rem 0.4rem',
+            borderRadius: '6px'
+          }}
+        >
+          <HelpCircle size={15} />
+          {language === 'es' ? '¿Cómo conectar tu servicio de música?' : 'How to connect your music service?'}
+        </button>
+      </div>
+
+      <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', margin: '0 0 1.25rem 0', lineHeight: 1.5 }}>
+        {language === 'es'
+          ? 'Conecta tu cuenta de Last.fm para mostrar en tiempo real la música que estás escuchando en Spotify, YouTube Music, Apple Music, Tidal o archivos locales en tu perfil.'
+          : 'Connect your Last.fm account to display in real-time what music you are listening to on Spotify, YouTube Music, Apple Music, Tidal, or local players on your profile.'}
+      </p>
+
+      <div>
+        <button
+          type="button"
+          onClick={handleLastFmLogin}
+          className="btn-primary"
+          style={{
+            background: '#d51007',
+            border: 'none',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            padding: '0.65rem 1.25rem',
+            fontSize: '0.9rem',
+            fontWeight: 600,
+            boxShadow: '0 4px 14px rgba(213, 16, 7, 0.3)'
+          }}
+        >
+          <Music size={16} />
+          {language === 'es' ? 'Conectar con Last.fm' : 'Connect with Last.fm'}
+        </button>
+      </div>
+    </div>
+  );
+
+  const renderMusicGrid = (type: 'artists' | 'albums' | 'tracks', items: any[], isLoading: boolean) => {
+    if (isLoading) {
+      return (
+        <div style={{ padding: '3rem 1rem', display: 'flex', justifyContent: 'center' }}>
+          <PathdLoader size="medium" message={language === 'es' ? 'Cargando música...' : 'Loading music...'} />
+        </div>
+      );
+    }
+
+    if (items.length === 0) {
+      return (
+        <div className="glass-card" style={{ padding: '3rem 2rem', textAlign: 'center', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
+          <Music size={32} color="#ef4444" style={{ opacity: 0.8 }} />
+          <div style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+            {type === 'albums' && (language === 'es' ? 'No hay álbumes escuchados en este período.' : 'No albums played in this period.')}
+            {type === 'artists' && (language === 'es' ? 'No hay artistas escuchados en este período.' : 'No artists played in this period.')}
+            {type === 'tracks' && (language === 'es' ? 'No hay canciones escuchadas en este período.' : 'No tracks played in this period.')}
+          </div>
+          <p style={{ margin: 0, fontSize: '0.85rem', maxWidth: '450px', lineHeight: '1.45' }}>
+            {isOwnProfile
+              ? (language === 'es'
+                ? 'Asegúrate de vincular tu reproductor de música (Spotify, Apple Music, YouTube Music, Deezer, Tidal, etc.) en Last.fm para que tus reproducciones se sincronicen automáticamente aquí.'
+                : 'Make sure to connect your music player (Spotify, Apple Music, YouTube Music, Deezer, Tidal, etc.) in Last.fm so your scrobbles sync automatically here.')
+              : (language === 'es'
+                ? 'Este usuario aún no ha reproducido música en este período.'
+                : 'This user has not played any music during this period.')}
+          </p>
+          {isOwnProfile && (
+            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', justifyContent: 'center', marginTop: '0.5rem' }}>
+              <button
+                type="button"
+                onClick={() => setShowMusicGuideModal(true)}
+                className="btn-secondary"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                  fontSize: '0.85rem',
+                  padding: '0.5rem 1rem'
+                }}
+              >
+                <HelpCircle size={14} />
+                {language === 'es' ? '¿Cómo conectar mi música?' : 'How to connect my music?'}
+              </button>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <div className="profile-music-grid">
+        {items.map((item, i) => {
+          const itemArtist = type === 'artists' ? item.name : item.artist;
+          const itemName = type === 'artists' ? undefined : item.name;
+          const modalItemType = type === 'albums' ? 'album' : type === 'artists' ? 'artist' : 'track';
+
+          return (
+            <div
+              key={`${item.name}-${i}`}
+              className={`glass-card profile-music-card ${type === 'artists' ? 'profile-music-card-artist' : ''}`}
+              onClick={() => {
+                const targetRoute = modalItemType === 'artist'
+                  ? `/music/artist/${encodeURIComponent(itemArtist)}`
+                  : `/music/${modalItemType}/${encodeURIComponent(itemArtist)}/${encodeURIComponent(itemName || '')}`;
+                navigate(targetRoute, {
+                  state: {
+                    backgroundLocation: location,
+                    image: item.image
+                  }
+                });
+              }}
+              onMouseEnter={(e) => {
+                if (window.innerWidth > 768) {
+                  e.currentTarget.style.transform = 'translateY(-4px)';
+                  e.currentTarget.style.borderColor = 'rgba(29, 185, 84, 0.5)';
+                  e.currentTarget.style.boxShadow = '0 8px 24px rgba(29, 185, 84, 0.15)';
+                }
+                prefetchMusicDetails(modalItemType, itemArtist, itemName);
+              }}
+              onMouseLeave={(e) => {
+                if (window.innerWidth > 768) {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.borderColor = 'var(--border-color)';
+                  e.currentTarget.style.boxShadow = 'none';
+                }
+              }}
+            >
+              <span className="profile-music-rank-badge">
+                #{i + 1}
+              </span>
+
+              {isOwnProfile && type === 'artists' && (() => {
+                const cleanName = (item.name || '').trim().toLowerCase();
+                const targetExt = `artist:${cleanName}`;
+                const isArtistFav = displayedFavorites.some(f => f.item_type === 'music' && (f.external_id?.toLowerCase() === targetExt || f.title?.toLowerCase() === cleanName));
+
+                return (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleToggleArtistFavorite(item.name, item.image);
+                    }}
+                    className={`btn-favorite-heart profile-music-fav-btn ${isArtistFav ? 'is-favorite' : ''}`}
+                    title={isArtistFav
+                      ? (language === 'es' ? 'Quitar Destacado' : 'Remove Featured')
+                      : (language === 'es' ? 'Destacar Artista' : 'Feature Artist')
+                    }
+                  >
+                    <Heart size={16} fill={isArtistFav ? 'var(--color-user, #F472B6)' : 'none'} />
+                  </button>
+                );
+              })()}
+
+              <div className="profile-music-artwork-wrap">
+                {item.image && !item.image.includes('2a96cbd8b46e442fc41c2b86b821562f') && !item.image.includes('d41d8cd98f00b204e9800998ecf8427e') ? (
+                  <img
+                    src={item.image}
+                    alt={item.name}
+                    referrerPolicy="no-referrer"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                      const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                      if (fallback) fallback.style.display = 'flex';
+                    }}
+                  />
+                ) : null}
+                <div
+                  className="profile-music-artwork-fallback"
+                  style={{
+                    display: (item.image && !item.image.includes('2a96cbd8b46e442fc41c2b86b821562f') && !item.image.includes('d41d8cd98f00b204e9800998ecf8427e')) ? 'none' : 'flex'
+                  }}
+                >
+                  {type === 'artists' ? <Mic size={24} /> : type === 'tracks' ? <Headphones size={24} /> : <Disc size={24} />}
+                </div>
+              </div>
+
+              <div className="profile-music-info">
+                <h4 title={item.name}>
+                  {item.name}
+                </h4>
+                {item.artist && (
+                  <span className="profile-music-artist" title={item.artist}>
+                    {item.artist}
+                  </span>
+                )}
+              </div>
+
+              <div className="profile-music-plays-wrap">
+                <span className="profile-music-plays-badge">
+                  {item.playcount} {language === 'es' ? 'reproducciones' : 'plays'}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  const renderMusicSlide = (type: 'artists' | 'albums' | 'tracks') => {
+    if (!profile?.lastfm_username) {
+      return renderLastFmConnectPanel();
+    }
+
+    return (
+      <div style={{ width: '100%', flex: 1, display: 'flex', flexDirection: 'column', gap: '1.25rem', textAlign: 'left' }}>
+        {/* Desktop Top Row: Content Type Selector (Left) and Period Selector (Right) */}
+        <div className="home-desktop-only" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.85rem' }}>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            {[
+              { id: 'artists', label: language === 'es' ? 'Artistas' : 'Artists', icon: Mic, step: 3 },
+              { id: 'albums', label: language === 'es' ? 'Álbumes' : 'Albums', icon: Disc, step: 4 },
+              { id: 'tracks', label: language === 'es' ? 'Canciones' : 'Tracks', icon: Headphones, step: 5 }
+            ].map(tab => {
+              const isSelected = type === tab.id;
+              const IconComp = tab.icon;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => goToProfileStep(tab.step)}
+                  className={`profile-category-tab ${isSelected ? 'selected' : ''}`}
+                  style={{
+                    padding: '0.35rem 0.85rem',
+                    fontSize: '0.85rem',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.45rem',
+                    '--tab-color': 'var(--color-music, #1DB954)',
+                    '--tab-text': '#ffffff'
+                  } as React.CSSProperties}
+                >
+                  <IconComp size={14} color={isSelected ? '#ffffff' : 'var(--color-music, #1DB954)'} />
+                  <span>{tab.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Period selector: 7 días, 1 mes, Siempre */}
+          {renderMusicPeriodSelector()}
+        </div>
+
+        {renderMusicGrid(type, musicMap[type] || [], musicLoadingMap[type])}
+      </div>
+    );
+  };
+
   return (
     <div 
       className="profile-page-container"
@@ -3723,123 +5014,208 @@ export const Profile: React.FC = () => {
       ) : (
         <>
           {/* Tab Navigation */}
-          <div className="profile-tabs-nav" style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', gap: '1.5rem' }}>
-            <button
-              onClick={() => handleTabChange('shelf')}
-              className={`profile-tab-btn ${activeTab === 'shelf' ? 'active' : ''}`}
-              title={language === 'es' ? 'Estantería' : 'My Shelf'}
-              style={{
-                '--tab-color': 'var(--accent-primary)'
-              } as React.CSSProperties}
-            >
-              {activeTab === 'shelf' ? (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                  {/* Row 1 */}
-                  <rect x="3" y="3" width="4.5" height="4.5" rx="1" />
-                  <rect x="9.75" y="3" width="4.5" height="4.5" rx="1" />
-                  <rect x="16.5" y="3" width="4.5" height="4.5" rx="1" />
-                  {/* Row 2 */}
-                  <rect x="3" y="9.75" width="4.5" height="4.5" rx="1" />
-                  <rect x="9.75" y="9.75" width="4.5" height="4.5" rx="1" />
-                  <rect x="16.5" y="9.75" width="4.5" height="4.5" rx="1" />
-                  {/* Row 3 */}
-                  <rect x="3" y="16.5" width="4.5" height="4.5" rx="1" />
-                  <rect x="9.75" y="16.5" width="4.5" height="4.5" rx="1" />
-                  <rect x="16.5" y="16.5" width="4.5" height="4.5" rx="1" />
-                </svg>
-              ) : (
-                <Grid size={18} strokeWidth={1.8} />
-              )}
-              <span className="profile-tab-label">{language === 'es' ? 'Estantería' : 'My Shelf'}</span>
-              {activeTab === 'shelf' && (
-                <div className="profile-tab-indicator" style={{ position: 'absolute', bottom: '-0.75rem', left: 0, right: 0, height: '2px', background: 'var(--accent-primary)' }} />
-              )}
-            </button>
-
-        <button
-          onClick={() => handleTabChange('guides')}
-          className={`profile-tab-btn ${activeTab === 'guides' ? 'active' : ''}`}
-          title={language === 'es' ? 'Guías' : 'Guides'}
-          style={{
-            '--tab-color': 'var(--color-guide, #2DD4BF)'
-          } as React.CSSProperties}
-        >
-          {activeTab === 'guides' ? (
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              {/* Single unified filled open book path with pronounced filled bottom spine tip */}
-              <path
-                d="M2 3h6a4 4 0 0 1 4 4v14.5a3 3 0 0 0-3-3.5H2zm20 0h-6a4 4 0 0 0-4 4v14.5a3 3 0 0 1 3-3.5h7z"
-                fill="currentColor"
-                stroke="currentColor"
-                strokeWidth="1.2"
-              />
-              {/* Inner fold line ending before the bottom point so the bottom tip stays fully solid */}
-              <line x1="12" y1="7" x2="12" y2="18.5" stroke="var(--bg-primary, #090d16)" strokeWidth="1.6" />
-            </svg>
-          ) : (
-            <BookOpen size={18} strokeWidth={1.8} />
-          )}
-          <span className="profile-tab-label">{language === 'es' ? 'Guías' : 'Guides'}</span>
-          {activeTab === 'guides' && (
-            <div className="profile-tab-indicator" style={{ position: 'absolute', bottom: '-0.75rem', left: 0, right: 0, height: '2px', background: 'var(--color-guide, #2DD4BF)' }} />
-          )}
-        </button>
-
-        {(Boolean(profile?.lastfm_username) || isOwnProfile) && (
-          <button
-            onClick={() => handleTabChange('music')}
-            className={`profile-tab-btn ${activeTab === 'music' ? 'active' : ''}`}
-            title={language === 'es' ? 'Música' : 'Music'}
+          <div
+            ref={profileTabsNavRef}
+            className="profile-tabs-nav"
             style={{
-              '--tab-color': 'var(--color-music, #1DB954)'
+              display: 'flex',
+              borderBottom: '1px solid var(--border-color)',
+              gap: '1.5rem',
+              position: 'relative',
+              '--tab-progress': String(computeMainProgress(currentProfileStep, hasMusic)),
+              '--profile-tab-count': hasMusic ? '4' : '3',
+              '--profile-indicator-color': (
+                activeTab === 'shelf' ? 'var(--accent-primary)' :
+                activeTab === 'guides' ? 'var(--color-guide, #2DD4BF)' :
+                activeTab === 'music' ? 'var(--color-music, #1DB954)' :
+                '#F472B6'
+              )
             } as React.CSSProperties}
           >
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={activeTab === 'music' ? 2.2 : 1.8}
-              strokeLinecap="round"
-              strokeLinejoin="round"
+            {mainTabs.map((tab, idx) => {
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  ref={el => { profileTabBtnRefs.current[idx] = el; }}
+                  onClick={() => goToProfileStep(tab.step)}
+                  className={`profile-tab-btn ${isActive ? 'active' : ''}`}
+                  title={tab.label}
+                  style={{
+                    '--tab-color': tab.color,
+                    '--tab-act': isActive ? '1' : '0'
+                  } as React.CSSProperties}
+                >
+                  {tab.id === 'shelf' ? (
+                    isActive ? (
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                        <rect x="3" y="3" width="4.5" height="4.5" rx="1" />
+                        <rect x="9.75" y="3" width="4.5" height="4.5" rx="1" />
+                        <rect x="16.5" y="3" width="4.5" height="4.5" rx="1" />
+                        <rect x="3" y="9.75" width="4.5" height="4.5" rx="1" />
+                        <rect x="9.75" y="9.75" width="4.5" height="4.5" rx="1" />
+                        <rect x="16.5" y="9.75" width="4.5" height="4.5" rx="1" />
+                        <rect x="3" y="16.5" width="4.5" height="4.5" rx="1" />
+                        <rect x="9.75" y="16.5" width="4.5" height="4.5" rx="1" />
+                        <rect x="16.5" y="16.5" width="4.5" height="4.5" rx="1" />
+                      </svg>
+                    ) : (
+                      <Grid size={18} strokeWidth={1.8} />
+                    )
+                  ) : tab.id === 'guides' ? (
+                    isActive ? (
+                      <svg width="18" height="18" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M2 3h6a4 4 0 0 1 4 4v14.5a3 3 0 0 0-3-3.5H2zm20 0h-6a4 4 0 0 0-4 4v14.5a3 3 0 0 1 3-3.5h7z" fill="currentColor" stroke="currentColor" strokeWidth="1.2" />
+                        <line x1="12" y1="7" x2="12" y2="18.5" stroke="var(--bg-primary, #090d16)" strokeWidth="1.6" />
+                      </svg>
+                    ) : (
+                      <BookOpen size={18} strokeWidth={1.8} />
+                    )
+                  ) : tab.id === 'music' ? (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={isActive ? 2.2 : 1.8} strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M9 18V5l12-2v13" />
+                      <circle cx="6" cy="18" r="3" fill={isActive ? 'currentColor' : 'none'} />
+                      <circle cx="18" cy="16" r="3" fill={isActive ? 'currentColor' : 'none'} />
+                    </svg>
+                  ) : (
+                    <Heart size={18} fill={isActive ? 'currentColor' : 'none'} strokeWidth={isActive ? 2 : 1.8} />
+                  )}
+                  <span className="profile-tab-label">{tab.label}</span>
+                  {isActive && (
+                    <div className="profile-tab-indicator home-desktop-only" style={{ position: 'absolute', bottom: '-0.75rem', left: 0, right: 0, height: '2px', background: tab.color }} />
+                  )}
+                </button>
+              );
+            })}
+
+            {/* Single Continuous Sliding Indicator for Profile Tabs */}
+            <div className="profile-tabs-sliding-indicator home-mobile-only" />
+          </div>
+
+          {/* Mobile Subtabs Header for Guides (Sticky right below main tabs) */}
+          {activeTab === 'guides' && profile && (
+            <div
+              ref={guidesSubtabsNavRef}
+              className="profile-guides-mobile-tabs-container home-mobile-only"
+              style={{
+                '--guides-subtab-progress': profileGuidesSubTab === 'saved' ? '1' : '0'
+              } as React.CSSProperties}
             >
-              <path d="M9 18V5l12-2v13" />
-              <circle cx="6" cy="18" r="3" fill={activeTab === 'music' ? 'currentColor' : 'none'} />
-              <circle cx="18" cy="16" r="3" fill={activeTab === 'music' ? 'currentColor' : 'none'} />
-            </svg>
-            <span className="profile-tab-label">{language === 'es' ? 'Música' : 'Music'}</span>
-            {activeTab === 'music' && (
-              <div className="profile-tab-indicator" style={{ position: 'absolute', bottom: '-0.75rem', left: 0, right: 0, height: '2px', background: 'var(--color-music, #1DB954)' }} />
-            )}
-          </button>
-        )}
-
-        <button
-          onClick={() => handleTabChange('favorites')}
-          className={`profile-tab-btn ${activeTab === 'favorites' ? 'active' : ''}`}
-          title={language === 'es' ? 'Destacados' : 'Favorites'}
-          style={{
-            '--tab-color': '#F472B6'
-          } as React.CSSProperties}
-        >
-          <Heart size={18} fill={activeTab === 'favorites' ? 'currentColor' : 'none'} strokeWidth={activeTab === 'favorites' ? 2 : 1.8} />
-          <span className="profile-tab-label">{language === 'es' ? 'Destacados' : 'Favorites'}</span>
-          {activeTab === 'favorites' && (
-            <div className="profile-tab-indicator" style={{ position: 'absolute', bottom: '-0.75rem', left: 0, right: 0, height: '2px', background: '#F472B6' }} />
+              <button
+                type="button"
+                ref={el => { guidesSubtabBtnRefs.current[0] = el; }}
+                className={`profile-guides-mobile-tab-btn ${profileGuidesSubTab === 'created' ? 'active' : ''}`}
+                onClick={() => goToProfileStep(1)}
+                style={{
+                  '--subtab-color': 'var(--color-guide, #2DD4BF)',
+                  '--subtab-act': profileGuidesSubTab === 'created' ? '1' : '0'
+                } as React.CSSProperties}
+              >
+                <span>{language === 'es' ? 'Guías creadas' : 'Created Guides'}</span>
+                <span style={{ fontSize: '0.78rem', opacity: 0.85, marginLeft: '0.35rem' }}>({profile.created_lists.length})</span>
+              </button>
+              <button
+                type="button"
+                ref={el => { guidesSubtabBtnRefs.current[1] = el; }}
+                className={`profile-guides-mobile-tab-btn ${profileGuidesSubTab === 'saved' ? 'active' : ''}`}
+                onClick={() => goToProfileStep(2)}
+                style={{
+                  '--subtab-color': 'var(--color-guide, #2DD4BF)',
+                  '--subtab-act': profileGuidesSubTab === 'saved' ? '1' : '0'
+                } as React.CSSProperties}
+              >
+                <span>{language === 'es' ? 'Guías guardadas' : 'Saved Guides'}</span>
+                <span style={{ fontSize: '0.78rem', opacity: 0.85, marginLeft: '0.35rem' }}>({profile.saved_lists.length})</span>
+              </button>
+              <div className="profile-guides-tab-sliding-indicator" />
+            </div>
           )}
-        </button>
-      </div>
 
-      {/* Tab Contents */}
-      {activeTab === 'shelf' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          {/* Mobile Subtabs Header for Music (Sticky right below main tabs) */}
+          {hasMusic && activeTab === 'music' && (
+            <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }} className="home-mobile-only">
+              <div
+                ref={musicSubtabsNavRef}
+                className="profile-music-mobile-tabs-container"
+                style={{
+                  '--music-subtab-progress': musicType === 'albums' ? '1' : musicType === 'tracks' ? '2' : '0'
+                } as React.CSSProperties}
+              >
+                {[
+                  { id: 'artists', label: language === 'es' ? 'Artistas' : 'Artists', step: 3 },
+                  { id: 'albums', label: language === 'es' ? 'Álbumes' : 'Albums', step: 4 },
+                  { id: 'tracks', label: language === 'es' ? 'Canciones' : 'Tracks', step: 5 }
+                ].map((sub, sIdx) => {
+                  const isSelected = musicType === sub.id;
+                  return (
+                    <button
+                      key={sub.id}
+                      type="button"
+                      ref={el => { musicSubtabBtnRefs.current[sIdx] = el; }}
+                      className={`profile-music-mobile-tab-btn ${isSelected ? 'active' : ''}`}
+                      onClick={() => goToProfileStep(sub.step)}
+                      style={{
+                        '--subtab-color': 'var(--color-music, #1DB954)',
+                        '--subtab-act': isSelected ? '1' : '0'
+                      } as React.CSSProperties}
+                    >
+                      <span>{sub.label}</span>
+                    </button>
+                  );
+                })}
+                <div className="profile-music-tab-sliding-indicator" />
+              </div>
+
+              {/* Period selector for mobile */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', width: '100%', paddingRight: '0.25rem', paddingLeft: '0.25rem', boxSizing: 'border-box', marginTop: '-0.25rem', marginBottom: '0.5rem' }}>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', background: 'var(--bg-secondary)', padding: '0.2rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                  {[
+                    { id: '7day', label: language === 'es' ? '7 días' : '7 days', icon: Clock },
+                    { id: '1month', label: language === 'es' ? '1 mes' : '1 month', icon: CalendarDays },
+                    { id: 'overall', label: language === 'es' ? 'Siempre' : 'All time', icon: InfinityIcon }
+                  ].map(p => {
+                    const isSelected = musicPeriod === p.id;
+                    const PeriodIcon = p.icon;
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => handleMusicPeriodChange(p.id as any)}
+                        className={`shelf-view-toggle-btn ${isSelected ? 'active' : ''}`}
+                        style={{
+                          padding: '0.3rem 0.65rem',
+                          borderRadius: '6px',
+                          fontSize: '0.78rem',
+                          fontWeight: isSelected ? 600 : 500,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.35rem',
+                          border: 'none',
+                          background: isSelected ? 'var(--color-music, #1DB954)' : 'transparent',
+                          color: isSelected ? '#ffffff' : 'var(--text-secondary)'
+                        }}
+                      >
+                        <PeriodIcon size={13} />
+                        <span>{p.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
+      {/* Tab Contents with SwipeViewPager */}
+      <SwipeViewPager
+        currentIndex={currentProfileStep}
+        totalSlides={hasMusic ? 7 : 4}
+        onSlideChange={goToProfileStep}
+        onScrollProgress={handleScrollProgress}
+        ignoreSelector={isCarouselFilter ? '.profile-scroll-carousel, .home-scroll-carousel, .scroll-fade-zone, .scroll-nav-arrow, .horizontal-scroll-content, .horizontal-scroll-container' : undefined}
+      >
+        {/* Slide 0: Shelf */}
+        <div key="shelf" style={{ width: '100%', flex: 1 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           {/* Media Filter Selectors & Search Bar */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'flex-start' }}>
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
@@ -4371,6 +5747,7 @@ export const Profile: React.FC = () => {
 
                         <div
                           ref={shelfScrollRef}
+                          className="profile-scroll-carousel home-scroll-carousel"
                           onScroll={updateShelfScrollState}
                           style={{
                             display: isTwoRows ? 'grid' : 'flex',
@@ -4515,896 +5892,38 @@ export const Profile: React.FC = () => {
       </div>
     )}
   </div>
-)}
+</div>
 
-      {activeTab === 'guides' && profile && (
-        <div ref={guidesContainerRef} style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem', textAlign: 'left' }}>
-          {(() => {
-            // Calculate dynamic columns for guides cards (min-width ~240px + 20px gap)
-            const computedColumns = guidesContainerWidth > 0
-              ? Math.max(1, Math.floor((guidesContainerWidth + 20) / 260))
-              : 4;
-            const guideCols = Math.max(1, computedColumns);
-
-            const renderGuideMediaIcon = (mt: string) => {
-              switch (mt) {
-                case 'movie':
-                  return <span key={mt} style={{ display: 'inline-flex', alignItems: 'center' }} title={language === 'es' ? 'Películas' : 'Movies'}><Film size={13} color="var(--color-movie)" /></span>;
-                case 'series':
-                  return <span key={mt} style={{ display: 'inline-flex', alignItems: 'center' }} title={language === 'es' ? 'Series' : 'TV Shows'}><Tv size={13} color="var(--color-series)" /></span>;
-                case 'anime':
-                  return <span key={mt} style={{ display: 'inline-flex', alignItems: 'center' }} title="Anime"><Sparkles size={13} color="var(--color-anime)" /></span>;
-                case 'manga':
-                  return <span key={mt} style={{ display: 'inline-flex', alignItems: 'center' }} title="Manga"><MessageCircle size={13} color="var(--color-manga)" /></span>;
-                case 'game':
-                  return <span key={mt} style={{ display: 'inline-flex', alignItems: 'center' }} title={language === 'es' ? 'Juegos' : 'Games'}><Gamepad2 size={13} color="var(--color-game)" /></span>;
-                case 'book':
-                  return <span key={mt} style={{ display: 'inline-flex', alignItems: 'center' }} title={language === 'es' ? 'Libros' : 'Books'}><Book size={13} color="var(--color-book)" /></span>;
-                case 'comic':
-                  return <span key={mt} style={{ display: 'inline-flex', alignItems: 'center' }} title={language === 'es' ? 'Cómics' : 'Comics'}><MessageSquare size={13} color="var(--color-comic)" /></span>;
-                default:
-                  return null;
-              }
-            };
-
-            const arrowBtnStyle: React.CSSProperties = {
-              position: 'absolute',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              zIndex: 10,
-              background: 'var(--bg-tertiary)',
-              border: '1.5px solid var(--border-color)',
-              borderRadius: '50%',
-              width: '40px',
-              height: '40px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              boxShadow: '0 4px 10px rgba(0,0,0,0.4)',
-              color: 'var(--text-primary)',
-              transition: 'all 0.15s ease'
-            };
-
-            // Helper to render a single guide card
-            const renderGuideCard = (list: any, isSaved: boolean) => {
-              const guideItemsCount = list.items_count ?? list.items?.length ?? 0;
-              return (
-                <div
-                  key={list.id}
-                  className="activity-card activity-card-portrait guide-explore-card profile-guide-card"
-                  style={{
-                    minWidth: '240px',
-                    width: '240px',
-                    background: 'var(--bg-secondary)',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: '12px',
-                    overflow: 'hidden',
-                    cursor: 'pointer',
-                    position: 'relative',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    transition: 'transform 0.2s ease, box-shadow 0.2s ease',
-                  }}
-                  onClick={() => handleOpenGuide(list.id)}
-                >
-                  {/* Desktop Title / Card Title */}
-                  <div
-                    className="card-item-title"
-                    style={{
-                      padding: '0.5rem 0.75rem',
-                      fontSize: '0.85rem',
-                      fontWeight: 600,
-                      borderBottom: '1px solid var(--border-color)',
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis'
-                    }}
-                    title={list.title}
-                  >
-                    {list.title}
-                  </div>
-
-                  {/* Cover Collage */}
-                  <div
-                    className="card-media-cover"
-                    style={{
-                      position: 'relative',
-                      width: '100%',
-                      height: '140px',
-                      background: 'linear-gradient(135deg, rgba(255,255,255,0.05), rgba(0,0,0,0.4))',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      overflow: 'hidden'
-                    }}
-                  >
-                    {list.covers && list.covers.length > 0 ? (
-                      <div
-                        style={{
-                          display: 'grid',
-                          gridTemplateColumns: list.covers.length >= 2 ? '1fr 1fr' : '1fr',
-                          gridTemplateRows: list.covers.length >= 3 ? '1fr 1fr' : '1fr',
-                          width: '100%',
-                          height: '100%',
-                          gap: '2px',
-                          background: '#000'
-                        }}
-                      >
-                        {list.covers.slice(0, 4).map((img: string, cIdx: number) => (
-                          <img
-                            key={cIdx}
-                            src={img}
-                            alt=""
-                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                          />
-                        ))}
-                      </div>
-                    ) : (
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', color: 'var(--text-secondary)' }}>
-                        <BookOpen size={28} color="var(--color-guide, #2DD4BF)" />
-                      </div>
-                    )}
-
-                    {/* Visibility badge overlay (top-left) */}
-                    {!isSaved && (
-                      <span
-                        className="guide-visibility-badge"
-                        style={{
-                          position: 'absolute',
-                          top: '6px',
-                          left: '6px',
-                          fontSize: '0.7rem',
-                          padding: '0.15rem 0.45rem',
-                          borderRadius: '4px',
-                          background: list.visibility === 'draft' ? 'rgba(245, 158, 11, 0.9)' : list.visibility === 'private' ? 'rgba(15, 23, 42, 0.85)' : 'rgba(45, 212, 191, 0.9)',
-                          color: list.visibility === 'draft' ? '#0f172a' : '#ffffff',
-                          fontWeight: 700,
-                          backdropFilter: 'blur(4px)',
-                          zIndex: 2
-                        }}
-                      >
-                        {list.visibility === 'draft'
-                          ? (language === 'es' ? 'Borrador' : 'Draft')
-                          : (list.visibility === 'private'
-                              ? (language === 'es' ? 'Privada' : 'Private')
-                              : (language === 'es' ? 'Pública' : 'Public')
-                            )
-                        }
-                      </span>
-                    )}
-
-                    {/* Items count overlay (bottom-right) */}
-                    <div
-                      className="guide-items-badge"
-                      style={{
-                        position: 'absolute',
-                        bottom: '6px',
-                        right: '6px',
-                        background: 'rgba(0,0,0,0.75)',
-                        backdropFilter: 'blur(4px)',
-                        padding: '2px 7px',
-                        borderRadius: '4px',
-                        fontSize: '0.72rem',
-                        fontWeight: 600,
-                        color: '#fff',
-                        zIndex: 2
-                      }}
-                    >
-                      {guideItemsCount} {t('guidesWorksCount')}
-                    </div>
-                  </div>
-
-                  {/* Body Content */}
-                  <div
-                    className="card-body-content"
-                    style={{
-                      padding: '0.75rem',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '0.35rem',
-                      flex: 1,
-                      minHeight: '2.5rem',
-                      justifyContent: 'center'
-                    }}
-                  >
-                    {list.description ? (
-                      <p
-                        className="profile-guide-desc"
-                        style={{
-                          color: 'var(--text-secondary)',
-                          fontSize: '0.78rem',
-                          margin: 0,
-                          display: '-webkit-box',
-                          WebkitLineClamp: 2,
-                          WebkitBoxOrient: 'vertical',
-                          overflow: 'hidden',
-                          lineHeight: 1.25
-                        }}
-                      >
-                        {list.description}
-                      </p>
-                    ) : null}
-
-                    {/* Metrics / Info bar */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                      <span>{guideItemsCount} {t('guidesWorksCount')}</span>
-                      {list.media_types && list.media_types.length > 0 && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                          {list.media_types.map((mt: string) => renderGuideMediaIcon(mt))}
-                        </div>
-                      )}
-                      {!isSaved && (
-                        <span
-                          className="profile-guide-status-inline"
-                          style={{
-                            fontSize: '0.7rem',
-                            fontWeight: 600,
-                            color: list.visibility === 'draft' ? '#f59e0b' : list.visibility === 'private' ? 'var(--text-secondary)' : 'var(--color-guide, #2DD4BF)'
-                          }}
-                        >
-                          • {list.visibility === 'draft'
-                              ? (language === 'es' ? 'Borrador' : 'Draft')
-                              : (list.visibility === 'private'
-                                  ? (language === 'es' ? 'Privada' : 'Private')
-                                  : (language === 'es' ? 'Pública' : 'Public')
-                                )
-                            }
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Right Actions Wrap on mobile / Footer on desktop */}
-                  {!isSaved && isOwnProfile ? (
-                    <div
-                      className="card-actions-wrap profile-guide-actions"
-                      onClick={(e) => e.stopPropagation()}
-                      style={{
-                        display: 'flex',
-                        gap: '0.35rem',
-                        alignItems: 'center',
-                        padding: '0.5rem 0.75rem',
-                        borderTop: '1px solid var(--border-color)',
-                        background: 'rgba(0,0,0,0.15)'
-                      }}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => handleOpenGuide(list.id)}
-                        className="btn-secondary"
-                        style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.78rem', padding: '0.25rem 0.55rem', flex: 1, justifyContent: 'center' }}
-                      >
-                        <Eye size={13} /> {language === 'es' ? 'Ver' : 'View'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (list.can_edit !== false) {
-                            navigate(`/create?edit=${list.id}`);
-                          } else {
-                            setShowProModal(true);
-                          }
-                        }}
-                        className="btn-secondary"
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.3rem',
-                          fontSize: '0.78rem',
-                          padding: '0.25rem 0.55rem',
-                          color: list.can_edit === false ? '#f59e0b' : 'inherit',
-                          borderColor: list.can_edit === false ? 'rgba(245, 158, 11, 0.3)' : 'var(--border-color)'
-                        }}
-                        title={language === 'es' ? 'Editar' : 'Edit'}
-                      >
-                        {list.can_edit === false ? <Lock size={13} /> : <Edit size={13} />}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteGuide(list.id)}
-                        className="btn-secondary"
-                        style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.78rem', padding: '0.25rem 0.55rem', color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.2)' }}
-                        title={language === 'es' ? 'Eliminar' : 'Delete'}
-                      >
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
-                  ) : null}
-                </div>
-              );
-            };
-
-            // Available width accounting for 45px padding on each side (90px total)
-            // Guide card is minWidth 260px, maxWidth 260px with 1rem gap
-            const availableGuidesWidth = Math.max(0, guidesContainerWidth - 90);
-            const maxGuidesInOneRow = Math.max(1, Math.floor((availableGuidesWidth + 16) / 276));
-
-            const canExpandCreated = profile.created_lists.length > maxGuidesInOneRow;
-            const isCreatedTwoRows = isCreatedGuidesExpanded;
-            const isCreatedTwoRowsByColumn = isCreatedTwoRows && profile.created_lists.length > 2 * maxGuidesInOneRow;
-            const isCreatedTwoRowsByRow = isCreatedTwoRows && profile.created_lists.length <= 2 * maxGuidesInOneRow;
-
-            // Created Guides pagination
-            const totalCreatedCols = isCreatedTwoRows ? Math.ceil(profile.created_lists.length / 2) : profile.created_lists.length;
-            const totalCreatedPages = Math.max(1, Math.ceil(totalCreatedCols / maxGuidesInOneRow));
-            const currentCreatedPage = Math.min(totalCreatedPages, Math.max(1, createdGuidesPage));
-
-            const canExpandSaved = profile.saved_lists.length > maxGuidesInOneRow;
-            const isSavedTwoRows = isSavedGuidesExpanded;
-            const isSavedTwoRowsByColumn = isSavedTwoRows && profile.saved_lists.length > 2 * maxGuidesInOneRow;
-            const isSavedTwoRowsByRow = isSavedTwoRows && profile.saved_lists.length <= 2 * maxGuidesInOneRow;
-
-            // Saved Guides pagination
-            const totalSavedCols = isSavedTwoRows ? Math.ceil(profile.saved_lists.length / 2) : profile.saved_lists.length;
-            const totalSavedPages = Math.max(1, Math.ceil(totalSavedCols / maxGuidesInOneRow));
-            const currentSavedPage = Math.min(totalSavedPages, Math.max(1, savedGuidesPage));
-
-            const getCreatedMaskImage = () => {
-              if (canCreatedGuidesScrollLeft && canCreatedGuidesScrollRight) {
-                return 'linear-gradient(to right, transparent 0px, transparent 45px, black 95px, black calc(100% - 95px), transparent calc(100% - 45px), transparent 100%)';
-              } else if (canCreatedGuidesScrollLeft) {
-                return 'linear-gradient(to right, transparent 0px, transparent 45px, black 95px, black 100%)';
-              } else if (canCreatedGuidesScrollRight) {
-                return 'linear-gradient(to right, black 0px, black calc(100% - 95px), transparent calc(100% - 45px), transparent 100%)';
-              }
-              return 'none';
-            };
-
-            const getSavedMaskImage = () => {
-              if (canSavedGuidesScrollLeft && canSavedGuidesScrollRight) {
-                return 'linear-gradient(to right, transparent 0px, transparent 45px, black 95px, black calc(100% - 95px), transparent calc(100% - 45px), transparent 100%)';
-              } else if (canSavedGuidesScrollLeft) {
-                return 'linear-gradient(to right, transparent 0px, transparent 45px, black 95px, black 100%)';
-              } else if (canSavedGuidesScrollRight) {
-                return 'linear-gradient(to right, black 0px, black calc(100% - 95px), transparent calc(100% - 45px), transparent 100%)';
-              }
-              return 'none';
-            };
-
-            const guideBtnBaseStyle: React.CSSProperties = {
-              position: 'absolute',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              zIndex: 10,
-              background: 'var(--bg-tertiary)',
-              border: '1.5px solid var(--border-color)',
-              borderRadius: '50%',
-              width: '40px',
-              height: '40px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              boxShadow: '0 4px 6px rgba(0,0,0,0.3)',
-              color: 'var(--text-primary)',
-              transition: 'border-color 0.15s ease, background 0.1s ease, color 0.1s ease, transform 0.1s ease, opacity 0.2s ease, visibility 0.2s ease'
-            };
-
-            const handleMouseEnterGuideBtn = (e: React.MouseEvent<HTMLButtonElement>) => {
-              e.currentTarget.style.borderColor = 'var(--color-guide, #2DD4BF)';
-            };
-            const handleMouseLeaveGuideBtn = (e: React.MouseEvent<HTMLButtonElement>) => {
-              e.currentTarget.style.borderColor = 'var(--border-color)';
-              e.currentTarget.style.background = 'var(--bg-tertiary)';
-              e.currentTarget.style.color = 'var(--text-primary)';
-            };
-            const handleMouseDownGuideBtn = (e: React.MouseEvent<HTMLButtonElement>) => {
-              e.currentTarget.style.background = 'var(--color-guide, #2DD4BF)';
-              e.currentTarget.style.borderColor = 'var(--color-guide, #2DD4BF)';
-              e.currentTarget.style.color = '#0f172a';
-            };
-            const handleMouseUpGuideBtn = (e: React.MouseEvent<HTMLButtonElement>) => {
-              e.currentTarget.style.background = 'var(--bg-tertiary)';
-              e.currentTarget.style.borderColor = 'var(--color-guide, #2DD4BF)';
-              e.currentTarget.style.color = 'var(--text-primary)';
-            };
-
-            return (
-              <>
-                {/* Mobile Sub-tabs for Guides (Horizontal Top-Bar-Style Full Width Tabs) */}
-                <div className="upcoming-mobile-tabs-container home-mobile-only">
-                  <button
-                    type="button"
-                    className={`profile-guides-mobile-tab-btn ${profileGuidesSubTab === 'created' ? 'active' : ''}`}
-                    onClick={() => handleSelectGuidesSubtab('created')}
-                  >
-                    <span>{language === 'es' ? 'Guías creadas' : 'Created Guides'}</span>
-                    <span style={{ fontSize: '0.78rem', opacity: 0.85, marginLeft: '0.35rem' }}>({profile.created_lists.length})</span>
-                    {profileGuidesSubTab === 'created' && <div className="profile-guides-tab-indicator" />}
-                  </button>
-                  <button
-                    type="button"
-                    className={`profile-guides-mobile-tab-btn ${profileGuidesSubTab === 'saved' ? 'active' : ''}`}
-                    onClick={() => handleSelectGuidesSubtab('saved')}
-                  >
-                    <span>{language === 'es' ? 'Guías guardadas' : 'Saved Guides'}</span>
-                    <span style={{ fontSize: '0.78rem', opacity: 0.85, marginLeft: '0.35rem' }}>({profile.saved_lists.length})</span>
-                    {profileGuidesSubTab === 'saved' && <div className="profile-guides-tab-indicator" />}
-                  </button>
-                </div>
-
-                {/* Mobile Swipe View (edge-to-edge swipeable container between Guías creadas & Guías guardadas) */}
-                <div
-                  ref={guidesSwipeRef}
-                  onTouchStart={() => {
-                    isUserTouchingGuidesSwipeRef.current = true;
-                  }}
-                  onTouchEnd={() => {
-                    isUserTouchingGuidesSwipeRef.current = false;
-                    setTimeout(() => {
-                      checkGuidesSwipeSettled();
-                    }, 60);
-                  }}
-                  onScroll={handleGuidesSwipeScroll}
-                  className="profile-guides-mobile-swipe-wrapper home-mobile-only"
-                >
-                  {/* Slide 1: Guías creadas */}
-                  <div className="profile-guides-mobile-swipe-slide">
-                    {profile.created_lists.length === 0 ? (
-                      <div className="glass-card" style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                        {language === 'es' ? 'Aún no has creado ninguna guía.' : 'You have not created any guides yet.'}
-                      </div>
-                    ) : (
-                      <div className="mobile-vertical-stack">
-                        {profile.created_lists.map(list => (
-                          <div key={list.id} className="profile-guide-item-wrapper" style={{ width: '100%' }}>
-                            {renderGuideCard(list, false)}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Slide 2: Guías guardadas */}
-                  <div className="profile-guides-mobile-swipe-slide">
-                    {profile.saved_lists.length === 0 ? (
-                      <div className="glass-card" style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                        {language === 'es' ? 'Aún no tienes guías guardadas.' : 'You have no saved guides yet.'}
-                      </div>
-                    ) : (
-                      <div className="mobile-vertical-stack">
-                        {profile.saved_lists.map(list => (
-                          <div key={list.id} className="profile-guide-item-wrapper" style={{ width: '100%' }}>
-                            {renderGuideCard(list, true)}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Desktop layout: Subtabs pills navigation and conditional single-subtab view */}
-                <div className="home-desktop-only" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', width: '100%' }}>
-                  {/* Desktop Sub-tabs Pills (Created / Saved Guides) */}
-                  <div style={{ display: 'flex', alignItems: 'center' }}>
-                    <div style={{ display: 'flex', background: 'var(--bg-tertiary)', padding: '3px', borderRadius: '8px', gap: '4px', border: '1px solid var(--border-color)' }}>
-                      <button
-                        type="button"
-                        onClick={() => handleSelectGuidesSubtab('created')}
-                        style={{
-                          border: 'none',
-                          background: profileGuidesSubTab === 'created' ? 'var(--color-guide, #2DD4BF)' : 'transparent',
-                          color: profileGuidesSubTab === 'created' ? '#0f172a' : 'var(--text-secondary)',
-                          padding: '6px 14px',
-                          borderRadius: '6px',
-                          fontSize: '0.85rem',
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                          transition: 'all 0.2s ease',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '0.45rem'
-                        }}
-                      >
-                        <span>{language === 'es' ? 'Guías creadas' : 'Created Guides'}</span>
-                        <span style={{ fontSize: '0.78rem', opacity: 0.9 }}>({profile.created_lists.length})</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleSelectGuidesSubtab('saved')}
-                        style={{
-                          border: 'none',
-                          background: profileGuidesSubTab === 'saved' ? 'var(--color-guide, #2DD4BF)' : 'transparent',
-                          color: profileGuidesSubTab === 'saved' ? '#0f172a' : 'var(--text-secondary)',
-                          padding: '6px 14px',
-                          borderRadius: '6px',
-                          fontSize: '0.85rem',
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                          transition: 'all 0.2s ease',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '0.45rem'
-                        }}
-                      >
-                        <span>{language === 'es' ? 'Guías guardadas' : 'Saved Guides'}</span>
-                        <span style={{ fontSize: '0.78rem', opacity: 0.9 }}>({profile.saved_lists.length})</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Active Sub-tab Section Content */}
-                  {profileGuidesSubTab === 'created' ? (
-                    /* 1. Created Guides Section */
-                    <div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                          <h3 style={{ margin: 0 }}>{language === 'es' ? 'Guías Creadas' : 'Created Guides'}</h3>
-                          <span
-                            style={{
-                              fontSize: '0.8rem',
-                              fontWeight: 700,
-                              padding: '0.15rem 0.55rem',
-                              borderRadius: '12px',
-                              background: 'rgba(45, 212, 191, 0.15)',
-                              color: 'var(--color-guide, #2DD4BF)',
-                              border: '1px solid rgba(45, 212, 191, 0.3)'
-                            }}
-                          >
-                            {profile.created_lists.length}
-                          </span>
-                        </div>
-                        {canExpandCreated && (
-                          <button
-                            type="button"
-                            onClick={handleToggleCreatedGuidesExpanded}
-                            className="shelf-view-toggle-btn"
-                            title={isCreatedGuidesExpanded
-                              ? (language === 'es' ? 'Contraer' : 'Collapse')
-                              : (language === 'es' ? 'Expandir' : 'Expand')
-                            }
-                            aria-label={isCreatedGuidesExpanded
-                              ? (language === 'es' ? 'Contraer' : 'Collapse')
-                              : (language === 'es' ? 'Expandir' : 'Expand')
-                            }
-                            style={{ padding: '0.3rem 0.55rem', borderRadius: '6px' }}
-                          >
-                            {isCreatedGuidesExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                          </button>
-                        )}
-                      </div>
-
-                      {profile.created_lists.length === 0 ? (
-                        <div className="glass-card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                          {language === 'es' ? 'Aún no has creado ninguna guía.' : 'You have not created any guides yet.'}
-                        </div>
-                      ) : (
-                        <div style={{ position: 'relative', width: '100%' }}>
-                          {/* Left fade click-blocking zone */}
-                          {canCreatedGuidesScrollLeft && (
-                            <div
-                              style={{
-                                position: 'absolute',
-                                left: 0,
-                                top: 0,
-                                bottom: 0,
-                                width: '70px',
-                                zIndex: 8,
-                                pointerEvents: 'auto',
-                                cursor: 'default'
-                              }}
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                          )}
-
-                          {/* Left Arrow Button */}
-                          <button
-                            type="button"
-                            onClick={() => createdContinuousScroll.handleClick('left', isCreatedGuidesExpanded ? 480 : 360)}
-                            onMouseEnter={handleMouseEnterGuideBtn}
-                            onMouseLeave={(e) => {
-                              handleMouseLeaveGuideBtn(e);
-                              createdContinuousScroll.stopScrolling();
-                            }}
-                            onMouseDown={(e) => {
-                              handleMouseDownGuideBtn(e);
-                              createdContinuousScroll.startScrolling('left');
-                            }}
-                            onMouseUp={(e) => {
-                              handleMouseUpGuideBtn(e);
-                              createdContinuousScroll.stopScrolling();
-                            }}
-                            onTouchStart={() => createdContinuousScroll.startScrolling('left')}
-                            onTouchEnd={createdContinuousScroll.stopScrolling}
-                            onTouchCancel={createdContinuousScroll.stopScrolling}
-                            style={{
-                              ...guideBtnBaseStyle,
-                              left: '0px',
-                              opacity: canCreatedGuidesScrollLeft ? 1 : 0,
-                              visibility: canCreatedGuidesScrollLeft ? 'visible' : 'hidden',
-                              pointerEvents: canCreatedGuidesScrollLeft ? 'auto' : 'none'
-                            }}
-                            aria-label={language === 'es' ? 'Desplazar a la izquierda' : 'Scroll left'}
-                          >
-                            <ChevronLeft size={20} color="currentColor" />
-                          </button>
-
-                          {/* Cards Scroll Container */}
-                          <div
-                            ref={createdGuidesScrollRef}
-                            onScroll={updateCreatedGuidesScrollState}
-                            className={`home-scroll-carousel profile-guides-carousel ${isCreatedTwoRows ? 'is-expanded' : ''} ${profile.created_lists.length === 1 ? 'has-single-item' : ''}`}
-                            style={{
-                              display: isCreatedTwoRows ? 'grid' : 'flex',
-                              gridTemplateColumns: isCreatedTwoRowsByRow ? `repeat(${maxGuidesInOneRow}, max-content)` : undefined,
-                              gridTemplateRows: isCreatedTwoRows ? 'repeat(2, auto)' : undefined,
-                              gridAutoFlow: isCreatedTwoRows ? (isCreatedTwoRowsByColumn ? 'column' : 'row') : undefined,
-                              gridAutoColumns: isCreatedTwoRowsByColumn ? 'max-content' : undefined,
-                              justifyContent: 'start',
-                              alignContent: 'start',
-                              gap: '1rem',
-                              overflowX: 'auto',
-                              scrollbarWidth: 'none',
-                              msOverflowStyle: 'none',
-                              paddingTop: '8px',
-                              paddingBottom: '1rem',
-                              paddingLeft: '45px',
-                              paddingRight: '45px',
-                              WebkitMaskImage: getCreatedMaskImage(),
-                              maskImage: getCreatedMaskImage()
-                            }}
-                          >
-                            {profile.created_lists.map(list => (
-                              <div key={list.id} className="profile-guide-item-wrapper" style={{ minWidth: '260px', maxWidth: '260px', flexShrink: 0 }}>
-                                {renderGuideCard(list, false)}
-                              </div>
-                            ))}
-                          </div>
-
-                          {/* Right Arrow Button */}
-                          <button
-                            type="button"
-                            onClick={() => createdContinuousScroll.handleClick('right', isCreatedGuidesExpanded ? 480 : 360)}
-                            onMouseEnter={handleMouseEnterGuideBtn}
-                            onMouseLeave={(e) => {
-                              handleMouseLeaveGuideBtn(e);
-                              createdContinuousScroll.stopScrolling();
-                            }}
-                            onMouseDown={(e) => {
-                              handleMouseDownGuideBtn(e);
-                              createdContinuousScroll.startScrolling('right');
-                            }}
-                            onMouseUp={(e) => {
-                              handleMouseUpGuideBtn(e);
-                              createdContinuousScroll.stopScrolling();
-                            }}
-                            onTouchStart={() => createdContinuousScroll.startScrolling('right')}
-                            onTouchEnd={createdContinuousScroll.stopScrolling}
-                            onTouchCancel={createdContinuousScroll.stopScrolling}
-                            style={{
-                              ...guideBtnBaseStyle,
-                              right: '0px',
-                              opacity: canCreatedGuidesScrollRight ? 1 : 0,
-                              visibility: canCreatedGuidesScrollRight ? 'visible' : 'hidden',
-                              pointerEvents: canCreatedGuidesScrollRight ? 'auto' : 'none'
-                            }}
-                            aria-label={language === 'es' ? 'Desplazar a la derecha' : 'Scroll right'}
-                          >
-                            <ChevronRight size={20} color="currentColor" />
-                          </button>
-
-                          {/* Right fade click-blocking zone */}
-                          {canCreatedGuidesScrollRight && (
-                            <div
-                              style={{
-                                position: 'absolute',
-                                right: 0,
-                                top: 0,
-                                bottom: 0,
-                                width: '70px',
-                                zIndex: 8,
-                                pointerEvents: 'auto',
-                                cursor: 'default'
-                              }}
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                          )}
-
-                          {/* Created Guides Page indicator */}
-                          {totalCreatedPages > 1 && (
-                            <div style={{ textAlign: 'center', marginTop: '0.75rem', fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
-                              {language === 'es' ? `Página ${currentCreatedPage} de ${totalCreatedPages}` : `Page ${currentCreatedPage} of ${totalCreatedPages}`}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    /* 2. Saved Guides Section */
-                    <div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                          <h3 style={{ margin: 0 }}>{language === 'es' ? 'Guías Guardadas' : 'Saved Guides'}</h3>
-                          <span
-                            style={{
-                              fontSize: '0.8rem',
-                              fontWeight: 700,
-                              padding: '0.15rem 0.55rem',
-                              borderRadius: '12px',
-                              background: 'rgba(45, 212, 191, 0.15)',
-                              color: 'var(--color-guide, #2DD4BF)',
-                              border: '1px solid rgba(45, 212, 191, 0.3)'
-                            }}
-                          >
-                            {profile.saved_lists.length}
-                          </span>
-                        </div>
-                        {canExpandSaved && (
-                          <button
-                            type="button"
-                            onClick={handleToggleSavedGuidesExpanded}
-                            className="shelf-view-toggle-btn"
-                            title={isSavedGuidesExpanded
-                              ? (language === 'es' ? 'Contraer' : 'Collapse')
-                              : (language === 'es' ? 'Expandir' : 'Expand')
-                            }
-                            aria-label={isSavedGuidesExpanded
-                              ? (language === 'es' ? 'Contraer' : 'Collapse')
-                              : (language === 'es' ? 'Expandir' : 'Expand')
-                            }
-                            style={{ padding: '0.3rem 0.55rem', borderRadius: '6px' }}
-                          >
-                            {isSavedGuidesExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                          </button>
-                        )}
-                      </div>
-
-                      {profile.saved_lists.length === 0 ? (
-                        <div className="glass-card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                          {language === 'es' ? 'Aún no tienes guías guardadas.' : 'You have no saved guides yet.'}
-                        </div>
-                      ) : (
-                        <div style={{ position: 'relative', width: '100%' }}>
-                          {/* Left fade click-blocking zone */}
-                          {canSavedGuidesScrollLeft && (
-                            <div
-                              style={{
-                                position: 'absolute',
-                                left: 0,
-                                top: 0,
-                                bottom: 0,
-                                width: '70px',
-                                zIndex: 8,
-                                pointerEvents: 'auto',
-                                cursor: 'default'
-                              }}
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                          )}
-
-                          {/* Left Arrow Button */}
-                          <button
-                            type="button"
-                            onClick={() => savedContinuousScroll.handleClick('left', isSavedGuidesExpanded ? 480 : 360)}
-                            onMouseEnter={handleMouseEnterGuideBtn}
-                            onMouseLeave={(e) => {
-                              handleMouseLeaveGuideBtn(e);
-                              savedContinuousScroll.stopScrolling();
-                            }}
-                            onMouseDown={(e) => {
-                              handleMouseDownGuideBtn(e);
-                              savedContinuousScroll.startScrolling('left');
-                            }}
-                            onMouseUp={(e) => {
-                              handleMouseUpGuideBtn(e);
-                              savedContinuousScroll.stopScrolling();
-                            }}
-                            onTouchStart={() => savedContinuousScroll.startScrolling('left')}
-                            onTouchEnd={savedContinuousScroll.stopScrolling}
-                            onTouchCancel={savedContinuousScroll.stopScrolling}
-                            style={{
-                              ...guideBtnBaseStyle,
-                              left: '0px',
-                              opacity: canSavedGuidesScrollLeft ? 1 : 0,
-                              visibility: canSavedGuidesScrollLeft ? 'visible' : 'hidden',
-                              pointerEvents: canSavedGuidesScrollLeft ? 'auto' : 'none'
-                            }}
-                            aria-label={language === 'es' ? 'Desplazar a la izquierda' : 'Scroll left'}
-                          >
-                            <ChevronLeft size={20} color="currentColor" />
-                          </button>
-
-                          {/* Cards Scroll Container */}
-                          <div
-                            ref={savedGuidesScrollRef}
-                            onScroll={updateSavedGuidesScrollState}
-                            className={`home-scroll-carousel profile-guides-carousel ${isSavedTwoRows ? 'is-expanded' : ''} ${profile.saved_lists.length === 1 ? 'has-single-item' : ''}`}
-                            style={{
-                              display: isSavedTwoRows ? 'grid' : 'flex',
-                              gridTemplateColumns: isSavedTwoRowsByRow ? `repeat(${maxGuidesInOneRow}, max-content)` : undefined,
-                              gridTemplateRows: isSavedTwoRows ? 'repeat(2, auto)' : undefined,
-                              gridAutoFlow: isSavedTwoRows ? (isSavedTwoRowsByColumn ? 'column' : 'row') : undefined,
-                              gridAutoColumns: isSavedTwoRowsByColumn ? 'max-content' : undefined,
-                              justifyContent: 'start',
-                              alignContent: 'start',
-                              gap: '1rem',
-                              overflowX: 'auto',
-                              scrollbarWidth: 'none',
-                              msOverflowStyle: 'none',
-                              paddingTop: '8px',
-                              paddingBottom: '1rem',
-                              paddingLeft: '45px',
-                              paddingRight: '45px',
-                              WebkitMaskImage: getSavedMaskImage(),
-                              maskImage: getSavedMaskImage()
-                            }}
-                          >
-                            {profile.saved_lists.map(list => (
-                              <div key={list.id} className="profile-guide-item-wrapper" style={{ minWidth: '260px', maxWidth: '260px', flexShrink: 0 }}>
-                                {renderGuideCard(list, true)}
-                              </div>
-                            ))}
-                          </div>
-
-                          {/* Right Arrow Button */}
-                          <button
-                            type="button"
-                            onClick={() => savedContinuousScroll.handleClick('right', isSavedGuidesExpanded ? 480 : 360)}
-                            onMouseEnter={handleMouseEnterGuideBtn}
-                            onMouseLeave={(e) => {
-                              handleMouseLeaveGuideBtn(e);
-                              savedContinuousScroll.stopScrolling();
-                            }}
-                            onMouseDown={(e) => {
-                              handleMouseDownGuideBtn(e);
-                              savedContinuousScroll.startScrolling('right');
-                            }}
-                            onMouseUp={(e) => {
-                              handleMouseUpGuideBtn(e);
-                              savedContinuousScroll.stopScrolling();
-                            }}
-                            onTouchStart={() => savedContinuousScroll.startScrolling('right')}
-                            onTouchEnd={savedContinuousScroll.stopScrolling}
-                            onTouchCancel={savedContinuousScroll.stopScrolling}
-                            style={{
-                              ...guideBtnBaseStyle,
-                              right: '0px',
-                              opacity: canSavedGuidesScrollRight ? 1 : 0,
-                              visibility: canSavedGuidesScrollRight ? 'visible' : 'hidden',
-                              pointerEvents: canSavedGuidesScrollRight ? 'auto' : 'none'
-                            }}
-                            aria-label={language === 'es' ? 'Desplazar a la derecha' : 'Scroll right'}
-                          >
-                            <ChevronRight size={20} color="currentColor" />
-                          </button>
-
-                          {/* Right fade click-blocking zone */}
-                          {canSavedGuidesScrollRight && (
-                            <div
-                              style={{
-                                position: 'absolute',
-                                right: 0,
-                                top: 0,
-                                bottom: 0,
-                                width: '70px',
-                                zIndex: 8,
-                                pointerEvents: 'auto',
-                                cursor: 'default'
-                              }}
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                          )}
-
-                          {/* Saved Guides Page indicator */}
-                          {totalSavedPages > 1 && (
-                            <div style={{ textAlign: 'center', marginTop: '0.75rem', fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
-                              {language === 'es' ? `Página ${currentSavedPage} de ${totalSavedPages}` : `Page ${currentSavedPage} of ${totalSavedPages}`}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </>
-            );
-          })()}
+        {/* Slide 1: Created Guides */}
+        <div key="guides-created" style={{ width: '100%', flex: 1 }}>
+          {renderCreatedGuidesSlide()}
         </div>
-      )}
 
-      {activeTab === 'favorites' && (
+        {/* Slide 2: Saved Guides */}
+        <div key="guides-saved" style={{ width: '100%', flex: 1 }}>
+          {renderSavedGuidesSlide()}
+        </div>
+
+        {hasMusic && (
+          <div key="music-artists" style={{ width: '100%', flex: 1 }}>
+            {renderMusicSlide('artists')}
+          </div>
+        )}
+
+        {hasMusic && (
+          <div key="music-albums" style={{ width: '100%', flex: 1 }}>
+            {renderMusicSlide('albums')}
+          </div>
+        )}
+
+        {hasMusic && (
+          <div key="music-tracks" style={{ width: '100%', flex: 1 }}>
+            {renderMusicSlide('tracks')}
+          </div>
+        )}
+
+        {/* Slide 6 (or 3 if !hasMusic): Favorites */}
+        <div key="favorites" style={{ width: '100%', flex: 1 }}>
         <div ref={favoritesContainerRef} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', textAlign: 'left' }}>
           {/* Favorites Category Filter Selectors - Top row */}
           {displayedFavorites.length > 0 && (
@@ -5821,6 +6340,7 @@ export const Profile: React.FC = () => {
                     {/* Cards Scroll Container */}
                     <div
                       ref={favoritesScrollRef}
+                      className="profile-scroll-carousel home-scroll-carousel"
                       onScroll={updateFavoritesScrollState}
                       style={{
                         display: isTwoRows ? 'grid' : 'flex',
@@ -6391,373 +6911,8 @@ export const Profile: React.FC = () => {
             </div>
           )}
         </div>
-      )}
-
-
-      {activeTab === 'music' && (
-        !profile?.lastfm_username ? (
-          /* Panel de conexión con Last.fm (idéntico al de /customize) */
-          <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px', textAlign: 'left' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.75rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                <h2 style={{ fontSize: '1.2rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0, color: 'var(--text-primary)' }}>
-                  <Music size={20} color="#ef4444" />
-                  {language === 'es' ? 'Mostrar música escuchada (Last.fm)' : 'Show Currently Playing Music (Last.fm)'}
-                </h2>
-                <span
-                  style={{
-                    fontSize: '0.75rem',
-                    padding: '0.2rem 0.55rem',
-                    borderRadius: '6px',
-                    background: 'rgba(255, 255, 255, 0.05)',
-                    color: 'var(--text-muted)',
-                    border: '1px solid var(--border-color)',
-                    fontWeight: 600
-                  }}
-                >
-                  {language === 'es' ? 'No conectado' : 'Not connected'}
-                </span>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setShowMusicGuideModal(true)}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: 'var(--accent-primary)',
-                  fontSize: '0.85rem',
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.35rem',
-                  padding: '0.2rem 0.4rem',
-                  borderRadius: '6px'
-                }}
-              >
-                <HelpCircle size={15} />
-                {language === 'es' ? '¿Cómo conectar tu servicio de música?' : 'How to connect your music service?'}
-              </button>
-            </div>
-
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', margin: '0 0 1.25rem 0', lineHeight: 1.5 }}>
-              {language === 'es'
-                ? 'Conecta tu cuenta de Last.fm para mostrar en tiempo real la música que estás escuchando en Spotify, YouTube Music, Apple Music, Tidal o archivos locales en tu perfil.'
-                : 'Connect your Last.fm account to display in real-time what music you are listening to on Spotify, YouTube Music, Apple Music, Tidal, or local players on your profile.'}
-            </p>
-
-            <div>
-              <button
-                type="button"
-                onClick={handleLastFmLogin}
-                className="btn-primary"
-                style={{
-                  background: '#d51007',
-                  border: 'none',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  padding: '0.65rem 1.25rem',
-                  fontSize: '0.9rem',
-                  fontWeight: 600,
-                  boxShadow: '0 4px 14px rgba(213, 16, 7, 0.3)'
-                }}
-              >
-                <Music size={16} />
-                {language === 'es' ? 'Conectar con Last.fm' : 'Connect with Last.fm'}
-              </button>
-            </div>
-          </div>
-        ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', textAlign: 'left' }}>
-          {/* Mobile Music Sub-tabs (Artistas, Álbumes, Canciones) matching Guides mobile sub-tabs */}
-          <div className="upcoming-mobile-tabs-container home-mobile-only" style={{ marginBottom: '0.4rem' }}>
-            {[
-              { id: 'artists', label: language === 'es' ? 'Artistas' : 'Artists' },
-              { id: 'albums', label: language === 'es' ? 'Álbumes' : 'Albums' },
-              { id: 'tracks', label: language === 'es' ? 'Canciones' : 'Tracks' }
-            ].map(tab => {
-              const isSelected = musicType === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  className={`profile-music-mobile-tab-btn ${isSelected ? 'active' : ''}`}
-                  onClick={() => handleMusicTypeChange(tab.id as any)}
-                >
-                  <span>{tab.label}</span>
-                  {isSelected && <div className="profile-music-tab-indicator" />}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Period selector for mobile (aligned closely to the right below the subtabs) */}
-          <div className="home-mobile-only" style={{ display: 'flex', justifyContent: 'flex-end', width: '100%', paddingRight: '0.25rem', paddingLeft: '0.25rem', boxSizing: 'border-box', marginTop: '-0.75rem', marginBottom: '0.1rem' }}>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', background: 'var(--bg-secondary)', padding: '0.2rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-              {[
-                { id: '7day', label: language === 'es' ? '7 días' : '7 days', icon: Clock },
-                { id: '1month', label: language === 'es' ? '1 mes' : '1 month', icon: CalendarDays },
-                { id: 'overall', label: language === 'es' ? 'Siempre' : 'All time', icon: InfinityIcon }
-              ].map(p => {
-                const isSelected = musicPeriod === p.id;
-                const PeriodIcon = p.icon;
-                return (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => handleMusicPeriodChange(p.id as any)}
-                    className={`shelf-view-toggle-btn ${isSelected ? 'active' : ''}`}
-                    style={{
-                      padding: '0.3rem 0.65rem',
-                      borderRadius: '6px',
-                      fontSize: '0.78rem',
-                      fontWeight: isSelected ? 600 : 500,
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.35rem',
-                      border: 'none',
-                      background: isSelected ? 'var(--color-music, #1DB954)' : 'transparent',
-                      color: isSelected ? '#ffffff' : 'var(--text-secondary)'
-                    }}
-                  >
-                    <PeriodIcon size={13} />
-                    <span>{p.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Desktop Top Row: Content Type Selector (Left) and Period Selector (Right) */}
-          <div className="home-desktop-only" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.85rem' }}>
-            {/* Type selector: Artistas, Álbumes, Canciones */}
-            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-              {[
-                { id: 'artists', label: language === 'es' ? 'Artistas' : 'Artists', icon: Mic },
-                { id: 'albums', label: language === 'es' ? 'Álbumes' : 'Albums', icon: Disc },
-                { id: 'tracks', label: language === 'es' ? 'Canciones' : 'Tracks', icon: Headphones }
-              ].map(tab => {
-                const isSelected = musicType === tab.id;
-                const IconComp = tab.icon;
-                return (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => handleMusicTypeChange(tab.id as any)}
-                    className={`profile-category-tab ${isSelected ? 'selected' : ''}`}
-                    style={{
-                      padding: '0.35rem 0.85rem',
-                      fontSize: '0.85rem',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.45rem',
-                      '--tab-color': 'var(--color-music, #1DB954)',
-                      '--tab-text': '#ffffff'
-                    } as React.CSSProperties}
-                  >
-                    <IconComp size={14} color={isSelected ? '#ffffff' : 'var(--color-music, #1DB954)'} />
-                    <span>{tab.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Period selector: 7 días, 1 mes, Siempre */}
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', background: 'var(--bg-secondary)', padding: '0.2rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-              {[
-                { id: '7day', label: language === 'es' ? '7 días' : '7 days', icon: Clock },
-                { id: '1month', label: language === 'es' ? '1 mes' : '1 month', icon: CalendarDays },
-                { id: 'overall', label: language === 'es' ? 'Siempre' : 'All time', icon: InfinityIcon }
-              ].map(p => {
-                const isSelected = musicPeriod === p.id;
-                const PeriodIcon = p.icon;
-                return (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => handleMusicPeriodChange(p.id as any)}
-                    className={`shelf-view-toggle-btn ${isSelected ? 'active' : ''}`}
-                    style={{
-                      padding: '0.3rem 0.65rem',
-                      borderRadius: '6px',
-                      fontSize: '0.78rem',
-                      fontWeight: isSelected ? 600 : 500,
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.35rem',
-                      border: 'none',
-                      background: isSelected ? 'var(--color-music, #1DB954)' : 'transparent',
-                      color: isSelected ? '#ffffff' : 'var(--text-secondary)'
-                    }}
-                  >
-                    <PeriodIcon size={13} />
-                    <span>{p.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {isMusicDataLoading ? (
-            <div style={{ padding: '3rem 1rem', display: 'flex', justifyContent: 'center' }}>
-              <PathdLoader size="medium" message={language === 'es' ? 'Cargando música...' : 'Loading music...'} />
-            </div>
-          ) : musicItems.length === 0 ? (
-            <div className="glass-card" style={{ padding: '3rem 2rem', textAlign: 'center', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
-              <Music size={32} color="#ef4444" style={{ opacity: 0.8 }} />
-              <div style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                {musicType === 'albums' && (language === 'es' ? 'No hay álbumes escuchados en este período.' : 'No albums played in this period.')}
-                {musicType === 'artists' && (language === 'es' ? 'No hay artistas escuchados en este período.' : 'No artists played in this period.')}
-                {musicType === 'tracks' && (language === 'es' ? 'No hay canciones escuchadas en este período.' : 'No tracks played in this period.')}
-              </div>
-              <p style={{ margin: 0, fontSize: '0.85rem', maxWidth: '450px', lineHeight: '1.45' }}>
-                {isOwnProfile
-                  ? (language === 'es'
-                    ? 'Asegúrate de vincular tu reproductor de música (Spotify, Apple Music, YouTube Music, Deezer, Tidal, etc.) en Last.fm para que tus reproducciones se sincronicen automáticamente aquí.'
-                    : 'Make sure to connect your music player (Spotify, Apple Music, YouTube Music, Deezer, Tidal, etc.) in Last.fm so your scrobbles sync automatically here.')
-                  : (language === 'es'
-                    ? 'Este usuario aún no ha reproducido música en este período.'
-                    : 'This user has not played any music during this period.')}
-              </p>
-              {isOwnProfile && (
-                <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', justifyContent: 'center', marginTop: '0.5rem' }}>
-                  <button
-                    type="button"
-                    onClick={() => setShowMusicGuideModal(true)}
-                    className="btn-secondary"
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.4rem',
-                      fontSize: '0.85rem',
-                      padding: '0.5rem 1rem'
-                    }}
-                  >
-                    <HelpCircle size={14} />
-                    {language === 'es' ? '¿Cómo conectar mi música?' : 'How to connect my music?'}
-                  </button>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="profile-music-grid">
-              {musicItems.map((item, i) => {
-                const itemArtist = musicType === 'artists' ? item.name : item.artist;
-                const itemName = musicType === 'artists' ? undefined : item.name;
-                const modalItemType = musicType === 'albums' ? 'album' : musicType === 'artists' ? 'artist' : 'track';
-
-                return (
-                  <div
-                    key={`${item.name}-${i}`}
-                    className={`glass-card profile-music-card ${musicType === 'artists' ? 'profile-music-card-artist' : ''}`}
-                    onClick={() => {
-                      const targetRoute = modalItemType === 'artist'
-                        ? `/music/artist/${encodeURIComponent(itemArtist)}`
-                        : `/music/${modalItemType}/${encodeURIComponent(itemArtist)}/${encodeURIComponent(itemName || '')}`;
-                      navigate(targetRoute, {
-                        state: {
-                          backgroundLocation: location,
-                          image: item.image
-                        }
-                      });
-                    }}
-                    onMouseEnter={(e) => {
-                      if (window.innerWidth > 768) {
-                        e.currentTarget.style.transform = 'translateY(-4px)';
-                        e.currentTarget.style.borderColor = 'rgba(29, 185, 84, 0.5)';
-                        e.currentTarget.style.boxShadow = '0 8px 24px rgba(29, 185, 84, 0.15)';
-                      }
-                      prefetchMusicDetails(modalItemType, itemArtist, itemName);
-                    }}
-                    onMouseLeave={(e) => {
-                      if (window.innerWidth > 768) {
-                        e.currentTarget.style.transform = 'translateY(0)';
-                        e.currentTarget.style.borderColor = 'var(--border-color)';
-                        e.currentTarget.style.boxShadow = 'none';
-                      }
-                    }}
-                  >
-                    {/* Position badge */}
-                    <span className="profile-music-rank-badge">
-                      #{i + 1}
-                    </span>
-
-                    {/* Artist Favorite Button (Only on own profile and artists view) */}
-                    {isOwnProfile && musicType === 'artists' && (() => {
-                      const cleanName = (item.name || '').trim().toLowerCase();
-                      const targetExt = `artist:${cleanName}`;
-                      const isArtistFav = displayedFavorites.some(f => f.item_type === 'music' && (f.external_id?.toLowerCase() === targetExt || f.title?.toLowerCase() === cleanName));
-
-                      return (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleToggleArtistFavorite(item.name, item.image);
-                          }}
-                          className={`btn-favorite-heart profile-music-fav-btn ${isArtistFav ? 'is-favorite' : ''}`}
-                          title={isArtistFav
-                            ? (language === 'es' ? 'Quitar Destacado' : 'Remove Featured')
-                            : (language === 'es' ? 'Destacar Artista' : 'Feature Artist')
-                          }
-                        >
-                          <Heart size={16} fill={isArtistFav ? 'var(--color-user, #F472B6)' : 'none'} />
-                        </button>
-                      );
-                    })()}
-
-                    {/* Artwork / Poster / Avatar */}
-                    <div className="profile-music-artwork-wrap">
-                      {item.image && !item.image.includes('2a96cbd8b46e442fc41c2b86b821562f') && !item.image.includes('d41d8cd98f00b204e9800998ecf8427e') ? (
-                        <img
-                          src={item.image}
-                          alt={item.name}
-                          referrerPolicy="no-referrer"
-                          onError={(e) => {
-                            e.currentTarget.style.display = 'none';
-                            const fallback = e.currentTarget.nextElementSibling as HTMLElement;
-                            if (fallback) fallback.style.display = 'flex';
-                          }}
-                        />
-                      ) : null}
-                      <div
-                        className="profile-music-artwork-fallback"
-                        style={{
-                          display: (item.image && !item.image.includes('2a96cbd8b46e442fc41c2b86b821562f') && !item.image.includes('d41d8cd98f00b204e9800998ecf8427e')) ? 'none' : 'flex'
-                        }}
-                      >
-                        {musicType === 'artists' ? <Mic size={24} /> : musicType === 'tracks' ? <Headphones size={24} /> : <Disc size={24} />}
-                      </div>
-                    </div>
-
-                    {/* Text details */}
-                    <div className="profile-music-info">
-                      <h4 title={item.name}>
-                        {item.name}
-                      </h4>
-                      {item.artist && (
-                        <span className="profile-music-artist" title={item.artist}>
-                          {item.artist}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Playcount Badge */}
-                    <div className="profile-music-plays-wrap">
-                      <span className="profile-music-plays-badge">
-                        {item.playcount} {language === 'es' ? 'reproducciones' : 'plays'}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
         </div>
-        )
-      )}
-
+      </SwipeViewPager>
       {/* AdBanner placed directly above Activity History */}
       <AdBanner style={{ margin: '1.5rem auto 2.5rem auto' }} />
 

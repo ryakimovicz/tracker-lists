@@ -497,14 +497,9 @@ h1, h2, h3, h4, h5, h6 {
     background: transparent !important;
     border: none !important;
     border-bottom: none !important;
-    color: var(--tab-color, var(--text-secondary)) !important;
-    opacity: 0.78;
-    transition: opacity 0.22s cubic-bezier(0.4, 0, 0.2, 1), transform 0.22s cubic-bezier(0.4, 0, 0.2, 1), color 0.22s ease !important;
-  }
-
-  .profile-tab-btn.active {
-    color: var(--tab-color, var(--accent-primary)) !important;
-    opacity: 1 !important;
+    color: color-mix(in srgb, var(--tab-color, var(--accent-primary)) calc(var(--tab-act, 0) * 100%), var(--text-secondary)) !important;
+    opacity: calc(0.7 + 0.3 * var(--tab-act, 0)) !important;
+    transition: none !important;
   }
 
   .profile-tab-btn .profile-tab-label {
@@ -512,35 +507,24 @@ h1, h2, h3, h4, h5, h6 {
     font-size: 0.65rem !important;
     font-weight: 700 !important;
     line-height: 1 !important;
-    color: var(--tab-color, var(--accent-primary)) !important;
+    color: inherit !important;
     text-align: center !important;
     white-space: nowrap !important;
     position: absolute !important;
     bottom: 0.05rem !important;
     left: 50% !important;
-    transform: translateX(-50%) translateY(4px) scale(0.9) !important;
-    opacity: 0 !important;
-    visibility: hidden !important;
-    pointer-events: none !important;
-    transition: opacity 0.22s cubic-bezier(0.4, 0, 0.2, 1), transform 0.22s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.22s !important;
-  }
-
-  .profile-tab-btn.active .profile-tab-label {
-    opacity: 1 !important;
+    transform: translateX(-50%) translateY(calc((1 - var(--tab-act, 0)) * 4px)) scale(calc(0.9 + 0.1 * var(--tab-act, 0))) !important;
+    opacity: var(--tab-act, 0) !important;
     visibility: visible !important;
-    transform: translateX(-50%) translateY(0) scale(1) !important;
+    pointer-events: none !important;
+    transition: none !important;
   }
 
   .profile-tab-btn svg {
     width: 20px !important;
     height: 20px !important;
-    color: var(--tab-color, currentColor) !important;
-    transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1), color 0.22s ease !important;
-  }
-
-  .profile-tab-btn.active svg {
-    color: var(--tab-color, var(--accent-primary)) !important;
-    transform: translateY(-5px) !important;
+    transform: translateY(calc(var(--tab-act, 0) * -5px)) !important;
+    transition: none !important;
   }
 
   /* Shelf Media Category Filters on Mobile */
@@ -1804,8 +1788,77 @@ h1, h2, h3, h4, h5, h6 {
     border-radius: 9999px !important;
   }
 
-  /* Legacy Social & Explore Mobile Tabs */
-  .social-tab-item,
+  /* Real-time Gestural Mobile Social Tab Items */
+  .social-tab-item {
+    flex: 1 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 0.25rem 0 0.35rem 0 !important;
+    border-radius: 8px !important;
+    position: relative !important;
+    min-height: 44px !important;
+    color: color-mix(in srgb, var(--accent-primary) calc(var(--tab-act, 0) * 100%), var(--text-secondary)) !important;
+    transition: none !important;
+  }
+
+  .social-tab-item .social-tab-label {
+    display: block !important;
+    font-size: 0.65rem !important;
+    font-weight: 700 !important;
+    line-height: 1 !important;
+    color: inherit !important;
+    text-align: center !important;
+    white-space: nowrap !important;
+    position: absolute !important;
+    bottom: 0.05rem !important;
+    left: 50% !important;
+    transform: translateX(-50%) translateY(calc((1 - var(--tab-act, 0)) * 4px)) scale(calc(0.9 + 0.1 * var(--tab-act, 0))) !important;
+    opacity: var(--tab-act, 0) !important;
+    visibility: visible !important;
+    pointer-events: none !important;
+    transition: none !important;
+  }
+
+  .social-tab-item .social-tab-icon {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    transform: translateY(calc(var(--tab-act, 0) * -5px)) !important;
+    transition: none !important;
+  }
+
+  .social-tab-item .social-tab-icon svg {
+    width: 20px !important;
+    height: 20px !important;
+  }
+
+  /* Single Continuous Sliding Underline Indicator for Social Mobile Tabs */
+  .social-tabs-sliding-indicator {
+    position: absolute !important;
+    bottom: -1px !important;
+    left: 0.5rem !important;
+    width: calc((100% - 1rem) / 4) !important;
+    height: 2px !important;
+    pointer-events: none !important;
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    transform: translateX(calc(var(--tab-progress, 0) * 100%)) !important;
+    will-change: transform !important;
+    z-index: 5 !important;
+  }
+
+  .social-tabs-sliding-indicator::after {
+    content: '' !important;
+    width: 65% !important;
+    height: 100% !important;
+    background: var(--accent-primary) !important;
+    border-radius: 9999px !important;
+  }
+
+  /* Real-time Gestural Mobile Explore Subtabs */
   .explore-subtab-item {
     flex: 1 !important;
     display: flex !important;
@@ -1814,12 +1867,12 @@ h1, h2, h3, h4, h5, h6 {
     justify-content: center !important;
     padding: 0.25rem 0 0.35rem 0 !important;
     border-radius: 8px !important;
-    transition: all 0.15s ease !important;
     position: relative !important;
     min-height: 44px !important;
+    color: color-mix(in srgb, var(--tab-color, var(--accent-primary)) calc(var(--tab-act, 0) * 100%), var(--text-secondary)) !important;
+    transition: none !important;
   }
 
-  .social-tab-item .social-tab-label,
   .explore-subtab-item .explore-subtab-label {
     display: block !important;
     font-size: 0.65rem !important;
@@ -1831,62 +1884,155 @@ h1, h2, h3, h4, h5, h6 {
     position: absolute !important;
     bottom: 0.05rem !important;
     left: 50% !important;
-    transform: translateX(-50%) translateY(4px) scale(0.9) !important;
-    opacity: 0 !important;
-    visibility: hidden !important;
-    pointer-events: none !important;
-    transition: opacity 0.22s cubic-bezier(0.4, 0, 0.2, 1), transform 0.22s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.22s !important;
-  }
-
-  .social-tab-item.active .social-tab-label,
-  .explore-subtab-item.active .explore-subtab-label {
-    opacity: 1 !important;
+    transform: translateX(-50%) translateY(calc((1 - var(--tab-act, 0)) * 4px)) scale(calc(0.9 + 0.1 * var(--tab-act, 0))) !important;
+    opacity: var(--tab-act, 0) !important;
     visibility: visible !important;
-    transform: translateX(-50%) translateY(0) scale(1) !important;
+    pointer-events: none !important;
+    transition: none !important;
   }
 
-  .social-tab-item .social-tab-icon,
   .explore-subtab-item .explore-subtab-icon {
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    transform: translateY(calc(var(--tab-act, 0) * -5px)) !important;
+    transition: none !important;
   }
 
-  .social-tab-item .social-tab-icon svg,
   .explore-subtab-item .explore-subtab-icon svg {
     width: 20px !important;
     height: 20px !important;
   }
 
-  .social-tab-item.active .social-tab-icon,
-  .explore-subtab-item.active .explore-subtab-icon {
-    transform: translateY(-5px) !important;
+  /* Single Continuous Sliding Underline Indicator for Explore Mobile Subtabs */
+  .explore-subtabs-sliding-indicator {
+    position: absolute !important;
+    bottom: -1px !important;
+    left: 0.5rem !important;
+    width: calc((100% - 1rem) / 3) !important;
+    height: 2px !important;
+    pointer-events: none !important;
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    transform: translateX(calc(var(--tab-progress, 0) * 100%)) !important;
+    will-change: transform !important;
+    z-index: 5 !important;
   }
 
-  .social-tab-item.active,
-  .explore-subtab-item.active {
-    color: var(--accent-primary) !important;
+  .explore-subtabs-sliding-indicator::after {
+    content: '' !important;
+    width: 65% !important;
+    height: 100% !important;
+    background: var(--accent-primary) !important;
+    border-radius: 9999px !important;
   }
 
-  .explore-subtab-item.active.explore-tab-new {
-    color: var(--accent-primary) !important;
+  /* Single Continuous Sliding Indicator for Profile Tabs */
+  .profile-tabs-sliding-indicator {
+    position: absolute !important;
+    bottom: -1px !important;
+    left: 0 !important;
+    width: calc(100% / var(--profile-tab-count, 4)) !important;
+    height: 2px !important;
+    pointer-events: none !important;
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    transform: translateX(calc(var(--tab-progress, 0) * 100%)) !important;
+    will-change: transform !important;
+    z-index: 5 !important;
   }
 
-  .explore-subtab-item.active.explore-tab-trending {
-    color: #f97316 !important;
+  .profile-tabs-sliding-indicator::after {
+    content: '' !important;
+    width: 65% !important;
+    height: 100% !important;
+    background: var(--profile-indicator-color, var(--accent-primary)) !important;
+    border-radius: 9999px !important;
   }
 
-  .explore-subtab-item.active.explore-tab-guides {
-    color: var(--color-guide, #2DD4BF) !important;
+  /* Subtabs in Profile: Guías (Creadas / Guardadas) & Música (Artistas / Álbumes / Canciones) */
+  .profile-guides-mobile-tabs-container,
+  .profile-music-mobile-tabs-container {
+    width: 100% !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-around !important;
+    border-bottom: 1px solid var(--border-color) !important;
+    margin-top: 0.25rem !important;
+    margin-bottom: 0.75rem !important;
+    box-sizing: border-box !important;
+    position: relative !important;
+  }
+
+  .profile-guides-mobile-tab-btn,
+  .profile-music-mobile-tab-btn {
+    flex: 1 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 0.55rem 0 !important;
+    font-size: 0.95rem !important;
+    font-weight: 600 !important;
+    color: color-mix(in srgb, var(--subtab-color, var(--accent-primary)) calc(var(--subtab-act, 0) * 100%), var(--text-secondary)) !important;
+    background: transparent !important;
+    border: none !important;
+    position: relative !important;
+    cursor: pointer !important;
+    transition: none !important;
+  }
+
+  .profile-guides-tab-sliding-indicator {
+    position: absolute !important;
+    bottom: -1px !important;
+    left: 0 !important;
+    width: 50% !important;
+    height: 2px !important;
+    pointer-events: none !important;
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    transform: translateX(calc(var(--guides-subtab-progress, 0) * 100%)) !important;
+    will-change: transform !important;
+    z-index: 5 !important;
+  }
+
+  .profile-guides-tab-sliding-indicator::after {
+    content: '' !important;
+    width: 80% !important;
+    height: 100% !important;
+    background: var(--color-guide, #2DD4BF) !important;
+    border-radius: 9999px !important;
+  }
+
+  .profile-music-tab-sliding-indicator {
+    position: absolute !important;
+    bottom: -1px !important;
+    left: 0 !important;
+    width: calc(100% / 3) !important;
+    height: 2px !important;
+    pointer-events: none !important;
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    transform: translateX(calc(var(--music-subtab-progress, 0) * 100%)) !important;
+    will-change: transform !important;
+    z-index: 5 !important;
+  }
+
+  .profile-music-tab-sliding-indicator::after {
+    content: '' !important;
+    width: 80% !important;
+    height: 100% !important;
+    background: var(--color-music, #1DB954) !important;
+    border-radius: 9999px !important;
   }
 
   .social-tab-item.active .social-tab-indicator,
   .explore-subtab-item.active .explore-subtab-indicator,
   .profile-tab-btn.active .profile-tab-indicator {
-    bottom: -0.5rem !important;
-    left: 15% !important;
-    right: 15% !important;
+    display: none !important;
   }
 
   /* -------------------------------------------------------------------------

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Users, Compass, Star, User, RefreshCw } from 'lucide-react';
 import { apiClient } from '../api/client';
 import { useAuth } from '../context/AuthContext';
@@ -7,6 +7,7 @@ import { SocialActivityCard } from '../components/SocialActivityCard';
 import type { ActivityCardData } from '../components/SocialActivityCard';
 import { ItemDetailsModal } from '../components/ItemDetailsModal';
 import { PathdLoader } from '../components/PathdLoader';
+import { SwipeViewPager } from '../components/SwipeViewPager';
 import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 
 type SocialTab = 'following' | 'discover' | 'reviews' | 'me';
@@ -49,14 +50,21 @@ export const Social: React.FC = () => {
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  const initialCached = feedCacheRef.current[activeTab] || [];
-  const [activities, setActivities] = useState<ActivityCardData[]>(initialCached);
-  const [loading, setLoading] = useState<boolean>(initialCached.length === 0);
+  const [tabFeeds, setTabFeeds] = useState<Record<SocialTab, ActivityCardData[]>>(() => ({
+    following: feedCacheRef.current.following || [],
+    discover: feedCacheRef.current.discover || [],
+    reviews: feedCacheRef.current.reviews || [],
+    me: feedCacheRef.current.me || [],
+  }));
+  const [tabLoading, setTabLoading] = useState<Record<SocialTab, boolean>>(() => ({
+    following: (feedCacheRef.current.following || []).length === 0,
+    discover: (feedCacheRef.current.discover || []).length === 0,
+    reviews: (feedCacheRef.current.reviews || []).length === 0,
+    me: (feedCacheRef.current.me || []).length === 0,
+  }));
   const [refreshing, setRefreshing] = useState(false);
   const [selectedItem, setSelectedItem] = useState<any | null>(null);
 
-  const loadingRef = useRef(loading);
-  loadingRef.current = loading;
   const refreshingRef = useRef(refreshing);
   refreshingRef.current = refreshing;
 
@@ -272,12 +280,8 @@ export const Social: React.FC = () => {
           localStorage.setItem(`pathd_social_feed_${tab}`, serialized);
         } catch (_) {}
 
-        // Only update visible activities if this is still the active tab
-        if (activeTabRef.current === tab) {
-          setActivities(consolidated);
-          setLoading(false);
-          loadingRef.current = false;
-        }
+        setTabFeeds(prev => ({ ...prev, [tab]: consolidated }));
+        setTabLoading(prev => ({ ...prev, [tab]: false }));
       }
     } catch (err: any) {
       if (err?.name === 'CanceledError' || err?.code === 'ERR_CANCELED' || signal?.aborted) {
@@ -285,12 +289,9 @@ export const Social: React.FC = () => {
       }
       console.error(`Error loading social feed for tab ${tab}:`, err);
     } finally {
-      if (activeTabRef.current === tab) {
-        setLoading(false);
-        loadingRef.current = false;
-        setRefreshing(false);
-        refreshingRef.current = false;
-      }
+      setTabLoading(prev => ({ ...prev, [tab]: false }));
+      setRefreshing(false);
+      refreshingRef.current = false;
     }
   };
 
@@ -307,17 +308,14 @@ export const Social: React.FC = () => {
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
-    // Immediately show cached items if available; otherwise show loader and clear previous tab data
+    // Immediately show cached items if available; otherwise show loader
     const cached = feedCacheRef.current[activeTab] || getCachedFeed(activeTab);
     if (cached && cached.length > 0) {
       feedCacheRef.current[activeTab] = cached;
-      setActivities(cached);
-      setLoading(false);
-      loadingRef.current = false;
+      setTabFeeds(prev => ({ ...prev, [activeTab]: cached }));
+      setTabLoading(prev => ({ ...prev, [activeTab]: false }));
     } else {
-      setActivities([]);
-      setLoading(true);
-      loadingRef.current = true;
+      setTabLoading(prev => ({ ...prev, [activeTab]: true }));
     }
 
     setHasNewUpdates(false);
@@ -359,7 +357,7 @@ export const Social: React.FC = () => {
       if (document.visibilityState === 'visible') {
         const timePassed = Date.now() - lastFeedFetchRef.current;
         // If more than 30 seconds passed and not busy, refresh feed
-        if (timePassed > 30000 && !loadingRef.current && !refreshingRef.current) {
+        if (timePassed > 30000 && !tabLoading[activeTabRef.current] && !refreshingRef.current) {
           const currentTab = activeTabRef.current;
           fetchTabFeed(currentTab, true);
           lastFeedFetchRef.current = Date.now();
@@ -376,23 +374,13 @@ export const Social: React.FC = () => {
   }, []);
 
   const handleTabChange = (tab: SocialTab) => {
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    }
     if (tab === activeTab) return;
     setHasNewUpdates(false);
 
-    // Instantly set target tab in activeTabRef and update displayed activities for 0ms response
     activeTabRef.current = tab;
-    const cached = feedCacheRef.current[tab] || getCachedFeed(tab);
-    if (cached && cached.length > 0) {
-      feedCacheRef.current[tab] = cached;
-      setActivities(cached);
-      setLoading(false);
-      loadingRef.current = false;
-    } else {
-      setActivities([]);
-      setLoading(true);
-      loadingRef.current = true;
-    }
-
     const newParams = new URLSearchParams(searchParams);
     if (tab === 'following') {
       newParams.delete('tab');
@@ -401,6 +389,37 @@ export const Social: React.FC = () => {
     }
     setSearchParams(newParams, { replace: true });
   };
+
+  const currentSocialStep = validTabs.indexOf(activeTab);
+
+  const goToSocialStep = (step: number) => {
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    }
+    const targetTab = validTabs[step] || 'following';
+    handleTabChange(targetTab);
+  };
+
+  // Real-time gesture tracking refs & handler for smooth mobile tab morphing
+  const socialTabsContainerRef = useRef<HTMLDivElement>(null);
+  const tabItemRefs = useRef<(HTMLDivElement | null)[]>([]);
+
+  const handleScrollProgress = useCallback((progress: number) => {
+    const clamped = Math.min(3, Math.max(0, progress));
+    if (socialTabsContainerRef.current) {
+      socialTabsContainerRef.current.style.setProperty('--tab-progress', clamped.toFixed(4));
+    }
+    tabItemRefs.current.forEach((el, i) => {
+      if (!el) return;
+      const dist = Math.abs(clamped - i);
+      const act = Math.max(0, Math.min(1, 1 - dist));
+      el.style.setProperty('--tab-act', act.toFixed(4));
+    });
+  }, []);
+
+  useEffect(() => {
+    handleScrollProgress(currentSocialStep);
+  }, [currentSocialStep, handleScrollProgress]);
 
   const handleApplyUpdates = () => {
     setHasNewUpdates(false);
@@ -414,15 +433,16 @@ export const Social: React.FC = () => {
   };
 
   const handleDeleteActivity = (id: number) => {
-    setActivities(prev => {
-      const updated = prev.filter(a => a.id !== id);
+    setTabFeeds(prev => {
+      const current = prev[activeTab] || [];
+      const updated = current.filter(a => a.id !== id);
       feedCacheRef.current[activeTab] = updated;
       try {
         const serialized = JSON.stringify(updated);
         sessionStorage.setItem(`pathd_social_feed_${activeTab}`, serialized);
         localStorage.setItem(`pathd_social_feed_${activeTab}`, serialized);
       } catch (_) {}
-      return updated;
+      return { ...prev, [activeTab]: updated };
     });
   };
 
@@ -453,10 +473,74 @@ export const Social: React.FC = () => {
     }
   ];
 
+  const renderSocialFeed = (tab: SocialTab) => {
+    const items = tabFeeds[tab] || [];
+    const isLoading = tabLoading[tab] && items.length === 0;
+
+    if (isLoading) {
+      return (
+        <div style={{ minHeight: '45vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '3rem 1rem' }}>
+          <PathdLoader size="medium" message={isEs ? 'Cargando comunidad...' : 'Loading community...'} />
+        </div>
+      );
+    }
+
+    if (items.length === 0) {
+      return (
+        <div className="glass-card" style={{ padding: '4rem 2rem', textAlign: 'center', borderRadius: '16px' }}>
+          <h3 style={{ fontSize: '1.4rem', marginBottom: '0.5rem', color: 'var(--text-primary)' }}>
+            {tab === 'following'
+              ? (isEs ? 'Tu muro está en silencio' : 'Your feed is quiet')
+              : (isEs ? 'No hay actividad disponible' : 'No activity available')}
+          </h3>
+          <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem', fontSize: '0.95rem', maxWidth: '460px', margin: '0 auto 1.5rem auto' }}>
+            {tab === 'following'
+              ? (isEs ? 'Los usuarios que sigues no han registrado actividad recientemente. ¡Explora la pestaña Descubrir para conectar con más personas!' : 'Users you follow have not recorded activity recently. Explore Discover to find new people!')
+              : tab === 'me'
+              ? (isEs ? 'Todavía no has registrado actividad pública. Completa obras o califícalas para ver tu progreso aquí.' : 'You have not logged public activity yet. Complete items or rate them to see your progress.')
+              : (isEs ? 'No se encontraron publicaciones con los criterios actuales.' : 'No entries found with the current criteria.')}
+          </p>
+          {tab === 'following' && (
+            <button
+              onClick={() => goToSocialStep(1)}
+              className="btn-primary"
+              style={{ padding: '0.7rem 1.75rem', borderRadius: '25px', fontWeight: 600 }}
+            >
+              {isEs ? 'Ir a Descubrir' : 'Go to Discover'}
+            </button>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <div
+        className="social-feed-grid"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+          gap: '1.25rem',
+          alignItems: 'stretch'
+        }}
+      >
+        {items.map(act => (
+          <SocialActivityCard
+            key={act.id}
+            activity={act}
+            isOwnActivity={Boolean(user && user.id === act.user_id)}
+            onDelete={handleDeleteActivity}
+            onOpenItem={(item) => handleOpenItem(item)}
+          />
+        ))}
+      </div>
+    );
+  };
+
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
       {/* Unified Underline Tabs Bar */}
       <div
+        ref={socialTabsContainerRef}
         className="social-tabs-container"
         style={{
           display: 'flex',
@@ -470,38 +554,40 @@ export const Social: React.FC = () => {
           background: 'var(--bg-primary)',
           marginTop: '-2rem',
           paddingTop: '1.35rem',
-          overflowX: 'auto'
-        }}
+          overflowX: 'auto',
+          '--tab-progress': String(currentSocialStep)
+        } as React.CSSProperties}
       >
-        {tabsConfig.map(tab => {
+        {tabsConfig.map((tab, idx) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
           return (
             <div
               key={tab.id}
-              onClick={() => handleTabChange(tab.id)}
+              ref={el => { tabItemRefs.current[idx] = el; }}
+              onClick={() => goToSocialStep(idx)}
               className={`social-tab-item ${isActive ? 'active' : ''}`}
               title={tab.label}
               style={{
                 fontSize: '1.05rem',
                 fontWeight: isActive ? 600 : 500,
-                color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
                 cursor: 'pointer',
                 padding: '0.25rem 0',
                 position: 'relative',
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '0.5rem',
-                whiteSpace: 'nowrap'
-              }}
+                whiteSpace: 'nowrap',
+                '--tab-act': isActive ? '1' : '0'
+              } as React.CSSProperties}
             >
               <span className="social-tab-icon">
-                <Icon size={18} style={{ color: isActive ? 'var(--accent-primary)' : 'inherit' }} />
+                <Icon size={18} />
               </span>
               <span className="social-tab-label">{tab.label}</span>
               {isActive && (
                 <div
-                  className="social-tab-indicator"
+                  className="social-tab-indicator home-desktop-only"
                   style={{
                     position: 'absolute',
                     bottom: '-0.75rem',
@@ -515,6 +601,9 @@ export const Social: React.FC = () => {
             </div>
           );
         })}
+
+        {/* Sliding Continuous Indicator for Mobile Social Tabs */}
+        <div className="social-tabs-sliding-indicator home-mobile-only" />
       </div>
 
       {/* Floating Centered Refresh Button */}
@@ -561,56 +650,18 @@ export const Social: React.FC = () => {
         </div>
       )}
 
-      {/* Feed Content */}
-      {loading ? (
-        <div style={{ minHeight: '45vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '3rem 1rem' }}>
-          <PathdLoader size="medium" message={isEs ? 'Cargando comunidad...' : 'Loading community...'} />
-        </div>
-      ) : activities.length === 0 ? (
-        <div className="glass-card" style={{ padding: '4rem 2rem', textAlign: 'center', borderRadius: '16px' }}>
-          <h3 style={{ fontSize: '1.4rem', marginBottom: '0.5rem', color: 'var(--text-primary)' }}>
-            {activeTab === 'following'
-              ? (isEs ? 'Tu muro está en silencio' : 'Your feed is quiet')
-              : (isEs ? 'No hay actividad disponible' : 'No activity available')}
-          </h3>
-          <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem', fontSize: '0.95rem', maxWidth: '460px', margin: '0 auto 1.5rem auto' }}>
-            {activeTab === 'following'
-              ? (isEs ? 'Los usuarios que sigues no han registrado actividad recientemente. ¡Explora la pestaña Descubrir para conectar con más personas!' : 'Users you follow have not recorded activity recently. Explore Discover to find new people!')
-              : activeTab === 'me'
-              ? (isEs ? 'Todavía no has registrado actividad pública. Completa obras o califícalas para ver tu progreso aquí.' : 'You have not logged public activity yet. Complete items or rate them to see your progress.')
-              : (isEs ? 'No se encontraron publicaciones con los criterios actuales.' : 'No entries found with the current criteria.')}
-          </p>
-          {activeTab === 'following' && (
-            <button
-              onClick={() => handleTabChange('discover')}
-              className="btn-primary"
-              style={{ padding: '0.7rem 1.75rem', borderRadius: '25px', fontWeight: 600 }}
-            >
-              {isEs ? 'Ir a Descubrir' : 'Go to Discover'}
-            </button>
-          )}
-        </div>
-      ) : (
-        <div
-          className="social-feed-grid"
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-            gap: '1.25rem',
-            alignItems: 'stretch'
-          }}
-        >
-          {activities.map(act => (
-            <SocialActivityCard
-              key={act.id}
-              activity={act}
-              isOwnActivity={Boolean(user && user.id === act.user_id)}
-              onDelete={handleDeleteActivity}
-              onOpenItem={(item) => handleOpenItem(item)}
-            />
-          ))}
-        </div>
-      )}
+      {/* Edge-to-Edge 1:1 Native Swipe ViewPager across Social Feeds */}
+      <SwipeViewPager
+        currentIndex={currentSocialStep}
+        totalSlides={4}
+        onSlideChange={goToSocialStep}
+        onScrollProgress={handleScrollProgress}
+      >
+        <div style={{ width: "100%", flex: 1 }}>{renderSocialFeed('following')}</div>
+        <div style={{ width: "100%", flex: 1 }}>{renderSocialFeed('discover')}</div>
+        <div style={{ width: "100%", flex: 1 }}>{renderSocialFeed('reviews')}</div>
+        <div style={{ width: "100%", flex: 1 }}>{renderSocialFeed('me')}</div>
+      </SwipeViewPager>
 
       {selectedItem && (
         <ItemDetailsModal
