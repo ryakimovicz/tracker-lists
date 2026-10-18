@@ -92,62 +92,70 @@ class TVMazeService:
         )
         
         results = []
-        try:
-            with urllib.request.urlopen(req, timeout=4) as response:
-                if response.status == 200:
-                    data = json.loads(response.read().decode())
-                    valid_shows = []
-                    for item in data:
-                        show = item.get("show", {})
-                        raw_show_name = show.get("name") or "Untitled Show"
-                        show_summary = show.get("summary") or ""
-                        if not is_safe_media_item(raw_show_name, show_summary):
-                            continue
+        data = None
+        for attempt in range(2):
+            try:
+                with urllib.request.urlopen(req, timeout=4) as response:
+                    if response.status == 200:
+                        data = json.loads(response.read().decode())
+                        break
+            except Exception as e:
+                if attempt == 0:
+                    time.sleep(0.5)
+                else:
+                    print(f"TVMaze Search API Error: {e}")
 
-                        genres = show.get("genres", [])
-                        language = show.get("language", "")
-                        
-                        if is_anime:
-                            if "Anime" not in genres and language != "Japanese":
-                                continue
-                        else:
-                            if "Anime" in genres or language == "Japanese":
-                                continue
-                        valid_shows.append(show)
+        if data:
+            valid_shows = []
+            for item in data:
+                show = item.get("show", {})
+                raw_show_name = show.get("name") or "Untitled Show"
+                show_summary = show.get("summary") or ""
+                if not is_safe_media_item(raw_show_name, show_summary):
+                    continue
 
-                    for show in valid_shows:
-                        raw_show_name = show.get("name") or "Untitled Show"
-                        show_summary = show.get("summary") or ""
-                        image_data = show.get("image")
-                        image_url = (image_data.get("original") or image_data.get("medium")) if image_data else None
-                        premiered = show.get("premiered")
-                        release_date = premiered[:4] if premiered else None
-                        externals = show.get("externals", {})
-                        imdb_id = externals.get("imdb")
-                        weight = show.get("weight")
-                        pop_score = float(weight) if weight is not None else None
-                        show_id_int = show.get("id")
+                genres = show.get("genres", [])
+                language = show.get("language", "")
+                
+                if is_anime:
+                    if "Anime" not in genres and language != "Japanese":
+                        continue
+                else:
+                    if "Anime" in genres or language == "Japanese":
+                        continue
+                valid_shows.append(show)
 
-                        # If AKAs are already in memory cache, use them; otherwise use raw_show_name instantly
-                        localized_name = raw_show_name
-                        if show_id_int and show_id_int in _TVMAZE_AKAS_CACHE:
-                            localized_name = TVMazeService.get_localized_title(show_id_int, raw_show_name, lang, country_code)
+            for show in valid_shows:
+                raw_show_name = show.get("name") or "Untitled Show"
+                show_summary = show.get("summary") or ""
+                image_data = show.get("image")
+                image_url = (image_data.get("original") or image_data.get("medium")) if image_data else None
+                premiered = show.get("premiered")
+                release_date = premiered[:4] if premiered else None
+                externals = show.get("externals", {})
+                imdb_id = externals.get("imdb")
+                weight = show.get("weight")
+                pop_score = float(weight) if weight is not None else None
+                show_id_int = show.get("id")
 
-                        results.append(
-                            SearchResultItem(
-                                external_id=f"tvm_{show.get('id')}",
-                                title=localized_name,
-                                image_url=image_url,
-                                description=show_summary,
-                                item_type="anime" if is_anime else "series",
-                                release_date=release_date,
-                                imdb_id=imdb_id,
-                                popularity=pop_score
-                            )
-                        )
-        except Exception as e:
-            print(f"TVMaze Search API Error: {e}")
-            
+                # If AKAs are already in memory cache, use them; otherwise use raw_show_name instantly
+                localized_name = raw_show_name
+                if show_id_int and show_id_int in _TVMAZE_AKAS_CACHE:
+                    localized_name = TVMazeService.get_localized_title(show_id_int, raw_show_name, lang, country_code)
+
+                results.append(
+                    SearchResultItem(
+                        external_id=f"tvm_{show.get('id')}",
+                        title=localized_name,
+                        image_url=image_url,
+                        description=show_summary,
+                        item_type="anime" if is_anime else "series",
+                        release_date=release_date,
+                        imdb_id=imdb_id,
+                        popularity=pop_score
+                    )
+                )
+
         return results
 
     @staticmethod
