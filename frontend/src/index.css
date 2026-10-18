@@ -1610,14 +1610,42 @@ h1, h2, h3, h4, h5, h6 {
   }
 
   /* Profile shelf list container on mobile:
-     Scrollable bounded container whose height shows available items with the last item sliced higher up
-     and leaves the divider line visible below. */
+     Dynamically sized to occupy the maximum available vertical screen space
+     between search controls and the divider line before Activity History. */
   .profile-shelf-list-container {
     height: auto !important;
-    max-height: clamp(190px, calc(100dvh - 375px), 395px) !important;
+    max-height: var(--mobile-shelf-max-height, clamp(220px, calc(100dvh - 290px), 680px)) !important;
     overflow-y: auto !important;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: thin;
+  }
+
+  .profile-swipe-pager {
+    min-height: auto !important;
+    padding-bottom: 0 !important;
+  }
+
+  .profile-swipe-pager .swipe-pager-slide {
+    min-height: auto !important;
+  }
+
+  .profile-shelf-slide {
+    gap: 0.65rem !important;
+  }
+
+  .profile-shelf-controls-wrapper {
+    gap: 0.65rem !important;
+    width: 100% !important;
+  }
+
+  .profile-shelf-items-wrapper {
+    gap: 0 !important;
+    width: 100% !important;
+  }
+
+  .profile-activity-history-section {
+    margin-top: 0.75rem !important;
+    padding-top: 1rem !important;
   }
 
   /* Modals sizing on mobile screens */

@@ -1093,6 +1093,46 @@ export const Profile: React.FC = () => {
   const [canFavoritesListScrollBottom, setCanFavoritesListScrollBottom] = useState(false);
   const [favoritesContainerWidth, setFavoritesContainerWidth] = useState(0);
 
+  const shelfControlsWrapperRef = useRef<HTMLDivElement>(null);
+  const [mobileShelfMaxHeight, setMobileShelfMaxHeight] = useState<number | null>(null);
+
+  const updateMobileShelfHeight = useCallback(() => {
+    if (typeof window === 'undefined' || window.innerWidth > 768) {
+      setMobileShelfMaxHeight(null);
+      return;
+    }
+    const vh = window.innerHeight;
+    const headerH = document.querySelector<HTMLElement>('.mobile-header')?.offsetHeight || 56;
+    const tabsH = profileTabsNavRef.current?.offsetHeight || 48;
+    const controlsH = shelfControlsWrapperRef.current?.offsetHeight || 110;
+    const bottomNavH = document.querySelector<HTMLElement>('.mobile-bottom-nav')?.offsetHeight || 60;
+
+    // Spacing: minimal breathing room for divider line above bottom navigation bar
+    const spacing = 16;
+    const available = Math.max(220, vh - headerH - tabsH - controlsH - bottomNavH - spacing);
+    setMobileShelfMaxHeight(available);
+  }, []);
+
+  useEffect(() => {
+    updateMobileShelfHeight();
+    window.addEventListener('resize', updateMobileShelfHeight);
+    window.addEventListener('orientationchange', updateMobileShelfHeight);
+
+    const observer = typeof ResizeObserver !== 'undefined' && shelfControlsWrapperRef.current
+      ? new ResizeObserver(() => updateMobileShelfHeight())
+      : null;
+
+    if (observer && shelfControlsWrapperRef.current) {
+      observer.observe(shelfControlsWrapperRef.current);
+    }
+
+    return () => {
+      window.removeEventListener('resize', updateMobileShelfHeight);
+      window.removeEventListener('orientationchange', updateMobileShelfHeight);
+      if (observer) observer.disconnect();
+    };
+  }, [updateMobileShelfHeight, mediaFilter, shelfStatusFilter, favoritesMediaFilter, libraryItems.length, shelfSearchQuery]);
+
   const updateShelfScrollState = useCallback(() => {
     const el = shelfScrollRef.current;
     if (!el) return;
@@ -5227,13 +5267,14 @@ export const Profile: React.FC = () => {
         totalSlides={hasMusic ? 7 : 4}
         onSlideChange={goToProfileStep}
         onScrollProgress={handleScrollProgress}
+        className="profile-swipe-pager"
         ignoreSelector={isCarouselFilter ? '.profile-scroll-carousel, .home-scroll-carousel, .scroll-fade-zone, .scroll-nav-arrow, .horizontal-scroll-content, .horizontal-scroll-container' : undefined}
       >
         {/* Slide 0: Shelf */}
         <div key="shelf" style={{ width: '100%', flex: 1 }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          <div className="profile-shelf-slide" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           {/* Media Filter Selectors & Search Bar */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'flex-start' }}>
+          <div ref={shelfControlsWrapperRef} className="profile-shelf-controls-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'flex-start' }}>
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
               {(() => {
                 const orderedMedia = getOrderedCategories(profile?.category_order || currentUser?.category_order);
@@ -5433,7 +5474,7 @@ export const Profile: React.FC = () => {
               {language === 'es' ? 'No hay elementos en esta categoría.' : 'No items found in this category.'}
             </div>
           ) : (
-            <div ref={shelfContainerRef} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            <div ref={shelfContainerRef} className="profile-shelf-items-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
               {/* Shelf Items */}
               {(() => {
                 const isMobileScreen = typeof window !== 'undefined' && window.innerWidth <= 768;
@@ -5873,13 +5914,16 @@ export const Profile: React.FC = () => {
                           display: 'flex',
                           flexDirection: 'column',
                           gap: '0.65rem',
-                          height: isShelfExpanded ? '774px' : '398px',
-                          maxHeight: isShelfExpanded ? '774px' : '398px',
+                          height: isMobileScreen ? 'auto' : (isShelfExpanded ? '774px' : '398px'),
+                          maxHeight: isMobileScreen 
+                            ? (mobileShelfMaxHeight ? `${mobileShelfMaxHeight}px` : undefined)
+                            : (isShelfExpanded ? '774px' : '398px'),
+                          '--mobile-shelf-max-height': mobileShelfMaxHeight ? `${mobileShelfMaxHeight}px` : undefined,
                           overflowY: 'auto',
                           paddingRight: '0.35rem',
                           WebkitMaskImage: getShelfListMaskImage(),
                           maskImage: getShelfListMaskImage()
-                        }}
+                        } as React.CSSProperties}
                       >
                         {filteredItems.map(item => {
                           const isEffectiveFav = displayedFavorites.some(df => df.id === item.id);
@@ -6676,12 +6720,15 @@ export const Profile: React.FC = () => {
                       flexDirection: 'column',
                       gap: '0.65rem',
                       height: isMobileScreen ? 'auto' : (isFavoritesExpanded ? '774px' : '398px'),
-                      maxHeight: isMobileScreen ? undefined : (isFavoritesExpanded ? '774px' : '398px'),
+                      maxHeight: isMobileScreen 
+                        ? (mobileShelfMaxHeight ? `${mobileShelfMaxHeight}px` : undefined)
+                        : (isFavoritesExpanded ? '774px' : '398px'),
+                      '--mobile-shelf-max-height': mobileShelfMaxHeight ? `${mobileShelfMaxHeight}px` : undefined,
                       overflowY: 'auto',
                       paddingRight: '0.35rem',
                       WebkitMaskImage: getFavoritesListMaskImage(),
                       maskImage: getFavoritesListMaskImage()
-                    }}
+                    } as React.CSSProperties}
                   >
                     {filteredFavorites.map((item, idx) => {
                       const canReorderFavorites = isOwnProfile && favoritesMediaFilter === 'all';
@@ -6933,7 +6980,7 @@ export const Profile: React.FC = () => {
       <AdBanner style={{ margin: '1.5rem auto 2.5rem auto' }} />
 
       {/* History log in footer */}
-      <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '2rem', textAlign: 'left' }}>
+      <div className="profile-activity-history-section" style={{ borderTop: '1px solid var(--border-color)', paddingTop: '2rem', textAlign: 'left' }}>
         <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
           <History size={20} /> {language === 'es' ? 'Historial de Actividad' : 'Activity History'}
         </h3>
