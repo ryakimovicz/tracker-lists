@@ -982,7 +982,8 @@ def auto_add_to_library(db: Session, user_id: int, item: ListItem):
         db.commit()
     else:
         existing.status = status_val
-        existing.completed_at = datetime.now(timezone.utc)
+        if not existing.completed_at:
+            existing.completed_at = datetime.now(timezone.utc)
         existing.updated_at = datetime.now(timezone.utc)
         db.commit()
 
@@ -3014,7 +3015,12 @@ def bulk_toggle_episodes(
                 else:
                     # Check if all aired episodes are completed
                     all_aired_completed = False
-                    if lib_item.external_id:
+                    is_ended = False
+                    real_tvm_id = str(lib_item.external_id).replace('tvm_', '').replace('tvm-', '') if lib_item.external_id else None
+                    from app.services.tvmaze import _TVMAZE_EPISODES_CACHE, _TVMAZE_SERIES_CACHE
+                    is_cached = bool(real_tvm_id and (real_tvm_id in _TVMAZE_EPISODES_CACHE))
+
+                    if is_cached:
                         try:
                             all_episodes = TVMazeService.get_all_episodes(lib_item.external_id)
                             now_date = now_dt.strftime("%Y-%m-%d")
@@ -3046,21 +3052,61 @@ def bulk_toggle_episodes(
                         except Exception as e:
                             logger.warning(f"Error checking all_aired_completed: {e}")
 
-                    is_ended = False
-                    if lib_item.external_id:
-                        try:
-                            series_detail = TVMazeService.get_series_detail(lib_item.external_id)
-                            show_status = (series_detail.get("status") or "").lower()
-                            is_ended = show_status in ("ended", "canceled", "cancelled")
-                        except Exception as e:
-                            logger.warning(f"Error checking series status: {e}")
+                        if lib_item.external_id:
+                            try:
+                                series_detail = TVMazeService.get_series_detail(lib_item.external_id)
+                                show_status = (series_detail.get("status") or "").lower()
+                                is_ended = show_status in ("ended", "canceled", "cancelled")
+                            except Exception as e:
+                                logger.warning(f"Error checking series status: {e}")
 
-                    if all_aired_completed and is_ended:
-                        lib_item.status = UserLibraryStatusEnum.COMPLETED
-                        lib_item.completed_at = now_dt
+                        if all_aired_completed and is_ended:
+                            lib_item.status = UserLibraryStatusEnum.COMPLETED
+                            if not lib_item.completed_at:
+                                lib_item.completed_at = now_dt
+                        else:
+                            lib_item.status = UserLibraryStatusEnum.WATCHING
+                            lib_item.completed_at = None
                     else:
+                        # Fast path: Default to WATCHING immediately so request finishes in milliseconds without blocking!
                         lib_item.status = UserLibraryStatusEnum.WATCHING
                         lib_item.completed_at = None
+
+                        def bg_verify_series_completion(uid: int, l_id: int, lib_id: int, ext_id: str):
+                            import app.core.database
+                            from app.models.item_progress import ItemProgress
+                            from app.models.library import UserLibraryItem, UserLibraryStatusEnum
+                            from app.services.tvmaze import TVMazeService
+                            from datetime import datetime, timezone
+                            now_utc = datetime.now(timezone.utc)
+                            now_date_str = now_utc.strftime("%Y-%m-%d")
+                            with app.core.database.SessionLocal() as session:
+                                try:
+                                    bg_eps = TVMazeService.get_all_episodes(ext_id)
+                                    bg_detail = TVMazeService.get_series_detail(ext_id)
+                                    bg_ended = (bg_detail.get("status") or "").lower() in ("ended", "canceled", "cancelled")
+                                    bg_aired = [
+                                        e for e in bg_eps 
+                                        if (e.get("airstamp") or (e.get("airdate") and e.get("airdate") <= now_date_str)) and not e.get("is_extra") and e.get("season_number", 1) != 0 and e.get("ep_type") != "insignificant_special"
+                                    ]
+                                    if bg_aired and bg_ended:
+                                        bg_aired_ids = {f"tvm-ep-{e['id']}" for e in bg_aired}
+                                        progs = session.query(ItemProgress.external_id).filter(
+                                            ItemProgress.user_id == uid,
+                                            ItemProgress.is_completed == True
+                                        ).all()
+                                        w_ids = {p[0] for p in progs if p[0]}
+                                        if bg_aired_ids.issubset(w_ids):
+                                            item_rec = session.query(UserLibraryItem).filter(UserLibraryItem.id == lib_id).first()
+                                            if item_rec:
+                                                item_rec.status = UserLibraryStatusEnum.COMPLETED
+                                                if not item_rec.completed_at:
+                                                    item_rec.completed_at = now_utc
+                                                session.commit()
+                                except Exception as err:
+                                    logger.warning(f"Error in bg_verify_series_completion: {err}")
+
+                        background_tasks.add_task(bg_verify_series_completion, current_user.id, list_id, lib_item.id, lib_item.external_id)
 
                     # Update last seen episode based on completed episodes
                     all_list_items = db.query(ListItem).filter(ListItem.list_id == list_id).all()

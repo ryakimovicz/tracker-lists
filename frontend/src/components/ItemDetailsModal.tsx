@@ -4569,7 +4569,10 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
         updateCachedShelfItem(newItem);
 
-        window.dispatchEvent(new Event('library-updated'));
+        syncUpcomingCacheForWork(newItem);
+        window.dispatchEvent(new CustomEvent('library-updated', { detail: { item: newItem } }));
+        window.dispatchEvent(new CustomEvent('progress-updated', { detail: { item: newItem } }));
+        window.dispatchEvent(new CustomEvent('activity-created', { detail: { item: newItem } }));
         onUpdate && onUpdate(newItem);
         return newItem;
       } catch (e) {
@@ -4582,6 +4585,102 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
     return await ensureTrackedPromiseRef.current;
   };
+
+  const syncUpcomingCacheForWork = (work: any, trackedListItems?: any[]) => {
+    try {
+      const targetWork = (work?.item_type === 'episode' && work?.parent_series) ? work.parent_series : (work || selectedItem);
+      if (!targetWork || !targetWork.external_id) return;
+      const cleanId = String(targetWork.external_id).replace(/^tvm[-_]/, '').replace(/^cv[-_]vol[-_]/, '');
+      const allEps = 
+        getCachedSeries(`${targetWork.external_id}_all_episodes_v2`) ||
+        getCachedSeries(`${cleanId}_all_episodes_v2`) ||
+        getCachedSeries(`${targetWork.external_id}_all_episodes`) ||
+        getCachedSeries(`${cleanId}_all_episodes`) ||
+        [];
+      
+      if (!Array.isArray(allEps) || allEps.length === 0) return;
+
+      const nowMs = Date.now();
+      const currentTracked = trackedListItems || episodes || [];
+
+      const getEpTracked = (ep: any) => {
+        const epIdStr = String(ep.id || ep.external_id || '');
+        return currentTracked.find((t: any) => {
+          if (t.id != null && (t.id === ep.id || String(t.id) === epIdStr)) return true;
+          const extClean = String(t.external_id || '').replace('tvm-ep-', '').replace('cv_issue_', '');
+          if (extClean && extClean === epIdStr) return true;
+          if (t.season_number != null && t.episode_number != null) {
+            return t.season_number === ep.season_number && t.episode_number === ep.episode_number;
+          }
+          return false;
+        });
+      };
+
+      const futureEps: any[] = [];
+      allEps.forEach((ep: any) => {
+        let epTimestamp = 0;
+        if (ep.airstamp) {
+          epTimestamp = new Date(ep.airstamp).getTime();
+        } else if (ep.airdate || ep.air_date) {
+          const ad = ep.airdate || ep.air_date;
+          const at = ep.airtime || '00:00';
+          epTimestamp = new Date(`${ad}T${at}:00Z`).getTime();
+        }
+        const isFuture = epTimestamp > nowMs;
+        if (isFuture) {
+          const t = getEpTracked(ep);
+          const isWatched = t && t.is_completed;
+          if (!isWatched) {
+            futureEps.push({
+              id: `ep-${ep.id || ep.external_id}-${ep.season_number}-${ep.episode_number}`,
+              title: targetWork.title,
+              coverUrl: ep.image_url || ep.still_path || ep.image?.medium || ep.image?.original || targetWork.image_url,
+              themeColor: `var(--color-${targetWork.item_type || 'series'})`,
+              themeTextColor: `var(--color-text-${targetWork.item_type || 'series'})`,
+              season_number: ep.season_number,
+              episode_number: ep.episode_number,
+              airdate: ep.airdate || ep.air_date,
+              airstamp: ep.airstamp,
+              timestamp: epTimestamp,
+              name: ep.name,
+              item_type: targetWork.item_type || 'series',
+              parent_series: targetWork,
+              rawEpisode: ep
+            });
+          }
+        }
+      });
+
+      let existingUpcoming: any[] = [];
+      try {
+        const cachedRaw = localStorage.getItem('pathd_upcoming_episodes_cache') || sessionStorage.getItem('pathd_upcoming_episodes_cache');
+        if (cachedRaw) existingUpcoming = JSON.parse(cachedRaw);
+      } catch (_) {}
+
+      const workIdStr = String(targetWork.external_id);
+      const workTitleStr = (targetWork.title || '').toLowerCase().trim();
+      const filtered = existingUpcoming.filter((u: any) => {
+        const uParentExt = u.parent_series?.external_id ? String(u.parent_series.external_id) : '';
+        const uTitle = (u.title || '').toLowerCase().trim();
+        return uParentExt !== workIdStr && uTitle !== workTitleStr;
+      });
+
+      const isTracked = !targetWork.status || ['watching', 'reading', 'plan_to_watch', 'plan_to_read'].includes(targetWork.status);
+      const updatedUpcoming = isTracked ? [...filtered, ...futureEps] : filtered;
+
+      updatedUpcoming.sort((a: any, b: any) => (a.timestamp || 0) - (b.timestamp || 0));
+
+      try {
+        localStorage.setItem('pathd_upcoming_episodes_cache', JSON.stringify(updatedUpcoming));
+        sessionStorage.setItem('pathd_upcoming_episodes_cache', JSON.stringify(updatedUpcoming));
+      } catch (_) {}
+
+      window.dispatchEvent(new CustomEvent('upcoming-updated', { detail: { upcoming: updatedUpcoming } }));
+    } catch (err) {
+      console.warn("Failed to sync upcoming cache for work", err);
+    }
+  };
+
   const checkCompletionStatus = async (effectiveListId: number, currentEpisodes: any[]) => {
     const isComic = selectedItem?.item_type === 'comic' || String(selectedItem?.external_id || '').startsWith('cv_vol_');
     const cleanVolId = String(selectedItem?.external_id || '').replace('cv_vol_', '').replace('cv_issue_', '').replace('cv_', '');
@@ -4683,7 +4782,11 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                   sessionStorage.setItem('pathd_lib_cache', JSON.stringify(cachedLib));
                 }
               } catch (e) {}
-              window.dispatchEvent(new Event('library-updated'));
+              const updatedDetail = { id: targetId, external_id: selectedItem.external_id, item_type: selectedItem.item_type, status: completedStatus };
+              syncUpcomingCacheForWork(updatedDetail, currentEpisodes);
+              window.dispatchEvent(new CustomEvent('library-updated', { detail: { item: updatedDetail } }));
+              window.dispatchEvent(new CustomEvent('progress-updated', { detail: { item: updatedDetail } }));
+              window.dispatchEvent(new CustomEvent('activity-created', { detail: { item: updatedDetail } }));
             }
           }
         } catch (e) {
@@ -4729,8 +4832,12 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                   sessionStorage.setItem('pathd_lib_cache', JSON.stringify(cachedLib));
                 }
               } catch (e) {}
-              updateCachedShelfItem({ id: targetId, external_id: selectedItem.external_id, item_type: selectedItem.item_type, status: fallbackStatus, completed_at: null });
-              window.dispatchEvent(new Event('library-updated'));
+              const updatedDetail = { id: targetId, external_id: selectedItem.external_id, item_type: selectedItem.item_type, status: fallbackStatus, completed_at: null };
+              updateCachedShelfItem(updatedDetail);
+              syncUpcomingCacheForWork(updatedDetail, currentEpisodes);
+              window.dispatchEvent(new CustomEvent('library-updated', { detail: { item: updatedDetail } }));
+              window.dispatchEvent(new CustomEvent('progress-updated', { detail: { item: updatedDetail } }));
+              window.dispatchEvent(new CustomEvent('activity-created', { detail: { item: updatedDetail } }));
             }
           } else if (selectedItem.item_type !== 'episode') {
             setSelectedItem((prev: any) => ({
@@ -5704,7 +5811,10 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
       updateCachedShelfItem(updatedSelected);
 
-      window.dispatchEvent(new Event('library-updated'));
+      syncUpcomingCacheForWork(updatedSelected, updatedList);
+      window.dispatchEvent(new CustomEvent('library-updated', { detail: { item: updatedSelected } }));
+      window.dispatchEvent(new CustomEvent('progress-updated', { detail: { item: updatedSelected } }));
+      window.dispatchEvent(new CustomEvent('activity-created', { detail: { item: updatedSelected } }));
       onUpdate && onUpdate(updatedSelected);
     } catch (err) {
       console.error("Bulk toggle missing episodes failed", err);
@@ -5829,7 +5939,10 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       }
       
       await checkCompletionStatus(effectiveListId, updatedList);
-      window.dispatchEvent(new Event('library-updated'));
+      syncUpcomingCacheForWork(selectedItem, updatedList);
+      window.dispatchEvent(new CustomEvent('library-updated', { detail: { item: selectedItem } }));
+      window.dispatchEvent(new CustomEvent('progress-updated', { detail: { item: selectedItem } }));
+      window.dispatchEvent(new CustomEvent('activity-created', { detail: { item: selectedItem } }));
       onUpdate && onUpdate();
     } catch (err) {
       console.error("Failed to toggle episode", err);
@@ -8180,6 +8293,10 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                               const updatedList = listRes.data.items || [];
                                               setEpisodes(updatedList);
                                               await checkCompletionStatus(effectiveListId, updatedList);
+                                              syncUpcomingCacheForWork(selectedItem, updatedList);
+                                              window.dispatchEvent(new CustomEvent('library-updated', { detail: { item: selectedItem } }));
+                                              window.dispatchEvent(new CustomEvent('progress-updated', { detail: { item: selectedItem } }));
+                                              window.dispatchEvent(new CustomEvent('activity-created', { detail: { item: selectedItem } }));
                                               onUpdate && onUpdate();
                                             } catch (err) {
                                               console.error("Failed to mark season as completed", err);
@@ -11069,6 +11186,10 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                             const updatedList = listRes.data.items || [];
                             setEpisodes(updatedList);
                             await checkCompletionStatus(effectiveListId, updatedList);
+                            syncUpcomingCacheForWork(selectedItem, updatedList);
+                            window.dispatchEvent(new CustomEvent('library-updated', { detail: { item: selectedItem } }));
+                            window.dispatchEvent(new CustomEvent('progress-updated', { detail: { item: selectedItem } }));
+                            window.dispatchEvent(new CustomEvent('activity-created', { detail: { item: selectedItem } }));
                             onUpdate && onUpdate();
                           } catch (err) {
                             console.error("Mark season again failed", err);
@@ -11141,6 +11262,10 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                             const updatedList = listRes.data.items || [];
                             setEpisodes(updatedList);
                             await checkCompletionStatus(effectiveListId, updatedList);
+                            syncUpcomingCacheForWork(selectedItem, updatedList);
+                            window.dispatchEvent(new CustomEvent('library-updated', { detail: { item: selectedItem } }));
+                            window.dispatchEvent(new CustomEvent('progress-updated', { detail: { item: selectedItem } }));
+                            window.dispatchEvent(new CustomEvent('activity-created', { detail: { item: selectedItem } }));
                             onUpdate && onUpdate();
                           } catch (err) {
                             console.error("Remove season failed", err);
@@ -11346,6 +11471,10 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                               const updatedList = listRes.data.items || [];
                               setEpisodes(updatedList);
                               await checkCompletionStatus(effectiveListId, updatedList);
+                              syncUpcomingCacheForWork(selectedItem, updatedList);
+                              window.dispatchEvent(new CustomEvent('library-updated', { detail: { item: selectedItem } }));
+                              window.dispatchEvent(new CustomEvent('progress-updated', { detail: { item: selectedItem } }));
+                              window.dispatchEvent(new CustomEvent('activity-created', { detail: { item: selectedItem } }));
                               onUpdate && onUpdate();
                             } catch (err) {
                               console.error("Bulk toggle failed", err);

@@ -971,6 +971,8 @@ def update_library_item(
         
     if item_in.status is not None:
         validate_media_status(lib_item.item_type, item_in.status)
+        old_status = lib_item.status
+        status_changed = (old_status != item_in.status)
         lib_item.status = item_in.status
         
         # Ensure tracking list exists for series, anime, comic
@@ -990,7 +992,9 @@ def update_library_item(
         # Set completed_at date
         if item_in.status in (UserLibraryStatusEnum.COMPLETED, UserLibraryStatusEnum.READ):
             now_dt = datetime.now(timezone.utc)
-            lib_item.completed_at = now_dt
+            # Only set completed_at to now if it was not already completed/read or completed_at is None
+            if not lib_item.completed_at or old_status not in (UserLibraryStatusEnum.COMPLETED, UserLibraryStatusEnum.READ):
+                lib_item.completed_at = now_dt
             
             # For movies, books, games: record consumption history on manual complete
             # For series/anime/comic: individual episodes/issues already record their own consumption history.
@@ -1015,7 +1019,7 @@ def update_library_item(
                     if diff_seconds < 60:
                         should_record = False
                         
-                if should_record:
+                if should_record and status_changed:
                     if not is_user_pro and existing_count >= 2:
                         pass
                     else:
@@ -1036,31 +1040,32 @@ def update_library_item(
             
         lib_item.updated_at = datetime.now(timezone.utc)
         
-        # Record activity log with structured metadata
-        from app.services.activity_service import ActivityService
-        t_str = lib_item.item_type.value if hasattr(lib_item.item_type, 'value') else str(lib_item.item_type)
-        stat_str = item_in.status.value if hasattr(item_in.status, "value") else str(item_in.status)
+        # Record activity log with structured metadata ONLY if status changed
+        if status_changed:
+            from app.services.activity_service import ActivityService
+            t_str = lib_item.item_type.value if hasattr(lib_item.item_type, 'value') else str(lib_item.item_type)
+            stat_str = item_in.status.value if hasattr(item_in.status, "value") else str(item_in.status)
 
-        act_meta = {
-            "status": stat_str,
-            "is_hundred_percent": bool(item_in.is_hundred_percent if item_in.is_hundred_percent is not None else lib_item.is_hundred_percent),
-            "pages_read": lib_item.pages_read or 0,
-            "total_pages": lib_item.total_pages or 0,
-            "last_seen_episode": lib_item.last_seen_episode,
-            "item_type": t_str
-        }
+            act_meta = {
+                "status": stat_str,
+                "is_hundred_percent": bool(item_in.is_hundred_percent if item_in.is_hundred_percent is not None else lib_item.is_hundred_percent),
+                "pages_read": lib_item.pages_read or 0,
+                "total_pages": lib_item.total_pages or 0,
+                "last_seen_episode": lib_item.last_seen_episode,
+                "item_type": t_str
+            }
 
-        ActivityService.record_activity(
-            db=db,
-            user_id=current_user.id,
-            activity_type="item_status_changed",
-            item_title=lib_item.title,
-            item_type=t_str,
-            external_id=lib_item.external_id,
-            image_url=lib_item.image_url,
-            details=stat_str,
-            metadata=act_meta
-        )
+            ActivityService.record_activity(
+                db=db,
+                user_id=current_user.id,
+                activity_type="item_status_changed",
+                item_title=lib_item.title,
+                item_type=t_str,
+                external_id=lib_item.external_id,
+                image_url=lib_item.image_url,
+                details=stat_str,
+                metadata=act_meta
+            )
 
     if item_in.is_hundred_percent is not None:
         lib_item.is_hundred_percent = item_in.is_hundred_percent

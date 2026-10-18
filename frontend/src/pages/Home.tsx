@@ -2719,7 +2719,7 @@ export const Home: React.FC = () => {
               const maxAllCycle = allEpCycles.length > 0 ? Math.max(...allEpCycles) : 0;
               const allCanonicalCompleted = allEpCycles.length > 0 && minAllCycle > 0 && minAllCycle === maxAllCycle;
 
-              if (item.status === 'completed' && hasUnwatchedAiredEpisode) {
+              if (item.status === 'completed' && hasUnwatchedAiredEpisode && trackedEps.length > 0) {
                 try {
                   await apiClient.put(`/library/${item.id}`, { status: 'watching' });
                   item.status = 'watching';
@@ -2813,11 +2813,19 @@ export const Home: React.FC = () => {
       }
     };
 
+    const handleUpcomingUpdate = (e: any) => {
+      if (e?.detail?.upcoming) {
+        setUpcomingEpisodes(e.detail.upcoming);
+      }
+    };
+
+    window.addEventListener('upcoming-updated', handleUpcomingUpdate);
     window.addEventListener('library-updated', handleLibraryUpdate);
     document.addEventListener('visibilitychange', handleVisibilityOrFocus);
     window.addEventListener('focus', handleVisibilityOrFocus);
 
     return () => {
+      window.removeEventListener('upcoming-updated', handleUpcomingUpdate);
       window.removeEventListener('library-updated', handleLibraryUpdate);
       document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
       window.removeEventListener('focus', handleVisibilityOrFocus);
