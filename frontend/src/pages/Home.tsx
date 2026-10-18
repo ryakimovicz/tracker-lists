@@ -14,6 +14,7 @@ import { useAuth } from '../context/AuthContext';
 import { getOrderedCategories, getCategoryLabel, getCategoryIcon, sortFilterTabs } from '../utils/categoryOrder';
 import { prefetchMediaDetails } from '../utils/prefetch';
 import { useContinuousScroll } from '../hooks/useContinuousScroll';
+import { SwipeViewPager } from '../components/SwipeViewPager';
 
 export const getTagClass = (type: string) => {
   switch (type) {
@@ -2112,11 +2113,19 @@ export const Home: React.FC = () => {
     : "watching";
 
   const handleTabChange = (tab: HomeTab) => {
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'instant' });
+      lastScrollYRef.current = 0;
+      scrollAccumulatorRef.current = 0;
+    }
     const newParams = new URLSearchParams(searchParams);
     if (tab === "watching") {
       newParams.delete('tab');
     } else {
       newParams.set('tab', tab);
+    }
+    if (tab !== "upcoming") {
+      newParams.delete('view');
     }
     setSearchParams(newParams);
     showFiltersRef.current = true;
@@ -2317,91 +2326,100 @@ export const Home: React.FC = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Synchronize mobile swipe scroll position when entering upcoming tab or changing view
-  useEffect(() => {
-    if (activeTab === "upcoming" && upcomingSwipeRef.current) {
-      if (isUserTouchingSwipeRef.current) return;
-      const el = upcomingSwipeRef.current;
-      const maxScroll = el.scrollWidth - el.clientWidth;
-      const targetScroll = upcomingFilter === "calendar" ? 0 : (maxScroll > 0 ? maxScroll : el.clientWidth);
-      // Synchronize without smooth animation on initial view restoration
-      if (Math.abs(el.scrollLeft - targetScroll) > 10) {
-        el.scrollTo({ left: targetScroll, behavior: 'instant' as any });
-      }
+  // Mobile swipe tab navigation order:
+  // Continuar (0) ↔ Guías (1) ↔ No comenzado (2) ↔ Terminado (3) ↔ Abandonado (4) ↔ Próximos Calendario (5) ↔ Próximos Por confirmar (6)
+  const getCurrentHomeStep = (): number => {
+    if (activeTab === 'watching') return 0;
+    if (activeTab === 'guides') return 1;
+    if (activeTab === 'plan_to_watch') return 2;
+    if (activeTab === 'completed') return 3;
+    if (activeTab === 'dropped') return 4;
+    if (activeTab === 'upcoming') {
+      return upcomingFilter === 'tba' ? 6 : 5;
     }
-  }, [activeTab, upcomingFilter]);
+    return 0;
+  };
 
-  const handleSelectUpcomingSubtab = (mode: "calendar" | "tba") => {
+  const goToHomeStep = (step: number) => {
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'instant' });
+      lastScrollYRef.current = 0;
+      scrollAccumulatorRef.current = 0;
+    }
     const newParams = new URLSearchParams(searchParams);
-    if (mode === "tba") {
-      newParams.set('view', 'tba');
-    } else {
+    if (step === 0) {
+      newParams.delete('tab');
       newParams.delete('view');
+    } else if (step === 1) {
+      newParams.set('tab', 'guides');
+      newParams.delete('view');
+    } else if (step === 2) {
+      newParams.set('tab', 'plan_to_watch');
+      newParams.delete('view');
+    } else if (step === 3) {
+      newParams.set('tab', 'completed');
+      newParams.delete('view');
+    } else if (step === 4) {
+      newParams.set('tab', 'dropped');
+      newParams.delete('view');
+    } else if (step === 5) {
+      newParams.set('tab', 'upcoming');
+      newParams.delete('view');
+    } else if (step === 6) {
+      newParams.set('tab', 'upcoming');
+      newParams.set('view', 'tba');
     }
     setSearchParams(newParams);
-
-    if (upcomingSwipeRef.current) {
-      const el = upcomingSwipeRef.current;
-      isProgrammaticUpcomingScrollRef.current = true;
-      if (upcomingScrollTimeoutRef.current) clearTimeout(upcomingScrollTimeoutRef.current);
-      
-      const maxScroll = el.scrollWidth - el.clientWidth;
-      const targetScroll = mode === "calendar" ? 0 : (maxScroll > 0 ? maxScroll : el.clientWidth);
-      el.scrollTo({ left: targetScroll, behavior: 'smooth' });
-
-      upcomingScrollTimeoutRef.current = setTimeout(() => {
-        isProgrammaticUpcomingScrollRef.current = false;
-      }, 500);
-    }
+    showFiltersRef.current = true;
+    setShowFiltersOnScroll(true);
   };
 
-  const upcomingSwipeDebounceRef = useRef<any>(null);
+  const currentHomeStep = getCurrentHomeStep();
 
-  const checkSwipeSettled = () => {
-    if (!upcomingSwipeRef.current) return;
-    if (isProgrammaticUpcomingScrollRef.current) return;
-    if (isUserTouchingSwipeRef.current) return;
-    const el = upcomingSwipeRef.current;
-    const scrollPos = el.scrollLeft;
-    const maxScroll = el.scrollWidth - el.clientWidth;
-    if (maxScroll <= 0) return;
-
-    // Check if scroll has settled near one of the edges (within 20% of 0 or maxScroll)
-    // so we don't trigger state updates while momentum scrolling in the middle
-    const scrollFraction = scrollPos / maxScroll;
-    if (scrollFraction > 0.25 && scrollFraction < 0.75) {
-      // Still in transit or deceleration, wait for scroll-snap to finish
-      if (upcomingSwipeDebounceRef.current) clearTimeout(upcomingSwipeDebounceRef.current);
-      upcomingSwipeDebounceRef.current = setTimeout(() => {
-        checkSwipeSettled();
-      }, 100);
-      return;
+  const handleSelectUpcomingSubtab = (mode: "calendar" | "tba") => {
+    if (mode === "tba") {
+      goToHomeStep(6);
+    } else {
+      goToHomeStep(5);
     }
-
-    const newMode: "calendar" | "tba" = scrollFraction >= 0.5 ? "tba" : "calendar";
-    if (newMode !== upcomingFilter) {
-      const newParams = new URLSearchParams(searchParams);
-      if (newMode === "tba") {
-        newParams.set('view', 'tba');
-      } else {
-        newParams.delete('view');
-      }
-      setSearchParams(newParams);
-    }
-  };
-
-  const handleUpcomingSwipeScroll = () => {
-    if (!upcomingSwipeRef.current) return;
-    if (isProgrammaticUpcomingScrollRef.current) return;
-    
-    // Clear debounce timer and wait for scroll to stop
-    if (upcomingSwipeDebounceRef.current) clearTimeout(upcomingSwipeDebounceRef.current);
-    upcomingSwipeDebounceRef.current = setTimeout(() => {
-      checkSwipeSettled();
-    }, 180);
   };
 
   const lastFetchRef = useRef<number>(Date.now());
+
+  // Real-time gesture tracking refs & handler for smooth mobile tab morphing
+  const homeTabsContainerRef = useRef<HTMLDivElement>(null);
+  const upcomingTabsContainerRef = useRef<HTMLDivElement>(null);
+  const tabItemRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const subtabBtnRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
+  const handleScrollProgress = useCallback((progress: number) => {
+    const mainProgress = Math.min(5, Math.max(0, progress));
+
+    if (homeTabsContainerRef.current) {
+      homeTabsContainerRef.current.style.setProperty('--tab-progress', mainProgress.toFixed(4));
+    }
+
+    tabItemRefs.current.forEach((el, i) => {
+      if (!el) return;
+      const dist = Math.abs(mainProgress - i);
+      const act = Math.max(0, Math.min(1, 1 - dist));
+      el.style.setProperty('--tab-act', act.toFixed(4));
+    });
+
+    if (upcomingTabsContainerRef.current) {
+      const subProgress = Math.min(1, Math.max(0, progress - 5));
+      upcomingTabsContainerRef.current.style.setProperty('--subtab-progress', subProgress.toFixed(4));
+
+      const sub0 = subtabBtnRefs.current[0];
+      const sub1 = subtabBtnRefs.current[1];
+      if (sub0) sub0.style.setProperty('--subtab-act', (1 - subProgress).toFixed(4));
+      if (sub1) sub1.style.setProperty('--subtab-act', subProgress.toFixed(4));
+    }
+  }, []);
+
+  useEffect(() => {
+    handleScrollProgress(currentHomeStep);
+  }, [currentHomeStep, handleScrollProgress]);
 
   // Replace Favorite Modal State & Pro Modal
   const [replaceModalState, setReplaceModalState] = useState<{
@@ -2780,9 +2798,9 @@ export const Home: React.FC = () => {
     ? "endless"
     : gameFilter;
 
-  let filteredItems: any[] = [];
-  if (activeTab === "watching") {
-    filteredItems = libraryItems.filter(i => {
+  const getItemsForTab = (targetTab: "watching" | "plan_to_watch" | "completed" | "dropped") => {
+    if (targetTab === "watching") {
+      return libraryItems.filter(i => {
       if (i.item_type === "custom") return false;
       if (i.item_type === "game") {
         if (effectiveGameFilter === "endless") {
@@ -2861,8 +2879,8 @@ export const Home: React.FC = () => {
 
       return true;
     });
-  } else if (activeTab === "plan_to_watch") {
-    filteredItems = libraryItems.filter(i => {
+  } else if (targetTab === "plan_to_watch") {
+    return libraryItems.filter(i => {
       if (!["plan_to_watch", "plan_to_play", "plan_to_read"].includes(i.status)) return false;
       if (i.item_type === "custom") return false;
       if (i.badge === "dlc" || i.custom_badge === "dlc" || i.badge === "expansion" || i.custom_badge === "expansion") return false;
@@ -2914,8 +2932,8 @@ export const Home: React.FC = () => {
 
       return true;
     });
-  } else if (activeTab === "completed") {
-    filteredItems = libraryItems.filter(i => {
+  } else if (targetTab === "completed") {
+    return libraryItems.filter(i => {
       // Exclude endless games from completed
       if (i.status === "endless") return false;
       if (!["completed", "read"].includes(i.status)) return false;
@@ -2945,16 +2963,17 @@ export const Home: React.FC = () => {
 
       return true;
     });
-  } else if (activeTab === "dropped") {
-    filteredItems = libraryItems.filter(i => i.status === "dropped" && i.item_type !== "custom");
+  } else if (targetTab === "dropped") {
+    return libraryItems.filter(i => i.status === "dropped" && i.item_type !== "custom");
   }
+  return [];
+};
 
   // Aggregate all upcoming items (calendar vs TBA)
   let upcomingAllItems: any[] = [];
   let tbaAllItems: any[] = [];
-  if (activeTab === "upcoming") {
-    // 1. Standalone library works (movies, games, books, comics, manga)
-    libraryItems.forEach(item => {
+  // 1. Standalone library works (movies, games, books, comics, manga)
+  libraryItems.forEach(item => {
       if (item.item_type !== 'series' && item.item_type !== 'anime') {
         // Resolve release_date from item or cached metadata
         const descCacheKey = `desc_${item.item_type}_${item.external_id}`;
@@ -3019,7 +3038,6 @@ export const Home: React.FC = () => {
     upcomingAllItems.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
     // Sort TBA alphabetically
     tbaAllItems.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
-  }
 
   // Filter upcoming and TBA lists by selected category if not 'all'
   const filteredUpcomingAllItems = homeCategoryFilter === 'all'
@@ -3048,187 +3066,16 @@ export const Home: React.FC = () => {
     return dateStr;
   };
 
-  return (
-    <div className="home-main-container" style={{ maxWidth: "1200px", margin: "0 auto", display: "flex", flexDirection: "column", gap: "2rem" }}>
-      
-      {/* Sticky Header: Tabs + Category Filters unified below tabs */}
-      <div className="home-sticky-header-wrapper">
-        {/* Tabs */}
-        <div 
-          className="home-tabs-container"
-          style={{ 
-            display: "flex", 
-            gap: "1.75rem", 
-            borderBottom: "1px solid var(--border-color)", 
-            paddingBottom: "0.75rem", 
-            marginBottom: "0.75rem",
-            position: "relative",
-            zIndex: 2, 
-            background: "var(--bg-primary)", 
-            paddingTop: "0.5rem" 
-          }}
-        >
-          {["watching", "guides", "plan_to_watch", "completed", "dropped", "upcoming"].map((tab, idx) => {
-            const labels: any = language === 'es'
-              ? { "watching": "Continuar", "guides": "Guías", "plan_to_watch": "No comenzado", "completed": "Terminado", "dropped": "Abandonado", "upcoming": "Próximos" }
-              : { "watching": "Continue", "guides": "Guides", "plan_to_watch": "Not started", "completed": "Completed", "dropped": "Dropped", "upcoming": "Upcoming" };
-            const icons: any = {
-              "watching": <Play size={18} />,
-              "guides": <BookOpen size={18} />,
-              "plan_to_watch": <Bookmark size={18} />,
-              "completed": <CheckCircle size={18} />,
-              "dropped": <XCircle size={18} />,
-              "upcoming": <Calendar size={18} />
-            };
-            const isActive = activeTab === tab;
-            return (
-              <div 
-                key={tab}
-                onClick={() => handleTabChange(tab as any)}
-                className={`home-tab-item ${isActive ? 'active' : ''}`}
-                data-tab={tab}
-                title={labels[tab]}
-                style={{
-                  fontSize: "1.05rem", fontWeight: isActive ? 600 : 500,
-                  color: isActive ? "var(--text-primary)" : "var(--text-secondary)",
-                  cursor: "pointer", padding: "0.25rem 0", position: "relative",
-                  whiteSpace: "nowrap"
-                }}
-              >
-                <span className="home-tab-icon">{icons[tab]}</span>
-                <span className="home-tab-label">{labels[tab]}</span>
-                {isActive && <div className="home-tab-indicator" style={{ position: "absolute", bottom: "-0.75rem", left: 0, right: 0, height: "2px", background: "var(--accent-primary)" }} />}
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Category Filters Bar (Todos + 7 Categorías) - Positioned right below tabs */}
-        {activeTab !== 'guides' && (
-          <div className={`home-category-filters-container ${showFiltersOnScroll ? 'show' : 'hide'}`}>
-            <div className="home-category-filters-container-inner">
-              {sortFilterTabs([
-                { value: 'all', label: language === 'es' ? 'Todo' : 'All' },
-                { value: 'movie', label: language === 'es' ? 'Películas' : 'Movies' },
-                { value: 'series', label: language === 'es' ? 'Series' : 'TV Shows' },
-                { value: 'anime', label: 'Anime' },
-                { value: 'book', label: language === 'es' ? 'Libros' : 'Books' },
-                { value: 'comic', label: language === 'es' ? 'Cómics' : 'Comics' },
-                { value: 'manga', label: 'Mangas' },
-                { value: 'game', label: language === 'es' ? 'Juegos' : 'Games' }
-              ], currentUser?.category_order).map(tab => {
-                const isSelected = homeCategoryFilter === tab.value;
-
-                const tabColor = tab.value === 'all' 
-                  ? 'var(--accent-primary)' 
-                  : `var(--color-${tab.value})`;
-                const tabTextColor = tab.value === 'all' 
-                  ? '#ffffff' 
-                  : `var(--color-text-${tab.value})`;
-
-                const handleFilterClick = () => {
-                  setHomeCategoryFilter(tab.value);
-                };
-
-                return (
-                  <button
-                    key={tab.value}
-                    type="button"
-                    onClick={handleFilterClick}
-                    className={`profile-category-tab search-filter-btn ${isSelected ? 'selected' : ''}`}
-                    title={tab.label}
-                    style={{
-                      padding: '0.35rem 0.85rem',
-                      fontSize: '0.85rem',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.4rem',
-                      '--tab-color': tabColor,
-                      '--tab-text': tabTextColor
-                    } as React.CSSProperties}
-                  >
-                    <span className="search-filter-icon" style={{ display: 'inline-flex', alignItems: 'center' }}>
-                      {getCategoryIcon(tab.value, { size: 14, color: isSelected ? tabTextColor : tabColor })}
-                    </span>
-                    <span className="search-filter-label">{tab.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Media Row */}
-      {activeTab === "upcoming" ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-          {/* Sub-tabs: Calendario / Por confirmar (Desktop Button Pills) */}
-          <div className="home-desktop-only" style={{ display: "flex", alignItems: "center" }}>
-            <div style={{ display: "flex", background: "var(--bg-tertiary)", padding: "3px", borderRadius: "8px", gap: "4px", border: "1px solid var(--border-color)" }}>
-              <button
-                type="button"
-                onClick={() => handleSelectUpcomingSubtab("calendar")}
-                style={{
-                  border: "none",
-                  background: upcomingFilter === "calendar" ? "var(--accent-primary, #6366f1)" : "transparent",
-                  color: upcomingFilter === "calendar" ? "#ffffff" : "var(--text-secondary)",
-                  padding: "6px 14px",
-                  borderRadius: "6px",
-                  fontSize: "0.85rem",
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  transition: "all 0.2s ease"
-                }}
-              >
-                {language === "es" ? "Calendario" : "Calendar"}
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSelectUpcomingSubtab("tba")}
-                style={{
-                  border: "none",
-                  background: upcomingFilter === "tba" ? "var(--accent-primary, #6366f1)" : "transparent",
-                  color: upcomingFilter === "tba" ? "#ffffff" : "var(--text-secondary)",
-                  padding: "6px 14px",
-                  borderRadius: "6px",
-                  fontSize: "0.85rem",
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  transition: "all 0.2s ease"
-                }}
-              >
-                {language === "es" ? "Por confirmar" : "TBA"}
-              </button>
-            </div>
-          </div>
-
-          {/* Sub-tabs: Calendario / Por confirmar (Mobile Top-Bar-Style Full Width Tabs) */}
-          <div className="upcoming-mobile-tabs-container home-mobile-only">
-            <button
-              type="button"
-              className={`upcoming-mobile-tab-btn ${upcomingFilter === "calendar" ? "active" : ""}`}
-              onClick={() => handleSelectUpcomingSubtab("calendar")}
-            >
-              <span>{language === "es" ? "Calendario" : "Calendar"}</span>
-              {upcomingFilter === "calendar" && <div className="upcoming-tab-indicator" />}
-            </button>
-            <button
-              type="button"
-              className={`upcoming-mobile-tab-btn ${upcomingFilter === "tba" ? "active" : ""}`}
-              onClick={() => handleSelectUpcomingSubtab("tba")}
-            >
-              <span>{language === "es" ? "Por confirmar" : "TBA"}</span>
-              {upcomingFilter === "tba" && <div className="upcoming-tab-indicator" />}
-            </button>
-          </div>
-
-          {/* Desktop view (pill tabs already rendered above) */}
-          <div className="home-desktop-only" style={{ width: "100%" }}>
-            {upcomingFilter === "calendar" ? (
+  const renderUpcomingSection = (subMode?: "calendar" | "tba") => {
+    const activeSubMode = subMode || upcomingFilter;
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: "1rem", width: "100%" }}>
+        {/* View content */}
+        <div style={{ width: "100%" }}>
+          {activeSubMode === "calendar" ? (
             filteredUpcomingAllItems.length > 0 ? (
               <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
                 {(() => {
-                  // Group upcoming items by month key (e.g. "2026-09" or "2027-01")
                   const currentYear = new Date().getFullYear();
                   const groups: { [key: string]: { label: string; items: any[] } } = {};
 
@@ -3257,12 +3104,7 @@ export const Home: React.FC = () => {
 
                       const monthName = dateObj.toLocaleDateString(language === 'es' ? 'es-ES' : 'en-US', { month: 'long' });
                       const capitalizedMonth = monthName.charAt(0).toUpperCase() + monthName.slice(1);
-                      
-                      if (itemYear !== currentYear) {
-                        groupLabel = `${capitalizedMonth} ${itemYear}`;
-                      } else {
-                        groupLabel = capitalizedMonth;
-                      }
+                      groupLabel = (itemYear === currentYear) ? capitalizedMonth : `${capitalizedMonth} ${itemYear}`;
                     }
 
                     if (!groups[groupKey]) {
@@ -3271,34 +3113,38 @@ export const Home: React.FC = () => {
                     groups[groupKey].items.push(uItem);
                   });
 
-                  return Object.keys(groups).map((gKey, gIdx) => {
-                    const group = groups[gKey];
+                  const sortedKeys = Object.keys(groups).sort((a, b) => {
+                    if (a === 'unknown') return 1;
+                    if (b === 'unknown') return -1;
+                    return a.localeCompare(b);
+                  });
+
+                  return sortedKeys.map(key => {
+                    const group = groups[key];
                     return (
-                      <div key={gKey} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                        {/* Month Header / Separator */}
+                      <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
                         <div style={{
+                          fontSize: '1rem',
+                          fontWeight: 700,
+                          color: 'var(--text-primary)',
+                          borderBottom: '1px solid var(--border-color)',
+                          paddingBottom: '0.35rem',
                           display: 'flex',
                           alignItems: 'center',
-                          gap: '0.75rem',
-                          paddingBottom: '0.35rem',
-                          borderBottom: '1px solid var(--border-color)',
-                          marginTop: gIdx === 0 ? 0 : '1rem'
+                          gap: '0.5rem'
                         }}>
-                          <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                            {group.label}
-                          </h4>
-                          <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
-                            ({group.items.length} {group.items.length === 1 ? (language === 'es' ? 'estreno' : 'release') : (language === 'es' ? 'estrenos' : 'releases')})
+                          <span>{group.label}</span>
+                          <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
+                            ({group.items.length})
                           </span>
                         </div>
 
-                        {/* Vertical List of Items */}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                           {group.items.map(uItem => {
-                            const isEpisodeItem = uItem.season_number !== undefined && uItem.episode_number !== undefined;
-                            const sStr = isEpisodeItem ? String(uItem.season_number).padStart(2, '0') : '';
-                            const eStr = isEpisodeItem ? String(uItem.episode_number).padStart(2, '0') : '';
-                            const epLabel = isEpisodeItem ? (language === 'es' ? `T${sStr} | E${eStr}` : `S${sStr} | E${eStr}`) : '';
+                            const isEpisodeItem = uItem.season_number != null && uItem.episode_number != null;
+                            const epLabel = isEpisodeItem
+                              ? (language === 'es' ? `T${uItem.season_number} E${uItem.episode_number}` : `S${uItem.season_number} E${uItem.episode_number}`)
+                              : '';
                             const formattedDate = formatUpcomingDate(uItem.airdate || uItem.release_date, uItem.airstamp);
                             const catLabel = getTypeCat(uItem.item_type);
 
@@ -3306,10 +3152,15 @@ export const Home: React.FC = () => {
                               <div
                                 key={uItem.id}
                                 onClick={() => {
-                                  if (uItem.parent_series) {
-                                    handleOpenItem(uItem.parent_series);
-                                  } else if (uItem.rawItem) {
-                                    handleOpenItem(uItem.rawItem);
+                                  if (uItem.rawItem) handleOpenItem(uItem.rawItem);
+                                  else if (uItem.external_id && uItem.item_type) {
+                                    handleOpenItem({
+                                      id: uItem.id,
+                                      external_id: uItem.external_id,
+                                      item_type: uItem.item_type,
+                                      title: uItem.title,
+                                      image_url: uItem.coverUrl
+                                    });
                                   }
                                 }}
                                 style={{
@@ -3323,16 +3174,7 @@ export const Home: React.FC = () => {
                                   cursor: 'pointer',
                                   transition: 'all 0.2s ease'
                                 }}
-                                onMouseEnter={(e) => {
-                                  e.currentTarget.style.borderColor = uItem.themeColor || 'var(--accent-primary)';
-                                  e.currentTarget.style.transform = 'translateX(3px)';
-                                }}
-                                onMouseLeave={(e) => {
-                                  e.currentTarget.style.borderColor = 'var(--border-color)';
-                                  e.currentTarget.style.transform = 'none';
-                                }}
                               >
-                                {/* Small Poster Thumbnail */}
                                 <img
                                   src={uItem.coverUrl}
                                   alt={uItem.title}
@@ -3349,9 +3191,7 @@ export const Home: React.FC = () => {
                                   }}
                                 />
 
-                                {/* Info Columns */}
                                 <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                                  {/* Row 1: Title + Season/Episode if series */}
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                                     <span style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                       {uItem.title}
@@ -3375,14 +3215,12 @@ export const Home: React.FC = () => {
                                     )}
                                   </div>
 
-                                  {/* Row 2: Release Date */}
                                   <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                                     <span>{language === 'es' ? 'Estreno:' : 'Airs:'}</span>
                                     <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{formattedDate}</span>
                                   </div>
                                 </div>
 
-                                {/* Category Badge */}
                                 <div style={{
                                   padding: '0.25rem 0.6rem',
                                   borderRadius: '12px',
@@ -3442,7 +3280,6 @@ export const Home: React.FC = () => {
               </div>
             )
           ) : (
-            /* TBA (Por confirmar) View */
             filteredTbaAllItems.length > 0 ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 {filteredTbaAllItems.map(uItem => {
@@ -3464,16 +3301,7 @@ export const Home: React.FC = () => {
                         cursor: 'pointer',
                         transition: 'all 0.2s ease'
                       }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.borderColor = uItem.themeColor || 'var(--accent-primary)';
-                        e.currentTarget.style.transform = 'translateX(3px)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.borderColor = 'var(--border-color)';
-                        e.currentTarget.style.transform = 'none';
-                      }}
                     >
-                      {/* Small Poster Thumbnail */}
                       <img
                         src={uItem.coverUrl}
                         alt={uItem.title}
@@ -3489,8 +3317,6 @@ export const Home: React.FC = () => {
                           (e.target as HTMLElement).style.display = 'none';
                         }}
                       />
-
-                      {/* Info Columns */}
                       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
                         <span style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {uItem.title}
@@ -3499,8 +3325,6 @@ export const Home: React.FC = () => {
                           {language === 'es' ? 'Fecha por confirmar (TBA)' : 'Release date to be announced (TBA)'}
                         </div>
                       </div>
-
-                      {/* Category Badge */}
                       <div style={{
                         padding: '0.25rem 0.6rem',
                         borderRadius: '12px',
@@ -3528,302 +3352,15 @@ export const Home: React.FC = () => {
               </div>
             )
           )}
-          </div>
-
-          {/* Mobile swipe view (edge-to-edge swipeable container between Calendario & Por confirmar) */}
-          <div
-            ref={upcomingSwipeRef}
-            onTouchStart={() => {
-              isUserTouchingSwipeRef.current = true;
-            }}
-            onTouchEnd={() => {
-              isUserTouchingSwipeRef.current = false;
-              setTimeout(() => {
-                checkSwipeSettled();
-              }, 60);
-            }}
-            onScroll={handleUpcomingSwipeScroll}
-            className="upcoming-mobile-swipe-wrapper home-mobile-only"
-          >
-            {/* Slide 1: Calendario */}
-            <div className="upcoming-mobile-swipe-slide">
-              {filteredUpcomingAllItems.length > 0 ? (
-                <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-                  {(() => {
-                    const currentYear = new Date().getFullYear();
-                    const groups: { [key: string]: { label: string; items: any[] } } = {};
-
-                    filteredUpcomingAllItems.forEach(uItem => {
-                      let dateObj: Date | null = null;
-                      if (uItem.airstamp) {
-                        dateObj = new Date(uItem.airstamp);
-                      } else if (uItem.airdate) {
-                        const parts = uItem.airdate.split('-');
-                        if (parts.length === 3) dateObj = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-                      } else if (uItem.release_date) {
-                        const parts = uItem.release_date.split('-');
-                        if (parts.length === 3) dateObj = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-                        else if (parts.length === 1) dateObj = new Date(parseInt(parts[0]), 0, 1);
-                      } else if (uItem.timestamp) {
-                        dateObj = new Date(uItem.timestamp);
-                      }
-
-                      let groupKey = 'unknown';
-                      let groupLabel = language === 'es' ? 'Próximamente' : 'Coming Soon';
-
-                      if (dateObj && !isNaN(dateObj.getTime())) {
-                        const itemYear = dateObj.getFullYear();
-                        const monthNum = String(dateObj.getMonth() + 1).padStart(2, '0');
-                        groupKey = `${itemYear}-${monthNum}`;
-
-                        const monthName = dateObj.toLocaleDateString(language === 'es' ? 'es-ES' : 'en-US', { month: 'long' });
-                        const capitalizedMonth = monthName.charAt(0).toUpperCase() + monthName.slice(1);
-                        
-                        if (itemYear !== currentYear) {
-                          groupLabel = `${capitalizedMonth} ${itemYear}`;
-                        } else {
-                          groupLabel = capitalizedMonth;
-                        }
-                      }
-
-                      if (!groups[groupKey]) {
-                        groups[groupKey] = { label: groupLabel, items: [] };
-                      }
-                      groups[groupKey].items.push(uItem);
-                    });
-
-                    return Object.keys(groups).map((gKey, gIdx) => {
-                      const group = groups[gKey];
-                      return (
-                        <div key={gKey} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                          <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.75rem',
-                            paddingBottom: '0.35rem',
-                            borderBottom: '1px solid var(--border-color)',
-                            marginTop: gIdx === 0 ? 0 : '1rem'
-                          }}>
-                            <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                              {group.label}
-                            </h4>
-                            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
-                              ({group.items.length} {group.items.length === 1 ? (language === 'es' ? 'estreno' : 'release') : (language === 'es' ? 'estrenos' : 'releases')})
-                            </span>
-                          </div>
-
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                            {group.items.map(uItem => {
-                              const isEpisodeItem = uItem.season_number !== undefined && uItem.episode_number !== undefined;
-                              const sStr = isEpisodeItem ? String(uItem.season_number).padStart(2, '0') : '';
-                              const eStr = isEpisodeItem ? String(uItem.episode_number).padStart(2, '0') : '';
-                              const epLabel = isEpisodeItem ? (language === 'es' ? `T${sStr} | E${eStr}` : `S${sStr} | E${eStr}`) : '';
-                              const formattedDate = formatUpcomingDate(uItem.airdate || uItem.release_date, uItem.airstamp);
-                              const catLabel = getTypeCat(uItem.item_type);
-
-                              return (
-                                <div
-                                  key={uItem.id}
-                                  onClick={() => {
-                                    if (uItem.parent_series) {
-                                      handleOpenItem(uItem.parent_series);
-                                    } else if (uItem.rawItem) {
-                                      handleOpenItem(uItem.rawItem);
-                                    }
-                                  }}
-                                  style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '1rem',
-                                    padding: '0.6rem 0.85rem',
-                                    background: 'var(--bg-secondary)',
-                                    border: '1px solid var(--border-color)',
-                                    borderRadius: '8px',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s ease'
-                                  }}
-                                >
-                                  <img
-                                    src={uItem.coverUrl}
-                                    alt={uItem.title}
-                                    style={{
-                                      width: '42px',
-                                      height: '60px',
-                                      objectFit: 'cover',
-                                      borderRadius: '4px',
-                                      flexShrink: 0,
-                                      background: 'var(--bg-tertiary)'
-                                    }}
-                                    onError={(e) => {
-                                      (e.target as HTMLElement).style.display = 'none';
-                                    }}
-                                  />
-                                  <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                                      <span style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                        {uItem.title}
-                                      </span>
-                                      {isEpisodeItem && (
-                                        <span style={{
-                                          fontSize: '0.75rem',
-                                          fontWeight: 700,
-                                          color: uItem.themeTextColor || '#ffffff',
-                                          background: uItem.themeColor || 'var(--accent-primary)',
-                                          padding: '0.1rem 0.4rem',
-                                          borderRadius: '4px'
-                                        }}>
-                                          {epLabel}
-                                        </span>
-                                      )}
-                                      {isEpisodeItem && uItem.name && (
-                                        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                          - {uItem.name}
-                                        </span>
-                                      )}
-                                    </div>
-                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                                      <span>{language === 'es' ? 'Estreno:' : 'Airs:'}</span>
-                                      <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{formattedDate}</span>
-                                    </div>
-                                  </div>
-                                  <div style={{
-                                    padding: '0.25rem 0.6rem',
-                                    borderRadius: '12px',
-                                    fontSize: '0.7rem',
-                                    fontWeight: 600,
-                                    background: uItem.themeColor ? `color-mix(in srgb, ${uItem.themeColor} 18%, transparent)` : 'var(--bg-tertiary)',
-                                    color: uItem.themeColor || 'var(--text-secondary)',
-                                    border: `1px solid ${uItem.themeColor ? `color-mix(in srgb, ${uItem.themeColor} 40%, transparent)` : 'var(--border-color)'}`,
-                                    whiteSpace: 'nowrap',
-                                    flexShrink: 0,
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '0.3rem'
-                                  }}>
-                                    {getCategoryIcon(uItem.item_type, { size: 12, color: uItem.themeColor || 'var(--text-secondary)' })}
-                                    <span>{catLabel}</span>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      );
-                    });
-                  })()}
-                  {isSyncingEpisodes && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-secondary)', fontSize: '0.85rem', padding: '0.5rem 0' }}>
-                      <div style={{
-                        width: '12px',
-                        height: '12px',
-                        border: '2px solid var(--border-color)',
-                        borderTopColor: 'var(--accent-primary, #6366f1)',
-                        borderRadius: '50%',
-                        animation: 'spin 0.8s linear infinite'
-                      }} />
-                      <span>{language === 'es' ? 'Sincronizando calendario de series...' : 'Syncing series calendar...'}</span>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div style={{ color: "var(--text-secondary)", padding: "1rem 0", display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  {isSyncingEpisodes ? (
-                    <>
-                      <div style={{
-                        width: '14px',
-                        height: '14px',
-                        border: '2px solid var(--border-color)',
-                        borderTopColor: 'var(--accent-primary, #6366f1)',
-                        borderRadius: '50%',
-                        animation: 'spin 0.8s linear infinite'
-                      }} />
-                      <span>{language === 'es' ? 'Cargando próximos episodios...' : 'Loading upcoming episodes...'}</span>
-                    </>
-                  ) : (
-                    <span>{language === 'es' ? 'No hay estrenos o episodios próximos en el calendario.' : 'No upcoming releases or episodes in the calendar.'}</span>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Slide 2: Por confirmar (TBA) */}
-            <div className="upcoming-mobile-swipe-slide">
-              {filteredTbaAllItems.length > 0 ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  {filteredTbaAllItems.map(uItem => {
-                    const catLabel = getTypeCat(uItem.item_type);
-                    return (
-                      <div
-                        key={uItem.id}
-                        onClick={() => {
-                          if (uItem.rawItem) handleOpenItem(uItem.rawItem);
-                        }}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '1rem',
-                          padding: '0.6rem 0.85rem',
-                          background: 'var(--bg-secondary)',
-                          border: '1px solid var(--border-color)',
-                          borderRadius: '8px',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s ease'
-                        }}
-                      >
-                        <img
-                          src={uItem.coverUrl}
-                          alt={uItem.title}
-                          style={{
-                            width: '42px',
-                            height: '60px',
-                            objectFit: 'cover',
-                            borderRadius: '4px',
-                            flexShrink: 0,
-                            background: 'var(--bg-tertiary)'
-                          }}
-                          onError={(e) => {
-                            (e.target as HTMLElement).style.display = 'none';
-                          }}
-                        />
-                        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                          <span style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {uItem.title}
-                          </span>
-                          <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                            {language === 'es' ? 'Fecha por confirmar (TBA)' : 'Release date to be announced (TBA)'}
-                          </div>
-                        </div>
-                        <div style={{
-                          padding: '0.25rem 0.6rem',
-                          borderRadius: '12px',
-                          fontSize: '0.7rem',
-                          fontWeight: 600,
-                          background: uItem.themeColor ? `color-mix(in srgb, ${uItem.themeColor} 18%, transparent)` : 'var(--bg-tertiary)',
-                          color: uItem.themeColor || 'var(--text-secondary)',
-                          border: `1px solid ${uItem.themeColor ? `color-mix(in srgb, ${uItem.themeColor} 40%, transparent)` : 'var(--border-color)'}`,
-                          whiteSpace: 'nowrap',
-                          flexShrink: 0,
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '0.3rem'
-                        }}>
-                          {getCategoryIcon(uItem.item_type, { size: 12, color: uItem.themeColor || 'var(--text-secondary)' })}
-                          <span>{catLabel}</span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div style={{ color: "var(--text-secondary)", padding: "1rem 0" }}>
-                  {language === 'es' ? 'No hay obras agregadas con fecha por confirmar.' : 'No works added with release date to be announced.'}
-                </div>
-              )}
-            </div>
-          </div>
         </div>
-      ) : activeTab === "guides" ? (
-        upNextGuides.length > 0 ? (
+      </div>
+    );
+  };
+
+  const renderGuidesSection = () => {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: "1rem", width: "100%" }}>
+        {upNextGuides.length > 0 ? (
           <>
             {/* Mobile Vertical Stack for Guides */}
             <div className="mobile-vertical-stack mobile-guides-stack home-mobile-only">
@@ -3947,23 +3484,164 @@ export const Home: React.FC = () => {
             </div>
           </>
         ) : (
-          <div style={{ color: "var(--text-secondary)", padding: "1rem 0" }}>No hay guías seguidas.</div>
-        )
-      ) : (
-        filteredItems.length > 0 ? (
+          <div style={{ color: "var(--text-secondary)", padding: "1rem 0" }}>
+            {language === 'es' ? 'No hay guías seguidas.' : 'No followed guides.'}
+          </div>
+        )}
+
+        {/* Activity Feed */}
+        <AdBanner style={{ margin: "1rem auto 2rem auto" }} />
+
+        <h3 className="mobile-guide-updates-title" style={{ fontSize: "1.2rem", marginBottom: "0.5rem", fontWeight: 600 }}>
+          {language === 'es' ? 'Novedades en guías seguidas' : 'Updates in followed guides'}
+        </h3>
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+          {(() => {
+            const normalizedUpdates: any[] = [];
+            if (Array.isArray(guideUpdates)) {
+              for (const u of guideUpdates) {
+                if (u && Array.isArray(u.updates) && u.updates.length > 0) {
+                  for (const sub of u.updates) {
+                    normalizedUpdates.push({
+                      id: sub.id || `${u.list_id}-${sub.created_at}`,
+                      username: sub.username || u.creator_name || u.username || (language === 'es' ? 'Usuario' : 'User'),
+                      photo_url: sub.photo_url || u.creator_photo || u.photo_url,
+                      activity_type: sub.activity_type || 'guide_edited',
+                      item_title: sub.item_title || u.guide_title || u.list_title || '',
+                      item_type: sub.item_type || 'guide',
+                      list_id: u.list_id,
+                      list_title: u.guide_title || u.list_title || '',
+                      created_at: sub.created_at || u.created_at
+                    });
+                  }
+                } else if (u) {
+                  normalizedUpdates.push({
+                    ...u,
+                    username: u.username || u.creator_name || (language === 'es' ? 'Usuario' : 'User'),
+                    photo_url: u.photo_url || u.creator_photo || null,
+                    list_title: u.list_title || u.guide_title || ''
+                  });
+                }
+              }
+            }
+
+            if (normalizedUpdates.length === 0) {
+              return (
+                <div style={{ color: "var(--text-secondary)" }}>{language === 'es' ? 'No hay novedades recientes.' : 'No recent updates.'}</div>
+              );
+            }
+
+            return normalizedUpdates.map(update => {
+              const userName = update.username || update.creator_name || (language === 'es' ? 'Usuario' : 'User');
+              const userInitial = (userName.charAt(0) || 'U').toUpperCase();
+              const photoUrl = update.photo_url || update.creator_photo;
+              const listTitle = update.list_title || update.guide_title || '';
+              const itemTitle = update.item_title || listTitle;
+
+              let text = "";
+              if (update.activity_type === "item_added") text = language === 'es' ? `agregó ${itemTitle} a` : `added ${itemTitle} to`;
+              else if (update.activity_type === "item_removed") text = language === 'es' ? `eliminó ${itemTitle} de` : `removed ${itemTitle} from`;
+              else if (update.activity_type === "item_moved") text = language === 'es' ? `movió ${itemTitle} en` : `moved ${itemTitle} in`;
+              else if (update.activity_type === "guide_created") text = language === 'es' ? `creó la guía` : `created the guide`;
+              else if (update.activity_type === "guide_edited") text = language === 'es' ? `actualizó la guía` : `updated the guide`;
+              else if (update.activity_type === "guide_published") text = language === 'es' ? `publicó la guía` : `published the guide`;
+              else if (update.activity_type === "block_edited") {
+                if (itemTitle === listTitle || itemTitle === "un bloque" || !itemTitle) {
+                  text = language === 'es' ? `editó un bloque de` : `edited a block in`;
+                } else if (itemTitle.startsWith("type:")) {
+                  const typeMatch = itemTitle.match(/type:([^|]*)(?:\|id:([^|]*))?\|title:(.*)/);
+                  if (typeMatch) {
+                    const elType = typeMatch[1];
+                    const elTitle = typeMatch[3];
+                    let typeName = language === 'es' ? 'un bloque' : 'a block';
+                    if (elType === 'section') typeName = language === 'es' ? 'una sección' : 'a section';
+                    else if (elType === 'subblock') typeName = language === 'es' ? 'un sub-bloque' : 'a sub-block';
+                    if (elTitle) {
+                      text = language === 'es' ? `editó ${typeName === 'una sección' ? 'la sección' : typeName === 'un sub-bloque' ? 'el sub-bloque' : 'el bloque'} '${elTitle}' de` : `edited the ${elType} '${elTitle}' in`;
+                    } else {
+                      text = language === 'es' ? `editó ${typeName} sin título en` : `edited an untitled ${elType} in`;
+                    }
+                  } else {
+                    text = language === 'es' ? `editó un bloque de` : `edited a block in`;
+                  }
+                } else {
+                  text = language === 'es' ? `editó el bloque '${itemTitle}' de` : `edited the block '${itemTitle}' in`;
+                }
+              } else {
+                text = language === 'es' ? `actualizó la guía` : `updated the guide`;
+              }
+              
+              return (
+                <div 
+                  key={update.id} 
+                  className="feed-update-card"
+                  onClick={() => {
+                    let hash = "";
+                    if (update.activity_type === "block_edited" && itemTitle.startsWith("type:")) {
+                      const m = itemTitle.match(/type:([^|]*)(?:\|id:([^|]*))?\|title:(.*)/);
+                      if (m && m[2]) hash = `#${m[2]}`;
+                    }
+                    navigate(`/guide/${update.list_id}${hash}`);
+                  }}
+                  style={{ background: "var(--bg-secondary)", padding: "1rem", borderRadius: "8px", border: "1px solid var(--border-color)", display: "flex", alignItems: "center", gap: "1rem", cursor: "pointer", transition: "transform 0.2s ease, box-shadow 0.2s ease" }}
+                >
+                  <div
+                    onClick={(e) => { e.stopPropagation(); if (userName) navigate(`/user/${encodeURIComponent(userName)}`); }}
+                    style={{ cursor: "pointer" }}
+                    className="feed-update-user-link"
+                  >
+                    {photoUrl ? (
+                      <img src={photoUrl} alt={userName} style={{ width: 40, height: 40, borderRadius: "50%", objectFit: "cover" }} />
+                    ) : (
+                      <div style={{ width: 40, height: 40, borderRadius: "50%", background: "var(--bg-tertiary)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 600 }}>{userInitial}</div>
+                    )}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: "0.95rem" }}>
+                      <span 
+                        className="feed-update-user-link"
+                        onClick={(e) => { e.stopPropagation(); if (userName) navigate(`/user/${encodeURIComponent(userName)}`); }}
+                        style={{ fontWeight: 600, cursor: "pointer", transition: "color 0.2s ease" }}
+                      >{userName}</span> {text} <span className="feed-update-guide" style={{ fontStyle: "italic", transition: "color 0.2s ease" }}>{listTitle}</span>
+                    </div>
+                    <div style={{ fontSize: "0.8rem", color: "var(--text-secondary)", marginTop: "0.25rem" }}>
+                      {update.created_at ? new Date(update.created_at).toLocaleDateString() : ''}
+                    </div>
+                  </div>
+                </div>
+              );
+            });
+          })()}
+        </div>
+      </div>
+    );
+  };
+
+  const renderMediaSection = (targetTab: "watching" | "plan_to_watch" | "completed" | "dropped") => {
+    const tabItems = getItemsForTab(targetTab);
+
+    return (
+      <div style={{ width: "100%" }}>
+        {tabItems.length === 0 ? (
+          <div style={{ color: "var(--text-secondary)", padding: "1rem 0" }}>
+            {targetTab === "watching" ? (language === "es" ? "No hay elementos en progreso." : "No items in progress.") :
+             targetTab === "plan_to_watch" ? (language === "es" ? "No hay elementos pendientes." : "No plan-to-watch items.") :
+             targetTab === "completed" ? (language === "es" ? "No hay elementos completados." : "No completed items.") :
+             (language === "es" ? "No hay elementos abandonados." : "No dropped items.")}
+          </div>
+        ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
             {(() => {
-              // Helper to render an item card in either row or vertical stack
               const renderItemCard = (item: any) => {
                 const isTrackedComic = item.item_type === "comic" && !!item.tracking_list_id;
-                if ((activeTab === "watching" || activeTab === "plan_to_watch") && (item.item_type === "series" || item.item_type === "anime" || isTrackedComic)) {
+                if ((targetTab === "watching" || targetTab === "plan_to_watch") && (item.item_type === "series" || item.item_type === "anime" || isTrackedComic)) {
                   return (
                     <ActiveSeriesCard 
                       key={item.id}
                       item={item}
                       language={language}
-                      actionIcon={activeTab === "plan_to_watch" ? "play" : "check"}
-                      variant={activeTab === "plan_to_watch" ? "poster" : "episode"}
+                      actionIcon={targetTab === "plan_to_watch" ? "play" : "check"}
+                      variant={targetTab === "plan_to_watch" ? "poster" : "episode"}
                       onUpdate={() => fetchDashboard(true)}
                       onOpenSeries={(seriesItem) => handleOpenItem(seriesItem)}
                       themeColor={`var(--color-${item.item_type})`}
@@ -3972,7 +3650,7 @@ export const Home: React.FC = () => {
                   );
                 }
 
-                if (activeTab === "completed" && (item.item_type === "series" || item.item_type === "anime" || isTrackedComic)) {
+                if (targetTab === "completed" && (item.item_type === "series" || item.item_type === "anime" || isTrackedComic)) {
                   return (
                     <CompletedSeriesCard 
                       key={item.id}
@@ -3986,7 +3664,7 @@ export const Home: React.FC = () => {
                   );
                 }
 
-                if (activeTab === "dropped" && (item.item_type === "series" || item.item_type === "anime" || isTrackedComic)) {
+                if (targetTab === "dropped" && (item.item_type === "series" || item.item_type === "anime" || isTrackedComic)) {
                   return (
                     <DroppedSeriesCard 
                       key={item.id}
@@ -4010,7 +3688,7 @@ export const Home: React.FC = () => {
                     themeColor={`var(--color-${item.item_type})`}
                     themeTextColor={`var(--color-text-${item.item_type})`}
                     coverBottomText={undefined}
-                    actionIcon={activeTab === 'plan_to_watch' || item.status === 'dropped' ? 'play' : 'check'}
+                    actionIcon={targetTab === 'plan_to_watch' || item.status === 'dropped' ? 'play' : 'check'}
                     subtitle1={undefined}
                     subtitle2={(() => {
                       const formatTime = (mins: number) => {
@@ -4041,72 +3719,16 @@ export const Home: React.FC = () => {
                       }
                       return "";
                     })()}
-                    onCheck={activeTab === 'plan_to_watch' || activeTab === 'watching' ? (e) => handleMarkCompleted(e, item) : undefined}
-                    onPlay={activeTab === 'plan_to_watch' || activeTab === 'dropped' ? (e) => handleStartConsuming(e, item) : undefined}
+                    onCheck={targetTab === 'plan_to_watch' || targetTab === 'watching' ? (e) => handleMarkCompleted(e, item) : undefined}
+                    onPlay={targetTab === 'plan_to_watch' || targetTab === 'dropped' ? (e) => handleStartConsuming(e, item) : undefined}
                     onClick={() => handleOpenItem(item)}
                     language={language}
                   />
                 );
               };
 
-              // Helper for guide card
-              const renderGuideCardItem = (g: any) => {
-                let insideTop = g.title;
-                let bottomText1 = '';
-                let bottomText2 = '';
-
-                const match = g.title.match(/^(.*?)\s*-\s*S(\d+)E(\d+)(.*)$/i);
-                if (match) {
-                  insideTop = match[1].trim();
-                  const s = match[2];
-                  const e = match[3];
-                  bottomText1 = language === 'es' ? `T${s} | E${e}` : `S${s} | E${e}`;
-                  bottomText2 = match[4].replace(/^\s*-\s*/, '').trim();
-                } else {
-                  const sMatch = g.title.match(/S(\d+)E(\d+)/i);
-                  if (sMatch) {
-                    const s = sMatch[1];
-                    const e = sMatch[2];
-                    bottomText1 = language === 'es' ? `T${s} | E${e}` : `S${s} | E${e}`;
-                    insideTop = g.title.replace(sMatch[0], '').replace(/-\s*-/, '-').trim();
-                  }
-                }
-
-                const isGuideEpisode = Boolean(g.title.match(/S(\d+)E(\d+)/i));
-                const shouldBlurGuide = Boolean(
-                  (currentUser?.is_pro || currentUser?.is_admin || currentUser?.is_vip) &&
-                  currentUser?.blur_unwatched_episodes &&
-                  isGuideEpisode &&
-                  !g.is_completed &&
-                  !revealedGuides[g.item_id]
-                );
-
-                return (
-                  <CustomCard 
-                    key={g.item_id}
-                    title={g.list_title}
-                    coverUrl={g.image_url}
-                    itemType="guide"
-                    preSubtitle={insideTop}
-                    themeColor="var(--color-guide)"
-                    themeTextColor="var(--color-text-guide)"
-                    coverBottomText={undefined}
-                    subtitle1={bottomText1}
-                    subtitle2={bottomText2}
-                    onCheck={(e) => handleMarkCompleted(e, g)}
-                    onClick={() => handleOpenItem({ ...g, id: g.item_id })}
-                    onTitleClick={(e) => { e.stopPropagation(); navigate(`/guide/${g.list_id}`); }}
-                    language={language}
-                    shouldBlurCover={shouldBlurGuide}
-                    onRevealCover={() => setRevealedGuides(prev => ({ ...prev, [g.item_id]: true }))}
-                  />
-                );
-              };
-
-              // If a specific category filter is active (not 'all' and not 'guide'),
-              // render desktop standard or mobile vertical stack
               if (homeCategoryFilter !== 'all' && homeCategoryFilter !== 'guide') {
-                const specificItems = filteredItems.filter(i => i.item_type === homeCategoryFilter);
+                const specificItems = tabItems.filter(i => i.item_type === homeCategoryFilter);
                 if (specificItems.length === 0) {
                   return (
                     <div style={{ color: "var(--text-secondary)", padding: "1rem 0" }}>
@@ -4117,7 +3739,6 @@ export const Home: React.FC = () => {
 
                 return (
                   <>
-                    {/* Unified category header title and count badge for both Mobile and Desktop */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', paddingLeft: '0.5rem', paddingRight: '0.5rem', marginBottom: '0.25rem', flexWrap: 'wrap' }}>
                       {getCategoryIcon(homeCategoryFilter, { size: 20, color: `var(--color-${homeCategoryFilter})` })}
                       <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)' }}>
@@ -4134,7 +3755,7 @@ export const Home: React.FC = () => {
                       }}>
                         {specificItems.length}
                       </span>
-                      {homeCategoryFilter === 'game' && activeTab === 'watching' && playingGamesCount > 0 && endlessGamesCount > 0 && (
+                      {homeCategoryFilter === 'game' && targetTab === 'watching' && playingGamesCount > 0 && endlessGamesCount > 0 && (
                         <div style={{ display: "inline-flex", background: "var(--bg-tertiary)", padding: "3px", borderRadius: "8px", gap: "4px", border: "1px solid var(--border-color)", marginLeft: "0.25rem" }}>
                           <button
                             type="button"
@@ -4174,14 +3795,12 @@ export const Home: React.FC = () => {
                       )}
                     </div>
 
-                    {/* Mobile vertical stack (edge to edge full width) */}
                     <div className="mobile-vertical-stack home-mobile-only">
                       {specificItems.map(item => renderItemCard(item))}
                     </div>
 
-                    {/* Desktop multi-column grid */}
                     <div className="home-desktop-only" style={{ display: 'flex', flexDirection: 'column', width: '100%', gap: '1rem' }}>
-                      <div className={`desktop-category-grid ${activeTab === 'watching' && (homeCategoryFilter === 'series' || homeCategoryFilter === 'anime') ? 'desktop-category-grid-landscape' : ''}`}>
+                      <div className={`desktop-category-grid ${targetTab === 'watching' && (homeCategoryFilter === 'series' || homeCategoryFilter === 'anime') ? 'desktop-category-grid-landscape' : ''}`}>
                         {specificItems.map(item => renderItemCard(item))}
                       </div>
                     </div>
@@ -4189,21 +3808,19 @@ export const Home: React.FC = () => {
                 );
               }
 
-              // Default ('all'): show all categories as rows, and on mobile show followed guides at the bottom
               return (
                 <>
                   {getOrderedCategories(currentUser?.category_order).map(category => {
-                    let catItems = filteredItems.filter(i => i.item_type === category);
+                    let catItems = tabItems.filter(i => i.item_type === category);
                     
-                    // In watching tab, only show game category if user actually has games in 'playing' or 'endless'
-                    if (category === "game" && activeTab === "watching") {
+                    if (category === "game" && targetTab === "watching") {
                       const totalActiveGames = libraryItems.filter(i => i.item_type === "game" && (i.status === "playing" || i.status === "endless")).length;
                       if (totalActiveGames === 0) return null;
                     } else if (catItems.length === 0) {
                       return null;
                     }
 
-                    const headerExtra = (category === "game" && activeTab === "watching" && playingGamesCount > 0 && endlessGamesCount > 0) ? (
+                    const headerExtra = (category === "game" && targetTab === "watching" && playingGamesCount > 0 && endlessGamesCount > 0) ? (
                       <div style={{ display: "flex", background: "var(--bg-tertiary)", padding: "3px", borderRadius: "8px", gap: "4px", border: "1px solid var(--border-color)" }}>
                         <button
                           type="button"
@@ -4212,9 +3829,9 @@ export const Home: React.FC = () => {
                             border: "none",
                             background: effectiveGameFilter === "playing" ? "var(--color-game, #10b981)" : "transparent",
                             color: effectiveGameFilter === "playing" ? "var(--color-text-game, #ffffff)" : "var(--text-secondary)",
-                            padding: "4px 10px",
+                            padding: "3px 8px",
                             borderRadius: "6px",
-                            fontSize: "0.8rem",
+                            fontSize: "0.78rem",
                             fontWeight: 600,
                             cursor: "pointer",
                             transition: "all 0.2s ease"
@@ -4229,9 +3846,9 @@ export const Home: React.FC = () => {
                             border: "none",
                             background: effectiveGameFilter === "endless" ? "var(--color-game, #10b981)" : "transparent",
                             color: effectiveGameFilter === "endless" ? "var(--color-text-game, #ffffff)" : "var(--text-secondary)",
-                            padding: "4px 10px",
+                            padding: "3px 8px",
                             borderRadius: "6px",
-                            fontSize: "0.8rem",
+                            fontSize: "0.78rem",
                             fontWeight: 600,
                             cursor: "pointer",
                             transition: "all 0.2s ease"
@@ -4240,23 +3857,21 @@ export const Home: React.FC = () => {
                           {language === "es" ? "Infinito" : "Endless"}
                         </button>
                       </div>
-                    ) : undefined;
+                    ) : null;
 
                     return (
                       <ScrollRow 
-                        key={`${activeTab}_${category}`} 
+                        key={`${targetTab}_${category}`} 
                         title={getTypeCat(category, true)} 
                         icon={getCategoryIcon(category, { size: 18 })}
                         outlineColor={`var(--color-${category})`} 
                         headerExtra={headerExtra} 
                         itemCount={catItems.length}
-                        storageKey={`${activeTab}_${category}`}
+                        storageKey={`${targetTab}_${category}`}
                       >
                         {catItems.length === 0 ? (
                           <div style={{ padding: "1rem 0", color: "var(--text-secondary)", fontSize: "0.9rem" }}>
-                            {language === "es" 
-                              ? (effectiveGameFilter === "endless" ? "No hay juegos infinitos." : "No hay juegos en curso.") 
-                              : (effectiveGameFilter === "endless" ? "No endless games." : "No games in progress.")}
+                            {language === 'es' ? 'No hay obras en esta categoría.' : 'No items in this category.'}
                           </div>
                         ) : (
                           catItems.map(item => renderItemCard(item))
@@ -4264,145 +3879,229 @@ export const Home: React.FC = () => {
                       </ScrollRow>
                     );
                   })}
-
                 </>
               );
             })()}
           </div>
-        ) : (
-          <div style={{ color: "var(--text-secondary)", padding: "1rem 0" }}>No hay elementos en esta categoria.</div>
-        )
-      )}
+        )}
+      </div>
+    );
+  };
 
-      {/* Activity Feed (Only visible on 'Guías' tab) */}
-      {activeTab === "guides" && (
-        <>
-          {/* AdBanner before updates in followed guides */}
-          <AdBanner style={{ margin: "1rem auto 2rem auto" }} />
+  return (
+    <div className="home-main-container" style={{ maxWidth: "1200px", margin: "0 auto", display: "flex", flexDirection: "column", gap: "2rem" }}>
+      
+      {/* Sticky Header: Tabs + Category Filters unified below tabs */}
+      <div className="home-sticky-header-wrapper">
+        {/* Tabs */}
+        <div 
+          ref={homeTabsContainerRef}
+          className="home-tabs-container"
+          style={{ 
+            display: "flex", 
+            gap: "1.75rem", 
+            borderBottom: "1px solid var(--border-color)", 
+            paddingBottom: "0.75rem", 
+            marginBottom: "0.75rem",
+            position: "relative",
+            zIndex: 2, 
+            background: "var(--bg-primary)", 
+            paddingTop: "0.5rem",
+            '--tab-progress': String(Math.min(5, Math.max(0, currentHomeStep)))
+          } as React.CSSProperties}
+        >
+          {["watching", "guides", "plan_to_watch", "completed", "dropped", "upcoming"].map((tab, idx) => {
+            const labels: any = language === 'es'
+              ? { "watching": "Continuar", "guides": "Guías", "plan_to_watch": "No comenzado", "completed": "Terminado", "dropped": "Abandonado", "upcoming": "Próximos" }
+              : { "watching": "Continue", "guides": "Guides", "plan_to_watch": "Not started", "completed": "Completed", "dropped": "Dropped", "upcoming": "Upcoming" };
+            const icons: any = {
+              "watching": <Play size={18} />,
+              "guides": <BookOpen size={18} />,
+              "plan_to_watch": <Bookmark size={18} />,
+              "completed": <CheckCircle size={18} />,
+              "dropped": <XCircle size={18} />,
+              "upcoming": <Calendar size={18} />
+            };
+            const isActive = activeTab === tab;
+            return (
+              <div 
+                key={tab}
+                ref={el => { tabItemRefs.current[idx] = el; }}
+                onClick={() => handleTabChange(tab as any)}
+                className={`home-tab-item ${isActive ? 'active' : ''}`}
+                data-tab={tab}
+                title={labels[tab]}
+                style={{
+                  fontSize: "1.05rem", fontWeight: isActive ? 600 : 500,
+                  cursor: "pointer", padding: "0.25rem 0", position: "relative",
+                  whiteSpace: "nowrap",
+                  '--tab-act': isActive ? '1' : '0'
+                } as React.CSSProperties}
+              >
+                <span className="home-tab-icon">{icons[tab]}</span>
+                <span className="home-tab-label">{labels[tab]}</span>
+                {isActive && <div className="home-tab-indicator home-desktop-only" style={{ position: "absolute", bottom: "-0.75rem", left: 0, right: 0, height: "2px", background: "var(--accent-primary)" }} />}
+              </div>
+            );
+          })}
 
-          <h3 className="mobile-guide-updates-title" style={{ fontSize: "1.2rem", marginBottom: "0.5rem", fontWeight: 600 }}>{language === 'es' ? 'Novedades en guías seguidas' : 'Updates in followed guides'}</h3>
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-            {(() => {
-              const normalizedUpdates: any[] = [];
-              if (Array.isArray(guideUpdates)) {
-                for (const u of guideUpdates) {
-                  if (u && Array.isArray(u.updates) && u.updates.length > 0) {
-                    for (const sub of u.updates) {
-                      normalizedUpdates.push({
-                        id: sub.id || `${u.list_id}-${sub.created_at}`,
-                        username: sub.username || u.creator_name || u.username || (language === 'es' ? 'Usuario' : 'User'),
-                        photo_url: sub.photo_url || u.creator_photo || u.photo_url,
-                        activity_type: sub.activity_type || 'guide_edited',
-                        item_title: sub.item_title || u.guide_title || u.list_title || '',
-                        item_type: sub.item_type || 'guide',
-                        list_id: u.list_id,
-                        list_title: u.guide_title || u.list_title || '',
-                        created_at: sub.created_at || u.created_at
-                      });
-                    }
-                  } else if (u) {
-                    normalizedUpdates.push({
-                      ...u,
-                      username: u.username || u.creator_name || (language === 'es' ? 'Usuario' : 'User'),
-                      photo_url: u.photo_url || u.creator_photo || null,
-                      list_title: u.list_title || u.guide_title || ''
-                    });
-                  }
-                }
-              }
+          {/* Sliding Continuous Indicator for Mobile Tabs */}
+          <div className="home-tabs-sliding-indicator home-mobile-only" />
+        </div>
 
-              if (normalizedUpdates.length === 0) {
-                return (
-                  <div style={{ color: "var(--text-secondary)" }}>{language === 'es' ? 'No hay novedades recientes.' : 'No recent updates.'}</div>
-                );
-              }
+        {/* Category Filters Bar (Todos + 7 Categorías) - Positioned right below tabs */}
+        <div className={`home-category-filters-container ${activeTab !== 'guides' && showFiltersOnScroll ? 'show' : 'hide'}`}>
+          <div className="home-category-filters-container-inner">
+            {sortFilterTabs([
+              { value: 'all', label: language === 'es' ? 'Todo' : 'All' },
+              { value: 'movie', label: language === 'es' ? 'Películas' : 'Movies' },
+              { value: 'series', label: language === 'es' ? 'Series' : 'TV Shows' },
+              { value: 'anime', label: 'Anime' },
+              { value: 'book', label: language === 'es' ? 'Libros' : 'Books' },
+              { value: 'comic', label: language === 'es' ? 'Cómics' : 'Comics' },
+              { value: 'manga', label: 'Mangas' },
+              { value: 'game', label: language === 'es' ? 'Juegos' : 'Games' }
+            ], currentUser?.category_order).map(tab => {
+              const isSelected = homeCategoryFilter === tab.value;
 
-              return normalizedUpdates.map(update => {
-                const userName = update.username || update.creator_name || (language === 'es' ? 'Usuario' : 'User');
-                const userInitial = (userName.charAt(0) || 'U').toUpperCase();
-                const photoUrl = update.photo_url || update.creator_photo;
-                const listTitle = update.list_title || update.guide_title || '';
-                const itemTitle = update.item_title || listTitle;
+              const tabColor = tab.value === 'all' 
+                ? 'var(--accent-primary)' 
+                : `var(--color-${tab.value})`;
+              const tabTextColor = tab.value === 'all' 
+                ? '#ffffff' 
+                : `var(--color-text-${tab.value})`;
 
-                let text = "";
-                if (update.activity_type === "item_added") text = language === 'es' ? `agregó ${itemTitle} a` : `added ${itemTitle} to`;
-                else if (update.activity_type === "item_removed") text = language === 'es' ? `eliminó ${itemTitle} de` : `removed ${itemTitle} from`;
-                else if (update.activity_type === "item_moved") text = language === 'es' ? `movió ${itemTitle} en` : `moved ${itemTitle} in`;
-                else if (update.activity_type === "guide_created") text = language === 'es' ? `creó la guía` : `created the guide`;
-                else if (update.activity_type === "guide_edited") text = language === 'es' ? `actualizó la guía` : `updated the guide`;
-                else if (update.activity_type === "guide_published") text = language === 'es' ? `publicó la guía` : `published the guide`;
-                else if (update.activity_type === "block_edited") {
-                  if (itemTitle === listTitle || itemTitle === "un bloque" || !itemTitle) {
-                    text = language === 'es' ? `editó un bloque de` : `edited a block in`;
-                  } else if (itemTitle.startsWith("type:")) {
-                    const typeMatch = itemTitle.match(/type:([^|]*)(?:\|id:([^|]*))?\|title:(.*)/);
-                    if (typeMatch) {
-                      const elType = typeMatch[1];
-                      const elTitle = typeMatch[3];
-                      
-                      let typeName = language === 'es' ? 'un bloque' : 'a block';
-                      if (elType === 'section') typeName = language === 'es' ? 'una sección' : 'a section';
-                      else if (elType === 'subblock') typeName = language === 'es' ? 'un sub-bloque' : 'a sub-block';
-                      
-                      if (elTitle) {
-                        text = language === 'es' ? `editó ${typeName === 'una sección' ? 'la sección' : typeName === 'un sub-bloque' ? 'el sub-bloque' : 'el bloque'} '${elTitle}' de` : `edited the ${elType} '${elTitle}' in`;
-                      } else {
-                        text = language === 'es' ? `editó ${typeName} sin título en` : `edited an untitled ${elType} in`;
-                      }
-                    } else {
-                      text = language === 'es' ? `editó un bloque de` : `edited a block in`;
-                    }
-                  } else {
-                    text = language === 'es' ? `editó el bloque '${itemTitle}' de` : `edited the block '${itemTitle}' in`;
-                  }
-                } else {
-                  text = language === 'es' ? `actualizó la guía` : `updated the guide`;
-                }
-                
-                return (
-                  <div 
-                    key={update.id} 
-                    className="feed-update-card"
-                    onClick={() => {
-                      let hash = "";
-                      if (update.activity_type === "block_edited" && itemTitle.startsWith("type:")) {
-                        const m = itemTitle.match(/type:([^|]*)(?:\|id:([^|]*))?\|title:(.*)/);
-                        if (m && m[2]) hash = `#${m[2]}`;
-                      }
-                      navigate(`/guide/${update.list_id}${hash}`);
-                    }}
-                    style={{ background: "var(--bg-secondary)", padding: "1rem", borderRadius: "8px", border: "1px solid var(--border-color)", display: "flex", alignItems: "center", gap: "1rem", cursor: "pointer", transition: "transform 0.2s ease, box-shadow 0.2s ease" }}
-                  >
-                    <div
-                      onClick={(e) => { e.stopPropagation(); if (userName) navigate(`/user/${encodeURIComponent(userName)}`); }}
-                      style={{ cursor: "pointer" }}
-                      className="feed-update-user-link"
-                    >
-                      {photoUrl ? (
-                        <img src={photoUrl} alt={userName} style={{ width: 40, height: 40, borderRadius: "50%", objectFit: "cover" }} />
-                      ) : (
-                        <div style={{ width: 40, height: 40, borderRadius: "50%", background: "var(--bg-tertiary)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 600 }}>{userInitial}</div>
-                      )}
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: "0.95rem" }}>
-                        <span 
-                          className="feed-update-user-link"
-                          onClick={(e) => { e.stopPropagation(); if (userName) navigate(`/user/${encodeURIComponent(userName)}`); }}
-                          style={{ fontWeight: 600, cursor: "pointer", transition: "color 0.2s ease" }}
-                        >{userName}</span> {text} <span className="feed-update-guide" style={{ fontStyle: "italic", transition: "color 0.2s ease" }}>{listTitle}</span>
-                      </div>
-                      <div style={{ fontSize: "0.8rem", color: "var(--text-secondary)", marginTop: "0.25rem" }}>
-                        {update.created_at ? new Date(update.created_at).toLocaleDateString() : ''}
-                      </div>
-                    </div>
-                  </div>
-                );
-              });
-            })()}
+              const handleFilterClick = () => {
+                setHomeCategoryFilter(tab.value);
+              };
+
+              return (
+                <button
+                  key={tab.value}
+                  type="button"
+                  onClick={handleFilterClick}
+                  className={`profile-category-tab search-filter-btn ${isSelected ? 'selected' : ''}`}
+                  title={tab.label}
+                  style={{
+                    padding: '0.35rem 0.85rem',
+                    fontSize: '0.85rem',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.4rem',
+                    '--tab-color': tabColor,
+                    '--tab-text': tabTextColor
+                  } as React.CSSProperties}
+                >
+                  <span className="search-filter-icon" style={{ display: 'inline-flex', alignItems: 'center' }}>
+                    {getCategoryIcon(tab.value, { size: 14, color: isSelected ? tabTextColor : tabColor })}
+                  </span>
+                  <span className="search-filter-label">{tab.label}</span>
+                </button>
+              );
+            })}
           </div>
-        </>
-      )}
+        </div>
+
+        {/* Sub-tabs: Calendario / Por confirmar (Stationary in Sticky Header) */}
+        {(activeTab === 'upcoming' || currentHomeStep === 5 || currentHomeStep === 6) && (
+          <div style={{ width: "100%", boxSizing: "border-box" }}>
+            {/* Desktop Button Pills */}
+            <div className="home-desktop-only" style={{ display: "flex", alignItems: "center", padding: "0.25rem 0 0.5rem" }}>
+              <div style={{ display: "flex", background: "var(--bg-tertiary)", padding: "3px", borderRadius: "8px", gap: "4px", border: "1px solid var(--border-color)" }}>
+                <button
+                  type="button"
+                  onClick={() => handleSelectUpcomingSubtab("calendar")}
+                  style={{
+                    border: "none",
+                    background: currentHomeStep === 5 ? "var(--accent-primary, #6366f1)" : "transparent",
+                    color: currentHomeStep === 5 ? "#ffffff" : "var(--text-secondary)",
+                    padding: "6px 14px",
+                    borderRadius: "6px",
+                    fontSize: "0.85rem",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    transition: "all 0.2s ease"
+                  }}
+                >
+                  {language === "es" ? "Calendario" : "Calendar"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSelectUpcomingSubtab("tba")}
+                  style={{
+                    border: "none",
+                    background: currentHomeStep === 6 ? "var(--accent-primary, #6366f1)" : "transparent",
+                    color: currentHomeStep === 6 ? "#ffffff" : "var(--text-secondary)",
+                    padding: "6px 14px",
+                    borderRadius: "6px",
+                    fontSize: "0.85rem",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    transition: "all 0.2s ease"
+                  }}
+                >
+                  {language === "es" ? "Por confirmar" : "TBA"}
+                </button>
+              </div>
+            </div>
+
+            {/* Mobile Top-Bar-Style Full Width Tabs */}
+            <div
+              ref={upcomingTabsContainerRef}
+              className="upcoming-mobile-tabs-container home-mobile-only"
+              style={{
+                marginTop: '0.25rem',
+                marginBottom: '0.5rem',
+                position: 'relative',
+                '--subtab-progress': String(currentHomeStep === 6 ? 1 : 0)
+              } as React.CSSProperties}
+            >
+              <button
+                type="button"
+                ref={el => { subtabBtnRefs.current[0] = el; }}
+                className={`upcoming-mobile-tab-btn ${currentHomeStep === 5 ? "active" : ""}`}
+                onClick={() => goToHomeStep(5)}
+                style={{
+                  '--subtab-act': currentHomeStep === 5 ? '1' : '0'
+                } as React.CSSProperties}
+              >
+                <span>{language === "es" ? "Calendario" : "Calendar"}</span>
+              </button>
+              <button
+                type="button"
+                ref={el => { subtabBtnRefs.current[1] = el; }}
+                className={`upcoming-mobile-tab-btn ${currentHomeStep === 6 ? "active" : ""}`}
+                onClick={() => goToHomeStep(6)}
+                style={{
+                  '--subtab-act': currentHomeStep === 6 ? '1' : '0'
+                } as React.CSSProperties}
+              >
+                <span>{language === "es" ? "Por confirmar" : "TBA"}</span>
+              </button>
+
+              {/* Sliding Continuous Subtab Indicator */}
+              <div className="upcoming-tab-sliding-indicator" />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Media Row - Edge-to-Edge 1:1 Native Swipe ViewPager across all tabs */}
+      <SwipeViewPager
+        currentIndex={currentHomeStep}
+        totalSlides={7}
+        onSlideChange={goToHomeStep}
+        onScrollProgress={handleScrollProgress}
+        ignoreSelector={homeCategoryFilter === 'all' ? '.home-scroll-carousel, .scroll-fade-zone, .scroll-nav-arrow' : undefined}
+      >
+        <div style={{ width: "100%", flex: 1 }}>{renderMediaSection("watching")}</div>
+        <div style={{ width: "100%", flex: 1 }}>{renderGuidesSection()}</div>
+        <div style={{ width: "100%", flex: 1 }}>{renderMediaSection("plan_to_watch")}</div>
+        <div style={{ width: "100%", flex: 1 }}>{renderMediaSection("completed")}</div>
+        <div style={{ width: "100%", flex: 1 }}>{renderMediaSection("dropped")}</div>
+        <div style={{ width: "100%", flex: 1 }}>{renderUpcomingSection("calendar")}</div>
+        <div style={{ width: "100%", flex: 1 }}>{renderUpcomingSection("tba")}</div>
+      </SwipeViewPager>
 
       {/* Non-intrusive bottom sponsor / AdBanner */}
       <AdBanner />
