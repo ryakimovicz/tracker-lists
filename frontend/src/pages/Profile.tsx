@@ -5,8 +5,9 @@ import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { getProfileTheme } from '../utils/profileThemes';
 
-import { apiClient } from '../api/client';
+import { apiClient, updateLibraryStatusSafe } from '../api/client';
 import { getCachedSeries, setCachedSeries } from '../utils/seriesCache';
+import { updateCachedShelfItem, getCachedShelfItems } from '../utils/shelfCache';
 import { ItemDetailsModal, StarRatingDisplay } from '../components/ItemDetailsModal';
 import { MediaPoster } from '../components/MediaPoster';
 import { AvatarSelectorModal } from '../components/AvatarSelectorModal';
@@ -2273,8 +2274,29 @@ export const Profile: React.FC = () => {
       } catch (_) {}
     };
 
-    const handleProfileUpdate = () => {
-      // Refresh activities instantly in parallel with full profile/library reload
+    const handleProfileUpdate = (e?: any) => {
+      // 1. Instantly update shelf in React state from event detail or cache
+      const updatedItem = (e as CustomEvent)?.detail?.item;
+      if (updatedItem && (!targetUserIdentifier || targetUserIdentifier === currentUser?.username)) {
+        setLibraryItems(prev => {
+          const matchIdx = prev.findIndex(i => (updatedItem.id && i.id === updatedItem.id) || (updatedItem.external_id && i.external_id === updatedItem.external_id && i.item_type === updatedItem.item_type));
+          if (matchIdx >= 0) {
+            const next = [...prev];
+            next[matchIdx] = { ...next[matchIdx], ...updatedItem };
+            return next;
+          }
+          return [updatedItem, ...prev];
+        });
+        fetchActivitiesFast();
+        return; // Single-item change handled cleanly without full profile reload!
+      } else if (!targetUserIdentifier) {
+        const cached = getCachedShelfItems();
+        if (cached && cached.length > 0) {
+          setLibraryItems(cached as any);
+        }
+      }
+
+      // 2. Full profile reload only when no specific item detail is passed
       fetchActivitiesFast();
       fetchProfileAndLibrary();
     };
@@ -2708,22 +2730,36 @@ export const Profile: React.FC = () => {
   };
 
   const handleStatusChange = async (itemId: number, newStatus: string) => {
-
     setErrorMsg('');
     setSuccessMsg('');
+    const targetItem = libraryItems.find(item => item.id === itemId);
+    const prevStatus = targetItem?.status;
+
+    // 1. Optimistic instant update (0ms latency in shelf UI)
+    setLibraryItems(prev => prev.map(item => item.id === itemId ? { ...item, status: newStatus } : item));
+    if (targetItem) {
+      const updatedStub = { ...targetItem, status: newStatus };
+      updateCachedShelfItem(updatedStub);
+      window.dispatchEvent(new CustomEvent('library-updated', { detail: { item: updatedStub } }));
+    }
+    setSuccessMsg(language === 'es' ? 'Estado actualizado con éxito.' : 'Status updated successfully.');
+    setTimeout(() => setSuccessMsg(''), 3000);
+
     try {
-      await apiClient.put(`/library/${itemId}`, { status: newStatus });
-      setLibraryItems(prev => prev.map(item => item.id === itemId ? { ...item, status: newStatus } : item));
-      setSuccessMsg(language === 'es' ? 'Estado actualizado con éxito.' : 'Status updated successfully.');
-      setTimeout(() => setSuccessMsg(''), 3000);
-      window.dispatchEvent(new Event('library-updated'));
+      await updateLibraryStatusSafe(itemId, newStatus);
       
       // Refresh activities
       const targetActivityUrl = userIdParam ? `/users/${userIdParam}/activity` : '/users/me/activity';
       const actRes = await apiClient.get(targetActivityUrl);
       setActivities(actRes.data);
     } catch (err: any) {
-      setErrorMsg(err.response?.data?.detail || 'Failed to update item status.');
+      if (prevStatus && targetItem) {
+        setLibraryItems(prev => prev.map(item => item.id === itemId ? { ...item, status: prevStatus } : item));
+        const rollbackStub = { ...targetItem, status: prevStatus };
+        updateCachedShelfItem(rollbackStub);
+        window.dispatchEvent(new CustomEvent('library-updated', { detail: { item: rollbackStub } }));
+      }
+      setErrorMsg(err.response?.data?.detail || err.message || 'Failed to update item status.');
     }
   };
   const handleToggleFavorite = async (itemId: number, currentFav: boolean) => {

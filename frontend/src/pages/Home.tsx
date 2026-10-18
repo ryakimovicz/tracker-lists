@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
-import { apiClient } from '../api/client';
+import { apiClient, updateLibraryStatusSafe } from '../api/client';
 import { useTranslation } from '../context/LanguageContext';
 import { getCachedSeries, setCachedSeries, clearCachedSeriesMatching } from '../utils/seriesCache';
+import { updateCachedShelfItem, getCachedShelfItems } from '../utils/shelfCache';
 import { ItemDetailsModal } from '../components/ItemDetailsModal';
 import { MediaPoster } from '../components/MediaPoster';
 import { AdBanner } from '../components/AdBanner';
@@ -534,7 +535,7 @@ const CustomCard = ({
     if (actionTimerRef.current) clearTimeout(actionTimerRef.current);
     actionTimerRef.current = setTimeout(() => {
       callback && callback(e);
-    }, 250);
+    }, 60);
   };
 
   const showBoth = !!(onCheck && onPlay);
@@ -1169,25 +1170,26 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
       episode_number: currentEpToMark.episode_number ?? currentEpToMark.issue_number ?? null,
       is_significant_special: isCurrentSpecial
     }).then(async () => {
-      let stateChanged = false;
       // If the series / comic was in plan_to_watch / plan_to_read, move it to in-progress
       if (item.status === 'plan_to_watch' || item.status === 'plan_to_read') {
-        try {
-          const nextSt = isComic ? 'reading' : 'watching';
-          await apiClient.put(`/library/${item.id}`, { status: nextSt });
-          stateChanged = true;
-          onUpdate();
-        } catch (e) {}
+        const nextSt = isComic ? 'reading' : 'watching';
+        item.status = nextSt;
+        const updated = { ...item, status: nextSt };
+        updateCachedShelfItem(updated);
+        window.dispatchEvent(new CustomEvent('library-updated', { detail: { item: updated } }));
+        updateLibraryStatusSafe(item.id, nextSt).catch(() => {});
+        onUpdate();
       }
 
       // If it is genuinely the last episode/issue of the entire volume/series, mark as completed / read
       if (isLastEpisodeOfAll) {
-        try {
-          const compSt = isComic ? 'read' : 'completed';
-          await apiClient.put(`/library/${item.id}`, { status: compSt });
-          stateChanged = true;
-          onUpdate();
-        } catch (e) {}
+        const compSt = isComic ? 'read' : 'completed';
+        item.status = compSt;
+        const updated = { ...item, status: compSt };
+        updateCachedShelfItem(updated);
+        window.dispatchEvent(new CustomEvent('library-updated', { detail: { item: updated } }));
+        updateLibraryStatusSafe(item.id, compSt).catch(() => {});
+        onUpdate();
       }
 
       // Always notify the app that activity was logged and library/progress changed
@@ -1206,24 +1208,29 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
     setIsJustPlayed(true);
     try { (e.currentTarget as HTMLButtonElement)?.blur(); } catch {}
 
+    const nextSt = isComic ? 'reading' : 'watching';
+    item.status = nextSt;
+    const updated = { ...item, status: nextSt };
+    updateCachedShelfItem(updated);
+    window.dispatchEvent(new CustomEvent('library-updated', { detail: { item: updated } }));
+    onUpdate();
+
     if (justPlayedTimerRef.current) clearTimeout(justPlayedTimerRef.current);
     justPlayedTimerRef.current = setTimeout(async () => {
       setIsLoading(true);
       try {
-        const nextSt = isComic ? 'reading' : 'watching';
-        const res = await apiClient.put(`/library/${item.id}`, { status: nextSt });
-        if (res.data?.tracking_list_id) {
-          item.tracking_list_id = res.data.tracking_list_id;
+        const res = await updateLibraryStatusSafe(item.id, nextSt);
+        if (res?.tracking_list_id) {
+          item.tracking_list_id = res.tracking_list_id;
         }
         onUpdate();
-        window.dispatchEvent(new Event('library-updated'));
       } catch (err) {
         console.error(err);
       } finally {
         setIsLoading(false);
         setIsJustPlayed(false);
       }
-    }, 250);
+    }, 60);
   };
 
   const handleCardClick = () => {
@@ -1880,12 +1887,18 @@ const DroppedSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor,
     setIsJustPlayed(true);
     try { (e.currentTarget as HTMLButtonElement)?.blur(); } catch {}
 
+    const nextSt = isComic ? 'reading' : 'watching';
+    item.status = nextSt;
+    const updated = { ...item, status: nextSt };
+    updateCachedShelfItem(updated);
+    window.dispatchEvent(new CustomEvent('library-updated', { detail: { item: updated } }));
+    onUpdate();
+
     if (justPlayedTimerRef.current) clearTimeout(justPlayedTimerRef.current);
     justPlayedTimerRef.current = setTimeout(async () => {
       setIsLoading(true);
       try {
-        const nextSt = isComic ? 'reading' : 'watching';
-        await apiClient.put(`/library/${item.id}`, { status: nextSt });
+        await updateLibraryStatusSafe(item.id, nextSt);
         onUpdate();
       } catch (err) {
         console.error(err);
@@ -1893,7 +1906,7 @@ const DroppedSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor,
         setIsLoading(false);
         setIsJustPlayed(false);
       }
-    }, 250);
+    }, 60);
   };
 
   return (
@@ -1977,12 +1990,22 @@ const ActiveItemCard = ({ item, onUpdate, language, onOpenItem, themeColor, them
 
   const handleMarkSeen = async (e: React.MouseEvent) => {
     e.stopPropagation();
+    const compStatus = ['book', 'comic', 'manga'].includes(item.item_type) ? 'read' : 'completed';
+    const prevStatus = item.status;
+    const updated = { ...item, status: compStatus };
+    updateCachedShelfItem(updated);
+    window.dispatchEvent(new CustomEvent('library-updated', { detail: { item: updated } }));
+    onUpdate();
+
     setIsLoading(true);
     try {
-      await apiClient.put(`/library/${item.id}`, { status: ['book', 'comic', 'manga'].includes(item.item_type) ? 'read' : 'completed' });
-      onUpdate();
+      await updateLibraryStatusSafe(item.id, compStatus);
     } catch (err) {
       console.error(err);
+      const rollback = { ...item, status: prevStatus };
+      updateCachedShelfItem(rollback);
+      window.dispatchEvent(new CustomEvent('library-updated', { detail: { item: rollback } }));
+      onUpdate();
     } finally {
       setIsLoading(false);
     }
@@ -2711,7 +2734,28 @@ export const Home: React.FC = () => {
     // If cached items exist, load silently in background without showing blocking spinner
     fetchDashboard(libraryItems.length > 0);
 
-    const handleLibraryUpdate = () => {
+    const handleLibraryUpdate = (e?: any) => {
+      const updatedItem = (e as CustomEvent)?.detail?.item;
+      if (updatedItem) {
+        setLibraryItems(prev => {
+          const matchIdx = prev.findIndex(i => (updatedItem.id && i.id === updatedItem.id) || (updatedItem.external_id && i.external_id === updatedItem.external_id && i.item_type === updatedItem.item_type));
+          if (matchIdx >= 0) {
+            if (prev[matchIdx].status === updatedItem.status && prev[matchIdx].completed_at === updatedItem.completed_at) {
+              return prev;
+            }
+            const next = [...prev];
+            next[matchIdx] = { ...next[matchIdx], ...updatedItem };
+            return next;
+          }
+          return [updatedItem, ...prev];
+        });
+        return; // Targeted update handled cleanly, do NOT reload entire dashboard!
+      } else {
+        const cached = getCachedShelfItems();
+        if (cached && cached.length > 0) {
+          setLibraryItems(cached as any);
+        }
+      }
       fetchDashboard(true);
     };
     const handleLanguageUpdate = () => {
@@ -2741,40 +2785,99 @@ export const Home: React.FC = () => {
 
   const handleStartConsuming = async (e: React.MouseEvent, item: any) => {
     e.stopPropagation();
-    try {
-      if (item.is_addition) {
+    if (item.is_addition) {
+      try {
         await apiClient.post(`/additions/items/additions/${item.addition_item_id}/toggle`);
-      } else if (item.item_id) {
-        await apiClient.post(`/lists/items/${item.item_id}/toggle`);
-      } else {
-        let targetStatus = 'watching';
-        if (item.item_type === 'game') targetStatus = 'playing';
-        else if (['book', 'comic', 'manga'].includes(item.item_type)) targetStatus = 'reading';
-        else targetStatus = 'watching';
-        await apiClient.put(`/library/${item.id}`, { status: targetStatus });
+        fetchDashboard(true);
+        window.dispatchEvent(new Event('library-updated'));
+      } catch (err) {
+        console.error(err);
       }
-      fetchDashboard(true);
-      window.dispatchEvent(new Event('library-updated'));
+      return;
+    }
+
+    if (item.item_id) {
+      const prevGuides = [...upNextGuides];
+      setUpNextGuides(prev => prev.filter(g => g.item_id !== item.item_id));
+      try {
+        await apiClient.post(`/lists/items/${item.item_id}/toggle`);
+        window.dispatchEvent(new Event('library-updated'));
+      } catch (err) {
+        console.error(err);
+        setUpNextGuides(prevGuides);
+      }
+      return;
+    }
+
+    let targetStatus = 'watching';
+    if (item.item_type === 'game') targetStatus = 'playing';
+    else if (['book', 'comic', 'manga'].includes(item.item_type)) targetStatus = 'reading';
+    else targetStatus = 'watching';
+
+    const prevStatus = item.status;
+    const updatedItem = { ...item, status: targetStatus };
+
+    // 1. Optimistic update (0ms latency in UI)
+    setLibraryItems(prev => prev.map(i => i.id === item.id ? { ...i, status: targetStatus } : i));
+    updateCachedShelfItem(updatedItem);
+    window.dispatchEvent(new CustomEvent('library-updated', { detail: { item: updatedItem } }));
+
+    try {
+      await updateLibraryStatusSafe(item.id, targetStatus);
     } catch (err) {
       console.error(err);
+      const rollbackItem = { ...item, status: prevStatus };
+      setLibraryItems(prev => prev.map(i => i.id === item.id ? { ...i, status: prevStatus } : i));
+      updateCachedShelfItem(rollbackItem);
+      window.dispatchEvent(new CustomEvent('library-updated', { detail: { item: rollbackItem } }));
     }
   };
 
   const handleMarkCompleted = async (e: React.MouseEvent, item: any) => {
     e.stopPropagation();
-    try {
-      if (item.is_addition) {
+    if (item.is_addition) {
+      try {
         await apiClient.post(`/additions/items/additions/${item.addition_item_id}/toggle`);
-      } else if (item.item_id) {
-        await apiClient.post(`/lists/items/${item.item_id}/toggle`);
-      } else {
-        const compStatus = ['book', 'comic', 'manga'].includes(item.item_type) ? 'read' : 'completed';
-        await apiClient.put(`/library/${item.id}`, { status: compStatus });
+        fetchDashboard(true);
+        window.dispatchEvent(new Event('library-updated'));
+      } catch (err) {
+        console.error(err);
       }
-      fetchDashboard(true);
-      window.dispatchEvent(new Event('library-updated'));
+      return;
+    }
+
+    if (item.item_id) {
+      const prevGuides = [...upNextGuides];
+      setUpNextGuides(prev => prev.filter(g => g.item_id !== item.item_id));
+      try {
+        await apiClient.post(`/lists/items/${item.item_id}/toggle`);
+        window.dispatchEvent(new Event('library-updated'));
+      } catch (err) {
+        console.error(err);
+        setUpNextGuides(prevGuides);
+      }
+      return;
+    }
+
+    const compStatus = ['book', 'comic', 'manga'].includes(item.item_type) ? 'read' : 'completed';
+    const prevStatus = item.status;
+    const prevCompletedAt = item.completed_at;
+    const updatedItem = { ...item, status: compStatus, completed_at: new Date().toISOString() };
+
+    // 1. Optimistic update (0ms latency - immediately vanishes from "Continuar"!)
+    setLibraryItems(prev => prev.map(i => i.id === item.id ? { ...i, status: compStatus, completed_at: updatedItem.completed_at } : i));
+    updateCachedShelfItem(updatedItem);
+    window.dispatchEvent(new CustomEvent('library-updated', { detail: { item: updatedItem } }));
+    window.dispatchEvent(new Event('progress-updated'));
+
+    try {
+      await updateLibraryStatusSafe(item.id, compStatus);
     } catch (err) {
       console.error(err);
+      const rollbackItem = { ...item, status: prevStatus, completed_at: prevCompletedAt };
+      setLibraryItems(prev => prev.map(i => i.id === item.id ? { ...i, status: prevStatus, completed_at: prevCompletedAt } : i));
+      updateCachedShelfItem(rollbackItem);
+      window.dispatchEvent(new CustomEvent('library-updated', { detail: { item: rollbackItem } }));
     }
   };
 
@@ -3642,7 +3745,7 @@ export const Home: React.FC = () => {
                       language={language}
                       actionIcon={targetTab === "plan_to_watch" ? "play" : "check"}
                       variant={targetTab === "plan_to_watch" ? "poster" : "episode"}
-                      onUpdate={() => fetchDashboard(true)}
+                      onUpdate={() => {}}
                       onOpenSeries={(seriesItem) => handleOpenItem(seriesItem)}
                       themeColor={`var(--color-${item.item_type})`}
                       themeTextColor={`var(--color-text-${item.item_type})`}
@@ -3656,7 +3759,7 @@ export const Home: React.FC = () => {
                       key={item.id}
                       item={item}
                       language={language}
-                      onUpdate={() => fetchDashboard(true)}
+                      onUpdate={() => {}}
                       onOpenSeries={(seriesItem) => handleOpenItem(seriesItem)}
                       themeColor={`var(--color-${item.item_type})`}
                       themeTextColor={`var(--color-text-${item.item_type})`}
@@ -3670,7 +3773,7 @@ export const Home: React.FC = () => {
                       key={item.id}
                       item={item}
                       language={language}
-                      onUpdate={() => fetchDashboard(true)}
+                      onUpdate={() => {}}
                       onOpenSeries={(seriesItem) => handleOpenItem(seriesItem)}
                       themeColor={`var(--color-${item.item_type})`}
                       themeTextColor={`var(--color-text-${item.item_type})`}
@@ -4155,8 +4258,9 @@ export const Home: React.FC = () => {
                 if (selectedItem && (selectedItem.id === updatedItem.id || selectedItem.external_id === updatedItem.external_id)) {
                   setSelectedItem((prev: any) => prev ? { ...prev, ...updatedItem } : null);
                 }
+              } else {
+                fetchDashboard(true);
               }
-              fetchDashboard(true);
             }}
             onOpenItem={(item) => handleOpenItem(item)}
             isFavorite={isFav}

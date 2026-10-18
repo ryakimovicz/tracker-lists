@@ -113,3 +113,45 @@ apiClient.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+/**
+ * Safely updates a library item's status using fetch with keepalive: true,
+ * ensuring the HTTP request survives tab unloads, modal closures, and navigation.
+ */
+export async function updateLibraryStatusSafe(
+  itemId: number | string,
+  status: string,
+  extraPayload: Record<string, any> = {}
+): Promise<any> {
+  const token = localStorage.getItem('access_token');
+  const lang = localStorage.getItem('language') || 'es';
+  const url = `${API_BASE_URL}/library/${itemId}`;
+  const payload = { status, ...extraPayload };
+
+  // Try fetch with keepalive: true first so tab unloads or background closes do not cancel the request
+  if (typeof fetch !== 'undefined') {
+    try {
+      const res = await fetch(url, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept-Language': lang,
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(payload),
+        credentials: 'include',
+        keepalive: true,
+      });
+
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch (_) {
+      // Fallback to apiClient if fetch with keepalive fails
+    }
+  }
+
+  // Fallback to standard axios client instance
+  const res = await apiClient.put(`/library/${itemId}`, payload);
+  return res.data;
+}

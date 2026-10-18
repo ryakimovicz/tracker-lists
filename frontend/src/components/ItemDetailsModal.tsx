@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
 import { getProfileTheme } from '../utils/profileThemes';
-import { apiClient } from '../api/client';
+import { apiClient, updateLibraryStatusSafe } from '../api/client';
 import { Star, Heart, X, Flag, CheckCircle, Check, CheckCheck, Plus, MoreVertical, Trash2, Clock, ChevronUp, ChevronDown, RotateCcw, BookOpen, Gamepad2, Package, Sparkles, Puzzle, Layers, ChevronLeft, ChevronRight, Calendar, RefreshCw, AlertCircle, Globe, Repeat, Trophy, ShieldAlert, Infinity as InfinityIcon, Reply, ThumbsUp, Edit2, Image as ImageIcon, Volume2, VolumeX, Play, Pause, MessageSquare, Eye, EyeOff } from 'lucide-react';
 
 
@@ -1789,10 +1789,25 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   const handleMarkCompleted = async () => {
     if (!selectedItem) return;
     const compStatus = getCompletedStatus(selectedItem.item_type);
+    const prevStatus = selectedItem.status;
+    const prevCompletedAt = selectedItem.completed_at;
+
     if (selectedItem.id) {
+      const optimisticItem = {
+        ...selectedItem,
+        status: compStatus,
+        completed_at: selectedItem.completed_at || new Date().toISOString()
+      };
+      setSelectedItem((prev: any) => prev ? optimisticItem : null);
+      updateCachedShelfItem(optimisticItem);
+      window.dispatchEvent(new CustomEvent('library-updated', { detail: { item: optimisticItem } }));
+      onUpdate && onUpdate(optimisticItem);
+
       try {
-        const res = await apiClient.put(`/library/${selectedItem.id}`, { status: compStatus });
-        setSelectedItem((prev: any) => prev ? { ...prev, status: compStatus, ...res.data } : null);
+        const res = await updateLibraryStatusSafe(selectedItem.id, compStatus);
+        const updatedItem = { ...optimisticItem, ...res };
+        setSelectedItem((prev: any) => prev ? updatedItem : null);
+        updateCachedShelfItem(updatedItem);
         
         if (user?.is_pro) {
           apiClient.get(`/library/${selectedItem.id}/consumption-history`)
@@ -1803,8 +1818,13 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
             })
             .catch(console.error);
         }
-        onUpdate && onUpdate();
       } catch (e: any) {
+        const rollbackItem = { ...selectedItem, status: prevStatus, completed_at: prevCompletedAt };
+        setSelectedItem((prev: any) => prev ? rollbackItem : null);
+        updateCachedShelfItem(rollbackItem);
+        window.dispatchEvent(new CustomEvent('library-updated', { detail: { item: rollbackItem } }));
+        onUpdate && onUpdate(rollbackItem);
+
         if (e.response?.data?.detail) {
           alert(e.response.data.detail);
         } else {
@@ -2124,12 +2144,26 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       else targetStatus = 'watching';
     }
 
+    const prevStatus = selectedItem.status;
+
     if (selectedItem.id) {
+      const optimisticItem = { ...selectedItem, status: targetStatus };
+      setSelectedItem((prev: any) => prev ? optimisticItem : null);
+      updateCachedShelfItem(optimisticItem);
+      window.dispatchEvent(new CustomEvent('library-updated', { detail: { item: optimisticItem } }));
+      onUpdate && onUpdate(optimisticItem);
+
       try {
-        await apiClient.put(`/library/${selectedItem.id}`, { status: targetStatus });
-        setSelectedItem((prev: any) => prev ? { ...prev, status: targetStatus } : null);
-        onUpdate && onUpdate();
+        const res = await updateLibraryStatusSafe(selectedItem.id, targetStatus);
+        const updatedItem = { ...optimisticItem, ...res };
+        setSelectedItem((prev: any) => prev ? updatedItem : null);
+        updateCachedShelfItem(updatedItem);
       } catch (e) {
+        const rollbackItem = { ...selectedItem, status: prevStatus };
+        setSelectedItem((prev: any) => prev ? rollbackItem : null);
+        updateCachedShelfItem(rollbackItem);
+        window.dispatchEvent(new CustomEvent('library-updated', { detail: { item: rollbackItem } }));
+        onUpdate && onUpdate(rollbackItem);
         console.error(e);
       }
     } else {
@@ -2163,21 +2197,26 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       }
     }
 
-    if (selectedItem.id) {
-      try {
-        const res = await apiClient.put(`/library/${selectedItem.id}`, { status: newStatus });
-        const updatedItem = { ...selectedItem, status: newStatus, ...res.data };
-        setSelectedItem((prev: any) => prev ? updatedItem : null);
-        
-        try {
-          const cachedLibStr = sessionStorage.getItem('pathd_lib_cache');
-          if (cachedLibStr) {
-            let cachedLib: any[] = JSON.parse(cachedLibStr);
-            cachedLib = cachedLib.map((it: any) => it.id === selectedItem.id ? { ...it, status: newStatus, ...res.data } : it);
-            sessionStorage.setItem('pathd_lib_cache', JSON.stringify(cachedLib));
-          }
-        } catch (e) {}
+    const previousStatus = selectedItem.status;
+    const previousCompletedAt = selectedItem.completed_at;
+    const optimisticCompletedAt = ['completed', 'read'].includes(newStatus) ? (selectedItem.completed_at || new Date().toISOString()) : null;
 
+    if (selectedItem.id) {
+      // 1. Instant 0ms Optimistic Update in UI, modal, caches, and listeners
+      const optimisticItem = {
+        ...selectedItem,
+        status: newStatus,
+        completed_at: optimisticCompletedAt
+      };
+      setSelectedItem((prev: any) => prev ? optimisticItem : null);
+      updateCachedShelfItem(optimisticItem);
+      window.dispatchEvent(new CustomEvent('library-updated', { detail: { item: optimisticItem } }));
+      onUpdate && onUpdate(optimisticItem);
+
+      try {
+        const res = await updateLibraryStatusSafe(selectedItem.id, newStatus);
+        const updatedItem = { ...optimisticItem, ...res };
+        setSelectedItem((prev: any) => prev ? updatedItem : null);
         updateCachedShelfItem(updatedItem);
 
         if (['completed', 'read'].includes(newStatus) && user?.is_pro) {
@@ -2190,9 +2229,18 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
             })
             .catch(console.error);
         }
-        window.dispatchEvent(new Event('library-updated'));
-        onUpdate && onUpdate(updatedItem);
       } catch (e: any) {
+        // Rollback on failure
+        const rollbackItem = {
+          ...selectedItem,
+          status: previousStatus,
+          completed_at: previousCompletedAt
+        };
+        setSelectedItem((prev: any) => prev ? rollbackItem : null);
+        updateCachedShelfItem(rollbackItem);
+        window.dispatchEvent(new CustomEvent('library-updated', { detail: { item: rollbackItem } }));
+        onUpdate && onUpdate(rollbackItem);
+
         if (e.response?.data?.detail) {
           alert(e.response.data.detail);
         } else {
@@ -2200,7 +2248,21 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
         }
       }
     } else {
-      await ensureTracked(newStatus);
+      // Untracked work: optimistically show status in modal while ensureTracked resolves
+      const optimisticItem = {
+        ...selectedItem,
+        status: newStatus,
+        completed_at: optimisticCompletedAt
+      };
+      setSelectedItem((prev: any) => prev ? optimisticItem : null);
+      try {
+        const tracked = await ensureTracked(newStatus);
+        if (!tracked) {
+          setSelectedItem((prev: any) => prev ? { ...prev, status: previousStatus } : null);
+        }
+      } catch (e) {
+        setSelectedItem((prev: any) => prev ? { ...prev, status: previousStatus } : null);
+      }
     }
   };
 
@@ -2293,12 +2355,20 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     // If game is not completed yet (e.g. playing, endless, dropped, plan_to_play, or untracked):
     // Directly complete at 100%
     if (selectedItem.id) {
+      const optimisticItem = { ...selectedItem, status: 'completed', is_hundred_percent: true, completed_at: selectedItem.completed_at || new Date().toISOString() };
+      setSelectedItem((prev: any) => prev ? optimisticItem : null);
+      updateCachedShelfItem(optimisticItem);
+      window.dispatchEvent(new CustomEvent('library-updated', { detail: { item: optimisticItem } }));
+      onUpdate && onUpdate(optimisticItem);
+
       try {
-        const res = await apiClient.put(`/library/${selectedItem.id}`, {
-          status: 'completed',
+        const res = await updateLibraryStatusSafe(selectedItem.id, 'completed', {
           is_hundred_percent: true
         });
-        setSelectedItem((prev: any) => prev ? { ...prev, status: 'completed', is_hundred_percent: true, ...res.data } : null);
+        const updatedItem = { ...optimisticItem, ...res };
+        setSelectedItem((prev: any) => prev ? updatedItem : null);
+        updateCachedShelfItem(updatedItem);
+
         if (user?.is_pro) {
           apiClient.get(`/library/${selectedItem.id}/consumption-history`)
             .then(hRes => {
@@ -2309,7 +2379,6 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
             })
             .catch(console.error);
         }
-        onUpdate && onUpdate();
       } catch (e: any) {
         console.error(e);
       }

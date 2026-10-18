@@ -17,7 +17,7 @@ export interface ShelfItemStub {
   completed_at?: string | null;
   last_seen_episode?: string | null;
   title?: string;
-  image_url?: string;
+  image_url?: string | null;
   imdb_id?: string;
   custom_badge?: string | null;
   release_date?: string | null;
