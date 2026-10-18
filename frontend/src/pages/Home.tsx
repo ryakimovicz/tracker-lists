@@ -406,7 +406,7 @@ const ScrollRow = ({
           
           <div 
             ref={scrollRef} 
-            className={`home-scroll-carousel ${isTwoRows ? 'is-expanded' : ''} ${actualItemCount === 1 ? 'has-single-item' : ''}`}
+            className={`home-scroll-carousel ${isTwoRows ? 'is-expanded' : ''} ${actualItemCount === 1 ? 'has-single-item' : ''} ${actualItemCount === 2 ? 'has-two-items' : ''} ${actualItemCount === 3 ? 'has-three-items' : ''}`}
             style={{ 
               display: isTwoRows ? "grid" : "flex",
               gridTemplateColumns: isTwoRowsByRow ? `repeat(${maxVisibleInOneRow}, max-content)` : undefined,

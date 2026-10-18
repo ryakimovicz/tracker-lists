@@ -2567,6 +2567,18 @@ h1, h2, h3, h4, h5, h6 {
     grid-template-rows: repeat(4, 70px) !important;
   }
 
+  .home-scroll-carousel.is-expanded.has-single-item {
+    grid-template-rows: repeat(1, 70px) !important;
+  }
+
+  .home-scroll-carousel.is-expanded.has-two-items {
+    grid-template-rows: repeat(2, 70px) !important;
+  }
+
+  .home-scroll-carousel.is-expanded.has-three-items {
+    grid-template-rows: repeat(3, 70px) !important;
+  }
+
   /* Hide scroll arrow buttons and touch-blocking fade overlays on mobile */
   .scroll-nav-arrow,
   .scroll-fade-zone,
