@@ -969,14 +969,19 @@ export const Profile: React.FC = () => {
 
       let indColor = 'var(--accent-primary)';
       if (hasMusic) {
-        if (mainProg < 0.5) indColor = 'var(--accent-primary)';
-        else if (mainProg < 1.5) indColor = 'var(--color-guide, #2DD4BF)';
-        else if (mainProg < 2.5) indColor = 'var(--color-music, #1DB954)';
-        else indColor = '#F472B6';
+        if (mainProg <= 1) {
+          indColor = `color-mix(in srgb, var(--color-guide, #2DD4BF) ${Math.round(mainProg * 100)}%, var(--accent-primary))`;
+        } else if (mainProg <= 2) {
+          indColor = `color-mix(in srgb, var(--color-music, #1DB954) ${Math.round((mainProg - 1) * 100)}%, var(--color-guide, #2DD4BF))`;
+        } else {
+          indColor = `color-mix(in srgb, #F472B6 ${Math.round((mainProg - 2) * 100)}%, var(--color-music, #1DB954))`;
+        }
       } else {
-        if (mainProg < 0.5) indColor = 'var(--accent-primary)';
-        else if (mainProg < 1.5) indColor = 'var(--color-guide, #2DD4BF)';
-        else indColor = '#F472B6';
+        if (mainProg <= 1) {
+          indColor = `color-mix(in srgb, var(--color-guide, #2DD4BF) ${Math.round(mainProg * 100)}%, var(--accent-primary))`;
+        } else {
+          indColor = `color-mix(in srgb, #F472B6 ${Math.round((mainProg - 1) * 100)}%, var(--color-guide, #2DD4BF))`;
+        }
       }
       profileTabsNavRef.current.style.setProperty('--profile-indicator-color', indColor);
     }
@@ -5046,40 +5051,51 @@ export const Profile: React.FC = () => {
                     '--tab-act': isActive ? '1' : '0'
                   } as React.CSSProperties}
                 >
-                  {tab.id === 'shelf' ? (
-                    isActive ? (
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                        <rect x="3" y="3" width="4.5" height="4.5" rx="1" />
-                        <rect x="9.75" y="3" width="4.5" height="4.5" rx="1" />
-                        <rect x="16.5" y="3" width="4.5" height="4.5" rx="1" />
-                        <rect x="3" y="9.75" width="4.5" height="4.5" rx="1" />
-                        <rect x="9.75" y="9.75" width="4.5" height="4.5" rx="1" />
-                        <rect x="16.5" y="9.75" width="4.5" height="4.5" rx="1" />
-                        <rect x="3" y="16.5" width="4.5" height="4.5" rx="1" />
-                        <rect x="9.75" y="16.5" width="4.5" height="4.5" rx="1" />
-                        <rect x="16.5" y="16.5" width="4.5" height="4.5" rx="1" />
+                  <span
+                    className="profile-tab-icon"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: isActive ? tab.color : 'inherit',
+                      transition: 'color 0.2s ease'
+                    }}
+                  >
+                    {tab.id === 'shelf' ? (
+                      isActive ? (
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                          <rect x="3" y="3" width="4.5" height="4.5" rx="1" />
+                          <rect x="9.75" y="3" width="4.5" height="4.5" rx="1" />
+                          <rect x="16.5" y="3" width="4.5" height="4.5" rx="1" />
+                          <rect x="3" y="9.75" width="4.5" height="4.5" rx="1" />
+                          <rect x="9.75" y="9.75" width="4.5" height="4.5" rx="1" />
+                          <rect x="16.5" y="9.75" width="4.5" height="4.5" rx="1" />
+                          <rect x="3" y="16.5" width="4.5" height="4.5" rx="1" />
+                          <rect x="9.75" y="16.5" width="4.5" height="4.5" rx="1" />
+                          <rect x="16.5" y="16.5" width="4.5" height="4.5" rx="1" />
+                        </svg>
+                      ) : (
+                        <Grid size={18} strokeWidth={1.8} />
+                      )
+                    ) : tab.id === 'guides' ? (
+                      isActive ? (
+                        <svg width="18" height="18" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M2 3h6a4 4 0 0 1 4 4v14.5a3 3 0 0 0-3-3.5H2zm20 0h-6a4 4 0 0 0-4 4v14.5a3 3 0 0 1 3-3.5h7z" fill="currentColor" stroke="currentColor" strokeWidth="1.2" />
+                          <line x1="12" y1="7" x2="12" y2="18.5" stroke="var(--bg-primary, #090d16)" strokeWidth="1.6" />
+                        </svg>
+                      ) : (
+                        <BookOpen size={18} strokeWidth={1.8} />
+                      )
+                    ) : tab.id === 'music' ? (
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={isActive ? 2.2 : 1.8} strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M9 18V5l12-2v13" />
+                        <circle cx="6" cy="18" r="3" fill={isActive ? 'currentColor' : 'none'} />
+                        <circle cx="18" cy="16" r="3" fill={isActive ? 'currentColor' : 'none'} />
                       </svg>
                     ) : (
-                      <Grid size={18} strokeWidth={1.8} />
-                    )
-                  ) : tab.id === 'guides' ? (
-                    isActive ? (
-                      <svg width="18" height="18" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M2 3h6a4 4 0 0 1 4 4v14.5a3 3 0 0 0-3-3.5H2zm20 0h-6a4 4 0 0 0-4 4v14.5a3 3 0 0 1 3-3.5h7z" fill="currentColor" stroke="currentColor" strokeWidth="1.2" />
-                        <line x1="12" y1="7" x2="12" y2="18.5" stroke="var(--bg-primary, #090d16)" strokeWidth="1.6" />
-                      </svg>
-                    ) : (
-                      <BookOpen size={18} strokeWidth={1.8} />
-                    )
-                  ) : tab.id === 'music' ? (
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={isActive ? 2.2 : 1.8} strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M9 18V5l12-2v13" />
-                      <circle cx="6" cy="18" r="3" fill={isActive ? 'currentColor' : 'none'} />
-                      <circle cx="18" cy="16" r="3" fill={isActive ? 'currentColor' : 'none'} />
-                    </svg>
-                  ) : (
-                    <Heart size={18} fill={isActive ? 'currentColor' : 'none'} strokeWidth={isActive ? 2 : 1.8} />
-                  )}
+                      <Heart size={18} fill={isActive ? 'currentColor' : 'none'} strokeWidth={isActive ? 2 : 1.8} />
+                    )}
+                  </span>
                   <span className="profile-tab-label">{tab.label}</span>
                   {isActive && (
                     <div className="profile-tab-indicator home-desktop-only" style={{ position: 'absolute', bottom: '-0.75rem', left: 0, right: 0, height: '2px', background: tab.color }} />

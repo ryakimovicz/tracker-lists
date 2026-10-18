@@ -523,8 +523,15 @@ h1, h2, h3, h4, h5, h6 {
   .profile-tab-btn svg {
     width: 20px !important;
     height: 20px !important;
+    color: inherit !important;
     transform: translateY(calc(var(--tab-act, 0) * -5px)) !important;
     transition: none !important;
+  }
+
+  .profile-tab-btn.active,
+  .profile-tab-btn.active .profile-tab-icon,
+  .profile-tab-btn.active svg {
+    color: var(--tab-color, var(--accent-primary)) !important;
   }
 
   /* Shelf Media Category Filters on Mobile */
@@ -926,8 +933,31 @@ h1, h2, h3, h4, h5, h6 {
 .profile-tab-btn {
   background: transparent !important;
   border: none !important;
-  color: var(--text-secondary) !important;
+  color: var(--text-secondary);
   cursor: pointer;
+}
+
+.profile-tab-btn.active,
+.profile-tab-btn.active .profile-tab-icon,
+.profile-tab-btn.active svg {
+  color: var(--tab-color, var(--accent-primary)) !important;
+}
+
+/* Explore Subtabs Styling */
+.explore-subtab-item {
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.explore-subtab-item:hover {
+  color: var(--tab-color, var(--accent-primary));
+}
+
+.explore-subtab-item.active,
+.explore-subtab-item.active .explore-subtab-icon,
+.explore-subtab-item.active svg {
+  color: var(--tab-color, var(--accent-primary)) !important;
 }
 
 @media (min-width: 769px) {
@@ -1924,7 +1954,7 @@ h1, h2, h3, h4, h5, h6 {
     content: '' !important;
     width: 65% !important;
     height: 100% !important;
-    background: var(--accent-primary) !important;
+    background: var(--explore-indicator-color, var(--accent-primary)) !important;
     border-radius: 9999px !important;
   }
 
@@ -2033,6 +2063,38 @@ h1, h2, h3, h4, h5, h6 {
   .explore-subtab-item.active .explore-subtab-indicator,
   .profile-tab-btn.active .profile-tab-indicator {
     display: none !important;
+  }
+
+  /* Hardware-accelerated smooth gliding transitions when switching tabs */
+  .home-tabs-sliding-indicator,
+  .social-tabs-sliding-indicator,
+  .explore-subtabs-sliding-indicator,
+  .profile-tabs-sliding-indicator,
+  .profile-guides-tab-sliding-indicator,
+  .profile-music-tab-sliding-indicator,
+  .upcoming-tab-sliding-indicator {
+    transition: transform 0.28s cubic-bezier(0.25, 1, 0.5, 1) !important;
+  }
+
+  /* Instant 1:1 real-time drag tracking when finger touches the screen */
+  body.is-swipe-dragging .home-tabs-sliding-indicator,
+  body.is-swipe-dragging .social-tabs-sliding-indicator,
+  body.is-swipe-dragging .explore-subtabs-sliding-indicator,
+  body.is-swipe-dragging .profile-tabs-sliding-indicator,
+  body.is-swipe-dragging .profile-guides-tab-sliding-indicator,
+  body.is-swipe-dragging .profile-music-tab-sliding-indicator,
+  body.is-swipe-dragging .upcoming-tab-sliding-indicator {
+    transition: none !important;
+  }
+
+  .home-tabs-sliding-indicator::after,
+  .social-tabs-sliding-indicator::after,
+  .explore-subtabs-sliding-indicator::after,
+  .profile-tabs-sliding-indicator::after,
+  .profile-guides-tab-sliding-indicator::after,
+  .profile-music-tab-sliding-indicator::after,
+  .upcoming-tab-sliding-indicator::after {
+    transition: background 0.25s ease !important;
   }
 
   /* -------------------------------------------------------------------------

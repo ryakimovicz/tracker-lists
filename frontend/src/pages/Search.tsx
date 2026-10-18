@@ -720,6 +720,14 @@ export const Search: React.FC = () => {
     const clamped = Math.min(2, Math.max(0, progress));
     if (exploreSubtabsContainerRef.current) {
       exploreSubtabsContainerRef.current.style.setProperty('--tab-progress', clamped.toFixed(4));
+
+      let indColor = 'var(--accent-primary)';
+      if (clamped <= 1) {
+        indColor = `color-mix(in srgb, #f97316 ${Math.round(clamped * 100)}%, var(--accent-primary))`;
+      } else {
+        indColor = `color-mix(in srgb, var(--color-guide, #2DD4BF) ${Math.round((clamped - 1) * 100)}%, #f97316)`;
+      }
+      exploreSubtabsContainerRef.current.style.setProperty('--explore-indicator-color', indColor);
     }
     subtabItemRefs.current.forEach((el, i) => {
       if (!el) return;
@@ -1616,7 +1624,12 @@ export const Search: React.FC = () => {
               paddingBottom: "0.75rem",
               paddingTop: "0.25rem",
               position: "relative",
-              '--tab-progress': String(currentExploreStep)
+              '--tab-progress': String(currentExploreStep),
+              '--explore-indicator-color': (
+                currentExploreStep === 1 ? '#f97316' :
+                currentExploreStep === 2 ? 'var(--color-guide, #2DD4BF)' :
+                'var(--accent-primary)'
+              )
             } as React.CSSProperties}
           >
               <button 

@@ -27,6 +27,7 @@ export const SwipeViewPager: React.FC<SwipeViewPagerProps> = ({
   const touchStartYRef = useRef<number>(0);
   const hasResetScrollForSwipeRef = useRef<boolean>(false);
   const lastSwipedIndexRef = useRef<number | null>(null);
+  const isDraggingRef = useRef(false);
   const [isDragging, setIsDragging] = useState(false);
   const [isScrolling, setIsScrolling] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
@@ -41,7 +42,12 @@ export const SwipeViewPager: React.FC<SwipeViewPagerProps> = ({
       setIsMobile(window.innerWidth <= 768);
     };
     window.addEventListener('resize', handleResize, { passive: true });
-    return () => window.removeEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      if (typeof document !== 'undefined') {
+        document.body.classList.remove('is-swipe-dragging');
+      }
+    };
   }, []);
 
   const currentIndexRef = useRef(currentIndex);
@@ -72,13 +78,15 @@ export const SwipeViewPager: React.FC<SwipeViewPagerProps> = ({
     if (Math.abs(el.scrollLeft - targetLeft) > 5) {
       isProgrammaticScrollRef.current = true;
       setIsAnimating(true);
+      el.style.scrollSnapType = 'none';
       el.scrollTo({ left: targetLeft, behavior: 'smooth' });
 
       if (programmaticTimeoutRef.current) clearTimeout(programmaticTimeoutRef.current);
       programmaticTimeoutRef.current = setTimeout(() => {
+        if (el) el.style.scrollSnapType = 'x mandatory';
         isProgrammaticScrollRef.current = false;
         setIsAnimating(false);
-      }, 380);
+      }, 350);
     }
   }, [currentIndex, isMobile]);
 
@@ -111,7 +119,9 @@ export const SwipeViewPager: React.FC<SwipeViewPagerProps> = ({
     const width = el.clientWidth;
     if (width <= 0) return;
 
-    // When the user or animation starts sliding away from the current tab on mobile,
+    if (isProgrammaticScrollRef.current) return;
+
+    // When the user starts sliding away from the current tab on mobile,
     // ensure each tab starts from the top by resetting window scroll position immediately
     const isMovingAway = Math.abs(el.scrollLeft - currentIndexRef.current * width) > 4;
     if (isMovingAway && !hasResetScrollForSwipeRef.current) {
@@ -126,15 +136,13 @@ export const SwipeViewPager: React.FC<SwipeViewPagerProps> = ({
       onScrollProgress(currentProgress);
     }
 
-    if (isProgrammaticScrollRef.current) return;
-
     setIsScrolling(true);
 
     const nearest = Math.round(currentProgress);
     if (nearest >= 0 && nearest < totalSlides) {
       setTargetIndex(nearest);
-      // If the scroll has snapped very close to a slide, notify parent early so indicators update in sync
-      if (Math.abs(el.scrollLeft - nearest * width) <= 15) {
+      // Only notify parent early if user is not dragging actively with finger
+      if (!isDraggingRef.current && Math.abs(el.scrollLeft - nearest * width) <= 5) {
         if (nearest !== currentIndexRef.current) {
           lastSwipedIndexRef.current = nearest;
           onSlideChange(nearest);
@@ -163,7 +171,11 @@ export const SwipeViewPager: React.FC<SwipeViewPagerProps> = ({
   }, [isMobile, totalSlides, onSlideChange, onScrollProgress]);
 
   const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    isDraggingRef.current = true;
     setIsDragging(true);
+    if (typeof document !== 'undefined') {
+      document.body.classList.add('is-swipe-dragging');
+    }
     hasResetScrollForSwipeRef.current = false;
     touchStartXRef.current = e.touches[0].clientX;
     touchStartYRef.current = e.touches[0].clientY;
@@ -189,7 +201,11 @@ export const SwipeViewPager: React.FC<SwipeViewPagerProps> = ({
   };
 
   const handleTouchEnd = () => {
+    isDraggingRef.current = false;
     setIsDragging(false);
+    if (typeof document !== 'undefined') {
+      document.body.classList.remove('is-swipe-dragging');
+    }
     hasResetScrollForSwipeRef.current = false;
     if (containerRef.current) {
       containerRef.current.style.overflowX = 'auto';
