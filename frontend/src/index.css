@@ -3385,10 +3385,14 @@ h1, h2, h3, h4, h5, h6 {
     -webkit-user-select: none !important;
   }
 
-  /* Item details, Activity post & Media picker (?modal=media) modals on mobile: stay between top header (56px) and bottom nav (60px) */
+  /* Item details, Activity post, Media picker (?modal=media) & Customize modals (?modal=avatar, ?modal=banner, ?modal=background) on mobile: stay between top header (56px) and bottom nav (60px) */
   .item-details-modal-overlay,
   .activity-modal-overlay,
-  .klipy-modal-overlay {
+  .klipy-modal-overlay,
+  .customize-selector-modal-overlay,
+  .avatar-selector-modal-overlay,
+  .banner-selector-modal-overlay,
+  .background-selector-modal-overlay {
     position: fixed !important;
     top: calc(56px + env(safe-area-inset-top, 0px)) !important;
     bottom: calc(60px + env(safe-area-inset-bottom, 0px)) !important;
@@ -3436,12 +3440,141 @@ h1, h2, h3, h4, h5, h6 {
     overflow-y: auto !important;
   }
 
+  /* Customize Selector Modals (Avatar, Banner, Background) Layout on Mobile:
+     Occupies full space between top header and bottom nav with clean internal margins (padding) */
+  .customize-selector-modal-card,
+  .avatar-selector-modal-card,
+  .banner-selector-modal-card,
+  .background-selector-modal-card,
+  .customize-selector-modal-overlay > .glass-card,
+  .customize-selector-modal-overlay > .customize-selector-modal-card,
+  .avatar-selector-modal-overlay > .glass-card,
+  .avatar-selector-modal-overlay > .avatar-selector-modal-card,
+  .banner-selector-modal-overlay > .glass-card,
+  .banner-selector-modal-overlay > .banner-selector-modal-card,
+  .background-selector-modal-overlay > .glass-card,
+  .background-selector-modal-overlay > .background-selector-modal-card {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100vw !important;
+    max-width: 100vw !important;
+    min-width: 100vw !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    border-radius: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+    padding: 1rem !important;
+    gap: 0.75rem !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
+    background: var(--bg-primary) !important;
+  }
+
+  .customize-modal-header {
+    flex-shrink: 0 !important;
+  }
+
+  .customize-modal-header h2 {
+    font-size: 1.15rem !important;
+  }
+
+  .customize-modal-header span,
+  .customize-modal-header p {
+    font-size: 0.75rem !important;
+  }
+
+  .customize-modal-search {
+    flex-shrink: 0 !important;
+    margin: 0 !important;
+  }
+
+  .customize-modal-search input {
+    height: 38px !important;
+    font-size: 0.85rem !important;
+  }
+
+  .customize-modal-categories {
+    flex-shrink: 0 !important;
+    gap: 0.35rem !important;
+  }
+
+  .customize-modal-categories button {
+    padding: 0.25rem 0.55rem !important;
+    font-size: 0.74rem !important;
+  }
+
+  /* Compact Previews on Mobile for Banner & Background */
+  .banner-preview-box {
+    flex-shrink: 0 !important;
+    height: 100px !important;
+    min-height: 100px !important;
+    padding: 0.65rem 0.85rem !important;
+    border-radius: 12px !important;
+    gap: 0.75rem !important;
+  }
+
+  .banner-preview-box .banner-preview-avatar {
+    width: 44px !important;
+    height: 44px !important;
+    font-size: 1.1rem !important;
+  }
+
+  .background-preview-box {
+    flex-shrink: 0 !important;
+    height: 95px !important;
+    min-height: 95px !important;
+    padding: 0.5rem !important;
+    border-radius: 12px !important;
+  }
+
+  .background-preview-box .background-preview-card {
+    padding: 0.4rem 0.75rem !important;
+    gap: 0.65rem !important;
+    border-radius: 8px !important;
+  }
+
+  .background-preview-box .background-preview-avatar {
+    width: 36px !important;
+    height: 36px !important;
+    font-size: 0.9rem !important;
+  }
+
+  /* Results Grid: Takes all remaining space and scrolls smoothly */
+  .customize-modal-results-grid {
+    flex: 1 !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    gap: 0.65rem !important;
+    padding: 0.25rem 0.15rem !important;
+  }
+
+  /* Footer Actions: Fixed at bottom of modal card */
+  .customize-modal-footer {
+    flex-shrink: 0 !important;
+    padding-top: 0.85rem !important;
+    border-top: 1px solid var(--border-color) !important;
+    gap: 0.5rem !important;
+  }
+
+  .customize-modal-footer button {
+    padding: 0.45rem 0.85rem !important;
+    font-size: 0.82rem !important;
+  }
+
   /* Fullscreen mobile modals for other overlay types without side margins or rounded corners */
   .content-modal-overlay,
-  div[style*="zIndex: 2000"]:not(.item-details-modal-overlay):not(.music-details-modal-overlay):not(.activity-modal-overlay):not(.klipy-modal-overlay):not(.notification-flyout-panel):not(.pro-modal-overlay):not(.progress-picker-modal-overlay),
-  div[style*="z-index: 2000"]:not(.item-details-modal-overlay):not(.music-details-modal-overlay):not(.activity-modal-overlay):not(.klipy-modal-overlay):not(.notification-flyout-panel):not(.pro-modal-overlay):not(.progress-picker-modal-overlay),
-  div[style*="zIndex: 9999"]:not(.item-details-modal-overlay):not(.music-details-modal-overlay):not(.activity-modal-overlay):not(.klipy-modal-overlay):not(.notification-flyout-panel):not(.pro-modal-overlay):not(.progress-picker-modal-overlay),
-  div[style*="z-index: 9999"]:not(.item-details-modal-overlay):not(.music-details-modal-overlay):not(.activity-modal-overlay):not(.klipy-modal-overlay):not(.notification-flyout-panel):not(.pro-modal-overlay):not(.progress-picker-modal-overlay),
+  div[style*="zIndex: 2000"]:not(.item-details-modal-overlay):not(.music-details-modal-overlay):not(.activity-modal-overlay):not(.klipy-modal-overlay):not(.notification-flyout-panel):not(.pro-modal-overlay):not(.progress-picker-modal-overlay):not(.customize-selector-modal-overlay):not(.avatar-selector-modal-overlay):not(.banner-selector-modal-overlay):not(.background-selector-modal-overlay),
+  div[style*="z-index: 2000"]:not(.item-details-modal-overlay):not(.music-details-modal-overlay):not(.activity-modal-overlay):not(.klipy-modal-overlay):not(.notification-flyout-panel):not(.pro-modal-overlay):not(.progress-picker-modal-overlay):not(.customize-selector-modal-overlay):not(.avatar-selector-modal-overlay):not(.banner-selector-modal-overlay):not(.background-selector-modal-overlay),
+  div[style*="zIndex: 9999"]:not(.item-details-modal-overlay):not(.music-details-modal-overlay):not(.activity-modal-overlay):not(.klipy-modal-overlay):not(.notification-flyout-panel):not(.pro-modal-overlay):not(.progress-picker-modal-overlay):not(.customize-selector-modal-overlay):not(.avatar-selector-modal-overlay):not(.banner-selector-modal-overlay):not(.background-selector-modal-overlay),
+  div[style*="z-index: 9999"]:not(.item-details-modal-overlay):not(.music-details-modal-overlay):not(.activity-modal-overlay):not(.klipy-modal-overlay):not(.notification-flyout-panel):not(.pro-modal-overlay):not(.progress-picker-modal-overlay):not(.customize-selector-modal-overlay):not(.avatar-selector-modal-overlay):not(.banner-selector-modal-overlay):not(.background-selector-modal-overlay),
   div[style*="zIndex: 10000"]:not(.activity-modal-overlay):not(.klipy-modal-overlay):not(.notification-flyout-panel):not(.pro-modal-overlay):not(.progress-picker-modal-overlay),
   div[style*="z-index: 10000"]:not(.activity-modal-overlay):not(.klipy-modal-overlay):not(.notification-flyout-panel):not(.pro-modal-overlay):not(.progress-picker-modal-overlay) {
     position: fixed !important;

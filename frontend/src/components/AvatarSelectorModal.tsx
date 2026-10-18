@@ -185,6 +185,7 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
         }
         isBackdropMouseDownRef.current = false;
       }}
+      className="avatar-selector-modal-overlay customize-selector-modal-overlay"
       style={{
         position: 'fixed',
         top: 0,
@@ -194,7 +195,7 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
         background: 'var(--modal-backdrop-bg, rgba(0, 0, 0, 0.75))',
         backdropFilter: 'blur(var(--modal-backdrop-blur, 6px))',
         WebkitBackdropFilter: 'blur(var(--modal-backdrop-blur, 6px))',
-        zIndex: 5000,
+        zIndex: 2000,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -203,7 +204,7 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="glass-card"
+        className="glass-card avatar-selector-modal-card customize-selector-modal-card"
         style={{
           width: '100%',
           maxWidth: '640px',
@@ -219,7 +220,7 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
       >
 
         {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="customize-modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
             <div
               style={{
@@ -261,7 +262,7 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
         </div>
 
         {/* Search Input & Submit Button */}
-        <form onSubmit={handleSearchSubmit} style={{ display: 'flex', gap: '0.75rem', width: '100%' }}>
+        <form className="customize-modal-search" onSubmit={handleSearchSubmit} style={{ display: 'flex', gap: '0.75rem', width: '100%' }}>
           <div style={{ position: 'relative', flex: 1 }}>
             <input
               type="search"
@@ -358,7 +359,7 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
           const allCategories = ['all', ...ordered, 'music'] as const;
 
           return (
-            <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap', alignItems: 'center' }}>
+            <div className="customize-modal-categories" style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap', alignItems: 'center' }}>
               {allCategories.map(cat => {
                 const isSelected = selectedCategory === cat;
                 const catColor = cat === 'all' ? 'var(--accent-primary)' : `var(--color-${cat})`;
@@ -426,8 +427,10 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
 
         {/* Characters Grid / Loading State */}
         <div
+          className="customize-modal-results-grid avatar-results-grid"
           style={{
             flex: 1,
+            minHeight: 0,
             overflowY: 'auto',
             display: isLoading ? 'flex' : 'grid',
             justifyContent: isLoading ? 'center' : undefined,
@@ -633,6 +636,7 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
 
         {/* Footer Actions */}
         <div
+          className="customize-modal-footer"
           style={{
             display: 'flex',
             justifyContent: 'space-between',

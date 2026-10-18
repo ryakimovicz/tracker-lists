@@ -181,13 +181,14 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
         }
         isBackdropMouseDownRef.current = false;
       }}
+      className="banner-selector-modal-overlay customize-selector-modal-overlay"
       style={{
         position: 'fixed',
         inset: 0,
         backgroundColor: 'var(--modal-backdrop-bg, rgba(0, 0, 0, 0.75))',
         backdropFilter: 'blur(var(--modal-backdrop-blur, 6px))',
         WebkitBackdropFilter: 'blur(var(--modal-backdrop-blur, 6px))',
-        zIndex: 9999,
+        zIndex: 2000,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -196,7 +197,7 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="glass-card"
+        className="glass-card banner-selector-modal-card customize-selector-modal-card"
         style={{
           width: '100%',
           maxWidth: '720px',
@@ -214,7 +215,7 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
       >
 
         {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="customize-modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <div
               style={{
@@ -267,6 +268,7 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
 
         {/* Live Preview of Selected Banner (Matches Profile Header 1:1) */}
         <div
+          className="banner-preview-box customize-modal-preview"
           style={{
             position: 'relative',
             width: '100%',
@@ -319,6 +321,7 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
               <img
                 src={user.photo_url}
                 alt={user.username}
+                className="banner-preview-avatar"
                 style={{
                   width: 68,
                   height: 68,
@@ -330,6 +333,7 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
               />
             ) : (
               <div
+                className="banner-preview-avatar"
                 style={{
                   width: 68,
                   height: 68,
@@ -381,7 +385,7 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
 
 
         {/* Search Input & Submit Button */}
-        <form onSubmit={handleSearchSubmit} style={{ display: 'flex', gap: '0.75rem', width: '100%' }}>
+        <form className="customize-modal-search" onSubmit={handleSearchSubmit} style={{ display: 'flex', gap: '0.75rem', width: '100%' }}>
           <div style={{ position: 'relative', flex: 1 }}>
             <input
               type="search"
@@ -478,7 +482,7 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
           const allCategories = ['all', ...ordered, 'music'] as const;
 
           return (
-            <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap', alignItems: 'center' }}>
+            <div className="customize-modal-categories" style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap', alignItems: 'center' }}>
               {allCategories.map(cat => {
                 const isSelected = selectedCategory === cat;
                 const catColor = cat === 'all' ? '#f59e0b' : `var(--color-${cat})`;
@@ -546,8 +550,10 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
 
         {/* Banners Grid / Loading State */}
         <div
+          className="customize-modal-results-grid banner-results-grid"
           style={{
             flex: 1,
+            minHeight: 0,
             overflowY: 'auto',
             display: isLoading ? 'flex' : 'grid',
             justifyContent: isLoading ? 'center' : undefined,
@@ -737,6 +743,7 @@ export const BannerSelectorModal: React.FC<BannerSelectorModalProps> = ({
 
         {/* Footer Actions */}
         <div
+          className="customize-modal-footer"
           style={{
             display: 'flex',
             justifyContent: 'space-between',
