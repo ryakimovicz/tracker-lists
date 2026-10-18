@@ -2135,11 +2135,32 @@ export const Home: React.FC = () => {
     ? (currentTabParam as HomeTab)
     : "watching";
 
+  const [activeHomeTab, setActiveHomeTab] = useState<HomeTab>(activeTab);
+  const isGuidesTabRef = useRef(activeHomeTab === 'guides');
+  isGuidesTabRef.current = activeHomeTab === 'guides';
+
+  useEffect(() => {
+    setActiveHomeTab(activeTab);
+    isGuidesTabRef.current = activeTab === 'guides';
+  }, [activeTab]);
+
   const handleTabChange = (tab: HomeTab) => {
+    isGuidesTabRef.current = tab === 'guides';
+    setActiveHomeTab(tab);
+
+    if (tab === 'guides') {
+      showFiltersRef.current = false;
+      setShowFiltersOnScroll(false);
+    } else {
+      showFiltersRef.current = true;
+      setShowFiltersOnScroll(true);
+    }
+
     if (typeof window !== 'undefined') {
       window.scrollTo({ top: 0, behavior: 'instant' });
       lastScrollYRef.current = 0;
       scrollAccumulatorRef.current = 0;
+      lastToggleTimeRef.current = Date.now();
     }
     const newParams = new URLSearchParams(searchParams);
     if (tab === "watching") {
@@ -2151,8 +2172,6 @@ export const Home: React.FC = () => {
       newParams.delete('view');
     }
     setSearchParams(newParams);
-    showFiltersRef.current = true;
-    setShowFiltersOnScroll(true);
   };
   
   const [libraryItems, setLibraryItems] = useState<any[]>(() => {
@@ -2274,6 +2293,7 @@ export const Home: React.FC = () => {
     let ticking = false;
     
     const handleScroll = () => {
+      if (isGuidesTabRef.current) return;
       if (window.innerWidth > 768) {
         if (!showFiltersRef.current) {
           showFiltersRef.current = true;
@@ -2364,10 +2384,32 @@ export const Home: React.FC = () => {
   };
 
   const goToHomeStep = (step: number) => {
+    const stepToTab: Record<number, HomeTab> = {
+      0: 'watching',
+      1: 'guides',
+      2: 'plan_to_watch',
+      3: 'completed',
+      4: 'dropped',
+      5: 'upcoming',
+      6: 'upcoming'
+    };
+    const nextTab = stepToTab[step] || 'watching';
+    isGuidesTabRef.current = nextTab === 'guides';
+    setActiveHomeTab(nextTab);
+
+    if (nextTab === 'guides') {
+      showFiltersRef.current = false;
+      setShowFiltersOnScroll(false);
+    } else {
+      showFiltersRef.current = true;
+      setShowFiltersOnScroll(true);
+    }
+
     if (typeof window !== 'undefined') {
       window.scrollTo({ top: 0, behavior: 'instant' });
       lastScrollYRef.current = 0;
       scrollAccumulatorRef.current = 0;
+      lastToggleTimeRef.current = Date.now();
     }
     const newParams = new URLSearchParams(searchParams);
     if (step === 0) {
@@ -2393,8 +2435,6 @@ export const Home: React.FC = () => {
       newParams.set('view', 'tba');
     }
     setSearchParams(newParams);
-    showFiltersRef.current = true;
-    setShowFiltersOnScroll(true);
   };
 
   const currentHomeStep = getCurrentHomeStep();
@@ -2411,6 +2451,7 @@ export const Home: React.FC = () => {
 
   // Real-time gesture tracking refs & handler for smooth mobile tab morphing
   const homeTabsContainerRef = useRef<HTMLDivElement>(null);
+  const homeCategoryFiltersRef = useRef<HTMLDivElement>(null);
   const upcomingTabsContainerRef = useRef<HTMLDivElement>(null);
   const tabItemRefs = useRef<(HTMLDivElement | null)[]>([]);
   const subtabBtnRefs = useRef<(HTMLButtonElement | null)[]>([]);
@@ -4025,7 +4066,7 @@ export const Home: React.FC = () => {
               "dropped": <XCircle size={18} />,
               "upcoming": <Calendar size={18} />
             };
-            const isActive = activeTab === tab;
+            const isActive = activeHomeTab === tab;
             return (
               <div 
                 key={tab}
@@ -4053,7 +4094,10 @@ export const Home: React.FC = () => {
         </div>
 
         {/* Category Filters Bar (Todos + 7 Categorías) - Positioned right below tabs */}
-        <div className={`home-category-filters-container ${activeTab !== 'guides' && showFiltersOnScroll ? 'show' : 'hide'}`}>
+        <div 
+          ref={homeCategoryFiltersRef}
+          className={`home-category-filters-container ${activeHomeTab === 'guides' ? 'guides-hidden' : (showFiltersOnScroll ? 'show' : 'hide')}`}
+        >
           <div className="home-category-filters-container-inner">
             {sortFilterTabs([
               { value: 'all', label: language === 'es' ? 'Todo' : 'All' },

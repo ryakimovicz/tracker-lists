@@ -25,7 +25,9 @@ export const SwipeViewPager: React.FC<SwipeViewPagerProps> = ({
   const scrollTimeoutRef = useRef<any>(null);
   const touchStartXRef = useRef<number>(0);
   const touchStartYRef = useRef<number>(0);
-  const hasResetScrollForSwipeRef = useRef<boolean>(false);
+  const isHorizontalSwipeRef = useRef<boolean>(false);
+  const swipeScrollYRef = useRef<number>(0);
+  const [swipeScrollY, setSwipeScrollY] = useState<number>(0);
   const lastSwipedIndexRef = useRef<number | null>(null);
   const isDraggingRef = useRef(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -57,6 +59,33 @@ export const SwipeViewPager: React.FC<SwipeViewPagerProps> = ({
   useEffect(() => {
     setTargetIndex(currentIndex);
   }, [currentIndex]);
+
+  // Settle slide change once the new slide has actually been reached
+  const settleSlideChange = useCallback((newIndex: number) => {
+    if (newIndex === currentIndexRef.current) return;
+    if (lastSwipedIndexRef.current === newIndex) return;
+    lastSwipedIndexRef.current = newIndex;
+
+    const hadScroll = swipeScrollYRef.current > 0;
+    swipeScrollYRef.current = 0;
+    setSwipeScrollY(0);
+    isHorizontalSwipeRef.current = false;
+
+    // Notify slide change FIRST so parent updates tab state before window.scrollTo
+    onSlideChange(newIndex);
+
+    if (hadScroll && typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    }
+  }, [onSlideChange]);
+
+  const cancelSwipeScroll = useCallback(() => {
+    if (swipeScrollYRef.current > 0 || isHorizontalSwipeRef.current) {
+      swipeScrollYRef.current = 0;
+      setSwipeScrollY(0);
+      isHorizontalSwipeRef.current = false;
+    }
+  }, []);
 
   // Sync scrollLeft when currentIndex prop changes programmatically
   useEffect(() => {
@@ -122,12 +151,14 @@ export const SwipeViewPager: React.FC<SwipeViewPagerProps> = ({
     if (isProgrammaticScrollRef.current) return;
 
     // When the user starts sliding away from the current tab on mobile,
-    // ensure each tab starts from the top by resetting window scroll position immediately
+    // capture the current scroll offset so incoming tabs appear starting from the top
     const isMovingAway = Math.abs(el.scrollLeft - currentIndexRef.current * width) > 4;
-    if (isMovingAway && !hasResetScrollForSwipeRef.current) {
-      hasResetScrollForSwipeRef.current = true;
-      if (typeof window !== 'undefined' && window.scrollY > 0) {
-        window.scrollTo({ top: 0, behavior: 'instant' });
+    if (isMovingAway && !isHorizontalSwipeRef.current) {
+      isHorizontalSwipeRef.current = true;
+      const currentScrollY = typeof window !== 'undefined' ? window.scrollY : 0;
+      if (currentScrollY > 0) {
+        swipeScrollYRef.current = currentScrollY;
+        setSwipeScrollY(currentScrollY);
       }
     }
 
@@ -141,11 +172,12 @@ export const SwipeViewPager: React.FC<SwipeViewPagerProps> = ({
     const nearest = Math.round(currentProgress);
     if (nearest >= 0 && nearest < totalSlides) {
       setTargetIndex(nearest);
-      // Only notify parent early if user is not dragging actively with finger
+      // Only notify parent when slide has fully settled and user is not actively dragging
       if (!isDraggingRef.current && Math.abs(el.scrollLeft - nearest * width) <= 5) {
         if (nearest !== currentIndexRef.current) {
-          lastSwipedIndexRef.current = nearest;
-          onSlideChange(nearest);
+          settleSlideChange(nearest);
+        } else {
+          cancelSwipeScroll();
         }
       }
     }
@@ -155,6 +187,7 @@ export const SwipeViewPager: React.FC<SwipeViewPagerProps> = ({
       setIsScrolling(false);
       if (!containerRef.current) return;
       if (isProgrammaticScrollRef.current) return;
+      if (isDraggingRef.current) return;
 
       const finalWidth = containerRef.current.clientWidth;
       if (finalWidth <= 0) return;
@@ -163,20 +196,18 @@ export const SwipeViewPager: React.FC<SwipeViewPagerProps> = ({
       if (finalNearest >= 0 && finalNearest < totalSlides) {
         setTargetIndex(finalNearest);
         if (finalNearest !== currentIndexRef.current) {
-          lastSwipedIndexRef.current = finalNearest;
-          onSlideChange(finalNearest);
+          settleSlideChange(finalNearest);
+        } else {
+          cancelSwipeScroll();
         }
       }
     }, 120);
-  }, [isMobile, totalSlides, onSlideChange, onScrollProgress]);
+  }, [isMobile, totalSlides, onScrollProgress, settleSlideChange, cancelSwipeScroll]);
 
   const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
     isDraggingRef.current = true;
     setIsDragging(true);
-    if (typeof document !== 'undefined') {
-      document.body.classList.add('is-swipe-dragging');
-    }
-    hasResetScrollForSwipeRef.current = false;
+    isHorizontalSwipeRef.current = false;
     touchStartXRef.current = e.touches[0].clientX;
     touchStartYRef.current = e.touches[0].clientY;
 
@@ -189,13 +220,18 @@ export const SwipeViewPager: React.FC<SwipeViewPagerProps> = ({
   };
 
   const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
-    if (hasResetScrollForSwipeRef.current) return;
+    if (isHorizontalSwipeRef.current) return;
     const dx = Math.abs(e.touches[0].clientX - touchStartXRef.current);
     const dy = Math.abs(e.touches[0].clientY - touchStartYRef.current);
     if (dx > 6 && dx > dy) {
-      hasResetScrollForSwipeRef.current = true;
-      if (typeof window !== 'undefined' && window.scrollY > 0) {
-        window.scrollTo({ top: 0, behavior: 'instant' });
+      isHorizontalSwipeRef.current = true;
+      if (typeof document !== 'undefined') {
+        document.body.classList.add('is-swipe-dragging');
+      }
+      const currentScrollY = typeof window !== 'undefined' ? window.scrollY : 0;
+      if (currentScrollY > 0) {
+        swipeScrollYRef.current = currentScrollY;
+        setSwipeScrollY(currentScrollY);
       }
     }
   };
@@ -206,7 +242,6 @@ export const SwipeViewPager: React.FC<SwipeViewPagerProps> = ({
     if (typeof document !== 'undefined') {
       document.body.classList.remove('is-swipe-dragging');
     }
-    hasResetScrollForSwipeRef.current = false;
     if (containerRef.current) {
       containerRef.current.style.overflowX = 'auto';
       const width = containerRef.current.clientWidth;
@@ -214,9 +249,12 @@ export const SwipeViewPager: React.FC<SwipeViewPagerProps> = ({
         const nearest = Math.round(containerRef.current.scrollLeft / width);
         if (nearest >= 0 && nearest < totalSlides) {
           setTargetIndex(nearest);
-          if (nearest !== currentIndexRef.current) {
-            lastSwipedIndexRef.current = nearest;
-            onSlideChange(nearest);
+          if (Math.abs(containerRef.current.scrollLeft - nearest * width) <= 5) {
+            if (nearest !== currentIndexRef.current) {
+              settleSlideChange(nearest);
+            } else {
+              cancelSwipeScroll();
+            }
           }
         }
       }
@@ -245,7 +283,7 @@ export const SwipeViewPager: React.FC<SwipeViewPagerProps> = ({
         const isTarget = idx === targetIndex;
         const isNear = Math.abs(idx - currentIndex) <= 1 || Math.abs(idx - targetIndex) <= 1;
         // While dragging, scrolling or animating, the current slide, target slide, and immediate neighbors are fully expanded
-        const shouldBeFullHeight = isCurrent || isTarget || isAnimating || ((isDragging || isScrolling) && isNear);
+        const shouldBeFullHeight = isCurrent || isTarget || isAnimating || ((isDragging || isScrolling || swipeScrollY > 0) && isNear);
 
         return (
           <div
@@ -255,7 +293,8 @@ export const SwipeViewPager: React.FC<SwipeViewPagerProps> = ({
               height: shouldBeFullHeight ? 'auto' : 0,
               minHeight: shouldBeFullHeight ? 'calc(100dvh - 160px)' : 0,
               overflow: shouldBeFullHeight ? 'visible' : 'hidden',
-              visibility: shouldBeFullHeight ? 'visible' : 'hidden'
+              visibility: shouldBeFullHeight ? 'visible' : 'hidden',
+              transform: idx !== currentIndex && swipeScrollY > 0 ? `translateY(${swipeScrollY}px)` : undefined
             }}
           >
             {child}
