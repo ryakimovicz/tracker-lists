@@ -1369,11 +1369,18 @@ export const Search: React.FC = () => {
     }
   };
 
-  const handleClearSearch = () => {
+  const handleClearSearch = (e?: React.MouseEvent | React.TouchEvent | React.PointerEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     setQuery('');
     setSubmittedQuery('');
     setResults([]);
     setIsSearching(false);
+    if (searchInputRef.current) {
+      searchInputRef.current.value = '';
+    }
   };
 
   const normType = selectedItem ? (selectedItem.item_type === 'anime' ? 'series' : selectedItem.item_type) : '';
@@ -1519,37 +1526,44 @@ export const Search: React.FC = () => {
               {query && (
                 <button
                   type="button"
+                  onPointerDown={handleClearSearch}
                   onClick={handleClearSearch}
                   title={language === 'es' ? 'Limpiar búsqueda' : 'Clear search'}
                   aria-label={language === 'es' ? 'Limpiar búsqueda' : 'Clear search'}
                   style={{
                     position: 'absolute',
-                    right: '0.75rem',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    background: 'rgba(255, 255, 255, 0.1)',
+                    right: '0.5rem',
+                    top: 0,
+                    bottom: 0,
+                    margin: 'auto 0',
+                    background: 'transparent',
                     border: 'none',
                     borderRadius: '50%',
-                    width: '22px',
-                    height: '22px',
+                    width: '36px',
+                    height: '36px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     cursor: 'pointer',
                     color: 'var(--text-muted)',
                     padding: 0,
-                    transition: 'background 0.2s, color 0.2s'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.25)';
-                    e.currentTarget.style.color = '#ffffff';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-                    e.currentTarget.style.color = 'var(--text-muted)';
+                    touchAction: 'manipulation'
                   }}
                 >
-                  <X size={14} />
+                  <span
+                    style={{
+                      width: '22px',
+                      height: '22px',
+                      borderRadius: '50%',
+                      background: 'rgba(255, 255, 255, 0.1)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'background 0.2s, color 0.2s'
+                    }}
+                  >
+                    <X size={14} />
+                  </span>
                 </button>
               )}
             </div>
