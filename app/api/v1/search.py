@@ -257,7 +257,9 @@ def search_media(
                     print(f"Error fetching var {future_to_var[future]}: {e}")
 
     combined = rank_search_results(combined, q, variations)
-    _SEARCH_QUERY_CACHE[cache_key] = (now_ts, combined)
+    # Only cache if results were found, avoiding poisoning the 15-minute cache with circuit-breaker or rate-limit fallbacks
+    if combined:
+        _SEARCH_QUERY_CACHE[cache_key] = (now_ts, combined)
     return combined
 
 @router.get("/all", response_model=List[SearchResultItem])
@@ -363,7 +365,9 @@ def search_all_media(
             user_category_order = None
 
     combined = rank_search_results(combined, q, variations, category_order=user_category_order)
-    _SEARCH_QUERY_CACHE[cache_key] = (now_ts, combined)
+    # Only cache if results were found, avoiding poisoning the 15-minute cache with circuit-breaker or rate-limit fallbacks
+    if combined:
+        _SEARCH_QUERY_CACHE[cache_key] = (now_ts, combined)
     return combined
 
 

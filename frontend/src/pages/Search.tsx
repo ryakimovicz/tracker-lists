@@ -1028,7 +1028,15 @@ export const Search: React.FC = () => {
         if (searchRequestIdRef.current !== currentReqId) return;
 
         const initialData = Array.isArray(primaryRes.data) ? primaryRes.data : [];
-        setResults(initialData);
+        setResults(prev => {
+          // If we already had results for this exact query (e.g. from 'all' search), merge new items without discarding existing ones
+          if (cleanQuery === submittedQuery && prev.length > 0) {
+            const seenIds = new Set(initialData.map(item => item.external_id));
+            const retainedPrev = prev.filter(item => !seenIds.has(item.external_id));
+            return [...initialData, ...retainedPrev];
+          }
+          return initialData;
+        });
         setIsSearching(false);
         if (initialData.length > 0) {
           initialData.slice(0, 8).forEach((r: any) => prefetchMediaDetails(r));
