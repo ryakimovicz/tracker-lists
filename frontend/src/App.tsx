@@ -82,6 +82,13 @@ function AppContent() {
   }, [isAuthenticated, isSuspended]);
 
   useEffect(() => {
+    // Whenever navigating to a new page (unless opening a modal over backgroundLocation), scroll to top
+    if (!state?.backgroundLocation) {
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    }
+  }, [location.pathname]);
+
+  useEffect(() => {
     const updateCentering = () => {
       const windowTotalWidth = window.outerWidth || window.innerWidth;
       const availableViewportWidth = window.innerWidth;

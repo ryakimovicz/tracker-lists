@@ -66,6 +66,8 @@ export const MobileBottomNav: React.FC = () => {
             onClick={(e) => {
               if (item.to === '/search' && currentPath.startsWith('/search')) {
                 window.dispatchEvent(new Event('focus-search-input'));
+              } else {
+                window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
               }
             }}
             onMouseEnter={() => prefetchRoute(item.to)}

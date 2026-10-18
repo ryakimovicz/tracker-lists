@@ -37,6 +37,9 @@ const NavItem: React.FC<NavItemProps> = ({ to, icon: Icon, label, currentPath, c
       to={to}
       onMouseEnter={() => prefetchRoute(to)}
       onTouchStart={() => prefetchRoute(to)}
+      onClick={() => {
+        window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+      }}
       style={{
         display: 'flex',
         alignItems: 'center',
