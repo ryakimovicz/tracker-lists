@@ -698,7 +698,14 @@ export const Profile: React.FC = () => {
     ? (profileTabParam as ProfileTab)
     : 'shelf';
 
+  const [activeProfileTab, setActiveProfileTab] = useState<ProfileTab>(activeTab);
+
+  useEffect(() => {
+    setActiveProfileTab(activeTab);
+  }, [activeTab]);
+
   const handleTabChange = (tab: ProfileTab) => {
+    setActiveProfileTab(tab);
     const newParams = new URLSearchParams(searchParams);
     if (tab === 'shelf') {
       newParams.delete('tab');
@@ -841,6 +848,12 @@ export const Profile: React.FC = () => {
   const guidesSubTabParam = searchParams.get('subtab');
   const profileGuidesSubTab: 'created' | 'saved' = (guidesSubTabParam === 'saved') ? 'saved' : 'created';
 
+  const [activeGuidesSubTab, setActiveGuidesSubTab] = useState<'created' | 'saved'>(profileGuidesSubTab);
+
+  useEffect(() => {
+    setActiveGuidesSubTab(profileGuidesSubTab);
+  }, [profileGuidesSubTab]);
+
   const musicTypeParam = searchParams.get('type');
   const validMusicTypes = ['artists', 'albums', 'tracks'] as const;
   const initialMusicType: 'artists' | 'albums' | 'tracks' = (musicTypeParam && validMusicTypes.includes(musicTypeParam as any))
@@ -859,83 +872,12 @@ export const Profile: React.FC = () => {
   useEffect(() => {
     if (musicTypeParam && validMusicTypes.includes(musicTypeParam as any)) {
       setMusicType(musicTypeParam as 'artists' | 'albums' | 'tracks');
-    } else if (activeTab === 'music' && !musicTypeParam) {
+    } else if (activeProfileTab === 'music' && !musicTypeParam) {
       setMusicType('artists');
     }
-  }, [musicTypeParam, activeTab]);
+  }, [musicTypeParam, activeProfileTab]);
 
   const hasMusic = Boolean(profile?.lastfm_username) || isOwnProfile;
-
-  const getCurrentProfileStep = useCallback((): number => {
-    if (activeTab === 'shelf') return 0;
-    if (activeTab === 'guides') {
-      return profileGuidesSubTab === 'saved' ? 2 : 1;
-    }
-    if (hasMusic) {
-      if (activeTab === 'music') {
-        if (musicType === 'albums') return 4;
-        if (musicType === 'tracks') return 5;
-        return 3;
-      }
-      if (activeTab === 'favorites') return 6;
-    } else {
-      if (activeTab === 'favorites') return 3;
-    }
-    return 0;
-  }, [activeTab, profileGuidesSubTab, hasMusic, musicType]);
-
-  const currentProfileStep = getCurrentProfileStep();
-
-  const goToProfileStep = useCallback((step: number) => {
-    if (typeof window !== 'undefined') {
-      window.scrollTo({ top: 0, behavior: 'instant' });
-    }
-
-    const newParams = new URLSearchParams(searchParams);
-
-    if (step === 0) {
-      newParams.delete('tab');
-      newParams.delete('subtab');
-      newParams.delete('type');
-      newParams.delete('period');
-    } else if (step === 1) {
-      newParams.set('tab', 'guides');
-      newParams.delete('subtab');
-      newParams.delete('type');
-      newParams.delete('period');
-    } else if (step === 2) {
-      newParams.set('tab', 'guides');
-      newParams.set('subtab', 'saved');
-      newParams.delete('type');
-      newParams.delete('period');
-    } else if (hasMusic && step === 3) {
-      newParams.set('tab', 'music');
-      newParams.delete('subtab');
-      newParams.delete('type');
-      setMusicType('artists');
-    } else if (hasMusic && step === 4) {
-      newParams.set('tab', 'music');
-      newParams.delete('subtab');
-      newParams.set('type', 'albums');
-      setMusicType('albums');
-    } else if (hasMusic && step === 5) {
-      newParams.set('tab', 'music');
-      newParams.delete('subtab');
-      newParams.set('type', 'tracks');
-      setMusicType('tracks');
-    } else if ((hasMusic && step === 6) || (!hasMusic && step === 3)) {
-      newParams.set('tab', 'favorites');
-      newParams.delete('subtab');
-      newParams.delete('type');
-      newParams.delete('period');
-    }
-
-    setSearchParams(newParams);
-  }, [hasMusic, searchParams, setSearchParams]);
-
-  const handleSelectGuidesSubtab = useCallback((mode: 'created' | 'saved') => {
-    goToProfileStep(mode === 'saved' ? 2 : 1);
-  }, [goToProfileStep]);
 
   // Compute 0-3 (or 0-2) main tab progress from 0-6 (or 0-3) slide progress
   const computeMainProgress = useCallback((p: number, hasM: boolean): number => {
@@ -952,6 +894,26 @@ export const Profile: React.FC = () => {
     }
   }, []);
 
+  const getCurrentProfileStep = useCallback((): number => {
+    if (activeProfileTab === 'shelf') return 0;
+    if (activeProfileTab === 'guides') {
+      return activeGuidesSubTab === 'saved' ? 2 : 1;
+    }
+    if (hasMusic) {
+      if (activeProfileTab === 'music') {
+        if (musicType === 'albums') return 4;
+        if (musicType === 'tracks') return 5;
+        return 3;
+      }
+      if (activeProfileTab === 'favorites') return 6;
+    } else {
+      if (activeProfileTab === 'favorites') return 3;
+    }
+    return 0;
+  }, [activeProfileTab, activeGuidesSubTab, hasMusic, musicType]);
+
+  const currentProfileStep = getCurrentProfileStep();
+
   // Gestural tracking refs
   const profileTabsNavRef = useRef<HTMLDivElement>(null);
   const profileTabBtnRefs = useRef<(HTMLButtonElement | null)[]>([]);
@@ -959,6 +921,128 @@ export const Profile: React.FC = () => {
   const guidesSubtabBtnRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const musicSubtabsNavRef = useRef<HTMLDivElement>(null);
   const musicSubtabBtnRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
+  const goToProfileStep = useCallback((step: number) => {
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    }
+
+    let nextTab: ProfileTab = 'shelf';
+    let nextGuidesSubTab: 'created' | 'saved' = 'created';
+    let nextMusicType: 'artists' | 'albums' | 'tracks' = musicType;
+
+    const newParams = new URLSearchParams(searchParams);
+
+    if (step === 0) {
+      nextTab = 'shelf';
+      newParams.delete('tab');
+      newParams.delete('subtab');
+      newParams.delete('type');
+      newParams.delete('period');
+    } else if (step === 1) {
+      nextTab = 'guides';
+      nextGuidesSubTab = 'created';
+      newParams.set('tab', 'guides');
+      newParams.delete('subtab');
+      newParams.delete('type');
+      newParams.delete('period');
+    } else if (step === 2) {
+      nextTab = 'guides';
+      nextGuidesSubTab = 'saved';
+      newParams.set('tab', 'guides');
+      newParams.set('subtab', 'saved');
+      newParams.delete('type');
+      newParams.delete('period');
+    } else if (hasMusic && step === 3) {
+      nextTab = 'music';
+      nextMusicType = 'artists';
+      newParams.set('tab', 'music');
+      newParams.delete('subtab');
+      newParams.delete('type');
+    } else if (hasMusic && step === 4) {
+      nextTab = 'music';
+      nextMusicType = 'albums';
+      newParams.set('tab', 'music');
+      newParams.delete('subtab');
+      newParams.set('type', 'albums');
+    } else if (hasMusic && step === 5) {
+      nextTab = 'music';
+      nextMusicType = 'tracks';
+      newParams.set('tab', 'music');
+      newParams.delete('subtab');
+      newParams.set('type', 'tracks');
+    } else if ((hasMusic && step === 6) || (!hasMusic && step === 3)) {
+      nextTab = 'favorites';
+      newParams.set('tab', 'favorites');
+      newParams.delete('subtab');
+      newParams.delete('type');
+      newParams.delete('period');
+    }
+
+    setActiveProfileTab(nextTab);
+    setActiveGuidesSubTab(nextGuidesSubTab);
+    setMusicType(nextMusicType);
+
+    // Synchronously update DOM styles for 0ms visual feedback
+    const mainProg = computeMainProgress(step, hasMusic);
+    if (profileTabsNavRef.current) {
+      profileTabsNavRef.current.style.setProperty('--tab-progress', mainProg.toFixed(4));
+      let indColor = 'var(--accent-primary)';
+      if (hasMusic) {
+        if (mainProg <= 1) {
+          indColor = `color-mix(in srgb, var(--color-guide, #2DD4BF) ${Math.round(mainProg * 100)}%, var(--accent-primary))`;
+        } else if (mainProg <= 2) {
+          indColor = `color-mix(in srgb, var(--color-music, #1DB954) ${Math.round((mainProg - 1) * 100)}%, var(--color-guide, #2DD4BF))`;
+        } else {
+          indColor = `color-mix(in srgb, #F472B6 ${Math.round((mainProg - 2) * 100)}%, var(--color-music, #1DB954))`;
+        }
+      } else {
+        if (mainProg <= 1) {
+          indColor = `color-mix(in srgb, var(--color-guide, #2DD4BF) ${Math.round(mainProg * 100)}%, var(--accent-primary))`;
+        } else {
+          indColor = `color-mix(in srgb, #F472B6 ${Math.round((mainProg - 1) * 100)}%, var(--color-guide, #2DD4BF))`;
+        }
+      }
+      profileTabsNavRef.current.style.setProperty('--profile-indicator-color', indColor);
+    }
+
+    const mainTabCount = hasMusic ? 4 : 3;
+    for (let i = 0; i < mainTabCount; i++) {
+      const el = profileTabBtnRefs.current[i];
+      if (!el) continue;
+      const dist = Math.abs(mainProg - i);
+      const act = Math.max(0, Math.min(1, 1 - dist));
+      el.style.setProperty('--tab-act', act.toFixed(4));
+    }
+
+    if (nextTab === 'guides') {
+      const gSubProg = nextGuidesSubTab === 'saved' ? 1 : 0;
+      if (guidesSubtabsNavRef.current) {
+        guidesSubtabsNavRef.current.style.setProperty('--guides-subtab-progress', String(gSubProg));
+      }
+      guidesSubtabBtnRefs.current.forEach((el, idx) => {
+        if (!el) return;
+        el.style.setProperty('--subtab-act', idx === gSubProg ? '1' : '0');
+      });
+    }
+
+    if (hasMusic && nextTab === 'music') {
+      const mSubProg = nextMusicType === 'albums' ? 1 : nextMusicType === 'tracks' ? 2 : 0;
+      if (musicSubtabsNavRef.current) {
+        musicSubtabsNavRef.current.style.setProperty('--music-subtab-progress', String(mSubProg));
+      }
+      musicSubtabBtnRefs.current.forEach((el, idx) => {
+        if (!el) return;
+        el.style.setProperty('--subtab-act', idx === mSubProg ? '1' : '0');
+      });
+    }
+
+    setSearchParams(newParams);
+  }, [hasMusic, musicType, searchParams, setSearchParams, computeMainProgress]);
+
+  const handleSelectGuidesSubtab = useCallback((mode: 'created' | 'saved') => {
+    goToProfileStep(mode === 'saved' ? 2 : 1);
+  }, [goToProfileStep]);
 
   const handleScrollProgress = useCallback((progress: number) => {
     const totalSlidesCount = hasMusic ? 7 : 4;
@@ -5106,15 +5190,15 @@ export const Profile: React.FC = () => {
               '--tab-progress': String(computeMainProgress(currentProfileStep, hasMusic)),
               '--profile-tab-count': hasMusic ? '4' : '3',
               '--profile-indicator-color': (
-                activeTab === 'shelf' ? 'var(--accent-primary)' :
-                activeTab === 'guides' ? 'var(--color-guide, #2DD4BF)' :
-                activeTab === 'music' ? 'var(--color-music, #1DB954)' :
+                activeProfileTab === 'shelf' ? 'var(--accent-primary)' :
+                activeProfileTab === 'guides' ? 'var(--color-guide, #2DD4BF)' :
+                activeProfileTab === 'music' ? 'var(--color-music, #1DB954)' :
                 '#F472B6'
               )
             } as React.CSSProperties}
           >
             {mainTabs.map((tab, idx) => {
-              const isActive = activeTab === tab.id;
+              const isActive = activeProfileTab === tab.id;
               return (
                 <button
                   key={tab.id}
@@ -5185,22 +5269,22 @@ export const Profile: React.FC = () => {
           </div>
 
           {/* Mobile Subtabs Header for Guides (Sticky right below main tabs) */}
-          {activeTab === 'guides' && profile && (
+          {activeProfileTab === 'guides' && profile && (
             <div
               ref={guidesSubtabsNavRef}
               className="profile-guides-mobile-tabs-container home-mobile-only"
               style={{
-                '--guides-subtab-progress': profileGuidesSubTab === 'saved' ? '1' : '0'
+                '--guides-subtab-progress': activeGuidesSubTab === 'saved' ? '1' : '0'
               } as React.CSSProperties}
             >
               <button
                 type="button"
                 ref={el => { guidesSubtabBtnRefs.current[0] = el; }}
-                className={`profile-guides-mobile-tab-btn ${profileGuidesSubTab === 'created' ? 'active' : ''}`}
+                className={`profile-guides-mobile-tab-btn ${activeGuidesSubTab === 'created' ? 'active' : ''}`}
                 onClick={() => goToProfileStep(1)}
                 style={{
                   '--subtab-color': 'var(--color-guide, #2DD4BF)',
-                  '--subtab-act': profileGuidesSubTab === 'created' ? '1' : '0'
+                  '--subtab-act': activeGuidesSubTab === 'created' ? '1' : '0'
                 } as React.CSSProperties}
               >
                 <span>{language === 'es' ? 'Guías creadas' : 'Created Guides'}</span>
@@ -5209,11 +5293,11 @@ export const Profile: React.FC = () => {
               <button
                 type="button"
                 ref={el => { guidesSubtabBtnRefs.current[1] = el; }}
-                className={`profile-guides-mobile-tab-btn ${profileGuidesSubTab === 'saved' ? 'active' : ''}`}
+                className={`profile-guides-mobile-tab-btn ${activeGuidesSubTab === 'saved' ? 'active' : ''}`}
                 onClick={() => goToProfileStep(2)}
                 style={{
                   '--subtab-color': 'var(--color-guide, #2DD4BF)',
-                  '--subtab-act': profileGuidesSubTab === 'saved' ? '1' : '0'
+                  '--subtab-act': activeGuidesSubTab === 'saved' ? '1' : '0'
                 } as React.CSSProperties}
               >
                 <span>{language === 'es' ? 'Guías guardadas' : 'Saved Guides'}</span>
@@ -5224,7 +5308,7 @@ export const Profile: React.FC = () => {
           )}
 
           {/* Mobile Subtabs Header for Music (Sticky right below main tabs) */}
-          {hasMusic && activeTab === 'music' && (
+          {hasMusic && activeProfileTab === 'music' && (
             <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }} className="home-mobile-only">
               <div
                 ref={musicSubtabsNavRef}
