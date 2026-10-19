@@ -200,22 +200,32 @@ export const prefetchRoute = (route: string) => {
 };
 
 /**
- * Runs idle warm-up 1.5s after app initialization
+ * Runs idle warm-up 1s after app initialization
  */
 export const initGlobalPrefetch = () => {
   if (typeof window === 'undefined') return;
 
   const runWarmup = () => {
+    // 1. Immediately pre-warm the dynamic imports so JS modules are pre-compiled in memory
+    try {
+      import('../pages/Home');
+      import('../pages/Social');
+      import('../pages/Search');
+      import('../pages/Profile');
+      import('../pages/CreateGuide');
+    } catch (_) {}
+
+    // 2. Prefetch initial data
     setTimeout(() => {
       prefetchRoute('/search');
       setTimeout(() => prefetchRoute('/social'), 600);
       setTimeout(() => prefetchRoute('/profile'), 1200);
-    }, 1500);
+    }, 1000);
   };
 
   if ('requestIdleCallback' in window) {
     (window as any).requestIdleCallback(runWarmup);
   } else {
-    setTimeout(runWarmup, 1500);
+    setTimeout(runWarmup, 1000);
   }
 };

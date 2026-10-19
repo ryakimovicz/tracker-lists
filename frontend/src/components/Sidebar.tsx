@@ -35,10 +35,10 @@ const NavItem: React.FC<NavItemProps> = ({ to, icon: Icon, label, currentPath, c
   return (
     <Link
       to={to}
-      onMouseEnter={() => prefetchRoute(to)}
-      onTouchStart={() => prefetchRoute(to)}
       onClick={() => {
-        window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+        if (isActive) {
+          window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+        }
       }}
       style={{
         display: 'flex',

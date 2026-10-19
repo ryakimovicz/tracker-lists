@@ -1508,6 +1508,7 @@ h1, h2, h3, h4, h5, h6 {
     border-top: 1px solid var(--border-color);
     z-index: 1000;
     box-sizing: content-box;
+    touch-action: manipulation;
   }
 
   [data-theme="light"] .mobile-bottom-nav {
@@ -1530,6 +1531,7 @@ h1, h2, h3, h4, h5, h6 {
     transition: color 0.2s ease, transform 0.15s ease;
     user-select: none;
     -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
   }
 
   .mobile-bottom-nav-item:active {

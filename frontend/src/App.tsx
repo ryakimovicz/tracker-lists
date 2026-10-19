@@ -45,6 +45,8 @@ import { MusicRouteModal } from './components/MusicRouteModal';
 import { PremiumRouteModal } from './components/PremiumRouteModal';
 import { MobileHeader } from './components/MobileHeader';
 import { MobileBottomNav } from './components/MobileBottomNav';
+import { MainTabsKeeper } from './components/MainTabsKeeper';
+import type { MainTabType } from './components/MainTabsKeeper';
 import React, { useEffect, Suspense } from 'react';
 
 function AppContent() {
@@ -56,6 +58,24 @@ function AppContent() {
   const location = useLocation();
   const navigate = useNavigate();
   const state = location.state as { backgroundLocation?: any } | undefined;
+
+  const currentPath = location.pathname;
+  const effectivePathname = state?.backgroundLocation?.pathname || currentPath;
+  const effectiveSearch = state?.backgroundLocation?.search || location.search;
+  const effectiveSearchParams = new URLSearchParams(effectiveSearch);
+  const effectiveUserIdParam = effectiveSearchParams.get('user_id');
+  const isEffectiveOtherUserProfile = effectivePathname === '/profile' && !!effectiveUserIdParam && String(effectiveUserIdParam) !== String(user?.id);
+
+  const activeMainTab: MainTabType | null = React.useMemo(() => {
+    if (effectivePathname === '/') return 'home';
+    if (effectivePathname.startsWith('/social')) return 'social';
+    if (effectivePathname.startsWith('/create')) return 'create';
+    if (effectivePathname.startsWith('/search')) return 'search';
+    if (effectivePathname === '/profile' && !isEffectiveOtherUserProfile) return 'profile';
+    return null;
+  }, [effectivePathname, isEffectiveOtherUserProfile]);
+
+  const isMainTabActive = Boolean(isAuthenticated && !(user?.is_suspended) && activeMainTab !== null);
 
   const isSuspended = Boolean(user?.is_suspended);
   const isAllowedSuspendedRoute = 
@@ -82,11 +102,11 @@ function AppContent() {
   }, [isAuthenticated, isSuspended]);
 
   useEffect(() => {
-    // Whenever navigating to a new page (unless opening a modal over backgroundLocation), scroll to top
-    if (!state?.backgroundLocation) {
+    // Whenever navigating to a non-tab page (unless opening a modal over backgroundLocation), scroll to top
+    if (!state?.backgroundLocation && !isMainTabActive) {
       window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
     }
-  }, [location.pathname]);
+  }, [location.pathname, isMainTabActive]);
 
   useEffect(() => {
     const updateCentering = () => {
@@ -170,164 +190,175 @@ function AppContent() {
         } as React.CSSProperties}
       >
         <ErrorBoundary>
-          <Suspense fallback={<PathdLoader fullScreen />}>
-            <Routes location={state?.backgroundLocation || location}>
-            {/* Conditional homepage depending on authentication status */}
-            <Route
-              path="/"
-              element={
-                isAuthenticated ? (
-                  <Home />
-                ) : isLoading && hasToken ? (
-                  <PathdLoader fullScreen />
-                ) : (
-                  <Landing />
-                )
-              }
+          {isAuthenticated && !isSuspended && (
+            <MainTabsKeeper
+              activeTab={activeMainTab}
+              isVisible={isMainTabActive}
             />
-            <Route path="/recommended" element={<Recommended />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-            <Route path="/verify-email" element={<VerifyEmail />} />
-            <Route path="/forgot-password" element={<ForgotPassword />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="/privacy" element={<PrivacyPolicy />} />
-            <Route path="/terms" element={<TermsOfService />} />
-            <Route path="/suspended" element={<SuspendedPage />} />
-            <Route
-              path="/premium"
-              element={
-                isAuthenticated ? (
-                  <Home />
-                ) : isLoading && hasToken ? (
-                  <PathdLoader fullScreen />
-                ) : (
-                  <Landing />
-                )
-              }
-            />
-            <Route
-              path="/pro"
-              element={
-                isAuthenticated ? (
-                  <Home />
-                ) : isLoading && hasToken ? (
-                  <PathdLoader fullScreen />
-                ) : (
-                  <Landing />
-                )
-              }
-            />
+          )}
 
-            
-            {/* Authenticated Routes */}
-            <Route
-              path="/settings"
-              element={
-                <RouteGuard>
-                  <SettingsPage />
-                </RouteGuard>
-              }
-            />
-            <Route
-              path="/customize"
-              element={
-                <RouteGuard>
-                  <CustomizePage />
-                </RouteGuard>
-              }
-            />
-            <Route
-              path="/profile"
-              element={
-                <RouteGuard>
-                  <Profile />
-                </RouteGuard>
-              }
-            />
-            <Route
-              path="/user/:username"
-              element={
-                <RouteGuard>
-                  <Profile />
-                </RouteGuard>
-              }
-            />
-            <Route
-              path="/guide/:id"
-              element={
-                <RouteGuard>
-                  <ViewGuide />
-                </RouteGuard>
-              }
-            />
-            <Route
-              path="/social"
-              element={
-                <RouteGuard>
-                  <Social />
-                </RouteGuard>
-              }
-            />
-            <Route
-              path="/create"
-              element={
-                <RouteGuard>
-                  <CreateGuide />
-                </RouteGuard>
-              }
-            />
-            <Route
-              path="/search"
-              element={
-                <RouteGuard>
-                  <Search />
-                </RouteGuard>
-              }
-            />
+          <div style={{ display: isMainTabActive ? 'none' : 'contents', width: '100%' }}>
+            <Suspense fallback={<PathdLoader fullScreen />}>
+              <Routes location={state?.backgroundLocation || location}>
+              {/* Conditional homepage depending on authentication status */}
+              <Route
+                path="/"
+                element={
+                  isAuthenticated ? null : isLoading && hasToken ? (
+                    <PathdLoader fullScreen />
+                  ) : (
+                    <Landing />
+                  )
+                }
+              />
+              <Route path="/recommended" element={<Recommended />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
+              <Route path="/verify-email" element={<VerifyEmail />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/privacy" element={<PrivacyPolicy />} />
+              <Route path="/terms" element={<TermsOfService />} />
+              <Route path="/suspended" element={<SuspendedPage />} />
+              <Route
+                path="/premium"
+                element={
+                  isAuthenticated ? null : isLoading && hasToken ? (
+                    <PathdLoader fullScreen />
+                  ) : (
+                    <Landing />
+                  )
+                }
+              />
+              <Route
+                path="/pro"
+                element={
+                  isAuthenticated ? null : isLoading && hasToken ? (
+                    <PathdLoader fullScreen />
+                  ) : (
+                    <Landing />
+                  )
+                }
+              />
 
-            {/* Admin Routes */}
-            <Route
-              path="/admin"
-              element={
-                <RouteGuard requireAdmin>
-                  <AdminPanel />
-                </RouteGuard>
-              }
-            />
+              
+              {/* Authenticated Routes */}
+              <Route
+                path="/settings"
+                element={
+                  <RouteGuard>
+                    <SettingsPage />
+                  </RouteGuard>
+                }
+              />
+              <Route
+                path="/customize"
+                element={
+                  <RouteGuard>
+                    <CustomizePage />
+                  </RouteGuard>
+                }
+              />
+              <Route
+                path="/profile"
+                element={
+                  isAuthenticated && !isEffectiveOtherUserProfile ? null : (
+                    <RouteGuard>
+                      <Profile />
+                    </RouteGuard>
+                  )
+                }
+              />
+              <Route
+                path="/user/:username"
+                element={
+                  <RouteGuard>
+                    <Profile />
+                  </RouteGuard>
+                }
+              />
+              <Route
+                path="/guide/:id"
+                element={
+                  <RouteGuard>
+                    <ViewGuide />
+                  </RouteGuard>
+                }
+              />
+              <Route
+                path="/social"
+                element={
+                  isAuthenticated ? null : (
+                    <RouteGuard>
+                      <Social />
+                    </RouteGuard>
+                  )
+                }
+              />
+              <Route
+                path="/create"
+                element={
+                  isAuthenticated ? null : (
+                    <RouteGuard>
+                      <CreateGuide />
+                    </RouteGuard>
+                  )
+                }
+              />
+              <Route
+                path="/search"
+                element={
+                  isAuthenticated ? null : (
+                    <RouteGuard>
+                      <Search />
+                    </RouteGuard>
+                  )
+                }
+              />
 
-            {/* Direct item view when accessed without backgroundLocation */}
-            <Route
-              path="/item/:type/:id"
-              element={
-                <RouteGuard>
-                  <Search />
-                </RouteGuard>
-              }
-            />
+              {/* Admin Routes */}
+              <Route
+                path="/admin"
+                element={
+                  <RouteGuard requireAdmin>
+                    <AdminPanel />
+                  </RouteGuard>
+                }
+              />
 
-            {/* Direct post / activity view when accessed without backgroundLocation */}
-            <Route
-              path="/post/:id"
-              element={
-                <RouteGuard>
-                  <Social />
-                </RouteGuard>
-              }
-            />
-            {/* Direct music view when accessed without backgroundLocation */}
-            <Route
-              path="/music/artist/:artist"
-              element={
-                <RouteGuard>
-                  <Profile />
-                </RouteGuard>
-              }
-            />
-            {/* 404 Catch-All Route */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </Suspense>
+              {/* Direct item view when accessed without backgroundLocation */}
+              <Route
+                path="/item/:type/:id"
+                element={
+                  <RouteGuard>
+                    <Search />
+                  </RouteGuard>
+                }
+              />
+
+              {/* Direct post / activity view when accessed without backgroundLocation */}
+              <Route
+                path="/post/:id"
+                element={
+                  <RouteGuard>
+                    <Social />
+                  </RouteGuard>
+                }
+              />
+              {/* Direct music view when accessed without backgroundLocation */}
+              <Route
+                path="/music/artist/:artist"
+                element={
+                  <RouteGuard>
+                    <Profile />
+                  </RouteGuard>
+                }
+              />
+              {/* 404 Catch-All Route */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </Suspense>
+        </div>
       </ErrorBoundary>
 
       {/* Modal overlay route when navigating from within the app */}
