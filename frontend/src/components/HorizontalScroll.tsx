@@ -20,13 +20,16 @@ export const HorizontalScroll: React.FC<HorizontalScrollProps> = ({ children, ti
     const el = scrollRef.current;
     if (!el) return;
     const { scrollLeft, scrollWidth, clientWidth } = el;
-    setCanScrollLeft(scrollLeft > 4);
-    setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 4);
+    setCanScrollLeft(scrollLeft > 6);
+    setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 6);
   }, []);
 
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
+    if (el.scrollLeft <= 6) {
+      el.scrollLeft = 0;
+    }
     updateScrollState();
     const timer = setTimeout(updateScrollState, 50);
     el.addEventListener('scroll', updateScrollState, { passive: true });
