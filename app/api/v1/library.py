@@ -688,6 +688,25 @@ def get_user_shelf(
         UserLibraryItem.release_date
     ).filter(UserLibraryItem.user_id == current_user.id).all()
 
+    ext_ids = [it.external_id for it in items if it.external_id]
+    ratings_map = {}
+    if ext_ids:
+        from app.models.review import MediaReview
+        user_reviews = db.query(
+            MediaReview.external_id,
+            MediaReview.item_type,
+            MediaReview.rating
+        ).filter(
+            MediaReview.user_id == current_user.id,
+            MediaReview.external_id.in_(ext_ids),
+            MediaReview.parent_id.is_(None),
+            MediaReview.rating.isnot(None)
+        ).all()
+        for r_eid, r_type, r_val in user_reviews:
+            if r_val is not None and r_val > 0:
+                ratings_map[(str(r_type).lower(), str(r_eid))] = float(r_val)
+                ratings_map[str(r_eid)] = float(r_val)
+
     return [
         {
             "id": it.id,
@@ -702,7 +721,8 @@ def get_user_shelf(
             "image_url": it.image_url,
             "imdb_id": it.imdb_id,
             "custom_badge": it.custom_badge,
-            "release_date": it.release_date
+            "release_date": it.release_date,
+            "rating": ratings_map.get((str(it.item_type).lower(), str(it.external_id)), ratings_map.get(str(it.external_id)))
         }
         for it in items
     ]
@@ -741,6 +761,7 @@ def get_library(
     ext_ids = [it.external_id for it in items if it.external_id]
     counts_map = {}
     hundred_counts_map = {}
+    ratings_map = {}
     if ext_ids:
         from sqlalchemy import case
         counts = db.query(
@@ -754,6 +775,23 @@ def get_library(
         for ext_id, c, h_c in counts:
             counts_map[ext_id] = c
             hundred_counts_map[ext_id] = int(h_c or 0)
+
+        # Batch query user ratings for these items from MediaReview
+        from app.models.review import MediaReview
+        user_reviews = db.query(
+            MediaReview.external_id,
+            MediaReview.item_type,
+            MediaReview.rating
+        ).filter(
+            MediaReview.user_id == target_user_id,
+            MediaReview.external_id.in_(ext_ids),
+            MediaReview.parent_id.is_(None),
+            MediaReview.rating.isnot(None)
+        ).all()
+        for r_eid, r_type, r_val in user_reviews:
+            if r_val is not None and r_val > 0:
+                ratings_map[(str(r_type).lower(), str(r_eid))] = float(r_val)
+                ratings_map[str(r_eid)] = float(r_val)
 
     # For series, anime, and tracked comic volumes, query episode/issue consumption counts if tracked to get accurate completions and last seen episode/issue count
     series_items = [it for it in items if it.item_type in ("series", "anime", "comic") and it.tracking_list_id]
@@ -916,7 +954,8 @@ def get_library(
             "times_completed_standard": times_standard,
             "times_completed_hundred": times_hundred,
             "last_seen_episode_count": last_ep_cnt,
-            "completed_episodes_count": series_completed_eps_count_map.get(it.id, it.pages_read or 0)
+            "completed_episodes_count": series_completed_eps_count_map.get(it.id, it.pages_read or 0),
+            "rating": ratings_map.get((it.item_type.value if hasattr(it.item_type, 'value') else str(it.item_type).lower(), str(it.external_id)), ratings_map.get(str(it.external_id)))
         }
         res.append(it_dict)
 

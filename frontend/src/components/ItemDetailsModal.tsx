@@ -1290,7 +1290,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 }) => {
   const onUpdate = React.useCallback((updatedItem?: any) => {
     if (rawOnUpdate) rawOnUpdate(updatedItem);
-    window.dispatchEvent(new Event('library-updated'));
+    window.dispatchEvent(new CustomEvent('library-updated', { detail: { item: updatedItem } }));
   }, [rawOnUpdate]);
   const { t, language } = useTranslation();
   const { theme } = useTheme();
@@ -4205,6 +4205,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
           return [res.data, ...prev];
         });
       }
+      onUpdate?.({ ...selectedItem, rating: ratingVal > 0 ? ratingVal : null });
     } catch(err) {
       console.error("Failed to save review", err);
       // Re-fetch to reconcile on error
@@ -4236,6 +4237,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
           media_type: null
         });
       }
+      onUpdate?.({ ...selectedItem, rating: null });
     } catch(err) {
       console.error("Failed to delete review", err);
       const revRes = await apiClient.get(`/reviews/${selectedItem.item_type}/${selectedItem.external_id}`);

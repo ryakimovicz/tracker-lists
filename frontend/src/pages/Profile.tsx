@@ -111,6 +111,7 @@ interface LibraryItem {
   last_seen_episode_count?: number;
   completed_episodes_count?: number;
   release_date?: string;
+  rating?: number | null;
 }
 
 
@@ -5834,6 +5835,17 @@ export const Profile: React.FC = () => {
                     });
                   }
 
+                  if (item.rating && Number(item.rating) > 0) {
+                    const numRating = Number(item.rating);
+                    const ratingFormatted = numRating % 1 === 0 ? numRating.toString() : numRating.toFixed(1);
+                    badges.push({
+                      text: ratingFormatted,
+                      color: '#f59e0b',
+                      bg: 'rgba(245, 158, 11, 0.15)',
+                      isStar: true
+                    });
+                  }
+
                   if (badges.length === 0) return null;
 
                   return (
@@ -5852,6 +5864,7 @@ export const Profile: React.FC = () => {
                           lineHeight: 1.2
                         }}>
                           {badge.isTrophy && <Trophy size={11} />}
+                          {badge.isStar && <Star size={11} fill="currentColor" stroke="none" style={{ flexShrink: 0 }} />}
                           <span>{badge.text}</span>
                         </span>
                       ))}

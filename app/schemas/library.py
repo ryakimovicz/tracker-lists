@@ -57,6 +57,7 @@ class LibraryItemResponse(BaseModel):
     times_completed_hundred: Optional[int] = 0
     last_seen_episode_count: Optional[int] = 1
     completed_episodes_count: Optional[int] = 0
+    rating: Optional[float] = None
 
     class Config:
         from_attributes = True
