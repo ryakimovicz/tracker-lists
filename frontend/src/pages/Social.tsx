@@ -37,6 +37,12 @@ export const Social: React.FC = () => {
     ? (tabParam as SocialTab)
     : 'following';
 
+  const [activeSocialTab, setActiveSocialTab] = useState<SocialTab>(activeTab);
+
+  useEffect(() => {
+    setActiveSocialTab(activeTab);
+  }, [activeTab]);
+
   // Fast in-memory cache to allow 0ms instantaneous tab switching
   const feedCacheRef = useRef<Partial<Record<SocialTab, ActivityCardData[]>>>({
     following: getCachedFeed('following'),
@@ -45,8 +51,8 @@ export const Social: React.FC = () => {
     me: getCachedFeed('me'),
   });
 
-  const activeTabRef = useRef<SocialTab>(activeTab);
-  activeTabRef.current = activeTab;
+  const activeTabRef = useRef<SocialTab>(activeSocialTab);
+  activeTabRef.current = activeSocialTab;
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -299,7 +305,7 @@ export const Social: React.FC = () => {
   const lastFeedFetchRef = useRef<number>(Date.now());
 
   useEffect(() => {
-    activeTabRef.current = activeTab;
+    activeTabRef.current = activeSocialTab;
 
     // Abort any pending fetch for another tab
     if (abortControllerRef.current) {
@@ -309,24 +315,24 @@ export const Social: React.FC = () => {
     abortControllerRef.current = controller;
 
     // Immediately show cached items if available; otherwise show loader
-    const cached = feedCacheRef.current[activeTab] || getCachedFeed(activeTab);
+    const cached = feedCacheRef.current[activeSocialTab] || getCachedFeed(activeSocialTab);
     if (cached && cached.length > 0) {
-      feedCacheRef.current[activeTab] = cached;
-      setTabFeeds(prev => ({ ...prev, [activeTab]: cached }));
-      setTabLoading(prev => ({ ...prev, [activeTab]: false }));
+      feedCacheRef.current[activeSocialTab] = cached;
+      setTabFeeds(prev => ({ ...prev, [activeSocialTab]: cached }));
+      setTabLoading(prev => ({ ...prev, [activeSocialTab]: false }));
     } else {
-      setTabLoading(prev => ({ ...prev, [activeTab]: true }));
+      setTabLoading(prev => ({ ...prev, [activeSocialTab]: true }));
     }
 
     setHasNewUpdates(false);
     lastFeedFetchRef.current = Date.now();
 
-    fetchTabFeed(activeTab, false, controller.signal);
+    fetchTabFeed(activeSocialTab, false, controller.signal);
 
     return () => {
       controller.abort();
     };
-  }, [activeTab]);
+  }, [activeSocialTab]);
 
   // Listen to system library and progress events to immediately refresh Social in the background
   useEffect(() => {
@@ -377,10 +383,22 @@ export const Social: React.FC = () => {
     if (typeof window !== 'undefined') {
       window.scrollTo({ top: 0, behavior: 'instant' });
     }
-    if (tab === activeTab) return;
+    if (tab === activeSocialTab) return;
+    setActiveSocialTab(tab);
     setHasNewUpdates(false);
-
     activeTabRef.current = tab;
+
+    const tabIdx = validTabs.indexOf(tab);
+    if (tabIdx !== -1) {
+      if (socialTabsContainerRef.current) {
+        socialTabsContainerRef.current.style.setProperty('--tab-progress', String(tabIdx));
+      }
+      tabItemRefs.current.forEach((el, i) => {
+        if (!el) return;
+        el.style.setProperty('--tab-act', i === tabIdx ? '1' : '0');
+      });
+    }
+
     const newParams = new URLSearchParams(searchParams);
     if (tab === 'following') {
       newParams.delete('tab');
@@ -390,14 +408,31 @@ export const Social: React.FC = () => {
     setSearchParams(newParams, { replace: true });
   };
 
-  const currentSocialStep = validTabs.indexOf(activeTab);
+  const currentSocialStep = validTabs.indexOf(activeSocialTab);
 
   const goToSocialStep = (step: number) => {
     if (typeof window !== 'undefined') {
       window.scrollTo({ top: 0, behavior: 'instant' });
     }
     const targetTab = validTabs[step] || 'following';
-    handleTabChange(targetTab);
+    setActiveSocialTab(targetTab);
+    activeTabRef.current = targetTab;
+
+    if (socialTabsContainerRef.current) {
+      socialTabsContainerRef.current.style.setProperty('--tab-progress', String(step));
+    }
+    tabItemRefs.current.forEach((el, i) => {
+      if (!el) return;
+      el.style.setProperty('--tab-act', i === step ? '1' : '0');
+    });
+
+    const newParams = new URLSearchParams(searchParams);
+    if (targetTab === 'following') {
+      newParams.delete('tab');
+    } else {
+      newParams.set('tab', targetTab);
+    }
+    setSearchParams(newParams, { replace: true });
   };
 
   // Real-time gesture tracking refs & handler for smooth mobile tab morphing
@@ -429,20 +464,20 @@ export const Social: React.FC = () => {
     }
     const controller = new AbortController();
     abortControllerRef.current = controller;
-    fetchTabFeed(activeTab, true, controller.signal);
+    fetchTabFeed(activeSocialTab, true, controller.signal);
   };
 
   const handleDeleteActivity = (id: number) => {
     setTabFeeds(prev => {
-      const current = prev[activeTab] || [];
+      const current = prev[activeSocialTab] || [];
       const updated = current.filter(a => a.id !== id);
-      feedCacheRef.current[activeTab] = updated;
+      feedCacheRef.current[activeSocialTab] = updated;
       try {
         const serialized = JSON.stringify(updated);
-        sessionStorage.setItem(`pathd_social_feed_${activeTab}`, serialized);
-        localStorage.setItem(`pathd_social_feed_${activeTab}`, serialized);
+        sessionStorage.setItem(`pathd_social_feed_${activeSocialTab}`, serialized);
+        localStorage.setItem(`pathd_social_feed_${activeSocialTab}`, serialized);
       } catch (_) {}
-      return { ...prev, [activeTab]: updated };
+      return { ...prev, [activeSocialTab]: updated };
     });
   };
 
@@ -560,7 +595,7 @@ export const Social: React.FC = () => {
       >
         {tabsConfig.map((tab, idx) => {
           const Icon = tab.icon;
-          const isActive = activeTab === tab.id;
+          const isActive = activeSocialTab === tab.id;
           return (
             <div
               key={tab.id}
@@ -676,7 +711,7 @@ export const Social: React.FC = () => {
             }
             const controller = new AbortController();
             abortControllerRef.current = controller;
-            fetchTabFeed(activeTab, true, controller.signal);
+            fetchTabFeed(activeSocialTab, true, controller.signal);
           }}
         />
       )}
