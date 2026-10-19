@@ -2147,6 +2147,20 @@ export const Home: React.FC = () => {
   const handleTabChange = (tab: HomeTab) => {
     isGuidesTabRef.current = tab === 'guides';
     setActiveHomeTab(tab);
+    if (tab === 'upcoming') {
+      setActiveUpcomingFilter('calendar');
+    }
+
+    const tabIdx = validHomeTabs.indexOf(tab);
+    if (tabIdx !== -1) {
+      if (homeTabsContainerRef.current) {
+        homeTabsContainerRef.current.style.setProperty('--tab-progress', String(tabIdx));
+      }
+      tabItemRefs.current.forEach((el, i) => {
+        if (!el) return;
+        el.style.setProperty('--tab-act', i === tabIdx ? '1' : '0');
+      });
+    }
 
     if (tab === 'guides') {
       showFiltersRef.current = false;
@@ -2223,6 +2237,11 @@ export const Home: React.FC = () => {
   const [gameFilter, setGameFilter] = useState<"playing" | "endless">("playing");
   const currentViewParam = searchParams.get('view');
   const upcomingFilter: "calendar" | "tba" = (currentViewParam === "tba") ? "tba" : "calendar";
+  const [activeUpcomingFilter, setActiveUpcomingFilter] = useState<"calendar" | "tba">(upcomingFilter);
+
+  useEffect(() => {
+    setActiveUpcomingFilter(upcomingFilter);
+  }, [upcomingFilter]);
 
   const [homeCategoryFilter, setHomeCategoryFilter] = useState<string>("all");
   const upcomingSwipeRef = useRef<HTMLDivElement>(null);
@@ -2372,13 +2391,13 @@ export const Home: React.FC = () => {
   // Mobile swipe tab navigation order:
   // Continuar (0) ↔ Guías (1) ↔ No comenzado (2) ↔ Terminado (3) ↔ Abandonado (4) ↔ Próximos Calendario (5) ↔ Próximos Por confirmar (6)
   const getCurrentHomeStep = (): number => {
-    if (activeTab === 'watching') return 0;
-    if (activeTab === 'guides') return 1;
-    if (activeTab === 'plan_to_watch') return 2;
-    if (activeTab === 'completed') return 3;
-    if (activeTab === 'dropped') return 4;
-    if (activeTab === 'upcoming') {
-      return upcomingFilter === 'tba' ? 6 : 5;
+    if (activeHomeTab === 'watching') return 0;
+    if (activeHomeTab === 'guides') return 1;
+    if (activeHomeTab === 'plan_to_watch') return 2;
+    if (activeHomeTab === 'completed') return 3;
+    if (activeHomeTab === 'dropped') return 4;
+    if (activeHomeTab === 'upcoming') {
+      return activeUpcomingFilter === 'tba' ? 6 : 5;
     }
     return 0;
   };
@@ -2396,6 +2415,16 @@ export const Home: React.FC = () => {
     const nextTab = stepToTab[step] || 'watching';
     isGuidesTabRef.current = nextTab === 'guides';
     setActiveHomeTab(nextTab);
+    setActiveUpcomingFilter(step === 6 ? 'tba' : 'calendar');
+
+    const progressIdx = Math.min(5, Math.max(0, step));
+    if (homeTabsContainerRef.current) {
+      homeTabsContainerRef.current.style.setProperty('--tab-progress', String(progressIdx));
+    }
+    tabItemRefs.current.forEach((el, i) => {
+      if (!el) return;
+      el.style.setProperty('--tab-act', i === progressIdx ? '1' : '0');
+    });
 
     if (nextTab === 'guides') {
       showFiltersRef.current = false;
@@ -2440,6 +2469,7 @@ export const Home: React.FC = () => {
   const currentHomeStep = getCurrentHomeStep();
 
   const handleSelectUpcomingSubtab = (mode: "calendar" | "tba") => {
+    setActiveUpcomingFilter(mode);
     if (mode === "tba") {
       goToHomeStep(6);
     } else {
@@ -4158,7 +4188,7 @@ export const Home: React.FC = () => {
         </div>
 
         {/* Sub-tabs: Calendario / Por confirmar (Stationary in Sticky Header) */}
-        {(activeTab === 'upcoming' || currentHomeStep === 5 || currentHomeStep === 6) && (
+        {(activeHomeTab === 'upcoming' || currentHomeStep === 5 || currentHomeStep === 6) && (
           <div style={{ width: "100%", boxSizing: "border-box" }}>
             {/* Desktop Button Pills */}
             <div className="home-desktop-only" style={{ display: "flex", alignItems: "center", padding: "0.25rem 0 0.5rem" }}>

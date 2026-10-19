@@ -2125,7 +2125,7 @@ h1, h2, h3, h4, h5, h6 {
   .profile-guides-tab-sliding-indicator,
   .profile-music-tab-sliding-indicator,
   .upcoming-tab-sliding-indicator {
-    transition: transform 0.28s cubic-bezier(0.25, 1, 0.5, 1) !important;
+    transition: transform 0.24s cubic-bezier(0.25, 1, 0.5, 1) !important;
   }
 
   /* Instant 1:1 real-time drag tracking when finger touches the screen */
@@ -4021,3 +4021,42 @@ h1, h2, h3, h4, h5, h6 {
   display: flex !important;
   flex-direction: column !important;
 }
+
+.swipe-pager-container.is-direct-transitioning {
+  overflow-x: hidden !important;
+  scroll-snap-type: none !important;
+}
+
+.swipe-pager-slide.is-hidden-slide {
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  height: 0 !important;
+  overflow: hidden !important;
+}
+
+.swipe-pager-slide.is-transitioning {
+  will-change: transform;
+}
+
+@keyframes pagerSlideFrom {
+  from { transform: translateX(var(--slide-from-start, 0%)); }
+  to { transform: translateX(var(--slide-from-target, 0%)); }
+}
+
+@keyframes pagerSlideTo {
+  from { transform: translateX(var(--slide-to-start, 0%)); }
+  to { transform: translateX(0%); }
+}
+
+.swipe-pager-slide.slide-out-custom {
+  animation: pagerSlideFrom 0.24s cubic-bezier(0.25, 1, 0.5, 1) forwards !important;
+  will-change: transform;
+}
+
+.swipe-pager-slide.slide-in-target {
+  animation: pagerSlideTo 0.24s cubic-bezier(0.25, 1, 0.5, 1) forwards !important;
+  will-change: transform;
+}
+
+

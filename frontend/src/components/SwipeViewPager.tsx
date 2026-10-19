@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import React, { useRef, useEffect, useLayoutEffect, useState, useCallback } from 'react';
 
 interface SwipeViewPagerProps {
   currentIndex: number;
@@ -8,6 +8,12 @@ interface SwipeViewPagerProps {
   children: React.ReactNode;
   ignoreSelector?: string;
   className?: string;
+}
+
+interface DirectTransition {
+  fromIndex: number;
+  toIndex: number;
+  direction: 'forward' | 'backward';
 }
 
 export const SwipeViewPager: React.FC<SwipeViewPagerProps> = ({
@@ -21,7 +27,6 @@ export const SwipeViewPager: React.FC<SwipeViewPagerProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const isProgrammaticScrollRef = useRef(false);
-  const programmaticTimeoutRef = useRef<any>(null);
   const scrollTimeoutRef = useRef<any>(null);
   const touchStartXRef = useRef<number>(0);
   const touchStartYRef = useRef<number>(0);
@@ -34,6 +39,14 @@ export const SwipeViewPager: React.FC<SwipeViewPagerProps> = ({
   const [isScrolling, setIsScrolling] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
   const [targetIndex, setTargetIndex] = useState<number>(currentIndex);
+
+  // Tracks active index for detecting programmatic jumps
+  const activeSlideIndexRef = useRef<number>(currentIndex);
+  const [prevPropIndex, setPrevPropIndex] = useState<number>(currentIndex);
+  const [directTransition, setDirectTransition] = useState<DirectTransition | null>(null);
+  const directTransitionRef = useRef<DirectTransition | null>(null);
+  directTransitionRef.current = directTransition;
+  const transitionTimerRef = useRef<any>(null);
 
   const [isMobile, setIsMobile] = useState<boolean>(() => {
     return typeof window !== 'undefined' ? window.innerWidth <= 768 : false;
@@ -52,19 +65,45 @@ export const SwipeViewPager: React.FC<SwipeViewPagerProps> = ({
     };
   }, []);
 
+  // Synchronous transition detection during render:
+  // When currentIndex changes via a tab click (programmatic jump), immediately configure the direct transition
+  // in the exact same render pass so the CSS keyframes trigger with zero latency and perfect synchronization!
+  if (currentIndex !== prevPropIndex) {
+    setPrevPropIndex(currentIndex);
+    setTargetIndex(currentIndex);
+
+    if (isMobile) {
+      if (lastSwipedIndexRef.current === currentIndex) {
+        lastSwipedIndexRef.current = null;
+        activeSlideIndexRef.current = currentIndex;
+      } else {
+        const fromIndex = activeSlideIndexRef.current;
+        const toIndex = currentIndex;
+        if (fromIndex !== toIndex) {
+          activeSlideIndexRef.current = toIndex;
+          const direction: 'forward' | 'backward' = toIndex > fromIndex ? 'forward' : 'backward';
+          setDirectTransition({
+            fromIndex,
+            toIndex,
+            direction
+          });
+          setIsAnimating(true);
+        }
+      }
+    } else {
+      activeSlideIndexRef.current = currentIndex;
+    }
+  }
+
   const currentIndexRef = useRef(currentIndex);
   currentIndexRef.current = currentIndex;
 
-  // Keep targetIndex in sync when currentIndex prop updates
-  useEffect(() => {
-    setTargetIndex(currentIndex);
-  }, [currentIndex]);
-
-  // Settle slide change once the new slide has actually been reached
+  // Settle slide change once the new slide has actually been reached by finger swipe
   const settleSlideChange = useCallback((newIndex: number) => {
     if (newIndex === currentIndexRef.current) return;
     if (lastSwipedIndexRef.current === newIndex) return;
     lastSwipedIndexRef.current = newIndex;
+    activeSlideIndexRef.current = newIndex;
 
     const hadScroll = swipeScrollYRef.current > 0;
     swipeScrollYRef.current = 0;
@@ -87,37 +126,46 @@ export const SwipeViewPager: React.FC<SwipeViewPagerProps> = ({
     }
   }, []);
 
-  // Sync scrollLeft when currentIndex prop changes programmatically
-  useEffect(() => {
-    if (!isMobile) return;
+  // Handle programmatic tab changes (e.g. clicking a tab in the header)
+  // useLayoutEffect runs BEFORE paint so animation starts in the exact same frame as the tab click!
+  useLayoutEffect(() => {
+    if (!isMobile || !directTransition) return;
     const el = containerRef.current;
     if (!el) return;
 
-    // If this currentIndex update was caused by the user swiping natively,
-    // do not trigger a conflicting scrollTo!
-    if (lastSwipedIndexRef.current === currentIndex) {
-      lastSwipedIndexRef.current = null;
-      return;
-    }
+    const { toIndex } = directTransition;
+    if (transitionTimerRef.current) clearTimeout(transitionTimerRef.current);
 
+    isProgrammaticScrollRef.current = true;
     const width = el.clientWidth;
-    if (width <= 0) return;
-
-    const targetLeft = currentIndex * width;
-    if (Math.abs(el.scrollLeft - targetLeft) > 5) {
-      isProgrammaticScrollRef.current = true;
-      setIsAnimating(true);
-      el.style.scrollSnapType = 'none';
-      el.scrollTo({ left: targetLeft, behavior: 'smooth' });
-
-      if (programmaticTimeoutRef.current) clearTimeout(programmaticTimeoutRef.current);
-      programmaticTimeoutRef.current = setTimeout(() => {
-        if (el) el.style.scrollSnapType = 'x mandatory';
-        isProgrammaticScrollRef.current = false;
-        setIsAnimating(false);
-      }, 350);
+    if (width > 0) {
+      // Pre-position container immediately at target slide offset BEFORE painting.
+      // Because incoming slide animates into translateX(0%), when the animation finishes
+      // it is already at its exact natural scroll position — eliminating any end-of-transition flicker!
+      el.scrollLeft = toIndex * width;
+      el.scrollTo({ left: toIndex * width, behavior: 'instant' as any });
     }
-  }, [currentIndex, isMobile]);
+
+    // Settle at toIndex after 240ms (matches .home-tabs-sliding-indicator CSS transition)
+    const TRANSITION_DURATION = 240;
+    transitionTimerRef.current = setTimeout(() => {
+      setDirectTransition(null);
+      setIsAnimating(false);
+      setTargetIndex(toIndex);
+
+      if (onScrollProgress) {
+        onScrollProgress(toIndex);
+      }
+
+      setTimeout(() => {
+        isProgrammaticScrollRef.current = false;
+      }, 50);
+    }, TRANSITION_DURATION);
+
+    return () => {
+      if (transitionTimerRef.current) clearTimeout(transitionTimerRef.current);
+    };
+  }, [directTransition, isMobile, onScrollProgress]);
 
   // Initial scroll position on mount or resize
   useEffect(() => {
@@ -148,7 +196,7 @@ export const SwipeViewPager: React.FC<SwipeViewPagerProps> = ({
     const width = el.clientWidth;
     if (width <= 0) return;
 
-    if (isProgrammaticScrollRef.current) return;
+    if (isProgrammaticScrollRef.current || directTransitionRef.current) return;
 
     // When the user starts sliding away from the current tab on mobile,
     // capture the current scroll offset so incoming tabs appear starting from the top
@@ -186,7 +234,7 @@ export const SwipeViewPager: React.FC<SwipeViewPagerProps> = ({
     scrollTimeoutRef.current = setTimeout(() => {
       setIsScrolling(false);
       if (!containerRef.current) return;
-      if (isProgrammaticScrollRef.current) return;
+      if (isProgrammaticScrollRef.current || directTransitionRef.current) return;
       if (isDraggingRef.current) return;
 
       const finalWidth = containerRef.current.clientWidth;
@@ -205,6 +253,21 @@ export const SwipeViewPager: React.FC<SwipeViewPagerProps> = ({
   }, [isMobile, totalSlides, onScrollProgress, settleSlideChange, cancelSwipeScroll]);
 
   const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    // If a direct transition is currently animating, finish it immediately so the user can interact
+    if (directTransitionRef.current) {
+      if (transitionTimerRef.current) clearTimeout(transitionTimerRef.current);
+      const target = directTransitionRef.current.toIndex;
+      if (containerRef.current) {
+        const width = containerRef.current.clientWidth;
+        if (width > 0) {
+          containerRef.current.scrollTo({ left: target * width, behavior: 'instant' as any });
+        }
+      }
+      setDirectTransition(null);
+      setIsAnimating(false);
+      isProgrammaticScrollRef.current = false;
+    }
+
     isDraggingRef.current = true;
     setIsDragging(true);
     isHorizontalSwipeRef.current = false;
@@ -271,7 +334,7 @@ export const SwipeViewPager: React.FC<SwipeViewPagerProps> = ({
   return (
     <div
       ref={containerRef}
-      className={`swipe-pager-container ${className}`}
+      className={`swipe-pager-container ${directTransition ? 'is-direct-transitioning' : ''} ${className}`}
       onScroll={handleScroll}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
@@ -279,10 +342,78 @@ export const SwipeViewPager: React.FC<SwipeViewPagerProps> = ({
       onTouchCancel={handleTouchEnd}
     >
       {childArray.map((child, idx) => {
+        // Direct transition when jumping between tabs via click
+        if (directTransition) {
+          const { fromIndex, toIndex, direction } = directTransition;
+          const isFrom = idx === fromIndex;
+          const isTo = idx === toIndex;
+
+          if (!isFrom && !isTo) {
+            return (
+              <div
+                key={idx}
+                className="swipe-pager-slide is-hidden-slide"
+                style={{
+                  visibility: 'hidden',
+                  opacity: 0,
+                  pointerEvents: 'none',
+                  height: 0,
+                  overflow: 'hidden'
+                }}
+              >
+                {child}
+              </div>
+            );
+          }
+
+          if (isFrom) {
+            const fromStart = (toIndex - fromIndex) * 100;
+            const fromTarget = direction === 'forward' ? fromStart - 100 : fromStart + 100;
+
+            return (
+              <div
+                key={idx}
+                className="swipe-pager-slide is-transitioning slide-out-custom"
+                style={{
+                  height: 'auto',
+                  minHeight: 'calc(100dvh - 160px)',
+                  overflow: 'visible',
+                  visibility: 'visible',
+                  zIndex: 1,
+                  ['--slide-from-start' as any]: `${fromStart}%`,
+                  ['--slide-from-target' as any]: `${fromTarget}%`
+                }}
+              >
+                {child}
+              </div>
+            );
+          }
+
+          // isTo
+          const toStart = direction === 'forward' ? 100 : -100;
+
+          return (
+            <div
+              key={idx}
+              className="swipe-pager-slide is-transitioning slide-in-target"
+              style={{
+                height: 'auto',
+                minHeight: 'calc(100dvh - 160px)',
+                overflow: 'visible',
+                visibility: 'visible',
+                zIndex: 2,
+                ['--slide-to-start' as any]: `${toStart}%`
+              }}
+            >
+              {child}
+            </div>
+          );
+        }
+
+        // Normal continuous mode (swiping or idle)
         const isCurrent = idx === currentIndex;
         const isTarget = idx === targetIndex;
         const isNear = Math.abs(idx - currentIndex) <= 1 || Math.abs(idx - targetIndex) <= 1;
-        // While dragging, scrolling or animating, the current slide, target slide, and immediate neighbors are fully expanded
         const shouldBeFullHeight = isCurrent || isTarget || isAnimating || ((isDragging || isScrolling || swipeScrollY > 0) && isNear);
 
         return (
