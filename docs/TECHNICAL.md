@@ -12,7 +12,7 @@ Documento de referencia para desarrolladores, arquitectura del sistema y catálo
 - **Migraciones de Base de Datos**: Alembic (`alembic/` y `alembic.ini`) para versionado y despliegue formal de esquemas
 - **Autenticación & Criptografía**: OAuth2 Password Bearer con JWT, cifrado irreversible de contraseñas mediante `bcrypt` (`gensalt`), rotación de token de refresco con cookies `HttpOnly`/`Secure` (HTTPS) y bloqueo estricto de tokens de prueba en producción
 - **Monitoreo de Errores & Rendimiento**: Sentry (`sentry-sdk`) con seguimiento de excepciones y transacciones en producción
-- **Resiliencia & Circuit Breakers**: Patrón Circuit Breaker (`app/core/circuit_breaker.py`) para aislar fallos de APIs externas (OMDb, TVMaze, AniList, ComicVine, IGDB, Last.fm, Deezer, etc.)
+- **Resiliencia & Circuit Breakers**: Patrón Circuit Breaker (`app/core/circuit_breaker.py`) para aislar fallos de APIs externas (OMDb, TVMaze, AniList, ComicVine, IGDB, Last.fm, Deezer, Apple iTunes, etc.)
 - **Email Transaccional**: Resend API con dominio personalizado `@pathd.net` y soporte bilingüe (ES/EN)
 - **Pagos y Suscripciones**: Dodo Payments API (Checkout Sessions, Customer Portal y Webhooks de ciclo de vida)
 - **Rate Limiting (Protección Anti-Fuerza Bruta & Anti-Spam)**: `slowapi` con límites dinámicos por IP en endpoints sensibles (búsqueda: 60/min, login: 10/min, registro: 5/min, recuperación de contraseña: 5/min, Google auth: 15/min)
@@ -81,7 +81,7 @@ Documento de referencia para desarrolladores, arquitectura del sistema y catálo
 | PUT | `/me/avatar` | Actualizar imagen de perfil / avatar |
 | PUT | `/me/banner` | Actualizar imagen de portada / banner (Premium) |
 | PUT | `/me/background` | Actualizar fondo de pantalla de perfil (Premium) |
-| PUT | `/me/color` | Actualizar color temático de perfil (Premium) |
+| PUT | `/me/color` | Actualizar color principal de la interfaz en toda la plataforma (Premium) |
 | PUT | `/me/category-order` | Guardar orden personalizado de categorías (Premium) |
 | DELETE | `/me` | Eliminar cuenta definitivamente |
 | GET | `/me/activity` | Historial de actividad personal con batching inteligente de 24h |
@@ -149,8 +149,8 @@ Documento de referencia para desarrolladores, arquitectura del sistema y catálo
 | PUT | `/{library_item_id}` | Actualizar estado, tiempo, páginas leídas, fecha de estreno, destacado o badge 100% |
 | PUT | `/favorites/reorder` | Persistir orden personalizado de obras destacadas en perfil (`favorite_order`) |
 | DELETE | `/{library_item_id}` | Eliminar obra de la estantería (con opción de conservar o purgar historial) |
-| POST | `/{library_item_id}/mark-consumed` | Volver a marcar como visto/leído/jugado (Free max 2 / Premium ilimitado) |
-| GET | `/{library_item_id}/consumption-history` | Obtener historial cronológico de fechas de consumo |
+| POST | `/{library_item_id}/mark-consumed` | Registrar nuevo re-consumo incrementando el contador de la obra |
+| GET | `/{library_item_id}/consumption-history` | Obtener historial cronológico completo de fechas de consumo (Premium) |
 | DELETE | `/{library_item_id}/consumption-history/latest` | Desmarcar última visualización o volver al estado anterior |
 
 ### Social (`/api/v1/social`)

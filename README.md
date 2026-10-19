@@ -14,7 +14,7 @@
   </p>
 </div>
 
-**Pathd** (`pathd.net`) es una plataforma web unificada de alto rendimiento diseñada para indexar, organizar y hacer seguimiento detallado de tu consumo cultural y entretenimiento en un único lugar: **Películas, Series, Anime, Libros, Cómics, Mangas, Música y Videojuegos**.
+**Pathd** (`pathd.net`) es una plataforma web unificada de alto rendimiento diseñada para indexar, organizar y hacer seguimiento detallado de tu consumo cultural y entretenimiento en un único lugar: **Películas, Series, Anime, Libros, Manga, Cómics, Juegos y Música**.
 
 Cuenta con un potente constructor de **Guías Cronológicas interactivas**, modificaciones de la comunidad (*Mods*), un **Feed Social y Reseñas con soporte multimedia KLIPY**, **Sincronización Musical con Last.fm**, calendario inteligente de próximos lanzamientos y un sistema de diseño inmersivo con estética *Glassmorphism*.
 
@@ -27,17 +27,17 @@ Cuenta con un potente constructor de **Guías Cronológicas interactivas**, modi
 - **Estantería Inteligente con Subcategorías por Estado**: Organización automática por medios y estados contextuales (*Viendo / Al día, Pausadas, Terminadas / Leídas, 🏆 100%, Por ver/leer/jugar y Abandonadas*) con contadores tipográficos sutiles y suma matemática unificada.
 - **Selectores de Progreso Inteligentes por Formato**:
   - *Series y Anime*: Detección automática del siguiente episodio por ver, avance con un solo clic, estado "Al día" en emisión, exclusión de extras/especiales en el cómputo y árbol interactivo de temporadas.
-  - *Libros, Cómics y Mangas*: Contador interactivo de páginas leídas, porcentaje en tiempo real, sincronización de grapas/números sueltos dentro de tomos y confirmación de números anteriores.
+  - *Libros, Manga y Cómics*: Contador interactivo de páginas leídas, porcentaje en tiempo real, sincronización de grapas/números sueltos dentro de tomos y confirmación de números anteriores.
   - *Juegos y Películas*: Registro dinámico de tiempo dedicado (*horas y minutos*), soporte para películas pausadas, juegos infinitos/continuos y distinciones entre completado estándar y **100% completado**.
 - **Calendario de Próximos Estrenos**:
   - Pestaña *Próximos* con visualización en *Calendario* mensual persistente y sección *Por Confirmar (TBA)* para obras anunciadas sin fecha exacta.
   - Persistencia permanente de fechas de estreno (`release_date`) en la base de datos para carga instantánea en 0 ms.
 
 ### 🧭 Exploración, Tendencias y Destacados
-- **Tendencias Globales y por Categoría**: Descubre lo más popular en películas, series, anime, libros, cómics y juegos en una interfaz fluida.
+- **Tendencias Globales y por Categoría**: Descubre lo más popular en películas, series, anime, libros, manga, cómics, juegos y música en una interfaz fluida.
 - **Pestaña de Guías Comunitarias**: Explora colecciones y cronologías recomendadas por la comunidad con métricas de votos, vistas y creadores.
 - **Vitrina de Obras Destacadas en Perfil**:
-  - Selección de hasta 7 (Free) o 70 (Pro) favoritos con filtros por tipo de obra y vistas en *Grid* o *Lista*.
+  - Selección de 1 obra por categoría (hasta 8 en Free) o hasta 10 por categoría (hasta 80 en Pro / Top 10) con filtros por tipo de obra y vistas en *Grid* o *Lista*.
   - Reordenamiento visual mediante **Arrastrar y Soltar (*Drag & Drop*)** y persistencia cronológica (`favorited_at` / `favorite_order`).
   - Navegación lateral con soporte para desplazamiento continuo (*Hold-to-Scroll*) y visualización fluida de 1 o 2 filas.
 
@@ -90,10 +90,12 @@ Cuenta con un potente constructor de **Guías Cronológicas interactivas**, modi
 |---|:---:|:---:|
 | **Biblioteca & Seguimiento Personal** | Ilimitado | Ilimitado |
 | **Experiencia sin Publicidad (Ad-Free)** | — | ✅ 100% Libre de Anuncios |
-| **Historial Detallado de Re-consumo** | Hasta 2 por obra | ✅ Ilimitado con Fechas |
-| **Obras Destacadas en el Perfil** | Hasta 7 obras | ✅ Hasta 70 obras |
-| **Creación de Guías Cronológicas** | Hasta 2 públicas | ✅ Ilimitadas (Públicas, Privadas y No Listadas) |
-| **Personalización** | Básico | ✅ Color de acento, avatar, fondo, banner y orden de categorías personalizado |
+| **Re-consumo de Obras** | Contador de re-consumos | ✅ Historial cronológico completo con fechas detalladas |
+| **Obras Destacadas en el Perfil** | 1 obra por categoría (hasta 8) | ✅ Hasta 10 por categoría (Top 10 / hasta 80) |
+| **Creación de Guías Cronológicas** | Públicas | ✅ Públicas, Privadas y No Listadas |
+| **Protección Anti-spoilers** | Estándar | ✅ Desenfoque automático de carátulas y episodios no vistos |
+| **Personalización de Interfaz** | Fondo y color predeterminado | ✅ Color de la interfaz en toda la app, portadas panorámicas y fondos de pantalla HD |
+| **Orden de Categorías** | Estándar | ✅ Reorganización libre en toda la app |
 | **Insignia Distintiva en la Comunidad** | — | ⭐ Insignia Dorada Premium / VIP |
 
 ---
@@ -103,11 +105,11 @@ Cuenta con un potente constructor de **Guías Cronológicas interactivas**, modi
 Pathd se alimenta e integra con los mejores servicios y APIs abiertas del mundo:
 
 - 🎬 **Películas**: [OMDb API](https://www.omdbapi.com/) & [Fanart.tv](https://fanart.tv/)
-- 📺 **Series & Anime**: [TVMaze](https://www.tvmaze.com/) & [AniList GraphQL](https://anilist.co/)
+- 📺 **Series & Anime**: [TVMaze](https://www.tvmaze.com/)
 - 📚 **Libros**: [Google Books](https://developers.google.com/books) & [Open Library](https://openlibrary.org/)
+- 🌸 **Manga & Novelas Ligeras**: [AniList GraphQL](https://anilist.co/)
 - 🦸 **Cómics**: [Comic Vine](https://comicvine.gamespot.com/)
-- 🌸 **Mangas & Novelas Ligeras**: [AniList GraphQL](https://anilist.co/)
-- 🎮 **Videojuegos**: [IGDB / Twitch](https://www.igdb.com/)
+- 🎮 **Juegos**: [IGDB / Twitch](https://www.igdb.com/)
 - 🎵 **Música & Scrobbling**: [Last.fm](https://www.last.fm/), [Deezer API](https://developers.deezer.com/) & [Apple iTunes](https://developer.apple.com/library/archive/documentation/AudioVideo/Conceptual/iTuneSearchAPI/index.html)
 - 🎭 **GIFs, Memes & Clips**: [KLIPY API](https://klipy.co/)
 - 💳 **Pagos Seguros**: [Dodo Payments](https://dodopayments.com/)
@@ -125,6 +127,6 @@ Si eres desarrollador o deseas auditar la arquitectura:
 ---
 
 <div align="center">
-  <sub>Desarrollado con ❤️ para amantes del cine, las series, el anime, los cómics, la literatura, los videojuegos y la música.</sub><br>
+  <sub>Desarrollado con ❤️ para amantes del cine, las series, el anime, los libros, el manga, los cómics, los juegos y la música.</sub><br>
   <sub>© 2026 Pathd (pathd.net). Todos los derechos reservados.</sub>
 </div>

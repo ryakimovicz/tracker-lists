@@ -12,7 +12,7 @@ Frontend oficial de **Pathd (v0.9.10)**, desarrollado como una Single Page Appli
 - **Diseño & Estilos**:
   - Vanilla CSS con sistema de diseño modular basado en variables CSS personalizadas (**Solar Amber `#f59e0b`** y **Deep Cinema Charcoal `#090d16`**).
   - Efectos *Glassmorphism* y desenfoques por capas (`backdrop-filter`).
-  - Colores temáticos y scrollbars contextuales por categoría (*Movies, Series, Anime, Books, Comics, Manga, Games*).
+  - Colores temáticos y scrollbars contextuales por categoría (*Movies, TV Shows, Anime, Books, Manga, Comics, Games, Music*).
   - Tipografía moderna (*Inter / Outfit*).
 - **Multimedia & Comunidad**:
   - **KLIPY API Integrada**: Selector de contenido enriquecido (**GIFs, Stickers, Memes y Clips de Audio**) en reseñas y comentarios con persistencia de favoritos (`klipyFavorites.ts`), buscador reactivo, slider de volumen y auto-silenciado en scroll o pérdida de foco.
@@ -72,6 +72,7 @@ frontend/src/
 │   ├── MusicRouteModal.tsx         # Enrutador modal deep-linked para música sincronizado con la URL
 │   ├── PostRouteModal.tsx          # Enrutador modal deep-linked para publicaciones
 │   ├── PremiumRouteModal.tsx       # Enrutador modal deep-linked para membresías
+│   ├── ProModal.tsx                # Modal de suscripción, beneficios y checkout de Pathd Premium
 │   ├── ErrorBoundary.tsx           # Error Boundary global con interfaz de recuperación y reintento
 │   ├── OfflineDetector.tsx         # Detector reactivo de conectividad de red con banner de reconexión
 │   ├── MobileBottomNav.tsx         # Barra de navegación inferior adaptativa para dispositivos móviles
@@ -84,7 +85,8 @@ frontend/src/
 │   ├── Sidebar.tsx                 # Navegación principal con prefetch inteligente al hover
 │   ├── ReplaceFavoriteModal.tsx    # Modal para reemplazar obras destacadas al alcanzar el límite
 │   ├── ReplaceSavedGuideModal.tsx  # Modal para reemplazar guías guardadas al alcanzar el límite
-│   ├── ConsumptionHistoryModal.tsx # Historial cronológico de re-consumo y fechas
+│   ├── SearchPanel.tsx             # Panel de búsqueda rápida y navegación de resultados
+│   ├── SwipeViewPager.tsx          # Paginador táctil fluido con gestos para navegación móvil
 │   ├── AdBanner.tsx                # Bloques de publicidad responsiva con bypass para usuarios Pro
 │   └── ...
 ├── context/      # Contextos globales de estado:
@@ -95,23 +97,25 @@ frontend/src/
 │   ├── useContinuousScroll.ts      # Desplazamiento continuo por clic sostenido en carruseles
 │   └── useScrollLock.ts            # Bloqueo dinámico de scroll del body en modales abiertos
 ├── pages/        # Vistas y pantallas de la aplicación (lazy-loaded con React.lazy):
+│   ├── Landing.tsx                 # Presentación pública de Pathd, planes, características y FAQ
 │   ├── Home.tsx                    # Dashboard (Continuar, Próximos/Calendario, Seguimiento)
 │   ├── Search.tsx                  # Búsqueda global, filtros por categoría y adición rápida
-│   ├── Explore.tsx                 # Tendencias multimedia y Guías comunitarias destacadas
-│   ├── Library.tsx                 # Estantería personal con filtros, estados y badge 100%
 │   ├── Social.tsx                  # Feed de actividad de seguidos y comunidad
 │   ├── CreateGuide.tsx             # Constructor interactivo de guías cronológicas (Drag & Drop)
-│   ├── GuideDetail.tsx             # Vista y progreso de guías con soporte para Mods
+│   ├── ViewGuide.tsx               # Vista y progreso de guías con soporte para Mods
 │   ├── Profile.tsx                 # Perfil (Estantería con subcategorías por estado, Favoritos Drag & Drop, Guías, Last.fm)
-│   ├── Customize.tsx               # Personalización estética de perfil y orden de categorías
+│   ├── Customize.tsx               # Personalización estética de la interfaz y orden de categorías
 │   ├── Settings.tsx                # Configuración de cuenta, seguridad y suscripciones
+│   ├── AdminPanel.tsx              # Panel de administración, métricas y moderación
+│   ├── TermsOfService.tsx          # Términos del servicio, atribuciones y políticas de APIs
+│   ├── PrivacyPolicy.tsx           # Política de privacidad, almacenamiento local y telemetría
 │   └── NotFound.tsx                # Página 404 global para rutas inexistentes
-└── utils/        # Utilidades y motores de caché:
-    ├── shelfCache.ts               # Caché local y diccionario hash O(1) de obras en estantería para sincronización inmediata
-    ├── klipyFavorites.ts           # Almacenamiento local de favoritos de KLIPY
-    ├── prefetch.ts                 # Motor de prefetching anticipado y warmup
-    ├── seriesCache.ts              # Caché de metadatos de episodios y volúmenes
-    ├── profileThemes.ts            # Paletas de color temáticas y estilos dinámicos de perfil
-    └── categoryOrder.ts            # Orden y visibilidad personalizada de categorías
+├── utils/        # Utilidades y motores de caché:
+│   ├── shelfCache.ts               # Caché local y diccionario hash O(1) de obras en estantería para sincronización inmediata
+│   ├── klipyFavorites.ts           # Almacenamiento local de favoritos de KLIPY
+│   ├── prefetch.ts                 # Motor de prefetching anticipado y warmup
+│   ├── seriesCache.ts              # Caché de metadatos de episodios y volúmenes
+│   ├── profileThemes.ts            # Paletas de color temáticas y estilos dinámicos de perfil
+│   └── categoryOrder.ts            # Orden y visibilidad personalizada de categorías
 ```
 
