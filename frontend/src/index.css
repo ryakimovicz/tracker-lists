@@ -2114,8 +2114,7 @@ h1, h2, h3, h4, h5, h6 {
   }
 
   .social-tab-item.active .social-tab-indicator,
-  .explore-subtab-item.active .explore-subtab-indicator,
-  .profile-tab-btn.active .profile-tab-indicator {
+  .explore-subtab-item.active .explore-subtab-indicator {
     display: none !important;
   }
 

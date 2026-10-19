@@ -5257,9 +5257,6 @@ export const Profile: React.FC = () => {
                     )}
                   </span>
                   <span className="profile-tab-label">{tab.label}</span>
-                  {isActive && (
-                    <div className="profile-tab-indicator home-desktop-only" style={{ position: 'absolute', bottom: '-0.75rem', left: 0, right: 0, height: '2px', background: tab.color }} />
-                  )}
                 </button>
               );
             })}
