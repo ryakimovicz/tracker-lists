@@ -689,10 +689,29 @@ export const Search: React.FC = () => {
     ? (normalizedTabParam as ExploreTab)
     : 'new';
 
+  const [activeExploreSubTab, setActiveExploreSubTab] = useState<ExploreTab>(exploreSubTab);
+
+  useEffect(() => {
+    setActiveExploreSubTab(exploreSubTab);
+  }, [exploreSubTab]);
+
   const handleExploreSubTabChange = (tab: ExploreTab) => {
     if (typeof window !== 'undefined') {
       window.scrollTo({ top: 0, behavior: 'instant' });
     }
+    setActiveExploreSubTab(tab);
+
+    const step = tab === 'trending' ? 1 : tab === 'guides' ? 2 : 0;
+    if (exploreSubtabsContainerRef.current) {
+      exploreSubtabsContainerRef.current.style.setProperty('--tab-progress', String(step));
+      const indColor = step === 1 ? '#f97316' : step === 2 ? 'var(--color-guide, #2DD4BF)' : 'var(--accent-primary)';
+      exploreSubtabsContainerRef.current.style.setProperty('--explore-indicator-color', indColor);
+    }
+    subtabItemRefs.current.forEach((el, i) => {
+      if (!el) return;
+      el.style.setProperty('--tab-act', i === step ? '1' : '0');
+    });
+
     const newParams = new URLSearchParams(searchParams);
     if (tab === 'new') {
       newParams.delete('tab');
@@ -702,15 +721,26 @@ export const Search: React.FC = () => {
     setSearchParams(newParams);
   };
 
-  const currentExploreStep = exploreSubTab === 'trending' ? 1 : exploreSubTab === 'guides' ? 2 : 0;
+  const currentExploreStep = activeExploreSubTab === 'trending' ? 1 : activeExploreSubTab === 'guides' ? 2 : 0;
 
   const goToExploreStep = (step: number) => {
     if (typeof window !== 'undefined') {
       window.scrollTo({ top: 0, behavior: 'instant' });
     }
-    if (step === 1) handleExploreSubTabChange('trending');
-    else if (step === 2) handleExploreSubTabChange('guides');
-    else handleExploreSubTabChange('new');
+    const targetTab = step === 1 ? 'trending' : step === 2 ? 'guides' : 'new';
+    setActiveExploreSubTab(targetTab);
+
+    if (exploreSubtabsContainerRef.current) {
+      exploreSubtabsContainerRef.current.style.setProperty('--tab-progress', String(step));
+      const indColor = step === 1 ? '#f97316' : step === 2 ? 'var(--color-guide, #2DD4BF)' : 'var(--accent-primary)';
+      exploreSubtabsContainerRef.current.style.setProperty('--explore-indicator-color', indColor);
+    }
+    subtabItemRefs.current.forEach((el, i) => {
+      if (!el) return;
+      el.style.setProperty('--tab-act', i === step ? '1' : '0');
+    });
+
+    handleExploreSubTabChange(targetTab);
   };
 
   const exploreSubtabsContainerRef = useRef<HTMLDivElement>(null);
@@ -806,10 +836,10 @@ export const Search: React.FC = () => {
   }, [exploreData, language, user?.category_order]);
 
   const filteredExploreCategories = React.useMemo(() => {
-    const targetCats = exploreSubTab === 'trending' ? exploreTrendingCategories : exploreNewCategories;
+    const targetCats = activeExploreSubTab === 'trending' ? exploreTrendingCategories : exploreNewCategories;
     if (activeTab === 'all') return targetCats;
     return targetCats.filter(cat => cat.type === activeTab);
-  }, [exploreSubTab, exploreTrendingCategories, exploreNewCategories, activeTab]);
+  }, [activeExploreSubTab, exploreTrendingCategories, exploreNewCategories, activeTab]);
 
   const getCategoryLabel = (cat: string) => {
     switch (cat) {
@@ -975,7 +1005,7 @@ export const Search: React.FC = () => {
   }, [submittedQuery]);
 
   useEffect(() => {
-    if (submittedQuery === '' && exploreSubTab === 'guides' && !guidesData) {
+    if (submittedQuery === '' && activeExploreSubTab === 'guides' && !guidesData) {
       const fetchGuides = async () => {
         const cachedRaw = sessionStorage.getItem('pathd_guides_explore_cache');
         if (cachedRaw) {
@@ -998,7 +1028,7 @@ export const Search: React.FC = () => {
       };
       fetchGuides();
     }
-  }, [submittedQuery, exploreSubTab, guidesData]);
+  }, [submittedQuery, activeExploreSubTab, guidesData]);
 
   const searchRequestIdRef = React.useRef<number>(0);
 
@@ -1657,11 +1687,11 @@ export const Search: React.FC = () => {
               <button 
                 type="button"
                 ref={el => { subtabItemRefs.current[0] = el; }}
-                className={`explore-subtab-item explore-tab-new ${exploreSubTab === 'new' ? 'active' : ''}`}
+                className={`explore-subtab-item explore-tab-new ${activeExploreSubTab === 'new' ? 'active' : ''}`}
                 onClick={() => goToExploreStep(0)}
                 title={t('exploreNew')}
                 style={{
-                  fontSize: "1.05rem", fontWeight: exploreSubTab === 'new' ? 600 : 500,
+                  fontSize: "1.05rem", fontWeight: activeExploreSubTab === 'new' ? 600 : 500,
                   background: "transparent",
                   border: "none",
                   cursor: "pointer",
@@ -1671,14 +1701,14 @@ export const Search: React.FC = () => {
                   alignItems: "center",
                   gap: "0.5rem",
                   '--tab-color': 'var(--accent-primary)',
-                  '--tab-act': exploreSubTab === 'new' ? '1' : '0'
+                  '--tab-act': activeExploreSubTab === 'new' ? '1' : '0'
                 } as React.CSSProperties}
               >
                 <span className="explore-subtab-icon">
                   <Rocket size={17} />
                 </span>
                 <span className="explore-subtab-label">{t('exploreNew')}</span>
-                {exploreSubTab === 'new' && (
+                {activeExploreSubTab === 'new' && (
                   <div className="explore-subtab-indicator home-desktop-only" style={{ position: "absolute", bottom: "-0.75rem", left: 0, right: 0, height: "2px", background: "var(--accent-primary)" }} />
                 )}
               </button>
@@ -1686,11 +1716,11 @@ export const Search: React.FC = () => {
               <button 
                 type="button"
                 ref={el => { subtabItemRefs.current[1] = el; }}
-                className={`explore-subtab-item explore-tab-trending ${exploreSubTab === 'trending' ? 'active' : ''}`}
+                className={`explore-subtab-item explore-tab-trending ${activeExploreSubTab === 'trending' ? 'active' : ''}`}
                 onClick={() => goToExploreStep(1)}
                 title={t('exploreTrending')}
                 style={{
-                  fontSize: "1.05rem", fontWeight: exploreSubTab === 'trending' ? 600 : 500,
+                  fontSize: "1.05rem", fontWeight: activeExploreSubTab === 'trending' ? 600 : 500,
                   background: "transparent",
                   border: "none",
                   cursor: "pointer",
@@ -1700,14 +1730,14 @@ export const Search: React.FC = () => {
                   alignItems: "center",
                   gap: "0.5rem",
                   '--tab-color': '#f97316',
-                  '--tab-act': exploreSubTab === 'trending' ? '1' : '0'
+                  '--tab-act': activeExploreSubTab === 'trending' ? '1' : '0'
                 } as React.CSSProperties}
               >
                 <span className="explore-subtab-icon">
                   <Flame size={17} />
                 </span>
                 <span className="explore-subtab-label">{t('exploreTrending')}</span>
-                {exploreSubTab === 'trending' && (
+                {activeExploreSubTab === 'trending' && (
                   <div className="explore-subtab-indicator home-desktop-only" style={{ position: "absolute", bottom: "-0.75rem", left: 0, right: 0, height: "2px", background: "#f97316" }} />
                 )}
               </button>
@@ -1715,11 +1745,11 @@ export const Search: React.FC = () => {
               <button 
                 type="button"
                 ref={el => { subtabItemRefs.current[2] = el; }}
-                className={`explore-subtab-item explore-tab-guides ${exploreSubTab === 'guides' ? 'active' : ''}`}
+                className={`explore-subtab-item explore-tab-guides ${activeExploreSubTab === 'guides' ? 'active' : ''}`}
                 onClick={() => goToExploreStep(2)}
                 title={t('exploreGuides')}
                 style={{
-                  fontSize: "1.05rem", fontWeight: exploreSubTab === 'guides' ? 600 : 500,
+                  fontSize: "1.05rem", fontWeight: activeExploreSubTab === 'guides' ? 600 : 500,
                   background: "transparent",
                   border: "none",
                   cursor: "pointer",
@@ -1729,14 +1759,14 @@ export const Search: React.FC = () => {
                   alignItems: "center",
                   gap: "0.5rem",
                   '--tab-color': 'var(--color-guide, #2DD4BF)',
-                  '--tab-act': exploreSubTab === 'guides' ? '1' : '0'
+                  '--tab-act': activeExploreSubTab === 'guides' ? '1' : '0'
                 } as React.CSSProperties}
               >
                 <span className="explore-subtab-icon">
                   <BookOpen size={17} />
                 </span>
                 <span className="explore-subtab-label">{t('exploreGuides')}</span>
-                {exploreSubTab === 'guides' && (
+                {activeExploreSubTab === 'guides' && (
                   <div className="explore-subtab-indicator home-desktop-only" style={{ position: "absolute", bottom: "-0.75rem", left: 0, right: 0, height: "2px", background: "var(--color-guide)" }} />
                 )}
               </button>
