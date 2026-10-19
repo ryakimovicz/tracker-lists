@@ -3282,6 +3282,34 @@ h1, h2, h3, h4, h5, h6 {
   animation: slideDownToast 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+/* Mobile Moving Favorite Toast (shown while holding down a card) */
+.fav-moving-mobile-toast {
+  position: fixed;
+  top: calc(56px + env(safe-area-inset-top, 0px) + 14px);
+  left: 16px;
+  right: 16px;
+  max-width: 390px;
+  margin: 0 auto;
+  z-index: 999999;
+  pointer-events: none;
+  background: rgba(18, 21, 33, 0.94);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1.5px solid var(--color-user, #F472B6);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.65), 0 0 24px rgba(244, 114, 182, 0.35);
+  border-radius: 14px;
+  padding: 0.6rem 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  animation: slideDownToast 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+[data-theme="light"] .fav-moving-mobile-toast {
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.15), 0 0 24px rgba(244, 114, 182, 0.25);
+}
+
 /* Floating Toast Notification for Customize Page */
 @keyframes toastSlideUpDesktop {
   0% {

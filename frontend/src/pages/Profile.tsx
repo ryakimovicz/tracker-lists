@@ -7053,9 +7053,10 @@ export const Profile: React.FC = () => {
             );
           })()}
 
-          {/* Floating Drag Preview Follower */}
+          {/* Floating Drag Preview Follower (Desktop only) */}
           {favPointerDrag && favPointerDrag.isDragging && (
             <div
+              className="home-desktop-only"
               style={{
                 position: 'fixed',
                 left: favPointerDrag.currentX + 14,
@@ -7089,6 +7090,27 @@ export const Profile: React.FC = () => {
                 </span>
                 <span style={{ fontSize: '0.7rem', color: 'var(--color-user, #F472B6)', fontWeight: 600 }}>
                   {language === 'es' ? 'Moviendo destacado' : 'Moving favorite'}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Mobile Toast Notification while holding / dragging a card (Mobile only) */}
+          {favPointerDrag && favPointerDrag.isDragging && (
+            <div className="fav-moving-mobile-toast home-mobile-only">
+              {favPointerDrag.item.image_url && (
+                <img
+                  src={favPointerDrag.item.image_url}
+                  alt=""
+                  style={{ width: '30px', height: '42px', objectFit: 'cover', borderRadius: '6px', flexShrink: 0 }}
+                />
+              )}
+              <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0, flex: 1 }}>
+                <span style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {favPointerDrag.item.title}
+                </span>
+                <span style={{ fontSize: '0.76rem', color: 'var(--color-user, #F472B6)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                  <span>{language === 'es' ? 'Moviendo destacado...' : 'Moving favorite...'}</span>
                 </span>
               </div>
             </div>
