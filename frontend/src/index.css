@@ -4096,4 +4096,32 @@ h1, h2, h3, h4, h5, h6 {
   will-change: transform;
 }
 
+/* Landing Page Feature Cards Responsive Grid */
+.landing-features-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+}
+
+@media (min-width: 560px) {
+  .landing-features-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 860px) and (max-width: 1119px) {
+  .landing-features-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .landing-features-grid > :nth-child(4) {
+    grid-column: 2 / 3;
+  }
+}
+
+@media (min-width: 1120px) {
+  .landing-features-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
 

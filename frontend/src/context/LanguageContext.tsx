@@ -31,22 +31,24 @@ const translations: Translations = {
 
 
   // Landing Page
-  heroTitleLine1: { en: 'Guides for everything you love', es: 'Guías de todo lo que amas' },
-  heroTitleLine2: { en: 'in a single place', es: 'en un único sitio' },
-  heroSubtitle: { en: 'Movies, series, anime, books, comics, manga, and games. Create complete guides, track your progress, and discover your next obsession together with the community.', es: 'Películas, series, animes, libros, comics, mangas y juegos. Crea las guías completas, haz un seguimiento de tu progreso y descubre tu próxima obsesión junto a la comunidad.' },
-  btnStartCollection: { en: 'Start My Collection', es: 'Empezar mi colección' },
-  btnExploreGuides: { en: 'Explore Guides', es: 'Explorar Guías' },
+  heroTitleLine1: { en: 'Everything you watch, read, play, and listen to.', es: 'Todo lo que ves, lees, juegas y escuchas.' },
+  heroTitleLine2: { en: 'In a single place.', es: 'En un solo lugar.' },
+  heroSubtitle: { en: 'Your home for movies, TV shows, anime, books, manga, comics, games, and music. Track your progress, rate with stars, build chronological universes, and discover your next obsession.', es: 'Tu espacio para películas, series, anime, libros, manga, cómics, juegos y música. Registra tu progreso, puntúa con estrellas, crea universos cronológicos y descubre tu próxima obsesión.' },
+  btnStartCollection: { en: 'Get Started for Free', es: 'Empezar gratis' },
+  btnExploreGuides: { en: 'Explore Guides', es: 'Explorar guías' },
   
   // Features
-  featTrackerTitle: { en: 'All-in-One Tracker', es: 'Tracker Todo en Uno' },
-  featTrackerDesc: { en: 'Track movies, TV shows, anime, books, comics, manga, and games. Log your activity, rate, and visualize your stats in a single unified profile.', es: 'Lleva el control de películas, series, anime, libros, cómics, mangas y juegos. Registra tu consumo, puntúa y visualiza estadísticas en un solo perfil unificado.' },
+  featTrackerTitle: { en: 'Universal Tracker', es: 'Tracker todo en uno' },
+  featTrackerDesc: { en: 'Track movies, TV shows, anime, books, manga, comics, games, and music. Log your consumption, rate with stars, record your progress, and view detailed statistics.', es: 'Lleva el control de películas, series, anime, libros, manga, cómics, juegos y música. Registra tu consumo, califica con estrellas, lleva el registro de tu progreso y visualiza tus estadísticas.' },
+  
+  featSearchTitle: { en: 'Guides & Cross-Media Universes', es: 'Guías y universos cronológicos' },
+  featSearchDesc: { en: 'Create and explore chronological or thematic lists combining any format. Organize complex sagas and franchises interleaving books, movies, shows, and games.', es: 'Crea y explora listas cronológicas o temáticas combinando cualquier formato. La herramienta ideal para organizar sagas y franquicias complejas intercalando libros, películas, series y juegos.' },
+  
+  featModsTitle: { en: 'Community & Reviews Without Spoilers', es: 'Comunidad y reseñas sin spoilers' },
+  featModsDesc: { en: 'Follow friends\' progress, share reviews, and join comments with Klipy GIFs, stickers, and clips, with one-click anti-spoiler blurs.', es: 'Sigue el progreso de tus amigos, comparte opiniones y participa en comentarios con GIFs, stickers y clips de Klipy, con desenfoque anti-spoilers con un solo clic.' },
 
-  
-  featSearchTitle: { en: 'Guides & Endless Universes', es: 'Guías y Universos Sin Fronteras' },
-  featSearchDesc: { en: 'Create and explore chronological or thematic lists combining any format. The ideal tool for organizing complex sagas and franchises.', es: 'Crea y explora listas cronológicas o temáticas combinando cualquier formato. La herramienta perfecta para organizar sagas y franquicias complejas.' },
-  
-  featModsTitle: { en: 'Community & Customization', es: 'Comunidad y Personalización' },
-  featModsDesc: { en: 'Follow friends\' progress, share recommendations, and enrich any guide by adding custom items and special notes.', es: 'Sigue el progreso de amigos, comparte recomendaciones y enriquece cualquier guía añadiendo ítems personalizados y notas especiales.' },
+  featMusicStatsTitle: { en: 'Music & Listening Stats', es: 'Música y estadísticas' },
+  featMusicStatsDesc: { en: 'Connect your Last.fm profile, explore artists and albums, and see your real-time scrobbles directly in your unified profile.', es: 'Conecta tu cuenta de Last.fm, explora artistas y álbumes, y visualiza tus scrobbles en tiempo real junto al resto de tu entretenimiento.' },
 
 
   // Priority Levels
@@ -164,12 +166,12 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (language === 'es') {
       document.title = 'Pathd • Seguimiento Multimedia y Guías';
       if (metaDesc) {
-        metaDesc.setAttribute('content', 'Organiza, descubre y lleva el seguimiento de películas, series, animes, libros, cómics, mangas y videojuegos. Crea y explora guías cronológicas comunitarias.');
+        metaDesc.setAttribute('content', 'Organiza, descubre y lleva el seguimiento de películas, series, anime, libros, manga, cómics, juegos y música. Crea y explora guías cronológicas comunitarias.');
       }
     } else {
       document.title = 'Pathd • Media Tracker & Guides';
       if (metaDesc) {
-        metaDesc.setAttribute('content', 'Track, discover and organize movies, TV shows, anime, books, comics, manga, and video games. Create and explore community chronological guides.');
+        metaDesc.setAttribute('content', 'Track, discover and organize movies, TV shows, anime, books, manga, comics, games, and music. Create and explore community chronological guides.');
       }
     }
   }, [language]);

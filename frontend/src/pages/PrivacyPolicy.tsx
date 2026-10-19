@@ -221,6 +221,12 @@ export const PrivacyPolicy: React.FC<PrivacyPolicyProps> = ({ onClose, isModal }
               ? 'Métricas de Red y Rendimiento (Cloudflare): Utilizamos Cloudflare Web Analytics a nivel de infraestructura para medir la velocidad de carga, estabilidad del servicio y volumen de tráfico general. Esta medición es totalmente anónima, no utiliza cookies, no almacena direcciones IP y no realiza seguimiento individual de los usuarios.'
               : 'Network & Performance Metrics (Cloudflare): We use Cloudflare Web Analytics at the infrastructure level to measure loading speeds, service reliability, and aggregate traffic volumes. This measurement is completely anonymous, uses no cookies, does not store IP addresses, and performs no cross-site tracking.'}
           </p>
+
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '0.75rem' }}>
+            {isEs
+              ? 'Diagnóstico y Reporte de Errores (Sentry): Utilizamos Sentry (Functional Software, Inc.) exclusivamente para detectar excepciones técnicas no controladas, registrar fallos de software y medir la estabilidad del servicio en tiempo real. Esta herramienta recopila únicamente datos técnicos de diagnóstico (como tipo y versión de navegador, sistema operativo y traza del error en el código) para permitirnos corregir fallos con rapidez. Sentry no almacena contraseñas, no realiza seguimiento publicitario ni comercializa tus datos.'
+              : 'Error Reporting & Diagnostics (Sentry): We use Sentry (Functional Software, Inc.) exclusively to detect unhandled technical exceptions, capture software crashes, and monitor service stability in real time. This tool collects only technical diagnostic information (such as browser type and version, operating system, and code error stack traces) to enable us to fix bugs promptly. Sentry does not store passwords, does not perform advertising tracking, and never sells your data.'}
+          </p>
         </section>
 
         <section style={{ marginBottom: '2rem' }}>

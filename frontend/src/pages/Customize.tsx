@@ -1005,12 +1005,12 @@ export const CustomizePage: React.FC = () => {
           </div>
         </div>
 
-        {/* 2. Color de Perfil */}
+        {/* 2. Color de la Interfaz */}
         <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px' }}>
           <div style={{ marginBottom: '1.25rem' }}>
             <h3 style={{ fontSize: '1.15rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.45rem', margin: 0 }}>
               <Palette size={19} color="var(--accent-primary)" />
-              {isEs ? 'Color de perfil' : 'Profile Color'}
+              {isEs ? 'Color de la interfaz' : 'Interface Color'}
               <span
                 style={{
                   fontSize: '0.65rem',
@@ -1031,8 +1031,8 @@ export const CustomizePage: React.FC = () => {
 
             <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: '0.25rem 0 0' }}>
               {isEs
-                ? 'Elige el color de acento y resplandor para tu perfil.'
-                : 'Choose the accent and glow color for your profile.'}
+                ? 'Elige el color principal para botones, detalles y elementos activos en toda la plataforma.'
+                : 'Choose the main color for buttons, highlights, and active elements across the entire platform.'}
             </p>
           </div>
 

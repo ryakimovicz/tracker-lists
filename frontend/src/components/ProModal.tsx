@@ -245,8 +245,8 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
               </h4>
               <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.35 }}>
                 {isEs
-                  ? 'Arma tu Top 10 en Películas, Series, Anime, Libros, Cómics, Manga y Juegos (hasta 70 obras en total).'
-                  : 'Build your ultimate Top 10 in Movies, TV Shows, Anime, Books, Comics, Manga, and Games (up to 70 total).'}
+                  ? 'Arma tu Top 10 en Películas, Series, Anime, Libros, Manga, Cómics y Juegos (hasta 70 obras en total).'
+                  : 'Build your ultimate Top 10 in Movies, TV Shows, Anime, Books, Manga, Comics, and Games (up to 70 total).'}
               </p>
             </div>
           </div>
@@ -258,12 +258,12 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
             </div>
             <div>
               <h4 style={{ margin: '0 0 0.15rem 0', fontSize: '0.92rem', fontWeight: 600 }}>
-                {isEs ? 'Personalización' : 'Customization'}
+                {isEs ? 'Color de la Interfaz y Personalización' : 'Interface Color & Customization'}
               </h4>
               <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.35 }}>
                 {isEs
-                  ? 'Elige tu propio color temático distintivo y reorganiza libremente el orden de las categorías en toda la plataforma.'
-                  : 'Choose your distinctive theme color and freely reorder categories across the entire platform.'}
+                  ? 'Elige el color principal de la interfaz en toda la plataforma y reorganiza libremente el orden de las categorías.'
+                  : 'Choose your main interface color across the entire platform and freely reorder categories.'}
               </p>
             </div>
           </div>
@@ -292,12 +292,12 @@ export const ProModal: React.FC<ProModalProps> = ({ onClose }) => {
             </div>
             <div>
               <h4 style={{ margin: '0 0 0.15rem 0', fontSize: '0.92rem', fontWeight: 600 }}>
-                {isEs ? 'Re-consumo Ilimitado e Historial' : 'Unlimited Re-consumption & History'}
+                {isEs ? 'Historial Completo de Re-consumos' : 'Full Re-consumption History'}
               </h4>
               <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.35 }}>
                 {isEs
-                  ? 'Vuelve a marcar obras completadas cuantas veces quieras y accede a tu lista cronológica de fechas de visualización, lectura y juego.'
-                  : 'Re-mark completed titles as many times as you want and access your full historical timeline of watches, reads, and plays.'}
+                  ? 'Vuelve a marcar obras completadas cuantas veces quieras y accede a tu lista cronológica detallada con fechas exactas de visualización, lectura y juego.'
+                  : 'Re-mark completed titles as many times as you want and access your detailed historical timeline of watches, reads, and plays.'}
               </p>
             </div>
           </div>

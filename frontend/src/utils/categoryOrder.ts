@@ -6,8 +6,8 @@ export const DEFAULT_CATEGORY_ORDER = [
   'series',
   'anime',
   'book',
-  'comic',
   'manga',
+  'comic',
   'game'
 ] as const;
 
