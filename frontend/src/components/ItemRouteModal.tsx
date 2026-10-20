@@ -119,12 +119,23 @@ export const ItemRouteModal: React.FC<ItemRouteModalProps> = ({ onClose, onUpdat
     };
   }, [type, id, location.state]);
 
+  const isFromParent = Boolean((location.state as any)?.fromParent || ((location.state as any)?.modalDepth || 0) > 1);
+
+  const handleBack = () => {
+    navigate(-1);
+  };
+
   const handleClose = () => {
     if (onClose) {
       onClose();
     }
+    const currentDepth = (location.state as any)?.modalDepth || 1;
     const bg = (location.state as any)?.backgroundLocation;
-    if (bg) {
+    if (bg && currentDepth > 1) {
+      navigate(-currentDepth);
+    } else if (bg && window.history.length > 1 && !isDirectPage) {
+      navigate(-1);
+    } else if (bg) {
       let targetUrl = typeof bg === 'string' ? bg : `${bg.pathname || '/'}${bg.search || ''}${bg.hash || ''}`;
       // Clean notifications query params if any were attached
       targetUrl = targetUrl.replace(/[?&]notifications(=[^&]*)?/g, '').replace(/[?&]notif_tab(=[^&]*)?/g, '').replace(/\?&/, '?').replace(/[?&]$/, '');
@@ -140,11 +151,13 @@ export const ItemRouteModal: React.FC<ItemRouteModalProps> = ({ onClose, onUpdat
     if (!newItem) return;
     const targetType = newItem.item_type || type || 'movie';
     const targetId = newItem.external_id || newItem.id;
+    const currentDepth = (location.state as any)?.modalDepth || 1;
     navigate(`/item/${targetType}/${targetId}`, {
-      replace: true,
       state: {
         backgroundLocation: (location.state as any)?.backgroundLocation || (isDirectPage ? { pathname: '/search' } : location),
-        item: newItem
+        item: newItem,
+        modalDepth: currentDepth + 1,
+        fromParent: true
       }
     });
   };
@@ -224,6 +237,7 @@ export const ItemRouteModal: React.FC<ItemRouteModalProps> = ({ onClose, onUpdat
       isOwnProfile={true}
       profileId={user?.id}
       onClose={handleClose}
+      onBack={isFromParent ? handleBack : undefined}
       onOpenItem={handleOpenItem}
       onUpdate={handleUpdate}
       isFavorite={Boolean(item?.is_favorite)}

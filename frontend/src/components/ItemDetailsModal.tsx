@@ -3,7 +3,7 @@ import { useTranslation } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
 import { getProfileTheme } from '../utils/profileThemes';
 import { apiClient, updateLibraryStatusSafe } from '../api/client';
-import { Star, Heart, X, Flag, CheckCircle, Check, CheckCheck, Plus, MoreVertical, Trash2, Clock, ChevronUp, ChevronDown, RotateCcw, BookOpen, Gamepad2, Package, Sparkles, Puzzle, Layers, ChevronLeft, ChevronRight, Calendar, RefreshCw, AlertCircle, Globe, Repeat, Trophy, ShieldAlert, Infinity as InfinityIcon, Reply, ThumbsUp, Edit2, Image as ImageIcon, Volume2, VolumeX, Play, Pause, MessageSquare, Eye, EyeOff } from 'lucide-react';
+import { Star, Heart, X, Flag, CheckCircle, Check, CheckCheck, Plus, MoreVertical, Trash2, Clock, ChevronUp, ChevronDown, RotateCcw, BookOpen, Gamepad2, Package, Sparkles, Puzzle, Layers, ChevronLeft, ChevronRight, Calendar, RefreshCw, AlertCircle, Globe, Repeat, Trophy, ShieldAlert, Infinity as InfinityIcon, Reply, ThumbsUp, Edit2, Image as ImageIcon, Volume2, VolumeX, Play, Pause, MessageSquare, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 
 
 
@@ -28,6 +28,7 @@ interface ItemDetailsModalProps {
   profileId?: number;
   profileColor?: string | null;
   onClose: () => void;
+  onBack?: () => void;
   onUpdate: (updatedItem?: any) => void; // Triggered when item details/status changes
   onOpenItem?: (item: any) => void;
   isFavorite?: boolean; // Prop from parent
@@ -1287,6 +1288,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   profileId,
   profileColor,
   onClose,
+  onBack,
   onUpdate: rawOnUpdate,
   onOpenItem,
   isFavorite = false,
@@ -5008,6 +5010,22 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     }
   };
 
+  const handleBackToParent = () => {
+    if (onBack) {
+      onBack();
+      return;
+    }
+    if (historyStack.length > 0) {
+      handleGoBackHistory();
+      return;
+    }
+    if (selectedItem?.parent_series && onOpenItem) {
+      onOpenItem(selectedItem.parent_series);
+      return;
+    }
+    onClose();
+  };
+
   const handleGoBackHistory = () => {
     if (historyStack.length === 0) {
       onClose();
@@ -6230,18 +6248,40 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
               {/* Modal Header */}
               <div className="item-details-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem' }}>
-                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: '0.85rem', alignItems: 'center' }}>
+                  {(onBack || historyStack.length > 0) && (
+                    <button
+                      type="button"
+                      onClick={handleBackToParent}
+                      className="btn-circle-action"
+                      title={language === 'es' ? (isComicIssue ? 'Volver al volumen' : 'Volver a la serie') : (isComicIssue ? 'Back to volume' : 'Back to series')}
+                      style={{
+                        width: '34px',
+                        height: '34px',
+                        minWidth: '34px',
+                        minHeight: '34px',
+                        padding: 0,
+                        borderRadius: '50%',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                        cursor: 'pointer',
+                        color: 'var(--text-primary)',
+                        border: '1px solid var(--border-color)',
+                        background: 'var(--bg-tertiary)',
+                        transition: 'all 0.2s ease'
+                      }}
+                    >
+                      <ArrowLeft size={18} />
+                    </button>
+                  )}
+
                   {isEpisode && epHeaderInfo ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                       {epHeaderInfo.seriesName && (
                         <div 
-                          onClick={async () => {
-                            if (selectedItem.parent_series && onOpenItem) {
-                              onOpenItem(selectedItem.parent_series);
-                            } else {
-                              handleGoBackHistory();
-                            }
-                          }}
+                          onClick={handleBackToParent}
                           style={{ 
                             fontSize: '0.9rem', 
                             fontWeight: 600, 
@@ -6252,8 +6292,12 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                             gap: '0.35rem',
                             width: 'fit-content'
                           }}
-                          title={language === 'es' ? 'Ver serie completa' : 'View full series'}
+                          title={language === 'es' 
+                            ? (onBack || historyStack.length > 0 ? (isComicIssue ? 'Volver al volumen' : 'Volver a la serie') : (isComicIssue ? 'Ver volumen completo' : 'Ver serie completa')) 
+                            : (onBack || historyStack.length > 0 ? (isComicIssue ? 'Back to volume' : 'Back to series') : (isComicIssue ? 'View full volume' : 'View full series'))
+                          }
                         >
+                          {(onBack || historyStack.length > 0) && <ChevronLeft size={15} style={{ flexShrink: 0 }} />}
                           <span>{epHeaderInfo.seriesName}</span>
                         </div>
                       )}

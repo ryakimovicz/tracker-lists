@@ -2265,6 +2265,15 @@ export const Home: React.FC = () => {
     window.history.pushState({ pathd_home_guard: true }, '', currentLoc);
 
     const handlePopState = (e: PopStateEvent) => {
+      // If an overlay modal route is active, let router handle modal navigation
+      if (
+        window.location.pathname.startsWith('/item/') ||
+        window.location.pathname.startsWith('/post/') ||
+        window.location.pathname.startsWith('/music/')
+      ) {
+        return;
+      }
+
       const now = Date.now();
       const elapsed = now - backPressTimeRef.current;
 
