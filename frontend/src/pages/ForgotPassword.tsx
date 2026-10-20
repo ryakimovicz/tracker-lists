@@ -34,16 +34,6 @@ export const ForgotPassword: React.FC = () => {
 
   return (
     <div className="auth-card">
-      <div className="auth-card-header-nav">
-        <Link to="/" className="auth-card-back-btn" title={isEs ? 'Volver al Inicio' : 'Back to Home'}>
-          <ArrowLeft size={15} />
-          <span>{isEs ? 'Inicio' : 'Home'}</span>
-        </Link>
-        <Link to="/login" className="auth-card-switch-link">
-          {isEs ? 'Iniciar sesión' : 'Login'}
-        </Link>
-      </div>
-
       {isSuccess ? (
         <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '1.25rem', alignItems: 'center' }}>
           <div style={{

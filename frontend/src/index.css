@@ -382,48 +382,6 @@ h1, h2, h3, h4, h5, h6 {
   border-color: var(--border-color) !important;
 }
 
-.auth-card-header-nav {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  margin-bottom: 0.85rem;
-}
-
-.auth-card-back-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  font-size: 0.84rem;
-  font-weight: 600;
-  color: var(--text-secondary);
-  text-decoration: none;
-  padding: 0.35rem 0.65rem;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--border-color);
-  transition: all 0.2s ease;
-}
-
-.auth-card-back-btn:hover,
-.auth-card-back-btn:active {
-  color: var(--accent-primary);
-  border-color: var(--accent-primary);
-  background: color-mix(in srgb, var(--accent-primary) 12%, transparent);
-}
-
-.auth-card-switch-link {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--accent-primary);
-  text-decoration: none;
-  transition: opacity 0.2s ease;
-}
-
-.auth-card-switch-link:hover {
-  text-decoration: underline;
-}
-
 .google-btn-wrapper {
   display: flex;
   justify-content: center;

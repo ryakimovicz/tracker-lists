@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../context/LanguageContext';
-import { CheckCircle, AlertCircle, Loader2, Mail, ArrowRight, ArrowLeft } from 'lucide-react';
+import { CheckCircle, AlertCircle, Loader2, Mail, ArrowRight } from 'lucide-react';
 
 export const VerifyEmail: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -74,15 +74,6 @@ export const VerifyEmail: React.FC = () => {
 
   return (
     <div className="auth-card" style={{ textAlign: 'center' }}>
-      <div className="auth-card-header-nav" style={{ marginBottom: '1.25rem' }}>
-        <Link to="/" className="auth-card-back-btn" title={isEs ? 'Volver al Inicio' : 'Back to Home'}>
-          <ArrowLeft size={15} />
-          <span>{isEs ? 'Inicio' : 'Home'}</span>
-        </Link>
-        <Link to="/login" className="auth-card-switch-link">
-          {isEs ? 'Iniciar sesión' : 'Login'}
-        </Link>
-      </div>
       {status === 'loading' && (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.25rem' }}>
           <Loader2 size={48} className="spin" color="var(--accent-primary)" />

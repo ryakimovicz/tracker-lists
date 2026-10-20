@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useSearchParams, Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from '../context/LanguageContext';
 import { apiClient } from '../api/client';
-import { Lock, CheckCircle, AlertCircle, Eye, EyeOff, ArrowRight, ArrowLeft } from 'lucide-react';
+import { Lock, CheckCircle, AlertCircle, Eye, EyeOff, ArrowRight } from 'lucide-react';
 
 export const ResetPassword: React.FC = () => {
   const { language, t } = useTranslation();
@@ -59,16 +59,6 @@ export const ResetPassword: React.FC = () => {
 
   return (
     <div className="auth-card">
-      <div className="auth-card-header-nav">
-        <Link to="/" className="auth-card-back-btn" title={isEs ? 'Volver al Inicio' : 'Back to Home'}>
-          <ArrowLeft size={15} />
-          <span>{isEs ? 'Inicio' : 'Home'}</span>
-        </Link>
-        <Link to="/login" className="auth-card-switch-link">
-          {t('navLogin')}
-        </Link>
-      </div>
-
       {isSuccess ? (
         <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '1.25rem', alignItems: 'center' }}>
           <div style={{

@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../context/LanguageContext';
 import { apiClient } from '../api/client';
-import { Mail, Lock, AlertCircle, LogIn, Eye, EyeOff, ArrowLeft } from 'lucide-react';
+import { Mail, Lock, AlertCircle, LogIn, Eye, EyeOff } from 'lucide-react';
 import { GoogleLogin, type CredentialResponse } from '@react-oauth/google';
 import { GoogleUsernameModal } from '../components/GoogleUsernameModal';
 import { AdBanner } from '../components/AdBanner';
@@ -157,16 +157,6 @@ export const Login: React.FC = () => {
 
   return (
     <div className="auth-card">
-      <div className="auth-card-header-nav">
-        <Link to="/" className="auth-card-back-btn" title={language === 'es' ? 'Volver al Inicio' : 'Back to Home'}>
-          <ArrowLeft size={15} />
-          <span>{language === 'es' ? 'Inicio' : 'Home'}</span>
-        </Link>
-        <Link to="/register" className="auth-card-switch-link">
-          {t('authRegisterButton')}
-        </Link>
-      </div>
-
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
 
         <div style={{ textAlign: 'center', marginBottom: '0.25rem' }}>
