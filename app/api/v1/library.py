@@ -761,20 +761,24 @@ def get_library(
     ext_ids = [it.external_id for it in items if it.external_id]
     counts_map = {}
     hundred_counts_map = {}
+    max_consumed_map = {}
     ratings_map = {}
+    has_repaired = False
     if ext_ids:
         from sqlalchemy import case
         counts = db.query(
             ConsumptionHistory.external_id,
             func.count(ConsumptionHistory.id),
-            func.sum(case((ConsumptionHistory.is_hundred_percent == True, 1), else_=0))
+            func.sum(case((ConsumptionHistory.is_hundred_percent == True, 1), else_=0)),
+            func.max(ConsumptionHistory.consumed_at)
         ).filter(
             ConsumptionHistory.user_id == target_user_id,
             ConsumptionHistory.external_id.in_(ext_ids)
         ).group_by(ConsumptionHistory.external_id).all()
-        for ext_id, c, h_c in counts:
+        for ext_id, c, h_c, max_c in counts:
             counts_map[ext_id] = c
             hundred_counts_map[ext_id] = int(h_c or 0)
+            max_consumed_map[ext_id] = max_c
 
         # Batch query user ratings for these items from MediaReview
         from app.models.review import MediaReview
@@ -867,6 +871,19 @@ def get_library(
                     else:
                         s_it.last_seen_episode = None
 
+                    # Self-heal series/comic completion date from actual episode progress records
+                    prog_dates = [p.completed_at for p in prog_recs if p.completed_at]
+                    max_prog_date = max(prog_dates) if prog_dates else None
+                    max_ch = db.query(func.max(ConsumptionHistory.consumed_at)).filter(
+                        ConsumptionHistory.user_id == target_user_id,
+                        ConsumptionHistory.external_id.in_(ep_eids)
+                    ).scalar() if ep_eids else None
+                    max_ep_date = max_prog_date or max_ch
+                    if s_it.status in (UserLibraryStatusEnum.READ, UserLibraryStatusEnum.COMPLETED) and max_ep_date:
+                        if s_it.completed_at is None or s_it.completed_at > max_ep_date:
+                            s_it.completed_at = max_ep_date
+                            has_repaired = True
+
                 if s_it.last_seen_episode:
                     # Find matching episode / issue item by title
                     import re
@@ -895,6 +912,14 @@ def get_library(
 
     res = []
     for it in items:
+        # Self-heal standalone items (movie, game, book) from ConsumptionHistory
+        if it.item_type not in ("series", "anime", "comic") and not it.tracking_list_id:
+            max_c_dt = max_consumed_map.get(it.external_id)
+            if it.status in (UserLibraryStatusEnum.COMPLETED, UserLibraryStatusEnum.READ):
+                if max_c_dt and (it.completed_at is None or it.completed_at > max_c_dt):
+                    it.completed_at = max_c_dt
+                    has_repaired = True
+
         # Pydantic will convert from attributes/dict
         c_val = counts_map.get(it.external_id, 0)
         if it.item_type in ("series", "anime", "comic") and it.tracking_list_id:
@@ -958,6 +983,12 @@ def get_library(
             "rating": ratings_map.get((it.item_type.value if hasattr(it.item_type, 'value') else str(it.item_type).lower(), str(it.external_id)), ratings_map.get(str(it.external_id)))
         }
         res.append(it_dict)
+
+    if has_repaired:
+        try:
+            db.commit()
+        except Exception:
+            db.rollback()
 
     return res
 
@@ -1031,9 +1062,38 @@ def update_library_item(
         # Set completed_at date
         if item_in.status in (UserLibraryStatusEnum.COMPLETED, UserLibraryStatusEnum.READ):
             now_dt = datetime.now(timezone.utc)
-            # Only set completed_at to now if it was not already completed/read or completed_at is None
-            if not lib_item.completed_at or old_status not in (UserLibraryStatusEnum.COMPLETED, UserLibraryStatusEnum.READ):
-                lib_item.completed_at = now_dt
+            t_str = lib_item.item_type.value if hasattr(lib_item.item_type, "value") else str(lib_item.item_type)
+            if t_str in ("series", "anime", "comic") and lib_item.tracking_list_id:
+                from app.models.list_item import ListItem
+                from app.models.item_progress import ItemProgress
+                from app.models.consumption import ConsumptionHistory
+                lep_ids = [it.id for it in db.query(ListItem.id).filter(ListItem.list_id == lib_item.tracking_list_id).all()]
+                max_prog_date = db.query(func.max(ItemProgress.completed_at)).filter(
+                    ItemProgress.user_id == current_user.id,
+                    ItemProgress.is_completed == True,
+                    ItemProgress.list_item_id.in_(lep_ids)
+                ).scalar() if lep_ids else None
+                
+                max_ch_date = db.query(func.max(ConsumptionHistory.consumed_at)).filter(
+                    ConsumptionHistory.user_id == current_user.id,
+                    ConsumptionHistory.list_item_id.in_(lep_ids)
+                ).scalar() if lep_ids else None
+                
+                real_dt = max_prog_date or max_ch_date or lib_item.completed_at or now_dt
+                lib_item.completed_at = real_dt
+            else:
+                from app.models.consumption import ConsumptionHistory
+                latest_c = db.query(ConsumptionHistory).filter(
+                    ConsumptionHistory.user_id == current_user.id,
+                    ConsumptionHistory.external_id == lib_item.external_id
+                ).order_by(ConsumptionHistory.consumed_at.desc()).first()
+                if lib_item.completed_at and old_status in (UserLibraryStatusEnum.COMPLETED, UserLibraryStatusEnum.READ):
+                    # Keep existing completed_at date
+                    pass
+                elif latest_c and latest_c.consumed_at:
+                    lib_item.completed_at = latest_c.consumed_at
+                elif not lib_item.completed_at:
+                    lib_item.completed_at = now_dt
             
             # For movies, books, games: record consumption history on manual complete
             # For series/anime/comic: individual episodes/issues already record their own consumption history.
@@ -1058,7 +1118,7 @@ def update_library_item(
                     if diff_seconds < 60:
                         should_record = False
                         
-                if should_record and status_changed:
+                if should_record and status_changed and existing_count == 0:
                     if not is_user_pro and existing_count >= 2:
                         pass
                     else:

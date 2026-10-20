@@ -2034,10 +2034,10 @@ def toggle_series_episode(
 
                 if all_aired_completed and is_ended:
                     lib_item.status = UserLibraryStatusEnum.COMPLETED
-                    lib_item.completed_at = datetime.now(timezone.utc)
+                    max_ep = max([p.completed_at for p in completed_progs if p.completed_at], default=None)
+                    lib_item.completed_at = max_ep or lib_item.completed_at or datetime.now(timezone.utc)
                 elif completed_ep_titles:
                     lib_item.status = UserLibraryStatusEnum.WATCHING
-                    lib_item.completed_at = None
                 else:
                     lib_item.last_seen_episode = None
                     lib_item.status = UserLibraryStatusEnum.PLAN_TO_WATCH
@@ -2366,10 +2366,14 @@ def bulk_toggle_season(
                                 total_episodes = len(cv_issues) if cv_issues else 99999
                                 if completed_eps >= total_episodes:
                                     lib_it.status = UserLibraryStatusEnum.READ
-                                    lib_it.completed_at = datetime.now(timezone.utc)
+                                    max_prog = session.query(func.max(ItemProgress.completed_at)).filter(
+                                        ItemProgress.user_id == user_id,
+                                        ItemProgress.is_completed == True,
+                                        (ItemProgress.list_item_id.in_(item_ids) | ItemProgress.external_id.in_(ext_ids))
+                                    ).scalar()
+                                    lib_it.completed_at = max_prog or lib_it.completed_at or datetime.now(timezone.utc)
                                 else:
                                     lib_it.status = UserLibraryStatusEnum.READING
-                                    lib_it.completed_at = None
                             else:
                                 series_id = int(str(ext_id).replace('tvm_', ''))
                                 series_detail = TVMazeService.get_series_detail(series_id)
@@ -2378,10 +2382,14 @@ def bulk_toggle_season(
                                 total_episodes = series_detail.get("number_of_episodes") or 99999
                                 if completed_eps >= total_episodes and is_ended:
                                     lib_it.status = UserLibraryStatusEnum.COMPLETED
-                                    lib_it.completed_at = datetime.now(timezone.utc)
+                                    max_prog = session.query(func.max(ItemProgress.completed_at)).filter(
+                                        ItemProgress.user_id == user_id,
+                                        ItemProgress.is_completed == True,
+                                        (ItemProgress.list_item_id.in_(item_ids) | ItemProgress.external_id.in_(ext_ids))
+                                    ).scalar()
+                                    lib_it.completed_at = max_prog or lib_it.completed_at or datetime.now(timezone.utc)
                                 else:
                                     lib_it.status = UserLibraryStatusEnum.WATCHING
-                                    lib_it.completed_at = None
                             session.commit()
                         except Exception as e:
                             logger.warning(f"Background check completion error: {e}")
@@ -2992,12 +3000,12 @@ def bulk_toggle_episodes(
 
                     if total_vol_issues > 0 and completed_count >= total_vol_issues:
                         lib_item.status = UserLibraryStatusEnum.READ
-                        lib_item.completed_at = now_dt
+                        max_prog = max([p.completed_at for p in completed_progs if p.completed_at], default=None)
+                        lib_item.completed_at = max_prog or lib_item.completed_at or now_dt
                         if lib_item.total_pages:
                             lib_item.pages_read = lib_item.total_pages
                     else:
                         lib_item.status = UserLibraryStatusEnum.READING
-                        lib_item.completed_at = None
 
                     completed_prog_item_ids = {p.list_item_id for p in completed_progs if p.list_item_id}
                     completed_prog_ext_ids = {p.external_id for p in completed_progs if p.external_id}
@@ -3062,15 +3070,17 @@ def bulk_toggle_episodes(
 
                         if all_aired_completed and is_ended:
                             lib_item.status = UserLibraryStatusEnum.COMPLETED
-                            if not lib_item.completed_at:
-                                lib_item.completed_at = now_dt
+                            max_prog = db.query(func.max(ItemProgress.completed_at)).filter(
+                                ItemProgress.user_id == current_user.id,
+                                ItemProgress.is_completed == True,
+                                (ItemProgress.list_item_id.in_(all_item_ids) | ItemProgress.external_id.in_(all_ext_ids))
+                            ).scalar() if (all_item_ids or all_ext_ids) else None
+                            lib_item.completed_at = max_prog or lib_item.completed_at or now_dt
                         else:
                             lib_item.status = UserLibraryStatusEnum.WATCHING
-                            lib_item.completed_at = None
                     else:
                         # Fast path: Default to WATCHING immediately so request finishes in milliseconds without blocking!
                         lib_item.status = UserLibraryStatusEnum.WATCHING
-                        lib_item.completed_at = None
 
                         def bg_verify_series_completion(uid: int, l_id: int, lib_id: int, ext_id: str):
                             import app.core.database
@@ -3100,8 +3110,12 @@ def bulk_toggle_episodes(
                                             item_rec = session.query(UserLibraryItem).filter(UserLibraryItem.id == lib_id).first()
                                             if item_rec:
                                                 item_rec.status = UserLibraryStatusEnum.COMPLETED
-                                                if not item_rec.completed_at:
-                                                    item_rec.completed_at = now_utc
+                                                max_prog = session.query(func.max(ItemProgress.completed_at)).filter(
+                                                    ItemProgress.user_id == uid,
+                                                    ItemProgress.is_completed == True,
+                                                    ItemProgress.external_id.in_(list(w_ids))
+                                                ).scalar()
+                                                item_rec.completed_at = max_prog or item_rec.completed_at or now_utc
                                                 session.commit()
                                 except Exception as err:
                                     logger.warning(f"Error in bg_verify_series_completion: {err}")

@@ -975,18 +975,7 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
         setNextEp(null);
         setCachedSeries(`next_candidate_${item.id}`, { nextEp: null, isCaughtUp: true });
       } else {
-        const cachedSeriesData = seriesData || (item.external_id ? getCachedSeries(seriesCacheKey) : null);
-        const isEnded = isComic ? (item.is_ended || item.status === 'Ended') : (cachedSeriesData?.status === 'Ended' || item.is_ended === true);
-        const hasWatchedAny = currentTracked.some((t: any) => t.is_completed);
         const allEpsCount = Array.isArray(allEps) ? allEps.length : 0;
-        const completedTrackedCount = currentTracked.filter((t: any) => t.is_completed).length;
-        const isTrulyFinished = isEnded && allEpsCount > 0 && completedTrackedCount >= allEpsCount;
-        const completedStatus = isComic ? 'read' : 'completed';
-        if (isTrulyFinished && item.status !== completedStatus && hasWatchedAny) {
-          item.status = completedStatus;
-          await apiClient.put(`/library/${item.id}`, { status: completedStatus });
-          onUpdate();
-        }
         if (allEpsCount > 0) {
           setIsCaughtUp(true);
         }
@@ -2652,19 +2641,6 @@ export const Home: React.FC = () => {
                 trackedEps = [];
               }
 
-              const isAiredFn = (ep: any) => {
-                const isExtra = ep.is_extra || ep.ep_type === 'insignificant_special' || (ep.season_number === 0 && !ep.is_significant_special && ep.ep_type !== 'significant_special');
-                if (isExtra) return false;
-                if (ep.airstamp) return new Date(ep.airstamp).getTime() <= nowMs;
-                if (ep.airdate || ep.air_date) {
-                  const ad = ep.airdate || ep.air_date;
-                  const at = ep.airtime || '00:00';
-                  return new Date(`${ad}T${at}:00Z`).getTime() <= nowMs;
-                }
-                return true;
-              };
-
-              const airedEpisodes = allEps.filter(isAiredFn);
               const pad = (n: number) => String(n).padStart(2, '0');
               const getEpTracked = (ep: any) => {
                 const epIdStr = String(ep.id || '');
@@ -2680,15 +2656,6 @@ export const Home: React.FC = () => {
                   return false;
                 });
               };
-
-              const airedCounts = airedEpisodes.map((ep: any) => {
-                const t = getEpTracked(ep);
-                return (t?.consumption_count !== undefined) ? t.consumption_count : (t?.is_completed ? 1 : 0);
-              });
-              const minAiredCount = airedCounts.length > 0 ? Math.min(...airedCounts) : 0;
-              const maxAiredCount = airedCounts.length > 0 ? Math.max(...airedCounts) : 0;
-              // Has unwatched aired episodes only if some aired episode is at 0 or behind the max cycle
-              const hasUnwatchedAiredEpisode = airedCounts.length > 0 && (minAiredCount < maxAiredCount || minAiredCount === 0);
 
               // Extract future unwatched episodes for Upcoming tab
               allEps.forEach(ep => {
@@ -2724,73 +2691,21 @@ export const Home: React.FC = () => {
                   }
                 }
               });
-
-              const hasWatchedAny = trackedEps.some((t: any) => t.is_completed);
-
-              // Check if show has ended / finished
-              let seriesData = getCachedSeries(`series_${item.external_id}`) || getCachedSeries(`${item.external_id}_metadata`);
-              if (!seriesData && item.external_id) {
-                try {
-                  const sRes = await apiClient.get(`/search/series/${item.external_id}`);
-                  if (sRes.data) {
-                    seriesData = sRes.data;
-                    setCachedSeries(`series_${item.external_id}`, sRes.data);
-                  }
-                } catch (e) {}
-              }
-              const showStatus = (seriesData?.status || '').toLowerCase();
-              const isEnded = showStatus === 'ended' || showStatus === 'finished' || showStatus === 'canceled' || seriesData?.is_ended === true;
-
-              // Check canonical episodes (regular seasons + significant specials, strictly excluding extras)
-              const canonicalAllEps = allEps.filter((ep: any) => !ep.is_extra && ep.ep_type !== 'insignificant_special' && ep.season_number !== 0);
-              const epsToCheck = canonicalAllEps.length > 0 ? canonicalAllEps : allEps;
-              const allEpCycles = epsToCheck.map((ep: any) => {
-                const t = getEpTracked(ep);
-                return (t?.consumption_count !== undefined) ? t.consumption_count : (t?.is_completed ? 1 : 0);
-              });
-              const minAllCycle = allEpCycles.length > 0 ? Math.min(...allEpCycles) : 0;
-              const maxAllCycle = allEpCycles.length > 0 ? Math.max(...allEpCycles) : 0;
-              const allCanonicalCompleted = allEpCycles.length > 0 && minAllCycle > 0 && minAllCycle === maxAllCycle;
-
-              if (item.status === 'completed' && hasUnwatchedAiredEpisode && trackedEps.length > 0) {
-                try {
-                  await apiClient.put(`/library/${item.id}`, { status: 'watching' });
-                  item.status = 'watching';
-                  return { id: item.id, status: 'watching', futureEps };
-                } catch (e) {}
-              } else if (item.status === 'watching' && hasWatchedAny && allCanonicalCompleted && isEnded) {
-                try {
-                  await apiClient.put(`/library/${item.id}`, { status: 'completed' });
-                  item.status = 'completed';
-                  return { id: item.id, status: 'completed', futureEps };
-                } catch (e) {}
-              }
             }
-            return { id: item.id, status: null, futureEps };
+            return { id: item.id, futureEps };
           })
         ).then(results => {
           let allCollectedFutureEps: any[] = [];
-          const changed = results.filter(r => {
-            if (r.status === 'fulfilled' && r.value) {
-              if (r.value.futureEps && r.value.futureEps.length > 0) {
-                allCollectedFutureEps.push(...r.value.futureEps);
-              }
-              return r.value.status !== null;
+          results.forEach(r => {
+            if (r.status === 'fulfilled' && r.value?.futureEps?.length > 0) {
+              allCollectedFutureEps.push(...r.value.futureEps);
             }
-            return false;
           });
           setUpcomingEpisodes(allCollectedFutureEps);
           try {
             localStorage.setItem('pathd_upcoming_episodes_cache', JSON.stringify(allCollectedFutureEps));
             sessionStorage.setItem('pathd_upcoming_episodes_cache', JSON.stringify(allCollectedFutureEps));
           } catch (e) {}
-          if (changed.length > 0) {
-            setLibraryItems([...currentLib]);
-            try {
-              localStorage.setItem('pathd_lib_cache', JSON.stringify(currentLib));
-              sessionStorage.setItem('pathd_lib_cache', JSON.stringify(currentLib));
-            } catch (e) {}
-          }
         }).finally(() => {
           setIsSyncingEpisodes(false);
         });
