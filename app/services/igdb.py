@@ -289,10 +289,6 @@ class IGDBService:
             remasters.id, remasters.name, remasters.cover.image_id, remasters.first_release_date;
             where id = {gid};'''
 
-        # Query 2: Children/Members if this game is a parent, bundle, or has edition variants
-        body_children = f'''fields id, name, category, game_type, cover.image_id, first_release_date, bundles, version_parent, parent_game;
-            where bundles = ({gid}) | version_parent = ({gid}) | parent_game = ({gid}); limit 50;'''
-
         relations = {
             "collections": [],
             "bundle_games": [],
@@ -303,14 +299,24 @@ class IGDBService:
 
         try:
             req1 = urllib.request.Request("https://api.igdb.com/v4/games", data=body_main.encode("utf-8"), headers={"Client-ID": client_id, "Authorization": f"Bearer {token}", "Accept": "application/json"})
+            vpid = None
+            parent_id = None
             with urllib.request.urlopen(req1, timeout=8) as resp1:
                 data_main = json.loads(resp1.read().decode())
                 if data_main and len(data_main) > 0:
                     game = data_main[0]
 
-                    # Parent game (if this is a DLC or expansion)
+                    # Parent game (if this is a DLC or expansion, or base game of an edition)
                     if game.get("parent_game"):
                         relations["parent_game"] = format_item(game.get("parent_game"))
+                    elif game.get("version_parent"):
+                        relations["parent_game"] = format_item(game.get("version_parent"))
+
+                    parent_id = relations["parent_game"]["id"] if relations.get("parent_game") else None
+
+                    if game.get("version_parent"):
+                        vp = game.get("version_parent")
+                        vpid = vp.get("id") if isinstance(vp, dict) else vp
 
                     # Collections/Bundles containing this game
                     seen_coll = set()
@@ -330,17 +336,16 @@ class IGDBService:
 
                     # Editions / Remakes / Remasters
                     seen_editions = set()
-                    if game.get("version_parent"):
-                        item = format_item(game.get("version_parent"))
-                        if item and item["id"] not in seen_editions and item["id"] != str(gid):
-                            seen_editions.add(item["id"])
-                            relations["editions"].append(item)
-
                     for e in game.get("remakes", []) + game.get("remasters", []):
                         item = format_item(e)
                         if item and item["id"] not in seen_editions and item["id"] != str(gid):
                             seen_editions.add(item["id"])
                             relations["editions"].append(item)
+
+            valid_vpids = tuple(filter(None, [gid, vpid]))
+            version_targets = f"{gid}, {vpid}" if vpid else str(gid)
+            body_children = f'''fields id, name, category, game_type, cover.image_id, first_release_date, bundles, version_parent, parent_game;
+                where bundles = ({gid}) | version_parent = ({version_targets}) | parent_game = ({gid}); limit 50;'''
 
             req2 = urllib.request.Request("https://api.igdb.com/v4/games", data=body_children.encode("utf-8"), headers={"Client-ID": client_id, "Authorization": f"Bearer {token}", "Accept": "application/json"})
             with urllib.request.urlopen(req2, timeout=8) as resp2:
@@ -349,9 +354,14 @@ class IGDBService:
                     item = format_item(child)
                     if not item or item["id"] == str(gid):
                         continue
+                    if parent_id and item["id"] == parent_id:
+                        continue
                     cat = child.get("game_type") if child.get("game_type") is not None else child.get("category", 0)
                     bundles_list = child.get("bundles", []) or []
                     
+                    child_vp = child.get("version_parent")
+                    child_vpid = child_vp.get("id") if isinstance(child_vp, dict) else child_vp
+
                     # If this is a DLC, expansion, or mod whose parent_game is THIS game:
                     if child.get("parent_game") == gid or (isinstance(child.get("parent_game"), dict) and child.get("parent_game", {}).get("id") == gid) or cat in (1, 2, 4, 6, 13, 14):
                         if not any(d["id"] == item["id"] for d in relations["dlcs"]):
@@ -360,8 +370,8 @@ class IGDBService:
                     elif gid in bundles_list or str(gid) in [str(x) for x in bundles_list]:
                         if not any(b["id"] == item["id"] for b in relations["bundle_games"]):
                             relations["bundle_games"].append(item)
-                    # If this is an alternative edition / version of the current game
-                    elif child.get("version_parent") == gid or (isinstance(child.get("version_parent"), dict) and child.get("version_parent", {}).get("id") == gid) or cat in (8, 9, 10):
+                    # If this is an alternative edition / version of the current game or sibling edition:
+                    elif (child_vpid and child_vpid in valid_vpids) or cat in (8, 9, 10):
                         if not any(e["id"] == item["id"] for e in relations["editions"]):
                             relations["editions"].append(item)
                     # Otherwise fallback to dlcs if it's a child or bundle games
