@@ -37,6 +37,13 @@ export const MainTabsKeeper: React.FC<MainTabsKeeperProps> = ({ activeTab, isVis
   const prevTabRef = useRef<MainTabType | null>(activeTab);
   const wasVisibleRef = useRef<boolean>(isVisible);
 
+  // Guarantee that whenever a tab is active and visible, it is marked as visited immediately
+  React.useEffect(() => {
+    if (isVisible && activeTab) {
+      setVisitedTabs(prev => prev[activeTab] ? prev : { ...prev, [activeTab]: true });
+    }
+  }, [activeTab, isVisible]);
+
   useLayoutEffect(() => {
     const currentScrollY = window.scrollY || document.documentElement.scrollTop || 0;
 
@@ -47,10 +54,11 @@ export const MainTabsKeeper: React.FC<MainTabsKeeperProps> = ({ activeTab, isVis
       return;
     }
 
-    // If we are returning to main tabs from a sub-route
+    // If we are returning to main tabs from a sub-route or after login
     if (!wasVisibleRef.current && isVisible && activeTab) {
       wasVisibleRef.current = true;
       prevTabRef.current = activeTab;
+      setVisitedTabs(prev => prev[activeTab] ? prev : { ...prev, [activeTab]: true });
       const targetScrollY = scrollPositionsRef.current[activeTab] || 0;
       requestAnimationFrame(() => {
         window.scrollTo({ top: targetScrollY, left: 0, behavior: 'instant' });
@@ -97,7 +105,7 @@ export const MainTabsKeeper: React.FC<MainTabsKeeperProps> = ({ activeTab, isVis
           width: '100%'
         }}
       >
-        {visitedTabs.home && (
+        {(visitedTabs.home || activeTab === 'home') && (
           <Suspense fallback={<PathdLoader fullScreen />}>
             <Home />
           </Suspense>
@@ -111,7 +119,7 @@ export const MainTabsKeeper: React.FC<MainTabsKeeperProps> = ({ activeTab, isVis
           width: '100%'
         }}
       >
-        {visitedTabs.social && (
+        {(visitedTabs.social || activeTab === 'social') && (
           <Suspense fallback={<PathdLoader fullScreen />}>
             <Social />
           </Suspense>
@@ -125,7 +133,7 @@ export const MainTabsKeeper: React.FC<MainTabsKeeperProps> = ({ activeTab, isVis
           width: '100%'
         }}
       >
-        {visitedTabs.create && (
+        {(visitedTabs.create || activeTab === 'create') && (
           <Suspense fallback={<PathdLoader fullScreen />}>
             <CreateGuide />
           </Suspense>
@@ -139,7 +147,7 @@ export const MainTabsKeeper: React.FC<MainTabsKeeperProps> = ({ activeTab, isVis
           width: '100%'
         }}
       >
-        {visitedTabs.search && (
+        {(visitedTabs.search || activeTab === 'search') && (
           <Suspense fallback={<PathdLoader fullScreen />}>
             <Search />
           </Suspense>
@@ -153,7 +161,7 @@ export const MainTabsKeeper: React.FC<MainTabsKeeperProps> = ({ activeTab, isVis
           width: '100%'
         }}
       >
-        {visitedTabs.profile && (
+        {(visitedTabs.profile || activeTab === 'profile') && (
           <Suspense fallback={<PathdLoader fullScreen />}>
             <Profile />
           </Suspense>

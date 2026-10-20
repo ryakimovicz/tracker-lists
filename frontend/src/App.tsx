@@ -60,7 +60,8 @@ function AppContent() {
   const state = location.state as { backgroundLocation?: any } | undefined;
 
   const currentPath = location.pathname;
-  const effectivePathname = state?.backgroundLocation?.pathname || currentPath;
+  const rawPath = state?.backgroundLocation?.pathname || currentPath;
+  const effectivePathname = (rawPath.length > 1 && rawPath.endsWith('/')) ? rawPath.slice(0, -1) : rawPath;
   const effectiveSearch = state?.backgroundLocation?.search || location.search;
   const effectiveSearchParams = new URLSearchParams(effectiveSearch);
   const effectiveUserIdParam = effectiveSearchParams.get('user_id');
@@ -204,7 +205,11 @@ function AppContent() {
               <Route
                 path="/"
                 element={
-                  isAuthenticated ? null : isLoading && hasToken ? (
+                  isMainTabActive ? null : isAuthenticated ? (
+                    <RouteGuard>
+                      <Home />
+                    </RouteGuard>
+                  ) : isLoading && hasToken ? (
                     <PathdLoader fullScreen />
                   ) : (
                     <Landing />
@@ -262,7 +267,7 @@ function AppContent() {
               <Route
                 path="/profile"
                 element={
-                  isAuthenticated && !isEffectiveOtherUserProfile ? null : (
+                  isMainTabActive ? null : (
                     <RouteGuard>
                       <Profile />
                     </RouteGuard>
@@ -288,7 +293,7 @@ function AppContent() {
               <Route
                 path="/social"
                 element={
-                  isAuthenticated ? null : (
+                  isMainTabActive ? null : (
                     <RouteGuard>
                       <Social />
                     </RouteGuard>
@@ -298,7 +303,7 @@ function AppContent() {
               <Route
                 path="/create"
                 element={
-                  isAuthenticated ? null : (
+                  isMainTabActive ? null : (
                     <RouteGuard>
                       <CreateGuide />
                     </RouteGuard>
@@ -308,7 +313,7 @@ function AppContent() {
               <Route
                 path="/search"
                 element={
-                  isAuthenticated ? null : (
+                  isMainTabActive ? null : (
                     <RouteGuard>
                       <Search />
                     </RouteGuard>
