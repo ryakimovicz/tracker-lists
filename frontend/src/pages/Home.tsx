@@ -2738,7 +2738,11 @@ export const Home: React.FC = () => {
         setLibraryItems(prev => {
           const matchIdx = prev.findIndex(i => (updatedItem.id && i.id === updatedItem.id) || (updatedItem.external_id && i.external_id === updatedItem.external_id && i.item_type === updatedItem.item_type));
           if (matchIdx >= 0) {
-            if (prev[matchIdx].status === updatedItem.status && prev[matchIdx].completed_at === updatedItem.completed_at) {
+            if (
+              prev[matchIdx].status === updatedItem.status && 
+              prev[matchIdx].completed_at === updatedItem.completed_at &&
+              prev[matchIdx].is_favorite === updatedItem.is_favorite
+            ) {
               return prev;
             }
             const next = [...prev];
@@ -4246,13 +4250,26 @@ export const Home: React.FC = () => {
           }
 
           try {
-            await apiClient.put(`/library/${itemId}`, { is_favorite: !currentFav });
+            await apiClient.put(`/library/${itemId}`, { is_favorite: !currentFav, status: targetItem?.status });
+            const updatedItem = { ...(targetItem || {}), id: itemId, is_favorite: !currentFav };
             setLibraryItems(prev => prev.map(item => item.id === itemId ? { ...item, is_favorite: !currentFav } : item));
             if (selectedItem && selectedItem.id === itemId) {
               setSelectedItem((prev: any) => prev ? { ...prev, is_favorite: !currentFav } : null);
             }
+            updateCachedShelfItem(updatedItem);
+            window.dispatchEvent(new CustomEvent('favorites-updated', {
+              detail: {
+                itemId,
+                externalId: targetItem?.external_id,
+                itemType: targetItem?.item_type,
+                isFavorite: !currentFav,
+                item: updatedItem
+              }
+            }));
+            window.dispatchEvent(new CustomEvent('library-updated', { detail: { item: updatedItem } }));
           } catch (err) {
             console.error("Failed to toggle favorite in Home", err);
+            throw err;
           }
         };
 
@@ -4263,10 +4280,12 @@ export const Home: React.FC = () => {
             onClose={() => setSelectedItem(null)}
             onUpdate={(updatedItem?: any) => {
               if (updatedItem && updatedItem.id) {
-                setLibraryItems(prev => prev.map(it => it.id === updatedItem.id ? { ...it, ...updatedItem } : it));
+                setLibraryItems(prev => prev.map(it => (it.id === updatedItem.id || (it.external_id === updatedItem.external_id && it.item_type === updatedItem.item_type)) ? { ...it, ...updatedItem } : it));
                 if (selectedItem && (selectedItem.id === updatedItem.id || selectedItem.external_id === updatedItem.external_id)) {
                   setSelectedItem((prev: any) => prev ? { ...prev, ...updatedItem } : null);
                 }
+              } else if (updatedItem && !updatedItem.id && updatedItem.external_id) {
+                setLibraryItems(prev => prev.filter(it => it.external_id !== updatedItem.external_id));
               } else {
                 fetchDashboard(true);
               }

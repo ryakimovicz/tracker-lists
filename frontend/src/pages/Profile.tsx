@@ -690,6 +690,10 @@ export const Profile: React.FC = () => {
       } catch { return []; }
     }
   });
+  const libraryItemsRef = useRef<LibraryItem[]>(libraryItems);
+  useEffect(() => {
+    libraryItemsRef.current = libraryItems;
+  }, [libraryItems]);
 
   const validProfileTabs = ['shelf', 'guides', 'favorites', 'music'] as const;
   type ProfileTab = typeof validProfileTabs[number];
@@ -2398,7 +2402,7 @@ export const Profile: React.FC = () => {
       }
 
       const updatedItem = detail?.item;
-      if (updatedItem && (!targetUserIdentifier || targetUserIdentifier === currentUser?.username)) {
+      if (updatedItem && isOwnProfile) {
         if (!updatedItem.id) {
           setLibraryItems(prev => prev.filter(i => {
             if (updatedItem.external_id && i.external_id === updatedItem.external_id && i.item_type === updatedItem.item_type) return false;
@@ -2469,15 +2473,15 @@ export const Profile: React.FC = () => {
             next[matchIdx] = { ...next[matchIdx], ...(item || {}), is_favorite: true };
             return next;
           }
-          const baseItem = item || libraryItems.find(li => (itemId && li.id === itemId) || (externalId && li.external_id === externalId));
+          const baseItem = item || libraryItemsRef.current.find(li => (itemId && li.id === itemId) || (externalId && li.external_id === externalId));
           if (baseItem) {
-            return [{ ...baseItem, is_favorite: true }, ...prev];
+            return [{ ...baseItem, ...(item || {}), is_favorite: true }, ...prev];
           }
           return prev;
         });
         setLibraryItems(prev => prev.map(i => {
           if ((itemId && i.id === itemId) || (externalId && i.external_id === externalId)) {
-            return { ...i, is_favorite: true };
+            return { ...i, ...(item || {}), is_favorite: true };
           }
           return i;
         }));
@@ -3027,7 +3031,20 @@ export const Profile: React.FC = () => {
     });
 
     try {
-      await apiClient.put(`/library/${itemId}`, { is_favorite: !currentFav });
+      await apiClient.put(`/library/${itemId}`, { is_favorite: !currentFav, status: targetItem.status });
+
+      const updatedStub = { ...targetItem, is_favorite: !currentFav };
+      updateCachedShelfItem(updatedStub);
+      window.dispatchEvent(new CustomEvent('favorites-updated', {
+        detail: {
+          itemId,
+          externalId: targetItem.external_id,
+          itemType: targetItem.item_type,
+          isFavorite: !currentFav,
+          item: updatedStub
+        }
+      }));
+      window.dispatchEvent(new CustomEvent('library-updated', { detail: { item: updatedStub } }));
 
       // Refresh activities in background without blocking UI
       const targetActivityUrl = userIdParam ? `/users/${userIdParam}/activity` : '/users/me/activity';
@@ -3092,6 +3109,21 @@ export const Profile: React.FC = () => {
 
       setSuccessMsg(language === 'es' ? 'Obra destacada actualizada correctamente.' : 'Featured item updated successfully.');
       setTimeout(() => setSuccessMsg(''), 4000);
+
+      const favStub = { ...finalNewItem, is_favorite: true };
+      const unFavStub = { ...newItemObj, id: itemToReplaceId, is_favorite: false };
+      updateCachedShelfItem(favStub);
+      updateCachedShelfItem(unFavStub);
+      window.dispatchEvent(new CustomEvent('favorites-updated', {
+        detail: {
+          itemId: finalNewItem.id,
+          externalId: finalNewItem.external_id,
+          itemType: finalNewItem.item_type,
+          isFavorite: true,
+          item: favStub
+        }
+      }));
+      window.dispatchEvent(new CustomEvent('library-updated', { detail: { item: favStub } }));
 
       // Refresh activities
       const targetActivityUrl = userIdParam ? `/users/${userIdParam}/activity` : '/users/me/activity';
@@ -7356,20 +7388,44 @@ export const Profile: React.FC = () => {
           onClose={() => setSelectedItem(null)} 
 
           onUpdate={(updatedItem?: any) => {
-            if (updatedItem && !updatedItem.id && updatedItem.external_id) {
-              setLibraryItems(prev => prev.filter(it => it.external_id !== updatedItem.external_id));
-              setFavorites(prev => prev.filter(it => it.external_id !== updatedItem.external_id));
-            }
-            apiClient.get(userIdParam ? `/library/?user_id=${userIdParam}` : '/library/').then(res => {
-              if (Array.isArray(res.data)) {
-                setLibraryItems(res.data);
-                const favs = res.data.filter((item: any) => item.is_favorite);
-                setFavorites(favs);
+            if (updatedItem) {
+              if (!updatedItem.id && updatedItem.external_id) {
+                setLibraryItems(prev => prev.filter(it => it.external_id !== updatedItem.external_id));
+                setFavorites(prev => prev.filter(it => it.external_id !== updatedItem.external_id));
+              } else if (updatedItem.id) {
+                setLibraryItems(prev => {
+                  const idx = prev.findIndex(it => it.id === updatedItem.id || (it.external_id === updatedItem.external_id && it.item_type === updatedItem.item_type));
+                  if (idx >= 0) {
+                    const copy = [...prev];
+                    copy[idx] = { ...copy[idx], ...updatedItem };
+                    return copy;
+                  }
+                  return [updatedItem, ...prev];
+                });
+                if (updatedItem.is_favorite === true) {
+                  setFavorites(prev => {
+                    const exists = prev.some(it => it.id === updatedItem.id || (it.external_id === updatedItem.external_id && it.item_type === updatedItem.item_type));
+                    if (exists) {
+                      return prev.map(it => (it.id === updatedItem.id || (it.external_id === updatedItem.external_id && it.item_type === updatedItem.item_type)) ? { ...it, ...updatedItem } : it);
+                    }
+                    return [{ ...updatedItem, is_favorite: true }, ...prev];
+                  });
+                } else if (updatedItem.is_favorite === false) {
+                  setFavorites(prev => prev.filter(it => it.id !== updatedItem.id && it.external_id !== updatedItem.external_id));
+                }
               }
-            });
+            } else {
+              apiClient.get(userIdParam ? `/library/?user_id=${userIdParam}` : '/library/').then(res => {
+                if (Array.isArray(res.data)) {
+                  setLibraryItems(res.data);
+                  const favs = res.data.filter((item: any) => item.is_favorite);
+                  setFavorites(favs);
+                }
+              }).catch(() => {});
+            }
             apiClient.get(userIdParam ? `/users/${userIdParam}/activity` : '/users/me/activity').then(res => {
               if (Array.isArray(res.data)) setActivities(res.data);
-            });
+            }).catch(() => {});
           }}
           onOpenItem={(item) => {
             handleOpenItem(item);

@@ -32,7 +32,7 @@ interface ItemDetailsModalProps {
   onUpdate: (updatedItem?: any) => void; // Triggered when item details/status changes
   onOpenItem?: (item: any) => void;
   isFavorite?: boolean; // Prop from parent
-  onToggleFavorite?: (itemId: number, currentFav: boolean) => void;
+  onToggleFavorite?: (itemId: number, currentFav: boolean, updatedItem?: any) => void | Promise<void>;
   onStatusChange?: (itemId: number, newStatus: string) => void;
 }
 
@@ -1855,12 +1855,13 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     }));
 
     try {
+      await apiClient.put(`/library/${selectedItem.id}`, { is_favorite: newFav, status: selectedItem.status });
       if (onToggleFavorite) {
-        await onToggleFavorite(selectedItem.id, currentFav);
-      } else {
-        await apiClient.put(`/library/${selectedItem.id}`, { is_favorite: newFav });
+        try {
+          await onToggleFavorite(selectedItem.id, currentFav, updatedModalItem);
+        } catch (_) {}
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to toggle favorite:", err);
       const rollbackItem = { ...selectedItem, is_favorite: currentFav };
       setSelectedItem(rollbackItem);
@@ -1877,6 +1878,9 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
           item: rollbackItem
         }
       }));
+      if (err.response?.data?.detail) {
+        alert(err.response.data.detail);
+      }
       return;
     }
 
@@ -1907,6 +1911,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
         const updatedItem = { ...optimisticItem, ...res };
         setSelectedItem((prev: any) => prev ? updatedItem : null);
         updateCachedShelfItem(updatedItem);
+        window.dispatchEvent(new CustomEvent('library-updated', { detail: { item: updatedItem } }));
+        onUpdate && onUpdate(updatedItem);
         
         if (user?.is_pro) {
           apiClient.get(`/library/${selectedItem.id}/consumption-history`)
@@ -2224,7 +2230,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
           .catch(console.error);
       }
 
-      window.dispatchEvent(new Event('library-updated'));
+      window.dispatchEvent(new CustomEvent('library-updated', { detail: { item: updatedSelected } }));
     } catch (err: any) {
       if (opSeq !== toggleAllSeqRef.current) return;
       console.error("Bulk toggle all seasons failed:", err?.response?.data || err);
@@ -2257,6 +2263,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
         const updatedItem = { ...optimisticItem, ...res };
         setSelectedItem((prev: any) => prev ? updatedItem : null);
         updateCachedShelfItem(updatedItem);
+        window.dispatchEvent(new CustomEvent('library-updated', { detail: { item: updatedItem } }));
+        onUpdate && onUpdate(updatedItem);
       } catch (e) {
         const rollbackItem = { ...selectedItem, status: prevStatus };
         setSelectedItem((prev: any) => prev ? rollbackItem : null);
@@ -2317,6 +2325,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
         const updatedItem = { ...optimisticItem, ...res };
         setSelectedItem((prev: any) => prev ? updatedItem : null);
         updateCachedShelfItem(updatedItem);
+        window.dispatchEvent(new CustomEvent('library-updated', { detail: { item: updatedItem } }));
+        onUpdate && onUpdate(updatedItem);
 
         if (['completed', 'read'].includes(newStatus) && user?.is_pro) {
           apiClient.get(`/library/${selectedItem.id}/consumption-history`)
@@ -4661,7 +4671,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   const ensureTrackedPromiseRef = React.useRef<Promise<any | null> | null>(null);
 
   const ensureTracked = async (status: string, isHundredPercent: boolean = false) => {
-    if (selectedItem.tracking_list_id && selectedItem.id) return selectedItem;
+    if (selectedItem.id) return selectedItem;
     if (ensureTrackedPromiseRef.current) {
       return await ensureTrackedPromiseRef.current;
     }

@@ -13,7 +13,7 @@ import { PathdLoader } from '../components/PathdLoader';
 import { getOrderedCategories, sortFilterTabs, getCategoryIcon } from '../utils/categoryOrder';
 import { prefetchMediaDetails } from '../utils/prefetch';
 import { removeCachedSeries, clearCachedSeriesMatching } from '../utils/seriesCache';
-import { getCachedShelfItems, setCachedShelfItems, createShelfMap, findInShelfMap } from '../utils/shelfCache';
+import { getCachedShelfItems, setCachedShelfItems, updateCachedShelfItem, createShelfMap, findInShelfMap } from '../utils/shelfCache';
 import { SwipeViewPager } from '../components/SwipeViewPager';
 
 import { Search as SearchIcon, AlertCircle, CheckCircle, Plus, X, Heart, Star, Users, BookOpen, Package, Puzzle, Sparkles, Gamepad2, Trash2, Flame, TrendingUp, Trophy, Bookmark, Film, Tv, Book, MessageSquare, MessageCircle, Rocket, Clock, Tag, RefreshCw, Zap } from 'lucide-react';
@@ -944,7 +944,23 @@ export const Search: React.FC = () => {
     loadSocialMetadata();
     lastShelfFetchRef.current = Date.now();
 
-    const handleLibUpdated = () => {
+    const handleLibUpdated = (e?: any) => {
+      const detailItem = (e as CustomEvent)?.detail?.item;
+      if (detailItem && detailItem.id) {
+        setShelfItems(prev => {
+          const idx = prev.findIndex(x => (x.id === detailItem.id) || (x.external_id === detailItem.external_id && x.item_type === detailItem.item_type));
+          if (idx >= 0) {
+            const copy = [...prev];
+            copy[idx] = { ...copy[idx], ...detailItem };
+            setCachedShelfItems(copy);
+            return copy;
+          }
+          const copy = [...prev, detailItem];
+          setCachedShelfItems(copy);
+          return copy;
+        });
+        return;
+      }
       const cached = getCachedShelfItems();
       if (cached && cached.length > 0) {
         setShelfItems(cached);
@@ -1338,10 +1354,10 @@ export const Search: React.FC = () => {
       });
 
   const handleToggleFavorite = async (itemId: number, currentFav: boolean) => {
-    const targetItem = shelfItems.find(li => li.id === itemId);
-    if (!targetItem) return;
+    const targetItem = shelfItems.find(li => li.id === itemId) || (((selectedItem as any)?.id === itemId) ? (selectedItem as any) : null);
+    if (!targetItem && !itemId) return;
 
-    if (!currentFav) {
+    if (!currentFav && targetItem) {
       const isDlcOrExpansion = targetItem.item_type === 'game' && ['dlc', 'expansion'].includes(targetItem.badge || targetItem.custom_badge || '');
       const isUnconsumed = !isDlcOrExpansion && ['plan_to_watch', 'plan_to_read', 'plan_to_play'].includes(targetItem.status);
       if (isUnconsumed) {
@@ -1367,8 +1383,25 @@ export const Search: React.FC = () => {
     }
 
     try {
-      await apiClient.put(`/library/${itemId}`, { is_favorite: !currentFav });
-      setShelfItems(prev => prev.map(item => item.id === itemId ? { ...item, is_favorite: !currentFav } : item));
+      await apiClient.put(`/library/${itemId}`, { is_favorite: !currentFav, status: targetItem?.status });
+      const updatedItem = { ...(targetItem || {}), id: itemId, is_favorite: !currentFav };
+      setShelfItems(prev => {
+        const updated = prev.map(item => item.id === itemId ? { ...item, is_favorite: !currentFav } : item);
+        setCachedShelfItems(updated);
+        return updated;
+      });
+      updateCachedShelfItem(updatedItem);
+      window.dispatchEvent(new CustomEvent('favorites-updated', {
+        detail: {
+          itemId,
+          externalId: targetItem?.external_id,
+          itemType: targetItem?.item_type,
+          isFavorite: !currentFav,
+          item: updatedItem
+        }
+      }));
+      window.dispatchEvent(new CustomEvent('library-updated', { detail: { item: updatedItem } }));
+
       setSuccessMsg(!currentFav 
         ? (language === 'es' ? 'Elemento añadido a destacados.' : 'Item added to favorites.')
         : (language === 'es' ? 'Elemento quitado de destacados.' : 'Item removed from favorites.')
@@ -1377,6 +1410,7 @@ export const Search: React.FC = () => {
     } catch (err: any) {
       setErrorMsg(err.response?.data?.detail || 'Error updating favorite status');
       setTimeout(() => setErrorMsg(''), 4000);
+      throw err;
     }
   };
 
@@ -1385,11 +1419,31 @@ export const Search: React.FC = () => {
       await apiClient.put(`/library/${itemToReplaceId}`, { is_favorite: false });
       await apiClient.put(`/library/${newItemId}`, { is_favorite: true });
 
-      setShelfItems(prev => prev.map(item => {
-        if (item.id === itemToReplaceId) return { ...item, is_favorite: false };
-        if (item.id === newItemId) return { ...item, is_favorite: true };
-        return item;
+      setShelfItems(prev => {
+        const next = prev.map(item => {
+          if (item.id === itemToReplaceId) return { ...item, is_favorite: false };
+          if (item.id === newItemId) return { ...item, is_favorite: true };
+          return item;
+        });
+        setCachedShelfItems(next);
+        return next;
+      });
+
+      const unFavStub = shelfItems.find(x => x.id === itemToReplaceId);
+      const favStub = shelfItems.find(x => x.id === newItemId);
+      if (unFavStub) updateCachedShelfItem({ ...unFavStub, is_favorite: false });
+      if (favStub) updateCachedShelfItem({ ...favStub, is_favorite: true });
+
+      window.dispatchEvent(new CustomEvent('favorites-updated', {
+        detail: {
+          itemId: newItemId,
+          externalId: favStub?.external_id,
+          itemType: favStub?.item_type,
+          isFavorite: true,
+          item: favStub ? { ...favStub, is_favorite: true } : undefined
+        }
       }));
+      window.dispatchEvent(new CustomEvent('library-updated', { detail: { item: favStub ? { ...favStub, is_favorite: true } : undefined } }));
 
       setSuccessMsg(language === 'es' ? 'Obra destacada actualizada correctamente.' : 'Featured item updated successfully.');
       setTimeout(() => setSuccessMsg(''), 4000);
@@ -2266,19 +2320,36 @@ export const Search: React.FC = () => {
           onUpdate={(updatedItem) => {
             if (updatedItem && updatedItem.id) {
               setResults(prev => prev.map(r => 
-                r.item_type === selectedItem.item_type && r.external_id === selectedItem.external_id 
+                r.item_type === selectedItem?.item_type && r.external_id === selectedItem?.external_id 
                 ? { ...r, ...updatedItem } 
                 : r
               ));
-            } else {
+              setShelfItems(prev => {
+                const idx = prev.findIndex(x => (x.id === updatedItem.id) || (x.external_id === updatedItem.external_id && x.item_type === updatedItem.item_type));
+                if (idx >= 0) {
+                  const copy = [...prev];
+                  copy[idx] = { ...copy[idx], ...updatedItem };
+                  setCachedShelfItems(copy);
+                  return copy;
+                }
+                const copy = [...prev, updatedItem];
+                setCachedShelfItems(copy);
+                return copy;
+              });
+            } else if (updatedItem && !updatedItem.id) {
               setResults(prev => prev.map(r => 
                 r.item_type === selectedItem?.item_type && r.external_id === selectedItem?.external_id 
                 ? { ...r, id: undefined, status: undefined, tracking_list_id: undefined, completed_at: undefined, is_favorite: false } 
                 : r
               ));
+              setShelfItems(prev => {
+                const filtered = prev.filter(x => !(x.external_id === updatedItem.external_id && x.item_type === updatedItem.item_type));
+                setCachedShelfItems(filtered);
+                return filtered;
+              });
+            } else {
+              loadShelfItems();
             }
-            // Re-fetch shelf items to reflect status/favorite changes
-            loadShelfItems();
           }}
         />
       )}
