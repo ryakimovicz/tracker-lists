@@ -247,7 +247,8 @@ export const Landing: React.FC = () => {
           </p>
         </div>
 
-        <div className="glass-card" style={{ borderRadius: '16px', overflow: 'hidden', border: '1px solid var(--border-color)', boxShadow: 'var(--card-shadow)' }}>
+        {/* Desktop Comparison Table */}
+        <div className="glass-card plan-comparison-desktop" style={{ borderRadius: '16px', overflow: 'hidden', border: '1px solid var(--border-color)', boxShadow: 'var(--card-shadow)' }}>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '600px' }}>
               <thead>
@@ -291,6 +292,44 @@ export const Landing: React.FC = () => {
               </tbody>
             </table>
           </div>
+        </div>
+
+        {/* Mobile Comparison Feature-by-Feature Cards */}
+        <div className="plan-comparison-mobile">
+          <div className="plan-mobile-summary-header">
+            <div className="plan-mobile-summary-card free">
+              <span className="plan-mobile-summary-name">{isEs ? 'Plan Gratuito' : 'Free Plan'}</span>
+              <span className="plan-mobile-summary-price">$0</span>
+              <span className="plan-mobile-summary-sub">{isEs ? 'Gratis para siempre' : 'Free forever'}</span>
+            </div>
+            <div className="plan-mobile-summary-card premium">
+              <span className="plan-mobile-summary-name">
+                <Star size={14} fill="#f59e0b" color="#f59e0b" /> Pathd Premium
+              </span>
+              <span className="plan-mobile-summary-price">
+                $4.99 USD <span style={{ fontSize: '0.72rem', fontWeight: 600 }}>/ {isEs ? 'mes' : 'mo'}</span>
+              </span>
+              <span className="plan-mobile-summary-sub">{isEs ? 'Prueba gratis de 7 días' : '7-day free trial'}</span>
+            </div>
+          </div>
+
+          {planComparison.map((row, idx) => (
+            <div key={idx} className="plan-mobile-feature-card">
+              <div className="plan-mobile-feature-title">{row.feature}</div>
+              <div className="plan-mobile-comparison-grid">
+                <div className="plan-mobile-col free">
+                  <span className="plan-mobile-badge free">{isEs ? 'Gratis' : 'Free'}</span>
+                  <span className="plan-mobile-value free">{row.free}</span>
+                </div>
+                <div className="plan-mobile-col premium">
+                  <span className="plan-mobile-badge premium">
+                    <Star size={11} fill="#f59e0b" color="#f59e0b" /> Premium
+                  </span>
+                  <span className="plan-mobile-value premium">{row.premium}</span>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </section>
 
