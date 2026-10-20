@@ -187,15 +187,14 @@ export const NotificationFlyout: React.FC<NotificationFlyoutProps> = ({
   const handleMarkAsRead = async (notifId: number) => {
     try {
       await apiClient.put(`/notifications/${notifId}/read`);
-      setNotifications(prev =>
-        prev.map(n => (n.id === notifId ? { ...n, is_read: new Date().toISOString() } : n))
-      );
+      let unread = 0;
+      setNotifications(prev => {
+        const next = prev.map(n => (n.id === notifId ? { ...n, is_read: new Date().toISOString() } : n));
+        unread = next.filter(n => !n.is_read).length;
+        return next;
+      });
       if (onUnreadCountChange) {
-        setNotifications(latest => {
-          const unread = latest.filter(n => !n.is_read).length;
-          onUnreadCountChange(unread);
-          return latest;
-        });
+        onUnreadCountChange(unread);
       }
     } catch (err) {
       console.error('Error marking as read:', err);
@@ -218,7 +217,15 @@ export const NotificationFlyout: React.FC<NotificationFlyoutProps> = ({
     e.stopPropagation();
     try {
       await apiClient.delete(`/notifications/${notifId}`);
-      setNotifications(prev => prev.filter(n => n.id !== notifId));
+      let unread = 0;
+      setNotifications(prev => {
+        const next = prev.filter(n => n.id !== notifId);
+        unread = next.filter(n => !n.is_read).length;
+        return next;
+      });
+      if (onUnreadCountChange) {
+        onUnreadCountChange(unread);
+      }
     } catch (err) {
       console.error('Error deleting notification:', err);
     }
