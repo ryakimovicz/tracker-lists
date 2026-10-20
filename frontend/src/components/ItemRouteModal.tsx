@@ -158,6 +158,18 @@ export const ItemRouteModal: React.FC<ItemRouteModalProps> = ({ onClose, onUpdat
     }
   };
 
+  const handleToggleFavorite = async (itemId: number, currentFav: boolean) => {
+    const nextFav = !currentFav;
+    setItem((prev: any) => prev ? { ...prev, is_favorite: nextFav } : prev);
+    try {
+      await apiClient.put(`/library/${itemId}`, { is_favorite: nextFav });
+    } catch (e) {
+      console.error('Failed to toggle favorite in ItemRouteModal:', e);
+      setItem((prev: any) => prev ? { ...prev, is_favorite: currentFav } : prev);
+      throw e;
+    }
+  };
+
   if (loading) {
     return (
       <div
@@ -214,7 +226,8 @@ export const ItemRouteModal: React.FC<ItemRouteModalProps> = ({ onClose, onUpdat
       onClose={handleClose}
       onOpenItem={handleOpenItem}
       onUpdate={handleUpdate}
-      isFavorite={Boolean(item.is_favorite)}
+      isFavorite={Boolean(item?.is_favorite)}
+      onToggleFavorite={handleToggleFavorite}
     />
   );
 };

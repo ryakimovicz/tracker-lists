@@ -974,7 +974,7 @@ def get_library(
             "pages_read": it.pages_read or 0,
             "total_pages": it.total_pages,
             "release_date": it.release_date,
-            "tracking_list_id": it.tracking_list_id,
+            "tracking_list_id": it.tracking_list_id if (target_user_id == current_user.id) else None,
             "times_completed": times_c,
             "times_completed_standard": times_standard,
             "times_completed_hundred": times_hundred,
@@ -1423,10 +1423,23 @@ def delete_from_library(
                 ConsumptionHistory.user_id == current_user.id,
                 ConsumptionHistory.external_id.in_(ext_list)
             ).delete(synchronize_session=False)
-            db.query(MediaReview).filter(
+            # Wipe official root reviews with ratings, preserving community comments
+            reviews_to_wipe = db.query(MediaReview).filter(
                 MediaReview.user_id == current_user.id,
-                MediaReview.external_id.in_(ext_list)
-            ).delete(synchronize_session=False)
+                MediaReview.external_id.in_(ext_list),
+                MediaReview.parent_id.is_(None),
+                MediaReview.rating.isnot(None)
+            ).all()
+            for r_wipe in reviews_to_wipe:
+                has_replies = db.query(MediaReview).filter(MediaReview.parent_id == r_wipe.id).count() > 0
+                if has_replies:
+                    r_wipe.is_deleted = True
+                    r_wipe.rating = None
+                    r_wipe.content = None
+                    r_wipe.media_url = None
+                    r_wipe.media_type = None
+                else:
+                    db.delete(r_wipe)
             # Delete loose episode/issue cards from library if any
             db.query(UserLibraryItem).filter(
                 UserLibraryItem.user_id == current_user.id,

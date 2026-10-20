@@ -727,6 +727,11 @@ const RootReviewEditor: React.FC<{
     setIsSpoiler(initialIsSpoiler);
   }, [initialIsSpoiler]);
 
+  // If not tracked and no existing review, do not occupy space
+  if (!isItemTracked && !hasExistingReview) {
+    return null;
+  }
+
   // If already published/saved, display fixed review (stars + optional text) with a single "Eliminar reseña" button
   if (hasExistingReview) {
     return (
@@ -1290,7 +1295,16 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 }) => {
   const onUpdate = React.useCallback((updatedItem?: any) => {
     if (rawOnUpdate) rawOnUpdate(updatedItem);
-    window.dispatchEvent(new CustomEvent('library-updated', { detail: { item: updatedItem } }));
+    if (updatedItem && !updatedItem.id) {
+      window.dispatchEvent(new CustomEvent('library-updated', {
+        detail: {
+          deletedExternalId: updatedItem.external_id,
+          deleteHistory: true
+        }
+      }));
+    } else {
+      window.dispatchEvent(new CustomEvent('library-updated', { detail: { item: updatedItem } }));
+    }
   }, [rawOnUpdate]);
   const { t, language } = useTranslation();
   const { theme } = useTheme();
@@ -1303,7 +1317,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   
   const [selectedItem, setSelectedItem] = useState<any>(() => {
     if (!initialItem) return initialItem;
-    if (initialItem.id) return initialItem;
+    const baseFav = initialItem.is_favorite !== undefined ? initialItem.is_favorite : (isFavorite || undefined);
+    if (initialItem.id) return { ...initialItem, is_favorite: baseFav };
     try {
       const cached = getCachedShelfItems();
       const map = createShelfMap(cached);
@@ -1314,14 +1329,23 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
           ...matched,
           id: matched.id,
           status: matched.status || initialItem.status,
-          is_favorite: matched.is_favorite ?? initialItem.is_favorite,
+          is_favorite: matched.is_favorite !== undefined ? matched.is_favorite : baseFav,
           tracking_list_id: matched.tracking_list_id ?? initialItem.tracking_list_id,
           completed_at: matched.completed_at ?? initialItem.completed_at
         };
       }
     } catch (_) {}
-    return initialItem;
+    return { ...initialItem, is_favorite: baseFav };
   });
+
+  useEffect(() => {
+    if (isFavorite !== undefined) {
+      setSelectedItem((prev: any) => {
+        if (!prev || prev.is_favorite === isFavorite) return prev;
+        return { ...prev, is_favorite: isFavorite };
+      });
+    }
+  }, [isFavorite]);
   const [isCoverPeek, setIsCoverPeek] = useState(false);
   const [isEpisodeCoverRevealed, setIsEpisodeCoverRevealed] = useState(false);
   
@@ -1783,6 +1807,79 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       if (resId) {
         onUpdate && onUpdate();
       }
+    }
+  };
+
+  const handleToggleFavoriteClick = async () => {
+    if (!user || !selectedItem?.id) return;
+    const currentFav = Boolean(selectedItem.is_favorite ?? isFavorite);
+    const newFav = !currentFav;
+
+    if (newFav) {
+      const isDlcOrExpansion = selectedItem?.item_type === 'game' && ['dlc', 'expansion'].includes(selectedItem?.badge || selectedItem?.custom_badge);
+      const isUnconsumed = !isDlcOrExpansion && ['plan_to_watch', 'plan_to_read', 'plan_to_play'].includes(selectedItem?.status);
+      if (isUnconsumed) return;
+    }
+
+    const updatedModalItem = { ...selectedItem, is_favorite: newFav };
+    setSelectedItem(updatedModalItem);
+    updateCachedShelfItem(updatedModalItem);
+
+    try {
+      const cachedLibStr = sessionStorage.getItem('pathd_lib_cache');
+      if (cachedLibStr) {
+        let cachedLib: any[] = JSON.parse(cachedLibStr);
+        cachedLib = cachedLib.map((it: any) => {
+          if (it.id === selectedItem.id || (it.external_id && it.external_id === selectedItem.external_id && it.item_type === selectedItem.item_type)) {
+            return { ...it, is_favorite: newFav };
+          }
+          return it;
+        });
+        sessionStorage.setItem('pathd_lib_cache', JSON.stringify(cachedLib));
+      }
+    } catch (e) {}
+
+    window.dispatchEvent(new CustomEvent('library-updated', {
+      detail: { item: updatedModalItem }
+    }));
+    window.dispatchEvent(new CustomEvent('favorites-updated', {
+      detail: {
+        itemId: selectedItem.id,
+        externalId: selectedItem.external_id,
+        itemType: selectedItem.item_type,
+        isFavorite: newFav,
+        item: updatedModalItem
+      }
+    }));
+
+    try {
+      if (onToggleFavorite) {
+        await onToggleFavorite(selectedItem.id, currentFav);
+      } else {
+        await apiClient.put(`/library/${selectedItem.id}`, { is_favorite: newFav });
+      }
+    } catch (err) {
+      console.error("Failed to toggle favorite:", err);
+      const rollbackItem = { ...selectedItem, is_favorite: currentFav };
+      setSelectedItem(rollbackItem);
+      updateCachedShelfItem(rollbackItem);
+      window.dispatchEvent(new CustomEvent('library-updated', {
+        detail: { item: rollbackItem }
+      }));
+      window.dispatchEvent(new CustomEvent('favorites-updated', {
+        detail: {
+          itemId: selectedItem.id,
+          externalId: selectedItem.external_id,
+          itemType: selectedItem.item_type,
+          isFavorite: currentFav,
+          item: rollbackItem
+        }
+      }));
+      return;
+    }
+
+    if (onUpdate) {
+      onUpdate(updatedModalItem);
     }
   };
 
@@ -2491,6 +2588,14 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       removeCachedShelfItem(removedId, selectedItem.external_id, selectedItem.item_type);
 
       if (deleteHistory) {
+        const myRootReview = (itemReviews || []).find((r: any) => r.user_id === user?.id && !r.parent_id && r.rating !== null && r.rating !== undefined);
+        if (myRootReview?.id) {
+          apiClient.delete(`/reviews/${myRootReview.id}`).catch(() => {});
+        }
+        setItemReviews(prev => (prev || []).filter((r: any) => !(r.user_id === user?.id && !r.parent_id && r.rating !== null && r.rating !== undefined)));
+        if (selectedItem?.item_type && selectedItem?.external_id) {
+          removeCachedSeries(`reviews_${selectedItem.item_type}_${selectedItem.external_id}`);
+        }
         const cleanId = String(selectedItem.external_id || selectedItem.id || '').replace('cv_vol_', '').replace('cv_issue_', '').replace('cv_', '').replace('tvm-ep-', '').replace('tvm_', '');
         clearCachedSeriesMatching(`issue_state_`);
         if (cleanId) {
@@ -2504,16 +2609,49 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
           removeCachedSeries(`list_${selectedItem.tracking_list_id}`);
         }
         setGlobalProgress({});
-        setEpisodes([]);
-        setSeasonEpisodes({});
+        setEpisodes(prev => (prev || []).map((ep: any) => ({ ...ep, is_completed: false, completed_at: null })));
+        setSeasonEpisodes(prev => Object.fromEntries(Object.entries(prev || {}).map(([k, eps]) => [k, (eps || []).map((ep: any) => ({ ...ep, is_completed: false, completed_at: null }))])));
         setPagesReadVal(0);
+        setConsumptionHistory([]);
+        setConsumptionEntries([]);
+        setUserRating(0);
+        setUserComment('');
+        setUserIsSpoiler(false);
+        setCommentMedia(null);
       }
 
-      setSelectedItem(null);
-      onClose();
-      window.dispatchEvent(new CustomEvent('progress-updated', { detail: { deletedExternalId: selectedItem.external_id, deleteHistory } }));
-      window.dispatchEvent(new Event('library-updated'));
-      onUpdate && onUpdate({ id: undefined, status: undefined, tracking_list_id: undefined, completed_at: undefined, is_favorite: false, pages_read: 0 });
+      const updatedModalItem = {
+        ...selectedItem,
+        id: undefined,
+        tracking_list_id: undefined,
+        is_favorite: false,
+        ...(deleteHistory ? {
+          status: undefined,
+          completed_at: undefined,
+          pages_read: 0,
+          last_seen_episode: null,
+          rating: null
+        } : {})
+      };
+
+      setSelectedItem(updatedModalItem);
+      closeSubModal(false);
+
+      window.dispatchEvent(new CustomEvent('progress-updated', {
+        detail: {
+          deletedId: removedId,
+          deletedExternalId: selectedItem.external_id,
+          deleteHistory
+        }
+      }));
+      window.dispatchEvent(new CustomEvent('library-updated', {
+        detail: {
+          deletedId: removedId,
+          deletedExternalId: selectedItem.external_id,
+          deleteHistory
+        }
+      }));
+      if (rawOnUpdate) rawOnUpdate(updatedModalItem);
     } catch (e) {
       console.error(e);
     }
@@ -2909,7 +3047,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       if (isComicIssueInit && item.external_id) {
         const cleanId = String(item.external_id).replace('cv_issue_', '').replace('cv_', '');
         const extId = `cv_issue_${cleanId}`;
-        const effectiveTrackingListId = item.tracking_list_id || item.list_id || item.parent_series?.tracking_list_id;
+        const effectiveTrackingListId = item.tracking_list_id || item.parent_series?.tracking_list_id;
 
         // 1. Check local list cache for completion
         let isReadFromList = Boolean(item.is_completed || item.completed_at || globalProgress[extId]);
@@ -2976,7 +3114,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       } else if (!isComicIssueInit && isActualEpisode && item.external_id) {
         const cleanId = String(item.external_id).replace('tvm-ep-', '');
         const extId = `tvm-ep-${cleanId}`;
-        const effectiveTrackingListId = item.tracking_list_id || item.list_id || item.parent_series?.tracking_list_id;
+        const effectiveTrackingListId = item.tracking_list_id || item.parent_series?.tracking_list_id;
 
         // Check local list cache for completion
         let isWatchedFromList = Boolean(item.is_completed || item.completed_at || globalProgress[extId]);
@@ -3137,7 +3275,10 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
         }
 
         // 3. Asynchronously fetch personal library state and freshest series metadata in parallel
-        const effectiveTrackingListId = incomingItem.tracking_list_id || incomingItem.list_id || incomingItem.parent_series?.tracking_list_id;
+        const isOwnItem = isOwnProfile || !incomingItem.user_id || incomingItem.user_id === user?.id;
+        const effectiveTrackingListId = isOwnItem
+          ? (incomingItem.tracking_list_id || incomingItem.parent_series?.tracking_list_id)
+          : undefined;
 
         if (user && effectiveTrackingListId) {
           apiClient.get(`/lists/${effectiveTrackingListId}`).then(listRes => {
@@ -3153,7 +3294,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                 .catch(e => console.error("Failed to fetch global progress from tracker list", e));
             }
           }).catch(err => {
-            if (err?.response?.status === 404) {
+            if (err?.response?.status === 404 || err?.response?.status === 403) {
               removeCachedSeries(`list_${effectiveTrackingListId}`);
               setSelectedItem((prev: any) => {
                 if (!prev) return null;
@@ -3219,7 +3360,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                       .catch(e => console.error("Failed to fetch global progress from tracker list", e));
                   }
                 }).catch(err => {
-                  if (err?.response?.status === 404) {
+                  if (err?.response?.status === 404 || err?.response?.status === 403) {
                     removeCachedSeries(`list_${myMatch.tracking_list_id}`);
                     setSelectedItem((prev: any) => {
                       if (!prev) return null;
@@ -6212,15 +6353,16 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                   {user && selectedItem?.id && !isEpisode && (() => {
                     const isDlcOrExpansion = selectedItem?.item_type === 'game' && ['dlc', 'expansion'].includes(selectedItem?.badge || selectedItem?.custom_badge);
                     const isUnconsumed = !isDlcOrExpansion && ['plan_to_watch', 'plan_to_read', 'plan_to_play'].includes(selectedItem?.status);
+                    const itemIsFavorite = Boolean(selectedItem?.is_favorite ?? isFavorite);
                     return (
                       <button
                         type="button"
-                        disabled={isUnconsumed && !isFavorite}
-                        onClick={() => onToggleFavorite && onToggleFavorite(selectedItem.id, isFavorite)}
-                        className={`btn-favorite-heart ${isFavorite ? 'is-favorite' : ''}`}
-                        title={isUnconsumed && !isFavorite
+                        disabled={isUnconsumed && !itemIsFavorite}
+                        onClick={handleToggleFavoriteClick}
+                        className={`btn-favorite-heart ${itemIsFavorite ? 'is-favorite' : ''}`}
+                        title={isUnconsumed && !itemIsFavorite
                           ? (language === 'es' ? 'Empieza a consumir la obra para poder destacarla' : 'Start consuming this item to feature it')
-                          : isFavorite
+                          : itemIsFavorite
                           ? (language === 'es' ? 'Quitar Destacado' : 'Remove Featured')
                           : (language === 'es' ? 'Destacar (Favorito)' : 'Feature (Favorite)')
                         }
@@ -6230,15 +6372,15 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                           minWidth: '34px',
                           minHeight: '34px',
                           flexShrink: 0,
-                          cursor: (isUnconsumed && !isFavorite) ? 'not-allowed' : 'pointer',
-                          opacity: (isUnconsumed && !isFavorite) ? 0.4 : 1,
-                          color: isFavorite ? 'var(--color-user, #F472B6)' : 'var(--text-secondary)',
-                          border: isFavorite ? '1px solid var(--color-user, #F472B6)' : '1px solid var(--border-color)',
-                          background: isFavorite ? 'rgba(244, 114, 182, 0.12)' : 'rgba(255, 255, 255, 0.05)',
+                          cursor: (isUnconsumed && !itemIsFavorite) ? 'not-allowed' : 'pointer',
+                          opacity: (isUnconsumed && !itemIsFavorite) ? 0.4 : 1,
+                          color: itemIsFavorite ? 'var(--color-user, #F472B6)' : 'var(--text-secondary)',
+                          border: itemIsFavorite ? '1px solid var(--color-user, #F472B6)' : '1px solid var(--border-color)',
+                          background: itemIsFavorite ? 'rgba(244, 114, 182, 0.12)' : 'rgba(255, 255, 255, 0.05)',
                           transition: 'all 0.2s ease'
                         }}
                       >
-                        <Heart size={18} fill={isFavorite ? 'var(--color-user, #F472B6)' : 'none'} />
+                        <Heart size={18} fill={itemIsFavorite ? 'var(--color-user, #F472B6)' : 'none'} />
                       </button>
                     );
                   })()}
@@ -6552,7 +6694,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                   })()}
 
                   {/* Unified Review section (Stars + optional text commentary + Guardar) */}
-                  {user && (
+                  {user && (isItemTracked || Boolean((itemReviews || []).some((r: any) => r.user_id === user?.id && !r.parent_id && r.rating !== null && r.rating !== undefined))) && (
                     <div>
                       {(() => {
                         const myRootReview = (itemReviews || []).find((r: any) => r.user_id === user?.id && !r.parent_id && r.rating !== null && r.rating !== undefined);

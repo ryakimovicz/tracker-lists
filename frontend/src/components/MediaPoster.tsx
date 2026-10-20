@@ -28,6 +28,10 @@ export const MediaPoster: React.FC<MediaPosterProps> = ({
 }) => {
   const [imgError, setImgError] = useState(false);
 
+  React.useEffect(() => {
+    setImgError(false);
+  }, [src]);
+
   // Normalize item type for icons & category colors
   const normType = (itemType || '').toLowerCase();
 
@@ -146,6 +150,9 @@ export const MediaPoster: React.FC<MediaPosterProps> = ({
       <img
         src={src!}
         alt={title}
+        loading="lazy"
+        decoding="async"
+        referrerPolicy="no-referrer"
         draggable={false}
         onDragStart={(e) => e.preventDefault()}
         onError={() => setImgError(true)}

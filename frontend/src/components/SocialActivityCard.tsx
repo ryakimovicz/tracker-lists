@@ -257,7 +257,7 @@ export const SocialActivityCard: React.FC<SocialActivityCardProps> = ({
           title: cleanTitle || activity.item_title || 'Media',
           image_url: activity.image_url || undefined,
           item_type: effectiveItemType,
-          tracking_list_id: activity.list_id || undefined
+          tracking_list_id: activity.user_id === user?.id ? (activity.list_id || undefined) : undefined
         };
         onOpenItem(itemToOpen);
       }

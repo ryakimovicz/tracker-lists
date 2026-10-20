@@ -199,8 +199,8 @@ const ShelfCardItem = React.memo<ShelfCardItemProps>(({
   const isEpOrSeason = item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tvm-ep-');
 
   let displayTitle = item.title;
-  if (isEpOrSeason && item.last_seen_episode && item.title.toLowerCase().startsWith(item.last_seen_episode.toLowerCase() + ' - ')) {
-    displayTitle = item.title.slice(item.last_seen_episode.length + 3);
+  if (isEpOrSeason && item.last_seen_episode && (item.title || '').toLowerCase().startsWith((item.last_seen_episode || '').toLowerCase() + ' - ')) {
+    displayTitle = (item.title || '').slice(item.last_seen_episode.length + 3);
   }
 
   return (
@@ -471,8 +471,8 @@ const ShelfListItemRow = React.memo<ShelfListItemRowProps>(({
     const epName = match[4].replace(/^\s*-\s*/, '').trim();
     const formattedSE = language === 'es' ? `T${s} | E${e}` : `S${s} | E${e}`;
     episodeSubtext = epName ? `${formattedSE} - ${epName}` : formattedSE;
-  } else if (isEpOrSeason && item.last_seen_episode && item.title.toLowerCase().startsWith(item.last_seen_episode.toLowerCase() + ' - ')) {
-    displayTitle = item.title.slice(item.last_seen_episode.length + 3);
+  } else if (isEpOrSeason && item.last_seen_episode && (item.title || '').toLowerCase().startsWith((item.last_seen_episode || '').toLowerCase() + ' - ')) {
+    displayTitle = (item.title || '').slice(item.last_seen_episode.length + 3);
   }
 
   // Prepare metadata snippet for Line 2
@@ -2361,8 +2361,39 @@ export const Profile: React.FC = () => {
 
     const handleProfileUpdate = (e?: any) => {
       // 1. Instantly update shelf in React state from event detail or cache
-      const updatedItem = (e as CustomEvent)?.detail?.item;
+      const detail = (e as CustomEvent)?.detail;
+      const deletedId = detail?.deletedId;
+      const deletedExternalId = detail?.deletedExternalId;
+      if (deletedId || deletedExternalId) {
+        setLibraryItems(prev => prev.filter(i => {
+          if (deletedId && i.id === deletedId) return false;
+          if (deletedExternalId && i.external_id === deletedExternalId) return false;
+          return true;
+        }));
+        setFavorites(prev => prev.filter(i => {
+          if (deletedId && i.id === deletedId) return false;
+          if (deletedExternalId && i.external_id === deletedExternalId) return false;
+          return true;
+        }));
+        fetchActivitiesFast();
+        return;
+      }
+
+      const updatedItem = detail?.item;
       if (updatedItem && (!targetUserIdentifier || targetUserIdentifier === currentUser?.username)) {
+        if (!updatedItem.id) {
+          setLibraryItems(prev => prev.filter(i => {
+            if (updatedItem.external_id && i.external_id === updatedItem.external_id && i.item_type === updatedItem.item_type) return false;
+            return true;
+          }));
+          setFavorites(prev => prev.filter(i => {
+            if (updatedItem.external_id && i.external_id === updatedItem.external_id && i.item_type === updatedItem.item_type) return false;
+            return true;
+          }));
+          fetchActivitiesFast();
+          return;
+        }
+
         setLibraryItems(prev => {
           const matchIdx = prev.findIndex(i => (updatedItem.id && i.id === updatedItem.id) || (updatedItem.external_id && i.external_id === updatedItem.external_id && i.item_type === updatedItem.item_type));
           if (matchIdx >= 0) {
@@ -2372,13 +2403,23 @@ export const Profile: React.FC = () => {
           }
           return [updatedItem, ...prev];
         });
+        if (updatedItem.is_favorite === false) {
+          setFavorites(prev => prev.filter(i => {
+            if (updatedItem.id && i.id === updatedItem.id) return false;
+            if (updatedItem.external_id && i.external_id === updatedItem.external_id && i.item_type === updatedItem.item_type) return false;
+            return true;
+          }));
+        } else if (updatedItem.is_favorite === true) {
+          setFavorites(prev => {
+            const exists = prev.some(i => (updatedItem.id && i.id === updatedItem.id) || (updatedItem.external_id && i.external_id === updatedItem.external_id && i.item_type === updatedItem.item_type));
+            if (exists) {
+              return prev.map(i => ((updatedItem.id && i.id === updatedItem.id) || (updatedItem.external_id && i.external_id === updatedItem.external_id && i.item_type === updatedItem.item_type)) ? { ...i, ...updatedItem } : i);
+            }
+            return [{ ...updatedItem, is_favorite: true }, ...prev];
+          });
+        }
         fetchActivitiesFast();
         return; // Single-item change handled cleanly without full profile reload!
-      } else if (!targetUserIdentifier) {
-        const cached = getCachedShelfItems();
-        if (cached && cached.length > 0) {
-          setLibraryItems(cached as any);
-        }
       }
 
       // 2. Full profile reload only when no specific item detail is passed
@@ -2386,18 +2427,75 @@ export const Profile: React.FC = () => {
       fetchProfileAndLibrary();
     };
 
-    const handleActivityOrProgressUpdate = () => {
+    const handleFavoritesUpdated = (e: any) => {
+      const detail = (e as CustomEvent)?.detail;
+      if (!detail) return;
+      const { itemId, externalId, isFavorite, item } = detail;
+      if (isFavorite === false) {
+        setFavorites(prev => prev.filter(i => {
+          if (itemId && i.id === itemId) return false;
+          if (externalId && i.external_id === externalId) return false;
+          return true;
+        }));
+        setLibraryItems(prev => prev.map(i => {
+          if ((itemId && i.id === itemId) || (externalId && i.external_id === externalId)) {
+            return { ...i, is_favorite: false };
+          }
+          return i;
+        }));
+      } else if (isFavorite === true) {
+        setFavorites(prev => {
+          const matchIdx = prev.findIndex(i => (itemId && i.id === itemId) || (externalId && i.external_id === externalId));
+          if (matchIdx >= 0) {
+            const next = [...prev];
+            next[matchIdx] = { ...next[matchIdx], ...(item || {}), is_favorite: true };
+            return next;
+          }
+          const baseItem = item || libraryItems.find(li => (itemId && li.id === itemId) || (externalId && li.external_id === externalId));
+          if (baseItem) {
+            return [{ ...baseItem, is_favorite: true }, ...prev];
+          }
+          return prev;
+        });
+        setLibraryItems(prev => prev.map(i => {
+          if ((itemId && i.id === itemId) || (externalId && i.external_id === externalId)) {
+            return { ...i, is_favorite: true };
+          }
+          return i;
+        }));
+      }
+      fetchActivitiesFast();
+    };
+
+    const handleActivityOrProgressUpdate = (e?: any) => {
+      const detail = (e as CustomEvent)?.detail;
+      const deletedId = detail?.deletedId;
+      const deletedExternalId = detail?.deletedExternalId;
+      if (deletedId || deletedExternalId) {
+        setLibraryItems(prev => prev.filter(i => {
+          if (deletedId && i.id === deletedId) return false;
+          if (deletedExternalId && i.external_id === deletedExternalId) return false;
+          return true;
+        }));
+        setFavorites(prev => prev.filter(i => {
+          if (deletedId && i.id === deletedId) return false;
+          if (deletedExternalId && i.external_id === deletedExternalId) return false;
+          return true;
+        }));
+      }
       fetchActivitiesFast();
     };
 
     window.addEventListener('profile-updated', handleProfileUpdate);
     window.addEventListener('library-updated', handleProfileUpdate);
+    window.addEventListener('favorites-updated', handleFavoritesUpdated);
     window.addEventListener('progress-updated', handleActivityOrProgressUpdate);
     window.addEventListener('activity-created', handleActivityOrProgressUpdate);
 
     return () => {
       window.removeEventListener('profile-updated', handleProfileUpdate);
       window.removeEventListener('library-updated', handleProfileUpdate);
+      window.removeEventListener('favorites-updated', handleFavoritesUpdated);
       window.removeEventListener('progress-updated', handleActivityOrProgressUpdate);
       window.removeEventListener('activity-created', handleActivityOrProgressUpdate);
     };
@@ -3310,6 +3408,7 @@ export const Profile: React.FC = () => {
 
   const visualLibraryItems = useMemo<LibraryItem[]>(() => {
     return libraryItems.filter((item: LibraryItem) => {
+      if (!item || !item.id) return false;
       if (item.item_type === 'music') return false;
       if (item.external_id?.startsWith('cv_issue_')) return false;
       const isLooseType = item.item_type === 'episode' || item.item_type === 'season' || item.external_id?.startsWith('tvm-ep-');
@@ -3317,7 +3416,7 @@ export const Profile: React.FC = () => {
       const parentTitle = item.last_seen_episode || '';
       const followsParentSeries = libraryItems.some((li: LibraryItem) => 
         (li.item_type === 'series' || li.item_type === 'anime') && 
-        (li.title === parentTitle || item.title.startsWith(li.title))
+        (Boolean(li.title && li.title === parentTitle) || Boolean(li.title && item.title && item.title.startsWith(li.title)))
       );
       return !followsParentSeries;
     });
@@ -3326,6 +3425,7 @@ export const Profile: React.FC = () => {
   const filteredItems = useMemo<LibraryItem[]>(() => {
     return libraryItems
       .filter((item: LibraryItem) => {
+        if (!item || !item.id) return false;
         if (item.item_type === 'music') return false;
         if (item.external_id?.startsWith('cv_issue_')) return false;
         let matchesMedia = false;
@@ -3334,12 +3434,12 @@ export const Profile: React.FC = () => {
         else if (mediaFilter === 'anime') matchesMedia = item.item_type === 'anime';
         else matchesMedia = item.item_type === mediaFilter;
         
-        const normalizeSearch = (str: string) => {
-          return str.toLowerCase().replace(/\b(y|and)\b|\s+&\s+/g, ' & ').replace(/\s+/g, ' ').trim();
+        const normalizeSearch = (str?: string | null) => {
+          return (str || '').toLowerCase().replace(/\b(y|and)\b|\s+&\s+/g, ' & ').replace(/\s+/g, ' ').trim();
         };
         
         const normalizedQuery = normalizeSearch(shelfSearchQuery);
-        const matchesSearch = normalizeSearch(item.title).includes(normalizedQuery);
+        const matchesSearch = !normalizedQuery || normalizeSearch(item?.title).includes(normalizedQuery);
         
         const isLoose = isLooseEpisodeOrSeason(item);
         const isSeriesOrRegular = item.item_type !== 'episode' && item.item_type !== 'season' && !item.external_id?.startsWith('tvm-ep-');
@@ -5956,11 +6056,11 @@ export const Profile: React.FC = () => {
                             maskImage: getMaskImage()
                           }}
                         >
-                          {filteredItems.map(item => {
+                          {filteredItems.map((item, idx) => {
                             const isEffectiveFav = displayedFavorites.some(df => df.id === item.id);
                             return (
                               <ShelfCardItem
-                                key={item.id}
+                                key={item.id ? `shelf_${item.id}` : `shelf_${item.item_type}_${item.external_id || idx}`}
                                 item={item}
                                 mediaFilter={mediaFilter}
                                 isEffectiveFav={isEffectiveFav}
@@ -6055,11 +6155,11 @@ export const Profile: React.FC = () => {
                           maskImage: getShelfListMaskImage()
                         } as React.CSSProperties}
                       >
-                        {filteredItems.map(item => {
+                        {filteredItems.map((item, idx) => {
                           const isEffectiveFav = displayedFavorites.some(df => df.id === item.id);
                           return (
                             <ShelfListItemRow
-                              key={item.id}
+                              key={item.id ? `shelf_row_${item.id}` : `shelf_row_${item.item_type}_${item.external_id || idx}`}
                               item={item}
                               mediaFilter={mediaFilter}
                               isEffectiveFav={isEffectiveFav}
@@ -6754,8 +6854,8 @@ export const Profile: React.FC = () => {
                                     );
                                   }
                                   let displayTitle = item.title;
-                                  if (isEpOrSeason && item.last_seen_episode && item.title.toLowerCase().startsWith(item.last_seen_episode.toLowerCase() + ' - ')) {
-                                    displayTitle = item.title.slice(item.last_seen_episode.length + 3);
+                                  if (isEpOrSeason && item.last_seen_episode && (item.title || '').toLowerCase().startsWith((item.last_seen_episode || '').toLowerCase() + ' - ')) {
+                                    displayTitle = (item.title || '').slice(item.last_seen_episode.length + 3);
                                   }
                                   return (
                                     <>
@@ -6902,8 +7002,8 @@ export const Profile: React.FC = () => {
                         const epName = match[4].replace(/^\s*-\s*/, '').trim();
                         const formattedSE = language === 'es' ? `T${s} | E${e}` : `S${s} | E${e}`;
                         episodeSubtext = epName ? `${formattedSE} - ${epName}` : formattedSE;
-                      } else if (isEpOrSeason && item.last_seen_episode && item.title.toLowerCase().startsWith(item.last_seen_episode.toLowerCase() + ' - ')) {
-                        displayTitle = item.title.slice(item.last_seen_episode.length + 3);
+                      } else if (isEpOrSeason && item.last_seen_episode && (item.title || '').toLowerCase().startsWith((item.last_seen_episode || '').toLowerCase() + ' - ')) {
+                        displayTitle = (item.title || '').slice(item.last_seen_episode.length + 3);
                       }
 
                       return (
@@ -7216,13 +7316,21 @@ export const Profile: React.FC = () => {
           profileColor={profile?.profile_color}
           onClose={() => setSelectedItem(null)} 
 
-          onUpdate={() => {
+          onUpdate={(updatedItem?: any) => {
+            if (updatedItem && !updatedItem.id && updatedItem.external_id) {
+              setLibraryItems(prev => prev.filter(it => it.external_id !== updatedItem.external_id));
+              setFavorites(prev => prev.filter(it => it.external_id !== updatedItem.external_id));
+            }
             apiClient.get(userIdParam ? `/library/?user_id=${userIdParam}` : '/library/').then(res => {
-              setLibraryItems(res.data);
-              const favs = res.data.filter((item: any) => item.is_favorite);
-              setFavorites(favs);
+              if (Array.isArray(res.data)) {
+                setLibraryItems(res.data);
+                const favs = res.data.filter((item: any) => item.is_favorite);
+                setFavorites(favs);
+              }
             });
-            apiClient.get(userIdParam ? `/users/${userIdParam}/activity` : '/users/me/activity').then(res => setActivities(res.data));
+            apiClient.get(userIdParam ? `/users/${userIdParam}/activity` : '/users/me/activity').then(res => {
+              if (Array.isArray(res.data)) setActivities(res.data);
+            });
           }}
           onOpenItem={(item) => {
             handleOpenItem(item);
@@ -8302,8 +8410,7 @@ const ProfileActivityCardItem: React.FC<ProfileActivityCardItemProps> = ({
       id: (!effectiveExternalId && act.list_id) ? act.list_id : undefined,
       title: cleanTitle || rawTitle || 'Media',
       image_url: targetPoster || undefined,
-      item_type: effectiveItemType,
-      tracking_list_id: act.list_id || undefined
+      item_type: effectiveItemType
     });
   };
 
