@@ -3342,6 +3342,17 @@ h1, h2, h3, h4, h5, h6 {
   }
 }
 
+@keyframes slideInLeft {
+  0% {
+    opacity: 0;
+    transform: translateX(-16px) scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
 .mobile-exit-toast {
   position: fixed;
   bottom: calc(72px + env(safe-area-inset-bottom, 0px));

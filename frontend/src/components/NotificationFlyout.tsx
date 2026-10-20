@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Bell, CheckCheck, Trash2, UserPlus, ThumbsUp, MessageSquare, Reply, UserCheck, X, ExternalLink, AtSign, AlertTriangle } from 'lucide-react';
 import { apiClient } from '../api/client';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
@@ -692,7 +693,7 @@ export const NotificationFlyout: React.FC<NotificationFlyoutProps> = ({
     );
   };
 
-  return (
+  return createPortal(
     <div
       ref={panelRef}
       className="notification-flyout-panel"
@@ -701,7 +702,7 @@ export const NotificationFlyout: React.FC<NotificationFlyoutProps> = ({
         left: '270px',
         bottom: '20px',
         width: '380px',
-        maxHeight: '560px',
+        maxHeight: 'min(560px, calc(100vh - 40px))',
         background: 'var(--bg-primary)',
         border: '1px solid var(--border-color)',
         borderRadius: '16px',
@@ -874,6 +875,7 @@ export const NotificationFlyout: React.FC<NotificationFlyoutProps> = ({
           {renderNotificationList(unreadItems, true)}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
