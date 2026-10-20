@@ -45,7 +45,7 @@ class User(Base):
 
     # Relationships
 
-    lists = relationship("ReadingList", back_populates="creator", cascade="all, delete-orphan")
+    lists = relationship("ReadingList", back_populates="creator", cascade="all, delete")
     saved_lists = relationship("SavedList", back_populates="user", cascade="all, delete-orphan")
     progress_records = relationship("ItemProgress", back_populates="user", cascade="all, delete-orphan")
 

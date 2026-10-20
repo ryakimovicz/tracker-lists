@@ -555,6 +555,92 @@ def admin_delete_user(
     db.commit()
     return None
 
+@router.delete("/users/{user_id}/shelf")
+def admin_delete_user_shelf(
+    user_id: int,
+    current_admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    from app.models.library import UserLibraryItem
+    from app.models.consumption import ConsumptionHistory
+    from app.models.activity import UserActivityLog
+    from app.models.review import MediaReview, MediaReviewVote, MediaReviewReport
+    from app.models.item_progress import ItemProgress
+    from app.models.list import ReadingList
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    # 1. Fetch user shelf items (excluding music, so music is preserved)
+    shelf_items = db.query(UserLibraryItem).filter(
+        UserLibraryItem.user_id == user_id,
+        UserLibraryItem.item_type != "music"
+    ).all()
+
+    # Track auto-generated reading lists to clean up
+    tracking_list_ids = [it.tracking_list_id for it in shelf_items if it.tracking_list_id]
+
+    # Detach tracking lists so foreign keys don't block deletion
+    for it in shelf_items:
+        it.tracking_list_id = None
+    db.flush()
+
+    # Delete all non-music library items (removes works, status, and favorites/destacados)
+    for it in shelf_items:
+        db.delete(it)
+    db.flush()
+
+    # Delete the user's private auto-generated tracking lists (e.g. series / comic tracking)
+    if tracking_list_ids:
+        db.query(ReadingList).filter(
+            ReadingList.id.in_(tracking_list_ids),
+            ReadingList.creator_id == user_id
+        ).delete(synchronize_session=False)
+
+    # 2. Wipe item progress (episodes watched, comic issues read, pages read)
+    db.query(ItemProgress).filter(ItemProgress.user_id == user_id).delete(synchronize_session=False)
+
+    # 3. Wipe consumption history (except music)
+    db.query(ConsumptionHistory).filter(
+        ConsumptionHistory.user_id == user_id,
+        ConsumptionHistory.item_type != "music"
+    ).delete(synchronize_session=False)
+
+    # 4. Wipe user's media reviews and ratings (reseñas y valoraciones)
+    user_reviews = db.query(MediaReview).filter(
+        MediaReview.user_id == user_id,
+        MediaReview.item_type != "music"
+    ).all()
+    user_review_ids = [r.id for r in user_reviews]
+    if user_review_ids:
+        db.query(MediaReviewVote).filter(MediaReviewVote.review_id.in_(user_review_ids)).delete(synchronize_session=False)
+        db.query(MediaReviewReport).filter(MediaReviewReport.review_id.in_(user_review_ids)).delete(synchronize_session=False)
+        db.query(MediaReview).filter(MediaReview.parent_id.in_(user_review_ids)).delete(synchronize_session=False)
+        db.query(MediaReview).filter(MediaReview.id.in_(user_review_ids)).delete(synchronize_session=False)
+
+    # 5. Wipe media/shelf-related activity logs for this user (preserving guide creations and general social activity)
+    shelf_activity_types = [
+        "item_added_to_library", "item_status_changed", "item_progress",
+        "item_completed", "item_reviewed", "item_rated", "item_favorited",
+        "item_unfavorited", "shelf_add", "item_added"
+    ]
+    db.query(UserActivityLog).filter(
+        UserActivityLog.user_id == user_id,
+        (
+            UserActivityLog.activity_type.in_(shelf_activity_types) |
+            UserActivityLog.activity_type.startswith("item_")
+        ),
+        UserActivityLog.item_type != "music"
+    ).delete(synchronize_session=False)
+
+    db.commit()
+
+    return {
+        "success": True,
+        "message": f"Estantería de '{user.username}' eliminada por completo."
+    }
+
 @router.delete("/lists/{list_id}", status_code=status.HTTP_204_NO_CONTENT)
 def admin_delete_list(
     list_id: int,

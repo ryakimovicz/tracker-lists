@@ -42,3 +42,9 @@ def test_forgot_password_generic_response(client):
     assert response.status_code == 200
     assert "password reset link has been generated" in response.json().get("message", "")
 
+
+def test_admin_delete_shelf_requires_admin(client):
+    response = client.delete("/api/v1/admin/users/1/shelf")
+    assert response.status_code in (401, 403)
+
+

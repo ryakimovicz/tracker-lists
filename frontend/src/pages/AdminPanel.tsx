@@ -615,6 +615,54 @@ export const AdminPanel: React.FC = () => {
     }, 'delete_user');
   };
 
+  const handleDeleteUserShelf = (targetUser?: AdminUser) => {
+    const userToWipe = targetUser || selectedUser;
+    if (!userToWipe) return;
+
+    openConfirmDialog({
+      title: isEs ? '¿Eliminar Toda la Estantería?' : 'Delete Entire Shelf?',
+      message: isEs
+        ? `¿Estás seguro de que deseas vaciar por completo la estantería de "${userToWipe.username}"? Se eliminarán todas sus obras, episodios vistos, números de cómics, progreso, valoraciones, reseñas y destacados. La música y listas personalizadas no se verán afectadas. Esta acción no se puede deshacer.`
+        : `Are you sure you want to completely clear "${userToWipe.username}"'s shelf? All shelf works, watched episodes, comic issues, progress, ratings, reviews, and featured items will be deleted. Music and custom lists will not be affected. This cannot be undone.`,
+      type: 'danger',
+      confirmText: isEs ? 'Vaciar Estantería' : 'Clear Shelf',
+      onConfirm: async () => {
+        closeConfirmDialog(false);
+        setActionLoading(true);
+        try {
+          const res = await apiClient.delete(`/admin/users/${userToWipe.id}/shelf`);
+          const msg = res.data?.message || (isEs ? `Estantería de "${userToWipe.username}" eliminada correctamente.` : `Shelf for "${userToWipe.username}" cleared successfully.`);
+          
+          if (selectedUser && selectedUser.id === userToWipe.id) {
+            setModalFeedback({ type: 'success', text: msg });
+          } else {
+            alert(msg);
+          }
+
+          // If the admin wiped their own shelf, clear client shelf caches and broadcast events
+          if (currentUser && currentUser.id === userToWipe.id) {
+            try {
+              localStorage.removeItem('pathd_shelf_cache');
+              localStorage.removeItem('pathd_lib_cache');
+              sessionStorage.removeItem('pathd_lib_cache');
+            } catch (_) {}
+            window.dispatchEvent(new CustomEvent('library-updated'));
+            window.dispatchEvent(new CustomEvent('progress-updated'));
+          }
+        } catch (err: any) {
+          const errorMsg = err.response?.data?.detail || (isEs ? 'Error al eliminar la estantería.' : 'Error deleting shelf.');
+          if (selectedUser && selectedUser.id === userToWipe.id) {
+            setModalFeedback({ type: 'error', text: errorMsg });
+          } else {
+            alert(errorMsg);
+          }
+        } finally {
+          setActionLoading(false);
+        }
+      }
+    }, 'delete_shelf');
+  };
+
   const handleDeleteReportItem = async (type: 'list' | 'comment' | 'activity_comment' | 'review', id: number) => {
     try {
       if (type === 'list') await apiClient.delete(`/admin/lists/${id}`);
@@ -938,7 +986,41 @@ export const AdminPanel: React.FC = () => {
 
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', color: 'var(--text-muted)', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '0.5rem' }}>
                     <span>ID: #{u.id} • {u.lists_count} {isEs ? 'listas' : 'lists'}</span>
-                    <span style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>{isEs ? 'Gestionar →' : 'Manage →'}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteUserShelf(u);
+                        }}
+                        title={isEs ? 'Eliminar toda la estantería' : 'Delete entire shelf'}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: 'var(--text-muted)',
+                          cursor: 'pointer',
+                          padding: '0.2rem 0.4rem',
+                          borderRadius: 4,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.25rem',
+                          fontSize: '0.72rem',
+                          transition: 'all 0.15s ease'
+                        }}
+                        onMouseEnter={e => {
+                          e.currentTarget.style.color = '#ef4444';
+                          e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
+                        }}
+                        onMouseLeave={e => {
+                          e.currentTarget.style.color = 'var(--text-muted)';
+                          e.currentTarget.style.background = 'none';
+                        }}
+                      >
+                        <Trash2 size={12} />
+                        <span>{isEs ? 'Vaciar estantería' : 'Clear shelf'}</span>
+                      </button>
+                      <span style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>{isEs ? 'Gestionar →' : 'Manage →'}</span>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -1906,6 +1988,39 @@ export const AdminPanel: React.FC = () => {
                     </div>
                   </div>
                 )}
+              </div>
+
+              {/* Action 4.5: Eliminar Toda la Estantería */}
+              <div style={{ background: 'rgba(239, 68, 68, 0.04)', padding: '1rem 1.25rem', borderRadius: 12, border: '1px solid rgba(239, 68, 68, 0.25)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+                <div style={{ flex: 1, minWidth: 240 }}>
+                  <div style={{ fontWeight: 700, fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#ef4444' }}>
+                    <Trash2 size={16} /> {isEs ? 'Eliminar Toda la Estantería' : 'Delete Entire Shelf'}
+                  </div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
+                    {isEs
+                      ? 'Elimina por completo todas las obras de su estantería, episodios vistos, números de cómics, progreso, reseñas, valoraciones y destacados. La música y listas personalizadas se mantienen intactas.'
+                      : 'Permanently deletes all shelf works, watched episodes, comic issues, progress, reviews, ratings, and featured items. Music and custom lists remain untouched.'}
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  disabled={actionLoading}
+                  onClick={() => handleDeleteUserShelf(selectedUser)}
+                  className="btn-secondary"
+                  style={{
+                    color: '#ef4444',
+                    borderColor: '#ef4444',
+                    fontSize: '0.85rem',
+                    padding: '0.45rem 1.2rem',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.4rem',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  <Trash2 size={14} /> {isEs ? 'Eliminar Estantería' : 'Delete Shelf'}
+                </button>
               </div>
 
               {/* Action 5: Eliminar Cuenta */}

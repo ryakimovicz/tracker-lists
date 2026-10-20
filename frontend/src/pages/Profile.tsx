@@ -734,6 +734,24 @@ export const Profile: React.FC = () => {
   const mobileToastTouchStartRef = useRef<{ x: number; y: number } | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+
+  const getCleanErrorMessage = useCallback((err: any, fallback: string): string => {
+    const detail = err?.response?.data?.detail;
+    if (!detail || typeof detail !== 'string') return fallback;
+    const isInternal = /sqlite|sql|integrityerror|not null|foreign key|syntaxerror|traceback|operationalerror|internal server error/i.test(detail);
+    if (isInternal || (err?.response?.status && err.response.status >= 500)) {
+      return fallback;
+    }
+    return detail;
+  }, []);
+
+  const showErrorMessage = useCallback((err: any, fallback: string) => {
+    const cleanMsg = getCleanErrorMessage(err, fallback);
+    setErrorMsg(cleanMsg);
+    setTimeout(() => {
+      setErrorMsg(prev => prev === cleanMsg ? '' : prev);
+    }, 4500);
+  }, [getCleanErrorMessage]);
   const [loading, setLoading] = useState(() => {
     if (!targetUserIdentifier) {
       try {
@@ -3018,8 +3036,8 @@ export const Profile: React.FC = () => {
       // Rollback on failure
       setLibraryItems(prevLibraryItems);
       setFavorites(prevFavorites);
-      setErrorMsg(err.response?.data?.detail || (language === 'es' ? 'Error al actualizar destacado' : 'Failed to update favorite'));
-      setTimeout(() => setErrorMsg(''), 5000);
+      const fallback = language === 'es' ? 'Error al actualizar destacado' : 'Failed to update favorite';
+      showErrorMessage(err, fallback);
     }
   };
 
@@ -3080,8 +3098,8 @@ export const Profile: React.FC = () => {
       const actRes = await apiClient.get(targetActivityUrl);
       setActivities(actRes.data);
     } catch(err: any) {
-      setErrorMsg(err.response?.data?.detail || (language === 'es' ? 'Error al reemplazar destacado' : 'Failed to replace favorite'));
-      setTimeout(() => setErrorMsg(''), 5000);
+      const fallback = language === 'es' ? 'Error al reemplazar destacado' : 'Failed to replace favorite';
+      showErrorMessage(err, fallback);
     }
   };
 
@@ -3166,8 +3184,8 @@ export const Profile: React.FC = () => {
       // Rollback on error
       setLibraryItems(prevLibraryItems);
       setFavorites(prevFavorites);
-      setErrorMsg(err.response?.data?.detail || (language === 'es' ? 'Error al destacar artista' : 'Failed to feature artist'));
-      setTimeout(() => setErrorMsg(''), 5000);
+      const fallback = language === 'es' ? 'Error al destacar artista' : 'Failed to feature artist';
+      showErrorMessage(err, fallback);
     }
   };
 
@@ -3198,7 +3216,8 @@ export const Profile: React.FC = () => {
           
           setTimeout(() => setSuccessMsg(''), 3000);
         } catch (err: any) {
-          setErrorMsg(err.response?.data?.detail || 'Failed to delete item.');
+          const fallback = language === 'es' ? 'No se pudo eliminar la obra de la estantería.' : 'Failed to delete item from shelf.';
+          showErrorMessage(err, fallback);
         }
       }
     }, 'delete_item');
@@ -3234,7 +3253,8 @@ export const Profile: React.FC = () => {
           setSuccessMsg(language === 'es' ? 'Guía eliminada con éxito.' : 'Guide deleted successfully.');
           setTimeout(() => setSuccessMsg(''), 3000);
         } catch (err: any) {
-          setErrorMsg(err.response?.data?.detail || 'Failed to delete guide.');
+          const fallback = language === 'es' ? 'No se pudo eliminar la guía. Por favor, intenta nuevamente.' : 'Failed to delete guide. Please try again.';
+          showErrorMessage(err, fallback);
         }
       }
     }, 'delete_guide');
@@ -5192,17 +5212,36 @@ export const Profile: React.FC = () => {
       )}
 
       {errorMsg && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', padding: '0.75rem', borderRadius: 8, fontSize: '0.9rem' }}>
-          <AlertCircle size={18} />
-          <span>{errorMsg}</span>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', background: 'rgba(239, 68, 68, 0.12)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#ef4444', padding: '0.75rem 1rem', borderRadius: 10, fontSize: '0.9rem', margin: '0.75rem 0' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <AlertCircle size={18} style={{ flexShrink: 0 }} />
+            <span>{errorMsg}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setErrorMsg('')}
+            style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '0.2rem', display: 'flex', alignItems: 'center', opacity: 0.8 }}
+            title={language === 'es' ? 'Cerrar' : 'Dismiss'}
+          >
+            <X size={16} />
+          </button>
         </div>
       )}
 
-
       {successMsg && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', padding: '0.75rem', borderRadius: 8, fontSize: '0.9rem' }}>
-          <CheckCircle size={18} />
-          <span>{successMsg}</span>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', background: 'rgba(16, 185, 129, 0.12)', border: '1px solid rgba(16, 185, 129, 0.3)', color: '#10b981', padding: '0.75rem 1rem', borderRadius: 10, fontSize: '0.9rem', margin: '0.75rem 0' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <CheckCircle size={18} style={{ flexShrink: 0 }} />
+            <span>{successMsg}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSuccessMsg('')}
+            style={{ background: 'none', border: 'none', color: '#10b981', cursor: 'pointer', padding: '0.2rem', display: 'flex', alignItems: 'center', opacity: 0.8 }}
+            title={language === 'es' ? 'Cerrar' : 'Dismiss'}
+          >
+            <X size={16} />
+          </button>
         </div>
       )}
 
