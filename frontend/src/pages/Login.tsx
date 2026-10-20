@@ -3,14 +3,14 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../context/LanguageContext';
 import { apiClient } from '../api/client';
-import { Mail, Lock, AlertCircle, LogIn, Eye, EyeOff } from 'lucide-react';
+import { Mail, Lock, AlertCircle, LogIn, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import { GoogleLogin, type CredentialResponse } from '@react-oauth/google';
 import { GoogleUsernameModal } from '../components/GoogleUsernameModal';
 import { AdBanner } from '../components/AdBanner';
 
 export const Login: React.FC = () => {
   const { login, isAuthenticated } = useAuth();
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -18,6 +18,18 @@ export const Login: React.FC = () => {
       navigate('/profile');
     }
   }, [isAuthenticated, navigate]);
+
+  const [googleBtnWidth, setGoogleBtnWidth] = useState<string>('360');
+
+  useEffect(() => {
+    const updateWidth = () => {
+      const available = Math.min(360, Math.max(220, window.innerWidth - 64));
+      setGoogleBtnWidth(String(Math.floor(available)));
+    };
+    updateWidth();
+    window.addEventListener('resize', updateWidth);
+    return () => window.removeEventListener('resize', updateWidth);
+  }, []);
 
   const [usernameOrEmail, setUsernameOrEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -144,15 +156,27 @@ export const Login: React.FC = () => {
   };
 
   return (
-    <div className="auth-card" style={{ maxWidth: 450, margin: '4rem auto', padding: '2.5rem' }}>
+    <div className="auth-card">
+      <div className="auth-card-header-nav">
+        <Link to="/" className="auth-card-back-btn" title={language === 'es' ? 'Volver al Inicio' : 'Back to Home'}>
+          <ArrowLeft size={15} />
+          <span>{language === 'es' ? 'Inicio' : 'Home'}</span>
+        </Link>
+        <Link to="/register" className="auth-card-switch-link">
+          {t('authRegisterButton')}
+        </Link>
+      </div>
+
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
 
         <div style={{ textAlign: 'center', marginBottom: '0.25rem' }}>
-          <img
-            src="/logo-transparent.svg"
-            alt="Pathd"
-            style={{ width: '48px', height: '48px', filter: 'drop-shadow(0 4px 14px rgba(245, 158, 11, 0.3))' }}
-          />
+          <Link to="/" title={language === 'es' ? 'Ir al Inicio' : 'Go to Home'} style={{ display: 'inline-block', textDecoration: 'none' }}>
+            <img
+              src="/logo-transparent.svg"
+              alt="Pathd"
+              style={{ width: '48px', height: '48px', filter: 'drop-shadow(0 4px 14px rgba(245, 158, 11, 0.3))' }}
+            />
+          </Link>
         </div>
 
         <h2 style={{ textAlign: 'center', margin: 0 }}>{t('authLoginButton')}</h2>
@@ -221,7 +245,7 @@ export const Login: React.FC = () => {
               placeholder={t('authEmailPlaceholder')}
               value={usernameOrEmail}
               onChange={(e) => setUsernameOrEmail(e.target.value)}
-              style={{ paddingLeft: '2.5rem' }}
+              style={{ paddingLeft: '2.5rem', width: '100%', boxSizing: 'border-box' }}
             />
             <Mail size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)' }} />
           </div>
@@ -242,7 +266,7 @@ export const Login: React.FC = () => {
               placeholder={t('authPasswordPlaceholder')}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              style={{ paddingLeft: '2.5rem', paddingRight: '2.5rem' }}
+              style={{ paddingLeft: '2.5rem', paddingRight: '2.5rem', width: '100%', boxSizing: 'border-box' }}
             />
             <Lock size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)' }} />
             <button
@@ -281,7 +305,7 @@ export const Login: React.FC = () => {
           <div style={{ flex: 1, height: '1px', background: 'var(--border-color)' }}></div>
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
+        <div className="google-btn-wrapper">
           <GoogleLogin
             onSuccess={handleGoogleSuccess}
             onError={() => setErrorMsg(t('errLoginFailed'))}
@@ -289,9 +313,8 @@ export const Login: React.FC = () => {
             shape="pill"
             text="signin_with"
             size="large"
-            width="360"
+            width={googleBtnWidth}
           />
-
         </div>
 
         <p style={{ textAlign: 'center', fontSize: '0.9rem', marginTop: '1rem', color: 'var(--text-secondary)' }}>

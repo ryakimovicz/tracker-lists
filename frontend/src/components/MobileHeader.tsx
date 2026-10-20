@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
-import { Shield, Bell, Settings, Crown } from 'lucide-react';
+import { useNavigate, useLocation, useSearchParams, Link } from 'react-router-dom';
+import { Shield, Bell, Settings, Crown, Home, LogIn } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../context/LanguageContext';
 import { BrandLogo } from './BrandLogo';
@@ -60,13 +60,34 @@ export const MobileHeader: React.FC = () => {
   return (
     <>
       <header className="mobile-header">
-        {/* Left Slot: Brand Logo */}
+        {/* Left Slot: Brand Logo (always links to home /) */}
         <div className="mobile-header-left">
-          <BrandLogo fontSize="1.65rem" disableLink={true} />
+          <BrandLogo fontSize="1.65rem" />
         </div>
 
-        {/* Right Slot: Premium, Notifications & Settings */}
+        {/* Right Slot: Premium, Notifications, Auth Actions & Settings */}
         <div className="mobile-header-right">
+          {!isUserLoggedIn && (
+            location.pathname === '/' ? (
+              <Link
+                to="/login"
+                className="mobile-header-pill-btn primary"
+                title={language === 'es' ? 'Iniciar sesión' : 'Login'}
+              >
+                <LogIn size={15} />
+                <span>{language === 'es' ? 'Iniciar sesión' : 'Login'}</span>
+              </Link>
+            ) : (
+              <Link
+                to="/"
+                className="mobile-header-pill-btn"
+                title={language === 'es' ? 'Inicio' : 'Home'}
+              >
+                <Home size={15} />
+                <span>{language === 'es' ? 'Inicio' : 'Home'}</span>
+              </Link>
+            )
+          )}
           {isUserLoggedIn && !user?.is_pro && (
             <button
               type="button"

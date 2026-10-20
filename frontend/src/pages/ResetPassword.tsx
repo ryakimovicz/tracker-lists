@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useSearchParams, Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from '../context/LanguageContext';
 import { apiClient } from '../api/client';
-import { Lock, CheckCircle, AlertCircle, Eye, EyeOff, ArrowRight } from 'lucide-react';
+import { Lock, CheckCircle, AlertCircle, Eye, EyeOff, ArrowRight, ArrowLeft } from 'lucide-react';
 
 export const ResetPassword: React.FC = () => {
   const { language, t } = useTranslation();
@@ -58,7 +58,17 @@ export const ResetPassword: React.FC = () => {
   };
 
   return (
-    <div className="auth-card" style={{ maxWidth: 450, margin: '4rem auto', padding: '2.5rem' }}>
+    <div className="auth-card">
+      <div className="auth-card-header-nav">
+        <Link to="/" className="auth-card-back-btn" title={isEs ? 'Volver al Inicio' : 'Back to Home'}>
+          <ArrowLeft size={15} />
+          <span>{isEs ? 'Inicio' : 'Home'}</span>
+        </Link>
+        <Link to="/login" className="auth-card-switch-link">
+          {t('navLogin')}
+        </Link>
+      </div>
+
       {isSuccess ? (
         <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '1.25rem', alignItems: 'center' }}>
           <div style={{
@@ -81,12 +91,27 @@ export const ResetPassword: React.FC = () => {
               ? 'Tu contraseña ha sido cambiada con éxito. Serás redirigido al inicio de sesión...'
               : 'Your password has been successfully updated. Redirecting to login...'}
           </p>
-          <Link to="/login" className="btn-primary" style={{ width: '100%', textDecoration: 'none', marginTop: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
-            {t('navLogin')} <ArrowRight size={16} />
-          </Link>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', width: '100%', marginTop: '0.5rem' }}>
+            <Link to="/login" className="btn-primary" style={{ width: '100%', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+              {t('navLogin')} <ArrowRight size={16} />
+            </Link>
+            <Link to="/" className="btn-secondary" style={{ width: '100%', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {isEs ? 'Volver al Inicio' : 'Back to Home'}
+            </Link>
+          </div>
         </div>
       ) : (
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          <div style={{ textAlign: 'center', marginBottom: '0.25rem' }}>
+            <Link to="/" title={isEs ? 'Ir al Inicio' : 'Go to Home'} style={{ display: 'inline-block', textDecoration: 'none' }}>
+              <img
+                src="/logo-transparent.svg"
+                alt="Pathd"
+                style={{ width: '48px', height: '48px', filter: 'drop-shadow(0 4px 14px rgba(245, 158, 11, 0.3))' }}
+              />
+            </Link>
+          </div>
+
           <h2 style={{ textAlign: 'center', margin: '0 0 0.25rem 0' }}>{t('authResetPasswordTitle')}</h2>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', textAlign: 'center', margin: 0 }}>
             {isEs ? 'Ingresa y confirma tu nueva contraseña:' : 'Enter and confirm your new password:'}
