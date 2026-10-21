@@ -150,8 +150,13 @@ export const TermsOfService: React.FC<TermsOfServiceProps> = ({ onClose, isModal
                 : 'You can disable auto-renewal at any time directly from your account Settings. You will retain full access to Premium benefits until the end of your paid billing cycle without additional charges.'}
             </li>
             <li>
+              <strong>{isEs ? 'Derecho de Desistimiento y Servicios Digitales:' : 'Right of Withdrawal & Digital Services:'}</strong> {isEs
+                ? 'De conformidad con la legislación de protección al consumidor aplicable (incluida la normativa de la Unión Europea), el derecho legal de desistimiento de 14 días no es aplicable al suministro de contenido y servicios digitales cuya ejecución comience inmediatamente tras la compra. Al suscribirte y obtener acceso inmediato a las funciones Premium, consientes expresamente la prestación instantánea del servicio y reconoces la pérdida de tu derecho de desistimiento.'
+                : 'Under applicable consumer protection laws (including European Union directives), the statutory 14-day right of withdrawal does not apply to digital content or online services that begin immediately upon payment. By subscribing and receiving instant access to Premium features, you expressly consent to immediate service execution and acknowledge the waiver of your right of withdrawal.'}
+            </li>
+            <li>
               <strong>{isEs ? 'Reembolsos:' : 'Refunds:'}</strong> {isEs
-                ? 'Salvo que la ley aplicable disponga lo contrario, los pagos realizados no son reembolsables una vez activado el período facturado. Ante cualquier inconveniente de cobro o disputa, puedes contactar a nuestro equipo de soporte.'
+                ? 'Salvo que la ley imperativa disponga lo contrario, los pagos realizados no son reembolsables una vez activado el período facturado. Ante cualquier inconveniente de cobro o disputa, puedes contactar a nuestro equipo de soporte.'
                 : 'Except where mandatory applicable law provides otherwise, payments are non-refundable once the billing period has commenced. In case of billing issues or disputes, please contact our support team.'}
             </li>
           </ul>
