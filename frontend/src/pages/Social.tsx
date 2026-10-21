@@ -167,6 +167,22 @@ export const Social: React.FC = () => {
             seenReviewRating.set(reviewKey, consolidated.length);
           }
 
+          // Deduplicate identical/consecutive item_favorited or shelf_favorite activities for the same work & user
+          const isFavorite = item.activity_type === 'item_favorited' || item.activity_type === 'shelf_favorite';
+          if (isFavorite) {
+            const itemWorkExt = (item.external_id || '').trim().toLowerCase();
+            const itemWorkTitle = (item.item_title || '').trim().toLowerCase();
+            const isDuplicate = consolidated.some(c => 
+              c.user_id === item.user_id &&
+              (c.activity_type === 'item_favorited' || c.activity_type === 'shelf_favorite') &&
+              ((itemWorkExt && c.external_id && (c.external_id || '').trim().toLowerCase() === itemWorkExt) ||
+               (itemWorkTitle && c.item_title && (c.item_title || '').trim().toLowerCase() === itemWorkTitle))
+            );
+            if (isDuplicate) {
+              continue;
+            }
+          }
+
           // Check for work completion unification:
           // An episode/issue event and a work completed event (item_completed or status=completed/read)
           const isWorkCompletion = (item.activity_type === 'item_completed' || item.activity_type === 'item_status_changed') &&

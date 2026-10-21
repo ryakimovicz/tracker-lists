@@ -7369,6 +7369,22 @@ export const Profile: React.FC = () => {
               const seenEntity = new Map<string, number>();
 
               for (const act of activities) {
+                // Deduplicate redundant item_favorited / shelf_favorite activities for the same item
+                const isFavorite = act.activity_type === 'item_favorited' || act.activity_type === 'shelf_favorite';
+                if (isFavorite) {
+                  const actExt = (act.external_id || '').trim().toLowerCase();
+                  const actTitle = (act.item_title || '').trim().toLowerCase();
+                  const isDuplicate = consolidated.some(c =>
+                    c.user_id === act.user_id &&
+                    (c.activity_type === 'item_favorited' || c.activity_type === 'shelf_favorite') &&
+                    ((actExt && c.external_id && (c.external_id || '').trim().toLowerCase() === actExt) ||
+                     (actTitle && c.item_title && (c.item_title || '').trim().toLowerCase() === actTitle))
+                  );
+                  if (isDuplicate) {
+                    continue;
+                  }
+                }
+
                 const isReview = act.activity_type === 'item_reviewed';
                 const isRating = act.activity_type === 'item_rated';
                 const key = (isReview || isRating) && (act.external_id || act.item_title)

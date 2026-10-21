@@ -29,6 +29,28 @@ class ActivityService:
         now = datetime.now(timezone.utc)
         meta_dict = metadata or {}
 
+        # Prevent duplicate item_favorited / shelf_favorite activity logs for the same work
+        if activity_type in ["item_favorited", "shelf_favorite"] and external_id is not None:
+            existing_fav = (
+                db.query(UserActivityLog)
+                .filter(
+                    UserActivityLog.user_id == user_id,
+                    UserActivityLog.activity_type.in_(["item_favorited", "shelf_favorite"]),
+                    UserActivityLog.external_id == str(external_id)
+                )
+                .order_by(desc(UserActivityLog.id))
+                .first()
+            )
+            if existing_fav:
+                existing_fav.updated_at = now
+                if image_url:
+                    existing_fav.image_url = image_url
+                if item_title:
+                    existing_fav.item_title = item_title
+                db.commit()
+                db.refresh(existing_fav)
+                return existing_fav
+
         # Check for 24h consecutive progress aggregation
         # Relevant progress activity types: item_progress, item_status_changed with progress
         is_progress_event = activity_type in ["item_progress", "item_status_changed"] and external_id is not None

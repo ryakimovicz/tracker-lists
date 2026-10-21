@@ -1855,11 +1855,10 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     }));
 
     try {
-      await apiClient.put(`/library/${selectedItem.id}`, { is_favorite: newFav, status: selectedItem.status });
       if (onToggleFavorite) {
-        try {
-          await onToggleFavorite(selectedItem.id, currentFav, updatedModalItem);
-        } catch (_) {}
+        await onToggleFavorite(selectedItem.id, currentFav, updatedModalItem);
+      } else {
+        await apiClient.put(`/library/${selectedItem.id}`, { is_favorite: newFav, status: selectedItem.status });
       }
     } catch (err: any) {
       console.error("Failed to toggle favorite:", err);

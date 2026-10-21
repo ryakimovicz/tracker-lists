@@ -822,7 +822,13 @@ def get_following_feed(
     ).order_by(UserActivityLog.created_at.desc()).offset(skip).limit(limit).all()
 
     feed = []
+    seen_favorite_keys = set()
     for r in activity_records:
+        if r.activity_type in ("item_favorited", "shelf_favorite"):
+            fav_key = (r.user_id, r.activity_type, str(r.external_id or r.item_title or r.id).strip().lower())
+            if fav_key in seen_favorite_keys:
+                continue
+            seen_favorite_keys.add(fav_key)
         item = _format_activity_item(r, db, current_user.id, client_lang, client_country)
         if item:
             feed.append(item)
@@ -853,7 +859,13 @@ def get_discover_feed(
 
     uid = current_user.id if current_user else None
     feed = []
+    seen_favorite_keys = set()
     for r in activity_records:
+        if r.activity_type in ("item_favorited", "shelf_favorite"):
+            fav_key = (r.user_id, r.activity_type, str(r.external_id or r.item_title or r.id).strip().lower())
+            if fav_key in seen_favorite_keys:
+                continue
+            seen_favorite_keys.add(fav_key)
         item = _format_activity_item(r, db, uid, client_lang, client_country)
         if item:
             feed.append(item)

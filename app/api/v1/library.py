@@ -1217,41 +1217,44 @@ def update_library_item(
                 for old_fav in existing_favs:
                     old_fav.is_favorite = False
                     
+        was_favorite = bool(lib_item.is_favorite)
         lib_item.is_favorite = item_in.is_favorite
         from app.services.activity_service import ActivityService
         t_str = lib_item.item_type.value if hasattr(lib_item.item_type, 'value') else str(lib_item.item_type)
 
         if item_in.is_favorite:
-            lib_item.favorited_at = datetime.now(timezone.utc)
-            lib_item.favorite_order = 0
-            # Shift existing favorites so the new favorite is at index 0
-            db.query(UserLibraryItem).filter(
-                UserLibraryItem.user_id == current_user.id,
-                UserLibraryItem.is_favorite == True,
-                UserLibraryItem.id != lib_item.id
-            ).update({UserLibraryItem.favorite_order: UserLibraryItem.favorite_order + 1}, synchronize_session=False)
+            if not was_favorite:
+                lib_item.favorited_at = datetime.now(timezone.utc)
+                lib_item.favorite_order = 0
+                # Shift existing favorites so the new favorite is at index 0
+                db.query(UserLibraryItem).filter(
+                    UserLibraryItem.user_id == current_user.id,
+                    UserLibraryItem.is_favorite == True,
+                    UserLibraryItem.id != lib_item.id
+                ).update({UserLibraryItem.favorite_order: UserLibraryItem.favorite_order + 1}, synchronize_session=False)
 
-            # Record activity log
-            ActivityService.record_activity(
-                db=db,
-                user_id=current_user.id,
-                activity_type="item_favorited",
-                item_title=lib_item.title,
-                item_type=t_str,
-                external_id=lib_item.external_id,
-                image_url=lib_item.image_url,
-                details="favorited",
-                metadata={"item_type": t_str}
-            )
+                # Record activity log
+                ActivityService.record_activity(
+                    db=db,
+                    user_id=current_user.id,
+                    activity_type="item_favorited",
+                    item_title=lib_item.title,
+                    item_type=t_str,
+                    external_id=lib_item.external_id,
+                    image_url=lib_item.image_url,
+                    details="favorited",
+                    metadata={"item_type": t_str}
+                )
         else:
-            lib_item.favorited_at = None
-            # Reversible cleanup when unfavorited
-            ActivityService.delete_activity(
-                db=db,
-                user_id=current_user.id,
-                activity_type="item_favorited",
-                external_id=lib_item.external_id
-            )
+            if was_favorite:
+                lib_item.favorited_at = None
+                # Reversible cleanup when unfavorited
+                ActivityService.delete_activity(
+                    db=db,
+                    user_id=current_user.id,
+                    activity_type="item_favorited",
+                    external_id=lib_item.external_id
+                )
 
     if item_in.custom_badge is not None:
         lib_item.custom_badge = item_in.custom_badge
