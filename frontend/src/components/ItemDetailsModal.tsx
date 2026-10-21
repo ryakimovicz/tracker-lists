@@ -6259,7 +6259,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
               {/* Modal Header */}
               <div className="item-details-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem' }}>
                 <div style={{ display: 'flex', gap: '0.85rem', alignItems: 'center' }}>
-                  {(onBack || historyStack.length > 0) && (
+                  {!isEpisode && (onBack || historyStack.length > 0) && (
                     <button
                       type="button"
                       onClick={handleBackToParent}
@@ -6307,7 +6307,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                             : (onBack || historyStack.length > 0 ? (isComicIssue ? 'Back to volume' : 'Back to series') : (isComicIssue ? 'View full volume' : 'View full series'))
                           }
                         >
-                          {(onBack || historyStack.length > 0) && <ChevronLeft size={15} style={{ flexShrink: 0 }} />}
+                          <ChevronLeft size={15} style={{ flexShrink: 0 }} />
                           <span>{epHeaderInfo.seriesName}</span>
                         </div>
                       )}
