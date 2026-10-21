@@ -4979,12 +4979,12 @@ export const Profile: React.FC = () => {
                   </span>
                 )}
 
-                {/* Follow / Unfollow / Request button on other users' profiles */}
+                {/* Follow / Unfollow / Request button on other users' profiles (Desktop) */}
                 {!isOwnProfile && currentUser && (
                   <button
                     type="button"
                     onClick={handleToggleFollowProfileUser}
-                    className={profile.is_following || (profile as any).follow_request_pending ? 'btn-secondary' : 'btn-primary'}
+                    className={`profile-follow-btn-desktop ${profile.is_following || (profile as any).follow_request_pending ? 'btn-secondary' : 'btn-primary'}`}
                     style={{
                       padding: '0.35rem 0.9rem',
                       fontSize: '0.85rem',
@@ -5021,6 +5021,50 @@ export const Profile: React.FC = () => {
               </div>
             </div>
           </div>
+
+          {/* Follow button on mobile (Full width row, cleanly positioned below avatar + identity) */}
+          {!isOwnProfile && currentUser && (
+            <div className="profile-follow-mobile-wrap" style={{ position: 'relative', zIndex: 2 }}>
+              <button
+                type="button"
+                onClick={handleToggleFollowProfileUser}
+                className={`profile-follow-btn-mobile ${profile.is_following || (profile as any).follow_request_pending ? 'btn-secondary' : 'btn-primary'}`}
+                style={{
+                  width: '100%',
+                  padding: '0.5rem 1rem',
+                  fontSize: '0.9rem',
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.45rem',
+                  borderRadius: '10px'
+                }}
+              >
+                {profile.is_following ? (
+                  <>
+                    <UserCheck size={17} />
+                    {language === 'es' ? 'Siguiendo' : 'Following'}
+                  </>
+                ) : (profile as any).follow_request_pending ? (
+                  <>
+                    <UserCheck size={17} color="var(--accent-primary)" />
+                    {language === 'es' ? 'Solicitud enviada' : 'Requested'}
+                  </>
+                ) : (profile as any).is_private ? (
+                  <>
+                    <UserPlus size={17} />
+                    {language === 'es' ? 'Solicitar seguir' : 'Request to follow'}
+                  </>
+                ) : (
+                  <>
+                    <UserPlus size={17} />
+                    {language === 'es' ? 'Seguir' : 'Follow'}
+                  </>
+                )}
+              </button>
+            </div>
+          )}
 
           {/* Details below top row: Join date, stats, and last.fm */}
           <div className="profile-header-details-wrap" style={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', gap: '0.65rem', width: '100%', textAlign: 'left' }}>
