@@ -252,18 +252,6 @@ export const TermsOfService: React.FC<TermsOfServiceProps> = ({ onClose, isModal
 
             <div style={{ background: 'var(--bg-tertiary)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
               <div style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span>Comic Vine</span>
-                <a href="https://comicvine.gamespot.com" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.85rem' }}>
-                  comicvine.gamespot.com <ExternalLink size={13} />
-                </a>
-              </div>
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0.5rem 0 0' }}>
-                {isEs ? 'Datos y tracking de volúmenes de cómics occidentales.' : 'Western comic book database and volume information.'}
-              </p>
-            </div>
-
-            <div style={{ background: 'var(--bg-tertiary)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
-              <div style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <span>AniList</span>
                 <a href="https://anilist.co" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.85rem' }}>
                   anilist.co <ExternalLink size={13} />
@@ -271,30 +259,6 @@ export const TermsOfService: React.FC<TermsOfServiceProps> = ({ onClose, isModal
               </div>
               <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0.5rem 0 0' }}>
                 {isEs ? 'Catálogo de manga, manhwa y novelas ligeras (API GraphQL).' : 'Manga, manhwa, and light novel catalog powered by AniList GraphQL.'}
-              </p>
-            </div>
-
-            <div style={{ background: 'var(--bg-tertiary)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
-              <div style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span>Google Books</span>
-                <a href="https://books.google.com" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.85rem' }}>
-                  books.google.com <ExternalLink size={13} />
-                </a>
-              </div>
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0.5rem 0 0' }}>
-                {isEs ? 'Metadatos bibliográficos de libros, autores, números de páginas y sinopsis.' : 'Book bibliographic metadata, authors, page counts, and synopses.'}
-              </p>
-            </div>
-
-            <div style={{ background: 'var(--bg-tertiary)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
-              <div style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span>Open Library</span>
-                <a href="https://openlibrary.org" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.85rem' }}>
-                  openlibrary.org <ExternalLink size={13} />
-                </a>
-              </div>
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0.5rem 0 0' }}>
-                {isEs ? 'Catálogo bibliográfico abierto y portadas de ediciones de libros.' : 'Open book bibliographic catalog and edition cover archives.'}
               </p>
             </div>
 

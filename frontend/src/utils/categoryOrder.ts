@@ -5,11 +5,11 @@ export const DEFAULT_CATEGORY_ORDER = [
   'movie',
   'series',
   'anime',
-  'book',
   'manga',
-  'comic',
   'game'
 ] as const;
+
+export const BLOCKED_CATEGORIES = new Set<string>(['book', 'comic']);
 
 export type CategoryType = typeof DEFAULT_CATEGORY_ORDER[number];
 
@@ -37,14 +37,14 @@ export function getOrderedCategories(customOrder?: string[] | string | null): st
     }
   }
 
-  // Filter only valid categories and preserve unique order
+  // Filter only valid categories and preserve unique order, strictly excluding blocked categories
   const validSet = new Set<string>(DEFAULT_CATEGORY_ORDER);
   const result: string[] = [];
   const seen = new Set<string>();
 
   for (const item of rawList) {
     const clean = item.toLowerCase().trim();
-    if (validSet.has(clean) && !seen.has(clean)) {
+    if (validSet.has(clean) && !seen.has(clean) && !BLOCKED_CATEGORIES.has(clean)) {
       result.push(clean);
       seen.add(clean);
     }
@@ -52,7 +52,7 @@ export function getOrderedCategories(customOrder?: string[] | string | null): st
 
   // Append any missing default categories at the end
   for (const cat of DEFAULT_CATEGORY_ORDER) {
-    if (!seen.has(cat)) {
+    if (!seen.has(cat) && !BLOCKED_CATEGORIES.has(cat)) {
       result.push(cat);
       seen.add(cat);
     }
@@ -85,6 +85,7 @@ export function sortByCategoryOrder<T>(
 /**
  * Sorts tab/filter objects. 'all' is always kept first,
  * and 'user' / 'guide' (if present) are kept at the end.
+ * Automatically excludes blocked categories like 'book' and 'comic'.
  */
 export function sortFilterTabs<T extends { value?: string; key?: string; type?: string }>(
   tabs: T[],
@@ -96,7 +97,10 @@ export function sortFilterTabs<T extends { value?: string; key?: string; type?: 
 
   const getVal = (item: T): string => item.value || item.key || item.type || '';
 
-  return [...tabs].sort((a, b) => {
+  // Exclude blocked categories
+  const allowedTabs = tabs.filter(t => !BLOCKED_CATEGORIES.has(getVal(t).toLowerCase().trim()));
+
+  return [...allowedTabs].sort((a, b) => {
     const valA = getVal(a);
     const valB = getVal(b);
 

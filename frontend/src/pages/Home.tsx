@@ -2912,8 +2912,9 @@ export const Home: React.FC = () => {
     : gameFilter;
 
   const getItemsForTab = (targetTab: "watching" | "plan_to_watch" | "completed" | "dropped") => {
+    const activeLib = libraryItems.filter(i => i.item_type !== "book" && i.item_type !== "comic");
     if (targetTab === "watching") {
-      return libraryItems.filter(i => {
+      return activeLib.filter(i => {
       if (i.item_type === "custom") return false;
       if (i.item_type === "game") {
         if (effectiveGameFilter === "endless") {
@@ -3046,7 +3047,7 @@ export const Home: React.FC = () => {
       return true;
     });
   } else if (targetTab === "completed") {
-    return libraryItems.filter(i => {
+    return activeLib.filter(i => {
       // Exclude endless games from completed
       if (i.status === "endless") return false;
       if (!["completed", "read"].includes(i.status)) return false;
@@ -3077,7 +3078,7 @@ export const Home: React.FC = () => {
       return true;
     });
   } else if (targetTab === "dropped") {
-    return libraryItems.filter(i => i.status === "dropped" && i.item_type !== "custom");
+    return activeLib.filter(i => i.status === "dropped" && i.item_type !== "custom");
   }
   return [];
 };
@@ -3085,8 +3086,8 @@ export const Home: React.FC = () => {
   // Aggregate all upcoming items (calendar vs TBA)
   let upcomingAllItems: any[] = [];
   let tbaAllItems: any[] = [];
-  // 1. Standalone library works (movies, games, books, comics, manga)
-  libraryItems.forEach(item => {
+  // 1. Standalone library works (movies, games, manga)
+  libraryItems.filter(i => i.item_type !== 'book' && i.item_type !== 'comic').forEach(item => {
       if (item.item_type !== 'series' && item.item_type !== 'anime') {
         // Resolve release_date from item or cached metadata
         const descCacheKey = `desc_${item.item_type}_${item.external_id}`;
@@ -4073,8 +4074,6 @@ export const Home: React.FC = () => {
               { value: 'movie', label: language === 'es' ? 'Películas' : 'Movies' },
               { value: 'series', label: language === 'es' ? 'Series' : 'TV Shows' },
               { value: 'anime', label: 'Anime' },
-              { value: 'book', label: language === 'es' ? 'Libros' : 'Books' },
-              { value: 'comic', label: language === 'es' ? 'Cómics' : 'Comics' },
               { value: 'manga', label: 'Mangas' },
               { value: 'game', label: language === 'es' ? 'Juegos' : 'Games' }
             ], currentUser?.category_order).map(tab => {

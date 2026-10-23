@@ -646,7 +646,7 @@ export const Search: React.FC = () => {
   const [submittedQuery, setSubmittedQuery] = useState('');
   const [results, setResults] = useState<SearchResultItem[]>([]);
   const [visibleCount, setVisibleCount] = useState<number>(24);
-  const [activeTab, setActiveTab] = useState<'all' | 'movie' | 'series' | 'anime' | 'book' | 'game' | 'user' | 'guide' | 'comic' | 'manga'>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'movie' | 'series' | 'anime' | 'game' | 'user' | 'guide' | 'manga'>('all');
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [isSearching, setIsSearching] = useState(false);
@@ -1066,19 +1066,19 @@ export const Search: React.FC = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
 
     try {
-      if (currentTab !== 'all' && ['comic', 'book', 'manga', 'game', 'movie', 'anime', 'series'].includes(currentTab)) {
+      if (currentTab !== 'all' && ['manga', 'game', 'movie', 'anime', 'series'].includes(currentTab)) {
         // 1. Fetch only the active category first (Super fast: ~150ms response)
         const primaryRes = await apiClient.get('/search/', {
           params: { q: cleanQuery, type: currentTab }
         });
         if (searchRequestIdRef.current !== currentReqId) return;
 
-        const initialData = Array.isArray(primaryRes.data) ? primaryRes.data : [];
+        const initialData = (Array.isArray(primaryRes.data) ? primaryRes.data : []).filter((item: any) => item.item_type !== 'book' && item.item_type !== 'comic');
         setResults(prev => {
           // If we already had results for this exact query (e.g. from 'all' search), merge new items without discarding existing ones
           if (cleanQuery === submittedQuery && prev.length > 0) {
             const seenIds = new Set(initialData.map(item => item.external_id));
-            const retainedPrev = prev.filter(item => !seenIds.has(item.external_id));
+            const retainedPrev = prev.filter(item => !seenIds.has(item.external_id) && item.item_type !== 'book' && item.item_type !== 'comic');
             return [...initialData, ...retainedPrev];
           }
           return initialData;
@@ -1089,7 +1089,7 @@ export const Search: React.FC = () => {
         }
 
         // 2. In background, fetch the rest of categories silently
-        const otherTypes = ['movie', 'series', 'anime', 'game', 'book', 'comic', 'manga'].filter(t => t !== currentTab);
+        const otherTypes = ['movie', 'series', 'anime', 'game', 'manga'].filter(t => t !== currentTab);
         Promise.allSettled(
           otherTypes.map(t => apiClient.get('/search/', { params: { q: cleanQuery, type: t } }))
         ).then(resultsArr => {
@@ -1100,7 +1100,7 @@ export const Search: React.FC = () => {
             resultsArr.forEach(resObj => {
               if (resObj.status === 'fulfilled' && Array.isArray(resObj.value.data)) {
                 resObj.value.data.forEach((item: SearchResultItem) => {
-                  if (!existingIds.has(item.external_id)) {
+                  if (item.item_type !== 'book' && item.item_type !== 'comic' && !existingIds.has(item.external_id)) {
                     existingIds.add(item.external_id);
                     newItems.push(item);
                   }
@@ -1117,10 +1117,11 @@ export const Search: React.FC = () => {
           params: { q: cleanQuery }
         });
         if (searchRequestIdRef.current !== currentReqId) return;
-        setResults(response.data);
+        const filteredAll = (Array.isArray(response.data) ? response.data : []).filter((item: any) => item.item_type !== 'book' && item.item_type !== 'comic');
+        setResults(filteredAll);
         setIsSearching(false);
-        if (Array.isArray(response.data)) {
-          response.data.slice(0, 8).forEach((r: any) => prefetchMediaDetails(r));
+        if (filteredAll.length > 0) {
+          filteredAll.slice(0, 8).forEach((r: any) => prefetchMediaDetails(r));
         }
       }
     } catch (err: any) {
@@ -1344,8 +1345,6 @@ export const Search: React.FC = () => {
         if (activeTab === 'series') return item.item_type === 'series';
         if (activeTab === 'anime') return item.item_type === 'anime';
         if (activeTab === 'movie') return item.item_type === 'movie';
-        if (activeTab === 'book') return item.item_type === 'book';
-        if (activeTab === 'comic') return item.item_type === 'comic';
         if (activeTab === 'manga') return item.item_type === 'manga';
         if (activeTab === 'game') return item.item_type === 'game';
         if (activeTab === 'user') return item.item_type === 'user';
@@ -1672,8 +1671,6 @@ export const Search: React.FC = () => {
                 { value: 'movie', label: language === 'es' ? 'Películas' : 'Movies' },
                 { value: 'series', label: language === 'es' ? 'Series' : 'TV Shows' },
                 { value: 'anime', label: 'Anime' },
-                { value: 'book', label: language === 'es' ? 'Libros' : 'Books' },
-                { value: 'comic', label: language === 'es' ? 'Cómics' : 'Comics' },
                 { value: 'manga', label: 'Mangas' },
                 { value: 'game', label: language === 'es' ? 'Juegos' : 'Games' },
                 { value: 'user', label: language === 'es' ? 'Usuarios' : 'Users' },

@@ -28,7 +28,7 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const [activeSearchTab, setActiveSearchTab] = useState<'all' | 'movie' | 'series' | 'anime' | 'book' | 'comic' | 'manga' | 'game'>('all');
+  const [activeSearchTab, setActiveSearchTab] = useState<'all' | 'movie' | 'series' | 'anime' | 'manga' | 'game'>('all');
   const [expandedMediaId, setExpandedMediaId] = useState<string | null>(null);
   
   const [expandedSeriesId, setExpandedSeriesId] = useState<string | null>(null);
@@ -182,8 +182,6 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
                 { value: 'movie', label: language === 'es' ? 'Películas' : 'Movies' },
                 { value: 'series', label: language === 'es' ? 'Series' : 'TV Shows' },
                 { value: 'anime', label: 'Anime' },
-                { value: 'book', label: language === 'es' ? 'Libros' : 'Books' },
-                { value: 'comic', label: language === 'es' ? 'Cómics' : 'Comics' },
                 { value: 'manga', label: 'Mangas' },
                 { value: 'game', label: language === 'es' ? 'Juegos' : 'Games' }
               ], user?.category_order).map(tab => {
@@ -220,18 +218,17 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
               </p>
             )}
             {(() => {
-              const filtered = activeSearchTab === 'all'
+              const filtered = (activeSearchTab === 'all'
                 ? searchResults
                 : searchResults.filter(item => {
                     if (activeSearchTab === 'series') return item.item_type === 'series';
                     if (activeSearchTab === 'anime') return item.item_type === 'anime';
                     if (activeSearchTab === 'movie') return item.item_type === 'movie';
-                    if (activeSearchTab === 'book') return item.item_type === 'book';
-                    if (activeSearchTab === 'comic') return item.item_type === 'comic';
                     if (activeSearchTab === 'manga') return item.item_type === 'manga';
                     if (activeSearchTab === 'game') return item.item_type === 'game';
                     return true;
-                  });
+                  })
+              ).filter(item => item.item_type !== 'book' && item.item_type !== 'comic');
               
               if (filtered.length === 0 && searchResults.length > 0) {
                 return (
