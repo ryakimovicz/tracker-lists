@@ -1474,8 +1474,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   } | null>(null);
 
   const getMissingPreviousEpisodesForEp = (ep: any, passedAllEps?: any[]) => {
-    const isComic = selectedItem?.item_type === 'comic' || String(selectedItem?.external_id || '').startsWith('cv_vol_') || String(selectedItem?.external_id || '').startsWith('cv_issue_');
-    const cleanId = String(selectedItem?.external_id || selectedItem?.id || '').replace('tvm-ep-', '').replace('cv_vol_', '').replace('cv_issue_', '').replace('cv_', '');
+    const isComic = selectedItem?.item_type === 'comic' || String(selectedItem?.external_id || '').startsWith('cv_vol_') || String(selectedItem?.external_id || '').startsWith('cv_issue_') || String(selectedItem?.external_id || '').startsWith('metron_series_') || String(selectedItem?.external_id || '').startsWith('metron_issue_');
+    const cleanId = String(selectedItem?.external_id || selectedItem?.id || '').replace('tvm-ep-', '').replace('cv_vol_', '').replace('cv_issue_', '').replace('cv_', '').replace('metron_series_', '').replace('metron_issue_', '');
     
     let allEps: any[] = [];
     const flattenedSeasonEps = Object.values(seasonEpisodes || {}).flat();
@@ -1942,7 +1942,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
   const handleToggleAllEpisodes = async (action?: 'mark_all' | 'mark_again' | 'remove' | 'toggle', scope: 'seasons_only' | 'seasons_and_specials' | 'all' | 'extras_only' = 'seasons_and_specials', passedEpisodes?: any[]) => {
     if (!selectedItem) return;
-    const isComic = selectedItem.item_type === 'comic' || String(selectedItem.external_id || '').startsWith('cv_vol_');
+    const isComic = selectedItem.item_type === 'comic' || String(selectedItem.external_id || '').startsWith('cv_vol_') || String(selectedItem.external_id || '').startsWith('metron_series_');
     let effectiveListId = selectedItem.tracking_list_id;
     let newlyTrackedItem: any = null;
     if (!effectiveListId) {
@@ -2607,7 +2607,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
         if (selectedItem?.item_type && selectedItem?.external_id) {
           removeCachedSeries(`reviews_${selectedItem.item_type}_${selectedItem.external_id}`);
         }
-        const cleanId = String(selectedItem.external_id || selectedItem.id || '').replace('cv_vol_', '').replace('cv_issue_', '').replace('cv_', '').replace('tvm-ep-', '').replace('tvm_', '');
+        const cleanId = String(selectedItem.external_id || selectedItem.id || '').replace('cv_vol_', '').replace('cv_issue_', '').replace('cv_', '').replace('metron_series_', '').replace('metron_issue_', '').replace('tvm-ep-', '').replace('tvm_', '');
         clearCachedSeriesMatching(`issue_state_`);
         if (cleanId) {
           removeCachedSeries(`comic_vol_${cleanId}`);
@@ -2768,7 +2768,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
     const cachedAll = getCachedSeries(cacheKeyAll);
     
     const processAllEps = (allEps: any[]) => {
-      const extIds = allEps.map(e => isComic ? `cv_issue_${e.id}` : `tvm-ep-${e.id}`);
+      const extIds = allEps.map(e => e.external_id || (isComic ? (String(e.id).startsWith('metron_') || String(e.id).startsWith('cv_') ? e.id : `cv_issue_${e.id}`) : `tvm-ep-${e.id}`));
       if (extIds.length > 0) {
         apiClient.post('/users/me/progress/bulk-check', { external_ids: extIds })
           .then(progRes => {
@@ -3904,12 +3904,13 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
   const isEpisode = !!(
     String(selectedItem?.external_id || '').startsWith('tvm-ep-') ||
     String(selectedItem?.external_id || '').startsWith('cv_issue_') ||
+    String(selectedItem?.external_id || '').startsWith('metron_issue_') ||
     selectedItem?.item_type === 'episode' ||
     (selectedItem?.item_type !== 'comic' && selectedItem?.list_id)
   );
   const isComicIssue = Boolean(
-    (selectedItem?.item_type === 'comic' || selectedItem?.parent_series?.item_type === 'comic' || String(selectedItem?.external_id || '').startsWith('cv_issue_')) &&
-    (isEpisode || selectedItem?.item_type === 'episode' || String(selectedItem?.external_id || '').startsWith('cv_issue_') || selectedItem?.issue_number != null || selectedItem?.badge === 'issue')
+    (selectedItem?.item_type === 'comic' || selectedItem?.parent_series?.item_type === 'comic' || String(selectedItem?.external_id || '').startsWith('cv_issue_') || String(selectedItem?.external_id || '').startsWith('metron_issue_')) &&
+    (isEpisode || selectedItem?.item_type === 'episode' || String(selectedItem?.external_id || '').startsWith('cv_issue_') || String(selectedItem?.external_id || '').startsWith('metron_issue_') || selectedItem?.issue_number != null || selectedItem?.badge === 'issue')
   );
   const isEpisodeCompleted = Boolean(isEpisode && (
     selectedItem?.status === 'read' ||

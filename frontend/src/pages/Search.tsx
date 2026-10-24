@@ -1066,7 +1066,7 @@ export const Search: React.FC = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
 
     try {
-      if (currentTab !== 'all' && ['manga', 'game', 'movie', 'anime', 'series'].includes(currentTab)) {
+      if (currentTab !== 'all' && ['manga', 'game', 'movie', 'anime', 'series', 'book', 'comic'].includes(currentTab)) {
         // 1. Fetch only the active category first (Super fast: ~150ms response)
         const primaryRes = await apiClient.get('/search/', {
           params: { q: cleanQuery, type: currentTab }
@@ -1346,11 +1346,12 @@ export const Search: React.FC = () => {
         if (activeTab === 'anime') return item.item_type === 'anime';
         if (activeTab === 'movie') return item.item_type === 'movie';
         if (activeTab === 'book') return item.item_type === 'book';
+        if (activeTab === 'comic') return item.item_type === 'comic';
         if (activeTab === 'manga') return item.item_type === 'manga';
         if (activeTab === 'game') return item.item_type === 'game';
         if (activeTab === 'user') return item.item_type === 'user';
         if (activeTab === 'guide') return item.item_type === 'guide';
-        return true;
+        return item.item_type === activeTab;
       });
 
   const handleToggleFavorite = async (itemId: number, currentFav: boolean) => {
@@ -2012,7 +2013,7 @@ export const Search: React.FC = () => {
                   </div>
 
                   {(() => {
-                    const isComicIssue = item.item_type === 'comic' && (String(item.external_id || '').startsWith('cv_issue_') || item.badge === 'issue');
+                    const isComicIssue = item.item_type === 'comic' && (String(item.external_id || '').startsWith('cv_issue_') || String(item.external_id || '').startsWith('metron_issue_') || item.badge === 'issue');
                     return (
                       <>
                         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', textAlign: 'left', paddingRight: (user && !isComicIssue) ? '36px' : 0 }}>

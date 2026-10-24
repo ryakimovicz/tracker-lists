@@ -99,12 +99,13 @@ def rank_search_results(
 
     def calculate_score(item: SearchResultItem):
         title_clean = item.title.lower().strip()
+        title_base = re.sub(r'\s*\(\d{4}\)$', '', title_clean).strip()
         score = 0.0
 
         # Exact match with user's original query
-        if title_clean == query_clean:
+        if title_clean == query_clean or title_base == query_clean:
             score += 1500.0
-        elif title_clean.startswith(query_clean):
+        elif title_clean.startswith(query_clean) or title_base.startswith(query_clean):
             score += 800.0
         elif query_clean in title_clean:
             score += 400.0
@@ -112,9 +113,9 @@ def rank_search_results(
         # Exact or prefix match with expanded variations (e.g. "batman" for query "batm")
         for idx, var in enumerate(var_terms):
             var_weight = max(1.0, 4.0 - idx)
-            if title_clean == var:
+            if title_clean == var or title_base == var:
                 score += 1200.0 * var_weight / 4.0
-            elif title_clean.startswith(var):
+            elif title_clean.startswith(var) or title_base.startswith(var):
                 score += 700.0 * var_weight / 4.0
             elif var in title_clean:
                 score += 350.0 * var_weight / 4.0
@@ -166,7 +167,22 @@ def rank_search_results(
         return score
 
     items.sort(key=calculate_score, reverse=True)
-    return items
+
+    # Flood prevention & category diversity for search results:
+    # Prevent identical (item_type, title_base) from monopolizing the top slots
+    seen_type_title_count: Dict[Tuple[str, str], int] = {}
+    primary_items = []
+    secondary_items = []
+    for it in items:
+        t_base = re.sub(r'\s*\(\d{4}\)$', '', (it.title or "").lower().strip()).strip()
+        key = (getattr(it, "item_type", "") or "", t_base)
+        seen_type_title_count[key] = seen_type_title_count.get(key, 0) + 1
+        if seen_type_title_count[key] <= 3:
+            primary_items.append(it)
+        else:
+            secondary_items.append(it)
+
+    return primary_items + secondary_items
 
 # In-memory search query cache with 15-minute TTL
 _SEARCH_QUERY_CACHE: Dict[str, Tuple[float, List[SearchResultItem]]] = {}

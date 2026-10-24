@@ -220,6 +220,23 @@ class MetronService:
                     ))
 
         if results:
+            def _comic_sort_key(item: SearchResultItem) -> float:
+                t_clean = item.title.lower().strip()
+                t_base = re.sub(r'\s*\(\d{4}\)$', '', t_clean).strip()
+                q_clean = cleaned_query.lower().strip()
+                score = 0.0
+                if t_clean == q_clean or t_base == q_clean:
+                    score += 1000.0
+                elif t_clean.startswith(q_clean) or t_base.startswith(q_clean):
+                    score += 500.0
+                elif q_clean in t_clean:
+                    score += 200.0
+                m = re.search(r'\b(19\d\d|20\d\d)\b', item.title)
+                if m:
+                    score += min(50.0, max(0.0, (int(m.group(1)) - 1930) * 0.5))
+                return score
+
+            results.sort(key=_comic_sort_key, reverse=True)
             _SEARCH_CACHE[cache_key] = (now_ts, results)
 
         return results
@@ -378,8 +395,12 @@ class MetronService:
             desc = _clean_html(itm.get("desc"))
             air_date = itm.get("store_date") or itm.get("cover_date")
 
+            cv_id = itm.get("cv_id")
+            ext_id = f"cv_issue_{cv_id}" if cv_id else f"metron_issue_{i_id}"
+
             episodes.append({
-                "id": f"metron_issue_{i_id}",
+                "id": ext_id,
+                "external_id": ext_id,
                 "name": title_str,
                 "episode_number": int(parsed_num) if parsed_num < 999999 else idx,
                 "season_number": 1,

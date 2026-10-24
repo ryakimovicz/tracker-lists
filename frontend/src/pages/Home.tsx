@@ -826,10 +826,11 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
       if (aired.length > 0) {
         const getTracked = (ep: any) => (trackedList || []).find((t: any) => {
           if (isComic) {
-            const cleanId = String(ep.id).replace('cv_issue_', '');
-            const tCleanId = String(t.external_id || '').replace('cv_issue_', '');
+            const cleanId = String(ep.id).replace('cv_issue_', '').replace('metron_issue_', '');
+            const tCleanId = String(t.external_id || '').replace('cv_issue_', '').replace('metron_issue_', '');
             return (
               t.external_id === `cv_issue_${cleanId}` ||
+              t.external_id === `metron_issue_${cleanId}` ||
               tCleanId === cleanId ||
               (ep.issue_number && t.title && (t.title.includes(`#${ep.issue_number}`) || t.episode_number == ep.issue_number))
             );
@@ -1032,15 +1033,15 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
       : (currentEpToMark.still_path || null);
 
     const epIdToSend = isComic
-      ? (String(currentEpToMark.id).startsWith('cv_') ? currentEpToMark.id : `cv_issue_${currentEpToMark.id}`)
+      ? (String(currentEpToMark.id).startsWith('cv_') || String(currentEpToMark.id).startsWith('metron_') ? currentEpToMark.id : `metron_issue_${currentEpToMark.id}`)
       : currentEpToMark.id;
 
     // Optimistically update trackedEpisodes and cache immediately
     const newCompletedEpId = String(currentEpToMark.id || '');
-    const cleanId = newCompletedEpId.replace('cv_issue_', '').replace('tvm-ep-', '');
+    const cleanId = newCompletedEpId.replace('cv_issue_', '').replace('metron_issue_', '').replace('tvm-ep-', '');
     const updatedTracked = [...trackedEpisodes];
     const existingIdx = updatedTracked.findIndex((t: any) => {
-      const tCleanId = String(t.external_id || t.id || '').replace('cv_issue_', '').replace('tvm-ep-', '');
+      const tCleanId = String(t.external_id || t.id || '').replace('cv_issue_', '').replace('metron_issue_', '').replace('tvm-ep-', '');
       if (tCleanId === cleanId) return true;
       if (isComic && (currentEpToMark.issue_number != null || currentEpToMark.episode_number != null)) {
         const numA = parseFloat(t.episode_number ?? '-1');
@@ -1058,7 +1059,7 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
       };
     } else {
       updatedTracked.push({
-        external_id: isComic ? (newCompletedEpId.startsWith('cv_') ? newCompletedEpId : `cv_issue_${newCompletedEpId}`) : `tvm-ep-${newCompletedEpId}`,
+        external_id: isComic ? (newCompletedEpId.startsWith('cv_') || newCompletedEpId.startsWith('metron_') ? newCompletedEpId : `metron_issue_${newCompletedEpId}`) : `tvm-ep-${newCompletedEpId}`,
         id: currentEpToMark.id,
         title: titleToSend,
         is_completed: true,
@@ -1081,10 +1082,10 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
       const validEps = !isComic ? allEps.filter((ep: any) => !isExtraEpisode(ep)) : allEps;
       const sortedAllEps = sortEpisodesChronologically(validEps);
       const allWatched = sortedAllEps.every((ep: any) => {
-        const epId = String(ep.id || '').replace('cv_issue_', '').replace('tvm-ep-', '');
-        const fullEpId = isComic ? (String(ep.id).startsWith('cv_issue_') ? String(ep.id) : `cv_issue_${ep.id}`) : (String(ep.id).startsWith('tvm-ep-') ? String(ep.id) : `tvm-ep-${ep.id}`);
+        const epId = String(ep.id || '').replace('cv_issue_', '').replace('metron_issue_', '').replace('tvm-ep-', '');
+        const fullEpId = isComic ? (String(ep.id).startsWith('cv_issue_') || String(ep.id).startsWith('metron_issue_') ? String(ep.id) : `metron_issue_${ep.id}`) : (String(ep.id).startsWith('tvm-ep-') ? String(ep.id) : `tvm-ep-${ep.id}`);
         return updatedTracked.some((t: any) => {
-          const tClean = String(t.external_id || t.id || '').replace('cv_issue_', '').replace('tvm-ep-', '');
+          const tClean = String(t.external_id || t.id || '').replace('cv_issue_', '').replace('metron_issue_', '').replace('tvm-ep-', '');
           return (tClean === epId || t.external_id === fullEpId) && t.is_completed;
         });
       });
@@ -1107,7 +1108,7 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
     }
 
     if (isComic) {
-      setCachedSeries(`issue_state_cv_issue_${cleanId}`, {
+      setCachedSeries(`issue_state_${newCompletedEpId.startsWith('cv_') || newCompletedEpId.startsWith('metron_') ? newCompletedEpId : `metron_issue_${cleanId}`}`, {
         status: 'read',
         pages_read: currentEpToMark.page_count || 0,
         total_pages: currentEpToMark.page_count || 0
@@ -1232,10 +1233,10 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
     }
     if (nextEp) {
       if (isComic) {
-        const cleanId = String(nextEp.id).replace('cv_issue_', '');
+        const cleanId = String(nextEp.id).replace('cv_issue_', '').replace('metron_issue_', '');
         const matchedTracked = trackedEpisodes.find((t: any) => {
-          const tCleanId = String(t.external_id || '').replace('cv_issue_', '');
-          return t.external_id === `cv_issue_${cleanId}` || tCleanId === cleanId || (nextEp.issue_number && t.title && (t.title.includes(`#${nextEp.issue_number}`) || t.episode_number == nextEp.issue_number));
+          const tCleanId = String(t.external_id || '').replace('cv_issue_', '').replace('metron_issue_', '');
+          return t.external_id === `cv_issue_${cleanId}` || t.external_id === `metron_issue_${cleanId}` || tCleanId === cleanId || (nextEp.issue_number && t.title && (t.title.includes(`#${nextEp.issue_number}`) || t.episode_number == nextEp.issue_number));
         });
         const isCompleted = !!matchedTracked?.is_completed;
         const completedAt = matchedTracked?.completed_at || null;
@@ -1251,7 +1252,7 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
           issue_number: nextEp.issue_number,
           season_number: 1,
           episode_number: nextEp.issue_number,
-          external_id: `cv_issue_${nextEp.id}`,
+          external_id: String(nextEp.id).startsWith('cv_') || String(nextEp.id).startsWith('metron_') ? nextEp.id : `metron_issue_${nextEp.id}`,
           image_url: nextEp.image_url || nextEp.image?.original || nextEp.image?.medium || nextEp.still_path || item.image_url,
           custom_notes: JSON.stringify({ description: nextEp.overview || '', release_date: nextEp.air_date || nextEp.cover_date || null }),
           release_date: nextEp.air_date || nextEp.cover_date || null,
@@ -1553,16 +1554,16 @@ const CompletedSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColo
   const [seriesTotals, setSeriesTotals] = useState<{ seasons: number; episodes: number; pages?: number } | null>(() => {
     return getCachedSeries(`totals_${item.id}`) || null;
   });
-  const isComic = item.item_type === 'comic' || String(item.external_id || '').startsWith('cv_vol_');
+  const isComic = item.item_type === 'comic' || String(item.external_id || '').startsWith('cv_vol_') || String(item.external_id || '').startsWith('metron_series_');
 
   useEffect(() => {
     let isMounted = true;
     const fetchSeriesTotals = async () => {
       try {
         if (isComic) {
-          const cleanVolId = String(item.external_id || '').replace('cv_vol_', '').replace('cv_issue_', '').replace('cv_', '');
+          const cleanVolId = String(item.external_id || '').replace('metron_series_', '').replace('metron_issue_', '').replace('metron_', '').replace('cv_vol_', '').replace('cv_issue_', '').replace('cv_', '');
           const cacheKeyAll = `${item.external_id}_all_episodes`;
-          let allEps = getCachedSeries(cacheKeyAll) || getCachedSeries(`cv_vol_${cleanVolId}_all_episodes`);
+          let allEps = getCachedSeries(cacheKeyAll) || getCachedSeries(`metron_series_${cleanVolId}_all_episodes`) || getCachedSeries(`cv_vol_${cleanVolId}_all_episodes`);
           if (!allEps || !Array.isArray(allEps) || allEps.length === 0) {
             try {
               const epRes = await apiClient.get(`/search/comic/volume/${item.external_id}/issues`);
@@ -1588,13 +1589,13 @@ const CompletedSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColo
           let totalPagesSum = 0;
           if (Array.isArray(allEps) && allEps.length > 0) {
             allEps.forEach((ep: any) => {
-              const cleanId = String(ep.id || ep.external_id || '').replace('cv_issue_', '').replace('cv_', '');
-              const extIdKey = `cv_issue_${cleanId}`;
+              const cleanId = String(ep.id || ep.external_id || '').replace('metron_issue_', '').replace('metron_', '').replace('cv_issue_', '').replace('cv_', '');
+              const extIdKey = String(ep.external_id || ep.id).startsWith('cv_') || String(ep.external_id || ep.id).startsWith('metron_') ? String(ep.external_id || ep.id) : `metron_issue_${cleanId}`;
               const trackedItem = (trackedItems || []).find((t: any) => {
-                const tClean = String(t.external_id || '').replace('cv_issue_', '').replace('cv_', '');
+                const tClean = String(t.external_id || '').replace('metron_issue_', '').replace('metron_', '').replace('cv_issue_', '').replace('cv_', '');
                 return (tClean && tClean === cleanId) || t.external_id === extIdKey || (ep.issue_number && t.title && (t.title.includes(`#${ep.issue_number}`) || t.episode_number == ep.issue_number));
               });
-              const cachedState = getCachedSeries(`issue_state_${extIdKey}`) || getCachedSeries(`issue_state_cv_issue_${cleanId}`);
+              const cachedState = getCachedSeries(`issue_state_${extIdKey}`) || getCachedSeries(`issue_state_cv_issue_${cleanId}`) || getCachedSeries(`issue_state_metron_issue_${cleanId}`);
 
               const p = (trackedItem && (trackedItem.pages_read || trackedItem.total_pages || trackedItem.page_count))
                 || (cachedState && (cachedState.pages_read || cachedState.total_pages))
@@ -1767,7 +1768,7 @@ const CompletedSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColo
 };
 
 const DroppedSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, themeTextColor }: { item: any, onUpdate: () => void, language: string, onOpenSeries: (item: any) => void, themeColor?: string, themeTextColor?: string }) => {
-  const isComic = item.item_type === 'comic' || String(item.external_id || '').startsWith('cv_vol_');
+  const isComic = item.item_type === 'comic' || String(item.external_id || '').startsWith('cv_vol_') || String(item.external_id || '').startsWith('metron_series_');
 
   const parseInitialLastSeen = () => {
     if (item.last_seen_episode) {
@@ -2960,10 +2961,11 @@ export const Home: React.FC = () => {
             if (cachedList && Array.isArray(cachedList)) {
               const getEpTracked = (ep: any) => cachedList.find((t: any) => {
                 if (isComic) {
-                  const cleanId = String(ep.id).replace('cv_issue_', '');
-                  const tCleanId = String(t.external_id || '').replace('cv_issue_', '');
+                  const cleanId = String(ep.id).replace('cv_issue_', '').replace('metron_issue_', '');
+                  const tCleanId = String(t.external_id || '').replace('cv_issue_', '').replace('metron_issue_', '');
                   return (
                     t.external_id === `cv_issue_${cleanId}` ||
+                    t.external_id === `metron_issue_${cleanId}` ||
                     tCleanId === cleanId ||
                     (ep.issue_number && t.title && (t.title.includes(`#${ep.issue_number}`) || t.episode_number == ep.issue_number))
                   );
@@ -2999,7 +3001,7 @@ export const Home: React.FC = () => {
       if (i.item_type === "custom") return false;
       if (i.badge === "dlc" || i.custom_badge === "dlc" || i.badge === "expansion" || i.custom_badge === "expansion") return false;
       
-      const isEpisodicComic = i.item_type === 'comic' && (!!i.tracking_list_id || String(i.external_id || '').startsWith('cv_vol_'));
+      const isEpisodicComic = i.item_type === 'comic' && (!!i.tracking_list_id || String(i.external_id || '').startsWith('cv_vol_') || String(i.external_id || '').startsWith('metron_series_'));
 
       // 1. Standalone items (movies, games, books, standalone comics, manga)
       if (i.item_type !== 'series' && i.item_type !== 'anime' && !isEpisodicComic) {
@@ -3019,9 +3021,9 @@ export const Home: React.FC = () => {
 
       // 2. Series / anime / comic volumes that haven't aired/released any episode/issue yet belong only in Upcoming
       if (i.item_type === 'series' || i.item_type === 'anime' || isEpisodicComic) {
-        const cleanVolId = String(i.external_id || '').replace('cv_vol_', '').replace('cv_issue_', '').replace('cv_', '');
+        const cleanVolId = String(i.external_id || '').replace('metron_series_', '').replace('metron_issue_', '').replace('metron_', '').replace('cv_vol_', '').replace('cv_issue_', '').replace('cv_', '');
         const cacheKeyAll = isEpisodicComic ? `${cleanVolId}_all_episodes` : `${i.external_id}_all_episodes`;
-        const allEps = getCachedSeries(cacheKeyAll) || (isEpisodicComic ? getCachedSeries(`cv_vol_${cleanVolId}_all_episodes`) : null) || (isEpisodicComic ? getCachedSeries(`${i.external_id}_all_episodes`) : null);
+        const allEps = getCachedSeries(cacheKeyAll) || (isEpisodicComic ? getCachedSeries(`metron_series_${cleanVolId}_all_episodes`) : null) || (isEpisodicComic ? getCachedSeries(`cv_vol_${cleanVolId}_all_episodes`) : null) || (isEpisodicComic ? getCachedSeries(`${i.external_id}_all_episodes`) : null);
         if (allEps && Array.isArray(allEps) && allEps.length > 0) {
           const hasAnyAired = allEps.some((ep: any) => {
             if (isEpisodicComic) {
@@ -3055,8 +3057,8 @@ export const Home: React.FC = () => {
 
       // Ongoing series / anime / comic volumes that are not ended (isEnded is false) are "Al día", NOT completed!
       if (i.item_type === 'series' || i.item_type === 'anime' || i.item_type === 'comic') {
-        const cleanVolId = String(i.external_id || '').replace('cv_vol_', '').replace('cv_issue_', '').replace('cv_', '');
-        const volMeta = i.item_type === 'comic' ? (getCachedSeries(`comic_vol_${i.external_id}`) || getCachedSeries(`${i.external_id}_metadata`) || getCachedSeries(`cv_vol_${cleanVolId}_metadata`) || getCachedSeries(`series_${i.external_id}`)) : null;
+        const cleanVolId = String(i.external_id || '').replace('metron_series_', '').replace('metron_issue_', '').replace('metron_', '').replace('cv_vol_', '').replace('cv_issue_', '').replace('cv_', '');
+        const volMeta = i.item_type === 'comic' ? (getCachedSeries(`comic_vol_${i.external_id}`) || getCachedSeries(`${i.external_id}_metadata`) || getCachedSeries(`metron_series_${cleanVolId}_metadata`) || getCachedSeries(`cv_vol_${cleanVolId}_metadata`) || getCachedSeries(`series_${i.external_id}`)) : null;
         const cached = i.item_type === 'comic' ? volMeta : (i.external_id ? getCachedSeries(`series_${i.external_id}`) : null);
         const anyItem = i as any;
         const sStatus = cached?.status || anyItem.series_status;

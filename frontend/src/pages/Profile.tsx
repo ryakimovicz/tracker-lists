@@ -2572,7 +2572,7 @@ export const Profile: React.FC = () => {
           sessionStorage.setItem('pathd_act_cache', JSON.stringify(activityRes.data || []));
           
           // Background clean up rogue standalone comic issue rows from user library
-          const rogueIssues = (libraryRes.data || []).filter((item: LibraryItem) => item.external_id?.startsWith('cv_issue_'));
+          const rogueIssues = (libraryRes.data || []).filter((item: LibraryItem) => item.external_id?.startsWith('cv_issue_') || item.external_id?.startsWith('metron_issue_'));
           rogueIssues.forEach((item: LibraryItem) => {
             apiClient.delete(`/library/${item.id}`).catch(() => {});
           });
@@ -3389,8 +3389,8 @@ export const Profile: React.FC = () => {
 
     if (['book', 'comic', 'manga'].includes(item.item_type)) {
       if (item.item_type === 'comic') {
-        const cleanVolId = String(item.external_id || '').replace('cv_vol_', '').replace('cv_issue_', '').replace('cv_', '');
-        const volMeta = getCachedSeries(`comic_vol_${item.external_id}`) || getCachedSeries(`${item.external_id}_metadata`) || getCachedSeries(`cv_vol_${cleanVolId}_metadata`) || getCachedSeries(`series_${item.external_id}`);
+        const cleanVolId = String(item.external_id || '').replace('metron_series_', '').replace('metron_issue_', '').replace('metron_', '').replace('cv_vol_', '').replace('cv_issue_', '').replace('cv_', '');
+        const volMeta = getCachedSeries(`comic_vol_${item.external_id}`) || getCachedSeries(`${item.external_id}_metadata`) || getCachedSeries(`metron_series_${cleanVolId}_metadata`) || getCachedSeries(`cv_vol_${cleanVolId}_metadata`) || getCachedSeries(`series_${item.external_id}`);
         const anyItem = item as any;
         const sStatus = volMeta?.status || anyItem.series_status;
         const currentYear = new Date().getFullYear();
