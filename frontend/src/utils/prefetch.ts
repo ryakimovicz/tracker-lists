@@ -92,7 +92,7 @@ export const prefetchMediaDetails = (item: any) => {
       }).catch(() => {});
     }
   } else if (type === 'movie') {
-    if (extId.startsWith('omdb_') && (!item.description || !item.image_url)) {
+    if ((extId.startsWith('trakt_') || extId.startsWith('omdb_') || extId.startsWith('tt')) && (!item.description || !item.image_url)) {
       const cacheKeyMovie = `movie_${extId}`;
       if (!getCachedSeries(cacheKeyMovie)) {
         apiClient.get(`/search/movies/${extId}`).then(res => {

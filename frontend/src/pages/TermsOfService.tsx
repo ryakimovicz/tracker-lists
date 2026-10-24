@@ -216,13 +216,13 @@ export const TermsOfService: React.FC<TermsOfServiceProps> = ({ onClose, isModal
 
             <div style={{ background: 'var(--bg-tertiary)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
               <div style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span>OMDb API</span>
-                <a href="https://www.omdbapi.com" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.85rem' }}>
-                  omdbapi.com <ExternalLink size={13} />
+                <span>Trakt</span>
+                <a href="https://trakt.tv" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.85rem' }}>
+                  trakt.tv <ExternalLink size={13} />
                 </a>
               </div>
               <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0.5rem 0 0' }}>
-                {isEs ? 'Información cinematográfica y sinopsis de películas bajo licencia CC BY-NC 4.0.' : 'Movie metadata and synopses provided under CC BY-NC 4.0 license.'}
+                {isEs ? 'Metadatos, estrenos e información cinematográfica. Pathd utiliza Trakt pero no está avalado ni certificado por Trakt.' : 'Movie metadata, schedules, and information. Pathd uses Trakt but is not endorsed or certified by Trakt.'}
               </p>
             </div>
 
@@ -283,30 +283,6 @@ export const TermsOfService: React.FC<TermsOfServiceProps> = ({ onClose, isModal
               </div>
               <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0.5rem 0 0' }}>
                 {isEs ? 'Portadas oficiales en alta fidelidad y metadatos de álbumes y artistas.' : 'Official high-fidelity album artwork and artist metadata.'}
-              </p>
-            </div>
-
-            <div style={{ background: 'var(--bg-tertiary)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
-              <div style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span>Apple Search API</span>
-                <a href="https://www.apple.com" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.85rem' }}>
-                  apple.com <ExternalLink size={13} />
-                </a>
-              </div>
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0.5rem 0 0' }}>
-                {isEs ? 'Búsqueda y verificación de catálogos musicales y fechas de lanzamiento.' : 'Music catalog search and release date verification.'}
-              </p>
-            </div>
-
-            <div style={{ background: 'var(--bg-tertiary)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
-              <div style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span>MusicBrainz</span>
-                <a href="https://musicbrainz.org" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.85rem' }}>
-                  musicbrainz.org <ExternalLink size={13} />
-                </a>
-              </div>
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0.5rem 0 0' }}>
-                {isEs ? 'Enciclopedia musical comunitaria para fechas históricas de lanzamiento.' : 'Open community music encyclopedia for authentic original release dates.'}
               </p>
             </div>
 

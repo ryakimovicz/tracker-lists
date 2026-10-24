@@ -3595,7 +3595,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
         const isWikiItem = item.external_id && item.external_id.startsWith('wiki_');
 
         if (hasPlaceholderPoster || isWikiItem || !item.description) {
-          if (item.external_id && item.external_id.startsWith('omdb_')) {
+          if (item.external_id && (item.external_id.startsWith('trakt_') || item.external_id.startsWith('omdb_') || item.external_id.startsWith('tt'))) {
             apiClient.get(`/search/movies/${item.external_id}`)
               .then(res => {
                 const found = res.data;
@@ -3649,8 +3649,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                       }).catch(console.error);
                     }
 
-                    // If URL is currently showing the old wiki_ ID, silently update to the new omdb_ ID
-                    if (found.external_id && found.external_id.startsWith('omdb_') && window.location.pathname.includes('/item/')) {
+                    // If URL is currently showing the old wiki_ ID, silently update to the new ID
+                    if (found.external_id && (found.external_id.startsWith('trakt_') || found.external_id.startsWith('omdb_')) && window.location.pathname.includes('/item/')) {
                       const newPath = window.location.pathname.replace(item.external_id, found.external_id);
                       if (newPath !== window.location.pathname) {
                         window.history.replaceState(window.history.state, '', newPath);
@@ -10099,8 +10099,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                   )
                 )}
                 {selectedItem.item_type === 'movie' && (
-                  <a href="https://www.omdbapi.com" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}>
-                    OMDb API
+                  <a href="https://trakt.tv" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}>
+                    Trakt
                   </a>
                 )}
                 {(selectedItem.item_type === 'series' || selectedItem.item_type === 'anime' || selectedItem.item_type === 'episode' || (selectedItem.external_id || '').startsWith('tvm-ep-')) && (

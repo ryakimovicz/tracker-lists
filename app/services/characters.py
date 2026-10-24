@@ -8,7 +8,7 @@ import concurrent.futures
 from typing import List, Dict, Any
 from app.core.config import settings
 from app.services.igdb import IGDBService
-from app.services.omdb import OMDbService
+from app.services.trakt import TraktService
 from app.services.googlebooks import GoogleBooksService
 
 class CharacterSearchResult:
@@ -575,7 +575,7 @@ class CharacterService:
             return []
         results = []
         try:
-            movies = OMDbService.search_movies(query)
+            movies = TraktService.search_movies(query)
             for m in movies[:6]:
                 if m.image_url and "unsplash" not in m.image_url and "default" not in m.image_url.lower():
                     results.append(CharacterSearchResult(
@@ -585,7 +585,7 @@ class CharacterService:
                         origin=m.title
                     ))
         except Exception as e:
-            print(f"OMDb Movies Search Error: {e}")
+            print(f"Trakt Movies Search Error: {e}")
         return results
 
     @classmethod

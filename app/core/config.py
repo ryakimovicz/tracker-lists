@@ -40,7 +40,7 @@ class Settings(BaseSettings):
     
     # New Added APIs
     TVMAZE_API_KEY: str = ""
-    OMDB_API_KEY: str = ""
+    TRAKT_CLIENT_ID: str = ""
     FANART_API_KEY: str = ""
     LASTFM_API_KEY: str = ""
     LASTFM_SHARED_SECRET: str = ""

@@ -2586,7 +2586,7 @@ export const Home: React.FC = () => {
             hasUpdatedStandalone = true;
           } else {
             try {
-              if (item.item_type === 'movie' && item.external_id && item.external_id.startsWith('omdb_')) {
+              if (item.item_type === 'movie' && item.external_id && (item.external_id.startsWith('trakt_') || item.external_id.startsWith('omdb_') || item.external_id.startsWith('tt'))) {
                 const mRes = await apiClient.get(`/search/movies/${item.external_id}`);
                 if (mRes.data) {
                   if (mRes.data.release_date) item.release_date = mRes.data.release_date;

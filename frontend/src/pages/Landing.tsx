@@ -124,8 +124,8 @@ export const Landing: React.FC = () => {
     {
       q: isEs ? '¿De dónde provienen las carátulas, sinopsis y fechas?' : 'Where do posters, synopses, and dates come from?',
       a: isEs
-        ? 'Pathd se conecta dinámicamente con las mejores bases de datos públicas y comunitarias del mundo: OMDb para cine, TVMaze para series y anime, Google Books y Open Library para libros, Comic Vine para cómics, AniList para manga, IGDB/Twitch para juegos, y Last.fm, Deezer, Apple (iTunes) y MusicBrainz para música.'
-        : 'Pathd connects dynamically to industry-leading open and community databases: OMDb for movies, TVMaze for TV shows and anime, Google Books and Open Library for books, Comic Vine for comics, AniList for manga, IGDB/Twitch for games, and Last.fm, Deezer, Apple (iTunes), and MusicBrainz for music.'
+        ? 'Pathd se conecta dinámicamente con las mejores bases de datos comunitarias y profesionales del mundo: Trakt para cine, TVMaze para series y anime, AniList para manga, IGDB/Twitch para videojuegos, y Last.fm y Deezer para música.'
+        : 'Pathd connects dynamically to industry-leading open and community databases: Trakt for movies, TVMaze for TV shows and anime, AniList for manga, IGDB/Twitch for games, and Last.fm and Deezer for music.'
     }
   ];
 

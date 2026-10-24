@@ -5,6 +5,7 @@ import concurrent.futures
 from typing import List, Dict, Any
 from app.core.config import settings
 from app.services.igdb import IGDBService
+from app.services.trakt import TraktService
 
 import re
 import time
@@ -195,64 +196,26 @@ class BannerService:
 
     @classmethod
     def _search_fanart_movies(cls, query: str) -> List[BannerSearchResult]:
-        if not query or not settings.FANART_API_KEY or not settings.OMDB_API_KEY:
+        if not query:
             return []
             
         results = []
         seen_images = set()
         variants = cls._generate_query_variants(query)[:2]
         
-        imdb_ids = []
         for term in variants:
-            encoded = urllib.parse.quote(term)
-            omdb_url = f"http://www.omdbapi.com/?s={encoded}&type=movie&apikey={settings.OMDB_API_KEY}"
-            try:
-                req_omdb = urllib.request.Request(omdb_url, headers={"User-Agent": "TrackerLists/1.0"})
-                with urllib.request.urlopen(req_omdb, timeout=2.0) as resp:
-                    if resp.status == 200:
-                        data = json.loads(resp.read().decode())
-                        for item in data.get("Search", [])[:5]:
-                            iid = item.get("imdbID")
-                            mtitle = item.get("Title")
-                            if iid and (iid, mtitle) not in imdb_ids:
-                                imdb_ids.append((iid, mtitle))
-            except Exception:
-                pass
-
-        # Fetch backgrounds for movies from Fanart.tv concurrently
-        def fetch_movie_fanart(item_tuple):
-            iid, mtitle = item_tuple
-            fan_url = f"https://webservice.fanart.tv/v3/movies/{iid}?api_key={settings.FANART_API_KEY}"
-            sub_results = []
-            try:
-                req_fan = urllib.request.Request(fan_url, headers={"User-Agent": "TrackerLists/1.0"})
-                with urllib.request.urlopen(req_fan, timeout=1.8) as resp_f:
-                    if resp_f.status == 200:
-                        fan_data = json.loads(resp_f.read().decode())
-                        for bg in fan_data.get("moviebackground", [])[:3]:
-                            bg_url = bg.get("url")
-                            if bg_url:
-                                sub_results.append(BannerSearchResult(
-                                    title=mtitle,
-                                    image_url=bg_url,
-                                    category="movie",
-                                    origin=mtitle,
-                                    kind="wallpaper"
-                                ))
-            except Exception:
-                pass
-            return sub_results
-
-        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as fan_executor:
-            future_to_movie = {fan_executor.submit(fetch_movie_fanart, m): m for m in imdb_ids[:5]}
-            for future in concurrent.futures.as_completed(future_to_movie):
-                try:
-                    for r in future.result():
-                        if r.image_url not in seen_images:
-                            seen_images.add(r.image_url)
-                            results.append(r)
-                except Exception:
-                    pass
+            banners = TraktService.search_movie_banners(term)
+            for b in banners:
+                img_url = b.get("image_url")
+                if img_url and img_url not in seen_images:
+                    seen_images.add(img_url)
+                    results.append(BannerSearchResult(
+                        title=b.get("title", ""),
+                        image_url=img_url,
+                        category="movie",
+                        origin=b.get("origin", ""),
+                        kind=b.get("kind", "wallpaper")
+                    ))
 
         return results
 
@@ -426,28 +389,25 @@ class BannerService:
 
     @classmethod
     def _search_music(cls, query: str, target_type: str = "banner") -> List[BannerSearchResult]:
-        if not query or not settings.FANART_API_KEY:
+        if not query or not settings.FANART_API_KEY or not settings.LASTFM_API_KEY:
             return []
 
         results = []
         seen_images = set()
 
         try:
-            # 1. Search MusicBrainz for artist MBID
+            # 1. Query Last.fm for artist info and MBID
             clean_q = urllib.parse.quote(query.strip())
-            mb_url = f"https://musicbrainz.org/ws/2/artist/?query={clean_q}&fmt=json&limit=3"
-            req_mb = urllib.request.Request(mb_url, headers={"User-Agent": "PathdApp/1.0 (contact@pathd.net)"})
-            with urllib.request.urlopen(req_mb, timeout=3.5) as mb_resp:
-                if mb_resp.status == 200:
-                    mb_data = json.loads(mb_resp.read().decode('utf-8', errors='replace'))
-                    artists = mb_data.get("artists", [])
+            lfm_url = f"https://ws.audioscrobbler.com/2.0/?method=artist.getinfo&artist={clean_q}&api_key={settings.LASTFM_API_KEY}&format=json"
+            req_lfm = urllib.request.Request(lfm_url, headers={"User-Agent": "PathdApp/1.0 (contact@pathd.net)"})
+            with urllib.request.urlopen(req_lfm, timeout=3.5) as lfm_resp:
+                if lfm_resp.status == 200:
+                    lfm_data = json.loads(lfm_resp.read().decode('utf-8', errors='replace'))
+                    art_obj = lfm_data.get("artist", {})
+                    mbid = art_obj.get("mbid")
+                    art_name = art_obj.get("name") or query
 
-                    for art in artists[:2]:
-                        mbid = art.get("id")
-                        art_name = art.get("name")
-                        if not mbid or not art_name:
-                            continue
-
+                    if mbid:
                         # 2. Query Fanart.tv for widescreen music banners and artist wallpapers
                         fan_url = f"https://webservice.fanart.tv/v3/music/{mbid}?api_key={settings.FANART_API_KEY}"
                         try:

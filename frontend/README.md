@@ -66,7 +66,7 @@ frontend/src/
 ├── api/          # Cliente Axios centralizado e interceptores de red (auth, refresh, language)
 ├── components/   # Componentes modulares y reutilizables:
 │   ├── ItemDetailsModal.tsx        # Modal de detalle de obra, cast, relaciones, episodios, tomos y reseñas
-│   ├── MusicDetailsModal.tsx       # Modal de detalle de álbumes, artistas y pistas (Last.fm, Deezer, iTunes)
+│   ├── MusicDetailsModal.tsx       # Modal de detalle de álbumes, artistas y pistas (Last.fm, Deezer)
 │   ├── MusicServiceGuideModal.tsx  # Guía de conexión para Last.fm (Spotify, Apple Music, YT Music, Deezer)
 │   ├── ItemRouteModal.tsx          # Enrutador modal deep-linked para obras sincronizado con la URL
 │   ├── MusicRouteModal.tsx         # Enrutador modal deep-linked para música sincronizado con la URL

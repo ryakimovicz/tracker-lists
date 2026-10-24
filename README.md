@@ -61,7 +61,7 @@ Cuenta con un potente constructor de **Guías Cronológicas interactivas**, modi
   - Vincula tu cuenta de Last.fm con soporte para Spotify, Apple Music, YouTube Music y Deezer.
   - Canción en reproducción en vivo con ecualizador animado adaptativo al tema de color de tu perfil.
   - Tops semanales, mensuales e históricos de artistas, álbumes y canciones.
-  - Enriquecimiento de portadas HD multifuente (*Last.fm, Deezer, MusicBrainz, Discogs*) y modal interactivo de detalles de álbumes y pistas con tracklist completo.
+  - Enriquecimiento de portadas HD multifuente (*Last.fm, Deezer*) y modal interactivo de detalles de álbumes y pistas con tracklist completo.
 
 ### ⚡ Rendimiento Ultrarrápido, Resiliencia & Sincronización Multidispositivo (0 ms)
 - **Sincronización Inteligente Multidispositivo**:
@@ -104,13 +104,11 @@ Cuenta con un potente constructor de **Guías Cronológicas interactivas**, modi
 
 Pathd se alimenta e integra con los mejores servicios y APIs abiertas del mundo:
 
-- 🎬 **Películas**: [OMDb API](https://www.omdbapi.com/) & [Fanart.tv](https://fanart.tv/)
+- 🎬 **Películas**: [Trakt API](https://trakt.tv/) & [Fanart.tv](https://fanart.tv/)
 - 📺 **Series & Anime**: [TVMaze](https://www.tvmaze.com/)
-- 📚 **Libros**: [Google Books](https://developers.google.com/books) & [Open Library](https://openlibrary.org/)
 - 🌸 **Manga & Novelas Ligeras**: [AniList GraphQL](https://anilist.co/)
-- 🦸 **Cómics**: [Comic Vine](https://comicvine.gamespot.com/)
 - 🎮 **Juegos**: [IGDB / Twitch](https://www.igdb.com/)
-- 🎵 **Música & Scrobbling**: [Last.fm](https://www.last.fm/), [Deezer API](https://developers.deezer.com/) & [Apple iTunes](https://developer.apple.com/library/archive/documentation/AudioVideo/Conceptual/iTuneSearchAPI/index.html)
+- 🎵 **Música & Scrobbling**: [Last.fm](https://www.last.fm/) & [Deezer API](https://developers.deezer.com/)
 - 🎭 **GIFs, Memes & Clips**: [KLIPY API](https://klipy.co/)
 - 💳 **Pagos Seguros**: [Dodo Payments](https://dodopayments.com/)
 - 💌 **Correos Transaccionales**: [Resend](https://resend.com/)

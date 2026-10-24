@@ -9,7 +9,7 @@ from app.models.list import ReadingList, VisibilityEnum
 from app.services.base import SearchResultItem
 from app.services.comicvine import ComicVineService
 from app.services.tvmaze import TVMazeService
-from app.services.omdb import OMDbService
+from app.services.trakt import TraktService
 from app.services.googlebooks import GoogleBooksService
 from app.services.igdb import IGDBService
 from app.services.anilist import AnilistService
@@ -229,7 +229,7 @@ def search_media(
         elif type_lower == "game":
             return execute_with_circuit_breaker("igdb", IGDBService.search_games, var, fallback=[])
         elif type_lower == "movie":
-            return execute_with_circuit_breaker("omdb", OMDbService.search_movies, var, fallback=[])
+            return execute_with_circuit_breaker("trakt", TraktService.search_movies, var, fallback=[])
         elif type_lower == "anime":
             return execute_with_circuit_breaker("tvmaze", TVMazeService.search_shows, var, is_anime=True, lang=client_lang, country_code=client_country, fallback=[])
         elif type_lower == "series":
@@ -297,7 +297,7 @@ def search_all_media(
     with concurrent.futures.ThreadPoolExecutor(max_workers=max(7, len(variations) * 7)) as executor:
         futures = []
         for var in variations:
-            futures.append(executor.submit(execute_with_circuit_breaker, "omdb", OMDbService.search_movies, var, fallback=[]))
+            futures.append(executor.submit(execute_with_circuit_breaker, "trakt", TraktService.search_movies, var, fallback=[]))
             futures.append(executor.submit(execute_with_circuit_breaker, "tvmaze", TVMazeService.search_shows, var, False, client_lang, client_country, fallback=[]))
             futures.append(executor.submit(execute_with_circuit_breaker, "tvmaze", TVMazeService.search_shows, var, True, client_lang, client_country, fallback=[]))
             # Disabled Comic Vine and Google Books due to commercial API terms:
@@ -420,7 +420,7 @@ def get_movie_detail(
     movie_id: str
 ):
     try:
-        detail = OMDbService.get_movie_detail(movie_id)
+        detail = TraktService.get_movie_detail(movie_id)
         if not detail:
             raise HTTPException(status_code=404, detail="Movie not found")
         return detail
@@ -603,7 +603,7 @@ def get_explore_recommendations(
         
         try:
             if q_type == "movie":
-                results = OMDbService.search_movies(q_term)
+                results = TraktService.search_movies(q_term)
             elif q_type == "anime":
                 results = TVMazeService.search_shows(q_term, is_anime=True)
             elif q_type == "game":
@@ -732,7 +732,7 @@ def get_explore_tabs(
                 futures_nuevo["anime"] = executor.submit(lambda: execute_with_circuit_breaker("tvmaze", lambda: [x for x in TVMazeService.get_new_anime() if is_safe_media_item(x.title, x.description)], fallback=[]))
                 futures_nuevo["manga"] = executor.submit(lambda: execute_with_circuit_breaker("anilist", lambda: [x for x in AnilistService.get_new_manga() if is_safe_media_item(x.title, x.description)], fallback=[]))
                 futures_nuevo["games"] = executor.submit(lambda: execute_with_circuit_breaker("igdb", lambda: [x for x in IGDBService.get_new_games() if is_safe_media_item(x.title, x.description)], fallback=[]))
-                futures_nuevo["movies"] = executor.submit(lambda: execute_with_circuit_breaker("omdb", lambda: [x for x in OMDbService.get_new_movies() if is_safe_media_item(x.title, x.description)], fallback=[]))
+                futures_nuevo["movies"] = executor.submit(lambda: execute_with_circuit_breaker("trakt", lambda: [x for x in TraktService.get_new_movies() if is_safe_media_item(x.title, x.description)], fallback=[]))
                 # Disabled due to commercial API terms:
                 # futures_nuevo["books"] = executor.submit(lambda: execute_with_circuit_breaker("googlebooks", lambda: [x for x in GoogleBooksService.get_new_books() if is_safe_media_item(x.title, x.description)], fallback=[]))
                 # futures_nuevo["comics"] = executor.submit(lambda: execute_with_circuit_breaker("comicvine", lambda: [x for x in ComicVineService.get_new_comics() if is_safe_media_item(x.title, x.description)], fallback=[]))
@@ -742,7 +742,7 @@ def get_explore_tabs(
                 futures_trend["anime"] = executor.submit(lambda: execute_with_circuit_breaker("tvmaze", lambda: [x for x in TVMazeService.get_trending_anime() if is_safe_media_item(x.title, x.description)], fallback=[]))
                 futures_trend["manga"] = executor.submit(lambda: execute_with_circuit_breaker("anilist", lambda: [x for x in AnilistService.get_trending_manga() if is_safe_media_item(x.title, x.description)], fallback=[]))
                 futures_trend["games"] = executor.submit(lambda: execute_with_circuit_breaker("igdb", lambda: [x for x in IGDBService.get_trending_games() if is_safe_media_item(x.title, x.description)], fallback=[]))
-                futures_trend["movies"] = executor.submit(lambda: execute_with_circuit_breaker("omdb", lambda: [x for x in OMDbService.get_trending_movies() if is_safe_media_item(x.title, x.description)], fallback=[]))
+                futures_trend["movies"] = executor.submit(lambda: execute_with_circuit_breaker("trakt", lambda: [x for x in TraktService.get_trending_movies() if is_safe_media_item(x.title, x.description)], fallback=[]))
                 # Disabled due to commercial API terms:
                 # futures_trend["books"] = executor.submit(lambda: execute_with_circuit_breaker("googlebooks", lambda: [x for x in GoogleBooksService.get_trending_books() if is_safe_media_item(x.title, x.description)], fallback=[]))
                 # futures_trend["comics"] = executor.submit(lambda: execute_with_circuit_breaker("comicvine", lambda: [x for x in ComicVineService.get_trending_comics() if is_safe_media_item(x.title, x.description)], fallback=[]))
@@ -873,8 +873,8 @@ def lookup_media_item(
     # 2. Try fetching from specific service based on type
     try:
         if type_clean == "movie":
-            if ext_id_clean.startswith("omdb_") or ext_id_clean.startswith("tt"):
-                m_detail = OMDbService.get_movie_detail(ext_id_clean)
+            if ext_id_clean.startswith("trakt_") or ext_id_clean.startswith("omdb_") or ext_id_clean.startswith("tt") or ext_id_clean.isdigit():
+                m_detail = TraktService.get_movie_detail(ext_id_clean)
                 if m_detail:
                     result_data = {
                         "external_id": getattr(m_detail, "external_id", ext_id_clean),
@@ -885,13 +885,13 @@ def lookup_media_item(
                         "release_date": getattr(m_detail, "release_date", None)
                     }
             elif ext_id_clean.startswith("wiki_"):
-                # If we have an existing database record, attempt to resolve via title in OMDb
+                # If we have an existing database record, attempt to resolve via title in Trakt
                 search_title = existing.title if existing else None
                 if search_title:
-                    omdb_candidates = OMDbService.search_movies(search_title)
-                    if omdb_candidates:
-                        best = omdb_candidates[0]
-                        m_detail = OMDbService.get_movie_detail(best.external_id) or best
+                    trakt_candidates = TraktService.search_movies(search_title)
+                    if trakt_candidates:
+                        best = trakt_candidates[0]
+                        m_detail = TraktService.get_movie_detail(best.external_id) or best
                         result_data = {
                             "external_id": getattr(m_detail, "external_id", best.external_id),
                             "title": getattr(m_detail, "title", best.title),
@@ -1130,7 +1130,7 @@ def get_popular_works(
         for t in types_to_fetch:
             for seed in popular_seed_queries.get(t, [])[:2]:
                 if t == "movie":
-                    futures.append(executor.submit(execute_with_circuit_breaker, "omdb", OMDbService.search_movies, seed, fallback=[]))
+                    futures.append(executor.submit(execute_with_circuit_breaker, "trakt", TraktService.search_movies, seed, fallback=[]))
                 elif t in ("series", "anime"):
                     is_an = (t == "anime")
                     futures.append(executor.submit(execute_with_circuit_breaker, "tvmaze", TVMazeService.search_shows, seed, is_an, fallback=[]))

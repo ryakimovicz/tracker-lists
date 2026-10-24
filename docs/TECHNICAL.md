@@ -12,7 +12,7 @@ Documento de referencia para desarrolladores, arquitectura del sistema y catálo
 - **Migraciones de Base de Datos**: Alembic (`alembic/` y `alembic.ini`) para versionado y despliegue formal de esquemas
 - **Autenticación & Criptografía**: OAuth2 Password Bearer con JWT, cifrado irreversible de contraseñas mediante `bcrypt` (`gensalt`), rotación de token de refresco con cookies `HttpOnly`/`Secure` (HTTPS) y bloqueo estricto de tokens de prueba en producción
 - **Monitoreo de Errores & Rendimiento**: Sentry (`sentry-sdk`) con seguimiento de excepciones y transacciones en producción
-- **Resiliencia & Circuit Breakers**: Patrón Circuit Breaker (`app/core/circuit_breaker.py`) para aislar fallos de APIs externas (OMDb, TVMaze, AniList, ComicVine, IGDB, Last.fm, Deezer, Apple iTunes, etc.)
+- **Resiliencia & Circuit Breakers**: Patrón Circuit Breaker (`app/core/circuit_breaker.py`) para aislar fallos de APIs externas (Trakt, TVMaze, AniList, IGDB, Last.fm, Deezer, etc.)
 - **Email Transaccional**: Resend API con dominio personalizado `@pathd.net` y soporte bilingüe (ES/EN)
 - **Pagos y Suscripciones**: Dodo Payments API (Checkout Sessions, Customer Portal y Webhooks de ciclo de vida)
 - **Rate Limiting (Protección Anti-Fuerza Bruta & Anti-Spam)**: `slowapi` con límites dinámicos por IP en endpoints sensibles (búsqueda: 60/min, login: 10/min, registro: 5/min, recuperación de contraseña: 5/min, Google auth: 15/min)
@@ -98,7 +98,7 @@ Documento de referencia para desarrolladores, arquitectura del sistema y catálo
 | GET | `/{user_id}/music/top-albums` | Álbumes más escuchados de un usuario público |
 | GET | `/{user_id}/music/top-artists` | Artistas más escuchados de un usuario público |
 | GET | `/{user_id}/music/top-tracks` | Canciones más escuchadas de un usuario público |
-| GET | `/music/details` | Detalle enriquecido de álbum, artista o track (Last.fm, MusicBrainz, Deezer, Discogs) |
+| GET | `/music/details` | Detalle enriquecido de álbum, artista o track (Last.fm, Deezer) |
 | GET | `/profile/{user_id}` | Perfil público de otro usuario |
 | GET | `/{user_id}/activity` | Historial de actividad pública de otro usuario |
 | GET | `/search?q={query}` | Buscar usuarios por nombre de usuario |

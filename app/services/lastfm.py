@@ -210,41 +210,6 @@ class LastFMService(metaclass=LastFMMeta):
         cls._cache_lfm_artist_tracks[key] = (now, tracks)
         return tracks
 
-    @classmethod
-    def _fetch_itunes_artwork(cls, artist_name: str, item_name: str = "") -> str:
-        """Fetches high-res artwork from iTunes API as fallback"""
-        try:
-            import re
-            import unicodedata
-            def strip_acc(s):
-                return "".join(c for c in unicodedata.normalize("NFD", s or "") if unicodedata.category(c) != "Mn")
-            norm_target = re.sub(r'[^a-zA-Z0-9]', '', strip_acc(artist_name)).lower()
-
-            search_terms = []
-            if item_name:
-                search_terms.append(f"{artist_name} {item_name}")
-            else:
-                lfm_tracks = cls._get_lastfm_artist_top_tracks(artist_name)
-                for trk in lfm_tracks[:3]:
-                    clean_t = re.sub(r'\(.*?\)', '', trk).strip()
-                    search_terms.append(f"{artist_name} {clean_t}")
-                search_terms.append(artist_name)
-
-            for term in search_terms:
-                q = urllib.parse.quote(term)
-                req = urllib.request.Request(f"https://itunes.apple.com/search?term={q}&entity=song&limit=5", headers={"User-Agent": "PathdApp/1.0"})
-                with urllib.request.urlopen(req, timeout=3.5) as res:
-                    if res.status == 200:
-                        data = json.loads(res.read().decode('utf-8', errors='replace'))
-                        for s in data.get("results", []):
-                            cand_art = re.sub(r'[^a-zA-Z0-9]', '', strip_acc(s.get("artistName", ""))).lower()
-                            if cand_art == norm_target or (len(norm_target) >= 4 and (norm_target in cand_art or cand_art in norm_target)):
-                                artwork = s.get("artworkUrl100", "")
-                                if artwork:
-                                    return artwork.replace("100x100bb", "600x600bb")
-        except Exception:
-            pass
-        return ""
 
     @classmethod
     def _resolve_deezer_artist(cls, artist_name: str) -> Optional[Dict[str, Any]]:
@@ -404,18 +369,12 @@ class LastFMService(metaclass=LastFMMeta):
                 cls._cache_artist_images[key] = img
                 return img
 
-        # Fallback to iTunes artwork
-        itunes_img = cls._fetch_itunes_artwork(artist_name)
-        if itunes_img and not cls._is_placeholder_or_empty(itunes_img):
-            cls._cache_artist_images[key] = itunes_img
-            return itunes_img
-
         cls._cache_artist_images[key] = ""
         return ""
 
     @classmethod
     def _fetch_track_image(cls, track_name: str, artist_name: str) -> str:
-        """Fetches track cover artwork (from its album) via Deezer API with multi-candidate artist matching and iTunes fallback"""
+        """Fetches track cover artwork (from its album) via Deezer API with multi-candidate artist matching"""
         if not track_name:
             return ""
         query_str = f"{artist_name} {track_name}".strip() if artist_name else track_name.strip()
@@ -454,18 +413,12 @@ class LastFMService(metaclass=LastFMMeta):
         except Exception:
             pass
 
-        # Fallback to iTunes artwork
-        itunes_img = cls._fetch_itunes_artwork(artist_name, track_name)
-        if itunes_img and not cls._is_placeholder_or_empty(itunes_img):
-            cls._cache_track_images[key] = itunes_img
-            return itunes_img
-
         cls._cache_track_images[key] = ""
         return ""
 
     @classmethod
     def _fetch_album_image(cls, album_name: str, artist_name: str) -> str:
-        """Fetches album cover artwork from Deezer API with multi-candidate artist matching and iTunes fallback"""
+        """Fetches album cover artwork from Deezer API with multi-candidate artist matching"""
         if not album_name:
             return ""
         query_str = f"{artist_name} {album_name}".strip() if artist_name else album_name.strip()
@@ -502,12 +455,6 @@ class LastFMService(metaclass=LastFMMeta):
                             return img
         except Exception:
             pass
-
-        # Fallback to iTunes artwork
-        itunes_img = cls._fetch_itunes_artwork(artist_name, album_name)
-        if itunes_img and not cls._is_placeholder_or_empty(itunes_img):
-            cls._cache_album_images[key] = itunes_img
-            return itunes_img
 
         cls._cache_album_images[key] = ""
         return ""
@@ -989,38 +936,6 @@ class LastFMService(metaclass=LastFMMeta):
             is_fallback = True
             results = cls._get_lastfm_top_albums_discography(artist_name)
 
-        # Cross-reference with iTunes catalog to correct re-issue/upload dates
-        itunes_catalog_items: List[tuple] = []
-        try:
-            q = urllib.parse.quote(artist_name)
-            req = urllib.request.Request(f"https://itunes.apple.com/search?term={q}&entity=album&limit=100", headers={"User-Agent": "PathdApp/1.0 (contact@pathd.net)"})
-            with urllib.request.urlopen(req, timeout=3) as res:
-                if res.status == 200:
-                    d = json.loads(res.read().decode('utf-8'))
-                    for item in d.get("results", []):
-                        raw_col = (item.get("collectionName") or "").strip()
-                        r_date = (item.get("releaseDate") or "")[:10]
-                        if raw_col and r_date:
-                            itunes_catalog_items.append((raw_col, r_date))
-        except Exception:
-            pass
-
-        for alb in results:
-            alb_title = alb.get("title", "")
-            matched_date = ""
-            for raw_col, r_date in itunes_catalog_items:
-                if cls._titles_match(alb_title, raw_col):
-                    matched_date = r_date
-                    break
-
-            if matched_date:
-                # If neither is special edition, pick the earlier original release date
-                # If it is a special edition, update with matched date
-                is_special = bool(cls._extract_descriptors(alb_title))
-                if not alb.get("release_date") or (not is_special and matched_date < alb["release_date"]) or is_special:
-                    alb["release_date"] = matched_date
-                    alb["year"] = matched_date.split("-")[0]
-
         # Multi-source concurrent deep resolution for accurate historical dates
         def _resolve_item_date(alb_dict):
             try:
@@ -1051,7 +966,7 @@ class LastFMService(metaclass=LastFMMeta):
 
     @classmethod
     def get_album_release_info(cls, artist_name: str, album_name: str) -> Dict[str, str]:
-        """Fetches accurate original release year and date prioritizing authentic historical release dates across MusicBrainz, iTunes and Deezer"""
+        """Fetches accurate original release year and date prioritizing authentic historical release dates via Deezer and Last.fm"""
         if not album_name:
             return {"year": "", "release_date": ""}
         cache_key = f"{artist_name.strip().lower()}_{album_name.strip().lower()}"
@@ -1060,43 +975,6 @@ class LastFMService(metaclass=LastFMMeta):
 
         is_special = bool(cls._extract_descriptors(album_name))
         query_title = album_name if is_special else cls._clean_album_title(album_name)
-
-        def _fetch_itunes() -> Optional[str]:
-            try:
-                q = urllib.parse.quote(f"{artist_name} {query_title}".strip())
-                req = urllib.request.Request(f"https://itunes.apple.com/search?term={q}&entity=album&limit=15", headers={"User-Agent": "PathdApp/1.0 (contact@pathd.net)"})
-                with urllib.request.urlopen(req, timeout=2.5) as res:
-                    if res.status == 200:
-                        d = json.loads(res.read().decode('utf-8'))
-                        for item in d.get("results", []):
-                            col_name = item.get("collectionName") or ""
-                            if cls._titles_match(album_name, col_name):
-                                r_date = (item.get("releaseDate") or "")[:10]
-                                if r_date:
-                                    return r_date
-            except Exception:
-                pass
-            return None
-
-        def _fetch_musicbrainz() -> Optional[str]:
-            try:
-                clean_mb = re.sub(r'[\"\[\]\(\)]', ' ', query_title).strip()
-                clean_mb = re.sub(r'\s+', ' ', clean_mb)
-                q = urllib.parse.quote(f'artist:"{artist_name}" AND (releasegroup:"{clean_mb}" OR release:"{clean_mb}")')
-                url = f'https://musicbrainz.org/ws/2/release-group?query={q}&fmt=json&limit=5'
-                req = urllib.request.Request(url, headers={'User-Agent': 'PathdApp/1.0 (contact@pathd.net)'})
-                with urllib.request.urlopen(req, timeout=2.5) as res:
-                    if res.status == 200:
-                        d = json.loads(res.read().decode('utf-8'))
-                        for rg in d.get('release-groups', []):
-                            rg_t = rg.get('title', '')
-                            if cls._titles_match(album_name, rg_t):
-                                d_str = rg.get('first-release-date')
-                                if d_str:
-                                    return d_str
-            except Exception:
-                pass
-            return None
 
         def _fetch_deezer() -> Optional[str]:
             try:
@@ -1123,18 +1001,9 @@ class LastFMService(metaclass=LastFMMeta):
 
         found_dates = []
         try:
-            with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
-                f_itunes = executor.submit(_fetch_itunes)
-                f_mb = executor.submit(_fetch_musicbrainz)
-                f_deezer = executor.submit(_fetch_deezer)
-
-                for f in [f_itunes, f_mb, f_deezer]:
-                    try:
-                        res = f.result(timeout=3.0)
-                        if res:
-                            found_dates.append(res)
-                    except Exception:
-                        pass
+            d_res = _fetch_deezer()
+            if d_res:
+                found_dates.append(d_res)
         except Exception:
             pass
 
