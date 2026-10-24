@@ -37,7 +37,7 @@ export const BackgroundSelectorModal: React.FC<BackgroundSelectorModalProps> = (
   const isLight = theme === 'light';
 
   const [query, setQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<'all' | 'movie' | 'series' | 'anime' | 'manga' | 'game' | 'music'>('all');
+  const [selectedCategory, setSelectedCategory] = useState<'all' | 'movie' | 'series' | 'anime' | 'book' | 'manga' | 'game' | 'music'>('all');
 
   const [results, setResults] = useState<BackgroundItem[]>([]);
   const [visibleCount, setVisibleCount] = useState<number>(24);
@@ -581,7 +581,7 @@ export const BackgroundSelectorModal: React.FC<BackgroundSelectorModalProps> = (
               <PathdLoader size="medium" message={isEs ? 'Buscando fondos...' : 'Searching backgrounds...'} />
             </div>
           ) : (() => {
-            const filteredResults = results.filter(b => b.category !== 'comic' && b.category !== 'book' && (selectedCategory === 'all' || b.category === selectedCategory));
+            const filteredResults = results.filter(b => b.category !== 'comic' && (selectedCategory === 'all' || b.category === selectedCategory));
 
             if (filteredResults.length === 0) {
               return (

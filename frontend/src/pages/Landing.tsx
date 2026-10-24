@@ -34,6 +34,7 @@ export const Landing: React.FC = () => {
     { key: 'movie', label: isEs ? 'Películas' : 'Movies', icon: <Film size={15} />, color: 'var(--color-movie, #10b981)' },
     { key: 'series', label: isEs ? 'Series' : 'TV Shows', icon: <Tv size={15} />, color: 'var(--color-series, #3b82f6)' },
     { key: 'anime', label: isEs ? 'Anime' : 'Anime', icon: <Star size={15} />, color: 'var(--color-anime, #f59e0b)' },
+    { key: 'book', label: isEs ? 'Libros' : 'Books', icon: <BookOpen size={15} />, color: 'var(--color-book, #06b6d4)' },
     { key: 'manga', label: isEs ? 'Manga' : 'Manga', icon: <Book size={15} />, color: 'var(--color-manga, #ec4899)' },
     { key: 'game', label: isEs ? 'Juegos' : 'Games', icon: <Gamepad2 size={15} />, color: 'var(--color-game, #8b5cf6)' },
     { key: 'music', label: isEs ? 'Música' : 'Music', icon: <Music size={15} />, color: 'var(--color-music, #a855f7)' }
@@ -41,7 +42,7 @@ export const Landing: React.FC = () => {
 
   const planComparison = [
     {
-      feature: isEs ? '6 Categorías completas (Películas, Series, Anime, Manga, Juegos, Música)' : '6 Full Categories (Movies, TV Shows, Anime, Manga, Games, Music)',
+      feature: isEs ? '7 Categorías completas (Películas, Series, Anime, Libros, Manga, Juegos, Música)' : '7 Full Categories (Movies, TV Shows, Anime, Books, Manga, Games, Music)',
       free: isEs ? 'Ilimitadas' : 'Unlimited',
       premium: isEs ? 'Ilimitadas' : 'Unlimited'
     },

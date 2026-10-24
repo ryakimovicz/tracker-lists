@@ -646,7 +646,7 @@ export const Search: React.FC = () => {
   const [submittedQuery, setSubmittedQuery] = useState('');
   const [results, setResults] = useState<SearchResultItem[]>([]);
   const [visibleCount, setVisibleCount] = useState<number>(24);
-  const [activeTab, setActiveTab] = useState<'all' | 'movie' | 'series' | 'anime' | 'game' | 'user' | 'guide' | 'manga'>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'movie' | 'series' | 'anime' | 'book' | 'game' | 'user' | 'guide' | 'manga'>('all');
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [isSearching, setIsSearching] = useState(false);
@@ -1345,6 +1345,7 @@ export const Search: React.FC = () => {
         if (activeTab === 'series') return item.item_type === 'series';
         if (activeTab === 'anime') return item.item_type === 'anime';
         if (activeTab === 'movie') return item.item_type === 'movie';
+        if (activeTab === 'book') return item.item_type === 'book';
         if (activeTab === 'manga') return item.item_type === 'manga';
         if (activeTab === 'game') return item.item_type === 'game';
         if (activeTab === 'user') return item.item_type === 'user';
@@ -1671,6 +1672,7 @@ export const Search: React.FC = () => {
                 { value: 'movie', label: language === 'es' ? 'Películas' : 'Movies' },
                 { value: 'series', label: language === 'es' ? 'Series' : 'TV Shows' },
                 { value: 'anime', label: 'Anime' },
+                { value: 'book', label: language === 'es' ? 'Libros' : 'Books' },
                 { value: 'manga', label: 'Mangas' },
                 { value: 'game', label: language === 'es' ? 'Juegos' : 'Games' },
                 { value: 'user', label: language === 'es' ? 'Usuarios' : 'Users' },

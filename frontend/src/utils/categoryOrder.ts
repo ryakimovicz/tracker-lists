@@ -86,7 +86,7 @@ export function sortByCategoryOrder<T>(
 /**
  * Sorts tab/filter objects. 'all' is always kept first,
  * and 'user' / 'guide' (if present) are kept at the end.
- * Automatically excludes blocked categories like 'book' and 'comic'.
+ * Automatically excludes blocked categories like 'comic'.
  */
 export function sortFilterTabs<T extends { value?: string; key?: string; type?: string }>(
   tabs: T[],

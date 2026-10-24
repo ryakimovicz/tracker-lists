@@ -740,7 +740,7 @@ class CharacterService:
             ("Star Wars", "movie"),
             ("Interstellar", "movie"),
             ("Pulp Fiction", "movie"),
-            ("Harry Potter", "movie"),
+            ("Harry Potter", "book"),
             ("The Beatles", "music"),
             ("Queen", "music"),
             ("Daft Punk", "music"),
@@ -756,6 +756,8 @@ class CharacterService:
                     f = executor.submit(cls._search_igdb, name)
                 elif cat == "movie":
                     f = executor.submit(cls._search_movies, name)
+                elif cat == "book":
+                    f = executor.submit(cls._search_books, name)
                 elif cat == "music":
                     f = executor.submit(cls._search_music, name)
                 else:
@@ -766,8 +768,8 @@ class CharacterService:
                 try:
                     res = future.result()
                     if res:
-                        # Exclude any comic or book category results
-                        valid = [x for x in res if getattr(x, "category", "") not in ("comic", "book")]
+                        # Exclude any comic category results
+                        valid = [x for x in res if getattr(x, "category", "") != "comic"]
                         all_results.extend(valid[:2])
                 except Exception:
                     pass
@@ -800,20 +802,20 @@ class CharacterService:
         search_term = clean_query if len(clean_query) >= 2 else raw_query
 
         all_results = []
-        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
             f_anilist = executor.submit(cls._search_anilist, search_term)
-            # Comic Vine and Google Books blocked due to commercial terms:
-            # f_comicvine = executor.submit(cls._search_comicvine, search_term)
             f_igdb = executor.submit(cls._search_igdb, search_term)
             f_tvmaze = executor.submit(cls._search_tvmaze, search_term, raw_query)
             f_movies = executor.submit(cls._search_movies, search_term)
-            # f_books = executor.submit(cls._search_books, search_term)
+            f_books = executor.submit(cls._search_books, search_term)
+            # Comic Vine blocked due to commercial terms:
+            # f_comicvine = executor.submit(cls._search_comicvine, search_term)
             f_music = executor.submit(cls._search_music, search_term)
 
-            for future in (f_anilist, f_igdb, f_tvmaze, f_movies, f_music):
+            for future in (f_anilist, f_igdb, f_tvmaze, f_movies, f_books, f_music):
                 try:
                     res = future.result()
-                    valid = [x for x in res if getattr(x, "category", "") not in ("comic", "book")]
+                    valid = [x for x in res if getattr(x, "category", "") != "comic"]
                     all_results.extend(valid)
                 except Exception:
                     pass

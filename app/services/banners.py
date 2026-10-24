@@ -610,20 +610,20 @@ class BannerService:
                     return entry["data"]
 
         all_results = []
-        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
             f_igdb = executor.submit(cls._search_igdb, search_term)
             f_ani = executor.submit(cls._search_anilist, search_term)
             f_movies = executor.submit(cls._search_fanart_movies, search_term)
             f_tv = executor.submit(cls._search_tvmaze, clean_query, raw_query)
-            # Comic Vine and Google Books blocked due to commercial terms:
+            f_books = executor.submit(cls._search_books, search_term)
+            # Comic Vine blocked due to commercial terms:
             # f_comic = executor.submit(cls._search_comicvine, search_term)
-            # f_books = executor.submit(cls._search_books, search_term)
             f_music = executor.submit(cls._search_music, search_term, target_type)
 
-            for future in (f_igdb, f_ani, f_movies, f_tv, f_music):
+            for future in (f_igdb, f_ani, f_movies, f_tv, f_books, f_music):
                 try:
                     res = future.result()
-                    valid = [x for x in res if getattr(x, "category", "") not in ("comic", "book") and getattr(x, "kind", "") not in ("comic", "book")]
+                    valid = [x for x in res if getattr(x, "category", "") != "comic" and getattr(x, "kind", "") != "comic"]
                     all_results.extend(valid)
                 except Exception:
                     pass

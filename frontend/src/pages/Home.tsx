@@ -2912,7 +2912,7 @@ export const Home: React.FC = () => {
     : gameFilter;
 
   const getItemsForTab = (targetTab: "watching" | "plan_to_watch" | "completed" | "dropped") => {
-    const activeLib = libraryItems.filter(i => i.item_type !== "book" && i.item_type !== "comic");
+    const activeLib = libraryItems.filter(i => i.item_type !== "comic");
     if (targetTab === "watching") {
       return activeLib.filter(i => {
       if (i.item_type === "custom") return false;
@@ -4074,6 +4074,7 @@ export const Home: React.FC = () => {
               { value: 'movie', label: language === 'es' ? 'Películas' : 'Movies' },
               { value: 'series', label: language === 'es' ? 'Series' : 'TV Shows' },
               { value: 'anime', label: 'Anime' },
+              { value: 'book', label: language === 'es' ? 'Libros' : 'Books' },
               { value: 'manga', label: 'Mangas' },
               { value: 'game', label: language === 'es' ? 'Juegos' : 'Games' }
             ], currentUser?.category_order).map(tab => {

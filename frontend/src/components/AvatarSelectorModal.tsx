@@ -35,7 +35,7 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
   const isEs = language === 'es';
 
   const [query, setQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<'all' | 'movie' | 'series' | 'anime' | 'manga' | 'game' | 'music'>('all');
+  const [selectedCategory, setSelectedCategory] = useState<'all' | 'movie' | 'series' | 'anime' | 'book' | 'manga' | 'game' | 'music'>('all');
   const [results, setResults] = useState<Character[]>([]);
   const [visibleCount, setVisibleCount] = useState<number>(24);
   const [isLoading, setIsLoading] = useState(false);
@@ -447,7 +447,7 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
               <PathdLoader size="medium" message={isEs ? 'Buscando personajes...' : 'Searching characters...'} />
             </div>
           ) : (() => {
-            const filteredResults = results.filter(ch => ch.category !== 'comic' && ch.category !== 'book' && (selectedCategory === 'all' || ch.category === selectedCategory));
+            const filteredResults = results.filter(ch => ch.category !== 'comic' && (selectedCategory === 'all' || ch.category === selectedCategory));
 
             if (filteredResults.length === 0) {
               return (
