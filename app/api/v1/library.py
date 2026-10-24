@@ -1277,6 +1277,12 @@ def update_library_item(
     if item_in.total_pages is not None:
         lib_item.total_pages = item_in.total_pages
         lib_item.updated_at = datetime.now(timezone.utc)
+    if item_in.image_url is not None:
+        lib_item.image_url = item_in.image_url
+    if item_in.external_id is not None:
+        lib_item.external_id = item_in.external_id
+    if item_in.imdb_id is not None:
+        lib_item.imdb_id = item_in.imdb_id
     
     pages_val = item_in.pages_read if item_in.pages_read is not None else (lib_item.pages_read or 0)
     if pages_val > 0 and lib_item.status not in (UserLibraryStatusEnum.READ, UserLibraryStatusEnum.COMPLETED, UserLibraryStatusEnum.ENDLESS, UserLibraryStatusEnum.DROPPED, UserLibraryStatusEnum.WATCHING, UserLibraryStatusEnum.PLAYING, UserLibraryStatusEnum.READING):

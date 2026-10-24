@@ -7903,6 +7903,7 @@ const ProfileActivityCardItem: React.FC<ProfileActivityCardItemProps> = ({
   setSelectedItem
 }) => {
   const [isHovered, setIsHovered] = useState(false);
+  const [imgError, setImgError] = useState(false);
   const isEs = language === 'es';
 
   const parseMeta = () => {
@@ -8595,7 +8596,7 @@ const ProfileActivityCardItem: React.FC<ProfileActivityCardItemProps> = ({
       }}
     >
       {/* Left: Thumbnail poster or Category icon */}
-      {targetPoster ? (
+      {targetPoster && !imgError ? (
         <div style={{
           width: act.item_type === 'music' || meta.item_type === 'music' || act.external_id?.startsWith('artist:') ? '46px' : '42px',
           height: act.item_type === 'music' || meta.item_type === 'music' || act.external_id?.startsWith('artist:') ? '46px' : '58px',
@@ -8610,6 +8611,7 @@ const ProfileActivityCardItem: React.FC<ProfileActivityCardItemProps> = ({
             src={targetPoster}
             alt={rawTitle || 'Media'}
             referrerPolicy="no-referrer"
+            onError={() => setImgError(true)}
             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
           />
         </div>

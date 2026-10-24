@@ -3601,19 +3601,21 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                 const found = res.data;
                 if (found) {
                   const validNewPoster = found.image_url && !found.image_url.includes('photo-1489599849927') && !found.image_url.includes('photo-1543002588');
-                  if (validNewPoster || found.description) {
+                    if (validNewPoster || found.description) {
                     setSelectedItem((prev: any) => prev ? {
                       ...prev,
                       image_url: validNewPoster ? found.image_url : prev.image_url,
                       description: found.description || prev.description,
-                      release_date: found.release_date || prev.release_date
+                      release_date: found.release_date || prev.release_date,
+                      external_id: found.external_id || prev.external_id
                     } : null);
 
-                    if (item.id && validNewPoster) {
+                    if (item.id && (validNewPoster || (found.external_id && found.external_id !== item.external_id))) {
                       apiClient.put(`/library/${item.id}`, {
-                        image_url: found.image_url,
-                        description: found.description || item.description,
-                        release_date: found.release_date || item.release_date
+                        image_url: validNewPoster ? found.image_url : item.image_url,
+                        release_date: found.release_date || item.release_date,
+                        external_id: found.external_id || item.external_id,
+                        imdb_id: found.imdb_id || item.imdb_id
                       }).then(() => {
                         onUpdate && onUpdate();
                       }).catch(console.error);
@@ -3866,7 +3868,14 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
           setIsLoadingMetadata(true);
           apiClient.get('/search/', { params: { q: item.title, type: item.item_type === 'anime' ? 'series' : item.item_type } })
             .then(searchRes => {
-              const match = searchRes.data.find((x: any) => x.external_id === item.external_id) || (!item.external_id ? searchRes.data[0] : null);
+              const cleanExt = (item.external_id || '').replace('omdb_', '').replace('trakt_', '');
+              const match = searchRes.data.find((x: any) => {
+                if (x.external_id === item.external_id) return true;
+                if (x.imdb_id && (x.imdb_id === cleanExt || x.imdb_id === item.imdb_id)) return true;
+                if (x.external_id && cleanExt && x.external_id.includes(cleanExt)) return true;
+                return false;
+              }) || (!item.external_id || (Array.isArray(searchRes.data) && searchRes.data.length === 1) ? searchRes.data[0] : null);
+
               if (match) {
                 const cachedVal = { description: match.description || '', release_date: match.release_date || null };
                 setCachedSeries(descCacheKey, cachedVal);
@@ -3874,6 +3883,8 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                   if (!prev) return null;
                   return {
                     ...prev,
+                    description: match.description || prev.description,
+                    release_date: match.release_date || prev.release_date,
                     custom_notes: JSON.stringify(cachedVal)
                   };
                 });
@@ -6646,7 +6657,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                     }
 
                     const notes = parseNotes(selectedItem.custom_notes || '');
-                    let cleanText = stripHtml(notes.description || '');
+                    let cleanText = stripHtml(notes.description || selectedItem.description || initialItem.description || '');
                     const isTranslatedView = language === 'es' && !showOriginalDesc && translatedDesc;
                     if (isTranslatedView) {
                       cleanText = stripHtml(translatedDesc);
@@ -6690,7 +6701,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                               <button
                                 onClick={() => {
                                   if (showOriginalDesc) {
-                                    handleTranslateDescription(notes.description || '');
+                                    handleTranslateDescription(notes.description || selectedItem.description || initialItem.description || '');
                                   } else {
                                     setShowOriginalDesc(true);
                                   }

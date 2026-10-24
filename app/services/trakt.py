@@ -77,7 +77,7 @@ class TraktService:
         imdb_id = ids.get("imdb")
 
         # Prioritize override_external_id (e.g. omdb_tt0111161) to preserve existing user library items
-        if override_external_id:
+        if override_external_id and str(override_external_id).startswith("trakt_"):
             external_id = override_external_id
         elif trakt_id:
             external_id = f"trakt_{trakt_id}"
@@ -85,6 +85,8 @@ class TraktService:
             external_id = f"trakt_{ids.get('slug')}"
         elif imdb_id:
             external_id = f"trakt_{imdb_id}"
+        elif override_external_id:
+            external_id = override_external_id
         else:
             import hashlib
             external_id = f"trakt_{hashlib.md5(str(data.get('title')).encode()).hexdigest()[:10]}"

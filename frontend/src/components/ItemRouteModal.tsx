@@ -50,17 +50,29 @@ export const ItemRouteModal: React.FC<ItemRouteModalProps> = ({ onClose, onUpdat
     const navItem = (location.state as any)?.item;
     if (matchesCurrentId(navItem)) {
       setItem(navItem);
-      // For episodes, or items that already have rich information (title, images, etc.),
+      // For episodes, or items that already have rich description/details,
       // we can stop loading right away.
-      if (type === 'episode' || navItem.item_type === 'episode' || navItem.still_path || navItem.name || navItem.image_url) {
+      const hasFullDetails = Boolean(
+        type === 'episode' ||
+        navItem.item_type === 'episode' ||
+        navItem.still_path ||
+        (navItem.description && String(navItem.description).trim().length > 0)
+      );
+      if (hasFullDetails) {
         setLoading(false);
         return;
       }
     }
 
     if (item && matchesCurrentId(item)) {
-      // If we already have the matching item and it has title/images, don't re-fetch
-      if (type === 'episode' || item.title || item.image_url) {
+      // If we already have the matching item and it has rich description, don't re-fetch
+      const hasFullDetails = Boolean(
+        type === 'episode' ||
+        item.item_type === 'episode' ||
+        item.still_path ||
+        (item.description && String(item.description).trim().length > 0)
+      );
+      if (hasFullDetails) {
         setLoading(false);
         return;
       }

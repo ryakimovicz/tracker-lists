@@ -876,14 +876,26 @@ def lookup_media_item(
             if ext_id_clean.startswith("trakt_") or ext_id_clean.startswith("omdb_") or ext_id_clean.startswith("tt") or ext_id_clean.isdigit():
                 m_detail = TraktService.get_movie_detail(ext_id_clean)
                 if m_detail:
+                    resolved_ext = getattr(m_detail, "external_id", ext_id_clean)
                     result_data = {
-                        "external_id": getattr(m_detail, "external_id", ext_id_clean),
+                        "external_id": resolved_ext,
                         "title": getattr(m_detail, "title", None),
                         "item_type": "movie",
                         "image_url": getattr(m_detail, "image_url", None),
                         "description": getattr(m_detail, "description", None),
-                        "release_date": getattr(m_detail, "release_date", None)
+                        "release_date": getattr(m_detail, "release_date", None),
+                        "imdb_id": getattr(m_detail, "imdb_id", None)
                     }
+                    if existing and resolved_ext and existing.external_id != resolved_ext:
+                        try:
+                            existing.external_id = resolved_ext
+                            if m_detail.imdb_id:
+                                existing.imdb_id = m_detail.imdb_id
+                            if m_detail.image_url:
+                                existing.image_url = m_detail.image_url
+                            db.commit()
+                        except Exception as e:
+                            db.rollback()
             elif ext_id_clean.startswith("wiki_"):
                 # If we have an existing database record, attempt to resolve via title in Trakt
                 search_title = existing.title if existing else None

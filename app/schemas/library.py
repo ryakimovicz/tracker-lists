@@ -30,6 +30,9 @@ class LibraryItemUpdate(BaseModel):
     pages_read: Optional[int] = None
     total_pages: Optional[int] = None
     release_date: Optional[str] = None
+    image_url: Optional[str] = None
+    external_id: Optional[str] = None
+    imdb_id: Optional[str] = None
 
 class LibraryItemResponse(BaseModel):
     id: int

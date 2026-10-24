@@ -305,6 +305,122 @@ def auto_migrate_schema():
 
 auto_migrate_schema()
 
+def migrate_legacy_omdb_items():
+    """
+    Idempotent migration: Checks if any library, activity, list items, reviews,
+    or consumption records still have legacy 'omdb_' external_ids and automatically
+    upgrades them to canonical Trakt IDs ('trakt_{id}') and resolves fresh WebP posters.
+    """
+    try:
+        from app.core.database import SessionLocal
+        from app.models.library import UserLibraryItem
+        from app.models.activity import UserActivityLog
+        from app.models.list_item import ListItem
+        from app.models.consumption import ConsumptionHistory
+        from app.models.social import BlockedMediaItem
+        from app.models.review import MediaReview
+        from app.models.list import ReadingList
+        from app.services.trakt import TraktService
+
+        if not TraktService.get_client_id():
+            logger.warning("TRAKT_CLIENT_ID not found in environment. Skipping legacy omdb migration until configured.")
+            return
+
+        db = SessionLocal()
+        try:
+            # 1. Collect all distinct omdb_ external IDs across all relevant tables
+            unique_legacy_ids = set()
+            for (eid,) in db.query(UserLibraryItem.external_id).filter(UserLibraryItem.external_id.like("omdb_%")).all():
+                if eid: unique_legacy_ids.add(eid)
+            for (eid,) in db.query(UserActivityLog.external_id).filter(UserActivityLog.external_id.like("omdb_%")).all():
+                if eid: unique_legacy_ids.add(eid)
+            for (eid,) in db.query(ListItem.external_id).filter(ListItem.external_id.like("omdb_%")).all():
+                if eid: unique_legacy_ids.add(eid)
+            for (eid,) in db.query(ConsumptionHistory.external_id).filter(ConsumptionHistory.external_id.like("omdb_%")).all():
+                if eid: unique_legacy_ids.add(eid)
+            for (eid,) in db.query(BlockedMediaItem.external_id).filter(BlockedMediaItem.external_id.like("omdb_%")).all():
+                if eid: unique_legacy_ids.add(eid)
+            for (eid,) in db.query(MediaReview.external_id).filter(MediaReview.external_id.like("omdb_%")).all():
+                if eid: unique_legacy_ids.add(eid)
+
+            if not unique_legacy_ids:
+                return
+
+            logger.info(f"Auto-migration: Upgrading {len(unique_legacy_ids)} unique legacy omdb_ items across DB to Trakt...")
+
+            for old_ext in unique_legacy_ids:
+                clean_imdb = old_ext.replace("omdb_", "").strip()
+                trakt_detail = TraktService.get_movie_detail(old_ext)
+                new_ext = getattr(trakt_detail, "external_id", None) if trakt_detail else None
+                new_poster = getattr(trakt_detail, "image_url", None) if trakt_detail else None
+                imdb_id = getattr(trakt_detail, "imdb_id", clean_imdb) if trakt_detail else clean_imdb
+
+                if not new_ext:
+                    continue
+
+                # 1. UserLibraryItem: update or remove duplicate if already added under new_ext
+                lib_items = db.query(UserLibraryItem).filter(UserLibraryItem.external_id == old_ext).all()
+                for lib_it in lib_items:
+                    existing_new = db.query(UserLibraryItem).filter(
+                        UserLibraryItem.user_id == lib_it.user_id,
+                        UserLibraryItem.item_type == lib_it.item_type,
+                        UserLibraryItem.external_id == new_ext
+                    ).first()
+                    if existing_new:
+                        db.delete(lib_it)
+                    else:
+                        lib_it.external_id = new_ext
+                        lib_it.imdb_id = imdb_id
+                        if new_poster:
+                            lib_it.image_url = new_poster
+
+                # 2. UserActivityLog
+                act_q = db.query(UserActivityLog).filter(UserActivityLog.external_id == old_ext)
+                if new_poster:
+                    act_q.update({UserActivityLog.external_id: new_ext, UserActivityLog.image_url: new_poster}, synchronize_session=False)
+                else:
+                    act_q.update({UserActivityLog.external_id: new_ext}, synchronize_session=False)
+
+                # 3. ListItem
+                list_q = db.query(ListItem).filter(ListItem.external_id == old_ext)
+                if new_poster:
+                    list_q.update({ListItem.external_id: new_ext, ListItem.image_url: new_poster}, synchronize_session=False)
+                else:
+                    list_q.update({ListItem.external_id: new_ext}, synchronize_session=False)
+
+                # 4. ConsumptionHistory
+                db.query(ConsumptionHistory).filter(ConsumptionHistory.external_id == old_ext).update(
+                    {ConsumptionHistory.external_id: new_ext}, synchronize_session=False
+                )
+
+                # 5. BlockedMediaItem
+                db.query(BlockedMediaItem).filter(BlockedMediaItem.external_id == old_ext).update(
+                    {BlockedMediaItem.external_id: new_ext}, synchronize_session=False
+                )
+
+                # 6. MediaReview
+                db.query(MediaReview).filter(MediaReview.external_id == old_ext).update(
+                    {MediaReview.external_id: new_ext}, synchronize_session=False
+                )
+
+                # 7. ReadingList section_descriptions JSON
+                reading_lists = db.query(ReadingList).filter(ReadingList.section_descriptions.like(f"%{old_ext}%")).all()
+                for rlist in reading_lists:
+                    if rlist.section_descriptions:
+                        rlist.section_descriptions = rlist.section_descriptions.replace(old_ext, new_ext)
+
+            db.commit()
+            logger.info("Auto-migration: Successfully upgraded all legacy omdb_ items to Trakt.")
+        except Exception as e:
+            db.rollback()
+            logger.warning(f"Auto-migration note on omdb_ upgrade: {e}")
+        finally:
+            db.close()
+    except Exception as e:
+        logger.warning(f"Could not run legacy omdb migration: {e}")
+
+migrate_legacy_omdb_items()
+
 app = FastAPI(
     title=settings.PROJECT_NAME,
     openapi_url=f"{settings.API_V1_STR}/openapi.json"
