@@ -264,53 +264,38 @@ class CharacterService:
 
     @classmethod
     def _search_comicvine(cls, query: str) -> List[CharacterSearchResult]:
-        if not query or not settings.COMIC_VINE_API_KEY:
+        if not query:
             return []
+        from app.services.metron import _metron_request
         
         variants = cls._generate_query_variants(query)
         results = []
         seen_names = set()
 
-        for term in variants[:3]:
-            encoded_query = urllib.parse.quote(term)
-            url = f"https://comicvine.gamespot.com/api/search/?api_key={settings.COMIC_VINE_API_KEY}&format=json&resources=character&query={encoded_query}&limit=12&field_list=id,name,real_name,image,publisher"
-            
-            req = urllib.request.Request(
-                url,
-                headers={"User-Agent": "Pathd/1.0 (contact@pathd.app)"}
-            )
-
+        for term in variants[:2]:
             try:
-                with urllib.request.urlopen(req, timeout=5) as response:
-                    if response.status == 200:
-                        data = json.loads(response.read().decode())
-                        for ch in data.get("results", []):
-                            name = ch.get("name") or "Unknown Character"
-                            real_name = ch.get("real_name")
-                            
-                            display_name = name
-                            if real_name and real_name.lower() != name.lower() and len(real_name) < 30:
-                                display_name = f"{name} ({real_name})"
-                                
-                            if display_name in seen_names:
-                                continue
-                            seen_names.add(display_name)
-
-                            img_obj = ch.get("image", {}) or {}
-                            img_url = img_obj.get("medium_url") or img_obj.get("super_url") or img_obj.get("small_url")
-                            publisher = (ch.get("publisher") or {}).get("name") or "Comic"
-
-                            if img_url and "default" not in img_url.lower():
-                                results.append(CharacterSearchResult(
-                                    name=display_name,
-                                    image_url=img_url,
-                                    category="comic",
-                                    origin=publisher
-                                ))
+                data = _metron_request("character/", {"name": term, "limit": 6})
+                if data and data.get("results"):
+                    for ch in data["results"][:4]:
+                        cid = ch.get("id")
+                        cname = ch.get("name")
+                        if not cid or not cname or cname.lower() in seen_names:
+                            continue
+                        seen_names.add(cname.lower())
+                        
+                        detail = _metron_request(f"character/{cid}/")
+                        img_url = detail.get("image") if detail else None
+                        if img_url:
+                            results.append(CharacterSearchResult(
+                                name=cname,
+                                image_url=img_url,
+                                category="comic",
+                                origin="Comic"
+                            ))
             except Exception as e:
-                print(f"Comic Vine Character Search Error: {e}")
-                
-            if len(results) >= 8:
+                print(f"Metron Character Search Error: {e}")
+
+            if len(results) >= 6:
                 break
 
         return results
@@ -768,9 +753,7 @@ class CharacterService:
                 try:
                     res = future.result()
                     if res:
-                        # Exclude any comic category results
-                        valid = [x for x in res if getattr(x, "category", "") != "comic"]
-                        all_results.extend(valid[:2])
+                        all_results.extend(res[:2])
                 except Exception:
                     pass
 
@@ -802,21 +785,19 @@ class CharacterService:
         search_term = clean_query if len(clean_query) >= 2 else raw_query
 
         all_results = []
-        with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=7) as executor:
             f_anilist = executor.submit(cls._search_anilist, search_term)
             f_igdb = executor.submit(cls._search_igdb, search_term)
             f_tvmaze = executor.submit(cls._search_tvmaze, search_term, raw_query)
             f_movies = executor.submit(cls._search_movies, search_term)
             f_books = executor.submit(cls._search_books, search_term)
-            # Comic Vine blocked due to commercial terms:
-            # f_comicvine = executor.submit(cls._search_comicvine, search_term)
+            f_comicvine = executor.submit(cls._search_comicvine, search_term)
             f_music = executor.submit(cls._search_music, search_term)
 
-            for future in (f_anilist, f_igdb, f_tvmaze, f_movies, f_books, f_music):
+            for future in (f_anilist, f_igdb, f_tvmaze, f_movies, f_books, f_comicvine, f_music):
                 try:
                     res = future.result()
-                    valid = [x for x in res if getattr(x, "category", "") != "comic"]
-                    all_results.extend(valid)
+                    all_results.extend(res)
                 except Exception:
                     pass
 

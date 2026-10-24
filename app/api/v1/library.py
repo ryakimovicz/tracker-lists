@@ -454,12 +454,6 @@ def add_to_library(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    if item_in.item_type in ("comic",):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Comics are currently disabled."
-        )
-
     validate_media_status(item_in.item_type, item_in.status)
 
     existing = db.query(UserLibraryItem).filter(
@@ -693,8 +687,7 @@ def get_user_shelf(
         UserLibraryItem.custom_badge,
         UserLibraryItem.release_date
     ).filter(
-        UserLibraryItem.user_id == current_user.id,
-        UserLibraryItem.item_type.notin_(["comic"])
+        UserLibraryItem.user_id == current_user.id
     ).all()
 
     ext_ids = [it.external_id for it in items if it.external_id]
@@ -755,8 +748,7 @@ def get_library(
     from app.models.consumption import ConsumptionHistory
     target_user_id = user_id if user_id is not None else current_user.id
     query = db.query(UserLibraryItem).filter(
-        UserLibraryItem.user_id == target_user_id,
-        UserLibraryItem.item_type.notin_(["comic"])
+        UserLibraryItem.user_id == target_user_id
     )
     if status:
         query = query.filter(UserLibraryItem.status == status)

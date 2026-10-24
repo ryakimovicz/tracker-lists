@@ -6,11 +6,12 @@ export const DEFAULT_CATEGORY_ORDER = [
   'series',
   'anime',
   'book',
+  'comic',
   'manga',
   'game'
 ] as const;
 
-export const BLOCKED_CATEGORIES = new Set<string>(['comic']);
+export const BLOCKED_CATEGORIES = new Set<string>();
 
 export type CategoryType = typeof DEFAULT_CATEGORY_ORDER[number];
 

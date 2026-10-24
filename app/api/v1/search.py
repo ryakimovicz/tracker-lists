@@ -7,6 +7,7 @@ from app.models.user import User
 from app.models.user import User
 from app.models.list import ReadingList, VisibilityEnum
 from app.services.base import SearchResultItem
+from app.services.metron import MetronService
 from app.services.comicvine import ComicVineService
 from app.services.tvmaze import TVMazeService
 from app.services.trakt import TraktService
@@ -185,15 +186,11 @@ def search_media(
         return []
 
     type_lower = type.lower()
-    
-    # Comic Vine is blocked/hidden due to commercial API terms
-    if type_lower in ["comic"]:
-        return []
 
-    if type_lower not in ["manga", "game", "movie", "anime", "series", "book"]:
+    if type_lower not in ["manga", "game", "movie", "anime", "series", "book", "comic"]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid search type. Must be 'manga', 'game', 'movie', 'anime', 'series' or 'book'."
+            detail="Invalid search type. Must be 'manga', 'game', 'movie', 'anime', 'series', 'book' or 'comic'."
         )
         
     import time
@@ -221,7 +218,7 @@ def search_media(
     
     def fetch_var(var):
         if type_lower == "comic":
-            return []  # Disabled due to commercial API terms
+            return execute_with_circuit_breaker("metron", MetronService.search_comics, var, fallback=[])
         elif type_lower == "book":
             return execute_with_circuit_breaker("books", BookSearchService.search_books, var, fallback=[])
         elif type_lower == "manga":
@@ -301,8 +298,7 @@ def search_all_media(
             futures.append(executor.submit(execute_with_circuit_breaker, "tvmaze", TVMazeService.search_shows, var, False, client_lang, client_country, fallback=[]))
             futures.append(executor.submit(execute_with_circuit_breaker, "tvmaze", TVMazeService.search_shows, var, True, client_lang, client_country, fallback=[]))
             futures.append(executor.submit(execute_with_circuit_breaker, "books", BookSearchService.search_books, var, fallback=[]))
-            # Disabled Comic Vine due to commercial API terms:
-            # futures.append(executor.submit(execute_with_circuit_breaker, "comicvine", ComicVineService.search_comics, var, fallback=[]))
+            futures.append(executor.submit(execute_with_circuit_breaker, "metron", MetronService.search_comics, var, fallback=[]))
             futures.append(executor.submit(execute_with_circuit_breaker, "igdb", IGDBService.search_games, var, fallback=[]))
             futures.append(executor.submit(execute_with_circuit_breaker, "anilist", AnilistService.search_manga, var, fallback=[]))
             
@@ -692,9 +688,6 @@ def get_explore_tabs(
     def is_item_allowed(item: SearchResultItem) -> bool:
         if item.external_id in blocked_media_ids:
             return False
-        # Block comics from explore tabs due to commercial API terms
-        if getattr(item, "item_type", "") in ("comic",):
-            return False
         if not is_safe_media_item(item.title, item.description):
             return False
         title_lower = (item.title or "").lower()
@@ -703,7 +696,7 @@ def get_explore_tabs(
         return True
 
     # 2. Nuevo (APIs with 4-hour in-memory cache)
-    cache_key_nuevo = "explore_nuevo_global_v16"
+    cache_key_nuevo = "explore_nuevo_global_v17"
     nuevo = []
     if cache_key_nuevo in _EXPLORE_NUEVO_CACHE:
         cache_time, cached_items = _EXPLORE_NUEVO_CACHE[cache_key_nuevo]
@@ -711,7 +704,7 @@ def get_explore_tabs(
             nuevo = [x for x in cached_items if is_item_allowed(x)]
 
     # 3. Tendencias (APIs with 4-hour in-memory cache)
-    cache_key_trend = "explore_tendencias_global_v11"
+    cache_key_trend = "explore_tendencias_global_v12"
     tendencias = []
     if cache_key_trend in _EXPLORE_TENDENCIAS_CACHE:
         cache_time, cached_items = _EXPLORE_TENDENCIAS_CACHE[cache_key_trend]
@@ -734,8 +727,7 @@ def get_explore_tabs(
                 futures_nuevo["games"] = executor.submit(lambda: execute_with_circuit_breaker("igdb", lambda: [x for x in IGDBService.get_new_games() if is_safe_media_item(x.title, x.description)], fallback=[]))
                 futures_nuevo["movies"] = executor.submit(lambda: execute_with_circuit_breaker("trakt", lambda: [x for x in TraktService.get_new_movies() if is_safe_media_item(x.title, x.description)], fallback=[]))
                 futures_nuevo["books"] = executor.submit(lambda: execute_with_circuit_breaker("books", lambda: [x for x in BookSearchService.get_new_books() if is_safe_media_item(x.title, x.description)], fallback=[]))
-                # Disabled due to commercial API terms:
-                # futures_nuevo["comics"] = executor.submit(lambda: execute_with_circuit_breaker("comicvine", lambda: [x for x in ComicVineService.get_new_comics() if is_safe_media_item(x.title, x.description)], fallback=[]))
+                futures_nuevo["comics"] = executor.submit(lambda: execute_with_circuit_breaker("metron", lambda: [x for x in MetronService.get_new_comics() if is_safe_media_item(x.title, x.description)], fallback=[]))
 
             if need_tendencias:
                 futures_trend["tv"] = executor.submit(lambda: execute_with_circuit_breaker("tvmaze", lambda: [x for x in TVMazeService.get_trending_series() if is_safe_media_item(x.title, x.description)], fallback=[]))
@@ -744,8 +736,7 @@ def get_explore_tabs(
                 futures_trend["games"] = executor.submit(lambda: execute_with_circuit_breaker("igdb", lambda: [x for x in IGDBService.get_trending_games() if is_safe_media_item(x.title, x.description)], fallback=[]))
                 futures_trend["movies"] = executor.submit(lambda: execute_with_circuit_breaker("trakt", lambda: [x for x in TraktService.get_trending_movies() if is_safe_media_item(x.title, x.description)], fallback=[]))
                 futures_trend["books"] = executor.submit(lambda: execute_with_circuit_breaker("books", lambda: [x for x in BookSearchService.get_trending_books() if is_safe_media_item(x.title, x.description)], fallback=[]))
-                # Disabled due to commercial API terms:
-                # futures_trend["comics"] = executor.submit(lambda: execute_with_circuit_breaker("comicvine", lambda: [x for x in ComicVineService.get_trending_comics() if is_safe_media_item(x.title, x.description)], fallback=[]))
+                futures_trend["comics"] = executor.submit(lambda: execute_with_circuit_breaker("metron", lambda: [x for x in MetronService.get_trending_comics() if is_safe_media_item(x.title, x.description)], fallback=[]))
 
             if need_nuevo:
                 fetched_nuevo = []
@@ -795,7 +786,7 @@ def get_comic_volume_detail(
     request: Request
 ):
     try:
-        detail = ComicVineService.get_comic_volume_detail(vol_id)
+        detail = MetronService.get_comic_volume_detail(vol_id)
         if not detail:
             raise HTTPException(status_code=404, detail="Comic volume not found")
         return detail
@@ -811,7 +802,7 @@ def get_comic_volume_issues(
     request: Request
 ):
     try:
-        return ComicVineService.get_comic_volume_issues(vol_id)
+        return MetronService.get_comic_volume_issues(vol_id)
     except Exception as e:
         print(f"Error fetching issues for comic volume {vol_id}: {e}")
         return []
@@ -822,7 +813,7 @@ def get_comic_issue_detail(
     request: Request
 ):
     try:
-        detail = ComicVineService.get_comic_issue_detail(issue_id)
+        detail = MetronService.get_comic_issue_detail(issue_id)
         if not detail:
             raise HTTPException(status_code=404, detail="Comic issue not found")
         return detail
@@ -948,8 +939,9 @@ def lookup_media_item(
                         "seasons": s_detail.get("seasons")
                     }
         elif type_clean == "comic":
-            if ext_id_clean.startswith("cv_vol_") or not ext_id_clean.startswith("cv_issue_"):
-                c_detail = ComicVineService.get_comic_volume_detail(ext_id_clean)
+            is_issue = ext_id_clean.startswith("cv_issue_") or ext_id_clean.startswith("metron_issue_")
+            if not is_issue:
+                c_detail = MetronService.get_comic_volume_detail(ext_id_clean)
                 if c_detail:
                     result_data = {
                         "external_id": ext_id_clean,
@@ -963,7 +955,7 @@ def lookup_media_item(
                         "series_status": c_detail.get("status")
                     }
             else:
-                iss_detail = ComicVineService.get_comic_issue_detail(ext_id_clean)
+                iss_detail = MetronService.get_comic_issue_detail(ext_id_clean)
                 if iss_detail:
                     result_data = {
                         "external_id": ext_id_clean,

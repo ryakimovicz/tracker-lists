@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     
     # External APIs
     COMIC_VINE_API_KEY: str = ""
+    METRON_API_TOKEN: str = ""
     TWITCH_CLIENT_ID: str = ""
     TWITCH_CLIENT_SECRET: str = ""
     

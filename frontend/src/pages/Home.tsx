@@ -761,7 +761,7 @@ const ActiveSeriesCard = ({ item, onUpdate, language, onOpenSeries, themeColor, 
     };
   }, []);
   const pad = (n: number) => n < 10 ? '0' + n : n;
-  const isComic = item.item_type === 'comic' || String(item.external_id || '').startsWith('cv_vol_');
+  const isComic = item.item_type === 'comic' || String(item.external_id || '').startsWith('cv_vol_') || String(item.external_id || '').startsWith('metron_series_');
 
   // Helpers for episode categorization and chronological sorting
   const isExtraEpisode = (ep: any) => {
@@ -2912,7 +2912,7 @@ export const Home: React.FC = () => {
     : gameFilter;
 
   const getItemsForTab = (targetTab: "watching" | "plan_to_watch" | "completed" | "dropped") => {
-    const activeLib = libraryItems.filter(i => i.item_type !== "comic");
+    const activeLib = libraryItems;
     if (targetTab === "watching") {
       return activeLib.filter(i => {
       if (i.item_type === "custom") return false;
@@ -3086,8 +3086,8 @@ export const Home: React.FC = () => {
   // Aggregate all upcoming items (calendar vs TBA)
   let upcomingAllItems: any[] = [];
   let tbaAllItems: any[] = [];
-  // 1. Standalone library works (movies, games, manga, books)
-  libraryItems.filter(i => i.item_type !== 'comic').forEach(item => {
+  // 1. Standalone library works (movies, games, manga, books, comics)
+  libraryItems.forEach(item => {
       if (item.item_type !== 'series' && item.item_type !== 'anime') {
         // Resolve release_date from item or cached metadata
         const descCacheKey = `desc_${item.item_type}_${item.external_id}`;

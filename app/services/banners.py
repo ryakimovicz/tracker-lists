@@ -329,36 +329,35 @@ class BannerService:
 
     @classmethod
     def _search_comicvine(cls, query: str) -> List[BannerSearchResult]:
-        if not query or not settings.COMIC_VINE_API_KEY:
+        if not query:
             return []
+        from app.services.metron import _metron_request
         
         results = []
         seen_images = set()
         variants = cls._generate_query_variants(query)[:2]
 
         for term in variants:
-            encoded = urllib.parse.quote(term)
-            url = f"https://comicvine.gamespot.com/api/search/?api_key={settings.COMIC_VINE_API_KEY}&format=json&resources=volume&query={encoded}&limit=8&field_list=id,name,image"
-            req = urllib.request.Request(url, headers={"User-Agent": "Pathd/1.0 (contact@pathd.app)"})
             try:
-                with urllib.request.urlopen(req, timeout=5) as resp:
-                    if resp.status == 200:
-                        data = json.loads(resp.read().decode())
-                        for v in data.get("results", []):
-                            vname = v.get("name") or "Comic"
-                            img_obj = v.get("image") or {}
-                            img_url = img_obj.get("super_url") or img_obj.get("medium_url") or img_obj.get("original_url")
-                            if img_url and img_url not in seen_images:
-                                seen_images.add(img_url)
-                                results.append(BannerSearchResult(
-                                    title=vname,
-                                    image_url=img_url,
-                                    category="comic",
-                                    origin=vname,
-                                    kind="comic"
-                                ))
+                data = _metron_request("issue/", {"series_name": term, "number": "1", "limit": 8})
+                if data and data.get("results"):
+                    for iss in data["results"]:
+                        img_url = iss.get("image")
+                        s_name = iss.get("series", {}).get("name") or iss.get("issue") or "Comic"
+                        if img_url and img_url not in seen_images:
+                            seen_images.add(img_url)
+                            results.append(BannerSearchResult(
+                                title=s_name,
+                                image_url=img_url,
+                                category="comic",
+                                origin=s_name,
+                                kind="comic"
+                            ))
             except Exception as e:
-                print(f"ComicVine Banner Search Error: {e}")
+                print(f"Metron Banner Search Error: {e}")
+
+            if len(results) >= 8:
+                break
 
         return results
 
@@ -610,21 +609,19 @@ class BannerService:
                     return entry["data"]
 
         all_results = []
-        with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=7) as executor:
             f_igdb = executor.submit(cls._search_igdb, search_term)
             f_ani = executor.submit(cls._search_anilist, search_term)
             f_movies = executor.submit(cls._search_fanart_movies, search_term)
             f_tv = executor.submit(cls._search_tvmaze, clean_query, raw_query)
             f_books = executor.submit(cls._search_books, search_term)
-            # Comic Vine blocked due to commercial terms:
-            # f_comic = executor.submit(cls._search_comicvine, search_term)
+            f_comic = executor.submit(cls._search_comicvine, search_term)
             f_music = executor.submit(cls._search_music, search_term, target_type)
 
-            for future in (f_igdb, f_ani, f_movies, f_tv, f_books, f_music):
+            for future in (f_igdb, f_ani, f_movies, f_tv, f_books, f_comic, f_music):
                 try:
                     res = future.result()
-                    valid = [x for x in res if getattr(x, "category", "") != "comic" and getattr(x, "kind", "") != "comic"]
-                    all_results.extend(valid)
+                    all_results.extend(res)
                 except Exception:
                     pass
 
