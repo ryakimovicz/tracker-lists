@@ -9,7 +9,7 @@ from typing import List, Dict, Any
 from app.core.config import settings
 from app.services.igdb import IGDBService
 from app.services.trakt import TraktService
-from app.services.googlebooks import GoogleBooksService
+from app.services.books import BookSearchService
 
 class CharacterSearchResult:
     def __init__(self, name: str, image_url: str, category: str, origin: str = "", score: int = 0):
@@ -594,8 +594,8 @@ class CharacterService:
             return []
         results = []
         try:
-            books_data = GoogleBooksService.fetch_google_books(query)
-            for b, _ in books_data[:5]:
+            books_data = BookSearchService.search_books(query)
+            for b in books_data[:5]:
                 if b.image_url:
                     results.append(CharacterSearchResult(
                         name=b.title,
@@ -604,7 +604,7 @@ class CharacterService:
                         origin=b.title
                     ))
         except Exception as e:
-            print(f"Google Books Search Error: {e}")
+            print(f"Book Search Error: {e}")
         return results
 
     @classmethod

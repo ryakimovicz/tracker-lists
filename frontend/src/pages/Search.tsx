@@ -1073,12 +1073,12 @@ export const Search: React.FC = () => {
         });
         if (searchRequestIdRef.current !== currentReqId) return;
 
-        const initialData = (Array.isArray(primaryRes.data) ? primaryRes.data : []).filter((item: any) => item.item_type !== 'book' && item.item_type !== 'comic');
+        const initialData = (Array.isArray(primaryRes.data) ? primaryRes.data : []).filter((item: any) => item.item_type !== 'comic');
         setResults(prev => {
           // If we already had results for this exact query (e.g. from 'all' search), merge new items without discarding existing ones
           if (cleanQuery === submittedQuery && prev.length > 0) {
             const seenIds = new Set(initialData.map(item => item.external_id));
-            const retainedPrev = prev.filter(item => !seenIds.has(item.external_id) && item.item_type !== 'book' && item.item_type !== 'comic');
+            const retainedPrev = prev.filter(item => !seenIds.has(item.external_id) && item.item_type !== 'comic');
             return [...initialData, ...retainedPrev];
           }
           return initialData;
@@ -1089,7 +1089,7 @@ export const Search: React.FC = () => {
         }
 
         // 2. In background, fetch the rest of categories silently
-        const otherTypes = ['movie', 'series', 'anime', 'game', 'manga'].filter(t => t !== currentTab);
+        const otherTypes = ['movie', 'series', 'anime', 'book', 'game', 'manga'].filter(t => t !== currentTab);
         Promise.allSettled(
           otherTypes.map(t => apiClient.get('/search/', { params: { q: cleanQuery, type: t } }))
         ).then(resultsArr => {
@@ -1100,7 +1100,7 @@ export const Search: React.FC = () => {
             resultsArr.forEach(resObj => {
               if (resObj.status === 'fulfilled' && Array.isArray(resObj.value.data)) {
                 resObj.value.data.forEach((item: SearchResultItem) => {
-                  if (item.item_type !== 'book' && item.item_type !== 'comic' && !existingIds.has(item.external_id)) {
+                  if (item.item_type !== 'comic' && !existingIds.has(item.external_id)) {
                     existingIds.add(item.external_id);
                     newItems.push(item);
                   }
@@ -1117,7 +1117,7 @@ export const Search: React.FC = () => {
           params: { q: cleanQuery }
         });
         if (searchRequestIdRef.current !== currentReqId) return;
-        const filteredAll = (Array.isArray(response.data) ? response.data : []).filter((item: any) => item.item_type !== 'book' && item.item_type !== 'comic');
+        const filteredAll = (Array.isArray(response.data) ? response.data : []).filter((item: any) => item.item_type !== 'comic');
         setResults(filteredAll);
         setIsSearching(false);
         if (filteredAll.length > 0) {

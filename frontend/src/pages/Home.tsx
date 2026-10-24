@@ -3086,8 +3086,8 @@ export const Home: React.FC = () => {
   // Aggregate all upcoming items (calendar vs TBA)
   let upcomingAllItems: any[] = [];
   let tbaAllItems: any[] = [];
-  // 1. Standalone library works (movies, games, manga)
-  libraryItems.filter(i => i.item_type !== 'book' && i.item_type !== 'comic').forEach(item => {
+  // 1. Standalone library works (movies, games, manga, books)
+  libraryItems.filter(i => i.item_type !== 'comic').forEach(item => {
       if (item.item_type !== 'series' && item.item_type !== 'anime') {
         // Resolve release_date from item or cached metadata
         const descCacheKey = `desc_${item.item_type}_${item.external_id}`;

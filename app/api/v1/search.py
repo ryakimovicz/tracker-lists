@@ -10,7 +10,7 @@ from app.services.base import SearchResultItem
 from app.services.comicvine import ComicVineService
 from app.services.tvmaze import TVMazeService
 from app.services.trakt import TraktService
-from app.services.googlebooks import GoogleBooksService
+from app.services.books import BookSearchService
 from app.services.igdb import IGDBService
 from app.services.anilist import AnilistService
 from app.core.limiter import limiter
@@ -186,14 +186,14 @@ def search_media(
 
     type_lower = type.lower()
     
-    # Comic Vine and Google Books are blocked/hidden due to commercial API terms
-    if type_lower in ["comic", "book"]:
+    # Comic Vine is blocked/hidden due to commercial API terms
+    if type_lower in ["comic"]:
         return []
 
-    if type_lower not in ["manga", "game", "movie", "anime", "series"]:
+    if type_lower not in ["manga", "game", "movie", "anime", "series", "book"]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid search type. Must be 'manga', 'game', 'movie', 'anime' or 'series'."
+            detail="Invalid search type. Must be 'manga', 'game', 'movie', 'anime', 'series' or 'book'."
         )
         
     import time
@@ -223,7 +223,7 @@ def search_media(
         if type_lower == "comic":
             return []  # Disabled due to commercial API terms
         elif type_lower == "book":
-            return []  # Disabled due to commercial API terms
+            return execute_with_circuit_breaker("books", BookSearchService.search_books, var, fallback=[])
         elif type_lower == "manga":
             return execute_with_circuit_breaker("anilist", AnilistService.search_manga, var, fallback=[])
         elif type_lower == "game":
@@ -300,8 +300,8 @@ def search_all_media(
             futures.append(executor.submit(execute_with_circuit_breaker, "trakt", TraktService.search_movies, var, fallback=[]))
             futures.append(executor.submit(execute_with_circuit_breaker, "tvmaze", TVMazeService.search_shows, var, False, client_lang, client_country, fallback=[]))
             futures.append(executor.submit(execute_with_circuit_breaker, "tvmaze", TVMazeService.search_shows, var, True, client_lang, client_country, fallback=[]))
-            # Disabled Comic Vine and Google Books due to commercial API terms:
-            # futures.append(executor.submit(execute_with_circuit_breaker, "googlebooks", GoogleBooksService.search_books, var, fallback=[]))
+            futures.append(executor.submit(execute_with_circuit_breaker, "books", BookSearchService.search_books, var, fallback=[]))
+            # Disabled Comic Vine due to commercial API terms:
             # futures.append(executor.submit(execute_with_circuit_breaker, "comicvine", ComicVineService.search_comics, var, fallback=[]))
             futures.append(executor.submit(execute_with_circuit_breaker, "igdb", IGDBService.search_games, var, fallback=[]))
             futures.append(executor.submit(execute_with_circuit_breaker, "anilist", AnilistService.search_manga, var, fallback=[]))
@@ -692,8 +692,8 @@ def get_explore_tabs(
     def is_item_allowed(item: SearchResultItem) -> bool:
         if item.external_id in blocked_media_ids:
             return False
-        # Block books and comics from explore tabs
-        if getattr(item, "item_type", "") in ("book", "comic"):
+        # Block comics from explore tabs due to commercial API terms
+        if getattr(item, "item_type", "") in ("comic",):
             return False
         if not is_safe_media_item(item.title, item.description):
             return False
@@ -703,7 +703,7 @@ def get_explore_tabs(
         return True
 
     # 2. Nuevo (APIs with 4-hour in-memory cache)
-    cache_key_nuevo = "explore_nuevo_global_v11"
+    cache_key_nuevo = "explore_nuevo_global_v13"
     nuevo = []
     if cache_key_nuevo in _EXPLORE_NUEVO_CACHE:
         cache_time, cached_items = _EXPLORE_NUEVO_CACHE[cache_key_nuevo]
@@ -711,7 +711,7 @@ def get_explore_tabs(
             nuevo = [x for x in cached_items if is_item_allowed(x)]
 
     # 3. Tendencias (APIs with 4-hour in-memory cache)
-    cache_key_trend = "explore_tendencias_global_v9"
+    cache_key_trend = "explore_tendencias_global_v11"
     tendencias = []
     if cache_key_trend in _EXPLORE_TENDENCIAS_CACHE:
         cache_time, cached_items = _EXPLORE_TENDENCIAS_CACHE[cache_key_trend]
@@ -733,8 +733,8 @@ def get_explore_tabs(
                 futures_nuevo["manga"] = executor.submit(lambda: execute_with_circuit_breaker("anilist", lambda: [x for x in AnilistService.get_new_manga() if is_safe_media_item(x.title, x.description)], fallback=[]))
                 futures_nuevo["games"] = executor.submit(lambda: execute_with_circuit_breaker("igdb", lambda: [x for x in IGDBService.get_new_games() if is_safe_media_item(x.title, x.description)], fallback=[]))
                 futures_nuevo["movies"] = executor.submit(lambda: execute_with_circuit_breaker("trakt", lambda: [x for x in TraktService.get_new_movies() if is_safe_media_item(x.title, x.description)], fallback=[]))
+                futures_nuevo["books"] = executor.submit(lambda: execute_with_circuit_breaker("books", lambda: [x for x in BookSearchService.get_new_books() if is_safe_media_item(x.title, x.description)], fallback=[]))
                 # Disabled due to commercial API terms:
-                # futures_nuevo["books"] = executor.submit(lambda: execute_with_circuit_breaker("googlebooks", lambda: [x for x in GoogleBooksService.get_new_books() if is_safe_media_item(x.title, x.description)], fallback=[]))
                 # futures_nuevo["comics"] = executor.submit(lambda: execute_with_circuit_breaker("comicvine", lambda: [x for x in ComicVineService.get_new_comics() if is_safe_media_item(x.title, x.description)], fallback=[]))
 
             if need_tendencias:
@@ -743,8 +743,8 @@ def get_explore_tabs(
                 futures_trend["manga"] = executor.submit(lambda: execute_with_circuit_breaker("anilist", lambda: [x for x in AnilistService.get_trending_manga() if is_safe_media_item(x.title, x.description)], fallback=[]))
                 futures_trend["games"] = executor.submit(lambda: execute_with_circuit_breaker("igdb", lambda: [x for x in IGDBService.get_trending_games() if is_safe_media_item(x.title, x.description)], fallback=[]))
                 futures_trend["movies"] = executor.submit(lambda: execute_with_circuit_breaker("trakt", lambda: [x for x in TraktService.get_trending_movies() if is_safe_media_item(x.title, x.description)], fallback=[]))
+                futures_trend["books"] = executor.submit(lambda: execute_with_circuit_breaker("books", lambda: [x for x in BookSearchService.get_trending_books() if is_safe_media_item(x.title, x.description)], fallback=[]))
                 # Disabled due to commercial API terms:
-                # futures_trend["books"] = executor.submit(lambda: execute_with_circuit_breaker("googlebooks", lambda: [x for x in GoogleBooksService.get_trending_books() if is_safe_media_item(x.title, x.description)], fallback=[]))
                 # futures_trend["comics"] = executor.submit(lambda: execute_with_circuit_breaker("comicvine", lambda: [x for x in ComicVineService.get_trending_comics() if is_safe_media_item(x.title, x.description)], fallback=[]))
 
             if need_nuevo:
@@ -912,6 +912,17 @@ def lookup_media_item(
                             "description": getattr(m_detail, "description", best.description),
                             "release_date": getattr(m_detail, "release_date", best.release_date)
                         }
+        elif type_clean == "book":
+            b_detail = BookSearchService.get_book_detail(ext_id_clean)
+            if b_detail:
+                result_data = {
+                    "external_id": b_detail.external_id,
+                    "title": b_detail.title,
+                    "item_type": "book",
+                    "image_url": b_detail.image_url,
+                    "description": b_detail.description,
+                    "release_date": b_detail.release_date
+                }
         elif type_clean in ("series", "anime"):
             if ext_id_clean.startswith("anime_"):
                 a_detail = AnilistService.get_anime_detail(ext_id_clean)
@@ -1116,7 +1127,7 @@ def get_popular_works(
     Results are cached in memory with automatic resilience.
     """
     clean_type = (media_type or "all").lower().strip()
-    if clean_type in ("book", "comic"):
+    if clean_type == "comic":
         return []
 
     cache_key = f"popular_works_{clean_type}"
@@ -1129,7 +1140,8 @@ def get_popular_works(
         "series": ["Breaking Bad", "Stranger Things", "Severance"],
         "anime": ["Attack on Titan", "Demon Slayer", "Frieren"],
         "game": ["Elden Ring", "The Legend of Zelda", "Baldur's Gate 3"],
-        "manga": ["Berserk", "One Piece", "Monster"]
+        "manga": ["Berserk", "One Piece", "Monster"],
+        "book": ["1984", "Dune", "Cien anos de soledad"]
     }
 
     results: List[SearchResultItem] = []
@@ -1150,6 +1162,8 @@ def get_popular_works(
                     futures.append(executor.submit(execute_with_circuit_breaker, "igdb", IGDBService.search_games, seed, fallback=[]))
                 elif t == "manga":
                     futures.append(executor.submit(execute_with_circuit_breaker, "anilist", AnilistService.search_manga, seed, fallback=[]))
+                elif t == "book":
+                    futures.append(executor.submit(execute_with_circuit_breaker, "books", BookSearchService.search_books, seed, fallback=[]))
 
         for fut in concurrent.futures.as_completed(futures):
             try:

@@ -370,9 +370,9 @@ class BannerService:
         results = []
         seen_images = set()
         try:
-            from app.services.googlebooks import GoogleBooksService
-            books_data = GoogleBooksService.fetch_google_books(query)
-            for b, _ in books_data[:8]:
+            from app.services.books import BookSearchService
+            books_data = BookSearchService.search_books(query)
+            for b in books_data[:8]:
                 if b.image_url and b.image_url not in seen_images:
                     seen_images.add(b.image_url)
                     results.append(BannerSearchResult(
@@ -383,7 +383,7 @@ class BannerService:
                         kind="book"
                     ))
         except Exception as e:
-            print(f"Google Books Banner Search Error: {e}")
+            print(f"Book Banner Search Error: {e}")
 
         return results
 
