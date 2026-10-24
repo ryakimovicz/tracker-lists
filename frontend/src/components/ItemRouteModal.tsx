@@ -29,9 +29,16 @@ export const ItemRouteModal: React.FC<ItemRouteModalProps> = ({ onClose, onUpdat
   // Check if location state provides this item or an item matching this id
   const matchesCurrentId = (candidate: any) => {
     if (!candidate || !id) return false;
+    const cleanCand = String(candidate.external_id || candidate.id || '')
+      .replace('cv_issue_metron_issue_', '')
+      .replace(/^cv_issue_|^metron_issue_|^cv_vol_|^metron_series_|^tvm[-_]ep[-_]|^tvm[-_]/, '');
+    const cleanRouteId = String(id)
+      .replace('cv_issue_metron_issue_', '')
+      .replace(/^cv_issue_|^metron_issue_|^cv_vol_|^metron_series_|^tvm[-_]ep[-_]|^tvm[-_]/, '');
     return (
       candidate.external_id === id ||
       String(candidate.id) === id ||
+      (cleanCand && cleanRouteId && cleanCand === cleanRouteId) ||
       (type === 'game' && (String(candidate.external_id) === String(id) || String(candidate.id) === String(id)))
     );
   };
@@ -56,6 +63,7 @@ export const ItemRouteModal: React.FC<ItemRouteModalProps> = ({ onClose, onUpdat
         type === 'episode' ||
         navItem.item_type === 'episode' ||
         navItem.still_path ||
+        (type === 'comic' && (navItem.issue_number || navItem.parent_series || navItem.title?.includes('#'))) ||
         (navItem.description && String(navItem.description).trim().length > 0)
       );
       if (hasFullDetails) {
@@ -116,10 +124,14 @@ export const ItemRouteModal: React.FC<ItemRouteModalProps> = ({ onClose, onUpdat
             setItem(existingItem);
           } else {
             // Fallback to a bare item so the modal can still initialize its internal search/data fetchers
+            const cleanFallbackTitle = id
+              .replace(/^cv_issue_metron_issue_|^cv_issue_|^metron_issue_|^cv_vol_|^metron_series_|^tvm[-_]ep[-_]|^tvm[-_]/, '')
+              .replace(/[-_]/g, ' ')
+              .trim();
             setItem({
               external_id: id,
               item_type: type,
-              title: id.replace(/[-_]/g, ' ')
+              title: cleanFallbackTitle ? (cleanFallbackTitle.charAt(0).toUpperCase() + cleanFallbackTitle.slice(1)) : id
             });
           }
           setLoading(false);

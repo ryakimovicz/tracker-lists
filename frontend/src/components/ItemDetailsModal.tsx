@@ -3451,7 +3451,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
       }
 
         // Comic Volume loading (structured like series with seasons/issues)
-        const isComicVolume = item.item_type === 'comic' && !isActualEpisode && item.external_id && (item.external_id.startsWith('cv_vol_') || !item.external_id.startsWith('cv_issue_'));
+        const isComicVolume = item.item_type === 'comic' && !isActualEpisode && item.external_id && !item.external_id.startsWith('cv_issue_') && !item.external_id.startsWith('metron_issue_');
         if (isComicVolume) {
           const volId = item.external_id;
           const cacheKeyMeta = `${volId}_metadata`;
@@ -3524,12 +3524,14 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
         }
 
         // Comic Issue individual loading (enrich parent series information if missing)
-        const isComicIssueFetch = item.item_type === 'comic' && (isActualEpisode || (item.external_id && item.external_id.startsWith('cv_issue_')));
+        const isComicIssueFetch = item.item_type === 'comic' && (isActualEpisode || (item.external_id && (item.external_id.startsWith('cv_issue_') || item.external_id.startsWith('metron_issue_'))));
         if (isComicIssueFetch && item.external_id) {
           apiClient.get(`/search/comic/issue/${item.external_id}`).then(res => {
             if (res.data) {
               setSelectedItem((prev: any) => prev ? {
                 ...prev,
+                title: res.data.title || res.data.name || prev.title,
+                name: res.data.name || res.data.title || prev.name,
                 parent_series: res.data.parent_series || prev.parent_series,
                 overview: res.data.overview || prev.overview,
                 description: res.data.description || prev.description,
@@ -7972,8 +7974,13 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                 style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '380px', overflowY: 'auto', paddingRight: '0.25rem' }}
                               >
                                 {displayedIssues.map((ep: any) => {
-                                  const cleanEpId = String(ep.id || ep.external_id || '').replace('cv_issue_', '').replace('cv_', '');
-                                  const extIdKey = `cv_issue_${cleanEpId}`;
+                                  const cleanEpId = String(ep.id || ep.external_id || '')
+                                    .replace('cv_issue_metron_issue_', '')
+                                    .replace('cv_issue_', '')
+                                    .replace('metron_issue_', '')
+                                    .replace('cv_', '')
+                                    .replace('metron_', '');
+                                  const extIdKey = ep.external_id || (String(ep.id).startsWith('metron_') || String(ep.id).startsWith('cv_') ? String(ep.id) : `metron_issue_${cleanEpId}`);
                                   
                                   const parseEpNum = (x: any) => {
                                     if (x == null) return -1;
@@ -8028,12 +8035,15 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                       }}
                                       onClick={() => {
                                         setHistoryStack(prev => [...prev, selectedItem]);
+                                        const issueTitle = (ep.name && (ep.name.includes('#') || ep.name.toLowerCase().includes(selectedItem.title.toLowerCase())))
+                                          ? ep.name
+                                          : `${selectedItem.title} #${ep.issue_number || ep.episode_number || 1}${ep.name ? ` - ${ep.name}` : ''}`;
                                         onOpenItem && onOpenItem({
                                           id: dbEp ? dbEp.id : ep.id,
                                           list_id: selectedItem.tracking_list_id,
                                           item_type: 'comic',
                                           external_id: extIdKey,
-                                          title: `${selectedItem.title} #${ep.issue_number || ep.episode_number || 1}${ep.name ? ` - ${ep.name}` : ''}`,
+                                          title: issueTitle,
                                           image_url: ep.image_url || ep.image?.original || ep.image?.medium || ep.still_path || selectedItem.image_url,
                                           custom_notes: JSON.stringify({ description: ep.overview || '', release_date: ep.air_date || null }),
                                           completed_at: dbEp?.completed_at,
@@ -8193,9 +8203,16 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                             return timeline.map((item) => {
                               if (item.type === 'standalone_special') {
                                 const ep = item.episode;
-                                const isComic = selectedItem?.item_type === 'comic' || String(selectedItem?.external_id || '').startsWith('cv_vol_');
-                                const cleanEpId = String(ep.id || ep.external_id || '').replace('cv_issue_', '').replace('cv_', '');
-                                const extIdKey = isComic ? `cv_issue_${cleanEpId}` : `tvm-ep-${ep.id}`;
+                                const isComic = selectedItem?.item_type === 'comic' || String(selectedItem?.external_id || '').startsWith('cv_vol_') || String(selectedItem?.external_id || '').startsWith('metron_series_');
+                                const cleanEpId = String(ep.id || ep.external_id || '')
+                                  .replace('cv_issue_metron_issue_', '')
+                                  .replace('cv_issue_', '')
+                                  .replace('metron_issue_', '')
+                                  .replace('cv_', '')
+                                  .replace('metron_', '');
+                                const extIdKey = isComic
+                                  ? (String(ep.external_id || ep.id).startsWith('metron_') || String(ep.external_id || ep.id).startsWith('cv_') ? String(ep.external_id || ep.id) : `metron_issue_${cleanEpId}`)
+                                  : `tvm-ep-${ep.id}`;
                                 const epNumFloat = parseFloat(ep.issue_number ?? ep.episode_number ?? -1);
 
                                 const dbEp = (episodes || []).find(x => {
@@ -8220,14 +8237,17 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                     className="episode-item-row"
                                     onClick={() => {
                                       setHistoryStack(prev => [...prev, selectedItem]);
+                                      const specTitle = isComic
+                                        ? ((ep.name && (ep.name.includes('#') || ep.name.toLowerCase().includes(selectedItem.title.toLowerCase())))
+                                            ? ep.name
+                                            : `${selectedItem.title} #${ep.issue_number || ep.episode_number || 1}${ep.name ? ` - ${ep.name}` : ''}`)
+                                        : `${selectedItem.title} - ${language === 'es' ? 'Especial' : 'Special'} • ${ep.name || 'Untitled'}`;
                                       onOpenItem && onOpenItem({
                                         id: dbEp ? dbEp.id : ep.id,
                                         list_id: selectedItem.tracking_list_id,
                                         item_type: isComic ? 'comic' : 'episode',
                                         external_id: extIdKey,
-                                        title: isComic
-                                          ? `${selectedItem.title} #${ep.issue_number || ep.episode_number || 1}${ep.name ? ` - ${ep.name}` : ''}`
-                                          : `${selectedItem.title} - ${language === 'es' ? 'Especial' : 'Special'} • ${ep.name || 'Untitled'}`,
+                                        title: specTitle,
                                         image_url: ep.image_url || ep.image?.original || ep.image?.medium || ep.still_path || selectedItem.image_url,
                                         custom_notes: JSON.stringify({ description: ep.overview || '', release_date: ep.air_date || null }),
                                         completed_at: dbEp?.completed_at,
@@ -8562,16 +8582,16 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                            </div>
                                          ) : (() => {
                                              const nextCandidate = (() => {
-                                               const isComic = selectedItem?.item_type === 'comic' || String(selectedItem?.external_id || '').startsWith('cv_vol_');
+                                               const isComic = selectedItem?.item_type === 'comic' || String(selectedItem?.external_id || '').startsWith('cv_vol_') || String(selectedItem?.external_id || '').startsWith('metron_series_');
                                                const cacheKeyAll = `${selectedItem?.external_id}_all_episodes`;
                                                const allEps = getCachedSeries(cacheKeyAll) || [];
                                                return findNextEpisodeCandidate(allEps, episodes, globalProgress, isComic).nextEp;
                                              })();
 
                                              return displayedSeasonEps.map((ep: any) => {
-                                               const isComic = selectedItem?.item_type === 'comic' || String(selectedItem?.external_id || '').startsWith('cv_vol_');
-                                               const cleanEpId = String(ep.id || ep.external_id || '').replace('cv_issue_', '').replace('cv_', '');
-                                               const extIdKey = isComic ? `cv_issue_${cleanEpId}` : `tvm-ep-${ep.id}`;
+                                               const isComic = selectedItem?.item_type === 'comic' || String(selectedItem?.external_id || '').startsWith('cv_vol_') || String(selectedItem?.external_id || '').startsWith('metron_series_');
+                                               const cleanEpId = String(ep.id || ep.external_id || '').replace('cv_issue_metron_issue_', '').replace('cv_issue_', '').replace('metron_issue_', '').replace('cv_', '').replace('metron_', '');
+                                               const extIdKey = isComic ? (String(ep.external_id || ep.id).startsWith('metron_') || String(ep.external_id || ep.id).startsWith('cv_') ? String(ep.external_id || ep.id) : `metron_issue_${cleanEpId}`) : `tvm-ep-${ep.id}`;
                                                const epNumFloat = parseFloat(ep.issue_number ?? ep.episode_number ?? -1);
 
                                                const isCandidateNext = nextCandidate && (
@@ -8582,7 +8602,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
 
                                                const dbEp = (episodes || []).find(x => {
                                                  if (isComic) {
-                                                   const xClean = String(x.external_id || '').replace('cv_issue_', '').replace('cv_', '');
+                                                   const xClean = String(x.external_id || '').replace('cv_issue_metron_issue_', '').replace('cv_issue_', '').replace('metron_issue_', '').replace('cv_', '').replace('metron_', '');
                                                    if (xClean && cleanEpId && xClean === cleanEpId) return true;
                                                    if (x.external_id === extIdKey || x.external_id === ep.external_id) return true;
                                                    if (epNumFloat >= 0 && parseFloat(x.episode_number ?? -1) === epNumFloat) return true;
@@ -8591,7 +8611,7 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                                  return x.external_id === extIdKey || x.id === ep.id;
                                                });
 
-                                               const cachedIssueState = isComic ? (getCachedSeries(`issue_state_${extIdKey}`) || getCachedSeries(`issue_state_cv_issue_${cleanEpId}`)) : null;
+                                               const cachedIssueState = isComic ? (getCachedSeries(`issue_state_${extIdKey}`) || getCachedSeries(`issue_state_metron_issue_${cleanEpId}`) || getCachedSeries(`issue_state_cv_issue_${cleanEpId}`)) : null;
                                                const isCompleted = isComic
                                                  ? (!!globalProgress[extIdKey] || !!globalProgress[cleanEpId] || !!dbEp?.is_completed || !!dbEp?.completed_at || (cachedIssueState && (cachedIssueState.status === 'read' || cachedIssueState.is_completed)))
                                                  : (!!globalProgress[extIdKey] || !!dbEp?.is_completed);
@@ -8618,14 +8638,17 @@ const ItemDetailsModalInner: React.FC<ItemDetailsModalProps> = ({
                                                   }}
                                                   onClick={() => {
                                                     setHistoryStack(prev => [...prev, selectedItem]);
+                                                    const seasonEpTitle = isComic
+                                                      ? ((ep.name && (ep.name.includes('#') || ep.name.toLowerCase().includes(selectedItem.title.toLowerCase())))
+                                                          ? ep.name
+                                                          : `${selectedItem.title} #${ep.issue_number || ep.episode_number || 1}${ep.name ? ` - ${ep.name}` : ''}`)
+                                                      : `${selectedItem.title} - ${ep.season_number > 0 ? (ep.season_number < 10 ? 'S0' + ep.season_number : 'S' + ep.season_number) : (language === 'es' ? 'Extras' : 'Extras')}${ep.episode_number != null ? (ep.episode_number < 10 ? 'E0' + ep.episode_number : 'E' + ep.episode_number) : (isSpecial ? ' • ' + (language === 'es' ? 'Especial' : 'Special') : '')} - ${ep.name || 'Untitled'}`;
                                                     onOpenItem && onOpenItem({
                                                       id: dbEp ? dbEp.id : ep.id,
                                                       list_id: selectedItem.tracking_list_id,
                                                       item_type: isComic ? 'comic' : 'episode',
                                                       external_id: extIdKey,
-                                                      title: isComic
-                                                        ? `${selectedItem.title} #${ep.issue_number || ep.episode_number || 1}${ep.name ? ` - ${ep.name}` : ''}`
-                                                        : `${selectedItem.title} - ${ep.season_number > 0 ? (ep.season_number < 10 ? 'S0' + ep.season_number : 'S' + ep.season_number) : (language === 'es' ? 'Extras' : 'Extras')}${ep.episode_number != null ? (ep.episode_number < 10 ? 'E0' + ep.episode_number : 'E' + ep.episode_number) : (isSpecial ? ' • ' + (language === 'es' ? 'Especial' : 'Special') : '')} - ${ep.name || 'Untitled'}`,
+                                                      title: seasonEpTitle,
                                                       image_url: ep.image_url || ep.image?.original || ep.image?.medium || ep.still_path || selectedItem.image_url,
                                                       custom_notes: JSON.stringify({ description: ep.overview || '', release_date: ep.air_date || null }),
                                                       completed_at: dbEp?.completed_at,

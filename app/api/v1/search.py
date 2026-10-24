@@ -46,6 +46,18 @@ def get_query_variations(q: str) -> List[str]:
             if v_norm and v_norm.lower() not in [x.lower() for x in variations]:
                 variations.append(v_norm)
 
+    # 2. Issue number / hashtag variations (e.g. "Batman #404" <-> "Batman 404")
+    if "#" in clean_q:
+        v_nohash = re.sub(r'\s+', ' ', clean_q.replace("#", " ")).strip()
+        if v_nohash and v_nohash.lower() not in [x.lower() for x in variations]:
+            variations.append(v_nohash)
+    else:
+        num_m = re.search(r'^(.*?)\s+(\d+)$', clean_q)
+        if num_m:
+            v_hash = f"{num_m.group(1).strip()} #{num_m.group(2).strip()}"
+            if v_hash.lower() not in [x.lower() for x in variations]:
+                variations.append(v_hash)
+
     # 2. Smart auto-completion / prefix expansion only for short queries (< 4 chars)
     if 2 <= len(clean_q) <= 4:
         try:
@@ -87,6 +99,9 @@ def rank_search_results(
         if cat not in cat_priority:
             cat_priority[cat] = len(cat_priority)
 
+    query_numbers = [w for w in query_words if w.isdigit()]
+    has_number_in_query = len(query_numbers) > 0
+
     def extract_year(item: SearchResultItem) -> int:
         rd = item.release_date or ""
         match = re.search(r'\b(19\d\d|20\d\d)\b', rd)
@@ -100,15 +115,27 @@ def rank_search_results(
     def calculate_score(item: SearchResultItem):
         title_clean = item.title.lower().strip()
         title_base = re.sub(r'\s*\(\d{4}\)$', '', title_clean).strip()
+        norm_title = re.sub(r'\s*\(\d{4}\)', '', title_clean).replace('#', ' ')
+        norm_title = " ".join(norm_title.split())
+        norm_query = re.sub(r'\s*\(\d{4}\)', '', query_clean).replace('#', ' ')
+        norm_query = " ".join(norm_query.split())
         score = 0.0
 
         # Exact match with user's original query
-        if title_clean == query_clean or title_base == query_clean:
+        if title_clean == query_clean or title_base == query_clean or norm_title == norm_query:
             score += 1500.0
-        elif title_clean.startswith(query_clean) or title_base.startswith(query_clean):
+        elif title_clean.startswith(query_clean) or title_base.startswith(query_clean) or norm_title.startswith(norm_query):
             score += 800.0
-        elif query_clean in title_clean:
+        elif query_clean in title_clean or norm_query in norm_title:
             score += 400.0
+
+        # Query number specificity boost & penalty
+        if has_number_in_query:
+            title_numbers = re.findall(r'\b\d+\b', norm_title)
+            if all(num in title_numbers for num in query_numbers):
+                score += 800.0
+            else:
+                score -= 600.0
 
         # Exact or prefix match with expanded variations (e.g. "batman" for query "batm")
         for idx, var in enumerate(var_terms):
@@ -955,12 +982,13 @@ def lookup_media_item(
                         "seasons": s_detail.get("seasons")
                     }
         elif type_clean == "comic":
-            is_issue = ext_id_clean.startswith("cv_issue_") or ext_id_clean.startswith("metron_issue_")
+            clean_comic_ext = ext_id_clean.replace("cv_issue_metron_issue_", "metron_issue_").replace("cv_vol_metron_series_", "metron_series_")
+            is_issue = clean_comic_ext.startswith("cv_issue_") or clean_comic_ext.startswith("metron_issue_")
             if not is_issue:
-                c_detail = MetronService.get_comic_volume_detail(ext_id_clean)
+                c_detail = MetronService.get_comic_volume_detail(clean_comic_ext)
                 if c_detail:
                     result_data = {
-                        "external_id": ext_id_clean,
+                        "external_id": clean_comic_ext,
                         "title": c_detail.get("name") or c_detail.get("volume_name"),
                         "item_type": "comic",
                         "image_url": c_detail.get("image_url"),
@@ -971,15 +999,22 @@ def lookup_media_item(
                         "series_status": c_detail.get("status")
                     }
             else:
-                iss_detail = MetronService.get_comic_issue_detail(ext_id_clean)
+                iss_detail = MetronService.get_comic_issue_detail(clean_comic_ext)
                 if iss_detail:
+                    parent = iss_detail.get("volume") or iss_detail.get("parent_series")
+                    parent_name = parent.get("name") if isinstance(parent, dict) else ""
+                    iss_num = iss_detail.get("issue_number")
+                    iss_title = iss_detail.get("name") or (f"{parent_name} #{iss_num}" if parent_name and iss_num else f"Issue #{iss_num}")
                     result_data = {
-                        "external_id": ext_id_clean,
-                        "title": iss_detail.get("name") or f"Issue #{iss_detail.get('issue_number')}",
+                        "external_id": clean_comic_ext,
+                        "title": iss_title,
+                        "name": iss_title,
                         "item_type": "comic",
                         "image_url": iss_detail.get("image_url"),
                         "description": iss_detail.get("description") or "",
-                        "parent_series": iss_detail.get("parent_series")
+                        "parent_series": iss_detail.get("parent_series") or iss_detail.get("volume"),
+                        "issue_number": iss_num,
+                        "release_date": iss_detail.get("air_date") or iss_detail.get("cover_date")
                     }
         elif type_clean == "episode":
             # TVMaze episode lookup: e.g. tvm-ep-12345 or 12345

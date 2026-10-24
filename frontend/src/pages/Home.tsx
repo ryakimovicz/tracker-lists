@@ -2571,7 +2571,7 @@ export const Home: React.FC = () => {
       // 2. Non-blocking background auto-sync of series/anime & metadata enrichment for standalone works
       const nowMs = Date.now();
       const trackingSeries = currentLib.filter((i: any) => (i.item_type === 'series' || i.item_type === 'anime') && i.tracking_list_id);
-      const standaloneItems = currentLib.filter((i: any) => ['movie', 'game', 'book', 'manga'].includes(i.item_type) && !i.tracking_list_id);
+      const standaloneItems = currentLib.filter((i: any) => ['movie', 'game', 'book', 'comic', 'manga'].includes(i.item_type) && !i.tracking_list_id);
 
       // Fetch release dates / metadata for standalone works with missing dates (cached or throttled)
       (async () => {
@@ -4077,6 +4077,7 @@ export const Home: React.FC = () => {
               { value: 'series', label: language === 'es' ? 'Series' : 'TV Shows' },
               { value: 'anime', label: 'Anime' },
               { value: 'book', label: language === 'es' ? 'Libros' : 'Books' },
+              { value: 'comic', label: language === 'es' ? 'Cómics' : 'Comics' },
               { value: 'manga', label: 'Mangas' },
               { value: 'game', label: language === 'es' ? 'Juegos' : 'Games' }
             ], currentUser?.category_order).map(tab => {

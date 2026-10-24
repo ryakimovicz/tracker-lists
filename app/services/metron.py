@@ -141,8 +141,11 @@ class MetronService:
                         if not is_safe_media_item(iss_title, desc):
                             continue
 
+                        cv_id = iss.get("cv_id")
+                        ext_id = f"cv_issue_{cv_id}" if cv_id else f"metron_issue_{iss_id}"
+
                         results.append(SearchResultItem(
-                            external_id=f"metron_issue_{iss_id}",
+                            external_id=ext_id,
                             title=iss_title,
                             image_url=img_url,
                             description=desc,
@@ -184,7 +187,7 @@ class MetronService:
                     image_url=img_url,
                     description=desc,
                     item_type="comic",
-                    badge="series",
+                    badge=None,
                     release_date=str(s_year) if s_year else None
                 ))
 
@@ -215,22 +218,28 @@ class MetronService:
                         image_url=None, # Loaded on detail
                         description=desc,
                         item_type="comic",
-                        badge="series",
+                        badge=None,
                         release_date=str(s_year) if s_year else None
                     ))
 
         if results:
             def _comic_sort_key(item: SearchResultItem) -> float:
                 t_clean = item.title.lower().strip()
-                t_base = re.sub(r'\s*\(\d{4}\)$', '', t_clean).strip()
-                q_clean = cleaned_query.lower().strip()
+                t_base = re.sub(r'\s*\(\d{4}\)', '', t_clean).replace('#', ' ').strip()
+                q_clean = re.sub(r'\s*\(\d{4}\)', '', cleaned_query.lower()).replace('#', ' ').strip()
+                q_num = [w for w in q_clean.split() if w.isdigit()]
                 score = 0.0
-                if t_clean == q_clean or t_base == q_clean:
+                if t_base == q_clean:
+                    score += 2000.0
+                elif t_base.startswith(q_clean):
                     score += 1000.0
-                elif t_clean.startswith(q_clean) or t_base.startswith(q_clean):
+                elif q_clean in t_base:
                     score += 500.0
-                elif q_clean in t_clean:
-                    score += 200.0
+                if q_num:
+                    if all(n in t_base.split() for n in q_num):
+                        score += 800.0
+                    else:
+                        score -= 400.0
                 m = re.search(r'\b(19\d\d|20\d\d)\b', item.title)
                 if m:
                     score += min(50.0, max(0.0, (int(m.group(1)) - 1930) * 0.5))
@@ -401,7 +410,9 @@ class MetronService:
             episodes.append({
                 "id": ext_id,
                 "external_id": ext_id,
+                "title": title_str,
                 "name": title_str,
+                "issue_number": int(parsed_num) if parsed_num < 999999 else idx,
                 "episode_number": int(parsed_num) if parsed_num < 999999 else idx,
                 "season_number": 1,
                 "still_path": img_url,
@@ -430,17 +441,18 @@ class MetronService:
                 return cached
 
         # Resolve issue ID
+        clean_id = clean_id.replace("cv_issue_metron_issue_", "metron_issue_").replace("cv_vol_metron_series_", "metron_series_")
         i_id: Optional[int] = None
-        if clean_id.startswith("cv_issue_") or clean_id.startswith("cv_"):
+        if "metron_issue_" in clean_id:
+            raw_id = clean_id.split("metron_issue_")[-1]
+            if raw_id.isdigit():
+                i_id = int(raw_id)
+        elif clean_id.startswith("cv_issue_") or clean_id.startswith("cv_"):
             raw_cv = clean_id.replace("cv_issue_", "").replace("cv_", "")
             if raw_cv.isdigit():
                 cv_res = _metron_request("issue/", {"cv_id": raw_cv})
                 if cv_res and cv_res.get("results"):
                     i_id = cv_res["results"][0].get("id")
-        elif clean_id.startswith("metron_issue_"):
-            raw_id = clean_id.replace("metron_issue_", "")
-            if raw_id.isdigit():
-                i_id = int(raw_id)
         elif clean_id.isdigit():
             i_id = int(clean_id)
 
@@ -468,8 +480,11 @@ class MetronService:
             if c_name:
                 creators_list.append(str(c_name))
 
+        series_ext_id = f"cv_vol_{series_data.get('cv_id')}" if series_data.get("cv_id") else f"metron_series_{s_id}"
         issue_result = {
             "id": f"cv_issue_{iss.get('cv_id')}" if iss.get("cv_id") else f"metron_issue_{i_id}",
+            "external_id": f"cv_issue_{iss.get('cv_id')}" if iss.get("cv_id") else f"metron_issue_{i_id}",
+            "title": iss_name,
             "name": iss_name,
             "issue_number": num_str,
             "cover_date": iss.get("cover_date"),
@@ -482,8 +497,18 @@ class MetronService:
             "page_count": iss.get("page"),
             "price": iss.get("price"),
             "volume": {
-                "id": f"cv_vol_{series_data.get('cv_id')}" if series_data.get("cv_id") else f"metron_series_{s_id}",
-                "name": s_name
+                "id": series_ext_id,
+                "external_id": series_ext_id,
+                "name": s_name,
+                "title": s_name
+            },
+            "parent_series": {
+                "id": series_ext_id,
+                "external_id": series_ext_id,
+                "name": s_name,
+                "title": s_name,
+                "item_type": "comic",
+                "image_url": series_data.get("image") or img_url
             },
             "characters": characters_list,
             "credits": creators_list
@@ -595,7 +620,7 @@ class MetronService:
                     image_url=img_url,
                     description=desc,
                     item_type="comic",
-                    badge="series",
+                    badge=None,
                     release_date=str(s_year) if s_year else None
                 ))
 

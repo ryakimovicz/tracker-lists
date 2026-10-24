@@ -80,6 +80,14 @@ export const renderMediaBadge = (
     label = isEs ? 'Próximamente' : 'Upcoming';
     icon = <Clock size={11} color="#f97316" />;
     borderColor = 'rgba(249, 115, 22, 0.5)';
+  } else if (bLower === 'issue' || bLower === 'número' || bLower === 'numero') {
+    label = isEs ? 'Número' : 'Issue';
+    icon = <BookOpen size={11} color="#a855f7" />;
+    borderColor = 'rgba(168, 85, 247, 0.5)';
+  } else if (bLower === 'series' || bLower === 'serie') {
+    label = isEs ? 'Serie' : 'Series';
+    icon = <Tv size={11} color="#3b82f6" />;
+    borderColor = 'rgba(59, 130, 246, 0.5)';
   }
 
   if (inline) {
@@ -256,7 +264,7 @@ const ExploreSection = React.memo<ExploreSectionProps>(({
 
         {/* Body Content / Subtitle */}
         <div className="card-body-content" style={{ padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.2rem', flex: 1, minHeight: '2.5rem', justifyContent: 'center' }}>
-          {item.item_type === 'comic' && item.badge ? (
+          {item.item_type === 'comic' && item.badge && item.badge !== 'series' ? (
             <>
               <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>
                 {item.badge}
@@ -2009,7 +2017,7 @@ export const Search: React.FC = () => {
                       width="100%"
                       borderRadius="8px"
                     />
-                    {renderMediaBadge(item.badge, language)}
+                    {item.badge !== 'series' && renderMediaBadge(item.badge, language)}
                   </div>
 
                   {(() => {
@@ -2046,7 +2054,7 @@ export const Search: React.FC = () => {
                                 <span>{getSingleCategoryLabel(item.item_type)}</span>
                               </span>
                             )}
-                            {item.badge && renderMediaBadge(item.badge, language, 'search-media-badge-inline', true)}
+                            {item.badge && item.badge !== 'series' && renderMediaBadge(item.badge, language, 'search-media-badge-inline', true)}
                           </div>
                         </div>
 
