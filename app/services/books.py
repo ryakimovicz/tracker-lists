@@ -545,7 +545,7 @@ class BookSearchService:
 
     @classmethod
     def get_new_books(cls) -> List[SearchResultItem]:
-        cache_key = "ol_new_books_releases_v4"
+        cache_key = "ol_new_books_releases_v5"
         now_ts = time.time()
         if cache_key in cls._new_books_cache:
             ts, data = cls._new_books_cache[cache_key]
@@ -553,21 +553,27 @@ class BookSearchService:
                 return data
 
         current_year = datetime.datetime.now().year
-        # Target recent releases: current year and previous 2 years (e.g. 2024 to 2026)
-        min_year = current_year - 2
-        max_year = current_year
-
         results: List[SearchResultItem] = []
         seen_keys: Set[str] = set()
         seen_titles: Set[str] = set()
 
+        def is_suitable_book_release(t_raw: str) -> bool:
+            t = t_raw.lower()
+            blocked_terms = [
+                "question bank", "class 10", "class 11", "class 12", "class 9",
+                "exam", "ncert", "cbse", "curriculum", "textbook", "sample paper",
+                "test bank", "anthropic test", "study guide for", "hackquire"
+            ]
+            return not any(b in t for b in blocked_terms)
+
         cls._rate_limit_ol()
         try:
+            # Query current year (e.g. 2026) first releases sorted by reader anticipation / demand
             params = urllib.parse.urlencode({
-                "q": f"first_publish_year:[{min_year} TO {max_year}]",
+                "q": f"first_publish_year:{current_year}",
                 "sort": "want_to_read",
                 "fields": "key,title,author_name,first_publish_year,cover_i",
-                "limit": 28
+                "limit": 45
             })
             url = f"https://openlibrary.org/search.json?{params}"
             req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
@@ -579,13 +585,16 @@ class BookSearchService:
                         pub_year = doc.get("first_publish_year")
                         cover_i = doc.get("cover_i")
 
-                        # Strictly enforce new release criteria: must have cover and recent first_publish_year
+                        # Must have valid cover artwork and match current year
                         if not cover_i or not pub_year:
                             continue
                         try:
-                            if int(pub_year) < min_year:
+                            if int(pub_year) != current_year:
                                 continue
                         except (ValueError, TypeError):
+                            continue
+
+                        if not is_suitable_book_release(title):
                             continue
 
                         key_raw = str(doc.get("key", "")).replace("/works/", "").strip()
@@ -625,13 +634,13 @@ class BookSearchService:
         except Exception as e:
             logger.warning(f"Open Library new books error: {e}")
 
-        # Secondary fallback with readinglog sorting if want_to_read didn't yield enough
-        if len(results) < 12:
+        # If current year has fewer than 16 items (e.g. at the beginning of the year), backfill with prior year
+        if len(results) < 16:
             cls._rate_limit_ol()
             try:
                 params = urllib.parse.urlencode({
-                    "q": f"first_publish_year:[{min_year} TO {max_year}]",
-                    "sort": "readinglog",
+                    "q": f"first_publish_year:{current_year - 1}",
+                    "sort": "want_to_read",
                     "fields": "key,title,author_name,first_publish_year,cover_i",
                     "limit": 25
                 })
@@ -645,12 +654,7 @@ class BookSearchService:
                             pub_year = doc.get("first_publish_year")
                             cover_i = doc.get("cover_i")
 
-                            if not cover_i or not pub_year:
-                                continue
-                            try:
-                                if int(pub_year) < min_year:
-                                    continue
-                            except (ValueError, TypeError):
+                            if not cover_i or not pub_year or not is_suitable_book_release(title):
                                 continue
 
                             key_raw = str(doc.get("key", "")).replace("/works/", "").strip()
@@ -688,23 +692,23 @@ class BookSearchService:
                             if len(results) >= 24:
                                 break
             except Exception as e:
-                logger.warning(f"Open Library new books secondary error: {e}")
+                logger.warning(f"Open Library new books backfill error: {e}")
 
-        # Curated recent bestsellers (2024-2026) fallback to ensure high quality and 0 failures
+        # Curated recent bestsellers (current year 2026) fallback to ensure high quality in case of complete API outage
         if len(results) < 8:
             curated_recent = [
-                ("openlibrary-OL41943074W", "Onyx Storm", "14826089", "Author: Rebecca Yarros. First published: 2025.", "2025"),
-                ("openlibrary-OL43426400W", "Sunrise on the Reaping", "14847912", "Author: Suzanne Collins. First published: 2025.", "2025"),
-                ("openlibrary-OL37576476W", "The Housemaid Is Watching", "14633291", "Author: Freida McFadden. First published: 2024.", "2024"),
-                ("openlibrary-OL37855093W", "Reckless", "14757366", "Author: Lauren Roberts. First published: 2024.", "2024"),
-                ("openlibrary-OL39181496W", "The Let Them Theory", "15165806", "Author: Mel Robbins. First published: 2024.", "2024"),
-                ("openlibrary-OL37572814W", "King of Sloth", "14705548", "Author: Ana Huang. First published: 2024.", "2024"),
-                ("openlibrary-OL42393184W", "King of Envy", "15000570", "Author: Ana Huang. First published: 2025.", "2025"),
-                ("openlibrary-OL42487406W", "Fearless", "15033785", "Author: Lauren Roberts. First published: 2025.", "2025"),
-                ("openlibrary-OL38128674W", "Lights Out", "14641117", "Author: Navessa Allen. First published: 2024.", "2024"),
-                ("openlibrary-OL42770100W", "Diary of a Wimpy Kid Party Pooper", "15049386", "Author: Jeff Kinney. First published: 2025.", "2025"),
-                ("openlibrary-OL39215037W", "The Boyfriend", "14856627", "Author: Freida McFadden. First published: 2024.", "2024"),
-                ("openlibrary-OL37841198W", "Nothing Like the Movies", "14755106", "Author: Lynn Painter. First published: 2024.", "2024"),
+                ("openlibrary-OL42393185W", "King of Gluttony", "15207442", "Author: Ana Huang. First published: 2026.", "2026"),
+                ("openlibrary-OL43158021W", "Tempting Venom", "15248444", "Author: Rina Kent. First published: 2026.", "2026"),
+                ("openlibrary-OL43591244W", "Dear Debbie", "15163694", "Author: Freida McFadden. First published: 2026.", "2026"),
+                ("openlibrary-OL43280192W", "Threshing Day", "15260919", "Author: Rebecca Yarros. First published: 2026.", "2026"),
+                ("openlibrary-OL43178201W", "My Husband's Wife", "15248921", "Author: Alice Feeney. First published: 2026.", "2026"),
+                ("openlibrary-OL43160293W", "Starside", "15248355", "Author: Alex Aster. First published: 2026.", "2026"),
+                ("openlibrary-OL43589210W", "Half His Age", "15166163", "Author: Jennette McCurdy. First published: 2026.", "2026"),
+                ("openlibrary-OL43019284W", "When I Kill You", "15125665", "Author: B.A. Paris. First published: 2026.", "2026"),
+                ("openlibrary-OL43581290W", "Woman Down", "15162122", "Author: Colleen Hoover. First published: 2026.", "2026"),
+                ("openlibrary-OL43201948W", "Love Song", "15210477", "Author: Elle Kennedy. First published: 2026.", "2026"),
+                ("openlibrary-OL43192048W", "Game On", "15235861", "Author: Navessa Allen. First published: 2026.", "2026"),
+                ("openlibrary-OL43519284W", "Cuando vi a la muerte prestar su sombrero", "15152509", "Author: Rodrigo Unda. First published: 2026.", "2026"),
             ]
             for ext_id, title, cov, desc, pub_year in curated_recent:
                 if ext_id not in seen_keys:

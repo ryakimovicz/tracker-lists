@@ -703,7 +703,7 @@ def get_explore_tabs(
         return True
 
     # 2. Nuevo (APIs with 4-hour in-memory cache)
-    cache_key_nuevo = "explore_nuevo_global_v15"
+    cache_key_nuevo = "explore_nuevo_global_v16"
     nuevo = []
     if cache_key_nuevo in _EXPLORE_NUEVO_CACHE:
         cache_time, cached_items = _EXPLORE_NUEVO_CACHE[cache_key_nuevo]
