@@ -2,6 +2,7 @@ import json
 import urllib.request
 import urllib.parse
 import time
+import datetime
 import unicodedata
 import re
 import logging
@@ -374,6 +375,23 @@ class BookSearchService:
                         desc = desc_raw.get("value") if isinstance(desc_raw, dict) else (desc_raw or "")
                         covers = data.get("covers") or []
                         image_url = f"https://covers.openlibrary.org/b/id/{covers[0]}-L.jpg" if covers else None
+
+                        # If work record does not have a direct cover, check first editions
+                        if not image_url:
+                            try:
+                                ed_url = f"https://openlibrary.org/works/{work_key}/editions.json?limit=3"
+                                ed_req = urllib.request.Request(ed_url, headers={"User-Agent": USER_AGENT})
+                                with urllib.request.urlopen(ed_req, timeout=4) as ed_res:
+                                    if ed_res.status == 200:
+                                        ed_data = json.loads(ed_res.read().decode())
+                                        for entry in ed_data.get("entries", []):
+                                            entry_covers = entry.get("covers") or []
+                                            if entry_covers and entry_covers[0] > 0:
+                                                image_url = f"https://covers.openlibrary.org/b/id/{entry_covers[0]}-L.jpg"
+                                                break
+                            except Exception:
+                                pass
+
                         first_pub = data.get("first_publish_date")
 
                         # If Open Library description is empty, check Inventaire summary
@@ -527,12 +545,17 @@ class BookSearchService:
 
     @classmethod
     def get_new_books(cls) -> List[SearchResultItem]:
-        cache_key = "ol_trending_books_weekly_v2"
+        cache_key = "ol_new_books_releases_v4"
         now_ts = time.time()
         if cache_key in cls._new_books_cache:
             ts, data = cls._new_books_cache[cache_key]
             if now_ts - ts < 14400: # 4 hours cache
                 return data
+
+        current_year = datetime.datetime.now().year
+        # Target recent releases: current year and previous 2 years (e.g. 2024 to 2026)
+        min_year = current_year - 2
+        max_year = current_year
 
         results: List[SearchResultItem] = []
         seen_keys: Set[str] = set()
@@ -540,51 +563,160 @@ class BookSearchService:
 
         cls._rate_limit_ol()
         try:
-            url = "https://openlibrary.org/trending/weekly.json?limit=35"
+            params = urllib.parse.urlencode({
+                "q": f"first_publish_year:[{min_year} TO {max_year}]",
+                "sort": "want_to_read",
+                "fields": "key,title,author_name,first_publish_year,cover_i",
+                "limit": 28
+            })
+            url = f"https://openlibrary.org/search.json?{params}"
             req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
             with urllib.request.urlopen(req, timeout=8) as response:
                 if response.status == 200:
                     data = json.loads(response.read().decode())
-                    for work in data.get("works", []):
-                        title = work.get("title") or "Untitled Book"
-                        norm = normalize_title(title)
-                        if norm in seen_titles:
+                    for doc in data.get("docs", []):
+                        title = doc.get("title") or "Untitled Book"
+                        pub_year = doc.get("first_publish_year")
+                        cover_i = doc.get("cover_i")
+
+                        # Strictly enforce new release criteria: must have cover and recent first_publish_year
+                        if not cover_i or not pub_year:
+                            continue
+                        try:
+                            if int(pub_year) < min_year:
+                                continue
+                        except (ValueError, TypeError):
                             continue
 
-                        authors = [a.get("name") for a in work.get("authors", []) if a.get("name")]
+                        key_raw = str(doc.get("key", "")).replace("/works/", "").strip()
+                        if not key_raw:
+                            continue
+                        ext_id = f"openlibrary-{key_raw}"
+
+                        norm = normalize_title(title)
+                        if ext_id in seen_keys or (norm and norm in seen_titles):
+                            continue
+
+                        authors = doc.get("author_name") or []
                         author_str = f"Author: {authors[0]}." if authors else ""
-                        first_pub = work.get("first_publish_year")
-                        pub_str = f" First published: {first_pub}." if first_pub else ""
-                        desc = f"{author_str}{pub_str}"
+                        pub_str = f" First published: {pub_year}."
+                        desc = f"{author_str}{pub_str}".strip()
 
                         if not is_safe_media_item(title, desc):
                             continue
 
-                        cover_i = work.get("cover_i") or work.get("cover_id")
-                        image_url = f"https://covers.openlibrary.org/b/id/{cover_i}-L.jpg" if cover_i else None
-                        key_raw = str(work.get("key", "")).replace("/works/", "")
-                        ext_id = f"openlibrary-{key_raw}"
-
-                        if ext_id not in seen_keys:
-                            seen_keys.add(ext_id)
+                        seen_keys.add(ext_id)
+                        if norm:
                             seen_titles.add(norm)
+
+                        image_url = f"https://covers.openlibrary.org/b/id/{cover_i}-L.jpg"
+
+                        results.append(SearchResultItem(
+                            external_id=ext_id,
+                            title=title,
+                            image_url=image_url,
+                            description=desc,
+                            item_type="book",
+                            release_date=str(pub_year)
+                        ))
+
+                        if len(results) >= 24:
+                            break
+        except Exception as e:
+            logger.warning(f"Open Library new books error: {e}")
+
+        # Secondary fallback with readinglog sorting if want_to_read didn't yield enough
+        if len(results) < 12:
+            cls._rate_limit_ol()
+            try:
+                params = urllib.parse.urlencode({
+                    "q": f"first_publish_year:[{min_year} TO {max_year}]",
+                    "sort": "readinglog",
+                    "fields": "key,title,author_name,first_publish_year,cover_i",
+                    "limit": 25
+                })
+                url = f"https://openlibrary.org/search.json?{params}"
+                req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+                with urllib.request.urlopen(req, timeout=7) as response:
+                    if response.status == 200:
+                        data = json.loads(response.read().decode())
+                        for doc in data.get("docs", []):
+                            title = doc.get("title") or "Untitled Book"
+                            pub_year = doc.get("first_publish_year")
+                            cover_i = doc.get("cover_i")
+
+                            if not cover_i or not pub_year:
+                                continue
+                            try:
+                                if int(pub_year) < min_year:
+                                    continue
+                            except (ValueError, TypeError):
+                                continue
+
+                            key_raw = str(doc.get("key", "")).replace("/works/", "").strip()
+                            if not key_raw:
+                                continue
+                            ext_id = f"openlibrary-{key_raw}"
+
+                            norm = normalize_title(title)
+                            if ext_id in seen_keys or (norm and norm in seen_titles):
+                                continue
+
+                            authors = doc.get("author_name") or []
+                            author_str = f"Author: {authors[0]}." if authors else ""
+                            pub_str = f" First published: {pub_year}."
+                            desc = f"{author_str}{pub_str}".strip()
+
+                            if not is_safe_media_item(title, desc):
+                                continue
+
+                            seen_keys.add(ext_id)
+                            if norm:
+                                seen_titles.add(norm)
+
+                            image_url = f"https://covers.openlibrary.org/b/id/{cover_i}-L.jpg"
+
                             results.append(SearchResultItem(
                                 external_id=ext_id,
                                 title=title,
                                 image_url=image_url,
                                 description=desc,
                                 item_type="book",
-                                release_date=str(first_pub) if first_pub else None
+                                release_date=str(pub_year)
                             ))
 
-                        if len(results) >= 24:
-                            break
-        except Exception as e:
-            logger.warning(f"Open Library weekly error: {e}")
+                            if len(results) >= 24:
+                                break
+            except Exception as e:
+                logger.warning(f"Open Library new books secondary error: {e}")
 
-        # Fallback to daily trending if weekly didn't populate enough
-        if len(results) < 10:
-            results = cls.get_trending_books()
+        # Curated recent bestsellers (2024-2026) fallback to ensure high quality and 0 failures
+        if len(results) < 8:
+            curated_recent = [
+                ("openlibrary-OL41943074W", "Onyx Storm", "14826089", "Author: Rebecca Yarros. First published: 2025.", "2025"),
+                ("openlibrary-OL43426400W", "Sunrise on the Reaping", "14847912", "Author: Suzanne Collins. First published: 2025.", "2025"),
+                ("openlibrary-OL37576476W", "The Housemaid Is Watching", "14633291", "Author: Freida McFadden. First published: 2024.", "2024"),
+                ("openlibrary-OL37855093W", "Reckless", "14757366", "Author: Lauren Roberts. First published: 2024.", "2024"),
+                ("openlibrary-OL39181496W", "The Let Them Theory", "15165806", "Author: Mel Robbins. First published: 2024.", "2024"),
+                ("openlibrary-OL37572814W", "King of Sloth", "14705548", "Author: Ana Huang. First published: 2024.", "2024"),
+                ("openlibrary-OL42393184W", "King of Envy", "15000570", "Author: Ana Huang. First published: 2025.", "2025"),
+                ("openlibrary-OL42487406W", "Fearless", "15033785", "Author: Lauren Roberts. First published: 2025.", "2025"),
+                ("openlibrary-OL38128674W", "Lights Out", "14641117", "Author: Navessa Allen. First published: 2024.", "2024"),
+                ("openlibrary-OL42770100W", "Diary of a Wimpy Kid Party Pooper", "15049386", "Author: Jeff Kinney. First published: 2025.", "2025"),
+                ("openlibrary-OL39215037W", "The Boyfriend", "14856627", "Author: Freida McFadden. First published: 2024.", "2024"),
+                ("openlibrary-OL37841198W", "Nothing Like the Movies", "14755106", "Author: Lynn Painter. First published: 2024.", "2024"),
+            ]
+            for ext_id, title, cov, desc, pub_year in curated_recent:
+                if ext_id not in seen_keys:
+                    seen_keys.add(ext_id)
+                    results.append(SearchResultItem(
+                        external_id=ext_id,
+                        title=title,
+                        image_url=f"https://covers.openlibrary.org/b/id/{cov}-L.jpg",
+                        description=desc,
+                        item_type="book",
+                        release_date=pub_year
+                    ))
 
         if results:
             cls._new_books_cache[cache_key] = (now_ts, results)
